@@ -191,7 +191,12 @@ COPY --chown=appuser:appgroup --from=frontend-build /app/dist/panel-frontend/bro
 # H2CheckpointPostProcessor (repsy-backend), which runs `CHECKPOINT SYNC` -- a synchronous, whole-
 # database flush+fsync -- after every protocol write, before the HTTP response is sent; that closes
 # the race regardless of this URL's write-delay setting.
-ENV DB_URL="jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE"
+# RPS-1857: no DB_CLOSE_ON_EXIT=FALSE. With it H2 is never closed when the JVM exits, so every
+# "docker stop" or restart leaves the database open: whatever H2 still held in memory (a user created in
+# the panel, a login's refresh token) was lost, and after such a restart even the CHECKPOINT SYNC above
+# stopped making a publish survive a crash (probed: 0 of 3 crash trials lost data without the option,
+# every one lost data with it). H2 closes the database in its own shutdown hook instead.
+ENV DB_URL="jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1"
 
 # Where an operator drops a marker file to reset a user's password (README "Forgot admin password?").
 # It lives on the persisted volume whatever STORAGE_BASE_PATH is. See RPS-1107.

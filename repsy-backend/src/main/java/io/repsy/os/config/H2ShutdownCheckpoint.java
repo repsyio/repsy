@@ -28,14 +28,15 @@ import org.springframework.stereotype.Component;
 /**
  * Flushes the embedded H2 database to its file when the application stops.
  *
- * <p>The Docker image's default {@code DB_URL} sets {@code DB_CLOSE_ON_EXIT=FALSE} (so H2 does not
- * close the database under requests that are still being served), which means nothing closes it
- * afterwards either: a {@code docker stop} or restart ends the JVM with the database still open.
- * H2's MVStore keeps a committed transaction in memory until its background writer saves it, and
- * that only happens once enough unsaved data has piled up, so a small write (a user created in the
- * panel, a login's refresh token) can sit unsaved for minutes and is lost by an ordinary, orderly
- * restart. {@code H2CheckpointPostProcessor} (RPS-1556) closes that window for the protocol writes
- * that can be followed by a crash; this closes it for a stop, for every kind of write.
+ * <p>An install whose {@code DB_URL} sets {@code DB_CLOSE_ON_EXIT=FALSE} (the Docker image's
+ * default did until RPS-1857, and the README showed it) never has the database closed when the JVM
+ * exits: a {@code docker stop} or restart ends the process with it still open. H2's MVStore keeps a
+ * committed transaction in memory until its background writer saves it, and that only happens once
+ * enough unsaved data has piled up, so a small write (a user created in the panel, a login's
+ * refresh token) can sit unsaved for minutes and is lost by an ordinary, orderly restart. {@code
+ * H2CheckpointPostProcessor} (RPS-1556) closes that window for the protocol writes that can be
+ * followed by a crash; this closes it for a stop, for every kind of write. Without that option H2
+ * closes the database itself on exit and this finds nothing left to flush.
  *
  * <p>The bean depends on the {@link DataSource}, so Spring destroys it first, while the pool still
  * has connections and after the web server has stopped taking requests. Only {@code CHECKPOINT

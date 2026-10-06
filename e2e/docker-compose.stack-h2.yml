@@ -15,7 +15,7 @@
 # The H2 stack profile: Repsy alone, backed by the embedded H2 database, no postgres service. See
 # README.md "Stack profiles (postgres and H2)" for how this was chosen and confirmed live -- the
 # root README's own documented `DB_URL` for embedded H2
-# (`jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE`) is the
+# (`jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1`) is the
 # one pinned here; a `DATABASE_TO_LOWER=TRUE` variant was probed too and also works, but is not
 # needed. RPS-1173 later made this the image's own ENV default too, so this explicit DB_URL is no
 # longer strictly load-bearing for booting -- kept anyway, on purpose: an e2e profile should pin its
@@ -41,7 +41,7 @@ services:
       - '${REPSY_E2E_API_PORT:-8080}:8080'
       - '${REPSY_E2E_REPO_PORT:-9090}:9090'
     environment:
-      DB_URL: jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+      DB_URL: jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
       DB_USERNAME: repsy
       DB_PASSWORD: repsy123
       ADMIN_INITIAL_PASSWORD: ${REPSY_ADMIN_PASSWORD:?Set REPSY_ADMIN_PASSWORD in e2e/.env}

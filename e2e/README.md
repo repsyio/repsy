@@ -990,7 +990,7 @@ variants were run directly against the locally built image (`repsy-os-e2e:local`
 postgres container reachable):
 
 - **(a)** the root `README.md`'s own documented default value,
-  `DB_URL=jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE` —
+  `DB_URL=jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1` —
   **boots cleanly.** Flyway ran all 19 H2 migrations with no error, the app logged
   `repsy started successfully!`, the SPA answered `200` on `/`, `POST /api/auth/login` with the
   configured `ADMIN_INITIAL_PASSWORD` returned a token, and the per-type repository list (then
@@ -1025,7 +1025,7 @@ the documentation bug already tracked by
 the default, but application.yml defaults DB_URL to PostgreSQL") — re-confirmed live here with fresh
 evidence (commented on that ticket) rather than filed again. **Not fixed here**: this step touches
 only `e2e/`, never the backend or its docs. **Fixed by RPS-1173 itself**: the `Dockerfile` now sets
-`ENV DB_URL=jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE`
+`ENV DB_URL=jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1`
 (the exact H2-1 (a) value this section already pinned), so the image now boots with embedded H2 when
 no `DB_URL` is passed, matching the README. This transcript is kept as the historical record of the
 bug, not rewritten.
