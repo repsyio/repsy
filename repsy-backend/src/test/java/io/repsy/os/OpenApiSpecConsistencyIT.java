@@ -87,6 +87,16 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
 class OpenApiSpecConsistencyIT extends AbstractIntegrationTest {
 
   private static final String SPEC_RESOURCE = "openapi/openapi-spec.yaml";
+
+  /**
+   * RPS-1897: the tag table, shared with the Cloud IT (it reads the same file from the classpath).
+   * {@code allowedTags} is every tag either spec may use; {@code os}, {@code cloud} and {@code
+   * cloudAdmin} map the old springdoc tag of each spec to its new one.
+   */
+  private static final String TAG_TABLE_RESOURCE = "openapi/openapi-tags.json";
+
+  private static final String CONTROLLER_SUFFIX = "-controller";
+  private static final Pattern KEBAB_CASE = Pattern.compile("[a-z][a-z0-9]*(-[a-z0-9]+)*");
   private static final String PANEL_PREFIX = "/api/";
   private static final String REPOS_PREFIX = "/api/repos/";
   private static final String BEARER = "bearerAuth";
@@ -884,6 +894,126 @@ class OpenApiSpecConsistencyIT extends AbstractIntegrationTest {
     }
   }
 
+  // ---------------------------------------------------------------------------------------------
+  // Tags (RPS-1897)
+  // ---------------------------------------------------------------------------------------------
+
+  @Test
+  @DisplayName("every operation has exactly one tag, a clean domain noun from the tag table")
+  void tagsAreCleanAndFromTheTable() throws IOException {
+    final var doc = loadSpec();
+    final var table = loadTagTable();
+
+    assertNoNewFindings("operation tags", tagFindings(doc, allowedTags(table)), Map.of());
+  }
+
+  @Test
+  @DisplayName("the tag table is consistent and describes the OS spec")
+  void tagTableIsConsistent() throws IOException {
+    final var doc = loadSpec();
+    final var table = loadTagTable();
+    final var allowed = allowedTags(table);
+    final var findings = new TreeSet<String>();
+
+    for (final var section : List.of("os", "cloud", "cloudAdmin")) {
+      asMap(table.get(section))
+          .forEach(
+              (oldTag, newTag) -> {
+                if (!String.valueOf(oldTag).endsWith(CONTROLLER_SUFFIX)) {
+                  findings.add(section + ": old tag " + oldTag + " has no -controller suffix");
+                }
+                if (!allowed.contains(String.valueOf(newTag))) {
+                  findings.add(section + ": " + oldTag + " maps to unlisted " + newTag);
+                }
+              });
+    }
+
+    for (final var tag : allowed) {
+      if (!KEBAB_CASE.matcher(tag).matches() || tag.endsWith(CONTROLLER_SUFFIX)) {
+        findings.add("allowed tag " + tag + " is not a kebab-case noun without -controller");
+      }
+    }
+
+    final var osTags = new TreeSet<String>();
+    asMap(table.get("os")).values().forEach(v -> osTags.add(String.valueOf(v)));
+    final var used = new TreeSet<String>();
+    specOperations(doc).values().forEach(op -> used.addAll(tagsOf(op)));
+
+    if (!osTags.equals(used)) {
+      findings.add("the os mapping yields " + osTags + " but the spec uses " + used);
+    }
+
+    assertNoNewFindings("the tag table", findings, Map.of());
+  }
+
+  /** Flip-and-fail: the tag rules see a -controller tag, no tag, two tags and an unlisted tag. */
+  @Test
+  @DisplayName(
+      "the tag rules fire on a -controller tag, a missing tag, two tags and an unlisted tag")
+  void tagRulesFire() throws IOException {
+    final var doc = loadSpec();
+    final var allowed = allowedTags(loadTagTable());
+    final var paths = asMap(doc.get("paths"));
+
+    asMap(asMap(paths.get("/api/users")).get("get")).put("tags", List.of("user-controller"));
+    asMap(asMap(paths.get("/api/users")).get("post")).remove("tags");
+    asMap(asMap(paths.get("/api/usage")).get("get")).put("tags", List.of("usage", "users"));
+    asMap(asMap(paths.get("/api/auth/login")).get("post")).put("tags", List.of("authentication"));
+
+    assertThat(tagFindings(doc, allowed))
+        .contains(
+            "GET /api/users has a tag ending in -controller: user-controller",
+            "POST /api/users has no tag",
+            "GET /api/usage has 2 tags: [usage, users]",
+            "POST /api/auth/login has a tag outside the table: authentication");
+  }
+
+  private static Set<String> tagFindings(final Map<String, Object> doc, final Set<String> allowed) {
+    final var findings = new TreeSet<String>();
+
+    specOperations(doc)
+        .forEach(
+            (key, operation) -> {
+              final var tags = tagsOf(operation);
+
+              if (tags.isEmpty()) {
+                findings.add(key + " has no tag");
+                return;
+              }
+              if (tags.size() > 1) {
+                findings.add(key + " has " + tags.size() + " tags: " + tags);
+              }
+              for (final var tag : tags) {
+                if (tag.endsWith(CONTROLLER_SUFFIX)) {
+                  findings.add(key + " has a tag ending in -controller: " + tag);
+                } else if (!allowed.contains(tag)) {
+                  findings.add(key + " has a tag outside the table: " + tag);
+                }
+              }
+            });
+
+    return findings;
+  }
+
+  private static List<String> tagsOf(final SpecOperation operation) {
+    final var tags = operation.raw().get("tags");
+
+    return tags == null ? List.of() : asList(tags).stream().map(String::valueOf).toList();
+  }
+
+  private static Set<String> allowedTags(final Map<String, Object> table) {
+    return asList(table.get("allowedTags")).stream()
+        .map(String::valueOf)
+        .collect(Collectors.toCollection(TreeSet::new));
+  }
+
+  private static Map<String, Object> loadTagTable() throws IOException {
+    try (var in = new ClassPathResource(TAG_TABLE_RESOURCE).getInputStream()) {
+      // JSON is YAML; the spec loader's parser reads it.
+      return asMap(new Yaml(new SafeConstructor(new LoaderOptions())).load(in));
+    }
+  }
+
   private static Map<String, Object> loadSpec() throws IOException {
     final var options = new LoaderOptions();
     // A key written twice in one mapping is silently last-wins for a parser that allows it, and
@@ -1279,6 +1409,158 @@ class OpenApiSpecConsistencyIT extends AbstractIntegrationTest {
     }
 
     return findings;
+  }
+
+  /**
+   * RPS-1959: operations whose 2xx body may be a {@code RestResponse} envelope, by operation key,
+   * with the reason. Empty: every panel success body is the bare resource (API guideline, Decision
+   * 5). The wire-protocol routes are not in the panel spec at all, so they need no entry.
+   */
+  private static final Map<String, String> ENVELOPED_SUCCESS_ALLOWED = Map.of();
+
+  @Test
+  @DisplayName("no 2xx body of the panel spec is a RestResponse envelope")
+  void noSuccessBodyIsAnEnvelope() throws IOException {
+    final var findings = envelopeFindings(loadSpec(), ENVELOPED_SUCCESS_ALLOWED.keySet());
+
+    assertThat(findings).as("enveloped 2xx bodies").isEmpty();
+  }
+
+  /** Flip-and-fail: an envelope schema on a 2xx fails, and the allow-list is the only way out. */
+  @Test
+  @DisplayName(
+      "the envelope rule fires on RestResponse and msgId bodies and honours the allow-list")
+  void envelopeRuleFires() throws IOException {
+    final var doc = loadSpec();
+    final var operations = specOperations(doc).values().stream().toList();
+    final var byName = operations.get(0);
+    final var byShape = operations.get(1);
+    final var inline = operations.get(2);
+    final var schemas = asMap(asMap(doc.get("components")).get("schemas"));
+
+    schemas.put("RestResponseFlip", Map.of("type", "object"));
+    asMap(byName.raw().get("responses"))
+        .put(
+            "200",
+            Map.of(
+                "description",
+                "x",
+                "content",
+                Map.of(
+                    "application/json",
+                    Map.of("schema", Map.of("$ref", "#/components/schemas/RestResponseFlip")))));
+
+    schemas.put(
+        "Wrapped",
+        Map.of(
+            "type",
+            "object",
+            "properties",
+            Map.of("msgId", Map.of("type", "string"), "type", Map.of("type", "string"))));
+    asMap(byShape.raw().get("responses"))
+        .put(
+            "200",
+            Map.of(
+                "description",
+                "x",
+                "content",
+                Map.of(
+                    "application/json",
+                    Map.of("schema", Map.of("$ref", "#/components/schemas/Wrapped")))));
+
+    asMap(inline.raw().get("responses"))
+        .put(
+            "200",
+            Map.of(
+                "description",
+                "x",
+                "content",
+                Map.of(
+                    "application/json",
+                    Map.of(
+                        "schema",
+                        Map.of(
+                            "type",
+                            "object",
+                            "properties",
+                            Map.of("msgId", Map.of("type", "string")))))));
+
+    assertThat(envelopeFindings(doc, Set.of()))
+        .anyMatch(f -> f.startsWith(byName.key()))
+        .anyMatch(f -> f.startsWith(byShape.key()))
+        .anyMatch(f -> f.startsWith(inline.key()));
+    assertThat(envelopeFindings(doc, Set.of(byName.key(), byShape.key(), inline.key()))).isEmpty();
+  }
+
+  /**
+   * The 2xx responses whose body schema is an envelope: a {@code RestResponse*} or {@code
+   * EmptyResponse} schema, or any schema (also inside {@code allOf}, {@code items}) that has a
+   * {@code msgId} property.
+   */
+  private static Set<String> envelopeFindings(
+      final Map<String, Object> doc, final Set<String> allowed) {
+
+    final var findings = new TreeSet<String>();
+
+    for (final var operation : specOperations(doc).values()) {
+      if (allowed.contains(operation.key())) {
+        continue;
+      }
+
+      final var responses = asMap(operation.raw().get("responses"));
+
+      for (final var code : successCodes(operation)) {
+        final var content = mapOrEmpty(deref(doc, responses.get(code)).get("content"));
+
+        for (final var media : content.values()) {
+          final var schema = mapOrEmpty(asMap(media).get("schema"));
+
+          if (isEnvelope(doc, schema, 0)) {
+            findings.add(operation.key() + ": " + code + " body is an envelope");
+          }
+        }
+      }
+    }
+
+    return findings;
+  }
+
+  private static Map<String, Object> mapOrEmpty(final Object value) {
+    return value == null ? Map.of() : asMap(value);
+  }
+
+  private static boolean isEnvelope(
+      final Map<String, Object> doc, final Map<String, Object> schema, final int depth) {
+
+    if (depth > 6) {
+      return false;
+    }
+
+    if (schema.get("$ref") instanceof final String ref) {
+      final var name = ref.substring(ref.lastIndexOf('/') + 1);
+
+      if (name.startsWith("RestResponse") || name.equals("EmptyResponse")) {
+        return true;
+      }
+
+      return resolves(doc, ref) && isEnvelope(doc, deref(doc, schema), depth + 1);
+    }
+
+    if (mapOrEmpty(schema.get("properties")).containsKey("msgId")) {
+      return true;
+    }
+
+    if (isEnvelope(doc, mapOrEmpty(schema.get("items")), depth + 1)) {
+      return true;
+    }
+
+    for (final var part : schema.get("allOf") instanceof final List<?> parts ? parts : List.of()) {
+      if (isEnvelope(doc, asMap(part), depth + 1)) {
+        return true;
+      }
+    }
+
+    return false;
   }
 
   /** Follows a {@code $ref} (a shared response component) to the node it names. */

@@ -15,7 +15,7 @@
 
 import { TestBed } from '@angular/core/testing';
 
-import { HelmChartControllerService, ProtocolRepoControllerService } from '../../../../../../generated/api';
+import { HelmChartsApi, ReposApi } from '../../../../../../generated/api';
 import {
   CallCase,
   describeCalls,
@@ -35,15 +35,13 @@ const CHART = 'nginx';
 const VERSION = '1.2.3';
 
 describe('HelmService', () => {
-  let repoApi: jasmine.SpyObj<ProtocolRepoControllerService>;
-  let helmApi: jasmine.SpyObj<HelmChartControllerService>;
+  let repoApi: jasmine.SpyObj<ReposApi>;
+  let helmApi: jasmine.SpyObj<HelmChartsApi>;
   let service: HelmService;
 
   beforeEach(() => {
-    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
-      'getRepoPermissions',
-    ]);
-    helmApi = jasmine.createSpyObj<HelmChartControllerService>('HelmChartControllerService', [
+    repoApi = jasmine.createSpyObj<ReposApi>('ReposApi', ['getRepoPermissions']);
+    helmApi = jasmine.createSpyObj<HelmChartsApi>('HelmChartsApi', [
       'searchHelmCharts',
       'getHelmChart',
       'listHelmChartVersions',
@@ -54,8 +52,8 @@ describe('HelmService', () => {
     ]);
     TestBed.configureTestingModule({
       providers: [
-        { provide: ProtocolRepoControllerService, useValue: repoApi },
-        { provide: HelmChartControllerService, useValue: helmApi },
+        { provide: ReposApi, useValue: repoApi },
+        { provide: HelmChartsApi, useValue: helmApi },
       ],
     });
     service = TestBed.inject(HelmService);

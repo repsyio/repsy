@@ -15,7 +15,7 @@
 
 import { TestBed } from '@angular/core/testing';
 
-import { GolangModuleControllerService, ProtocolRepoControllerService } from '../../../../../../generated/api';
+import { GolangModulesApi, ReposApi } from '../../../../../../generated/api';
 import {
   CallCase,
   describeCalls,
@@ -35,15 +35,13 @@ const MODULE = 'github.com/acme/widget';
 const VERSION = 'v1.2.3';
 
 describe('GolangService', () => {
-  let repoApi: jasmine.SpyObj<ProtocolRepoControllerService>;
-  let golangApi: jasmine.SpyObj<GolangModuleControllerService>;
+  let repoApi: jasmine.SpyObj<ReposApi>;
+  let golangApi: jasmine.SpyObj<GolangModulesApi>;
   let service: GolangService;
 
   beforeEach(() => {
-    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
-      'getRepoPermissions',
-    ]);
-    golangApi = jasmine.createSpyObj<GolangModuleControllerService>('GolangModuleControllerService', [
+    repoApi = jasmine.createSpyObj<ReposApi>('ReposApi', ['getRepoPermissions']);
+    golangApi = jasmine.createSpyObj<GolangModulesApi>('GolangModulesApi', [
       'listGolangModules',
       'deleteGolangModule',
       'listGolangModuleVersions',
@@ -52,8 +50,8 @@ describe('GolangService', () => {
     ]);
     TestBed.configureTestingModule({
       providers: [
-        { provide: ProtocolRepoControllerService, useValue: repoApi },
-        { provide: GolangModuleControllerService, useValue: golangApi },
+        { provide: ReposApi, useValue: repoApi },
+        { provide: GolangModulesApi, useValue: golangApi },
       ],
     });
     service = TestBed.inject(GolangService);

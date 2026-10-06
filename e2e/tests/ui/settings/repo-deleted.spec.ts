@@ -88,17 +88,14 @@ test.describe('Repository settings: the repo is gone under an open page', { tag:
     // Another admin renames it; the page still holds the old name. Tracked, so cleanup deletes it.
     const newName = seeder.reserveRepoName(type);
     seeder.adoptRepo(newName);
-    const res = await fetch(
-      `${env.apiBaseUrl}${repoApiPath(encodeURIComponent(repo.name), 'name')}`,
-      {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${adminSession.token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ name: newName }),
+    const res = await fetch(`${env.apiBaseUrl}${repoApiPath(encodeURIComponent(repo.name))}`, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${adminSession.token}`,
+        'Content-Type': 'application/json',
       },
-    );
+      body: JSON.stringify({ name: newName }),
+    });
     expect(res.status).toBe(200);
     const before = comparable(await panelApi.getSettings(newName));
 

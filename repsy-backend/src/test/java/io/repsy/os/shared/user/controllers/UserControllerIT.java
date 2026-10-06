@@ -15,6 +15,9 @@
  */
 package io.repsy.os.shared.user.controllers;
 
+import static io.repsy.os.server.shared.http.BareBodyAssertions.expectBare;
+import static io.repsy.os.server.shared.http.BareBodyAssertions.expectCreated;
+import static io.repsy.os.server.shared.http.BareBodyAssertions.expectNoContent;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
@@ -27,6 +30,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jayway.jsonpath.JsonPath;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
@@ -66,14 +70,6 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 @DisplayName("UserController /api/users/*")
 class UserControllerIT extends AbstractIntegrationTest {
 
-  private static final Map<String, String> SUCCESS_TEXTS =
-      Map.of(
-          "usersFetched", "Users fetched.",
-          "adminCountFetched", "Admin count fetched.",
-          "userCreated", "User created.",
-          "userUpdated", "User updated.",
-          "userDeleted", "User deleted.",
-          "passwordReset", "Password reset.");
   private static final String VALIDATION_TEXT = "Incoming data couldn't be validated.";
   private static final String UNSUPPORTED_MEDIA_TYPE_TEXT = "Unsupported media type.";
   private static final String USERNAME_IN_USE_TEXT = "Username is in use. Please try another one.";
@@ -126,12 +122,6 @@ class UserControllerIT extends AbstractIntegrationTest {
   // Response helpers
   // ---------------------------------------------------------------------------------------------
 
-  /** Asserts a 200 SUCCESS envelope whose {@code text} is the one {@link #SUCCESS_TEXTS} lists. */
-  private static String expectSuccess(final ResultActions result, final String msgId)
-      throws Exception {
-    return expectSuccess(result, msgId, SUCCESS_TEXTS.get(msgId));
-  }
-
   private static void expectValidationError(final ResultActions result) throws Exception {
     expectError(result, HttpStatus.BAD_REQUEST, "validationError", null, VALIDATION_TEXT);
   }
@@ -165,7 +155,7 @@ class UserControllerIT extends AbstractIntegrationTest {
   }
 
   private static List<String> usernames(final String body) {
-    final List<Map<String, Object>> content = JsonPath.read(body, "$.data.content");
+    final List<Map<String, Object>> content = JsonPath.read(body, "$.content");
     return content.stream().map(node -> (String) node.get("username")).toList();
   }
 
@@ -341,15 +331,14 @@ class UserControllerIT extends AbstractIntegrationTest {
       assertThat(expectedMiddle.getLastLoginAt()).isNotNull();
 
       final var body =
-          expectSuccess(
+          expectBare(
               UserControllerIT.this.perform(
-                  get("/api/users").header(AUTHORIZATION, token).param("q", tag)),
-              "usersFetched");
+                  get("/api/users").header(AUTHORIZATION, token).param("q", tag)));
 
-      final Map<String, Object> data = JsonPath.read(body, "$.data");
+      final Map<String, Object> data = JsonPath.read(body, "$");
       assertThat(data).containsOnlyKeys("content", "page");
 
-      final List<Map<String, Object>> content = JsonPath.read(body, "$.data.content");
+      final List<Map<String, Object>> content = JsonPath.read(body, "$.content");
       assertThat(content).hasSize(3);
       assertUserJson(content.get(0), expectedNewest);
       assertUserJson(content.get(1), expectedMiddle);
@@ -358,7 +347,7 @@ class UserControllerIT extends AbstractIntegrationTest {
       assertThat(content.get(0)).containsEntry("lastLoginAt", null);
       assertThat(content.get(2)).containsEntry("lastLoginAt", null);
 
-      final Map<String, Object> page = JsonPath.read(body, "$.data.page");
+      final Map<String, Object> page = JsonPath.read(body, "$.page");
       assertThat(page).containsOnlyKeys(PAGE_KEYS);
       assertThat(number(page.get("size"))).isEqualTo(10);
       assertThat(number(page.get("number"))).isZero();
@@ -374,12 +363,11 @@ class UserControllerIT extends AbstractIntegrationTest {
       final var totalUsers = UserControllerIT.this.userRepository.count();
 
       final var body =
-          expectSuccess(
+          expectBare(
               UserControllerIT.this.perform(
-                  get("/api/users").header(AUTHORIZATION, token).param("size", "100")),
-              "usersFetched");
+                  get("/api/users").header(AUTHORIZATION, token).param("size", "100")));
 
-      final List<Map<String, Object>> content = JsonPath.read(body, "$.data.content");
+      final List<Map<String, Object>> content = JsonPath.read(body, "$.content");
       assertThat(content).hasSize((int) totalUsers);
       final var seededNode =
           content.stream()
@@ -389,7 +377,7 @@ class UserControllerIT extends AbstractIntegrationTest {
       assertUserJson(seededNode, seeded);
       assertThat(seededNode).containsEntry("role", "ADMIN");
 
-      final Map<String, Object> page = JsonPath.read(body, "$.data.page");
+      final Map<String, Object> page = JsonPath.read(body, "$.page");
       assertThat(page).containsOnlyKeys(PAGE_KEYS);
       assertThat(number(page.get("size"))).isEqualTo(100);
       assertThat(number(page.get("totalElements"))).isEqualTo(totalUsers);
@@ -406,19 +394,17 @@ class UserControllerIT extends AbstractIntegrationTest {
           tag + "-beta", UserRole.USER, BASE_TIME.plusSeconds(60));
 
       final var byTag =
-          expectSuccess(
+          expectBare(
               UserControllerIT.this.perform(
-                  get("/api/users").header(AUTHORIZATION, token).param("q", tag.toUpperCase())),
-              "usersFetched");
+                  get("/api/users").header(AUTHORIZATION, token).param("q", tag.toUpperCase())));
       assertThat(usernames(byTag)).containsExactly(tag + "-beta", tag + "-Alpha");
 
       final var byFullName =
-          expectSuccess(
+          expectBare(
               UserControllerIT.this.perform(
                   get("/api/users")
                       .header(AUTHORIZATION, token)
-                      .param("q", (tag + "-ALPHA").toLowerCase())),
-              "usersFetched");
+                      .param("q", (tag + "-ALPHA").toLowerCase())));
       assertThat(usernames(byFullName)).containsExactly(tag + "-Alpha");
     }
 
@@ -428,18 +414,17 @@ class UserControllerIT extends AbstractIntegrationTest {
       final var token = UserControllerIT.this.adminBearerToken();
 
       final var body =
-          expectSuccess(
+          expectBare(
               UserControllerIT.this.perform(
                   get("/api/users")
                       .header(AUTHORIZATION, token)
-                      .param("q", "nomatch" + randomTag())),
-              "usersFetched");
+                      .param("q", "nomatch" + randomTag())));
 
-      final Map<String, Object> data = JsonPath.read(body, "$.data");
+      final Map<String, Object> data = JsonPath.read(body, "$");
       assertThat(data).containsOnlyKeys("content", "page");
-      final List<Object> content = JsonPath.read(body, "$.data.content");
+      final List<Object> content = JsonPath.read(body, "$.content");
       assertThat(content).isEmpty();
-      final Map<String, Object> page = JsonPath.read(body, "$.data.page");
+      final Map<String, Object> page = JsonPath.read(body, "$.page");
       assertThat(page).containsOnlyKeys(PAGE_KEYS);
       assertThat(number(page.get("size"))).isEqualTo(10);
       assertThat(number(page.get("number"))).isZero();
@@ -467,17 +452,16 @@ class UserControllerIT extends AbstractIntegrationTest {
 
       for (final var entry : expectedByPage.entrySet()) {
         final var body =
-            expectSuccess(
+            expectBare(
                 UserControllerIT.this.perform(
                     get("/api/users")
                         .header(AUTHORIZATION, token)
                         .param("q", tag)
                         .param("page", String.valueOf(entry.getKey()))
-                        .param("size", "2")),
-                "usersFetched");
+                        .param("size", "2")));
 
         assertThat(usernames(body)).as("page %d", entry.getKey()).isEqualTo(entry.getValue());
-        final Map<String, Object> page = JsonPath.read(body, "$.data.page");
+        final Map<String, Object> page = JsonPath.read(body, "$.page");
         assertThat(page).containsOnlyKeys(PAGE_KEYS);
         assertThat(number(page.get("size"))).isEqualTo(2);
         assertThat(number(page.get("number"))).isEqualTo(entry.getKey().longValue());
@@ -541,13 +525,12 @@ class UserControllerIT extends AbstractIntegrationTest {
 
       for (final var entry : expected.entrySet()) {
         final var body =
-            expectSuccess(
+            expectBare(
                 UserControllerIT.this.perform(
                     get("/api/users")
                         .header(AUTHORIZATION, token)
                         .param("q", tag)
-                        .param("sort", entry.getKey())),
-                "usersFetched");
+                        .param("sort", entry.getKey())));
 
         assertThat(usernames(body))
             .as("sort=%s", entry.getKey())
@@ -581,23 +564,20 @@ class UserControllerIT extends AbstractIntegrationTest {
       final var nobody = "nomatch" + randomTag();
 
       final var ignored =
-          expectSuccess(
+          expectBare(
               UserControllerIT.this.perform(
                   get("/api/users")
                       .header(AUTHORIZATION, token)
                       .param("search", nobody)
-                      .param("size", "100")),
-              "usersFetched");
+                      .param("size", "100")));
       final var everyone =
-          expectSuccess(
+          expectBare(
               UserControllerIT.this.perform(
-                  get("/api/users").header(AUTHORIZATION, token).param("size", "100")),
-              "usersFetched");
+                  get("/api/users").header(AUTHORIZATION, token).param("size", "100")));
       final var filtered =
-          expectSuccess(
+          expectBare(
               UserControllerIT.this.perform(
-                  get("/api/users").header(AUTHORIZATION, token).param("q", nobody)),
-              "usersFetched");
+                  get("/api/users").header(AUTHORIZATION, token).param("q", nobody)));
 
       assertThat(usernames(ignored)).containsExactlyInAnyOrderElementsOf(usernames(everyone));
       assertThat(usernames(ignored)).contains(tag + "-one", tag + "-two");
@@ -618,10 +598,9 @@ class UserControllerIT extends AbstractIntegrationTest {
     void acceptsSizeBounds(final String size) throws Exception {
       final var token = UserControllerIT.this.adminBearerToken();
 
-      expectSuccess(
+      expectBare(
           UserControllerIT.this.perform(
-              get("/api/users").header(AUTHORIZATION, token).param("size", size)),
-          "usersFetched");
+              get("/api/users").header(AUTHORIZATION, token).param("size", size)));
     }
 
     /**
@@ -673,17 +652,16 @@ class UserControllerIT extends AbstractIntegrationTest {
       final var token = UserControllerIT.this.adminBearerToken();
 
       final var body =
-          expectSuccess(
+          expectBare(
               UserControllerIT.this.perform(
                   get("/api/users")
                       .header(AUTHORIZATION, token)
                       .param("page", "1000000")
-                      .param("size", "100")),
-              "usersFetched");
+                      .param("size", "100")));
 
-      final List<Object> content = JsonPath.read(body, "$.data.content");
+      final List<Object> content = JsonPath.read(body, "$.content");
       assertThat(content).isEmpty();
-      final Map<String, Object> page = JsonPath.read(body, "$.data.page");
+      final Map<String, Object> page = JsonPath.read(body, "$.page");
       assertThat(number(page.get("number"))).isEqualTo(1000000);
       assertThat(number(page.get("size"))).isEqualTo(100);
     }
@@ -706,15 +684,14 @@ class UserControllerIT extends AbstractIntegrationTest {
       final var password = "NewPassword2@";
 
       final var body =
-          expectSuccess(
+          expectCreated(
               UserControllerIT.this.perform(
                   post("/api/users")
                       .header(AUTHORIZATION, token)
                       .contentType(MediaType.APPLICATION_JSON)
-                      .content(createBody(username, password, role.name()))),
-              "userCreated");
+                      .content(createBody(username, password, role.name()))));
 
-      final Map<String, Object> data = JsonPath.read(body, "$.data");
+      final Map<String, Object> data = JsonPath.read(body, "$");
       assertThat(data)
           .containsOnlyKeys(USER_KEYS)
           .containsEntry("username", username)
@@ -749,15 +726,14 @@ class UserControllerIT extends AbstractIntegrationTest {
       final var token = UserControllerIT.this.adminBearerToken();
 
       final var body =
-          expectSuccess(
+          expectCreated(
               UserControllerIT.this.perform(
                   post("/api/users")
                       .header(AUTHORIZATION, token)
                       .contentType(MediaType.APPLICATION_JSON)
-                      .content(createBody(username, password, "USER"))),
-              "userCreated");
+                      .content(createBody(username, password, "USER"))));
 
-      assertThat((String) JsonPath.read(body, "$.data.username")).isEqualTo(username);
+      assertThat((String) JsonPath.read(body, "$.username")).isEqualTo(username);
       assertThat(UserControllerIT.this.userRepository.existsByUsername(username)).isTrue();
     }
 
@@ -805,13 +781,12 @@ class UserControllerIT extends AbstractIntegrationTest {
       final var lowerCaseUsername = username.toLowerCase(Locale.ROOT);
       assertThat(lowerCaseUsername).isNotEqualTo(username);
 
-      expectSuccess(
+      expectCreated(
           UserControllerIT.this.perform(
               post("/api/users")
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content(createBody(lowerCaseUsername, VALID_PASSWORD, "USER"))),
-          "userCreated");
+                  .content(createBody(lowerCaseUsername, VALID_PASSWORD, "USER"))));
     }
 
     @Test
@@ -942,13 +917,12 @@ class UserControllerIT extends AbstractIntegrationTest {
       final var newUsername = uniqueUsername("after");
 
       final var body =
-          expectSuccess(
+          expectBare(
               UserControllerIT.this.perform(
                   put("/api/users/" + target.getId())
                       .header(AUTHORIZATION, token)
                       .contentType(MediaType.APPLICATION_JSON)
-                      .content(updateBody(newUsername, "ADMIN"))),
-              "userUpdated");
+                      .content(updateBody(newUsername, "ADMIN"))));
 
       final var after = UserControllerIT.this.reload(target.getId());
       assertThat(after.getUsername()).isEqualTo(newUsername);
@@ -957,7 +931,7 @@ class UserControllerIT extends AbstractIntegrationTest {
       assertThat(after.getCreatedAt()).isEqualTo(createdAt);
       assertThat(after.getLastLoginAt()).isEqualTo(lastLoginAt);
 
-      final Map<String, Object> data = JsonPath.read(body, "$.data");
+      final Map<String, Object> data = JsonPath.read(body, "$");
       assertUserJson(data, after);
       assertThat(data.get("lastLoginAt")).isNotNull();
     }
@@ -969,18 +943,17 @@ class UserControllerIT extends AbstractIntegrationTest {
       final var target = UserControllerIT.this.createUser(uniqueUsername("demote"), UserRole.ADMIN);
 
       final var body =
-          expectSuccess(
+          expectBare(
               UserControllerIT.this.perform(
                   put("/api/users/" + target.getId())
                       .header(AUTHORIZATION, token)
                       .contentType(MediaType.APPLICATION_JSON)
-                      .content(updateBody(target.getUsername(), "USER"))),
-              "userUpdated");
+                      .content(updateBody(target.getUsername(), "USER"))));
 
       final var after = UserControllerIT.this.reload(target.getId());
       assertThat(after.getUsername()).isEqualTo(target.getUsername());
       assertThat(after.getRole()).isEqualTo(UserRole.USER);
-      final Map<String, Object> data = JsonPath.read(body, "$.data");
+      final Map<String, Object> data = JsonPath.read(body, "$");
       assertUserJson(data, after);
       assertThat(data).containsEntry("role", "USER").containsEntry("lastLoginAt", null);
     }
@@ -1038,13 +1011,12 @@ class UserControllerIT extends AbstractIntegrationTest {
       // Created before the name was reserved, so it bypasses the check like an upgraded instance.
       final var target = UserControllerIT.this.createUser("anonymous", UserRole.USER);
 
-      expectSuccess(
+      expectBare(
           UserControllerIT.this.perform(
               put("/api/users/" + target.getId())
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content(updateBody("anonymous", "ADMIN"))),
-          "userUpdated");
+                  .content(updateBody("anonymous", "ADMIN"))));
 
       assertThat(UserControllerIT.this.reload(target.getId()).getRole()).isEqualTo(UserRole.ADMIN);
     }
@@ -1061,13 +1033,12 @@ class UserControllerIT extends AbstractIntegrationTest {
           UserControllerIT.this.createUser(uniqueUsername("legacy") + ":x", UserRole.USER);
       final var newUsername = uniqueUsername("fixed");
 
-      expectSuccess(
+      expectBare(
           UserControllerIT.this.perform(
               put("/api/users/" + target.getId())
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content(updateBody(newUsername, "USER"))),
-          "userUpdated");
+                  .content(updateBody(newUsername, "USER"))));
 
       assertThat(UserControllerIT.this.reload(target.getId()).getUsername()).isEqualTo(newUsername);
     }
@@ -1183,13 +1154,12 @@ class UserControllerIT extends AbstractIntegrationTest {
       assertThat(UserControllerIT.this.userRepository.countByRole(UserRole.ADMIN))
           .isGreaterThanOrEqualTo(2L);
 
-      expectSuccess(
+      expectBare(
           UserControllerIT.this.perform(
               put("/api/users/" + self.getId())
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content(updateBody(self.getUsername(), "USER"))),
-          "userUpdated");
+                  .content(updateBody(self.getUsername(), "USER"))));
 
       assertThat(UserControllerIT.this.reload(self.getId()).getRole()).isEqualTo(UserRole.USER);
     }
@@ -1209,14 +1179,10 @@ class UserControllerIT extends AbstractIntegrationTest {
       final var token = UserControllerIT.this.adminBearerToken();
       final var target = UserControllerIT.this.createUser(uniqueUsername("delme"), UserRole.USER);
 
-      final var body =
-          expectSuccess(
-              UserControllerIT.this.perform(
-                  delete("/api/users/" + target.getId()).header(AUTHORIZATION, token)),
-              "userDeleted");
+      expectNoContent(
+          UserControllerIT.this.perform(
+              delete("/api/users/" + target.getId()).header(AUTHORIZATION, token)));
 
-      final Object data = JsonPath.read(body, "$.data");
-      assertThat(data).isNull();
       UserControllerIT.this.entityManager.flush();
       assertThat(UserControllerIT.this.userRepository.findById(target.getId())).isEmpty();
     }
@@ -1227,10 +1193,9 @@ class UserControllerIT extends AbstractIntegrationTest {
       final var token = UserControllerIT.this.adminBearerToken();
       final var target = UserControllerIT.this.createUser(uniqueUsername("admin2"), UserRole.ADMIN);
 
-      expectSuccess(
+      expectNoContent(
           UserControllerIT.this.perform(
-              delete("/api/users/" + target.getId()).header(AUTHORIZATION, token)),
-          "userDeleted");
+              delete("/api/users/" + target.getId()).header(AUTHORIZATION, token)));
 
       UserControllerIT.this.entityManager.flush();
       assertThat(UserControllerIT.this.userRepository.findById(target.getId())).isEmpty();
@@ -1242,10 +1207,9 @@ class UserControllerIT extends AbstractIntegrationTest {
       final var admin = UserControllerIT.this.createUser(uniqueUsername("selfdel"), UserRole.ADMIN);
       final var token = UserControllerIT.this.bearerTokenFor(admin);
 
-      expectSuccess(
+      expectNoContent(
           UserControllerIT.this.perform(
-              delete("/api/users/" + admin.getId()).header(AUTHORIZATION, token)),
-          "userDeleted");
+              delete("/api/users/" + admin.getId()).header(AUTHORIZATION, token)));
       UserControllerIT.this.entityManager.flush();
 
       expectError(
@@ -1295,10 +1259,9 @@ class UserControllerIT extends AbstractIntegrationTest {
     void deletingTwice() throws Exception {
       final var token = UserControllerIT.this.adminBearerToken();
       final var target = UserControllerIT.this.createUser(uniqueUsername("twice"), UserRole.USER);
-      expectSuccess(
+      expectNoContent(
           UserControllerIT.this.perform(
-              delete("/api/users/" + target.getId()).header(AUTHORIZATION, token)),
-          "userDeleted");
+              delete("/api/users/" + target.getId()).header(AUTHORIZATION, token)));
       UserControllerIT.this.entityManager.flush();
 
       expectError(
@@ -1341,13 +1304,12 @@ class UserControllerIT extends AbstractIntegrationTest {
       final var oldHash = target.getHash();
 
       final var body =
-          expectSuccess(
+          expectBare(
               UserControllerIT.this.perform(
                   post("/api/users/" + target.getId() + "/actions/reset-password")
-                      .header(AUTHORIZATION, token)),
-              "passwordReset");
+                      .header(AUTHORIZATION, token)));
 
-      final String newPassword = JsonPath.read(body, "$.data");
+      final String newPassword = new ObjectMapper().readValue(body, String.class);
       // PasswordGeneratorUtil: 12 chars with at least one lower, upper, digit and special char.
       assertThat(newPassword)
           .hasSize(12)
@@ -1399,11 +1361,10 @@ class UserControllerIT extends AbstractIntegrationTest {
 
     private long adminCount(final String token) throws Exception {
       final var body =
-          expectSuccess(
+          expectBare(
               UserControllerIT.this.perform(
-                  get("/api/users/admin-count").header(AUTHORIZATION, token)),
-              "adminCountFetched");
-      return number(JsonPath.read(body, "$.data"));
+                  get("/api/users/admin-count").header(AUTHORIZATION, token)));
+      return number(JsonPath.read(body, "$"));
     }
 
     @Test
@@ -1433,19 +1394,17 @@ class UserControllerIT extends AbstractIntegrationTest {
           UserControllerIT.this.createUser(uniqueUsername("cnt-admin-b"), UserRole.ADMIN);
       assertThat(this.adminCount(token)).isEqualTo(before + 2);
 
-      expectSuccess(
+      expectNoContent(
           UserControllerIT.this.perform(
-              delete("/api/users/" + first.getId()).header(AUTHORIZATION, token)),
-          "userDeleted");
+              delete("/api/users/" + first.getId()).header(AUTHORIZATION, token)));
       assertThat(this.adminCount(token)).isEqualTo(before + 1);
 
-      expectSuccess(
+      expectBare(
           UserControllerIT.this.perform(
               put("/api/users/" + second.getId())
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content(updateBody(second.getUsername(), "USER"))),
-          "userUpdated");
+                  .content(updateBody(second.getUsername(), "USER"))));
       assertThat(this.adminCount(token)).isEqualTo(before);
     }
   }

@@ -28,6 +28,7 @@ import type {
   KeyStoreItem,
   PagedModelKeyStoreItem,
 } from '../../../src/api/generated/index.js';
+import { generateKeyPair } from '../../../src/clients/pgp.js';
 import { expect, test } from '../../../src/ui/fixtures.js';
 import { fulfillJson } from '../../../src/ui/stub-responses.js';
 import { RepoSettingsPage } from '../../../src/ui/pages/repo-settings/page.js';
@@ -254,41 +255,30 @@ test.describe('Repository settings: PGP key stores', { tag: SETTINGS }, () => {
     const { pgp } = settings;
 
     // No public keys are registered yet.
-    await expect(pgp.publicKeys).toContainText('No public keys registered yet.');
-    expect(await pgp.publicKeyCount()).toBe(0);
+    // The list container is only rendered with keys; the empty state is a paragraph beside it.
+    await expect(pgp.root).toContainText('No public keys registered yet.');
+    await pgp.expectPublicKeyCount(0);
 
-    // Add a public key. Test with a minimal but valid armored public key block.
-    const armoredKey = `-----BEGIN PGP PUBLIC KEY BLOCK-----
-
-mI0EZvEb6wEEAIJ7c2qpSUzMrlJwRl1L/Q5A6wQfbq/V8VqwCLqEpUfKCZhK
-CrAHBdCa/pGKbG6LPQDA0gFi0rX3LjVEBsZ4xvP7PAQG6gvXhkFGRZVGqo8t
-bG7L6P9xJvIZuR5Rqw==
-=AbC0
------END PGP PUBLIC KEY BLOCK-----`;
+    // Add a public key: the server parses it, so it has to be a real armored key (a made-up block is a 400).
+    const armoredKey = (await generateKeyPair()).publicKeyArmored;
 
     await pgp.addPublicKey(armoredKey);
     await settings.shell.toasts.expectSuccess('Public key added');
 
     // The key is now visible in the list.
-    await expect(pgp.publicKeys).not.toContainText('No public keys registered yet.');
-    expect(await pgp.publicKeyCount()).toBe(1);
+    await expect(pgp.root).not.toContainText('No public keys registered yet.');
+    await pgp.expectPublicKeyCount(1);
 
     // It is still there after a reload.
     await settings.reload();
-    expect(await pgp.publicKeyCount()).toBe(1);
+    await pgp.expectPublicKeyCount(1);
 
     // Add another public key.
-    const secondArmoredKey = `-----BEGIN PGP PUBLIC KEY BLOCK-----
-
-mI0EZvEb6wEEAJJ7c2qpSUzMrlJwRl1L/Q5A6wQfbq/V8VqwCLqEpUfKCZhL
-CrAHBdCa/pGKbG6LPQDA0gFi0rX3LjVEBsZ4xvP7PAQG6gvXhkFGRZVGqo8t
-bG7L6P9xJvIZuR5Rqx==
-=CdE1
------END PGP PUBLIC KEY BLOCK-----`;
+    const secondArmoredKey = (await generateKeyPair()).publicKeyArmored;
 
     await pgp.addPublicKey(secondArmoredKey);
     await settings.shell.toasts.expectSuccess('Public key added');
-    expect(await pgp.publicKeyCount()).toBe(2);
+    await pgp.expectPublicKeyCount(2);
 
     // Delete the first one; the second remains.
     const uuids = await pgp.publicKeyUuids();
@@ -299,12 +289,12 @@ bG7L6P9xJvIZuR5Rqx==
     await settings.shell.dangerModal.expectOpen('Delete Public Key');
     await settings.shell.dangerModal.cancel();
     await settings.shell.dangerModal.expectClosed();
-    expect(await pgp.publicKeyCount()).toBe(2);
+    await pgp.expectPublicKeyCount(2);
 
     await pgp.deletePublicKey(firstUuid);
     await settings.shell.dangerModal.expectOpen('Delete Public Key');
     await settings.shell.dangerModal.confirm();
     await settings.shell.toasts.expectSuccess('Public key deleted');
-    expect(await pgp.publicKeyCount()).toBe(1);
+    await pgp.expectPublicKeyCount(1);
   });
 });

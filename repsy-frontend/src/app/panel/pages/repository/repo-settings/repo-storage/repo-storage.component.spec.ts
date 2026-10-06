@@ -15,17 +15,15 @@
 
 import { of, throwError } from 'rxjs';
 
-import { ProtocolRepoControllerService } from '../../../../../../generated/api';
+import { ReposApi } from '../../../../../../generated/api';
 import { RepoStorageComponent } from './repo-storage.component';
 
 describe('RepoStorageComponent', () => {
   let component: RepoStorageComponent;
-  let repoService: jasmine.SpyObj<ProtocolRepoControllerService>;
+  let repoService: jasmine.SpyObj<ReposApi>;
 
   beforeEach(() => {
-    repoService = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
-      'getRepoUsage',
-    ]);
+    repoService = jasmine.createSpyObj<ReposApi>('ReposApi', ['getRepoUsage']);
     repoService.getRepoUsage.and.returnValue(of({ totalSize: 42 }) as never);
     component = new RepoStorageComponent(repoService);
     component.repoName = 'acme-repo';

@@ -12,8 +12,8 @@ info:
     bumped for each one. It is independent of the Repsy release version.
 
 
-    A successful response body is the envelope `msgId`, `type`, `text`, `errorCode` (always `null`)
-    and `data`. A failed request is answered with an RFC 9457 problem document,
+    A successful response body is the bare resource: no envelope. A create answers 201 with a
+    `Location` header, a delete or an update with nothing to return answers 204. A failed request is answered with an RFC 9457 problem document,
     `application/problem+json`, described by `ProblemDetail`: `status`, `title`, `detail`,
     `instance`, `code` (the stable key of the failure), `traceId` (the unique id of the failure)
     and, for a validation failure, `errors`.
@@ -30,7 +30,7 @@ paths:
   "/api/auth/tokens/refresh":
     post:
       tags:
-        - auth-controller
+        - auth
       operationId: refreshToken
       requestBody:
         content:
@@ -50,7 +50,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseLoginInfo"
+                "$ref": "#/components/schemas/LoginInfo"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -67,7 +67,7 @@ paths:
   "/api/auth/login":
     post:
       tags:
-        - auth-controller
+        - auth
       operationId: login
       requestBody:
         content:
@@ -87,7 +87,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseLoginInfo"
+                "$ref": "#/components/schemas/LoginInfo"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -98,7 +98,7 @@ paths:
   "/api/auth/logout":
     post:
       tags:
-        - auth-controller
+        - auth
       operationId: logout
       requestBody:
         content:
@@ -119,7 +119,7 @@ paths:
   "/api/users/{userId}":
     put:
       tags:
-        - user-controller
+        - users
       operationId: updateUser
       parameters:
         - name: userId
@@ -140,7 +140,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseUserResponse"
+                "$ref": "#/components/schemas/UserResponse"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -152,7 +152,7 @@ paths:
       summary: Update a user
     delete:
       tags:
-        - user-controller
+        - users
       operationId: deleteUser
       parameters:
         - name: userId
@@ -162,12 +162,8 @@ paths:
             type: string
             format: uuid
       responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/EmptyResponse"
+        '204':
+          "$ref": "#/components/responses/NoContent"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -182,7 +178,7 @@ paths:
   "/api/users/admin-count":
     get:
       tags:
-        - user-controller
+        - users
       operationId: countAdmins
       responses:
         '200':
@@ -190,7 +186,8 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseLong"
+                type: integer
+                format: int64
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
@@ -199,7 +196,7 @@ paths:
   "/api/users":
     get:
       tags:
-        - user-controller
+        - users
       operationId: listUsers
       description: >-
         Sortable by `createdAt`, `username` (`property,direction`). The default is `createdAt,desc`.
@@ -220,7 +217,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponsePagedModelUserResponse"
+                "$ref": "#/components/schemas/PagedModelUserResponse"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -230,7 +227,7 @@ paths:
       summary: List all users
     post:
       tags:
-        - user-controller
+        - users
       operationId: createUser
       requestBody:
         content:
@@ -239,12 +236,18 @@ paths:
               "$ref": "#/components/schemas/UserCreateForm"
         required: true
       responses:
-        '200':
-          description: OK
+        '201':
+          description: Created
+          headers:
+            Location:
+              description: The URL of the created user, `/api/users/{userId}`
+              schema:
+                type: string
+                format: uri
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseUserResponse"
+                "$ref": "#/components/schemas/UserResponse"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -255,7 +258,7 @@ paths:
   "/api/users/{userId}/actions/reset-password":
     post:
       tags:
-        - user-controller
+        - users
       operationId: resetPassword
       parameters:
         - name: userId
@@ -266,11 +269,16 @@ paths:
             format: uuid
       responses:
         '200':
-          description: OK
+          description: The new password, as a JSON string
+          headers:
+            Cache-Control:
+              description: "`no-store`, the response carries a secret"
+              schema:
+                type: string
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/RestResponseString"
+                type: string
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -284,7 +292,7 @@ paths:
   "/api/profile/username":
     patch:
       tags:
-        - profile-controller
+        - profile
       operationId: updateUsername
       requestBody:
         content:
@@ -314,7 +322,7 @@ paths:
   "/api/profile/password":
     patch:
       tags:
-        - profile-controller
+        - profile
       operationId: updatePassword
       requestBody:
         content:
@@ -344,7 +352,7 @@ paths:
   "/api/profile":
     get:
       tags:
-        - profile-controller
+        - profile
       operationId: getProfile
       responses:
         '200':
@@ -358,7 +366,7 @@ paths:
       summary: Get the current user's profile
     delete:
       tags:
-        - profile-controller
+        - profile
       operationId: deleteProfile
       responses:
         '204':
@@ -370,7 +378,7 @@ paths:
   "/api/repos/{repoName}/settings":
     get:
       tags:
-        - protocol-repo-controller
+        - repos
       operationId: getRepoSettings
       responses:
         '200':
@@ -390,7 +398,7 @@ paths:
       summary: Get settings for a repository
     put:
       tags:
-        - protocol-repo-controller
+        - repos
       operationId: updateRepoSettings
       requestBody:
         content:
@@ -424,7 +432,7 @@ paths:
   "/api/repos":
     get:
       tags:
-        - repo-collection-controller
+        - repos
       operationId: listRepos
       description: >-
         Lists the repositories of every type, one page at a time. Open to every authenticated
@@ -469,7 +477,7 @@ paths:
       summary: List repositories, filtered by type and name
     post:
       tags:
-        - repo-collection-controller
+        - repos
       operationId: createRepository
       description: >-
         Creates a repository of the type given in the body and returns it. Admin only (403
@@ -514,7 +522,7 @@ paths:
   "/api/repos/counts":
     get:
       tags:
-        - repo-collection-controller
+        - repos
       operationId: getRepoCounts
       description: >-
         The number of repositories of each type. Every type is a key, zero included. Open to every
@@ -532,7 +540,7 @@ paths:
   "/api/repos/{repoName}/contents":
     get:
       tags:
-        - protocol-repo-controller
+        - repos
       operationId: getPathContent
       parameters:
         - name: path
@@ -570,7 +578,7 @@ paths:
   "/api/repos/{repoName}":
     get:
       tags:
-        - protocol-repo-controller
+        - repos
       operationId: getRepo
       description: >-
         One repository: its name, description, type (the format), visibility, disk usage and
@@ -595,7 +603,7 @@ paths:
       summary: Get a repository
     patch:
       tags:
-        - protocol-repo-controller
+        - repos
       operationId: updateRepo
       description: >-
         Renames the repository and/or changes its description. A field that is omitted (or sent as
@@ -637,7 +645,7 @@ paths:
       summary: Rename a repository or change its description
     delete:
       tags:
-        - protocol-repo-controller
+        - repos
       operationId: deleteRepo
       responses:
         '204':
@@ -663,7 +671,7 @@ paths:
   "/api/repos/{repoName}/deploy-tokens/{tokenId}":
     delete:
       tags:
-        - protocol-deploy-token-controller
+        - deploy-tokens
       operationId: revokeDeployToken
       parameters:
         - name: tokenId
@@ -695,7 +703,7 @@ paths:
   "/api/repos/{repoName}/deploy-tokens/{tokenId}/actions/rotate":
     post:
       tags:
-        - protocol-deploy-token-controller
+        - deploy-tokens
       operationId: rotateDeployToken
       parameters:
         - name: tokenId
@@ -736,7 +744,7 @@ paths:
   "/api/repos/{repoName}/deploy-tokens":
     get:
       tags:
-        - protocol-deploy-token-controller
+        - deploy-tokens
       operationId: listDeployTokens
       description: >-
         Sortable by `id`, `name`, `username`, `description`, `readOnly`, `expirationDate`, `createdAt`
@@ -765,7 +773,7 @@ paths:
       summary: List deploy tokens for a repository
     post:
       tags:
-        - protocol-deploy-token-controller
+        - deploy-tokens
       operationId: createDeployToken
       requestBody:
         content:
@@ -812,7 +820,7 @@ paths:
   "/api/repos/{repoName}/permissions":
     get:
       tags:
-        - protocol-repo-controller
+        - repos
       operationId: getRepoPermissions
       security:
         - { }
@@ -840,7 +848,7 @@ paths:
   "/api/repos/{repoName}/download-token":
     post:
       tags:
-        - protocol-repo-controller
+        - repos
       operationId: createDownloadToken
       parameters:
         - name: path
@@ -882,7 +890,7 @@ paths:
   "/api/usage":
     get:
       tags:
-        - usage-controller
+        - usage
       operationId: getTotalUsage
       responses:
         '200':
@@ -897,7 +905,7 @@ paths:
   "/api/repos/{repoName}/usage":
     get:
       tags:
-        - protocol-repo-controller
+        - repos
       operationId: getRepoUsage
       responses:
         '200':
@@ -925,7 +933,7 @@ paths:
   "/api/repos/{repoName}/artifacts/{artifactName}/versions/{version}/scans":
     get:
       tags:
-        - vulnerability-scan-controller
+        - security-scans
       operationId: listVulnerabilityScans
       description: >-
         Sortable by `createdAt` (`property,direction`). The default is `createdAt,desc`.
@@ -971,7 +979,7 @@ paths:
   "/api/repos/{repoName}/scopes/{scope}/artifacts/{artifactName}/versions/{version}/scans":
     get:
       tags:
-        - vulnerability-scan-controller
+        - security-scans
       operationId: listScopedVulnerabilityScans
       description: >-
         Sortable by `createdAt` (`property,direction`). The default is `createdAt,desc`.
@@ -1023,7 +1031,7 @@ paths:
   "/api/repos/{repoName}/artifacts/{artifactName}/versions/{version}/scan-overview":
     get:
       tags:
-        - vulnerability-scan-controller
+        - security-scans
       operationId: getScanOverview
       parameters:
         - name: artifactName
@@ -1067,7 +1075,7 @@ paths:
   "/api/repos/{repoName}/scopes/{scope}/artifacts/{artifactName}/versions/{version}/scan-overview":
     get:
       tags:
-        - vulnerability-scan-controller
+        - security-scans
       operationId: getScopedScanOverview
       parameters:
         - name: scope
@@ -1117,7 +1125,7 @@ paths:
   "/api/repos/{repoName}/artifacts/{artifactName}/versions/{version}/scan":
     post:
       tags:
-        - vulnerability-scan-controller
+        - security-scans
       operationId: triggerVulnerabilityScan
       parameters:
         - name: artifactName
@@ -1162,7 +1170,7 @@ paths:
   "/api/repos/{repoName}/scopes/{scope}/artifacts/{artifactName}/versions/{version}/scan":
     post:
       tags:
-        - vulnerability-scan-controller
+        - security-scans
       operationId: triggerScopedVulnerabilityScan
       parameters:
         - name: scope
@@ -1213,7 +1221,7 @@ paths:
   "/api/repos/{repoName}/artifacts/{artifactName}/security-summary":
     get:
       tags:
-        - vulnerability-scan-controller
+        - security-scans
       operationId: getVersionSecuritySummary
       parameters:
         - name: artifactName
@@ -1247,7 +1255,7 @@ paths:
   "/api/repos/{repoName}/scopes/{scope}/artifacts/{artifactName}/security-summary":
     get:
       tags:
-        - vulnerability-scan-controller
+        - security-scans
       operationId: getScopedVersionSecuritySummary
       parameters:
         - name: scope
@@ -1287,7 +1295,7 @@ paths:
   "/api/repos/{repoName}/artifacts/security-summary":
     get:
       tags:
-        - vulnerability-scan-controller
+        - security-scans
       operationId: getArtifactSecuritySummary
       security:
         - { }
@@ -1315,7 +1323,7 @@ paths:
   "/api/repos/{repoName}/scans/{scanId}":
     get:
       tags:
-        - vulnerability-scan-controller
+        - security-scans
       operationId: getVulnerabilityScan
       parameters:
         - name: scanId
@@ -1352,7 +1360,7 @@ paths:
   "/api/repos/{repoName}/scans/{scanId}/findings":
     get:
       tags:
-        - vulnerability-scan-controller
+        - security-scans
       operationId: getVulnerabilityScanFindings
       description: >-
         Sortable by `id`, `cveId`, `severity`, `packageName`, `packageVersion`, `fixedVersion`,
@@ -1395,7 +1403,7 @@ paths:
   "/api/repos/{repoName}/security-detail":
     get:
       tags:
-        - vulnerability-scan-controller
+        - security-scans
       operationId: getRepoSecurityDetail
       security:
         - { }
@@ -1423,7 +1431,7 @@ paths:
   "/api/repos/{repoName}/artifacts/{artifactName}/security-detail":
     get:
       tags:
-        - vulnerability-scan-controller
+        - security-scans
       operationId: getArtifactSecurityDetail
       parameters:
         - name: artifactName
@@ -1457,7 +1465,7 @@ paths:
   "/api/repos/{repoName}/scopes/{scope}/artifacts/{artifactName}/security-detail":
     get:
       tags:
-        - vulnerability-scan-controller
+        - security-scans
       operationId: getScopedArtifactSecurityDetail
       parameters:
         - name: scope
@@ -1497,7 +1505,7 @@ paths:
   "/api/repos/security-summary":
     get:
       tags:
-        - vulnerability-scan-controller
+        - security-scans
       operationId: getSecuritySummary
       parameters:
         - name: repoNames
@@ -1522,7 +1530,7 @@ paths:
   "/api/security/scans":
     get:
       tags:
-        - security-scan-controller
+        - security-scans
       operationId: listSecurityScans
       description: >-
         Sortable by `createdAt` (`property,direction`). The default is `createdAt,desc`.
@@ -1565,7 +1573,7 @@ paths:
   "/api/security/scans/summary":
     get:
       tags:
-        - security-scan-controller
+        - security-scans
       operationId: getSecurityScansSummary
       parameters:
         - name: repoType
@@ -1598,7 +1606,7 @@ paths:
   "/api/security/supported-repo-types":
     get:
       tags:
-        - security-scan-controller
+        - security-scans
       operationId: getSupportedRepoTypes
       security: []
       responses:
@@ -1615,7 +1623,7 @@ paths:
   "/api/cargo/crates/{repoName}":
     get:
       tags:
-        - cargo-crate-controller
+        - cargo-crates
       operationId: searchCargoCrates
       description: >-
         Sortable by `id`, `name`, `maxVersion`, `downloads`, `totalDownloads`, `updatedAt`,
@@ -1659,7 +1667,7 @@ paths:
   "/api/cargo/crates/{repoName}/{packageName}":
     get:
       tags:
-        - cargo-crate-controller
+        - cargo-crates
       operationId: getCargoCrate
       parameters:
         - name: packageName
@@ -1686,7 +1694,7 @@ paths:
       summary: Get a Cargo crate
     delete:
       tags:
-        - cargo-crate-controller
+        - cargo-crates
       operationId: deleteCargoCrate
       parameters:
         - name: packageName
@@ -1715,7 +1723,7 @@ paths:
   "/api/cargo/crates/{repoName}/{packageName}/versions/{version}":
     get:
       tags:
-        - cargo-crate-controller
+        - cargo-crates
       operationId: getCargoCrateVersion
       parameters:
         - name: packageName
@@ -1747,7 +1755,7 @@ paths:
       summary: Get a specific Cargo crate version
     delete:
       tags:
-        - cargo-crate-controller
+        - cargo-crates
       operationId: deleteCargoCrateVersion
       parameters:
         - name: packageName
@@ -1781,7 +1789,7 @@ paths:
   "/api/cargo/crates/{repoName}/{packageName}/versions":
     get:
       tags:
-        - cargo-crate-controller
+        - cargo-crates
       operationId: listCargoCrateVersions
       description: >-
         Sortable by `version`, `createdAt` (`property,direction`).
@@ -1830,7 +1838,7 @@ paths:
   "/api/docker/images/{repoName}":
     get:
       tags:
-        - docker-image-controller
+        - docker-images
       operationId: listDockerImages
       description: >-
         Sortable by `id`, `name`, `updatedAt`, `lastUpdatedAt` (`property,direction`). The default is
@@ -1874,7 +1882,7 @@ paths:
   "/api/repos/{repoName}/docker/orphan-layers":
     delete:
       tags:
-        - docker-repo-cleanup-controller
+        - docker-repo-cleanup
       operationId: deleteDockerOrphanLayers
       description: >-
         Deletes the layers no manifest uses any more. The layer rows are removed before the response;
@@ -1902,7 +1910,7 @@ paths:
   "/api/repos/{repoName}/docker/untagged-manifests":
     delete:
       tags:
-        - docker-repo-cleanup-controller
+        - docker-repo-cleanup
       operationId: deleteDockerUntaggedManifests
       description: >-
         Deletes the manifests of the repository that no tag points to, directly or through an index,
@@ -1944,7 +1952,7 @@ paths:
   "/api/repos/{repoName}/docker/cleanup-policy":
     get:
       tags:
-        - docker-cleanup-policy-controller
+        - docker-cleanup-policy
       operationId: getDockerCleanupPolicy
       description: >-
         The cleanup policy of a Docker repository. A disabled default policy is created on the
@@ -1972,7 +1980,7 @@ paths:
       summary: The cleanup policy of a Docker repository
     put:
       tags:
-        - docker-cleanup-policy-controller
+        - docker-cleanup-policy
       operationId: updateDockerCleanupPolicy
       description: >-
         Replaces the rules of the cleanup policy. The policy must be enabled (400
@@ -2016,7 +2024,7 @@ paths:
   "/api/repos/{repoName}/docker/cleanup-policy/status":
     patch:
       tags:
-        - docker-cleanup-policy-controller
+        - docker-cleanup-policy
       operationId: updateDockerCleanupPolicyStatus
       description: >-
         Enables or disables the cleanup policy. Enabling makes the policy due at once, so the next
@@ -2056,7 +2064,7 @@ paths:
   "/api/repos/{repoName}/docker/cleanup-policy/actions/run":
     post:
       tags:
-        - docker-cleanup-policy-controller
+        - docker-cleanup-policy
       operationId: runDockerCleanupPolicy
       description: >-
         Makes the cleanup policy due now; the scheduler runs it on its next pass and the work
@@ -2087,7 +2095,7 @@ paths:
   "/api/docker/images/{repoName}/{imageName}":
     get:
       tags:
-        - docker-image-controller
+        - docker-images
       operationId: getDockerImage
       description: >-
         The image as the list shows it, including how many tags and untagged manifests it has and
@@ -2122,7 +2130,7 @@ paths:
       summary: Get a Docker image
     delete:
       tags:
-        - docker-image-controller
+        - docker-images
       operationId: deleteDockerImage
       parameters:
         - name: imageName
@@ -2157,7 +2165,7 @@ paths:
   "/api/docker/images/{repoName}/{imageName}/tags":
     get:
       tags:
-        - docker-image-controller
+        - docker-images
       operationId: listDockerImageTags
       description: >-
         Sortable by `id`, `name`, `createdAt` (`property,direction`). The default is `id,desc`.
@@ -2209,7 +2217,7 @@ paths:
   "/api/docker/images/{repoName}/{imageName}/tags/{tagName}":
     get:
       tags:
-        - docker-image-controller
+        - docker-images
       operationId: getDockerImageTag
       parameters:
         - name: imageName
@@ -2245,7 +2253,7 @@ paths:
       summary: Get a specific Docker image tag
     delete:
       tags:
-        - docker-image-controller
+        - docker-images
       operationId: deleteDockerTag
       parameters:
         - name: imageName
@@ -2285,7 +2293,7 @@ paths:
   "/api/docker/images/{repoName}/{imageName}/tags/{tagName}/manifests":
     get:
       tags:
-        - docker-image-controller
+        - docker-images
       operationId: listDockerTagManifests
       description: >-
         Sortable by `id`, `name`, `createdAt` (`property,direction`). The default is `id,desc`.
@@ -2342,7 +2350,7 @@ paths:
   "/api/docker/images/{repoName}/{imageName}/manifests/{reference}":
     get:
       tags:
-        - docker-image-controller
+        - docker-images
       operationId: getDockerImageManifest
       description: The manifest as stored, as a JSON string.
       parameters:
@@ -2386,7 +2394,7 @@ paths:
   "/api/docker/images/{repoName}/{imageName}/configs/{digest}":
     get:
       tags:
-        - docker-image-controller
+        - docker-images
       operationId: getDockerImageConfig
       description: The config blob as stored, as a JSON string.
       parameters:
@@ -2431,7 +2439,7 @@ paths:
   "/api/go/modules/{repoName}":
     get:
       tags:
-        - golang-module-controller
+        - golang-modules
       operationId: listGolangModules
       description: >-
         Sortable by `id`, `modulePath`, `createdAt` (`property,direction`). The default is `id,desc`.
@@ -2468,7 +2476,7 @@ paths:
       summary: List or search Go modules in a repository
     delete:
       tags:
-        - golang-module-controller
+        - golang-modules
       operationId: deleteGolangModule
       parameters:
         - name: modulePath
@@ -2501,7 +2509,7 @@ paths:
   "/api/go/modules/{repoName}/versions":
     get:
       tags:
-        - golang-module-controller
+        - golang-modules
       operationId: listGolangModuleVersions
       description: >-
         Sortable by `id`, `version`, `createdAt` (`property,direction`). The default is `id,desc`.
@@ -2542,7 +2550,7 @@ paths:
       summary: List versions of a Go module
     delete:
       tags:
-        - golang-module-controller
+        - golang-modules
       operationId: deleteGolangModuleVersion
       parameters:
         - name: modulePath
@@ -2580,7 +2588,7 @@ paths:
   "/api/go/modules/{repoName}/info":
     get:
       tags:
-        - golang-module-controller
+        - golang-modules
       operationId: getGolangModuleInfo
       parameters:
         - name: modulePath
@@ -2617,7 +2625,7 @@ paths:
   "/api/helm/charts/{repoName}":
     get:
       tags:
-        - helm-chart-controller
+        - helm-charts
       operationId: searchHelmCharts
       description: >-
         Sortable by `name`, `latestVersion`, `updatedAt`, `createdAt`, `lastUpdatedAt`
@@ -2661,7 +2669,7 @@ paths:
   "/api/helm/charts/{repoName}/{packageName}":
     get:
       tags:
-        - helm-chart-controller
+        - helm-charts
       operationId: getHelmChart
       parameters: []
       security:
@@ -2683,7 +2691,7 @@ paths:
       summary: Get a Helm chart
     delete:
       tags:
-        - helm-chart-controller
+        - helm-charts
       operationId: deleteAllHelmChartVersions
       parameters: []
       responses:
@@ -2714,7 +2722,7 @@ paths:
   "/api/helm/charts/{repoName}/{packageName}/tags":
     get:
       tags:
-        - helm-chart-controller
+        - helm-charts
       operationId: getHelmChartOciTags
       parameters: []
       security:
@@ -2750,7 +2758,7 @@ paths:
   "/api/helm/charts/{repoName}/{packageName}/versions":
     get:
       tags:
-        - helm-chart-controller
+        - helm-charts
       operationId: listHelmChartVersions
       description: >-
         Sortable by `version`, `createdAt` (`property,direction`). The default is `createdAt,desc`.
@@ -2798,7 +2806,7 @@ paths:
   "/api/helm/charts/{repoName}/{packageName}/versions/{version}":
     get:
       tags:
-        - helm-chart-controller
+        - helm-charts
       operationId: getHelmChartDetail
       parameters: []
       security:
@@ -2820,7 +2828,7 @@ paths:
       summary: Get a specific chart version detail
     delete:
       tags:
-        - helm-chart-controller
+        - helm-charts
       operationId: deleteHelmChartVersion
       parameters: []
       responses:
@@ -2857,7 +2865,7 @@ paths:
   "/api/mvn/artifacts/{repoName}":
     get:
       tags:
-        - maven-artifact-controller
+        - maven-artifacts
       operationId: listMavenGroups
       description: >-
         Sortable by `id`, `groupName`, `artifactName`, `lastUpdatedAt` (`property,direction`). The
@@ -2901,7 +2909,7 @@ paths:
   "/api/mvn/artifacts/{repoName}/{groupName}":
     get:
       tags:
-        - maven-artifact-controller
+        - maven-artifacts
       operationId: listMavenArtifacts
       description: >-
         Sortable by `id`, `groupName`, `artifactName`, `lastUpdatedAt` (`property,direction`). The
@@ -2943,7 +2951,7 @@ paths:
       summary: List artifacts in a Maven group
     delete:
       tags:
-        - maven-artifact-controller
+        - maven-artifacts
       operationId: deleteMavenGroup
       parameters:
         - name: groupName
@@ -2972,7 +2980,7 @@ paths:
   "/api/mvn/groups/{repoName}/{groupName}":
     get:
       tags:
-        - maven-group-controller
+        - maven-groups
       operationId: getMavenGroupSummary
       description: >-
         What deleting the group removes: how many artifacts the group holds and how many versions
@@ -3010,7 +3018,7 @@ paths:
   "/api/mvn/artifacts/{repoName}/{groupName}/{artifactName}/versions":
     get:
       tags:
-        - maven-artifact-controller
+        - maven-artifacts
       operationId: listMavenArtifactVersions
       description: >-
         Sortable by `id`, `versionName`, `lastUpdatedAt` (`property,direction`). The default is
@@ -3064,7 +3072,7 @@ paths:
   "/api/mvn/artifacts/{repoName}/{groupName}/{artifactName}":
     get:
       tags:
-        - maven-artifact-controller
+        - maven-artifacts
       operationId: getMavenArtifact
       parameters:
         - name: groupName
@@ -3096,7 +3104,7 @@ paths:
       summary: Get a Maven artifact
     delete:
       tags:
-        - maven-artifact-controller
+        - maven-artifacts
       operationId: deleteMavenArtifact
       parameters:
         - name: groupName
@@ -3130,7 +3138,7 @@ paths:
   "/api/mvn/artifacts/{repoName}/{groupName}/{artifactName}/versions/{version}":
     get:
       tags:
-        - maven-artifact-controller
+        - maven-artifacts
       operationId: getMavenArtifactVersion
       parameters:
         - name: groupName
@@ -3167,7 +3175,7 @@ paths:
       summary: Get a specific version of a Maven artifact
     delete:
       tags:
-        - maven-artifact-controller
+        - maven-artifacts
       operationId: deleteMavenArtifactVersion
       parameters:
         - name: groupName
@@ -3207,7 +3215,7 @@ paths:
   "/api/mvn/allowed-key-servers":
     get:
       tags:
-        - key-store-controller
+        - maven-key-stores
       operationId: listMavenAllowedKeyServers
       responses:
         '200':
@@ -3224,7 +3232,7 @@ paths:
   "/api/mvn/key-stores/{repoName}":
     get:
       tags:
-        - key-store-controller
+        - maven-key-stores
       operationId: listMavenKeyStores
       description: >-
         Sortable by `id`, `host`, `displayName` (`property,direction`). The default is `id,desc`.
@@ -3252,7 +3260,7 @@ paths:
       summary: List key stores for a Maven repository
     post:
       tags:
-        - key-store-controller
+        - maven-key-stores
       operationId: createMavenKeyStore
       requestBody:
         content:
@@ -3297,7 +3305,7 @@ paths:
   "/api/mvn/key-stores/{repoName}/public-keys":
     get:
       tags:
-        - key-store-controller
+        - maven-key-stores
       operationId: listMavenPgpPublicKeys
       parameters:
         - "$ref": "#/components/parameters/Page"
@@ -3333,7 +3341,7 @@ paths:
         default is `id,desc`.
     post:
       tags:
-        - key-store-controller
+        - maven-key-stores
       operationId: createMavenPgpPublicKey
       requestBody:
         content:
@@ -3382,7 +3390,7 @@ paths:
   "/api/mvn/key-stores/{repoName}/public-keys/{publicKeyId}":
     get:
       tags:
-        - key-store-controller
+        - maven-key-stores
       operationId: getMavenPgpPublicKey
       parameters:
         - name: publicKeyId
@@ -3411,7 +3419,7 @@ paths:
       summary: Get a registered PGP public key of a Maven repository
     delete:
       tags:
-        - key-store-controller
+        - maven-key-stores
       operationId: deleteMavenPgpPublicKey
       parameters:
         - name: publicKeyId
@@ -3443,7 +3451,7 @@ paths:
   "/api/mvn/key-stores/{repoName}/{keyStoreId}":
     get:
       tags:
-        - key-store-controller
+        - maven-key-stores
       operationId: getMavenKeyStore
       parameters:
         - name: keyStoreId
@@ -3472,7 +3480,7 @@ paths:
       summary: Get a key store of a Maven repository
     delete:
       tags:
-        - key-store-controller
+        - maven-key-stores
       operationId: deleteMavenKeyStore
       parameters:
         - name: keyStoreId
@@ -3505,7 +3513,7 @@ paths:
   "/api/npm/packages/{repoName}":
     get:
       tags:
-        - npm-package-api-controller
+        - npm-packages
       operationId: listNpmPackages
       description: >-
         Sortable by `id`, `name`, `scope`, `latestVersion`, `updatedAt` (`property,direction`). The
@@ -3547,7 +3555,7 @@ paths:
   "/api/npm/packages/{repoName}/{packageName}":
     get:
       tags:
-        - npm-package-api-controller
+        - npm-packages
       operationId: getNpmPackage
       description: >-
         The package summary: its latest version and when it was created. The detail of one version is `versions/{version}`.
@@ -3576,7 +3584,7 @@ paths:
       summary: Get a npm package
     delete:
       tags:
-        - npm-package-api-controller
+        - npm-packages
       operationId: deleteNpmPackage
       parameters:
         - name: packageName
@@ -3607,7 +3615,7 @@ paths:
   "/api/npm/packages/{repoName}/{packageName}/versions":
     get:
       tags:
-        - npm-package-api-controller
+        - npm-packages
       operationId: listNpmPackageVersions
       description: >-
         Sortable by `id`, `version`, `createdAt` (`property,direction`). The default is `createdAt,desc`.
@@ -3655,7 +3663,7 @@ paths:
   "/api/npm/packages/{repoName}/{packageName}/versions/{version}":
     get:
       tags:
-        - npm-package-api-controller
+        - npm-packages
       operationId: getNpmPackageVersion
       parameters:
         - name: packageName
@@ -3687,7 +3695,7 @@ paths:
       summary: Get a specific npm package version
     delete:
       tags:
-        - npm-package-api-controller
+        - npm-packages
       operationId: deleteNpmPackageVersion
       parameters:
         - name: packageName
@@ -3723,7 +3731,7 @@ paths:
   "/api/npm/packages/{repoName}/{packageName}/tags":
     get:
       tags:
-        - npm-package-api-controller
+        - npm-packages
       operationId: listNpmPackageTags
       parameters:
         - name: packageName
@@ -3759,7 +3767,7 @@ paths:
   "/api/npm/scopes/{repoName}/packages":
     get:
       tags:
-        - npm-scope-api-controller
+        - npm-scopes
       operationId: listUnscopedNpmPackages
       description: >-
         Sortable by `id`, `name`, `scope`, `latestVersion`, `updatedAt` (`property,direction`). The
@@ -3803,7 +3811,7 @@ paths:
   "/api/npm/scopes/{repoName}/{scope}/packages":
     get:
       tags:
-        - npm-scope-api-controller
+        - npm-scopes
       operationId: listNpmPackagesByScope
       description: >-
         Sortable by `id`, `name`, `scope`, `latestVersion`, `updatedAt` (`property,direction`). The
@@ -3852,7 +3860,7 @@ paths:
   "/api/npm/scopes/{repoName}/{scope}/packages/{packageName}":
     get:
       tags:
-        - npm-scope-api-controller
+        - npm-scopes
       operationId: getNpmScopedPackage
       description: >-
         The package summary: its latest version and when it was created. The detail of one version is `versions/{version}`.
@@ -3887,7 +3895,7 @@ paths:
       summary: Get a scoped npm package
     delete:
       tags:
-        - npm-scope-api-controller
+        - npm-scopes
       operationId: deleteScopedNpmPackage
       parameters:
         - name: scope
@@ -3924,7 +3932,7 @@ paths:
   "/api/npm/scopes/{repoName}/{scope}/packages/{packageName}/versions":
     get:
       tags:
-        - npm-scope-api-controller
+        - npm-scopes
       operationId: listNpmScopedPackageVersions
       description: >-
         Sortable by `id`, `version`, `createdAt` (`property,direction`). The default is `createdAt,desc`.
@@ -3978,7 +3986,7 @@ paths:
   "/api/npm/scopes/{repoName}/{scope}/packages/{packageName}/versions/{version}":
     get:
       tags:
-        - npm-scope-api-controller
+        - npm-scopes
       operationId: getNpmScopedPackageVersion
       parameters:
         - name: scope
@@ -4016,7 +4024,7 @@ paths:
       summary: Get a specific scoped npm package version
     delete:
       tags:
-        - npm-scope-api-controller
+        - npm-scopes
       operationId: deleteNpmScopedPackageVersion
       parameters:
         - name: scope
@@ -4058,7 +4066,7 @@ paths:
   "/api/npm/scopes/{repoName}/{scope}/packages/{packageName}/tags":
     get:
       tags:
-        - npm-scope-api-controller
+        - npm-scopes
       operationId: listNpmScopedPackageTags
       parameters:
         - name: scope
@@ -4101,7 +4109,7 @@ paths:
   "/api/nuget/packages/{repoName}":
     get:
       tags:
-        - nuget-package-controller
+        - nuget-packages
       operationId: searchNugetPackages
       description: >-
         Sortable by `packageId` (`property,direction`).
@@ -4146,7 +4154,7 @@ paths:
   "/api/nuget/packages/{repoName}/{packageName}":
     get:
       tags:
-        - nuget-package-controller
+        - nuget-packages
       operationId: getNugetPackage
       parameters:
         - name: packageName
@@ -4173,7 +4181,7 @@ paths:
       summary: Get a NuGet package
     delete:
       tags:
-        - nuget-package-controller
+        - nuget-packages
       operationId: deleteNugetPackage
       parameters:
         - name: packageName
@@ -4203,7 +4211,7 @@ paths:
   "/api/nuget/packages/{repoName}/{packageName}/versions":
     get:
       tags:
-        - nuget-package-controller
+        - nuget-packages
       operationId: listNugetVersions
       description: >-
         Sortable by `version`, `publishedAt` (`property,direction`).
@@ -4253,7 +4261,7 @@ paths:
   "/api/nuget/packages/{repoName}/{packageName}/versions/{version}":
     get:
       tags:
-        - nuget-package-controller
+        - nuget-packages
       operationId: getNugetVersion
       parameters:
         - name: packageName
@@ -4285,7 +4293,7 @@ paths:
       summary: Get a specific NuGet package version
     delete:
       tags:
-        - nuget-package-controller
+        - nuget-packages
       operationId: deleteNugetVersion
       parameters:
         - name: packageName
@@ -4320,7 +4328,7 @@ paths:
   "/api/pypi/packages/{repoName}":
     get:
       tags:
-        - pypi-package-controller
+        - pypi-packages
       operationId: listPypiPackages
       description: >-
         Sortable by `id`, `name`, `latestVersion`, `updatedAt` (`property,direction`). The default is
@@ -4364,7 +4372,7 @@ paths:
   "/api/pypi/packages/{repoName}/{packageName}/versions":
     get:
       tags:
-        - pypi-package-controller
+        - pypi-packages
       operationId: listPypiVersions
       description: >-
         Sortable by `id`, `version`, `createdAt` (`property,direction`). The default is `id,desc`.
@@ -4412,7 +4420,7 @@ paths:
   "/api/pypi/packages/{repoName}/{packageName}/versions/{version}":
     get:
       tags:
-        - pypi-package-controller
+        - pypi-packages
       operationId: getPypiVersion
       parameters:
         - name: packageName
@@ -4444,7 +4452,7 @@ paths:
       summary: Get a version of a PyPI package
     delete:
       tags:
-        - pypi-package-controller
+        - pypi-packages
       operationId: deletePypiVersion
       parameters:
         - name: packageName
@@ -4480,7 +4488,7 @@ paths:
   "/api/pypi/packages/{repoName}/{packageName}":
     get:
       tags:
-        - pypi-package-controller
+        - pypi-packages
       operationId: getPypiPackage
       parameters:
         - name: packageName
@@ -4507,7 +4515,7 @@ paths:
       summary: Get a PyPI package
     delete:
       tags:
-        - pypi-package-controller
+        - pypi-packages
       operationId: deletePypiPackage
       parameters:
         - name: packageName
@@ -4539,7 +4547,7 @@ paths:
   "/api/ruby/gems/{repoName}":
     get:
       tags:
-        - ruby-gem-api-controller
+        - ruby-gems
       operationId: listGems
       description: >-
         Sortable by `id`, `name`, `updatedAt` (`property,direction`).
@@ -4582,7 +4590,7 @@ paths:
   "/api/ruby/gems/{repoName}/{packageName}":
     get:
       tags:
-        - ruby-gem-api-controller
+        - ruby-gems
       operationId: getGem
       description: >-
         The gem summary: its latest version, described by that version's gemspec fields.
@@ -4611,7 +4619,7 @@ paths:
       summary: Get a Ruby gem
     delete:
       tags:
-        - ruby-gem-api-controller
+        - ruby-gems
       operationId: deleteGem
       parameters:
         - name: packageName
@@ -4640,7 +4648,7 @@ paths:
   "/api/ruby/gems/{repoName}/{packageName}/versions":
     get:
       tags:
-        - ruby-gem-api-controller
+        - ruby-gems
       operationId: listGemVersions
       description: >-
         Sortable by `id`, `version`, `createdAt` (`property,direction`).
@@ -4688,7 +4696,7 @@ paths:
   "/api/ruby/gems/{repoName}/{packageName}/versions/{version}":
     get:
       tags:
-        - ruby-gem-api-controller
+        - ruby-gems
       operationId: getGemVersion
       parameters:
         - name: packageName
@@ -4726,7 +4734,7 @@ paths:
       summary: Get a specific Ruby gem version
     delete:
       tags:
-        - ruby-gem-api-controller
+        - ruby-gems
       operationId: deleteGemVersion
       parameters:
         - name: packageName
@@ -4978,33 +4986,6 @@ components:
             this setting.
         type:
           "$ref": "#/components/schemas/RepoType"
-    RestResponseVoid:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data: { }
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
-    RestResponseString:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          type: string
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     LoginInfo:
       type: object
       properties:
@@ -5013,20 +4994,6 @@ components:
         token:
           type: string
         refreshToken:
-          type: string
-    RestResponseLoginInfo:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/LoginInfo"
-        errorCode:
-          type: string
-          nullable: true
-        text:
           type: string
     PageMetadata:
       type: object
@@ -5043,31 +5010,6 @@ components:
         totalPages:
           type: integer
           format: int64
-    ResponseType:
-      type: string
-      enum:
-        - ERROR
-        - SUCCESS
-        - WARNING
-    EmptyResponse:
-      type: object
-      description: >-
-        The envelope of a successful request that returns no data: `msgId`, `type`, `text`,
-        `errorCode` (always null) and `data`. Failures do not use it; they are a `ProblemDetail`.
-      properties:
-        msgId:
-          type: string
-          example: userDeleted
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        text:
-          type: string
-        errorCode:
-          type: string
-          format: uuid
-        data:
-          type: string
-          description: A detail about the result, or null when there is none.
     ProblemDetail:
       type: object
       description: >-
@@ -5194,20 +5136,6 @@ components:
       required:
         - username
         - role
-    RestResponseUserResponse:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/UserResponse"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     UserResponse:
       type: object
       properties:
@@ -5260,35 +5188,6 @@ components:
             "$ref": "#/components/schemas/UserResponse"
         page:
           "$ref": "#/components/schemas/PageMetadata"
-    RestResponsePagedModelUserResponse:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          "$ref": "#/components/schemas/PagedModelUserResponse"
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
-    RestResponseLong:
-      type: object
-      properties:
-        msgId:
-          type: string
-        type:
-          "$ref": "#/components/schemas/ResponseType"
-        data:
-          type: integer
-          format: int64
-        errorCode:
-          type: string
-          nullable: true
-        text:
-          type: string
     # region: profile
     UpdateUsernameForm:
       type: object

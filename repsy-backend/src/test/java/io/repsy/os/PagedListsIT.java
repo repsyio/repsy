@@ -505,8 +505,7 @@ class PagedListsIT extends AbstractIntegrationTest {
     if (plain.getResponse().getStatus() == 200) {
       final var body = plain.getResponse().getContentAsString();
 
-      // Bare PagedModel bodies (Decision 5) carry `page` at the root, the rest still in `data`.
-      final var root = body.contains("\"msgId\"") ? "$.data" : "$";
+      final var root = "$";
       assertThat(JsonPath.<Integer>read(body, root + ".page.size")).isEqualTo(10);
       assertThat(JsonPath.<Integer>read(body, root + ".page.number")).isZero();
     }

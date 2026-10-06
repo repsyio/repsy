@@ -347,7 +347,6 @@ class MessageKeysTest {
     // A refactor that breaks a pattern must fail here instead of silently checking nothing.
     assertThat(usedMsgIds.keySet())
         .contains(
-            "usersFetched", // literal in a controller
             "repoNotFound", // literal in an exception
             "unAuthorized", // ErrorConstants constant in an exception
             "validationError", // constant in ErrorHandler

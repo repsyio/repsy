@@ -16,7 +16,7 @@
 
 import { firstValueFrom, Observable, of, throwError } from 'rxjs';
 
-import { SecurityScanControllerService } from '../../../../generated/api';
+import { SecurityScansApi } from '../../../../generated/api';
 import { SecurityScanSupportService } from './security-scan-support.service';
 
 describe('SecurityScanSupportService', () => {
@@ -24,7 +24,7 @@ describe('SecurityScanSupportService', () => {
 
   function createService(response: Observable<unknown>): SecurityScanSupportService {
     getSupportedRepoTypes = jasmine.createSpy('getSupportedRepoTypes').and.returnValue(response);
-    return new SecurityScanSupportService({ getSupportedRepoTypes } as unknown as SecurityScanControllerService);
+    return new SecurityScanSupportService({ getSupportedRepoTypes } as unknown as SecurityScansApi);
   }
 
   it('reports a repo type the scanner supports, ignoring case', async () => {

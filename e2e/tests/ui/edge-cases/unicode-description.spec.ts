@@ -113,9 +113,9 @@ test.describe('RPS-1761 Unicode: what the 500 limit counts', { tag: ['@cloud-ski
         privateRepo: true,
       });
 
-    expect((await create(accented, ACCENTED_AT_LIMIT)).status, 'bytes are not counted').toBe(200);
+    expect((await create(accented, ACCENTED_AT_LIMIT)).status, 'bytes are not counted').toBe(201);
     expect(await repoDescription(token, accented)).toBe(ACCENTED_AT_LIMIT);
-    expect((await create(emoji, EMOJI_AT_LIMIT)).status).toBe(200);
+    expect((await create(emoji, EMOJI_AT_LIMIT)).status).toBe(201);
     expect(await repoDescription(token, emoji)).toBe(EMOJI_AT_LIMIT);
     expect((await create(refused, EMOJI_OVER_LIMIT)).status, 'code points are not counted').toBe(
       400,
@@ -123,7 +123,7 @@ test.describe('RPS-1761 Unicode: what the 500 limit counts', { tag: ['@cloud-ski
     expect(await repoDescription(token, refused)).toBeUndefined();
 
     const patch = (description: string) =>
-      panelCall(token, 'PATCH', repoApiPath(emoji, 'description'), { description });
+      panelCall(token, 'PATCH', repoApiPath(emoji), { description });
     expect((await patch(EMOJI_OVER_LIMIT)).status).toBe(400);
     expect(await repoDescription(token, emoji)).toBe(EMOJI_AT_LIMIT);
     expect((await patch(ACCENTED_AT_LIMIT)).status).toBe(200);

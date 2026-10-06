@@ -16,12 +16,7 @@
 import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 
-import {
-  MavenArtifactControllerService,
-  MavenGroupControllerService,
-  ProtocolRepoControllerService,
-  RepoSettingsForm,
-} from '../../../../../../generated/api';
+import { MavenArtifactsApi, MavenGroupsApi, ReposApi, RepoSettingsForm } from '../../../../../../generated/api';
 import {
   CallCase,
   describeCalls,
@@ -44,19 +39,19 @@ const VERSION = '1.2.3';
 const PATH = 'io/acme/widget';
 
 describe('MavenService', () => {
-  let repoApi: jasmine.SpyObj<ProtocolRepoControllerService>;
-  let mavenApi: jasmine.SpyObj<MavenArtifactControllerService>;
-  let groupApi: jasmine.SpyObj<MavenGroupControllerService>;
+  let repoApi: jasmine.SpyObj<ReposApi>;
+  let mavenApi: jasmine.SpyObj<MavenArtifactsApi>;
+  let groupApi: jasmine.SpyObj<MavenGroupsApi>;
   let service: MavenService;
 
   beforeEach(() => {
-    repoApi = jasmine.createSpyObj<ProtocolRepoControllerService>('ProtocolRepoControllerService', [
+    repoApi = jasmine.createSpyObj<ReposApi>('ReposApi', [
       'getRepoPermissions',
       'updateRepoSettings',
       'getPathContent',
       'createDownloadToken',
     ]);
-    mavenApi = jasmine.createSpyObj<MavenArtifactControllerService>('MavenArtifactControllerService', [
+    mavenApi = jasmine.createSpyObj<MavenArtifactsApi>('MavenArtifactsApi', [
       'listMavenGroups',
       'listMavenArtifacts',
       'listMavenArtifactVersions',
@@ -65,14 +60,12 @@ describe('MavenService', () => {
       'deleteMavenArtifact',
       'deleteMavenArtifactVersion',
     ]);
-    groupApi = jasmine.createSpyObj<MavenGroupControllerService>('MavenGroupControllerService', [
-      'getMavenGroupSummary',
-    ]);
+    groupApi = jasmine.createSpyObj<MavenGroupsApi>('MavenGroupsApi', ['getMavenGroupSummary']);
     TestBed.configureTestingModule({
       providers: [
-        { provide: ProtocolRepoControllerService, useValue: repoApi },
-        { provide: MavenArtifactControllerService, useValue: mavenApi },
-        { provide: MavenGroupControllerService, useValue: groupApi },
+        { provide: ReposApi, useValue: repoApi },
+        { provide: MavenArtifactsApi, useValue: mavenApi },
+        { provide: MavenGroupsApi, useValue: groupApi },
       ],
     });
     service = TestBed.inject(MavenService);

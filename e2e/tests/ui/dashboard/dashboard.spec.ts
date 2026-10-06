@@ -63,8 +63,8 @@ async function apiSecurityTotal(request: APIRequestContext, token: string): Prom
     headers: { Authorization: `Bearer ${token}` },
   });
   expect(response.ok()).toBe(true);
-  const { data } = (await response.json()) as { data: Record<string, unknown> };
-  return Object.keys(data).length;
+  const summaries = (await response.json()) as Record<string, unknown>;
+  return Object.keys(summaries).length;
 }
 
 test.describe('Dashboard', () => {

@@ -17,7 +17,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 
-import { DockerRepoCleanupControllerService, UntaggedManifestCleanupResult } from '../../../../../../generated/api';
+import { DockerRepoCleanupApi, UntaggedManifestCleanupResult } from '../../../../../../generated/api';
 import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { permission } from '../../testing/protocol-service-spec-helpers';
@@ -30,12 +30,12 @@ function answer(result: UntaggedManifestCleanupResult): UntaggedManifestCleanupR
 
 describe('DeleteUntaggedManifestsComponent', () => {
   let component: DeleteUntaggedManifestsComponent;
-  let dockerService: jasmine.SpyObj<DockerRepoCleanupControllerService>;
+  let dockerService: jasmine.SpyObj<DockerRepoCleanupApi>;
   let toastService: jasmine.SpyObj<ToastService>;
   let dangerModalService: DangerModalService;
 
   beforeEach(() => {
-    dockerService = jasmine.createSpyObj<DockerRepoCleanupControllerService>('DockerRepoCleanupControllerService', [
+    dockerService = jasmine.createSpyObj<DockerRepoCleanupApi>('DockerRepoCleanupApi', [
       'deleteDockerUntaggedManifests',
     ]);
     dockerService.deleteDockerUntaggedManifests.and.returnValue(
@@ -185,7 +185,7 @@ describe('DeleteUntaggedManifestsComponent', () => {
         imports: [DeleteUntaggedManifestsComponent],
         providers: [
           provideRouter([]),
-          { provide: DockerRepoCleanupControllerService, useValue: dockerService },
+          { provide: DockerRepoCleanupApi, useValue: dockerService },
           { provide: ToastService, useValue: toastService },
           { provide: DangerModalService, useValue: dangerModalService },
         ],
