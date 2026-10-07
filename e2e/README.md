@@ -4894,9 +4894,14 @@ user and the admin still log in:
 4. crash (`docker kill --signal KILL`, `docker start`): a fresh npm package and Docker image published
    immediately beforehand, with no settle wait, are not lost (RPS-1556: H2's MVStore write-behind used
    to lose exactly that, sometimes every time, until `H2CheckpointPostProcessor` started running
-   `CHECKPOINT SYNC` after every protocol write, before the response is sent). Deliberately narrower
-   than the other legs' checks: re-checking the whole `packages` array here runs into a separate,
-   pre-existing flakiness of the crash/restart cycle (see the test's own comment);
+   `CHECKPOINT SYNC` after every protocol write, before the response is sent). It starts from a CLEAN
+   restart (`restartRepsy`, 120 s grace period, and on H2 the log must show `database: closing`):
+   H2 2.5.250 and later (2.5.252 is what Repsy ships) lose what is committed after an UNCLEAN open once
+   about 45 s have passed, checkpointed or not, and a clean close and open resets that (RPS-1976, reproduced
+   with plain H2; 2.4.240 and older do not have it). A stop that ends in SIGKILL, for example Docker's default 10 s
+   grace on a loaded runner, would otherwise make this test lose a package for a reason that is not
+   the one it tests, which is why the stack files set `stop_grace_period: 120s`. Deliberately narrower
+   than the other legs' checks: only the fresh publish is checked;
 5. sessions: with `OS_APP_JWT_SECRET` unset (every stack file) a restart and a recreate each end a session:
    the access token and the refresh token from before are answered 401 `accessNotAllowed`; recreated with
    `docker-compose.stack-jwt.yml` and a secret (`REPSY_E2E_JWT_SECRET`, random per run), both stay valid
