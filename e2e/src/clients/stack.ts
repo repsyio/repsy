@@ -184,11 +184,37 @@ export async function waitHealthy(
 }
 
 /**
- * `docker restart` of the Repsy container (SIGTERM, then SIGKILL after `stopTimeoutSeconds`, default
- * Docker's 10 s), then waits for it to be healthy again. The container, its anonymous volumes and its
+ * How long a stop of the Repsy container may take before Docker kills it: `docker restart` here and
+ * `stop_grace_period` in docker-compose.stack.yml / docker-compose.stack-h2.yml (what a compose
+ * recreate uses). Docker's own 10 s is too short on a loaded runner, and a stop that ends in SIGKILL is
+ * a crash for the embedded H2 database: the next open is "unclean", and H2 2.5.250 and later then lose
+ * what is committed after about 45 s even when it was checkpointed (RPS-1976). A restart that is meant to
+ * be graceful has to be one.
+ */
+export const CLEAN_STOP_SECONDS = 120;
+
+/**
+ * On the H2 profile with H2's INFO trace on (docker-compose.stack-h2.yml): whether the container's log
+ * has the `database: closing` line of a clean shutdown. `undefined` when it cannot tell (PostgreSQL, or no
+ * trace), so a caller asserts only what it can see.
+ */
+export async function h2ClosedCleanly(container: string): Promise<boolean | undefined> {
+  const dbUrl = (await dockerExec(container, ['printenv', 'DB_URL'])).stdout;
+  if (!dbUrl.startsWith('jdbc:h2:')) {
+    return undefined;
+  }
+  if ((await logLinesContaining(container, 'database: opening')).length === 0) {
+    return undefined;
+  }
+  return (await logLinesContaining(container, 'database: closing')).length > 0;
+}
+
+/**
+ * `docker restart` of the Repsy container (SIGTERM, then SIGKILL after `stopTimeoutSeconds`, by default
+ * `CLEAN_STOP_SECONDS`), then waits for it to be healthy again. The container, its anonymous volumes and its
  * environment are unchanged. Returns the container id.
  */
-export async function restartRepsy(stopTimeoutSeconds = 10): Promise<string> {
+export async function restartRepsy(stopTimeoutSeconds = CLEAN_STOP_SECONDS): Promise<string> {
   const container = await findRepsyContainer();
   const before = await stateOf(container);
   await docker(
