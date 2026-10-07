@@ -46,7 +46,13 @@ test.describe('SEC-01 the Vulnerability Scanning setting', { tag: SCANNER_TAG },
     panelApi,
   }) => {
     // The backend's own answer, not a stub: the stub scanner speaks for the Trivy adapter's types.
-    expect(await panelApi.supportedScanRepoTypes()).toEqual(['DOCKER', 'MAVEN', 'NPM', 'PYPI']);
+    expect(await panelApi.supportedScanRepoTypes()).toEqual([
+      'DOCKER',
+      'HELM',
+      'MAVEN',
+      'NPM',
+      'PYPI',
+    ]);
     const scanning = new VulnerabilityScanningSection(adminPage);
 
     for (const type of [RepoType.MAVEN, RepoType.NPM, RepoType.PYPI, RepoType.DOCKER]) {

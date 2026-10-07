@@ -990,7 +990,7 @@ variants were run directly against the locally built image (`repsy-os-e2e:local`
 postgres container reachable):
 
 - **(a)** the root `README.md`'s own documented default value,
-  `DB_URL=jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE` —
+  `DB_URL=jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1` —
   **boots cleanly.** Flyway ran all 19 H2 migrations with no error, the app logged
   `repsy started successfully!`, the SPA answered `200` on `/`, `POST /api/auth/login` with the
   configured `ADMIN_INITIAL_PASSWORD` returned a token, and the per-type repository list (then
@@ -1025,7 +1025,7 @@ the documentation bug already tracked by
 the default, but application.yml defaults DB_URL to PostgreSQL") — re-confirmed live here with fresh
 evidence (commented on that ticket) rather than filed again. **Not fixed here**: this step touches
 only `e2e/`, never the backend or its docs. **Fixed by RPS-1173 itself**: the `Dockerfile` now sets
-`ENV DB_URL=jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE`
+`ENV DB_URL=jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1`
 (the exact H2-1 (a) value this section already pinned), so the image now boots with embedded H2 when
 no `DB_URL` is passed, matching the README. This transcript is kept as the historical record of the
 bug, not rewritten.
@@ -4795,17 +4795,17 @@ differently, so each of them is an **opt-in overlay**: a compose file layered on
 PostgreSQL one or the H2 one) with one more `-f`, that changes what Repsy runs with for one nightly leg
 and is never part of the default stack.
 
-| Overlay      | Flag (`local up\|down`) | Switch (env)             | Compose file                          | Opt-in name  | What it changes                                            | Specs                                                                       |
-| ------------ | ----------------------- | ------------------------ | ------------------------------------- | ------------ | ---------------------------------------------------------- | --------------------------------------------------------------------------- |
-| `scanner`    | `--scanner`             | `REPSY_E2E_SCANNER=1`    | `docker-compose.stack-scanner.yml`    | `scanner`    | stub scanner, `SECURITY_SCANNER=enabled`                   | `@scanner` (ui, npm-clients, docker, maven, pypi), "Scanner stack"          |
-| `throttle`   | `--throttle`            | `REPSY_E2E_THROTTLE=1`   | `docker-compose.stack-throttle.yml`   | `throttle`   | 3 failed password checks per 10 s per client               | `@throttle` (stack, ui), "Auth-throttle leg"                                |
-| `tls`        | `--tls`                 | `REPSY_E2E_TLS=1`        | `docker-compose.stack-tls.yml`        | `tls`        | Repsy's own https listeners 8443/9443                      | `@tls` (skeleton, golang, ui), "TLS stack"; nightly `@smoke` of all clients |
-| `limits`     | `--limits`              | `REPSY_E2E_LIMITS=1`     | `docker-compose.stack-limits.yml`     | `limits`     | every configurable upload limit at 64 KiB                  | `@limits` (7 runners), "Size-limit leg"                                     |
-| `cors`       | `--cors`                | `REPSY_E2E_CORS=1`       | `docker-compose.stack-cors.yml`       | `cors`       | `APP_ALLOWED_ORIGINS` set to two origins (default: unset)  | `@cors` (api), "CORS leg"                                                   |
-| `proxy`      | `--proxy`               | `REPSY_E2E_PROXY=1`      | `docker-compose.stack-proxy.yml`      | `proxy`      | an nginx in front of Repsy, TLS terminated there           | `@proxy` (ui, api), "Reverse proxy stack"                                   |
-| `upload-ttl` | `--upload-ttl`          | `REPSY_E2E_UPLOAD_TTL=1` | `docker-compose.stack-upload-ttl.yml` | `upload-ttl` | short `ABANDONED_UPLOAD_TTL` (5 s) and cleanup intervals   | `@upload-ttl` (docker, helm), "Abandoned upload cleanup"                    |
-| `upgrade`    | `--upgrade`             | `REPSY_E2E_UPGRADE=1`    | `docker-compose.stack-upgrade.yml`    | `upgrade`    | the PREVIOUS release's image and its old-style environment | `@upgrade` (stack), "Upgrade path"                                          |
-| `trivy`      | `--trivy`               | `REPSY_E2E_TRIVY=1`      | `docker-compose.stack-trivy.yml`      | `trivy`      | the REAL repsy-scanner-trivy, `SECURITY_SCANNER=enabled`   | `@trivy` (api), "Real scanner stack"                                        |
+| Overlay      | Flag (`local up\|down`) | Switch (env)             | Compose file                          | Opt-in name  | What it changes                                            | Specs                                                                          |
+| ------------ | ----------------------- | ------------------------ | ------------------------------------- | ------------ | ---------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `scanner`    | `--scanner`             | `REPSY_E2E_SCANNER=1`    | `docker-compose.stack-scanner.yml`    | `scanner`    | stub scanner, `SECURITY_SCANNER=enabled`                   | `@scanner` (ui, npm-clients, docker, maven, pypi), "Scanner stack"             |
+| `throttle`   | `--throttle`            | `REPSY_E2E_THROTTLE=1`   | `docker-compose.stack-throttle.yml`   | `throttle`   | 3 failed password checks per 10 s per client               | `@throttle` (stack, ui), "Auth-throttle leg"                                   |
+| `tls`        | `--tls`                 | `REPSY_E2E_TLS=1`        | `docker-compose.stack-tls.yml`        | `tls`        | Repsy's own https listeners 8443/9443                      | `@tls` (skeleton, golang, ui), "TLS stack"; nightly `@smoke` of all clients    |
+| `limits`     | `--limits`              | `REPSY_E2E_LIMITS=1`     | `docker-compose.stack-limits.yml`     | `limits`     | every configurable upload limit at 64 KiB                  | `@limits` (7 runners), "Size-limit leg"                                        |
+| `cors`       | `--cors`                | `REPSY_E2E_CORS=1`       | `docker-compose.stack-cors.yml`       | `cors`       | `APP_ALLOWED_ORIGINS` set to two origins (default: unset)  | `@cors` (api), "CORS leg"                                                      |
+| `proxy`      | `--proxy`               | `REPSY_E2E_PROXY=1`      | `docker-compose.stack-proxy.yml`      | `proxy`      | an nginx in front of Repsy, TLS terminated there           | `@proxy` (ui, api), "Reverse proxy stack"                                      |
+| `upload-ttl` | `--upload-ttl`          | `REPSY_E2E_UPLOAD_TTL=1` | `docker-compose.stack-upload-ttl.yml` | `upload-ttl` | short `ABANDONED_UPLOAD_TTL` (5 s) and cleanup intervals   | `@upload-ttl` (docker runner: Docker and Helm OCI), "Abandoned upload cleanup" |
+| `upgrade`    | `--upgrade`             | `REPSY_E2E_UPGRADE=1`    | `docker-compose.stack-upgrade.yml`    | `upgrade`    | the PREVIOUS release's image and its old-style environment | `@upgrade` (stack), "Upgrade path"                                             |
+| `trivy`      | `--trivy`               | `REPSY_E2E_TRIVY=1`      | `docker-compose.stack-trivy.yml`      | `trivy`      | the REAL repsy-scanner-trivy, `SECURITY_SCANNER=enabled`   | `@trivy` (api), "Real scanner stack"                                           |
 
 How it fits together, so a later overlay is one row:
 
@@ -5346,7 +5346,7 @@ uploads).
 
 ```bash
 ./run.sh local up --upload-ttl                                           # (or REPSY_E2E_UPLOAD_TTL=1) add --h2 for H2
-REPSY_E2E_UPLOAD_TTL=1 ./run.sh test --protocol docker,helm --grep @upload-ttl
+REPSY_E2E_UPLOAD_TTL=1 ./run.sh test --protocol docker --grep @upload-ttl
 ./run.sh local down --upload-ttl
 ```
 
@@ -5762,9 +5762,8 @@ REPSY_E2E_PROXY=1 ./run.sh test --protocol api --grep @proxy            # what R
   text its copy button copies name the public repository URL (`REPO_BASE_URL`) and never Repsy's internal host and port.
 - **`tests/api/reverse-proxy.spec.ts`** (`@proxy`): the Docker token realm, the Cargo `config.json` (`dl`, `api`) and the PyPI simple page
   links are the proxy's https URLs (each with the direct answer as the control), HSTS goes out through the proxy and not on the
-  direct http port, and **RPS-1515 is pinned**: the third listener forwards `X-Forwarded-Host: localhost:<port>` and no
-  `X-Forwarded-Port` (what `proxy_set_header X-Forwarded-Host $http_host` does), and Repsy's public URL loses the port
-  (`realm="https://localhost/v2/token"`); `test.fail('RPS-1515')` until it is fixed or documented.
+  direct http port, and the third listener (RPS-1515, fixed) forwards `X-Forwarded-Host: localhost:<port>` and no
+  `X-Forwarded-Port` (what `proxy_set_header X-Forwarded-Host $http_host` does) and Repsy's public URL keeps the port.
 - **No subpath.** Repsy does not support serving the panel under a path such as `/repsy/`: `index.html` has `<base href="/">` and
   absolute `/assets/...` and `/api/...` URLs, and there is no context path setting (the README only offers a different host or
   port; `REPO_BASE_URL` is a full URL and may carry a path for the wire protocols, which is a different thing). So nothing is tested
@@ -7265,7 +7264,9 @@ says; without it the leg takes tonight's runner of the rotation and `protocol` f
 | `image`      |                                             | builds the Repsy image from the checkout (layer cache) and hands it to the legs as an artifact                                                                                                                                      | 40 min                                                                     |
 | `typecheck`  |                                             | `tsc --noEmit` and `eslint .` of this harness against the client generated from `openapi-spec.yaml`, no stack ("UI suite: route stubs typed from the OpenAPI models")                                                               | 10 min                                                                     |
 | `ui`         | PostgreSQL                                  | `--protocol ui`, the whole panel UI suite                                                                                                                                                                                           | 60 min                                                                     |
-| `wire`       | PostgreSQL                                  | `--protocol` `skeleton`, `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby`, `stack`, one `run.sh test` each                                                                               | 150 min                                                                    |
+| `wire`       | PostgreSQL                                  | `--protocol` `skeleton`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby`, `api`, one `run.sh test` each (RPS-1857: `maven` and `stack` have legs of their own below)                             | 60 min                                                                     |
+| `wire-maven` | PostgreSQL                                  | `--protocol maven`, its whole catalog, the largest of all (about 30 minutes on a runner)                                                                                                                                            | 75 min                                                                     |
+| `wire-stack` | PostgreSQL                                  | `--protocol stack`: the cases that restart, crash and recreate the Repsy container                                                                                                                                                  | 30 min                                                                     |
 | `browsers`   | PostgreSQL                                  | `ui-firefox`, then `ui-webkit`: `@smoke`, `@tls` (skips here) and A11Y-13 of the UI suite in each engine ("UI suite: Firefox and WebKit"), one runner per browser so a failure names it                                             | 30 min                                                                     |
 | `h2`         | embedded H2 (`docker-compose.stack-h2.yml`) | `@smoke` of every wire runner above; `stack` has no `@smoke` test, so it runs whole (the "Scope decision" above)                                                                                                                    | 90 min                                                                     |
 | `h2-ui`      | embedded H2                                 | `--protocol ui`, the WHOLE panel UI suite on H2 ("UI suite: the complete suite on H2")                                                                                                                                              | 45 min                                                                     |
