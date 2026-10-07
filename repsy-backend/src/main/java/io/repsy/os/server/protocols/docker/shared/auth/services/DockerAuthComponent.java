@@ -31,13 +31,17 @@ import io.repsy.os.shared.auth.dtos.AuthenticationType;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.constants.ErrorConstants;
+import io.repsy.os.shared.token.dtos.TokenType;
 import io.repsy.os.shared.user.dtos.UserInfo;
+import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.docker.protocol.parser.DockerScopes;
 import io.repsy.protocols.docker.shared.auth.services.DockerAuthService;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.repo.dtos.Credentials;
 import io.repsy.protocols.shared.repo.dtos.Permission;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -89,7 +93,8 @@ public class DockerAuthComponent extends ProtocolAuthService implements DockerAu
 
     final var credentials = this.getBasicAuthCredentials(removeBasicPrefix(authHeader));
 
-    return this.authenticateWithDeployToken(credentials)
+    return this.authenticateWithPersonalAccessToken(credentials, grants)
+        .or(() -> this.authenticateWithDeployToken(credentials))
         .or(() -> this.authenticateWithUsernamePassword(credentials, grants))
         .orElseThrow(() -> new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED));
   }
@@ -116,6 +121,48 @@ public class DockerAuthComponent extends ProtocolAuthService implements DockerAu
     }
 
     return credentials;
+  }
+
+  /**
+   * Exchanges a personal access token for a {@link AuthenticationType#PERSONAL_ACCESS_TOKEN} JWT of
+   * the protocol realm (RPS-1903). The username is ignored, as it is for a deploy token. The grants
+   * the JWT carries are what was asked for, narrowed to the scopes of the token and the role of its
+   * owner ({@link PatDockerGrants}); a request for repositories that leaves nothing is refused with
+   * {@code unAuthorized}, and so is the request of a token that is unknown or expired, which also
+   * counts as a failed credential. A request that asks for nothing (a {@code docker login}) is
+   * answered. The JWT is read against the token again on every {@code /v2} request.
+   *
+   * @return empty only when the password is not a personal access token
+   */
+  private Optional<String> authenticateWithPersonalAccessToken(
+      final Credentials credentials, final List<String> grants) {
+
+    if (!TokenType.REPSY_USER_TOKEN.matches(credentials.getPassword())) {
+      return Optional.empty();
+    }
+
+    final var token = this.authenticateWithPat(credentials.getPassword());
+    final var admin =
+        this.userTxService.getAuthenticatedUserById(token.userId()).getRole() == UserRole.ADMIN;
+    final var narrowed = PatDockerGrants.narrow(grants, token.scopes(), admin);
+
+    if (!grants.isEmpty() && narrowed.isEmpty()) {
+      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+    }
+
+    this.touchPersonalAccessToken(token);
+
+    final var untilExpiry = Duration.between(Instant.now(), token.expirationDate());
+    final var timeout =
+        untilExpiry.compareTo(TIMEOUT_ACCESS_TOKEN) < 0 ? untilExpiry : TIMEOUT_ACCESS_TOKEN;
+
+    return Optional.of(
+        this.jwtUtils.createProtocolToken(
+            token.id(),
+            token.username(),
+            timeout,
+            AuthenticationType.PERSONAL_ACCESS_TOKEN,
+            narrowed));
   }
 
   private Optional<String> authenticateWithUsernamePassword(

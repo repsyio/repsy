@@ -226,6 +226,31 @@ public class JwtUtils {
         .sign(this.algorithm());
   }
 
+  /**
+   * Creates the protocol token of a personal access token exchange, as {@code /v2/token} does for
+   * Docker (RPS-1903): the subject is the id of the token, the type is {@link
+   * AuthenticationType#PERSONAL_ACCESS_TOKEN} and {@code access} holds what the token was granted
+   * for the repositories it asked for. It carries no {@code tv} claim, as it is not bound to a user
+   * version: the token row is read again on every request. It is a protocol token, signed for the
+   * protocol realm and for it only.
+   */
+  public @NonNull String createProtocolToken(
+      final @NonNull UUID tokenId,
+      final @NonNull String username,
+      final @NonNull TemporalAmount timeoutDuration,
+      final @NonNull AuthenticationType authenticationType,
+      final @NonNull List<String> access) {
+    return JWT.create()
+        .withJWTId(UUID.randomUUID().toString())
+        .withSubject(tokenId.toString())
+        .withAudience(TokenRealm.PROTOCOL.getAudience())
+        .withClaim(CLAIM_USERNAME, username)
+        .withClaim(AUTH_TYPE, authenticationType.getValue())
+        .withClaim(CLAIM_ACCESS, access)
+        .withExpiresAt(Instant.now().plus(timeoutDuration))
+        .sign(this.algorithm());
+  }
+
   private @NonNull Algorithm algorithm() {
     return Algorithm.HMAC512(this.secret);
   }
