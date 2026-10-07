@@ -44,12 +44,15 @@ services:
       - '${REPSY_E2E_API_PORT:-8080}:8080'
       - '${REPSY_E2E_REPO_PORT:-9090}:9090'
     environment:
-      DB_URL: jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
+      # H2's own INFO trace (opening and closing of the database, what it does on an open after a crash) goes to the
+      # container log too (RPS-1976).
+      DB_URL: jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1;TRACE_LEVEL_SYSTEM_OUT=2
       DB_USERNAME: repsy
       DB_PASSWORD: repsy123
-      # RPS-1740: log every CHECKPOINT SYNC (the request, how long it took), so a persistence failure in CI shows
-      # whether the flush ran before the container was killed.
-      LOGGING_LEVEL_IO_REPSY_OS_SERVER_CORE_POST_PRECESSORS: DEBUG
+      # RPS-1976: log every CHECKPOINT SYNC (the request, how long it took), so a persistence failure in CI shows
+      # whether the flush ran before the container was killed. Set through SPRING_APPLICATION_JSON, not
+      # LOGGING_LEVEL_*: the package is `post_precessors` and an environment variable cannot carry the underscore.
+      SPRING_APPLICATION_JSON: '{"logging.level.io.repsy.os.server.core.post_precessors":"DEBUG"}'
       ADMIN_INITIAL_PASSWORD: ${REPSY_ADMIN_PASSWORD:?Set REPSY_ADMIN_PASSWORD in e2e/.env}
       # The panel's client snippets (docker login/pull, mvn, npm ...) print this host and port
       # (entrypoint.sh writes it into static-env.js); the image defaults to http://localhost:9090
