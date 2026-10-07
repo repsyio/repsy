@@ -26,6 +26,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 import javax.sql.DataSource;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
@@ -107,7 +108,7 @@ public class H2CheckpointPostProcessor extends ProtocolProcessor {
           CHECKPOINT_SQL,
           request.getMethod(),
           request.getRequestURI(),
-          (System.nanoTime() - started) / 1_000_000);
+          TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
     }
 
     return ProcessorResult.next();
