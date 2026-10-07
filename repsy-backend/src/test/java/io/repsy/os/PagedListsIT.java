@@ -108,6 +108,16 @@ class PagedListsIT extends AbstractIntegrationTest {
               "expirationDate",
               "createdAt"),
           list(
+              "listAccessTokens",
+              null,
+              "/api/profile/access-tokens",
+              false,
+              "id",
+              "name",
+              "expirationDate",
+              "lastUsedAt",
+              "createdAt"),
+          list(
               "listMavenKeyStores",
               RepoType.MAVEN,
               "/api/mvn/key-stores/{repo}",

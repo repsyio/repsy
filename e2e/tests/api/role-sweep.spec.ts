@@ -136,9 +136,11 @@ test.describe('the operations the spec declares 403 on', { tag: ['@smoke'] }, ()
     ]) {
       expect(ids.has(id), id).toBe(true);
     }
-    // Every delete of a package, version or repo, in every protocol; only deleting yourself is not one.
+    // Every delete of a package, version or repo, in every protocol; only deleting yourself, or
+    // revoking an access token of your own, is not one.
+    const ownDeletes = new Set(['deleteProfile', 'revokeAccessToken']);
     const deletes = OPERATIONS.filter(
-      (candidate) => candidate.method === 'DELETE' && candidate.operationId !== 'deleteProfile',
+      (candidate) => candidate.method === 'DELETE' && !ownDeletes.has(candidate.operationId),
     );
     expect(deletes.length).toBeGreaterThanOrEqual(28);
     for (const op of deletes) {

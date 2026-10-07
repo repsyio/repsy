@@ -82,6 +82,16 @@ public interface UserRepository extends JpaRepository<User, UUID> {
   @NonNull Optional<UUID> lockUserId(@NonNull @Param("id") UUID id);
 
   /**
+   * Like {@link #lockUserId}, but an exclusive lock ({@code FOR UPDATE}): two transactions cannot
+   * both hold it, so work that must see the effect of the other (the cap of personal access tokens
+   * per user) is serialized per user. {@link #lockUserId} stays a shared lock because login and
+   * refresh-token issuance only need to wait for a deletion, and must not queue behind each other.
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
+  @Query("select u.id from User u where u.id = :id")
+  @NonNull Optional<UUID> lockUserIdForUpdate(@NonNull @Param("id") UUID id);
+
+  /**
    * Swaps a user's password hash only while it still holds {@code oldHash}, so a password change
    * that committed in the meantime is never overwritten by a re-hash of the old password. It also
    * clears the salt, which only a legacy SHA-256 hash reads (RPS-1615). Written as a bulk update
