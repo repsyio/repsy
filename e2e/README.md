@@ -7383,6 +7383,43 @@ shows "cancelled"), and a manual run that is in progress at 01:23 UTC delays the
 schedule that arrives behind a running dispatch and a pending one cancels the pending one). Dispatch one run, wait for it
 (`gh run watch`), then dispatch the next; use `-f suite=` to run only the legs you care about, `all` takes about an hour.
 
+### The runner host and the `hetzner-e2e` label (RPS-1982)
+
+The self-hosted runners are containers on ONE machine (an AMD Ryzen 5 3600: 6 cores, 12 threads, 62 GB): `hetzner-sm-1..10`
+(1 CPU, 2 GB), `hetzner-md-1..4` (2 CPUs, 6 GB) and `hetzner-lg-1..3` (4 CPUs, 15 GB), shared by the workflows of repsy and
+repsy-mono. What the e2e legs start (the stack, the Playwright runner containers) are not children of the runner
+containers: they are sibling containers started through the host's Docker socket, so the runner containers' CPU limits do
+not apply to them and the e2e containers have no limits of their own. Measured on 2026-10-07 with the nightly running: load
+average 25-30 on 12 threads, 1% idle, no IO or memory pressure: the host is CPU-bound, and a full nightly needs about 550
+thread-minutes, so about 50 minutes at best. Four `hetzner-md` slots are enough for that; more slots cannot help.
+
+What does help is keeping the nightly away from the slots that PR checks need: 59% of the nightly's run time in the week
+before was overlapped by another job of the organisation. For that the e2e jobs take their label from the repository
+variable `E2E_RUNNER` (`vars.E2E_RUNNER || 'hetzner-md'`), and three more runner containers with their own label
+`hetzner-e2e` can be added:
+
+```bash
+# on the runner host, as a user who may use its Docker daemon (RPS-1982); the first call is a dry run
+./e2e/runners/host/add-e2e-runners.sh
+./e2e/runners/host/add-e2e-runners.sh --apply
+```
+
+The script clones `hetzner-md-1` (image, restart policy, limits, mounts, entrypoint, environment) as `hetzner-e2e-1..3`
+with label `hetzner-e2e,hetzner` and its own work directory. The environment holds the runner registration credentials; the
+script never prints or writes them (it passes them to `docker run` through the docker client's environment) and its dry run
+prints variable names only. It skips containers that exist, so it can be run again. Then, in this order:
+
+1. Check that `hetzner-e2e-1..3` are online in the organisation's runner list.
+2. `gh variable set E2E_RUNNER --body hetzner-e2e --org repsyio --visibility selected --repos repsy,repsy-mono` (or per
+   repository). A label without a runner leaves its jobs queued forever, so never set the variable first.
+3. Dispatch a `suite=all` run and compare its wall time and its `Test timeout` count with the runs before (about 63 minutes,
+   none, with four slots). With three slots the floor is about 65 minutes.
+
+Roll back with `gh variable delete E2E_RUNNER` (the workflows fall back to `hetzner-md`) and
+`docker rm -f hetzner-e2e-1 hetzner-e2e-2 hetzner-e2e-3`. The runners serve the whole organisation: do not touch the
+`hetzner-md`, `hetzner-sm` or `hetzner-lg` containers for this. A job that is cancelled or times out leaves its Playwright
+runner container running on the host (RPS-1981); the workflow removes those at the start of a run and in `Stop the stack`.
+
 ### Trivy database mirror and cache (RPS-1600)
 
 The `trivy` leg downloads about 1.4 GB of vulnerability databases from ghcr.io on a shared runner egress, where
@@ -7442,7 +7479,7 @@ no change in the workflow). To run against an image you already built, set `REPS
   the Repsy JVM, PostgreSQL and `REPSY_UI_WORKERS` (4) Chromiums. The runner runs the ui container with
   `network_mode: host` and `ipc: host`, as it does locally, so a runner that forbids either (some
   container-based or rootless runners) cannot run it.
-- The jobs use `runs-on: ${{ vars.E2E_RUNNER || 'ubuntu-24.04' }}` (the plan job `ubuntu-24.04`), not
+- (Since RPS-1829 the default is `hetzner-md` and the plan job runs on `hetzner-sm`; see "The runner host and the `hetzner-e2e` label" below.) The jobs use `runs-on: ${{ vars.E2E_RUNNER || 'ubuntu-24.04' }}` (the plan job `ubuntu-24.04`), not
   `ubuntu-latest`, which moves to Ubuntu 26 on 2026-10-19 (RPS-1600): the Chromium sandbox probe, the Docker version
   and the docker socket's gid of the `stack` runner all change with the image, so the pin moves on purpose, in a PR of
   its own, after a manual `suite=all` run on the new one (`release.yml` still uses `ubuntu-latest`). Set the repository variable `E2E_RUNNER` (Settings, Secrets and variables,
