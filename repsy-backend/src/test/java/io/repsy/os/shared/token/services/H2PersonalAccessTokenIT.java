@@ -48,7 +48,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 @DisplayName("PersonalAccessToken expiration date under H2: the answer is the stored date")
 class H2PersonalAccessTokenIT extends H2IntegrationTest {
 
-  private static final String PASSWORD_HASH = PasswordHasher.hash("Password1!");
+  private static final String PASSWORD_HASH = PasswordHasher.hash("Other1234!");
 
   @Autowired private PersonalAccessTokenService tokenService;
   @Autowired private PersonalAccessTokenRepository tokenRepository;
