@@ -65,7 +65,7 @@ usage() {
 Usage:
   run.sh local up|down [--h2] [--scanner] [--throttle] [--tls] [--limits] [--cors] [--upgrade] [--trivy] [--proxy] [--upload-ttl] [--force]
   run.sh local logs|ps [--h2] [--scanner] [--throttle] [--tls] [--limits] [--cors] [--upgrade] [--trivy] [--proxy] [--upload-ttl]
-  run.sh test [--target local|remote|ci] [--protocol a,b] [--grep PATTERN] [--workers N] [--update-snapshots] [-b]
+  run.sh test [--target local|remote|ci] [--protocol a,b] [--grep PATTERN] [--grep-invert PATTERN] [--workers N] [--update-snapshots] [-b]
   run.sh sweep [--hours N] [--all] [--dry-run]
 
 Every subcommand also takes --project NAME and --port-offset N (or REPSY_E2E_PROJECT and
@@ -681,6 +681,7 @@ cmd_test() {
   local target="local"
   local protocols=""
   local grep_pattern=""
+  local grep_invert_pattern=""
   local rebuild="false"
   local update_snapshots="false"
   local workers="${REPSY_E2E_WORKERS:-}"
@@ -697,6 +698,14 @@ cmd_test() {
         ;;
       --grep)
         grep_pattern="$2"
+        shift 2
+        ;;
+      --grep-invert)
+        if [ $# -lt 2 ]; then
+          echo "--grep-invert needs a pattern" >&2
+          exit 1
+        fi
+        grep_invert_pattern="$2"
         shift 2
         ;;
       --workers)
@@ -796,6 +805,9 @@ cmd_test() {
   local -a play_args=()
   if [ -n "$grep_pattern" ]; then
     play_args+=(--grep "$grep_pattern")
+  fi
+  if [ -n "$grep_invert_pattern" ]; then
+    play_args+=(--grep-invert "$grep_invert_pattern")
   fi
   if [ "$update_snapshots" = "true" ]; then
     play_args+=(--update-snapshots)

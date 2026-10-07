@@ -60,7 +60,11 @@ defaults:
 env:
   # Tag of the image the `image` job builds and every leg loads; run.sh then starts it as it is
   # (REPSY_IMAGE) instead of building again.
-  REPSY_IMAGE: repsy-os-e2e:ci
+  #
+  # The tag carries the run id (RPS-1857): the legs run on the same Docker host as the image job, so a leg that finds the tag
+  # already there skips the download and the load (about 1 minute of each of the 18 legs), and a tag shared between runs
+  # could hand a leg the image of another run.
+  REPSY_IMAGE: repsy-os-e2e:ci-${{ github.run_id }}
 
 jobs:
   # Decides which legs run, from the dispatch inputs (a scheduled run has none: everything).
@@ -101,7 +105,10 @@ jobs:
               # runner restarts, crashes and recreates the Repsy container for another 10. All three belong to the `wire`
               # suite, so `suite=wire` still runs them together, and each has its own stack, so they run in parallel.
               "wire": ("wire", "", [r for r in WIRE if r not in ("maven", "stack")], "", 60, "", True),
-              "wire-maven": ("wire", "", ["maven"], "", 75, "", True),
+              # Maven is split by spec file in two halves that take about the same time (RPS-1857; SPLIT below): the
+              # Gradle Kotlin family and the Groovy locking spec against everything else. 75% of the runner is Gradle.
+              "wire-maven-kotlin": ("wire", "", ["maven"], "", 45, "", True),
+              "wire-maven-rest": ("wire", "", ["maven"], "", 45, "", True),
               "wire-stack": ("wire", "", ["stack"], "", 30, "", True),
               # The panel UI beyond Chromium (RPS-1651, README.md "UI suite: Firefox and WebKit"): the @smoke set, the
               # keyboard walkthrough and the panel-over-https spec (which skips without the TLS stack) in Firefox and
@@ -171,6 +178,16 @@ jobs:
               "proxy": ("proxy", "--proxy", ["ui", "api"], "@smoke|@proxy", 45, "proxy", True),
           }
 
+          # leg -> (the run.sh flag, the Playwright pattern, the leg that runs the whole runner when the grep input is set).
+          # --grep and --grep-invert with the same pattern cover the catalog exactly, with no gap and no overlap; the pattern
+          # matches the title path, which starts with the project and the spec file. One --grep cannot carry both the split
+          # and the person's pattern, so with the grep input the first half runs the whole runner as `wire-maven`.
+          MAVEN_KOTLIN = r"maven/gradle-([a-z-]+-)?kotlin\.spec|maven/gradle-locking-groovy\.spec"
+          SPLIT = {
+              "wire-maven-kotlin": ("--grep", MAVEN_KOTLIN, "wire-maven"),
+              "wire-maven-rest": ("--grep-invert", MAVEN_KOTLIN, None),
+          }
+
           # leg -> the env switches the `test` step sets (README.md "Stack overlays": `up` takes the flag,
           # `test` the env switch, and with it the https URLs).
           SWITCHES = {"tls": "REPSY_E2E_TLS=1", "proxy": "REPSY_E2E_PROXY=1", "upload-ttl": "REPSY_E2E_UPLOAD_TTL=1"}
@@ -215,8 +232,20 @@ jobs:
               runners = [r for r in runners if not only or r in only or explicit]
               if not runners:
                   continue
+              leg_name, split_flag, split_pattern = leg, "", ""
+              if leg in SPLIT:
+                  flag, pattern, whole = SPLIT[leg]
+                  if os.environ["GREP"] and grep_input:
+                      if whole is None:
+                          continue
+                      # The whole runner in one leg again: the timeout it had before the split.
+                      leg_name, timeout = whole, 75
+                  else:
+                      split_flag, split_pattern = flag, pattern
               include.append({
-                  "leg": leg,
+                  "leg": leg_name,
+                  "split_flag": split_flag,
+                  "split_pattern": split_pattern,
                   "port_offset": 11 * (len(include) + 1),
                   "stack": stack,
                   "protocols": " ".join(runners),
@@ -280,6 +309,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           submodules: recursive
+
+      # Runs queue in the e2e-nightly group, so no leg of another run is using the host now; an image that is still
+      # used by a container is kept (docker rmi refuses it).
+      - name: Remove the images of earlier runs
+        run: |
+          docker images --format '{{.Repository}}:{{.Tag}}' repsy-os-e2e \
+            | { grep ':ci-' || true; } | { grep -v ":ci-${GITHUB_RUN_ID}\$" || true; } \
+            | xargs -r docker rmi || true
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
@@ -360,13 +397,26 @@ jobs:
           # e2e/ runs from the checkout; the image comes from the artifact, so no submodule.
           submodules: false
 
+      # The image job built it on this host's Docker daemon (the tag has the run id, so it is this run's image).
+      # Another host does not have it and falls back to the artifact.
+      - name: Look for the image on this host
+        id: image
+        run: |
+          if docker image inspect "$REPSY_IMAGE" > /dev/null 2>&1; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Download the image
+        if: steps.image.outputs.present != 'true'
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: e2e-repsy-image
           path: ${{ runner.temp }}
 
       - name: Load the image
+        if: steps.image.outputs.present != 'true'
         run: gunzip -c "$RUNNER_TEMP/repsy-image.tar.gz" | docker load
 
       - name: Start the stack
@@ -426,6 +476,9 @@ jobs:
         env:
           PROTOCOLS: ${{ matrix.protocols }}
           GREP: ${{ matrix.grep }}
+          # The spec-file split of a leg (plan job, SPLIT): `--grep` or `--grep-invert` with its pattern; empty elsewhere.
+          SPLIT_FLAG: ${{ matrix.split_flag }}
+          SPLIT_PATTERN: ${{ matrix.split_pattern }}
           # {runner: pattern} for the runners that must not take GREP (plan job, RUNNER_GREP); "" runs
           # the whole catalog of that runner.
           RUNNER_GREP: ${{ toJSON(matrix.runner_grep) }}
@@ -451,6 +504,9 @@ jobs:
             grep_args=()
             if [ -n "$pattern" ]; then
               grep_args=(--grep "$pattern")
+            fi
+            if [ -n "$SPLIT_FLAG" ]; then
+              grep_args+=("$SPLIT_FLAG" "$SPLIT_PATTERN")
             fi
             echo "::group::$protocol"
             ./run.sh test --target ci --protocol "$protocol" "${grep_args[@]}" || failed=1
