@@ -80,6 +80,7 @@ public class H2CheckpointPostProcessor extends ProtocolProcessor {
 
     this.dataSource = dataSource;
     this.enabled = datasourceUrl.startsWith("jdbc:h2:");
+    log.info("CHECKPOINT SYNC after protocol writes: {}", this.enabled ? "enabled (H2)" : "off");
 
     for (final var protocolProvider : protocolProviders) {
       protocolProvider.registerPostProcessor(this);
@@ -99,7 +100,14 @@ public class H2CheckpointPostProcessor extends ProtocolProcessor {
       final @NonNull Map<@NonNull String, @NonNull Object> properties) {
 
     if (this.enabled && this.isWriteOperation(properties)) {
+      final long started = System.nanoTime();
       this.checkpoint();
+      log.debug(
+          "{} after {} {} took {} ms",
+          CHECKPOINT_SQL,
+          request.getMethod(),
+          request.getRequestURI(),
+          (System.nanoTime() - started) / 1_000_000);
     }
 
     return ProcessorResult.next();
