@@ -37,6 +37,9 @@ services:
     # The tag follows the project (run.sh sets REPSY_E2E_IMAGE_TAG), so two checkouts that build at the
     # same time do not retag each other's image; local for the default project (RPS-1422).
     image: ${REPSY_IMAGE:-repsy-os-e2e:${REPSY_E2E_IMAGE_TAG:-local}}
+    # A stop (docker restart, compose recreate) may take as long as the JVM needs on a loaded runner: Docker's
+    # default 10 s would end in SIGKILL, which is a crash for the embedded H2 database (RPS-1976).
+    stop_grace_period: 120s
     build:
       context: ..
       dockerfile: Dockerfile

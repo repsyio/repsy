@@ -62,6 +62,7 @@ import {
   restartRepsy,
   restoreStack,
   type ComposeFiles,
+  h2ClosedCleanly,
 } from '../../src/clients/stack.js';
 import { dockerAdapter } from '../../src/clients/docker.js';
 import { golangAdapter } from '../../src/clients/golang.js';
@@ -263,15 +264,25 @@ test.describe.serial(
       // after every protocol write, before the HTTP response is sent, closing that race: publishing
       // with no settle wait right before the crash is the right test for it, not a flaky one.
       //
-      // Deliberately narrower than `expectEverythingThere`/the `packages` from beforeAll: those are
-      // long settled by now (the control, restart and recreate tests above already spent real wall
-      // time) and re-checking all five protocols here also re-runs into a separate, pre-existing
-      // flakiness of the crash/restart cycle itself: the crash test intermittently loses an
-      // otherwise-settled package (maven or golang so far, whichever was published last) even with a
-      // full multi-second settle wait before the crash -- so it is not this race. Filed separately
-      // (see the RPS-1556 PR description); tracked here only so this comment is not mistaken for a
-      // claim that a wider check would be safe to add back. Only the fresh publish below is this
-      // test's concern.
+      // RPS-1976: H2 2.5.250 and later (what Repsy ships) lose what is committed after an UNCLEAN open once
+      // about 45 s have passed, checkpointed or not (reproduced with plain H2 and no Repsy code; 2.4.240
+      // and older do not). A clean close and open resets that. So this test starts from one: the restart
+      // below stops the container with a generous grace period (CLEAN_STOP_SECONDS) and, where H2's trace
+      // shows it, the log must say the database was closed. Without it a slow stop under load was
+      // SIGKILLed by Docker, the crash below was the second unclean open, and the package it had just
+      // consumed disappeared (RPS-1740: "an otherwise-settled package", "consume works but the panel
+      // does not list it").
+      //
+      // Deliberately narrower than `expectEverythingThere`/the `packages` from beforeAll: only the
+      // fresh publish below is this test's concern.
+      const container = await findRepsyContainer();
+      await restartRepsy();
+      await relogin();
+      const closed = await h2ClosedCleanly(container);
+      expect(
+        closed !== false,
+        'the restart before the crash test was a clean shutdown of the H2 database (log: "database: closing"); an unclean one makes H2 2.5.25x lose later commits (RPS-1976)',
+      ).toBe(true);
       const freshPublishes = [
         await publish(npmAdapter, RepoType.NPM),
         await publish(dockerAdapter, RepoType.DOCKER),
