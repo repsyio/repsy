@@ -33,6 +33,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
@@ -122,6 +123,26 @@ public class VersionSignatureService {
     return this.versionSignatureRepository
         .findByArtifactVersionIdAndFileName(version.getId(), fileName)
         .isPresent();
+  }
+
+  /** The id of the verified signature recorded for the file, if there is one right now. */
+  @Transactional(readOnly = true)
+  public Optional<UUID> findRecordedId(final ArtifactVersion version, final String fileName) {
+
+    return this.versionSignatureRepository
+        .findByArtifactVersionIdAndFileName(version.getId(), fileName)
+        .map(VersionSignature::getId);
+  }
+
+  /**
+   * Forgets exactly the record that was read, never a newer one for the same file (RPS-1984): a
+   * signature request can record the file's signature between the moment the file's own request
+   * read the record and the moment it deletes it, and deleting by file name would take that fresh
+   * record with it and leave the version unsigned for good.
+   */
+  public void forget(final UUID signatureId) {
+
+    this.versionSignatureRepository.deleteById(signatureId);
   }
 
   /** Forgets the verified signature of a file that was stored again: its bytes are new. */
