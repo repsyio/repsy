@@ -107,8 +107,8 @@ jobs:
               "wire": ("wire", "", [r for r in WIRE if r not in ("maven", "stack")], "", 60, "", True),
               # Maven is split by spec file in two halves that take about the same time (RPS-1857; SPLIT below): the
               # Gradle Kotlin family and the Groovy locking spec against everything else. 75% of the runner is Gradle.
-              "wire-maven-kotlin": ("wire", "", ["maven"], "", 45, "", True),
-              "wire-maven-rest": ("wire", "", ["maven"], "", 45, "", True),
+              "wire-maven-kotlin": ("wire", "", ["maven"], "", 60, "", True),
+              "wire-maven-rest": ("wire", "", ["maven"], "", 60, "", True),
               "wire-stack": ("wire", "", ["stack"], "", 30, "", True),
               # The panel UI beyond Chromium (RPS-1651, README.md "UI suite: Firefox and WebKit"): the @smoke set, the
               # keyboard walkthrough and the panel-over-https spec (which skips without the TLS stack) in Firefox and
@@ -312,6 +312,18 @@ jobs:
 
       # Runs queue in the e2e-nightly group, so no leg of another run is using the host now; an image that is still
       # used by a container is kept (docker rmi refuses it).
+      # A cancelled or timed-out leg leaves its Playwright runner container running: `docker compose run --rm`
+      # ends with the compose client, not with the container, and `Stop the stack` only brings down the stack
+      # project. The orphan keeps running its tests on this shared host and, with network_mode: host, against the
+      # ports of the next run's stack of the same leg (RPS-1981). Runs queue in the e2e-nightly group, so at this
+      # point every runner container of the suite is such an orphan. Cloud's harness names its projects
+      # repsy-cloud-e2e-*, which the pattern does not match.
+      - name: Remove runner containers left by cancelled or timed-out legs
+        run: |
+          docker ps -a --format '{{.ID}} {{.Label "com.docker.compose.project"}}' \
+            | awk '$2 ~ /^repsy-e2e-.+-runners$/ { print $1 }' \
+            | xargs -r docker rm -f || true
+
       - name: Remove the images of earlier runs
         run: |
           docker images --format '{{.Repository}}:{{.Tag}}' repsy-os-e2e \
@@ -744,4 +756,7 @@ jobs:
           STACK: ${{ matrix.stack }}
         run: |
           read -ra stack_args <<< "$STACK"
+          # The leg's own runner containers first: after a timeout or a cancel Playwright is still running in them
+          # (RPS-1981).
+          docker ps -aq --filter "label=com.docker.compose.project=${REPSY_E2E_PROJECT}-runners" | xargs -r docker rm -f || true
           ./run.sh local down "${stack_args[@]}"
