@@ -18,6 +18,7 @@ package io.repsy.os.shared.auth.utils;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.apache.commons.codec.binary.Base64.decodeBase64;
 
+import io.repsy.os.shared.token.dtos.TokenType;
 import io.repsy.protocols.shared.repo.dtos.Credentials;
 import java.time.Duration;
 import java.time.Instant;
@@ -92,6 +93,22 @@ public class AuthUtils {
   public static @NonNull String removeBearerHeader(final @NonNull String authHeader) {
 
     return authHeader.substring(AUTH_BEARER.length());
+  }
+
+  /**
+   * The secret of a personal access token sent as the Bearer value, or {@code null} for any other
+   * header. A header is a personal access token by its {@code rut-} prefix and nothing else, which
+   * is what keeps it away from the JWT and the password checks.
+   */
+  public static @Nullable String personalAccessTokenSecretOf(final @NonNull String authHeader) {
+
+    if (!isBearerToken(authHeader)) {
+      return null;
+    }
+
+    final var bearerToken = removeBearerHeader(authHeader);
+
+    return TokenType.REPSY_USER_TOKEN.matches(bearerToken) ? bearerToken : null;
   }
 
   public static boolean isBearerToken(final @NonNull String authHeader) {

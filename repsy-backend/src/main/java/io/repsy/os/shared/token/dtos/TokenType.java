@@ -27,4 +27,9 @@ public enum TokenType {
   TokenType(final String prefix) {
     this.prefix = prefix;
   }
+
+  /** Whether {@code secret} carries this type's prefix, which is what tells the types apart. */
+  public boolean matches(final String secret) {
+    return secret.startsWith(this.prefix);
+  }
 }

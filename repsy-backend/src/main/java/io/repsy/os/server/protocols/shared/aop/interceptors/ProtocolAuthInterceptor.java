@@ -108,9 +108,7 @@ public class ProtocolAuthInterceptor implements HandlerInterceptor {
     }
 
     final var authComponent = this.getUnknownRepoAuthComponent(methodHandler);
-    final var userInfo = authComponent.authenticateUser(authHeader);
-
-    authComponent.authorizePanelUser(userInfo, this.getPermission(methodHandler));
+    authComponent.authorizeUnknownRepoRequest(authHeader, this.getPermission(methodHandler));
 
     return new ItemNotFoundException("repoNotFound");
   }

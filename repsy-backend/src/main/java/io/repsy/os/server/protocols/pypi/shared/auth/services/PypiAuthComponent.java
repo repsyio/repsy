@@ -56,6 +56,10 @@ public class PypiAuthComponent extends ProtocolAuthService {
       throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
     }
 
+    if (super.tryAuthorizeWithPat(repoId, credentials.getPassword(), permission)) {
+      return;
+    }
+
     if (super.tryAuthorizeWithDeployToken(repoId, credentials.getPassword(), permission)) {
       return;
     }

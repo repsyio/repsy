@@ -380,11 +380,15 @@ paths:
         - access-tokens
       operationId: getCurrentAccessToken
       description: >-
-        Who the access token of the request belongs to, what it may do and until when. It answers
-        400 `notAnAccessToken` for the access token of a login: this route is for a client that
-        authenticates with a personal access token, which asks it what it is. No route accepts a
-        personal access token yet (see the `personalAccessToken` security scheme), so until one
-        does this answers 400, or 401 to anything that is not a login token.
+        Who the access token of the request belongs to, what it may do and until when. It is the
+        route for a client that authenticates with a personal access token (see the
+        `personalAccessToken` security scheme), which asks it what it is. The answer carries the
+        owner, the name, the scopes, `expirationDate` and `lastUsedAt` of the token. It answers 400
+        `notAnAccessToken` for the access token of a login, and 401 for anything that is neither
+        (a personal access token sent as Basic credentials included).
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -489,6 +493,9 @@ paths:
       tags:
         - repos
       operationId: getRepoSettings
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -515,6 +522,9 @@ paths:
             schema:
               "$ref": "#/components/schemas/RepoSettingsForm"
         required: true
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '204':
           "$ref": "#/components/responses/NoContent"
@@ -572,6 +582,9 @@ paths:
         - "$ref": "#/components/parameters/Page"
         - "$ref": "#/components/parameters/Size"
         - "$ref": "#/components/parameters/Sort"
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -604,6 +617,9 @@ paths:
             schema:
               "$ref": "#/components/schemas/RepoCreateRequest"
         required: true
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '201':
           description: Created
@@ -660,6 +676,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -696,6 +713,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -730,6 +748,9 @@ paths:
             schema:
               "$ref": "#/components/schemas/RepoUpdateForm"
         required: true
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -756,6 +777,9 @@ paths:
       tags:
         - repos
       operationId: deleteRepo
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '204':
           "$ref": "#/components/responses/NoContent"
@@ -789,6 +813,9 @@ paths:
           schema:
             type: string
             format: uuid
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '204':
           "$ref": "#/components/responses/NoContent"
@@ -821,6 +848,9 @@ paths:
           schema:
             type: string
             format: uuid
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -862,6 +892,9 @@ paths:
         - "$ref": "#/components/parameters/Page"
         - "$ref": "#/components/parameters/Size"
         - "$ref": "#/components/parameters/Sort"
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -890,6 +923,9 @@ paths:
             schema:
               "$ref": "#/components/schemas/DeployTokenForm"
         required: true
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '201':
           description: Created
@@ -934,6 +970,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -968,6 +1005,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -1016,6 +1054,9 @@ paths:
       tags:
         - repos
       operationId: getRepoUsage
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -1063,6 +1104,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -1115,6 +1157,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -1156,6 +1199,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -1206,6 +1250,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -1247,6 +1292,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '202':
           "$ref": "#/components/responses/Accepted"
@@ -1298,6 +1346,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '202':
           "$ref": "#/components/responses/Accepted"
@@ -1341,6 +1392,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -1381,6 +1433,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -1409,6 +1462,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -1444,6 +1498,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -1487,6 +1542,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -1517,6 +1573,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -1551,6 +1608,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -1591,6 +1649,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -1751,6 +1810,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -1787,6 +1847,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -1811,6 +1872,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '204':
           "$ref": "#/components/responses/NoContent"
@@ -1848,6 +1912,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -1877,6 +1942,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '204':
           "$ref": "#/components/responses/NoContent"
@@ -1921,6 +1989,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -1966,6 +2035,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -1996,6 +2066,9 @@ paths:
       description: >-
         Deletes the layers no manifest uses any more. The layer rows are removed before the response;
         the blobs are removed in the background.
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '204':
           "$ref": "#/components/responses/NoContent"
@@ -2034,6 +2107,9 @@ paths:
           description: Only delete the untagged manifests of this image.
           schema:
             type: string
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -2067,6 +2143,9 @@ paths:
         The cleanup policy of a Docker repository. A disabled default policy is created on the
         first read, so nothing is ever deleted until a policy is enabled. Fails with 400
         (`repoScopeNotMatched`) when the repository is not a Docker repository.
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -2104,6 +2183,9 @@ paths:
           application/json:
             schema:
               "$ref": "#/components/schemas/CleanupPolicyForm"
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -2144,6 +2226,9 @@ paths:
           application/json:
             schema:
               "$ref": "#/components/schemas/CleanupPolicyStatusForm"
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -2179,6 +2264,9 @@ paths:
         Makes the cleanup policy due now; the scheduler runs it on its next pass and the work
         finishes later. The `Location` header is the policy, whose `lastRunAt` reports the outcome.
         The policy must be enabled (400 `cleanupPolicyDisabled`).
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '202':
           "$ref": "#/components/responses/Accepted"
@@ -2223,6 +2311,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -2251,6 +2340,9 @@ paths:
           schema:
             type: string
         - "$ref": "#/components/parameters/DockerImage"
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '204':
           "$ref": "#/components/responses/NoContent"
@@ -2301,6 +2393,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -2346,6 +2439,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -2379,6 +2473,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '204':
           "$ref": "#/components/responses/NoContent"
@@ -2434,6 +2531,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -2480,6 +2578,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -2524,6 +2623,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -2567,6 +2667,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -2593,6 +2694,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '204':
           description: No Content
@@ -2641,6 +2745,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -2672,6 +2777,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '204':
           description: No Content
@@ -2708,6 +2816,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -2753,6 +2862,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -2784,6 +2894,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -2803,6 +2914,9 @@ paths:
         - helm-charts
       operationId: deleteAllHelmChartVersions
       parameters: []
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '204':
           "$ref": "#/components/responses/NoContent"
@@ -2837,6 +2951,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -2885,6 +3000,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -2921,6 +3037,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -2940,6 +3057,9 @@ paths:
         - helm-charts
       operationId: deleteHelmChartVersion
       parameters: []
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '204':
           "$ref": "#/components/responses/NoContent"
@@ -2993,6 +3113,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -3042,6 +3163,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -3068,6 +3190,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '204':
           description: No Content
@@ -3104,6 +3229,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -3156,6 +3282,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -3197,6 +3324,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -3226,6 +3354,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '204':
           description: No Content
@@ -3268,6 +3399,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -3302,6 +3434,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '204':
           description: No Content
@@ -3349,6 +3484,9 @@ paths:
         - "$ref": "#/components/parameters/Page"
         - "$ref": "#/components/parameters/Size"
         - "$ref": "#/components/parameters/Sort"
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -3377,6 +3515,9 @@ paths:
             schema:
               "$ref": "#/components/schemas/KeyStoreForm"
         required: true
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '201':
           description: Created
@@ -3420,6 +3561,9 @@ paths:
         - "$ref": "#/components/parameters/Page"
         - "$ref": "#/components/parameters/Size"
         - "$ref": "#/components/parameters/Sort"
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -3458,6 +3602,9 @@ paths:
             schema:
               "$ref": "#/components/schemas/PgpPublicKeyForm"
         required: true
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '201':
           description: Created
@@ -3508,6 +3655,9 @@ paths:
           schema:
             type: string
             format: uuid
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -3537,6 +3687,9 @@ paths:
           schema:
             type: string
             format: uuid
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '204':
           description: No Content
@@ -3569,6 +3722,9 @@ paths:
           schema:
             type: string
             format: uuid
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -3598,6 +3754,9 @@ paths:
           schema:
             type: string
             format: uuid
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '204':
           description: No Content
@@ -3639,6 +3798,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -3677,6 +3837,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -3701,6 +3862,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '204':
           description: No Content
@@ -3747,6 +3911,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -3788,6 +3953,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -3817,6 +3983,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '204':
           description: No Content
@@ -3851,6 +4020,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -3895,6 +4065,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -3944,6 +4115,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -3988,6 +4160,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -4018,6 +4191,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '204':
           description: No Content
@@ -4070,6 +4246,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -4117,6 +4294,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -4152,6 +4330,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '204':
           description: No Content
@@ -4192,6 +4373,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -4237,6 +4419,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -4274,6 +4457,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -4298,6 +4482,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '204':
           description: No Content
@@ -4344,6 +4531,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -4386,6 +4574,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -4415,6 +4604,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '204':
           description: No Content
@@ -4456,6 +4648,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -4504,6 +4697,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -4545,6 +4739,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -4574,6 +4769,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '204':
           description: No Content
@@ -4608,6 +4806,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -4632,6 +4831,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '204':
           description: No Content
@@ -4674,6 +4876,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -4712,6 +4915,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -4736,6 +4940,9 @@ paths:
           required: true
           schema:
             type: string
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '204':
           description: No Content
@@ -4780,6 +4987,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -4827,6 +5035,7 @@ paths:
       security:
         - { }
         - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -4862,6 +5071,9 @@ paths:
           schema:
             type: string
             default: 'ruby'
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '204':
           description: No Content
@@ -4889,7 +5101,8 @@ components:
       description: >-
         The access token returned by `login` or `refreshToken`. Every operation needs it unless it
         says `security: []` (public), or lists an empty requirement next to `bearerAuth` (readable
-        anonymously when the repository is public, otherwise it needs the token).
+        anonymously when the repository is public, otherwise it needs the token), or lists
+        `personalAccessToken` next to it, which is then accepted in its place.
     personalAccessToken:
       type: http
       scheme: bearer
@@ -4897,7 +5110,18 @@ components:
       description: >-
         A personal access token (`rut-...`), issued by `createAccessToken` and sent as `Authorization:
         Bearer <token>`. An operation that accepts it lists it next to `bearerAuth` in its
-        `security`; none does yet.
+        `security`: the operations on a repository (every path with `{repoName}`), `listRepos`,
+        `createRepo` and `getCurrentAccessToken`. Every other operation takes the access token of a
+        login only, so a personal access token cannot change a password or a username, and cannot
+        create, list or revoke tokens (it answers 401).
+
+
+        What a token may do is the permission of its owner intersected with its scopes:
+        `repo:read` reads, `repo:write` also writes, and `repo:manage` also manages, which is the
+        permission of an ADMIN, so it gives nothing to a user who is not one. A token that is
+        signed in but may not do an operation is answered 403 `accessDenied`, and an unknown,
+        expired or revoked token 401. Repeated unknown or expired tokens count against the client
+        like wrong passwords and are answered 429.
   parameters:
     # region: shared
     Page:

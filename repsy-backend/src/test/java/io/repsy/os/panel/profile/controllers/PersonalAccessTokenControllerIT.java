@@ -26,6 +26,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
@@ -800,9 +801,14 @@ class PersonalAccessTokenControllerIT extends AbstractIntegrationTest {
     }
   }
 
-  @ParameterizedTest(name = "{0} does not accept a personal access token yet")
-  @MethodSource("endpoints")
-  @DisplayName("no route accepts a personal access token yet, not even its own routes")
+  /** The routes that manage tokens: a personal access token cannot mint or revoke tokens. */
+  static Stream<Endpoint> managementEndpoints() {
+    return endpoints().filter(endpoint -> !endpoint.name().endsWith("/current"));
+  }
+
+  @ParameterizedTest(name = "{0} does not accept a personal access token")
+  @MethodSource("managementEndpoints")
+  @DisplayName("the routes that manage tokens refuse a personal access token (RPS-1903)")
   void refusesAPersonalAccessToken(final Endpoint endpoint) throws Exception {
     final var body = expectCreated(this.create(this.aliceBearer, form("ci", "repo:manage")));
     final String secret = JsonPath.read(body, "$.token");
@@ -813,6 +819,55 @@ class PersonalAccessTokenControllerIT extends AbstractIntegrationTest {
         .andExpect(status().isUnauthorized());
 
     assertThat(this.countOf(this.alice)).isEqualTo(1);
+  }
+
+  @Test
+  @DisplayName("GET /current answers who a personal access token is, what it may do and until when")
+  void currentAnswersWhatThePersonalAccessTokenIs() throws Exception {
+    final var body = expectCreated(this.create(this.aliceBearer, form("ci", "repo:write")));
+    final String secret = JsonPath.read(body, "$.token");
+
+    this.current("Bearer " + secret)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.username").value(this.alice.getUsername()))
+        .andExpect(jsonPath("$.name").value("ci"))
+        .andExpect(jsonPath("$.scopes[0]").value("profile:read"))
+        .andExpect(jsonPath("$.scopes[1]").value("repo:write"))
+        .andExpect(
+            jsonPath("$.expirationDate").value((String) JsonPath.read(body, "$.expirationDate")));
+
+    // It is the token's own use: the answer after it says when. The test runs in one transaction,
+    // so the row the update touched is read again from the database.
+    this.entityManager.flush();
+    this.entityManager.clear();
+
+    this.current("Bearer " + secret)
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.lastUsedAt").isNotEmpty());
+  }
+
+  @Test
+  @DisplayName("GET /current refuses a personal access token sent as Basic credentials")
+  void currentRefusesABasicPersonalAccessToken() throws Exception {
+    final var body = expectCreated(this.create(this.aliceBearer, form("ci", "repo:read")));
+    final String secret = JsonPath.read(body, "$.token");
+
+    this.current(basicAuth(this.alice.getUsername(), secret)).andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  @DisplayName("GET /current refuses an unknown, an expired and a revoked personal access token")
+  void currentRefusesATokenThatIsNotLive() throws Exception {
+    final var body = expectCreated(this.create(this.aliceBearer, form("ci", "repo:read")));
+    final String secret = JsonPath.read(body, "$.token");
+    final var id = idOf(body);
+
+    this.current("Bearer " + TokenFactory.personalAccessToken())
+        .andExpect(status().isUnauthorized());
+
+    this.revoke(this.aliceBearer, id).andExpect(status().isNoContent());
+
+    this.current("Bearer " + secret).andExpect(status().isUnauthorized());
   }
 
   // ---------------------------------------------------------------------------------------------

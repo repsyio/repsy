@@ -24,6 +24,12 @@ public enum AuthenticationType {
   DEPLOY_TOKEN("deploy_token"),
   USERNAME_PASSWORD("username_password"),
   DOCKER_SCAN("docker_scan"),
+  /**
+   * A JWT minted from a personal access token (the Docker token exchange). Its subject is the id of
+   * the token, which is read again on every request, so it ends with the token. It is a protocol
+   * token and never a panel one.
+   */
+  PERSONAL_ACCESS_TOKEN("personal_access_token"),
   ANONYMOUS("anonymous");
 
   final String value;
@@ -43,6 +49,10 @@ public enum AuthenticationType {
 
     if (DOCKER_SCAN.value.equals(value)) {
       return DOCKER_SCAN;
+    }
+
+    if (PERSONAL_ACCESS_TOKEN.value.equals(value)) {
+      return PERSONAL_ACCESS_TOKEN;
     }
 
     if (ANONYMOUS.value.equals(value)) {

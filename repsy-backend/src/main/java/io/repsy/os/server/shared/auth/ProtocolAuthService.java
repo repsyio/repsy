@@ -31,17 +31,25 @@ import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.dtos.AuthenticationType;
 import io.repsy.os.shared.auth.dtos.PermissionInfo;
 import io.repsy.os.shared.auth.services.RevokedProtocolTokenService;
+import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
+import io.repsy.os.shared.token.dtos.PersonalAccessTokenInfo;
+import io.repsy.os.shared.token.dtos.TokenScope;
+import io.repsy.os.shared.token.dtos.TokenType;
+import io.repsy.os.shared.token.services.PersonalAccessTokenService;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.shared.repo.dtos.Credentials;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
@@ -63,6 +71,7 @@ public class ProtocolAuthService {
   protected final @NonNull AuthFailureThrottle authFailureThrottle;
 
   private @Nullable RevokedProtocolTokenService revokedTokens;
+  private @Nullable PersonalAccessTokenService personalAccessTokens;
 
   /**
    * Setter-injected so that the protocol auth components, which all pass the five arguments above
@@ -72,6 +81,17 @@ public class ProtocolAuthService {
   @Autowired(required = false)
   public void setRevokedTokens(final @Nullable RevokedProtocolTokenService revokedTokens) {
     this.revokedTokens = revokedTokens;
+  }
+
+  /**
+   * Setter-injected for the same reason as {@link #setRevokedTokens}. Without it (a unit test that
+   * builds a component by hand) no personal access token is known, so every {@code rut-} secret is
+   * refused.
+   */
+  @Autowired(required = false)
+  public void setPersonalAccessTokens(
+      final @Nullable PersonalAccessTokenService personalAccessTokens) {
+    this.personalAccessTokens = personalAccessTokens;
   }
 
   /**
@@ -94,6 +114,11 @@ public class ProtocolAuthService {
    * is whatever the client typed into the Basic credentials, so it never identifies a user
    * (RPS-979).
    *
+   * <p>A Bearer value that starts with {@code rut-} is a personal access token and nothing else: it
+   * is authorized as one or refused, and never reaches the JWT or the password checks (see {@link
+   * #tryAuthorizeWithPat}). A JWT minted from one ({@link
+   * AuthenticationType#PERSONAL_ACCESS_TOKEN}) is authorized as that token, read again.
+   *
    * <p>A Bearer value that is neither a live deploy token nor a verifiable protocol JWT answers
    * {@code unAuthorized} and counts against {@link AuthFailureThrottle}, like a wrong Basic
    * password (RPS-1209). An expired protocol JWT is answered {@code sessionExpired} and not
@@ -106,6 +131,10 @@ public class ProtocolAuthService {
 
     final var bearerToken = authHeader.substring(AUTH_BEARER.length());
 
+    if (this.tryAuthorizeWithPatBearer(repoId, bearerToken, permission)) {
+      return;
+    }
+
     if (this.acceptsRawDeployTokenBearer()
         && this.tryAuthorizeWithDeployToken(repoId, bearerToken, permission)) {
       return;
@@ -115,26 +144,33 @@ public class ProtocolAuthService {
 
     this.rejectRevokedToken(bearerToken);
 
-    if (authenticationType == AuthenticationType.DEPLOY_TOKEN) {
-      this.authorizeTokenRequestTokenId(
-          repoId, this.jwtUtils.extractUserId(authHeader, TokenRealm.PROTOCOL), permission);
-      return;
-    }
+    this.authorizeByAuthenticationType(authenticationType, authHeader, repoId, permission);
+  }
 
-    // A scanner token is repo-scoped and has no user; only Docker knows how to authorize one, so
-    // every other protocol keeps refusing it through the hook's default.
-    if (authenticationType == AuthenticationType.DOCKER_SCAN) {
-      this.authorizeScannerBearer(authHeader, repoId, permission);
-      return;
-    }
+  private void authorizeByAuthenticationType(
+      final @NonNull AuthenticationType authenticationType,
+      final @NonNull String authHeader,
+      final @NonNull UUID repoId,
+      final @NonNull Permission permission) {
 
-    // An anonymous token has no user either, so its username claim must not be looked up
-    // (RPS-986).
-    if (authenticationType == AuthenticationType.ANONYMOUS) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
-    }
+    switch (authenticationType) {
+      case DEPLOY_TOKEN ->
+          this.authorizeTokenRequestTokenId(
+              repoId, this.jwtUtils.extractUserId(authHeader, TokenRealm.PROTOCOL), permission);
 
-    this.authorizeJWTRequest(authHeader, permission);
+      // The JWT of a personal access token exchange (Docker): the token row is read again.
+      case PERSONAL_ACCESS_TOKEN -> this.authorizePersonalAccessTokenJwt(authHeader, permission);
+
+      // A scanner token is repo-scoped and has no user; only Docker knows how to authorize one, so
+      // every other protocol keeps refusing it through the hook's default.
+      case DOCKER_SCAN -> this.authorizeScannerBearer(authHeader, repoId, permission);
+
+      // An anonymous token has no user either, so its username claim must not be looked up
+      // (RPS-986).
+      case ANONYMOUS -> throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+
+      case null, default -> this.authorizeJWTRequest(authHeader, permission);
+    }
   }
 
   /**
@@ -245,6 +281,10 @@ public class ProtocolAuthService {
       throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
     }
 
+    if (this.tryAuthorizeWithPat(repoId, credentials.getPassword(), permission)) {
+      return;
+    }
+
     if (this.tryAuthorizeWithDeployToken(repoId, credentials.getPassword(), permission)) {
       return;
     }
@@ -316,6 +356,66 @@ public class ProtocolAuthService {
     throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
   }
 
+  /**
+   * Authenticates and authorizes the caller of a web UI API request to a repo that does not exist,
+   * as if the repo were a private one (see {@code ProtocolAuthInterceptor}). A personal access
+   * token is treated as on an existing repo, so its owner gets the same answer for a missing repo
+   * as for any other.
+   */
+  public void authorizeUnknownRepoRequest(
+      final @NonNull String authHeader, final @NonNull Permission permission) {
+
+    final var secret = AuthUtils.personalAccessTokenSecretOf(authHeader);
+
+    if (secret != null) {
+      this.authorizePanelPersonalAccessToken(secret, permission);
+      return;
+    }
+
+    this.authorizePanelUser(this.authenticateUser(authHeader), permission);
+  }
+
+  /**
+   * Authorizes a personal access token on a web UI API route. The token is the Bearer value and
+   * nothing else, like on the protocol routes. What it may do is its scopes intersected with the
+   * owner's role, and a caller who is signed in but may not do it is answered {@code accessDenied}
+   * (403), not {@code unAuthorized}: only a missing or invalid credential is a 401 there
+   * (RPS-1284).
+   */
+  private @NonNull PermissionInfo authorizePanelPersonalAccessToken(
+      final @NonNull String secret, final @NonNull Permission permission) {
+
+    final var token = this.authenticateWithPat(secret);
+    final var isAdmin =
+        this.userTxService.getAuthenticatedUserById(token.userId()).getRole() == UserRole.ADMIN;
+
+    final var permissionInfo =
+        PermissionInfo.builder()
+            .canRead(TokenScope.permits(token.scopes(), Permission.READ))
+            .canWrite(TokenScope.permits(token.scopes(), Permission.WRITE))
+            .canManage(TokenScope.permits(token.scopes(), Permission.MANAGE) && isAdmin)
+            .build();
+
+    if (!grants(permissionInfo, permission)) {
+      throw new AccessNotAllowedException(ACCESS_DENIED);
+    }
+
+    this.touchPersonalAccessToken(token);
+
+    return permissionInfo;
+  }
+
+  private static boolean grants(
+      final @NonNull PermissionInfo permissionInfo, final @NonNull Permission permission) {
+
+    return switch (permission) {
+      case READ -> permissionInfo.isCanRead();
+      case WRITE -> permissionInfo.isCanWrite();
+      case MANAGE -> permissionInfo.isCanManage();
+      default -> false;
+    };
+  }
+
   /** Authenticates a web UI API request, so a bearer token has to be a panel access token. */
   public @NonNull UserInfo authenticateUser(final @Nullable String authHeader) {
 
@@ -334,6 +434,147 @@ public class ProtocolAuthService {
       final @NonNull RepoInfo repoInfo, final @NonNull Permission permission) {
 
     return !repoInfo.isPrivateRepo() && Permission.READ.equals(permission);
+  }
+
+  /**
+   * Authorizes a personal access token presented as the secret itself: the password of a Basic
+   * credential (the username is ignored, as it is for a deploy token) or a Bearer value.
+   *
+   * <p>A secret that starts with {@code rut-} is a personal access token and only that: this method
+   * either authorizes it or throws, so it never reaches the JWT decode or the password check. One
+   * that is unknown or expired counts as a failed credential against {@link AuthFailureThrottle}
+   * and is answered {@code unAuthorized}. A token that is recognized but not allowed (the scope
+   * does not reach the permission, or MANAGE without the ADMIN role) answers {@code unAuthorized}
+   * too and is not counted, like a refused deploy token.
+   *
+   * <p>The token is not bound to a repo, so {@code repoId} does not narrow it: what it may do on
+   * any repo is its scopes intersected with what its owner may do, which can only be less.
+   *
+   * @return {@code false} only when the secret is not a personal access token
+   */
+  protected boolean tryAuthorizeWithPat(
+      final @NonNull UUID repoId,
+      final @NonNull String secret,
+      final @NonNull Permission permission) {
+
+    if (!TokenType.REPSY_USER_TOKEN.matches(secret)) {
+      return false;
+    }
+
+    this.authorizePersonalAccessToken(this.authenticateWithPat(secret), permission);
+
+    return true;
+  }
+
+  private boolean tryAuthorizeWithPatBearer(
+      final @NonNull UUID repoId,
+      final @NonNull String bearerToken,
+      final @NonNull Permission permission) {
+
+    if (!TokenType.REPSY_USER_TOKEN.matches(bearerToken)) {
+      return false;
+    }
+
+    // Docker clients exchange their credentials at /v2/token first, so a raw secret handed to /v2
+    // is refused there, as a raw deploy-token secret is.
+    if (!this.acceptsRawDeployTokenBearer()) {
+      throw this.countedUnAuthorized();
+    }
+
+    return this.tryAuthorizeWithPat(repoId, bearerToken, permission);
+  }
+
+  /**
+   * Finds the live token a {@code rut-} secret belongs to. An unknown or expired one is a failed
+   * credential: it is counted, and is answered like a wrong password.
+   */
+  protected @NonNull PersonalAccessTokenInfo authenticateWithPat(final @NonNull String secret) {
+
+    final var service = this.personalAccessTokens;
+    final Optional<PersonalAccessTokenInfo> found =
+        service == null ? Optional.empty() : service.findByToken(secret);
+
+    if (found.isEmpty() || found.get().isExpired()) {
+      throw this.countedUnAuthorized();
+    }
+
+    return found.get();
+  }
+
+  /**
+   * What a personal access token may do on a protocol route: its scopes intersected with what its
+   * owner may do. A scope narrows and never widens: it cannot give MANAGE to a user who is not an
+   * ADMIN (the role is read only when MANAGE is asked for, since every user reads and writes), and
+   * {@code repo:manage} on a user without the role is refused.
+   */
+  protected void authorizePersonalAccessToken(
+      final @NonNull PersonalAccessTokenInfo token, final @NonNull Permission permission) {
+
+    if (!TokenScope.permits(token.scopes(), permission)) {
+      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+    }
+
+    if (permission == Permission.MANAGE) {
+      this.checkManage(this.userTxService.getAuthenticatedUserById(token.userId()));
+    }
+
+    this.touchPersonalAccessToken(token);
+  }
+
+  /**
+   * Mints the protocol JWT of a personal access token, for a login that exchanges one (npm, Cargo,
+   * Docker). The subject is the id of the token and the type is {@link
+   * AuthenticationType#PERSONAL_ACCESS_TOKEN}, so every request with it reads the token again; the
+   * JWT never outlives the token. It is a protocol token: no personal access token is ever turned
+   * into a panel one.
+   */
+  protected @NonNull String createPersonalAccessTokenJwt(
+      final @NonNull PersonalAccessTokenInfo token, final @NonNull Duration maxTimeout) {
+
+    final var untilExpiry = Duration.between(Instant.now(), token.expirationDate());
+    final var timeout = untilExpiry.compareTo(maxTimeout) < 0 ? untilExpiry : maxTimeout;
+
+    return this.jwtUtils.createProtocolToken(
+        token.id(), token.username(), timeout, AuthenticationType.PERSONAL_ACCESS_TOKEN);
+  }
+
+  protected void touchPersonalAccessToken(final @NonNull PersonalAccessTokenInfo token) {
+
+    final var service = this.personalAccessTokens;
+
+    if (service != null) {
+      service.updateLastUsedTime(token.id());
+    }
+  }
+
+  /**
+   * Authorizes the JWT a personal access token was exchanged for. Its subject is the id of the
+   * token, which is read again, so a revoked or expired token stops working at once, and the
+   * intersection is applied again with the scopes the token has now. A token that is gone is
+   * answered {@code unAuthorized} and is not counted: the JWT is one Repsy signed, not a guess.
+   */
+  private void authorizePersonalAccessTokenJwt(
+      final @NonNull String authHeader, final @NonNull Permission permission) {
+
+    final var tokenId = this.jwtUtils.extractUserId(authHeader, TokenRealm.PROTOCOL);
+
+    this.authorizePersonalAccessToken(
+        this.findLivePersonalAccessToken(tokenId)
+            .orElseThrow(() -> new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED)),
+        permission);
+  }
+
+  /** The token with this id if it exists and has not expired, for a JWT minted from it. */
+  protected @NonNull Optional<PersonalAccessTokenInfo> findLivePersonalAccessToken(
+      final @NonNull UUID tokenId) {
+
+    final var service = this.personalAccessTokens;
+
+    if (service == null) {
+      return Optional.empty();
+    }
+
+    return service.findById(tokenId).filter(token -> !token.isExpired());
   }
 
   protected boolean tryAuthorizeWithDeployToken(
@@ -469,6 +710,10 @@ public class ProtocolAuthService {
       throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
     }
 
+    // A personal access token is not a password: it is never hashed against one (see
+    // tryAuthorizeWithPat), so a password that looks like one is refused here, whoever the user is.
+    this.rejectPersonalAccessTokenAsPassword(password);
+
     final var userInfo = this.userTxService.getUserByUsernameOptional(username).orElse(null);
 
     // A password the cache remembers costs no hash check, so it is let through even for a client
@@ -484,6 +729,13 @@ public class ProtocolAuthService {
     }
 
     return userInfo;
+  }
+
+  private void rejectPersonalAccessTokenAsPassword(final @NonNull String password) {
+
+    if (TokenType.REPSY_USER_TOKEN.matches(password)) {
+      throw this.countedUnAuthorized();
+    }
   }
 
   /**
@@ -522,8 +774,11 @@ public class ProtocolAuthService {
       final @NonNull String authHeader,
       final @NonNull Permission permission) {
 
-    final var userInfo = this.authenticateUser(authHeader);
-    final var permissionInfo = this.authorizePanelUser(userInfo, permission);
+    final var secret = AuthUtils.personalAccessTokenSecretOf(authHeader);
+    final var permissionInfo =
+        secret != null
+            ? this.authorizePanelPersonalAccessToken(secret, permission)
+            : this.authorizePanelUser(this.authenticateUser(authHeader), permission);
 
     return RepoPermissionInfo.builder()
         .repoName(repoInfo.getName())

@@ -113,6 +113,15 @@ public class PersonalAccessTokenService {
   }
 
   /**
+   * The token with this id, expired or not, for a request that carries a JWT minted from it: the
+   * row is read again on every request, so a revoked token stops working at once.
+   */
+  public @NonNull Optional<PersonalAccessTokenInfo> findById(final @NonNull UUID tokenId) {
+
+    return this.tokenRepository.findById(tokenId).map(this.converter::toInfo);
+  }
+
+  /**
    * What a token says about itself, for the route a client calls with a token to learn what it is.
    *
    * @throws ItemNotFoundException if there is no such token

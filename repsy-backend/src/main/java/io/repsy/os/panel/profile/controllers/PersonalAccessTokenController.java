@@ -18,7 +18,6 @@ package io.repsy.os.panel.profile.controllers;
 import static org.springframework.data.domain.Sort.Direction.DESC;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 
-import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.os.generated.model.AccessTokenCreated;
 import io.repsy.os.generated.model.AccessTokenForm;
@@ -51,9 +50,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * The personal access tokens of the signed-in user. All of it works with the access token of a
- * login: nothing here accepts a personal access token yet, and the secret of a token is shown by
- * {@link #create} only.
+ * The personal access tokens of the signed-in user. Creating, listing and revoking work with the
+ * access token of a login only, so a token cannot mint or revoke tokens (the other three routes
+ * answer 401 to one); {@link #current} is the one route a personal access token may call. The
+ * secret of a token is shown by {@link #create} only.
  */
 @RestApiPort(MultiPortNames.PORT_API)
 @RestController
@@ -101,17 +101,16 @@ class PersonalAccessTokenController {
   }
 
   /**
-   * What the token of this request is. Its answer is {@link AccessTokenWhoAmI}, built by {@code
-   * PersonalAccessTokenService#getWhoAmI}, for the day a personal access token can authenticate a
-   * request; until then every caller here holds the access token of a login, which is not one.
+   * What the token of this request is. The one route here that takes a personal access token: it
+   * answers who the token belongs to, what it may do and when it stops working. With the access
+   * token of a login it answers {@code notAnAccessToken} (400), as there is no token to describe.
    */
   @GetMapping("/current")
   public AccessTokenWhoAmI current(@RequestHeader(AUTHORIZATION) final String authHeader) {
 
-    // A login token is checked first, so a request that is not authenticated at all is still 401.
-    this.panelAuthHelper.authenticate(authHeader);
+    final var token = this.panelAuthHelper.authenticateAccessToken(authHeader);
 
-    throw new BadRequestException("notAnAccessToken");
+    return this.tokenService.getWhoAmI(token.id());
   }
 
   @DeleteMapping("/{tokenId}")

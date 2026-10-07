@@ -16,14 +16,23 @@
 package io.repsy.os.shared.auth;
 
 import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
+import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.shared.auth.dtos.PanelSession;
+import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.auth.utils.JwtUtils;
+import io.repsy.os.shared.constants.ErrorConstants;
+import io.repsy.os.shared.token.dtos.PersonalAccessTokenInfo;
+import io.repsy.os.shared.token.dtos.TokenScope;
+import io.repsy.os.shared.token.services.PersonalAccessTokenService;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.os.shared.user.services.UserTxService;
+import io.repsy.protocols.shared.repo.dtos.Permission;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -35,6 +44,23 @@ public final class PanelAuthHelper {
   private final @NonNull JwtUtils jwtUtils;
   private final @NonNull UserTxService userTxService;
 
+  private @Nullable PersonalAccessTokenService personalAccessTokens;
+
+  /**
+   * Setter-injected, so that a helper built by hand in a unit test needs no service. Without it no
+   * personal access token is known.
+   */
+  @Autowired(required = false)
+  public void setPersonalAccessTokens(
+      final @Nullable PersonalAccessTokenService personalAccessTokens) {
+    this.personalAccessTokens = personalAccessTokens;
+  }
+
+  /**
+   * Authenticates a web UI API request with the access token of a login. A personal access token is
+   * not accepted here: {@link #authenticate} and every method that builds on it take a login only.
+   * The routes a command line client needs have an entry point of their own below.
+   */
   public @NonNull UserInfo authenticate(final @NonNull String authHeader) {
     return this.authenticateSession(authHeader).user();
   }
@@ -54,6 +80,90 @@ public final class PanelAuthHelper {
     }
 
     return new PanelSession(user, claims.sessionStart());
+  }
+
+  /**
+   * Authenticates the caller of the repo list: a login, or a personal access token that may read
+   * ({@code repo:read}).
+   */
+  public @NonNull UserInfo authenticateRepoReader(final @NonNull String authHeader) {
+    return this.authenticateOrPersonalAccessToken(authHeader, Permission.READ);
+  }
+
+  /**
+   * Authenticates the caller of the repo creation: a login, or a personal access token with {@code
+   * repo:manage}. The caller still has to be an ADMIN ({@link #requireAdmin}), which a scope cannot
+   * give.
+   */
+  public @NonNull UserInfo authenticateRepoCreator(final @NonNull String authHeader) {
+    return this.authenticateOrPersonalAccessToken(authHeader, Permission.MANAGE);
+  }
+
+  /**
+   * Authenticates the caller of {@code GET /api/profile/access-tokens/current}, the one route that
+   * is for a personal access token: it answers what the token is. A login is a valid caller and is
+   * answered {@code notAnAccessToken} (400), as it has no token to describe.
+   */
+  public @NonNull PersonalAccessTokenInfo authenticateAccessToken(
+      final @NonNull String authHeader) {
+
+    final var secret = AuthUtils.personalAccessTokenSecretOf(authHeader);
+
+    if (secret == null) {
+      this.authenticate(authHeader);
+
+      throw new BadRequestException("notAnAccessToken");
+    }
+
+    final var token = this.liveToken(secret);
+
+    this.touch(token);
+
+    return token;
+  }
+
+  private @NonNull UserInfo authenticateOrPersonalAccessToken(
+      final @NonNull String authHeader, final @NonNull Permission required) {
+
+    final var secret = AuthUtils.personalAccessTokenSecretOf(authHeader);
+
+    if (secret == null) {
+      return this.authenticate(authHeader);
+    }
+
+    final var token = this.liveToken(secret);
+
+    // Signed in but not allowed is a 403 on the panel API, not a 401 (RPS-1284).
+    if (!TokenScope.permits(token.scopes(), required)) {
+      throw new AccessNotAllowedException(ACCESS_DENIED);
+    }
+
+    final var user = this.userTxService.getAuthenticatedUserById(token.userId());
+
+    this.touch(token);
+
+    return user;
+  }
+
+  private @NonNull PersonalAccessTokenInfo liveToken(final @NonNull String secret) {
+
+    final var service = this.personalAccessTokens;
+    final var found = service == null ? null : service.findByToken(secret).orElse(null);
+
+    if (found == null || found.isExpired()) {
+      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+    }
+
+    return found;
+  }
+
+  private void touch(final @NonNull PersonalAccessTokenInfo token) {
+
+    final var service = this.personalAccessTokens;
+
+    if (service != null) {
+      service.updateLastUsedTime(token.id());
+    }
   }
 
   public void requireAdmin(final @NonNull UserInfo userInfo) {

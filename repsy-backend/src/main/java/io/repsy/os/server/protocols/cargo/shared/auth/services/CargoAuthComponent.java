@@ -30,9 +30,11 @@ import io.repsy.os.server.shared.auth.ProtocolAuthService;
 import io.repsy.os.server.shared.auth.VerifiedPasswordCache;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.dtos.AuthenticationType;
+import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.constants.ErrorConstants;
+import io.repsy.os.shared.token.dtos.TokenType;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.shared.repo.dtos.Credentials;
 import java.util.Optional;
@@ -66,6 +68,12 @@ public class CargoAuthComponent extends ProtocolAuthService {
     }
 
     if (isBearerToken(authHeader)) {
+      final var patSecret = AuthUtils.personalAccessTokenSecretOf(authHeader);
+
+      if (patSecret != null) {
+        return this.authenticateWithPersonalAccessToken(patSecret);
+      }
+
       // Only a token issued to a user is renewed. A deploy-token JWT carries a username the client
       // chose, so exchanging it would hand out the token of the user of that name (RPS-979).
       if (this.jwtUtils.extractAuthenticationType(authHeader, TokenRealm.PROTOCOL)
@@ -96,9 +104,28 @@ public class CargoAuthComponent extends ProtocolAuthService {
       throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
     }
 
+    // A secret with the personal access token prefix is that and nothing else (RPS-1903).
+    if (TokenType.REPSY_USER_TOKEN.matches(credentials.getPassword())) {
+      return this.authenticateWithPersonalAccessToken(credentials.getPassword());
+    }
+
     return this.authenticateWithDeployToken(credentials)
         .or(() -> this.authenticateWithUsernamePassword(credentials))
         .orElseThrow(() -> new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED));
+  }
+
+  /**
+   * Answers a personal access token with a {@link AuthenticationType#PERSONAL_ACCESS_TOKEN} JWT,
+   * which {@code handleBearerAuth} authorizes as that token, read again on every request. The
+   * secret sent as the Bearer value, with or without the scheme, is the same credential.
+   */
+  private String authenticateWithPersonalAccessToken(final String secret) {
+
+    final var token = super.authenticateWithPat(secret);
+
+    super.touchPersonalAccessToken(token);
+
+    return super.createPersonalAccessTokenJwt(token, TIMEOUT_ACCESS_TOKEN);
   }
 
   private Optional<String> authenticateWithDeployToken(final Credentials credentials) {

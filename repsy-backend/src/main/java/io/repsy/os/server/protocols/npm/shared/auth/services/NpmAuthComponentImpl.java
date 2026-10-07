@@ -31,12 +31,15 @@ import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.constants.ErrorConstants;
+import io.repsy.os.shared.token.dtos.PersonalAccessTokenInfo;
+import io.repsy.os.shared.token.dtos.TokenType;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.npm.shared.auth.services.NpmAuthComponent;
 import io.repsy.protocols.npm.shared.auth.services.NpmIdentityResolver;
 import io.repsy.protocols.npm.shared.auth.services.NpmTokenRevoker;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.repo.dtos.Credentials;
+import java.time.Duration;
 import java.time.Period;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
@@ -72,12 +75,33 @@ public class NpmAuthComponentImpl extends ProtocolAuthService
       final @NonNull String username,
       final @NonNull String password) {
 
+    // A secret with the personal access token prefix is that and nothing else: it never reaches the
+    // password check (RPS-1903).
+    if (TokenType.REPSY_USER_TOKEN.matches(password)) {
+      return this.authenticateWithPersonalAccessToken(password);
+    }
+
     final var deployTokenInfoOpt =
         this.deployTokenService.findByRepoIdAndToken(repoInfo.getStorageKey(), password);
 
     return deployTokenInfoOpt
         .map(deployTokenInfo -> this.authenticateWithDeployToken(deployTokenInfo, username))
         .orElseGet(() -> this.authenticateWithUserCredentials(username, password));
+  }
+
+  /**
+   * Answers a personal access token login with a {@link AuthenticationType#PERSONAL_ACCESS_TOKEN}
+   * JWT, which {@code ProtocolAuthService.handleBearerAuth} authorizes as that token: read again on
+   * every request, so it ends with the token and carries its scopes. The username the client typed
+   * is ignored.
+   */
+  private @NonNull String authenticateWithPersonalAccessToken(final @NonNull String secret) {
+
+    final var token = super.authenticateWithPat(secret);
+
+    super.touchPersonalAccessToken(token);
+
+    return super.createPersonalAccessTokenJwt(token, Duration.ofDays(TOKEN_EXPIRATION_DAYS));
   }
 
   private @NonNull String authenticateWithUserCredentials(
@@ -213,6 +237,10 @@ public class NpmAuthComponentImpl extends ProtocolAuthService
       throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
     }
 
+    if (TokenType.REPSY_USER_TOKEN.matches(credentials.getPassword())) {
+      return personalAccessTokenCaller(super.authenticateWithPat(credentials.getPassword()));
+    }
+
     final var deployToken =
         this.deployTokenService.findByRepoIdAndToken(repoId, credentials.getPassword());
 
@@ -226,6 +254,12 @@ public class NpmAuthComponentImpl extends ProtocolAuthService
   }
 
   private @NonNull Caller bearerCaller(final @NonNull UUID repoId, final @NonNull String header) {
+
+    final var patSecret = AuthUtils.personalAccessTokenSecretOf(header);
+
+    if (patSecret != null) {
+      return personalAccessTokenCaller(super.authenticateWithPat(patSecret));
+    }
 
     final var deployToken =
         this.deployTokenService.findByRepoIdAndToken(repoId, AuthUtils.removeBearerHeader(header));
@@ -247,6 +281,13 @@ public class NpmAuthComponentImpl extends ProtocolAuthService
             .map(NpmAuthComponentImpl::callerOf)
             .orElseThrow(() -> new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED));
       }
+      case PERSONAL_ACCESS_TOKEN -> {
+        final var tokenId = this.jwtUtils.extractUserId(header, TokenRealm.PROTOCOL);
+
+        yield super.findLivePersonalAccessToken(tokenId)
+            .map(NpmAuthComponentImpl::personalAccessTokenCaller)
+            .orElseThrow(() -> new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED));
+      }
       case ANONYMOUS, DOCKER_SCAN -> throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
       default -> {
         final var user = this.authenticateJwtUser(header);
@@ -265,6 +306,15 @@ public class NpmAuthComponentImpl extends ProtocolAuthService
   }
 
   /** A live deploy token; an expired one identifies nobody. */
+  /**
+   * A personal access token is known by its own id and by the username of its owner, never by the
+   * username the client typed.
+   */
+  private static @NonNull Caller personalAccessTokenCaller(
+      final @NonNull PersonalAccessTokenInfo token) {
+    return new Caller(token.id(), token.username());
+  }
+
   private static @NonNull Caller callerOf(final @NonNull DeployTokenInfo deployToken) {
 
     if (deployToken.isExpired() || deployToken.getUsername() == null) {

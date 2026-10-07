@@ -79,7 +79,7 @@ public class RepoCollectionController {
       @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC)
           final Pageable pageable) {
 
-    this.panelAuthHelper.authenticate(authHeader);
+    this.panelAuthHelper.authenticateRepoReader(authHeader);
 
     SortValidator.requireSortableBy(pageable, SORT_PROPERTIES);
 
@@ -99,7 +99,7 @@ public class RepoCollectionController {
       @RequestHeader(AUTHORIZATION) final String authHeader,
       @RequestBody @Valid final RepoCreateRequest form) {
 
-    final var user = this.panelAuthHelper.authenticate(authHeader);
+    final var user = this.panelAuthHelper.authenticateRepoCreator(authHeader);
     this.panelAuthHelper.requireAdmin(user);
 
     final var repoType = form.getType();
