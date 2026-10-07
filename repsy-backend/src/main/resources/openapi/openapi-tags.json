@@ -1,5 +1,6 @@
 {
   "allowedTags": [
+    "access-tokens",
     "admin-stats",
     "auth",
     "billing",
@@ -60,6 +61,7 @@
     "npm-package-api-controller": "npm-packages",
     "npm-scope-api-controller": "npm-scopes",
     "nuget-package-controller": "nuget-packages",
+    "personal-access-token-controller": "access-tokens",
     "profile-controller": "profile",
     "protocol-deploy-token-controller": "deploy-tokens",
     "protocol-repo-controller": "repos",
@@ -96,6 +98,7 @@
     "npm-scope-api-controller": "npm-scopes",
     "nu-get-package-controller": "nuget-packages",
     "nuget-package-controller": "nuget-packages",
+    "personal-access-token-controller": "access-tokens",
     "profile-controller": "profile",
     "protocol-cache-controller": "cache",
     "protocol-deploy-token-controller": "deploy-tokens",

@@ -374,6 +374,115 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
       summary: Delete the current user's account
+  "/api/profile/access-tokens/current":
+    get:
+      tags:
+        - access-tokens
+      operationId: getCurrentAccessToken
+      description: >-
+        Who the access token of the request belongs to, what it may do and until when. It answers
+        400 `notAnAccessToken` for the access token of a login: this route is for a client that
+        authenticates with a personal access token, which asks it what it is. No route accepts a
+        personal access token yet (see the `personalAccessToken` security scheme), so until one
+        does this answers 400, or 401 to anything that is not a login token.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/AccessTokenWhoAmI"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+      summary: Get the personal access token the request is authenticated with
+  "/api/profile/access-tokens/{tokenId}":
+    delete:
+      tags:
+        - access-tokens
+      operationId: revokeAccessToken
+      description: >-
+        Revokes the token at once. A token of another user is a 404, as is one that is already gone.
+      responses:
+        '204':
+          "$ref": "#/components/responses/NoContent"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+      summary: Revoke a personal access token
+    parameters:
+      - name: tokenId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+  "/api/profile/access-tokens":
+    get:
+      tags:
+        - access-tokens
+      operationId: listAccessTokens
+      description: >-
+        The personal access tokens of the current user. Sortable by `id`, `name`, `expirationDate`,
+        `lastUsedAt`, `createdAt` (`property,direction`). The default is `id,desc`.
+      parameters:
+        - "$ref": "#/components/parameters/Page"
+        - "$ref": "#/components/parameters/Size"
+        - "$ref": "#/components/parameters/Sort"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/PagedModelAccessTokenListItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+      summary: List the personal access tokens of the current user
+    post:
+      tags:
+        - access-tokens
+      operationId: createAccessToken
+      description: >-
+        Creates a personal access token for the current user. The secret is in the response and
+        nowhere else: only its hash is stored, so it cannot be shown again. The answer is 400 when
+        the expiration date is in the past (`accessTokenExpirationInPast`) or more than 365 days
+        ahead by UTC calendar day (`accessTokenExpirationTooLate`), and when the user already holds
+        50 tokens that have not expired (`accessTokenLimitReached`); an expired token does not count.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/AccessTokenForm"
+        required: true
+      responses:
+        '201':
+          description: Created
+          headers:
+            Cache-Control:
+              description: "`no-store`, the response carries a secret"
+              schema:
+                type: string
+            Location:
+              description: >-
+                The URL of the created token, `/api/profile/access-tokens/{tokenId}`. Only DELETE is
+                served there; there is no token detail route.
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/AccessTokenCreated"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+      summary: Create a personal access token
   # region: repos
   "/api/repos/{repoName}/settings":
     get:
@@ -4781,6 +4890,14 @@ components:
         The access token returned by `login` or `refreshToken`. Every operation needs it unless it
         says `security: []` (public), or lists an empty requirement next to `bearerAuth` (readable
         anonymously when the repository is public, otherwise it needs the token).
+    personalAccessToken:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+      description: >-
+        A personal access token (`rut-...`), issued by `createAccessToken` and sent as `Authorization:
+        Bearer <token>`. An operation that accepts it lists it next to `bearerAuth` in its
+        `security`; none does yet.
   parameters:
     # region: shared
     Page:
@@ -5239,6 +5356,136 @@ components:
         - diskUsage
         - createdAt
         - lastLoginAt
+    AccessTokenScope:
+      type: string
+      enum:
+        - profile:read
+        - repo:manage
+        - repo:read
+        - repo:write
+        - scan:read
+      description: >-
+        What a token may do. `repo:read` downloads and reads, `repo:write` publishes (and reads),
+        `repo:manage` deletes and changes settings (and writes and reads), `scan:read` reads scan
+        results, `profile:read` reads who the token belongs to. Every token has `profile:read`, so
+        it never has to be asked for. A token can only narrow what its owner can do: its permission
+        on a repository is the owner's own permission intersected with these, and `repo:manage` is
+        never implied by another scope.
+    AccessTokenForm:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 80
+          minLength: 1
+        scopes:
+          type: array
+          uniqueItems: true
+          minItems: 1
+          items:
+            "$ref": "#/components/schemas/AccessTokenScope"
+        expirationDate:
+          type: string
+          format: date-time
+          description: >-
+            When the token stops working. It has to be in the future and at most 365 days ahead (by
+            UTC calendar day), otherwise the answer is 400 `accessTokenExpirationInPast` or
+            `accessTokenExpirationTooLate`. Defaults to 365 days from now. The date is truncated to
+            microseconds before it is checked and stored, so the last instant that is accepted is
+            `23:59:59.999999Z` of the last day, and the date in the answer is the stored one.
+      required:
+        - name
+        - scopes
+    AccessTokenCreated:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        scopes:
+          type: array
+          uniqueItems: true
+          items:
+            "$ref": "#/components/schemas/AccessTokenScope"
+        expirationDate:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        token:
+          type: string
+          description: The secret. It is shown once and cannot be read again.
+      required:
+        - id
+        - name
+        - scopes
+        - expirationDate
+        - createdAt
+        - token
+    AccessTokenListItem:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        scopes:
+          type: array
+          uniqueItems: true
+          items:
+            "$ref": "#/components/schemas/AccessTokenScope"
+        expirationDate:
+          type: string
+          format: date-time
+        lastUsedAt:
+          type: string
+          format: date-time
+          description: When the token last authenticated a request. Absent if it never did.
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - scopes
+        - expirationDate
+        - createdAt
+    PagedModelAccessTokenListItem:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            "$ref": "#/components/schemas/AccessTokenListItem"
+        page:
+          "$ref": "#/components/schemas/PageMetadata"
+    AccessTokenWhoAmI:
+      type: object
+      properties:
+        username:
+          type: string
+        name:
+          type: string
+        scopes:
+          type: array
+          uniqueItems: true
+          items:
+            "$ref": "#/components/schemas/AccessTokenScope"
+        expirationDate:
+          type: string
+          format: date-time
+        lastUsedAt:
+          type: string
+          format: date-time
+          description: When the token last authenticated a request. Absent if it never did.
+      required:
+        - username
+        - name
+        - scopes
+        - expirationDate
     # region: repos
     RepoSettingsForm:
       type: object

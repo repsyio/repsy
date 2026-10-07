@@ -13,27 +13,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.shared.token.utils;
+package io.repsy.os.shared.token.dtos;
 
-import io.repsy.os.shared.token.dtos.TokenType;
-import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NonNull;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import java.time.Instant;
+import java.util.Set;
 
-@UtilityClass
-public class TokenFactory {
+/**
+ * One row of the token list: what the owner sees of a token, never its secret or its hash. A closed
+ * projection, so the query reads only these columns.
+ */
+public interface PersonalAccessTokenListItem {
 
-  public static @NonNull String of(final @NonNull TokenType tokenType) {
+  String getId();
 
-    return TokenGenerator.generate(tokenType);
-  }
+  String getName();
 
-  public static @NonNull String deployToken() {
+  Set<TokenScope> getScopes();
 
-    return of(TokenType.REPSY_DEPLOY_TOKEN);
-  }
+  Instant getExpirationDate();
 
-  public static @NonNull String personalAccessToken() {
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  Instant getLastUsedAt();
 
-    return of(TokenType.REPSY_USER_TOKEN);
-  }
+  Instant getCreatedAt();
 }

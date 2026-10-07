@@ -15,25 +15,24 @@
  */
 package io.repsy.os.shared.token.utils;
 
-import io.repsy.os.shared.token.dtos.TokenType;
 import lombok.experimental.UtilityClass;
+import org.apache.commons.codec.digest.DigestUtils;
 import org.jspecify.annotations.NonNull;
 
+/**
+ * The hash a token is stored and looked up by: SHA-256 of the whole token, as lower-case hex (64
+ * characters), without a salt.
+ *
+ * <p>A salt would protect a low-entropy secret from a dictionary, and a token is not one: {@link
+ * TokenFactory} makes it from a SHA-256 of 32 random alphanumeric characters, so there is nothing
+ * to guess. A salt would also make it impossible to look a token up by its hash, which is how every
+ * request that presents one finds it. {@code DeployTokenHash} makes the same choice for deploy
+ * tokens.
+ */
 @UtilityClass
-public class TokenFactory {
+public class TokenHash {
 
-  public static @NonNull String of(final @NonNull TokenType tokenType) {
-
-    return TokenGenerator.generate(tokenType);
-  }
-
-  public static @NonNull String deployToken() {
-
-    return of(TokenType.REPSY_DEPLOY_TOKEN);
-  }
-
-  public static @NonNull String personalAccessToken() {
-
-    return of(TokenType.REPSY_USER_TOKEN);
+  public static @NonNull String hash(final @NonNull String token) {
+    return DigestUtils.sha256Hex(token);
   }
 }

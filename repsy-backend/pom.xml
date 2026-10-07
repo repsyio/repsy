@@ -384,6 +384,9 @@
                                  JSON without regard to case (RPS-1269), so no other enum is affected. -->
                             <schemaMappings>
                                 <schemaMapping>RepoType=io.repsy.protocols.shared.repo.dtos.RepoType</schemaMapping>
+                                <!-- The scope enum of a personal access token: the wire values are the ones of
+                                     the hand-written enum, which owns their canonical order. -->
+                                <schemaMapping>AccessTokenScope=io.repsy.os.shared.token.dtos.TokenScope</schemaMapping>
                             </schemaMappings>
                             <configOptions>
                                 <useSpringBoot3>true</useSpringBoot3>
