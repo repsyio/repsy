@@ -355,6 +355,7 @@ This is the first release after `v26.08.4`. Read this section before you upgrade
 - **Embedded H2 in `v26.08.4` and earlier stops accepting writes after about 30 minutes; this release fixes it.**
   See [Embedded H2 stops accepting writes (releases up to `v26.08.4`)](#embedded-h2-stops-accepting-writes-releases-up-to-v26084-rps-1676)
   for who is affected and the workaround for an image you cannot replace yet. (RPS-1652, RPS-1676)
+- **On the embedded H2 database, remove `;DB_CLOSE_ON_EXIT=FALSE` from `DB_URL` and give the container a stop grace period of 60 seconds or more.** With the option a restart loses recent changes. See "Embedded H2 loses recent changes when Repsy stops" under [Upgrading](#upgrading). (RPS-1857)
 - **`DB_HOST`, `DB_PORT` and `DB_DATABASE` are no longer read.** Only `DB_URL` selects the database, and the Docker
   image now defaults it to an embedded H2 file. An installation that set only those three variables starts on a new,
   empty H2 database (the PostgreSQL data is untouched; a `WARN` is logged). Set
@@ -508,6 +509,20 @@ This is the first release after `v26.08.4`. Read this section before you upgrade
 **Fixed in:** the first release after `v26.08.4`, which ships H2 2.5.252 (`H2CheckConstraintAcrossConnectionsTest` pins it).
 
 **For an image you cannot replace yet:** set `SPRING_DATASOURCE_HIKARI_MAX_LIFETIME=2147483647` so that the pool does not retire connections. `2147483647` milliseconds is about 24.8 days, so restart the container at least that often. This was verified on the `v26.08.4` image for a 200 second run (repository creation kept answering `200`; with `SPRING_DATASOURCE_HIKARI_MAX_LIFETIME=30000` the same probe failed with `500` from 20 seconds on); it was not run for the full 30 minutes. The reliable options are to upgrade or to use PostgreSQL. The embedded H2 database is meant for evaluation, so use PostgreSQL (`DB_URL=jdbc:postgresql://<host>:<port>/<database>`) for production.
+
+### Embedded H2 loses recent changes when Repsy stops (`DB_CLOSE_ON_EXIT=FALSE`) (RPS-1857 / RPS-1977)
+
+**Who is affected:** an installation on the embedded H2 database whose `DB_URL` ends in `;DB_CLOSE_ON_EXIT=FALSE`. That is the value the README listed as the H2 example up to `v26.08.5`, the default `DB_URL` of the Docker image of the releases that used H2 by default (up to `26.08.0`) and the one the `repsy-os` Helm chart set in its H2 mode up to chart `26.08.5`. Installations on PostgreSQL are not affected, and neither is an H2 `DB_URL` without that option.
+
+**What happens:** with `DB_CLOSE_ON_EXIT=FALSE` H2 is never closed when the JVM exits, so whatever H2 still holds in memory is lost on an ordinary `docker stop` or restart: users created in the panel, the refresh token of a login, recent publishes. In a probe 11 of 11 recent changes were gone after a restart.
+
+**Fixed in:** the first release after `v26.08.5`. The Docker image no longer sets the option, and Repsy runs `CHECKPOINT SYNC` when it stops, which also protects an installation that keeps the old `DB_URL`.
+
+**What to do now, on any release:**
+
+- Remove `;DB_CLOSE_ON_EXIT=FALSE` from `DB_URL` (for example `jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1`). This works on the releases already published; no image change is needed.
+- Give the container a stop grace period well above Docker's default of 10 seconds, so that H2 can finish closing: `stop_grace_period: 120s` in Compose, `docker stop -t 120`, or `terminationGracePeriodSeconds` in Kubernetes. A JVM that is killed before it has closed H2 counts as a crash.
+- A crash (a kill, a power loss) is still not safe on H2 2.5.250 and later: after an unclean stop the next start can lose changes that were committed earlier (RPS-1978). The embedded H2 database is meant for evaluation; use PostgreSQL for anything you cannot afford to lose.
 
 ### Artifact storage moved to `/app/data/storage` in the Docker image (RPS-1401)
 
