@@ -26,6 +26,9 @@ import { expect, test } from '../../../src/ui/users-fixtures.js';
 const PAGE_SIZE = 10;
 
 // @cloud-skip: the admin Users page exists on Repsy OS only (`target.ui.hasUsersPage`).
+/** `USER_SEARCH_DEBOUNCE_MS` of the panel's user management page. */
+const USER_SEARCH_DEBOUNCE_MS = 250;
+
 test.describe('USR-06 users list', { tag: ['@cloud-skip'] }, () => {
   // 11 users: one more than a page.
   test('search, pagination and refresh with more than one page of users', async ({
@@ -171,9 +174,20 @@ test.describe('USR-06 users list', { tag: ['@cloud-skip'] }, () => {
       }
     });
 
+    // The page's clock stands still while the name is typed, so that no pause between two keystrokes can
+    // outlast the debounce on a loaded host (RPS-1979: a real 20 ms typing delay against a 250 ms debounce
+    // sent the first letter on its own now and then). Typing is the one thing that is not timed; the debounce
+    // timer is, and it only moves when the test says so.
+    await adminPage.clock.install({ time: new Date() });
+    await adminPage.clock.pauseAt(new Date(Date.now() + 1_000));
+    await usersPage.searchInput.pressSequentially(mine.username);
+    await expect(usersPage.searchInput).toHaveValue(mine.username);
+    expect(searches, 'no request while the typing is inside the debounce').toEqual([]);
+
     const answered = usersPage.listResponse(mine.username, 0);
-    await usersPage.searchInput.pressSequentially(mine.username, { delay: 20 });
+    await adminPage.clock.runFor(USER_SEARCH_DEBOUNCE_MS + 50);
     await answered;
+    await adminPage.clock.resume();
     await expect(usersPage.row(mine.username)).toBeVisible();
     await usersPage.settle();
 
