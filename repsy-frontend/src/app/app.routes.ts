@@ -21,6 +21,7 @@ import { adminGuard } from './auth/guard/admin.guard';
 import { AuthGuard } from './auth/guard/auth.guard';
 import { AuthRedirectGuard } from './auth/guard/auth-redirect.guard';
 import { LoginComponent } from './auth/pages/login/login.component';
+import { CliAuthComponent } from './panel/pages/cli-auth/cli-auth.component';
 import { NotFoundComponent } from './panel/pages/not-found/not-found.component';
 import { ProfileComponent } from './panel/pages/profile/profile.component';
 import { repoTypeResolver } from './panel/pages/repository/repo-entry/repo-type.resolver';
@@ -79,6 +80,15 @@ export const routes: Routes = [
         canActivate: [AuthGuard, adminGuard],
         title: 'repsy | Security',
         component: SecurityComponent,
+      },
+      // RPS-1905: two segments, ahead of ':repoName' (which would otherwise read it as the page `auth`
+      // of a repository named `cli`).
+      {
+        path: 'cli/auth',
+        pathMatch: 'full',
+        canActivate: [AuthGuard],
+        title: 'repsy | CLI Sign In',
+        component: CliAuthComponent,
       },
       {
         path: 'not-found',

@@ -18,13 +18,14 @@ import { Component, OnInit } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
 import { BreadcrumbComponent } from '../../shared/components/breadcrumb/breadcrumb.component';
+import { AccessTokensComponent } from './access-tokens/access-tokens.component';
 import { AccountInfoComponent } from './account-info/account-info.component';
 import { DeleteAccountComponent } from './delete-account/delete-account.component';
 
 @Component({
   selector: 'app-profile',
   standalone: true,
-  imports: [RouterModule, BreadcrumbComponent, AccountInfoComponent, DeleteAccountComponent],
+  imports: [RouterModule, BreadcrumbComponent, AccountInfoComponent, AccessTokensComponent, DeleteAccountComponent],
   templateUrl: './profile.component.html',
 })
 export class ProfileComponent implements OnInit {

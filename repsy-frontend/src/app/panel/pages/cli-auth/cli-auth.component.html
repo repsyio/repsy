@@ -1,0 +1,32 @@
+<div animate.enter="fade-in-down" class="mx-auto max-w-[700px] space-y-[24px]">
+  <h2 data-testid="cli-auth-title" class="text-[24px] text-white">Sign in the Repsy CLI</h2>
+
+  @if (!created) {
+    <p class="text-sm text-[#9FA0A0]">
+      The CLI asked for an access token. Check the name and the scopes below, then create it and paste it into the CLI.
+    </p>
+    <div class="rounded-xl border border-[#404141] bg-[#101112] p-6">
+      <app-access-token-form
+        [initialName]="name"
+        [initialScopes]="scopes"
+        submitLabel="Create token"
+        (created)="onCreated($event)"
+      />
+    </div>
+  } @else {
+    <p class="text-warning-500 text-sm">You can only view this access token once, so be sure to save it.</p>
+    <div class="rounded-xl border border-[#404141] bg-[#101112] p-6">
+      <p class="mb-2 text-[#9FA0A0]">{{ created.name }} · {{ scopesText() }}</p>
+      <div class="flex items-center gap-2 rounded-lg border border-[#404141] px-4 py-3">
+        <code data-testid="cli-auth-token" class="flex-1 text-[16px] break-all text-white select-all">{{
+          created.token
+        }}</code>
+        <app-copy-clipboard data-testid="cli-auth-copy" [text]="created.token" />
+      </div>
+      <p class="mt-4 text-sm text-[#9FA0A0]">
+        Paste it into the CLI. You can revoke it any time under
+        <a routerLink="/profile" fragment="access-tokens" class="text-secondary-500">Profile</a>.
+      </p>
+    </div>
+  }
+</div>

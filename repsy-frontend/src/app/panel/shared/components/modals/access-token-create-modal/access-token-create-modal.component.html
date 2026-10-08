@@ -1,0 +1,34 @@
+@if (open) {
+  <div
+    data-testid="access-token-create-backdrop"
+    animate.enter="fade-in-up"
+    class="bg-opacity-50 fixed inset-0 z-40 backdrop-blur-sm"
+    (click)="closeModal()"
+    aria-hidden="true"
+  ></div>
+
+  <div
+    data-testid="access-token-create-modal"
+    appDialog
+    #dialog="appDialog"
+    (appDialogClose)="closeModal()"
+    class="fixed top-1/2 left-1/2 z-50 max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] max-w-[400px] -translate-x-1/2 -translate-y-1/2 transform overflow-y-auto rounded-xl border border-[#404141] bg-[#101112] p-6 sm:max-w-[600px] sm:p-8 md:max-w-[700px] md:p-[45px]"
+  >
+    <div class="flex justify-between">
+      <h1 [id]="dialog.titleId" class="text-[24px] leading-6 text-white">Create Access Token</h1>
+      <button
+        data-testid="access-token-create-close"
+        type="button"
+        aria-label="Close dialog"
+        (click)="closeModal()"
+        class="hover:text-secondary-500 text-neutral-200"
+      >
+        <i aria-hidden="true" class="ri-close-line"></i>
+      </button>
+    </div>
+
+    <div class="gradient-border mx-auto my-6 sm:my-10"></div>
+
+    <app-access-token-form (created)="onCreated($event)" (cancelled)="closeModal()" />
+  </div>
+}

@@ -1,0 +1,67 @@
+<section data-testid="access-tokens-section" id="access-tokens" class="scroll-mt-[100px]">
+  <div class="flex w-full justify-between rounded-t-[12px] border border-[#404141] bg-[#101112] p-4 sm:p-6">
+    <h3 class="font-medium text-[#FDFDFD]">Access Tokens</h3>
+  </div>
+
+  <div
+    class="w-full overflow-y-auto rounded-b-[12px] border-r border-b border-l border-[#404141] bg-[#101112] p-4 sm:p-6"
+  >
+    <div class="mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+      <p class="text-sm text-[#9FA0A0]">
+        Personal access tokens work across all your repositories, limited to the scopes you pick.
+      </p>
+      <button
+        data-testid="access-token-create"
+        class="repsy-btn-confirm w-full sm:w-auto"
+        [disabled]="operationLock"
+        (click)="openCreate()"
+      >
+        Create Token
+      </button>
+    </div>
+
+    @if (tokens.length > 0) {
+      <ul data-testid="access-token-list" class="mb-6 flex flex-col gap-3">
+        @for (token of tokens; track token.id) {
+          <li
+            [attr.data-testid]="'access-token-row-' + token.name"
+            class="flex flex-col gap-3 rounded-[12px] border border-[#404141] p-4 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <div class="min-w-0 space-y-1 text-sm">
+              <p data-testid="row-name" class="text-secondary-500 truncate">{{ token.name }}</p>
+              <p data-testid="row-scopes" class="text-[#9FA0A0]">{{ scopesText(token) }}</p>
+              <p class="text-[#9FA0A0]">
+                Created {{ timeAgo(token.createdAt) }} · Last used
+                <span data-testid="row-last-used">{{ timeAgo(token.lastUsedAt) }}</span> · Expires
+                <span data-testid="row-expires" [class]="expiryClass(token.expirationDate)">{{
+                  token.expirationDate | date: 'mediumDate'
+                }}</span>
+              </p>
+            </div>
+            <button
+              data-testid="row-revoke"
+              [attr.aria-label]="'Revoke access token ' + token.name"
+              [disabled]="operationLock"
+              class="repsy-btn-danger w-full sm:w-auto"
+              (click)="revokeToken(token)"
+            >
+              Revoke
+            </button>
+          </li>
+        }
+      </ul>
+      <app-pagination
+        (pageNumChange)="loadPage($event)"
+        [(pageNum)]="pageNum"
+        [totalPages]="pagedData.page.totalPages"
+      />
+    } @else {
+      <div data-testid="access-token-empty">
+        <app-empty-list message="No access tokens yet." />
+      </div>
+    }
+  </div>
+</section>
+
+<app-access-token-create-modal [(open)]="showCreateModal" (created)="onCreated($event)" />
+<app-access-token-info-modal [open]="showInfoModal" (openChange)="closeInfo($event)" [tokenInfo]="createdToken" />
