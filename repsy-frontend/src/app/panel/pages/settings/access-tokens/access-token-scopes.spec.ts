@@ -21,7 +21,16 @@ describe('access token scopes', () => {
   });
 
   it('keeps the known scopes of a list, in the order they are offered', () => {
-    expect(parseRequestedScopes('scan:read, repo:write,repo:read')).toEqual(['repo:read', 'repo:write', 'scan:read']);
+    expect(parseRequestedScopes(' repo:manage, repo:write,repo:read')).toEqual([
+      'repo:read',
+      'repo:write',
+      'repo:manage',
+    ]);
+  });
+
+  it('does not offer scan:read and drops it from a link', () => {
+    expect(SELECTABLE_SCOPES.map((s) => s.scope)).not.toContain('scan:read');
+    expect(parseRequestedScopes('scan:read,repo:read')).toEqual(['repo:read']);
   });
 
   it('drops unknown values, profile:read and duplicates without a word', () => {

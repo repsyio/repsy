@@ -1,4 +1,7 @@
 <form data-testid="access-token-form" [formGroup]="form" class="flex flex-col gap-4" (submit)="submit()">
+  @if (blockedReason) {
+    <p data-testid="access-token-blocked" class="text-warning-500 text-sm">{{ blockedReason }}</p>
+  }
   <div class="flex flex-col text-[#9FA0A0]">
     <div class="form-group w-full">
       <label [attr.for]="id('name')">Name <span class="text-error">*</span></label>

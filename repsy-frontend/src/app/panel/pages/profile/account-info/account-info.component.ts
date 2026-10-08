@@ -56,6 +56,8 @@ export class AccountInfoComponent implements OnInit {
   @Input() passwordForm: FormGroup;
   @Input() usernameForm: FormGroup;
   @Input() username: string;
+  /** Access tokens that have not expired. A password change does not revoke them (decision). */
+  @Input() liveAccessTokens = 0;
 
   public loading = false;
 
@@ -85,6 +87,10 @@ export class AccountInfoComponent implements OnInit {
     this.usernameForm = this.fb.group({
       username: ['', usernameValidators()],
     });
+  }
+
+  public get hasLiveAccessTokens(): boolean {
+    return this.liveAccessTokens > 0;
   }
 
   ngOnInit(): void {

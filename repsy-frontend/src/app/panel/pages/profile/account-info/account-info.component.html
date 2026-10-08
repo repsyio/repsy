@@ -15,6 +15,13 @@
       (submit)="passwordForm.valid && updatePassword()"
       class="w-full"
     >
+      @if (hasLiveAccessTokens) {
+        <p data-testid="profile-password-tokens-warning" class="text-warning-500 mb-4 text-sm">
+          Your {{ liveAccessTokens }} access {{ liveAccessTokens === 1 ? 'token stays' : 'tokens stay' }} valid after
+          the password changes. Please
+          <a routerLink="/profile/settings" fragment="access-tokens" class="underline">review them</a>.
+        </p>
+      }
       <!-- New Password Field -->
       <div>
         <label [attr.for]="id('new-password')" class="text-body1 mb-2 inline-block text-neutral-200"

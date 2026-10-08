@@ -13,7 +13,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 ///
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 
 import { AccessTokenListItem, AccessTokensApi, AccessTokenScope } from '../../../../../generated/api';
 import { DangerModalService } from '../../../shared/components/modals/danger-modal/danger-modal.service';
@@ -52,7 +52,7 @@ describe('AccessTokensComponent', () => {
   it('loads the first page, five at a time', () => {
     component.ngOnInit();
 
-    expect(api.listAccessTokens).toHaveBeenCalledOnceWith(0, 5);
+    expect(api.listAccessTokens).toHaveBeenCalledWith(0, 5);
     expect(component.tokens.map((t) => t.id)).toEqual(['a', 'b']);
     expect(component.pagedData.page.totalPages).toBe(2);
   });
@@ -76,7 +76,7 @@ describe('AccessTokensComponent', () => {
 
     expect(api.revokeAccessToken).toHaveBeenCalledOnceWith('a');
     expect(toast.show).toHaveBeenCalledWith('Access token revoked successfully', 'success');
-    expect(api.listAccessTokens).toHaveBeenCalledTimes(2);
+    expect(api.listAccessTokens).toHaveBeenCalledWith(0, 5);
     expect(component.operationLock).toBeFalse();
   });
 
@@ -89,7 +89,74 @@ describe('AccessTokensComponent', () => {
 
     component.revokeToken(token('f'));
 
-    expect(api.listAccessTokens).toHaveBeenCalledOnceWith(0, 5);
+    expect(api.listAccessTokens).toHaveBeenCalledWith(0, 5);
+    expect(api.listAccessTokens).not.toHaveBeenCalledWith(1, 5);
+  });
+
+  describe('limit and expiry', () => {
+    function live(i: number): AccessTokenListItem {
+      return { ...token(`l${i}`), expirationDate: '2999-01-01T00:00:00Z' };
+    }
+    const expired = { ...token('old'), expirationDate: '2000-01-01T00:00:00Z' };
+
+    it('marks an expired token and leaves it in the list', () => {
+      expect(component.isExpired(expired)).toBeTrue();
+      expect(component.isExpired(live(1))).toBeFalse();
+    });
+
+    it('counts only live tokens and blocks creating at 50', () => {
+      const fifty = Array.from({ length: 50 }, (_, i) => live(i));
+      api.listAccessTokens.and.returnValue(of(listing([...fifty, expired], 1, 51)) as never);
+
+      component.ngOnInit();
+
+      expect(component.liveCount).toBe(50);
+      expect(component.limitReached).toBeTrue();
+    });
+
+    it('is not at the limit with 49 live tokens and any number of expired ones', () => {
+      api.listAccessTokens.and.returnValue(
+        of(listing([...Array.from({ length: 49 }, (_, i) => live(i)), expired, expired], 1, 51)) as never,
+      );
+
+      component.ngOnInit();
+
+      expect(component.limitReached).toBeFalse();
+    });
+  });
+
+  describe('revoke all', () => {
+    beforeEach(() => {
+      api.listAccessTokens.and.returnValue(of(listing([token('a'), token('b'), token('c')])) as never);
+      spyOn(danger, 'show').and.callFake((_t, _b, ok) => ok());
+    });
+
+    it('revokes every token one after the other', () => {
+      component.revokeAll();
+
+      expect(api.revokeAccessToken.calls.allArgs().map((a) => a[0])).toEqual(['a', 'b', 'c']);
+      expect(component.revokeAllReport).toEqual({ revoked: 3, failed: [] });
+      expect(component.operationLock).toBeFalse();
+    });
+
+    it('goes on after a failure and reports the names that could not be revoked', () => {
+      api.revokeAccessToken.and.callFake(((id: string) =>
+        id === 'b' ? throwError(() => new Error('boom')) : of({})) as never);
+
+      component.revokeAll();
+
+      expect(api.revokeAccessToken).toHaveBeenCalledTimes(3);
+      expect(component.revokeAllReport).toEqual({ revoked: 2, failed: ['b'] });
+      expect(toast.show).toHaveBeenCalledWith('2 revoked, 1 could not be revoked', 'error');
+    });
+
+    it('revokes nothing when the list cannot be read', () => {
+      api.listAccessTokens.and.returnValue(throwError(() => new Error('boom')) as never);
+
+      component.revokeAll();
+
+      expect(api.revokeAccessToken).not.toHaveBeenCalled();
+    });
   });
 
   it('says never for a token that was not used', () => {

@@ -63,6 +63,8 @@ export class Shell {
     avatar: Locator;
     menu: Locator;
     profile: Locator;
+    /** The "Settings" entry of the avatar menu (RPS-2002): the OS Settings page. Not on every target. */
+    settings: Locator;
     /** The "Docs" entry of the avatar menu (only while it is open, see `openAvatarMenu`). */
     menuDocs: Locator;
     logout: Locator;
@@ -94,6 +96,7 @@ export class Shell {
       avatar: page.getByTestId('header-avatar'),
       menu: page.getByTestId('header-menu'),
       profile: page.getByTestId('header-menu-profile'),
+      settings: page.getByTestId('header-menu-settings'),
       menuDocs: page.getByTestId('header-menu-docs'),
       logout: page.getByTestId('header-menu-logout'),
     };

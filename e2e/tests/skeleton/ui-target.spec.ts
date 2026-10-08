@@ -30,7 +30,13 @@ import type { PackageProtocol, PackageRef } from '../../src/seed/packages.js';
 import { capabilitiesFor, target } from '../../src/target.js';
 import { uiBaseUrlFrom } from '../../src/ui/base-url.js';
 import { DESCRIPTORS } from '../../src/ui/pages/protocol.js';
-import { profileRoute, repoRoute, urlEndsWith } from '../../src/ui/routes.js';
+import {
+  accessTokensRoute,
+  profileRoute,
+  repoRoute,
+  settingsRoute,
+  urlEndsWith,
+} from '../../src/ui/routes.js';
 import { seedSession, type UiSession } from '../../src/ui/session.js';
 
 const HARNESS_ROOT = resolve(import.meta.dirname, '../..');
@@ -61,6 +67,8 @@ test.describe('UI capabilities per target (RPS-1638)', () => {
       expect(ui.repoRoute('r', 'settings'), name).toBe('/r/settings');
       expect(ui.repoRoute('r', 'g', 'a', '1.0'), name).toBe('/r/g/a/1.0');
       expect(ui.profilePath, name).toBe('/profile');
+      expect(ui.settingsPath, name).toBe('/profile/settings');
+      expect(ui.accessTokensPath, name).toBe('/profile/settings');
       expect(ui.hasUsersPage, name).toBe(true);
       expect(ui.loginField, name).toBe('username');
       expect(ui.sessionStorageKeys, name).toEqual({
@@ -79,6 +87,8 @@ test.describe('UI capabilities per target (RPS-1638)', () => {
         expect(ui.repoRoute('r'), name).toBe('/acme/r');
         expect(ui.repoRoute('r', 'settings'), name).toBe('/acme/r/settings');
         expect(ui.profilePath, name).toBe('/account');
+        expect(ui.settingsPath, name).toBe('/settings');
+        expect(ui.accessTokensPath, name).toBe('/settings');
         expect(ui.hasUsersPage, name).toBe(false);
         expect(ui.loginField, name).toBe('usernameOrEmail');
         expect(ui.sessionStorageKeys, name).toEqual({
@@ -105,11 +115,15 @@ test.describe('UI capabilities per target (RPS-1638)', () => {
     await withUiTarget('local', undefined, () => {
       expect(repoRoute('r', 'settings')).toBe('/r/settings');
       expect(profileRoute()).toBe('/profile');
+      expect(settingsRoute()).toBe('/profile/settings');
+      expect(accessTokensRoute()).toBe('/profile/settings');
     });
 
     await withUiTarget('cloud-remote', 'acme', () => {
       expect(repoRoute('r', 'settings')).toBe('/acme/r/settings');
       expect(profileRoute()).toBe('/account');
+      expect(settingsRoute()).toBe('/settings');
+      expect(accessTokensRoute()).toBe('/settings');
     });
   });
 

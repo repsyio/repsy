@@ -44,6 +44,19 @@ export function profileRoute(): string {
   return target.ui.profilePath;
 }
 
+/** The signed-in account's Settings page: `/profile/settings` (Repsy OS) or `/settings` (Repsy Cloud). */
+export function settingsRoute(): string {
+  return target.ui.settingsPath;
+}
+
+/**
+ * The page that holds the access token section: the Settings page of Repsy OS (`/profile/settings`) and of Repsy
+ * Cloud (`/settings`, RPS-2003): `target.ui.accessTokensPath`.
+ */
+export function accessTokensRoute(): string {
+  return target.ui.accessTokensPath;
+}
+
 /** `text` as a regular-expression fragment that matches it literally. */
 export function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

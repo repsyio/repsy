@@ -47,6 +47,16 @@ describe('AccountInfoComponent', () => {
     component.passwordForm.setValue({ newPassword, passwordConfirmation });
   }
 
+  describe('access tokens warning', () => {
+    it('warns only while there are access tokens that have not expired', () => {
+      expect(component.hasLiveAccessTokens).toBeFalse();
+
+      component.liveAccessTokens = 3;
+
+      expect(component.hasLiveAccessTokens).toBeTrue();
+    });
+  });
+
   describe('username validation', () => {
     const isValid = (username: string): boolean => {
       component.usernameForm.get('username').setValue(username);

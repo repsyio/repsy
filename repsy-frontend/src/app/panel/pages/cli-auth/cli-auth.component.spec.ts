@@ -14,12 +14,26 @@
 /// limitations under the License.
 ///
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
+import { of, throwError } from 'rxjs';
 
+import { AccessTokensApi, AccessTokenScope } from '../../../../generated/api';
 import { CliAuthComponent } from './cli-auth.component';
 
-function pageFor(query: Record<string, string>): CliAuthComponent {
+function liveToken(i: number): unknown {
+  return {
+    id: `t${i}`,
+    name: `t${i}`,
+    scopes: [],
+    expirationDate: '2999-01-01T00:00:00Z',
+    createdAt: '2026-01-01T00:00:00Z',
+  };
+}
+
+function pageFor(query: Record<string, string>, tokens: unknown[] = []): CliAuthComponent {
   const route = { snapshot: { queryParamMap: convertToParamMap(query) } } as unknown as ActivatedRoute;
-  const component = new CliAuthComponent(route);
+  const api = jasmine.createSpyObj<AccessTokensApi>('AccessTokensApi', ['listAccessTokens']);
+  api.listAccessTokens.and.returnValue(of({ content: tokens, page: {} }) as never);
+  const component = new CliAuthComponent(route, api);
   component.ngOnInit();
   return component;
 }
@@ -32,15 +46,59 @@ describe('CliAuthComponent', () => {
     expect(page.scopes).toEqual(['repo:read', 'repo:write']);
   });
 
-  it('drops scopes it does not know, so the link never grants more than the page shows', () => {
-    expect(pageFor({ scopes: 'repo:read,profile:read,admin' }).scopes).toEqual(['repo:read']);
+  it('drops scopes it does not know, scan:read and profile:read included', () => {
+    expect(pageFor({ scopes: 'repo:read,profile:read,scan:read,admin' }).scopes).toEqual(['repo:read']);
   });
 
-  it('falls back to a default name and no scope', () => {
-    const page = pageFor({});
+  it('ticks the three repository scopes when the link names none the page knows', () => {
+    const all: AccessTokenScope[] = ['repo:read', 'repo:write', 'repo:manage'];
 
-    expect(page.name).toBe('Repsy CLI');
-    expect(page.scopes).toEqual([]);
+    expect(pageFor({}).scopes).toEqual(all);
+    expect(pageFor({ scopes: 'scan:read,admin' }).scopes).toEqual(all);
+    expect(pageFor({ scopes: '' }).scopes).toEqual(all);
+  });
+
+  it('falls back to a default name', () => {
+    expect(pageFor({}).name).toBe('Repsy CLI');
+  });
+
+  it('cuts a long name to what the backend accepts and keeps markup as plain text', () => {
+    expect(pageFor({ name: 'x'.repeat(500) }).name.length).toBe(80);
+    expect(pageFor({ name: '<img src=x onerror=alert(1)>' }).name).toBe('<img src=x onerror=alert(1)>');
+  });
+
+  it('blocks the create button when 50 tokens have not expired', () => {
+    const full = Array.from({ length: 50 }, (_, i) => liveToken(i));
+
+    expect(pageFor({}, full).blockedReason).toContain('50 access tokens');
+    expect(pageFor({}, full.slice(1)).blockedReason).toBeNull();
+  });
+
+  it('does not count expired tokens against the limit', () => {
+    const expired = { ...(liveToken(1) as object), expirationDate: '2000-01-01T00:00:00Z' };
+
+    expect(
+      pageFor(
+        {},
+        Array.from({ length: 60 }, () => expired),
+      ).blockedReason,
+    ).toBeNull();
+  });
+
+  it('reports the check of the token count: under way, done, or failed', () => {
+    const route = { snapshot: { queryParamMap: convertToParamMap({}) } } as unknown as ActivatedRoute;
+    const api = jasmine.createSpyObj<AccessTokensApi>('AccessTokensApi', ['listAccessTokens']);
+    api.listAccessTokens.and.returnValue(throwError(() => new Error('down')) as never);
+    const failed = new CliAuthComponent(route, api);
+
+    expect(failed.checkingRoom).toBeTrue();
+    failed.ngOnInit();
+
+    expect(failed.checkingRoom).toBeFalse();
+    expect(failed.roomCheckFailed).toBeTrue();
+    expect(failed.blockedReason).toBeNull();
+    expect(pageFor({}).checkingRoom).toBeFalse();
+    expect(pageFor({}).roomCheckFailed).toBeFalse();
   });
 
   it('shows the secret once the token is created', () => {

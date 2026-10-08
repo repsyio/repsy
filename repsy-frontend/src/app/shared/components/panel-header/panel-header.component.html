@@ -99,6 +99,23 @@
                 Profile
               </a>
 
+              <!-- Settings -->
+              <a
+                data-testid="header-menu-settings"
+                routerLink="/profile/settings"
+                (click)="profileDropdown = false"
+                class="flex w-full items-center gap-2 px-4 py-2 text-[14px] text-white hover:bg-[#2D2C2C]"
+              >
+                <img
+                  class="h-4 w-4 sm:h-5 sm:w-5"
+                  ngSrc="/assets/icons/header/settings.svg"
+                  height="18"
+                  width="18"
+                  alt="Repsy"
+                />
+                Settings
+              </a>
+
               <!-- Docs -->
               <a
                 data-testid="header-menu-docs"

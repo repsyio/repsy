@@ -81,6 +81,16 @@ export interface UiCapabilities {
   /** The route of the signed-in account's own page: `/profile` (OS) or `/account` (Cloud). */
   profilePath: string;
   /**
+   * The route of the signed-in account's Settings page: `/profile/settings` (OS, nested under the reserved
+   * `profile` so no repository name is taken, RPS-2002) or `/settings` (Cloud).
+   */
+  settingsPath: string;
+  /**
+   * The page that holds the access token section (`access-tokens-section`): the Settings page on both products
+   * (Cloud moves the section from its account page to `/settings`, RPS-2003).
+   */
+  accessTokensPath: string;
+  /**
    * The regex pattern for the profile API endpoint (e.g., `/\/api\/profile(\?|$)/` on Repsy OS).
    * `null` means the panel does not request this endpoint (Repsy Cloud).
    */
@@ -141,6 +151,8 @@ const OS_UI: UiCapabilities = {
   repoRoute: (repo, ...segments) => ['', repo, ...segments].join('/'),
   repoApiPath: (repo, ...segments) => ['', 'api', 'repos', repo, ...segments].join('/'),
   profilePath: '/profile',
+  settingsPath: '/profile/settings',
+  accessTokensPath: '/profile/settings',
   profileApiUrl: /\/api\/profile(\?|$)/,
   hasUsersPage: true,
   loginField: 'username',
@@ -172,6 +184,8 @@ const CLOUD_UI: UiCapabilities = {
     return ['', 'api', 'repos', env.repoOwner, repo, ...segments].join('/');
   },
   profilePath: '/account',
+  settingsPath: '/settings',
+  accessTokensPath: '/settings',
   profileApiUrl: null,
   hasUsersPage: false,
   loginField: 'usernameOrEmail',

@@ -28,6 +28,7 @@ import { repoTypeResolver } from './panel/pages/repository/repo-entry/repo-type.
 import { RepositoryWrapperComponent } from './panel/pages/repository/repo-entry/repository-wrapper.component';
 import { RepositoryComponent } from './panel/pages/repository/repository.component';
 import { SecurityComponent } from './panel/pages/security/security.component';
+import { SettingsComponent } from './panel/pages/settings/settings.component';
 import { UserManagementComponent } from './panel/pages/user/user-management/user-management.component';
 import { PanelLayoutComponent } from './panel/shared/layout/panel-layout.component';
 
@@ -59,6 +60,14 @@ export const routes: Routes = [
         canActivate: [AuthGuard],
         title: 'repsy | Account',
         component: ProfileComponent,
+      },
+      // RPS-2002: nested under the reserved `profile` so no new reserved repository name is needed.
+      {
+        path: 'profile/settings',
+        pathMatch: 'full',
+        canActivate: [AuthGuard],
+        title: 'repsy | Settings',
+        component: SettingsComponent,
       },
       {
         path: 'repositories',

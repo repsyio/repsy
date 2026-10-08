@@ -1,0 +1,16 @@
+<app-breadcrumb />
+<div animate.enter="fade-in-down" class="space-y-[24px]">
+  <h2 data-testid="settings-title" class="text-[14px] text-[#9FA0A0]">Settings</h2>
+  <nav data-testid="settings-nav" aria-label="Settings sections" class="flex flex-wrap gap-4 text-sm">
+    @for (section of sections; track section.id) {
+      <a
+        [attr.data-testid]="'settings-nav-' + section.id"
+        [routerLink]="[]"
+        [fragment]="section.id"
+        class="text-secondary-500"
+        >{{ section.title }}</a
+      >
+    }
+  </nav>
+  <div><app-access-tokens /></div>
+</div>
