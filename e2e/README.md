@@ -386,6 +386,8 @@ capability, so a spec or the engine asks the capability and never the target's n
 | `supportsVersionAllowanceSettings(type)` | Maven, NuGet                          | the same                                                              |
 | `ui.repoRoute(repo, ...segments)`        | `/<repo>/...`                         | `/<owner>/<repo>/...` (`REPSY_REPO_OWNER`, read when called)          |
 | `ui.profilePath`                         | `/profile`                            | `/account`                                                            |
+| `ui.settingsPath`                        | `/profile/settings`                   | `/settings`                                                           |
+| `ui.accessTokensPath`                    | `/profile/settings`                   | `/account` (the section moves to `/settings` with Cloud's Settings)   |
 | `ui.hasUsersPage`                        | yes (`/users`)                        | no                                                                    |
 | `ui.loginField`                          | `username`                            | `usernameOrEmail`                                                     |
 | `ui.sessionStorageKeys`                  | `username`, `token`, `refresh-token`  | the same plus `email`                                                 |
@@ -545,7 +547,7 @@ not the API host. `target.ui` (`UiCapabilities` in `src/target.ts`) is where tha
 against both while what only Repsy OS has is tagged `@cloud-skip`:
 
 - **Routes.** A page object or spec never writes `` `/${repo}` ``: it calls `repoRoute(repo, ...segments)`
-  (`src/ui/routes.ts`, the short form of `target.ui.repoRoute`), and `profileRoute()` for the account page.
+  (`src/ui/routes.ts`, the short form of `target.ui.repoRoute`), `profileRoute()` for the account page, `settingsRoute()` for the Settings page and `accessTokensRoute()` for the page that holds the access token section.
   All nine protocol descriptors (`src/ui/pages/protocols/*.ts`), the repo settings page and the shared
   package scenarios do. A route that is the same on both (`/`, `/login`, `/repositories`, `/security`,
   `/not-found`) stays a literal, and so does an assertion that only needs the END of a URL
@@ -6247,6 +6249,47 @@ Rules these specs follow (and a later spec on these pages should too):
   messages (RPS-1261) and the page-scoped last-admin check (RPS-1246) are fixed and asserted unpinned. The spec text
   of a `test.fail` states the key.
 
+### Access tokens and /cli/auth (RPS-2004)
+
+Specs: `tests/ui/profile/access-tokens.spec.ts` (PAT-01..PAT-08) and `tests/ui/profile/cli-auth.spec.ts`
+(PAT-10..PAT-17). Page objects: `src/ui/pages/access-tokens.ts` (`AccessTokensPage`, `SettingsPage`, `CliAuthPage`, the
+create form and modals; `AccessTokenInfoModal` is a `SecretModal`, the part of `OneTimeSecretModal` that every
+"shown once" modal shares). Fixtures: `src/ui/access-token-fixtures.ts` (`tokenUser`, `tokenPage`, `tokenApi`).
+The API helper is `src/ui/access-token-api.ts` (plain `fetch`, like `RepoSettingsReadback`).
+
+| Scenario | Where                                                                                                                                                    |
+| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PAT-01   | create with a name, scopes and an expiry: the secret is shown once (masked, reveal, copy), the row, persisted as asked, gone after a reload              |
+| PAT-02   | form validation: empty and 81-character name, no scope, an expiry past a year; no `scan:read` on offer                                                   |
+| PAT-03   | revoke one behind a confirmation: cancel keeps it, confirm removes only it                                                                               |
+| PAT-04   | revoke all with several tokens: the count in the report, the list empty                                                                                  |
+| PAT-05   | 50 tokens that have not expired: create is disabled with the reason; revoking one frees it                                                               |
+| PAT-06   | the created token answers `GET /api/profile/access-tokens/current` with its owner and scopes; after the revoke in the UI the same call is 401            |
+| PAT-07   | `@cloud-skip`: the password warning appears only while live tokens exist and links to them                                                               |
+| PAT-08   | `@cloud-skip`: Settings in the avatar menu, its title and navigation, no token section on the profile page                                               |
+| PAT-10   | `/cli/auth` signed out: sign-in, then the page opens with the same name and scopes (the END state only: OS keeps a return URL, Cloud a hand-over)        |
+| PAT-11   | unknown scopes and `scan:read` are dropped; none left means the three repository scopes; the default name                                                |
+| PAT-12   | opening (and reloading) creates nothing; Create makes one token and shows the secret once with the "paste it into the terminal where rp is waiting" text |
+| PAT-13   | a name with markup is shown as text, never as an element                                                                                                 |
+| PAT-14   | a name longer than 80 characters is cut to 80                                                                                                            |
+| PAT-15   | at 50 live tokens the page says so and does not create                                                                                                   |
+| PAT-16   | `@cloud-skip`: `X-Frame-Options: DENY` and CSP `frame-ancestors 'none'` on the page                                                                      |
+| PAT-17   | `@cloud-skip`: the link to manage tokens goes to the Settings page                                                                                       |
+
+Rules these specs follow:
+
+- **One account per test.** The list, "revoke all" and the limit of 50 are per user, so a shared admin would make
+  parallel tests read each other's tokens. `tokenUser` is `seeder.createUser()` (deleted with the test, its tokens
+  with it) logged in through the API, `tokenPage` a page of a new context logged in as it. Not `seededUser`/`userPage`:
+  those skip a target without the USER role, and these pages exist on both products.
+- **Unique names.** The row id holds the raw token name (rule 2 of "UI test ids"): every name is
+  `pat-<runId>-<what>`.
+- **No expired token.** The API refuses a past expiry on create, so the Expired badge has no spec here; it is a
+  Karma test (`access-tokens.component.spec.ts`).
+- **Where the section is.** `accessTokensRoute()`: the OS Settings page; Cloud's account page until its Settings
+  page takes the section. No `profile`, no hard-coded path.
+- **The secret is checked against the server.** PAT-06 uses it; the list never contains it.
+
 ### Repository settings and deploy tokens (RPS-1254)
 
 `/:repo/settings` and the deploy-token modals: SET-01..09 and TOK-01..05 of RPS-1254 (34 tests,
@@ -7698,8 +7741,22 @@ Selector priority: `getByTestId` first, then `getByRole`/`getByLabel`, never CSS
 | shell            | `header`, `header-menu`, `sidebar`, `mobile-sidebar`, `panel-content`, `footer`, `login-page`                                                                                                                                                       |
 
 Modal families use one prefix each (`repo-create-*`, `user-create-*`, `user-edit-*`,
-`user-reset-password-*`, `token-create-*`, `token-info-*`, `config-modal-*`, `*-security-modal-*`),
-each with `-backdrop`, `-close` and its form fields.
+`user-reset-password-*`, `token-create-*`, `token-info-*`, `access-token-create-*`, `access-token-info-*`,
+`config-modal-*`, `*-security-modal-*`), each with `-backdrop`, `-close` and its form fields.
+
+### Access tokens, Settings and /cli/auth
+
+| Prefix / id                                                                                                          | Where                                                                                        |
+| -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `settings-title`, `settings-nav`, `settings-nav-<section>` (`access-tokens`)                                         | the Settings page (`/profile/settings`, OS)                                                  |
+| `access-tokens-section`, `access-token-create`, `-limit`, `-list`, `-empty`, `-revoke-all`, `-revoke-all-report`     | the access token section (the element id `access-tokens` is the link fragment)               |
+| `access-token-row-<name>` with `row-name`, `row-expired`, `row-scopes`, `row-last-used`, `row-expires`, `row-revoke` | one token (rule 2: the raw name; rule 4: short ids, scope them to the row)                   |
+| `access-token-form`, `-blocked`, `-name`, `-name-error-<validator>`, `-scopes`, `-scope-<scope>`, `-scopes-error`    | the create form (the create modal and `/cli/auth` share it)                                  |
+| `access-token-expiration`, `-expiration-error`, `-cancel`, `-submit`                                                 | the rest of the form                                                                         |
+| `access-token-create-{backdrop,modal,close}`, `access-token-info-{backdrop,modal,close,token,toggle,copy}`           | the two modals; the info modal shows the secret once                                         |
+| `cli-auth-title`, `-loading`, `-error`, `-token`, `-copy`, `-manage`                                                 | `/cli/auth`: `-loading` while the live tokens are counted, `-error` when they cannot be read |
+| `profile-password-tokens-warning`                                                                                    | the password form, while live tokens exist                                                   |
+| `header-menu-settings`                                                                                               | the avatar menu, next to `header-menu-profile`                                               |
 
 ### Protocol pages
 

@@ -104,9 +104,7 @@ describe('AccessTokensComponent', () => {
       expect(component.isExpired(live(1))).toBeFalse();
     });
 
-    it('counts only live tokens, tells the parent, and blocks creating at 50', () => {
-      const counts: number[] = [];
-      component.liveCountChange.subscribe((n) => counts.push(n));
+    it('counts only live tokens and blocks creating at 50', () => {
       const fifty = Array.from({ length: 50 }, (_, i) => live(i));
       api.listAccessTokens.and.returnValue(of(listing([...fifty, expired], 1, 51)) as never);
 
@@ -114,7 +112,6 @@ describe('AccessTokensComponent', () => {
 
       expect(component.liveCount).toBe(50);
       expect(component.limitReached).toBeTrue();
-      expect(counts.at(-1)).toBe(50);
     });
 
     it('is not at the limit with 49 live tokens and any number of expired ones', () => {

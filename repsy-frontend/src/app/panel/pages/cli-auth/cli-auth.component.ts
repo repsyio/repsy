@@ -24,8 +24,8 @@ import {
   DEFAULT_CLI_SCOPES,
   MAX_ACCESS_TOKEN_NAME_LENGTH,
   MAX_LIVE_ACCESS_TOKENS,
-} from '../profile/access-tokens/access-token-limits';
-import { parseRequestedScopes } from '../profile/access-tokens/access-token-scopes';
+} from '../settings/access-tokens/access-token-limits';
+import { parseRequestedScopes } from '../settings/access-tokens/access-token-scopes';
 
 /**
  * `/cli/auth?name=&scopes=&state=`: the page the CLI opens in a browser so a person can create an
@@ -45,6 +45,9 @@ export class CliAuthComponent implements OnInit {
   public scopes: AccessTokenScope[] = [];
   public created: AccessTokenCreated | null = null;
   public blockedReason: string | null = null;
+  /** The check of how many live tokens exist is under way / could not be read. */
+  public checkingRoom = true;
+  public roomCheckFailed = false;
 
   constructor(
     private readonly route: ActivatedRoute,
@@ -65,11 +68,15 @@ export class CliAuthComponent implements OnInit {
   private checkRoom(): void {
     this.accessTokensApi.listAccessTokens(0, 100, ['expirationDate,desc']).subscribe({
       next: (r) => {
+        this.checkingRoom = false;
         if (countLive(r.content ?? []) >= MAX_LIVE_ACCESS_TOKENS) {
-          this.blockedReason = `You already have ${MAX_LIVE_ACCESS_TOKENS} access tokens that have not expired, the most allowed. Revoke one under Profile first.`;
+          this.blockedReason = `You already have ${MAX_LIVE_ACCESS_TOKENS} access tokens that have not expired, the most allowed. Revoke one under Settings first.`;
         }
       },
-      error: () => {},
+      error: () => {
+        this.checkingRoom = false;
+        this.roomCheckFailed = true;
+      },
     });
   }
 

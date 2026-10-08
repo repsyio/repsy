@@ -22,20 +22,11 @@
  */
 import { expect, type Locator, type Page } from '@playwright/test';
 
-export interface OneTimeSecretModalIds {
-  root: string;
+export interface OneTimeSecretModalIds extends SecretModalIds {
   /** Whose secret it is (the username). */
   subject: string;
-  /** The read-only input holding the secret. */
-  value: string;
-  /** The show/hide button of the input. */
-  toggle: string;
   /** The primary "Close" button. */
   done: string;
-  /** The X in the header. */
-  close: string;
-  /** The copy button next to the secret (RPS-1623). */
-  copyValue: string;
   /** The copy button in the footer, next to "Close" (RPS-1623). */
   copyFooter: string;
 }
@@ -51,28 +42,43 @@ export const RESET_PASSWORD_MODAL_IDS: OneTimeSecretModalIds = {
   copyFooter: 'user-reset-password-copy-footer',
 };
 
-export class OneTimeSecretModal {
+/** What every "shown once" modal has: the root, the masked secret, its eye, the X and the copy button. */
+export interface SecretModalIds {
+  root: string;
+  /** The read-only input holding the secret. */
+  value: string;
+  /** The show/hide button of the input. */
+  toggle: string;
+  /** The X in the header. */
+  close: string;
+  /** The copy button next to the secret. */
+  copyValue: string;
+  /** The "save it now" notice, matched by its text (the modals carry no test id on it). */
+  warning?: RegExp;
+}
+
+const DEFAULT_WARNING = /won't be able to see it again/i;
+
+/**
+ * The part of a "shown once" modal that is the same everywhere (the access token modal uses it as it is;
+ * `OneTimeSecretModal` adds the subject and the footer buttons of the reset-password modal).
+ */
+export class SecretModal {
   readonly root: Locator;
-  readonly subject: Locator;
   readonly value: Locator;
   readonly toggle: Locator;
-  readonly done: Locator;
   readonly close: Locator;
   readonly copyValue: Locator;
-  readonly copyFooter: Locator;
   /** The "save it now, you will not see it again" notice (no test id: matched by its text). */
   readonly warning: Locator;
 
-  constructor(page: Page, ids: OneTimeSecretModalIds = RESET_PASSWORD_MODAL_IDS) {
+  constructor(page: Page, ids: SecretModalIds) {
     this.root = page.getByTestId(ids.root);
-    this.subject = page.getByTestId(ids.subject);
     this.value = page.getByTestId(ids.value);
     this.toggle = page.getByTestId(ids.toggle);
-    this.done = page.getByTestId(ids.done);
     this.close = page.getByTestId(ids.close);
     this.copyValue = page.getByTestId(ids.copyValue);
-    this.copyFooter = page.getByTestId(ids.copyFooter);
-    this.warning = this.root.getByText(/won't be able to see it again/i);
+    this.warning = this.root.getByText(ids.warning ?? DEFAULT_WARNING);
   }
 
   async expectOpen(): Promise<void> {
@@ -99,6 +105,19 @@ export class OneTimeSecretModal {
   async reveal(): Promise<void> {
     await this.toggle.click();
     await expect(this.value).toHaveAttribute('type', 'text');
+  }
+}
+
+export class OneTimeSecretModal extends SecretModal {
+  readonly subject: Locator;
+  readonly done: Locator;
+  readonly copyFooter: Locator;
+
+  constructor(page: Page, ids: OneTimeSecretModalIds = RESET_PASSWORD_MODAL_IDS) {
+    super(page, ids);
+    this.subject = page.getByTestId(ids.subject);
+    this.done = page.getByTestId(ids.done);
+    this.copyFooter = page.getByTestId(ids.copyFooter);
   }
 
   /** Closes it with the "Close" button and waits until it is gone. */

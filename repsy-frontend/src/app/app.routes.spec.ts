@@ -65,6 +65,7 @@ describe('app routes', () => {
     it('lists the static pages before the :repoName catch-all, which must stay last', () => {
       expect(layout().children!.map((route) => route.path)).toEqual([
         'profile',
+        'profile/settings',
         'repositories',
         'users',
         'security',

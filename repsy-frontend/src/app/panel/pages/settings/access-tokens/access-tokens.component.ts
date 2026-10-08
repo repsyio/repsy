@@ -15,7 +15,7 @@
 ///
 import { DatePipe } from '@angular/common';
 import { HttpContext } from '@angular/common/http';
-import { Component, EventEmitter, OnInit, Output } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import moment from 'moment';
 import { concat, Observable, of } from 'rxjs';
 import { catchError, finalize, map, switchMap, tap, toArray } from 'rxjs/operators';
@@ -58,8 +58,6 @@ export class AccessTokensComponent implements OnInit {
   /** The outcome of the last "revoke all": how many were revoked and the names that failed. */
   public revokeAllReport: { revoked: number; failed: string[] } | null = null;
 
-  @Output() liveCountChange = new EventEmitter<number>();
-
   constructor(
     private readonly accessTokensApi: AccessTokensApi,
     private readonly toastService: ToastService,
@@ -87,7 +85,6 @@ export class AccessTokensComponent implements OnInit {
     this.accessTokensApi.listAccessTokens(0, 100, ['expirationDate,desc']).subscribe({
       next: (r) => {
         this.liveCount = countLive(r.content ?? []);
-        this.liveCountChange.emit(this.liveCount);
       },
       error: () => {},
     });

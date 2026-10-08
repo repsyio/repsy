@@ -84,7 +84,10 @@ describe('PanelHeaderComponent profile link', () => {
     TestBed.configureTestingModule({
       imports: [PanelHeaderComponent],
       providers: [
-        provideRouter([{ path: 'profile', component: PanelHeaderComponent }]),
+        provideRouter([
+          { path: 'profile', component: PanelHeaderComponent },
+          { path: 'profile/settings', component: PanelHeaderComponent },
+        ]),
         { provide: AuthService, useValue: { username: 'admin', isAuthenticated: () => true } },
       ],
     });
@@ -97,6 +100,20 @@ describe('PanelHeaderComponent profile link', () => {
 
   it('points at the absolute /profile route, whatever page the header is on', () => {
     expect(query('header-menu-profile')!.getAttribute('href')).toBe('/profile');
+  });
+
+  // RPS-2002: the Settings entry sits next to Profile and goes the same way.
+  it('points the Settings entry at /profile/settings and closes the menu after a router navigation', async () => {
+    expect(query('header-menu-settings')!.getAttribute('href')).toBe('/profile/settings');
+    const click = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 });
+
+    query('header-menu-settings')!.dispatchEvent(click);
+    await fixture.whenStable();
+    fixture.detectChanges();
+
+    expect(click.defaultPrevented).toBeTrue();
+    expect(router.url).toBe('/profile/settings');
+    expect(query('header-menu')).toBeNull();
   });
 
   it('navigates through the router without a document load, and closes the menu', async () => {

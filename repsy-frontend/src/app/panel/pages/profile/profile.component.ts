@@ -17,15 +17,16 @@
 import { Component, OnInit } from '@angular/core';
 import { RouterModule } from '@angular/router';
 
+import { AccessTokensApi } from '../../../../generated/api';
 import { BreadcrumbComponent } from '../../shared/components/breadcrumb/breadcrumb.component';
-import { AccessTokensComponent } from './access-tokens/access-tokens.component';
+import { countLive } from '../settings/access-tokens/access-token-limits';
 import { AccountInfoComponent } from './account-info/account-info.component';
 import { DeleteAccountComponent } from './delete-account/delete-account.component';
 
 @Component({
   selector: 'app-profile',
   standalone: true,
-  imports: [RouterModule, BreadcrumbComponent, AccountInfoComponent, AccessTokensComponent, DeleteAccountComponent],
+  imports: [RouterModule, BreadcrumbComponent, AccountInfoComponent, DeleteAccountComponent],
   templateUrl: './profile.component.html',
 })
 export class ProfileComponent implements OnInit {
@@ -33,7 +34,15 @@ export class ProfileComponent implements OnInit {
   /** Access tokens that have not expired: a password change leaves them valid, so it warns. */
   liveAccessTokens = 0;
 
+  constructor(private readonly accessTokensApi: AccessTokensApi) {}
+
   ngOnInit(): void {
     this.username = localStorage.getItem('username') || '';
+    // The tokens are managed under Settings now; the password warning still needs how many are live. They sort
+    // by expiration, newest first, and there are at most 50 live ones, so the first 100 hold every one.
+    this.accessTokensApi.listAccessTokens(0, 100, ['expirationDate,desc']).subscribe({
+      next: (r) => (this.liveAccessTokens = countLive(r.content ?? [])),
+      error: () => {},
+    });
   }
 }

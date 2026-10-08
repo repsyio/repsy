@@ -14,7 +14,7 @@
 /// limitations under the License.
 ///
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 
 import { AccessTokensApi, AccessTokenScope } from '../../../../generated/api';
 import { CliAuthComponent } from './cli-auth.component';
@@ -83,6 +83,22 @@ describe('CliAuthComponent', () => {
         Array.from({ length: 60 }, () => expired),
       ).blockedReason,
     ).toBeNull();
+  });
+
+  it('reports the check of the token count: under way, done, or failed', () => {
+    const route = { snapshot: { queryParamMap: convertToParamMap({}) } } as unknown as ActivatedRoute;
+    const api = jasmine.createSpyObj<AccessTokensApi>('AccessTokensApi', ['listAccessTokens']);
+    api.listAccessTokens.and.returnValue(throwError(() => new Error('down')) as never);
+    const failed = new CliAuthComponent(route, api);
+
+    expect(failed.checkingRoom).toBeTrue();
+    failed.ngOnInit();
+
+    expect(failed.checkingRoom).toBeFalse();
+    expect(failed.roomCheckFailed).toBeTrue();
+    expect(failed.blockedReason).toBeNull();
+    expect(pageFor({}).checkingRoom).toBeFalse();
+    expect(pageFor({}).roomCheckFailed).toBeFalse();
   });
 
   it('shows the secret once the token is created', () => {

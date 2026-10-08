@@ -5,6 +5,14 @@
     <p class="text-sm text-[#9FA0A0]">
       The CLI asked for an access token. Check the name and the scopes below, then create it and paste it into the CLI.
     </p>
+    @if (checkingRoom) {
+      <p data-testid="cli-auth-loading" class="text-sm text-[#9FA0A0]">Checking your access tokens…</p>
+    }
+    @if (roomCheckFailed) {
+      <p data-testid="cli-auth-error" class="text-warning-500 text-sm">
+        Could not check how many access tokens you have. You can still try to create the token.
+      </p>
+    }
     <div class="rounded-xl border border-[#404141] bg-[#101112] p-6">
       <app-access-token-form
         [initialName]="name"
@@ -27,7 +35,13 @@
       <p class="mt-4 text-sm text-[#9FA0A0]">
         Copy this token and paste it into the terminal where rp is waiting. It will not be shown again. You can revoke
         it any time under
-        <a routerLink="/profile" fragment="access-tokens" class="text-secondary-500">Profile</a>.
+        <a
+          data-testid="cli-auth-manage"
+          routerLink="/profile/settings"
+          fragment="access-tokens"
+          class="text-secondary-500"
+          >Settings</a
+        >.
       </p>
     </div>
   }
