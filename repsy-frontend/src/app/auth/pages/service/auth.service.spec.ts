@@ -400,6 +400,23 @@ describe('AuthService', () => {
         expect(ended).toHaveBeenCalledTimes(1);
       });
 
+      it('keeps the session when a write event arrives before the rest of the pair is visible (RPS-1767)', () => {
+        seedStorage(SESSION);
+        const service = createService();
+        const ended = jasmine.createSpy('sessionEndedElsewhere');
+        service.sessionEndedElsewhere$.subscribe(ended);
+
+        // Another tab logs in again: the browser reports the first key while the others are not readable yet.
+        STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
+        window.dispatchEvent(
+          new StorageEvent('storage', { key: 'username', newValue: 'alice', storageArea: localStorage }),
+        );
+
+        expect(service.isAuthenticated()).toBeTrue();
+        expect(service.accessToken).toBe('access-1');
+        expect(ended).not.toHaveBeenCalled();
+      });
+
       it('signs this tab out on localStorage.clear() (a null key)', () => {
         seedStorage(SESSION);
         const service = createService();
