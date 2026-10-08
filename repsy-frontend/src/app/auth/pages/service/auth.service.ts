@@ -141,7 +141,11 @@ export class AuthService {
   private readonly onStorage = (event: StorageEvent): void => {
     // A null key is `localStorage.clear()`. Other keys and sessionStorage are none of our business.
     if (event.storageArea === localStorage && (event.key === null || SESSION_KEYS.includes(event.key))) {
-      this._syncFromStorage();
+      // A write (`newValue` set) can never end a session. The three keys of a login or refresh are written one
+      // after the other and Chromium replicates them between processes one event at a time, so the first event
+      // can arrive while a re-read still finds the keys that follow empty. Reading that as a logout sent the
+      // second tab to /login with a valid session (RPS-1767); the events that follow complete the pair.
+      this._syncFromStorage(event.key !== null && event.newValue !== null);
     }
   };
 
@@ -270,9 +274,16 @@ export class AuthService {
   }
 
   /** Adopts whatever the shared storage holds now, i.e. what the other tabs did to the session. */
-  private _syncFromStorage(): void {
+  private _syncFromStorage(keepSession = false): void {
     const wasAuthenticated = this.isAuthenticated();
+    const { _username, _accessToken, _refreshToken } = this;
     this._readStorage();
+    if (keepSession && wasAuthenticated && !this.isAuthenticated()) {
+      this._username = _username;
+      this._accessToken = _accessToken;
+      this._refreshToken = _refreshToken;
+      return;
+    }
     this._authenticated$.next(this.isAuthenticated());
     if (wasAuthenticated && !this.isAuthenticated()) {
       this._sessionEndedElsewhere$.next();
