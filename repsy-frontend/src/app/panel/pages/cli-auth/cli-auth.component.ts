@@ -16,9 +16,15 @@
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 
-import { AccessTokenCreated, AccessTokenScope } from '../../../../generated/api';
+import { AccessTokenCreated, AccessTokensApi, AccessTokenScope } from '../../../../generated/api';
 import { AccessTokenFormComponent } from '../../shared/components/access-token-form/access-token-form.component';
 import { CopyClipboardComponent } from '../../shared/components/copy-clipboard/copy-clipboard.component';
+import {
+  countLive,
+  DEFAULT_CLI_SCOPES,
+  MAX_ACCESS_TOKEN_NAME_LENGTH,
+  MAX_LIVE_ACCESS_TOKENS,
+} from '../profile/access-tokens/access-token-limits';
 import { parseRequestedScopes } from '../profile/access-tokens/access-token-scopes';
 
 /**
@@ -38,13 +44,33 @@ export class CliAuthComponent implements OnInit {
   public name = '';
   public scopes: AccessTokenScope[] = [];
   public created: AccessTokenCreated | null = null;
+  public blockedReason: string | null = null;
 
-  constructor(private readonly route: ActivatedRoute) {}
+  constructor(
+    private readonly route: ActivatedRoute,
+    private readonly accessTokensApi: AccessTokensApi,
+  ) {}
 
   ngOnInit(): void {
     const params = this.route.snapshot.queryParamMap;
-    this.name = params.get('name') ?? 'Repsy CLI';
-    this.scopes = parseRequestedScopes(params.get('scopes'));
+    // Shown as text (Angular escapes it) and cut to what the backend accepts.
+    this.name = (params.get('name') ?? 'Repsy CLI').trim().slice(0, MAX_ACCESS_TOKEN_NAME_LENGTH);
+    const requested = parseRequestedScopes(params.get('scopes'));
+    // A link that names no scope the page knows gets the three repository scopes, ticked.
+    this.scopes = requested.length > 0 ? requested : [...DEFAULT_CLI_SCOPES];
+    this.checkRoom();
+  }
+
+  /** Blocks the create button when the user already holds the most tokens that have not expired. */
+  private checkRoom(): void {
+    this.accessTokensApi.listAccessTokens(0, 100, ['expirationDate,desc']).subscribe({
+      next: (r) => {
+        if (countLive(r.content ?? []) >= MAX_LIVE_ACCESS_TOKENS) {
+          this.blockedReason = `You already have ${MAX_LIVE_ACCESS_TOKENS} access tokens that have not expired, the most allowed. Revoke one under Profile first.`;
+        }
+      },
+      error: () => {},
+    });
   }
 
   public scopesText(): string {

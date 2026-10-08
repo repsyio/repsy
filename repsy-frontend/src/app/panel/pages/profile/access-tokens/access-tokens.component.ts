@@ -14,11 +14,14 @@
 /// limitations under the License.
 ///
 import { DatePipe } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { HttpContext } from '@angular/common/http';
+import { Component, EventEmitter, OnInit, Output } from '@angular/core';
 import moment from 'moment';
-import { finalize, switchMap, tap } from 'rxjs/operators';
+import { concat, Observable, of } from 'rxjs';
+import { catchError, finalize, map, switchMap, tap, toArray } from 'rxjs/operators';
 
 import { AccessTokenCreated, AccessTokenListItem, AccessTokensApi } from '../../../../../generated/api';
+import { SILENT_ERROR } from '../../../../shared/interceptor/error-handler.interceptor';
 import { EmptyListComponent } from '../../../shared/components/empty-list/empty-list.component';
 import { AccessTokenCreateModalComponent } from '../../../shared/components/modals/access-token-create-modal/access-token-create-modal.component';
 import { AccessTokenInfoModalComponent } from '../../../shared/components/modals/access-token-info-modal/access-token-info-modal.component';
@@ -26,6 +29,7 @@ import { DangerModalService } from '../../../shared/components/modals/danger-mod
 import { PaginationComponent } from '../../../shared/components/pagination/pagination.component';
 import { ToastService } from '../../../shared/components/toast/toast.service';
 import { PagedData } from '../../../shared/dto/paged-data';
+import { countLive, isExpired, MAX_LIVE_ACCESS_TOKENS } from './access-token-limits';
 
 @Component({
   selector: 'app-access-tokens',
@@ -48,6 +52,13 @@ export class AccessTokensComponent implements OnInit {
   public createdToken: AccessTokenCreated;
   public showCreateModal = false;
   public showInfoModal = false;
+  /** Tokens that have not expired: the limit applies to them, and a password change warns about them. */
+  public liveCount = 0;
+  public readonly maxLive = MAX_LIVE_ACCESS_TOKENS;
+  /** The outcome of the last "revoke all": how many were revoked and the names that failed. */
+  public revokeAllReport: { revoked: number; failed: string[] } | null = null;
+
+  @Output() liveCountChange = new EventEmitter<number>();
 
   constructor(
     private readonly accessTokensApi: AccessTokensApi,
@@ -59,8 +70,27 @@ export class AccessTokensComponent implements OnInit {
     this.fetchTokens();
   }
 
+  public get limitReached(): boolean {
+    return this.liveCount >= this.maxLive;
+  }
+
   public fetchTokens(): void {
     this.listPage(this.pageNum).subscribe({ next: (r) => this.showTokens(r), error: () => {} });
+    this.refreshLiveCount();
+  }
+
+  /**
+   * The tokens that have not expired. They sort first by expiration, newest first, and there are at
+   * most 50 of them, so the first 100 hold every one.
+   */
+  private refreshLiveCount(): void {
+    this.accessTokensApi.listAccessTokens(0, 100, ['expirationDate,desc']).subscribe({
+      next: (r) => {
+        this.liveCount = countLive(r.content ?? []);
+        this.liveCountChange.emit(this.liveCount);
+      },
+      error: () => {},
+    });
   }
 
   public loadPage(pageNum: number): void {
@@ -96,6 +126,7 @@ export class AccessTokensComponent implements OnInit {
           tap(() => this.toastService.show('Access token revoked successfully', 'success')),
           switchMap(() => {
             this.pageNum = this.pageAfterRevoke();
+            this.refreshLiveCount();
             return this.listPage(this.pageNum);
           }),
           finalize(() => {
@@ -109,6 +140,66 @@ export class AccessTokensComponent implements OnInit {
   /** The scopes of a token as text (the wire value is an array, the generated type a Set). */
   public scopesText(token: AccessTokenListItem): string {
     return Array.from(token.scopes).join(', ');
+  }
+
+  public isExpired(token: AccessTokenListItem): boolean {
+    return isExpired(token);
+  }
+
+  /**
+   * Revokes every token (expired ones too), one DELETE after the other (there is no bulk route). A
+   * token that cannot be revoked does not stop the rest; the names that failed are reported. One
+   * run handles the first 100 (expired ones sort last); run it again for more.
+   */
+  public revokeAll(): void {
+    this.dangerModalService.show('Revoke All Access Tokens', 'Revoke all', () => {
+      this.operationLock = true;
+      this.revokeAllReport = null;
+      this.collectAll()
+        .pipe(
+          switchMap((all) => this.revokeEach(all)),
+          finalize(() => {
+            this.operationLock = false;
+          }),
+        )
+        .subscribe((report) => {
+          this.revokeAllReport = report;
+          this.pageNum = 0;
+          this.toastService.show(
+            report.failed.length === 0
+              ? `${report.revoked} access tokens revoked`
+              : `${report.revoked} revoked, ${report.failed.length} could not be revoked`,
+            report.failed.length === 0 ? 'success' : 'error',
+          );
+          this.fetchTokens();
+        });
+    });
+  }
+
+  private collectAll(): Observable<AccessTokenListItem[]> {
+    return this.accessTokensApi.listAccessTokens(0, 100, ['expirationDate,desc']).pipe(
+      map((r) => r.content ?? []),
+      // A list that cannot be read revokes nothing.
+      catchError(() => of([] as AccessTokenListItem[])),
+    );
+  }
+
+  private revokeEach(all: AccessTokenListItem[]): Observable<{ revoked: number; failed: string[] }> {
+    const silent = { context: new HttpContext().set(SILENT_ERROR, true) };
+    return concat(
+      ...all.map((t) =>
+        this.accessTokensApi.revokeAccessToken(t.id, 'body', false, silent).pipe(
+          map(() => null as string | null),
+          catchError(() => of(t.name)),
+        ),
+      ),
+    ).pipe(
+      toArray(),
+      map((outcomes) => ({
+        revoked: outcomes.filter((o) => o === null).length,
+        failed: outcomes.filter((o): o is string => o !== null),
+      })),
+    );
   }
 
   public timeAgo(date: string | undefined): string {

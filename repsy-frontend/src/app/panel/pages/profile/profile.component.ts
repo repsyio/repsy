@@ -30,6 +30,8 @@ import { DeleteAccountComponent } from './delete-account/delete-account.componen
 })
 export class ProfileComponent implements OnInit {
   username = '';
+  /** Access tokens that have not expired: a password change leaves them valid, so it warns. */
+  liveAccessTokens = 0;
 
   ngOnInit(): void {
     this.username = localStorage.getItem('username') || '';

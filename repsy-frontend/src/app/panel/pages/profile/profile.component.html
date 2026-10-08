@@ -1,7 +1,7 @@
 <app-breadcrumb />
 <div animate.enter="fade-in-down" class="space-y-[24px]">
   <h2 data-testid="profile-title" class="text-[14px] text-[#9FA0A0]">Profile Settings</h2>
-  <div><app-account-info [username]="username" /></div>
-  <div><app-access-tokens /></div>
+  <div><app-account-info [username]="username" [liveAccessTokens]="liveAccessTokens" /></div>
+  <div><app-access-tokens (liveCountChange)="liveAccessTokens = $event" /></div>
   <div><app-delete-account /></div>
 </div>

@@ -21,6 +21,7 @@ import { finalize } from 'rxjs/operators';
 
 import { AccessTokenCreated, AccessTokenForm, AccessTokensApi, AccessTokenScope } from '../../../../../generated/api';
 import { idFactory } from '../../../../shared/util/unique-id';
+import { MAX_ACCESS_TOKEN_NAME_LENGTH } from '../../../pages/profile/access-tokens/access-token-limits';
 import { SELECTABLE_SCOPES } from '../../../pages/profile/access-tokens/access-token-scopes';
 import { ToastService } from '../toast/toast.service';
 
@@ -41,6 +42,8 @@ export class AccessTokenFormComponent implements OnInit {
   @Input() public initialName = '';
   @Input() public initialScopes: AccessTokenScope[] = [];
   @Input() public submitLabel = 'Create';
+  /** When set, creating is blocked and this says why (for example the limit of tokens is reached). */
+  @Input() public blockedReason: string | null = null;
   @Output() created = new EventEmitter<AccessTokenCreated>();
   @Output() cancelled = new EventEmitter<void>();
 
@@ -57,8 +60,8 @@ export class AccessTokenFormComponent implements OnInit {
     private readonly toastService: ToastService,
   ) {
     this.form = this.fb.group({
-      name: ['', [Validators.required, Validators.maxLength(80)]],
-      expirationDate: [null],
+      name: ['', [Validators.required, Validators.maxLength(MAX_ACCESS_TOKEN_NAME_LENGTH)]],
+      expirationDate: [null, [Validators.required]],
     });
   }
 
@@ -67,7 +70,10 @@ export class AccessTokenFormComponent implements OnInit {
     this.minDate = today.clone().add(1, 'day').format('YYYY-MM-DD');
     this.maxDate = today.clone().add(365, 'days').format('YYYY-MM-DD');
     this.selectedScopes = new Set(this.initialScopes);
-    this.form.patchValue({ name: this.initialName.trim().slice(0, 80), expirationDate: this.maxDate });
+    this.form.patchValue({
+      name: this.initialName.trim().slice(0, MAX_ACCESS_TOKEN_NAME_LENGTH),
+      expirationDate: this.maxDate,
+    });
   }
 
   isSelected(scope: AccessTokenScope): boolean {
@@ -90,7 +96,9 @@ export class AccessTokenFormComponent implements OnInit {
   }
 
   get canSubmit(): boolean {
-    return this.form.valid && this.selectedScopes.size > 0 && !this.expirationInvalid && !this.loading;
+    return (
+      this.form.valid && this.selectedScopes.size > 0 && !this.expirationInvalid && !this.loading && !this.blockedReason
+    );
   }
 
   submit(): void {

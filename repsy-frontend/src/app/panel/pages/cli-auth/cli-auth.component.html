@@ -10,6 +10,7 @@
         [initialName]="name"
         [initialScopes]="scopes"
         submitLabel="Create token"
+        [blockedReason]="blockedReason"
         (created)="onCreated($event)"
       />
     </div>
@@ -24,7 +25,8 @@
         <app-copy-clipboard data-testid="cli-auth-copy" [text]="created.token" />
       </div>
       <p class="mt-4 text-sm text-[#9FA0A0]">
-        Paste it into the CLI. You can revoke it any time under
+        Copy this token and paste it into the terminal where rp is waiting. It will not be shown again. You can revoke
+        it any time under
         <a routerLink="/profile" fragment="access-tokens" class="text-secondary-500">Profile</a>.
       </p>
     </div>

@@ -24,7 +24,8 @@ export interface SelectableScope {
 
 /**
  * The scopes a person can ask for. `profile:read` is not listed: every token has it, so it is never
- * asked for. `repo:manage` is never implied by another scope, so it is a choice of its own.
+ * asked for. `repo:manage` is never implied by another scope, so it is a choice of its own. `scan:read` is not
+ * offered either (decision pending).
  */
 export const SELECTABLE_SCOPES: readonly SelectableScope[] = [
   { scope: 'repo:read', label: 'Read repositories', description: 'Download packages and read metadata.' },
@@ -34,7 +35,6 @@ export const SELECTABLE_SCOPES: readonly SelectableScope[] = [
     label: 'Manage repositories',
     description: 'Delete packages and change repository settings (and write, read).',
   },
-  { scope: 'scan:read', label: 'Read scan results', description: 'Read security scan results.' },
 ];
 
 /**
