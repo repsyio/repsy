@@ -41,7 +41,7 @@ import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactV
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.VersionSignatureRepository;
 import io.repsy.os.server.protocols.maven.shared.keystore.dtos.PublicKeySources;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreService;
-import io.repsy.os.server.protocols.maven.shared.keystore.services.PGPVerifierService;
+import io.repsy.os.server.protocols.maven.shared.keystore.services.PgpVerifierService;
 import io.repsy.os.shared.repo.entities.Repo;
 import java.util.List;
 import java.util.Optional;
@@ -70,7 +70,7 @@ class VersionSignatureServiceTest {
   @Mock ArtifactVersionRepository artifactVersionRepository;
   @Mock StorageStrategy storageStrategy;
   @Mock KeyStoreService keyStoreService;
-  @Mock PGPVerifierService pgpVerifierService;
+  @Mock PgpVerifierService pgpVerifierService;
 
   private VersionSignatureService service;
   private final UUID storageKey = UUID.randomUUID();

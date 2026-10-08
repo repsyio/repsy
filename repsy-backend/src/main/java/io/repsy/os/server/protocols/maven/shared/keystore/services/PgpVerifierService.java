@@ -63,7 +63,7 @@ import org.springframework.web.client.RestClientException;
 
 @Slf4j
 @Service
-public class PGPVerifierService {
+public class PgpVerifierService {
 
   private static final String KEY_ID_FORMAT = "%016X";
   private static final int PGP_BUFFER_SIZE = 4_096;
@@ -95,14 +95,14 @@ public class PGPVerifierService {
       CacheBuilder.newBuilder().maximumSize(PARSED_KEY_CACHE_SIZE).recordStats().build();
 
   @Autowired
-  public PGPVerifierService(
+  public PgpVerifierService(
       final @Qualifier("pgpVerifierRestClient") @NonNull RestClient restClient) {
 
     this(restClient, Ticker.systemTicker());
   }
 
   @VisibleForTesting
-  PGPVerifierService(final @NonNull RestClient restClient, final @NonNull Ticker ticker) {
+  PgpVerifierService(final @NonNull RestClient restClient, final @NonNull Ticker ticker) {
 
     this.restClient = restClient;
     this.keyBlocksByUrl =

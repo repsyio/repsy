@@ -24,7 +24,7 @@ import org.passay.generate.PasswordGenerator;
 import org.passay.rule.CharacterRule;
 
 @UtilityClass
-public class PasswordGeneratorUtil {
+public class PasswordGeneratorUtils {
 
   private static final int DEFAULT_PASSWORD_LENGTH = 12;
   private static final String SPECIAL_CHARS = "!@#$%^&*";

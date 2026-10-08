@@ -51,8 +51,8 @@ services:
       DB_PASSWORD: repsy123
       # RPS-1976: log every CHECKPOINT SYNC (the request, how long it took), so a persistence failure in CI shows
       # whether the flush ran before the container was killed. Set through SPRING_APPLICATION_JSON, not
-      # LOGGING_LEVEL_*: the package is `post_precessors` and an environment variable cannot carry the underscore.
-      SPRING_APPLICATION_JSON: '{"logging.level.io.repsy.os.server.core.post_precessors":"DEBUG"}'
+      # LOGGING_LEVEL_*: the package is `post_processors` and an environment variable cannot carry the underscore.
+      SPRING_APPLICATION_JSON: '{"logging.level.io.repsy.os.server.core.post_processors":"DEBUG"}'
       ADMIN_INITIAL_PASSWORD: ${REPSY_ADMIN_PASSWORD:?Set REPSY_ADMIN_PASSWORD in e2e/.env}
       # The panel's client snippets (docker login/pull, mvn, npm ...) print this host and port
       # (entrypoint.sh writes it into static-env.js); the image defaults to http://localhost:9090

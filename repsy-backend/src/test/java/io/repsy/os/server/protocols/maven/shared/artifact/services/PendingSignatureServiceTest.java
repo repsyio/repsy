@@ -42,7 +42,7 @@ import io.repsy.os.server.protocols.maven.shared.artifact.repositories.PendingSi
 import io.repsy.os.server.protocols.maven.shared.keystore.dtos.PublicKeySources;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreService;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.MavenPgpCaps;
-import io.repsy.os.server.protocols.maven.shared.keystore.services.PGPVerifierService;
+import io.repsy.os.server.protocols.maven.shared.keystore.services.PgpVerifierService;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
@@ -83,7 +83,7 @@ class PendingSignatureServiceTest {
   @Mock ArtifactVersionRepository artifactVersionRepository;
   @Mock RepoRepository repoRepository;
   @Mock VersionSignatureService versionSignatureService;
-  @Mock PGPVerifierService pgpVerifierService;
+  @Mock PgpVerifierService pgpVerifierService;
   @Mock KeyStoreService keyStoreService;
   @Mock UsageUpdateService usageUpdateService;
   @Mock StorageStrategy storageStrategy;

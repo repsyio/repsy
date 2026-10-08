@@ -106,7 +106,7 @@ public class Release {
   private @NonNull Set<ReleaseClassifier> releaseClassifiers = new HashSet<>();
 
   @OneToMany(mappedBy = "release", cascade = CascadeType.ALL, orphanRemoval = true)
-  private @NonNull Set<ReleaseProjectURL> releaseProjectURLS = new HashSet<>();
+  private @NonNull Set<ReleaseProjectUrl> releaseProjectURLS = new HashSet<>();
 
   /**
    * Identifier-based equality: two releases are equal when they are the same instance or carry the

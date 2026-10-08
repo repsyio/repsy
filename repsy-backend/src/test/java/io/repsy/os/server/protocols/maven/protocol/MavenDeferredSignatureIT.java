@@ -31,7 +31,7 @@ import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.config.async.SignedRecomputeExecutorConfig;
 import io.repsy.os.server.protocols.maven.shared.artifact.services.PendingSignatureService;
 import io.repsy.os.server.protocols.maven.shared.keystore.PgpTestKeys;
-import io.repsy.os.server.protocols.maven.shared.keystore.services.PGPVerifierService;
+import io.repsy.os.server.protocols.maven.shared.keystore.services.PgpVerifierService;
 import io.repsy.os.server.protocols.maven.shared.keystore.support.StubKeyServers;
 import io.repsy.os.server.protocols.maven.shared.storage.services.MavenStorageService;
 import io.repsy.os.shared.repo.entities.Repo;
@@ -105,7 +105,7 @@ class MavenDeferredSignatureIT extends AbstractIntegrationTest {
   private RestClient keyServer;
 
   @MockitoBean private UsageUpdateService usageUpdateService;
-  @MockitoSpyBean private PGPVerifierService pgpVerifierService;
+  @MockitoSpyBean private PgpVerifierService pgpVerifierService;
 
   @Autowired private RepoTxService repoTxService;
   @Autowired private MavenStorageService mavenStorageService;

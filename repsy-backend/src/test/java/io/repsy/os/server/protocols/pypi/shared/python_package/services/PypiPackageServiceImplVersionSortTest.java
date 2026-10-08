@@ -27,7 +27,7 @@ import io.repsy.os.server.protocols.pypi.shared.python_package.entities.PypiPack
 import io.repsy.os.server.protocols.pypi.shared.python_package.mappers.PypiPackageConverter;
 import io.repsy.os.server.protocols.pypi.shared.python_package.repositories.PypiPackageRepository;
 import io.repsy.os.server.protocols.pypi.shared.python_package.repositories.ReleaseClassifierRepository;
-import io.repsy.os.server.protocols.pypi.shared.python_package.repositories.ReleaseProjectURLRepository;
+import io.repsy.os.server.protocols.pypi.shared.python_package.repositories.ReleaseProjectUrlRepository;
 import io.repsy.os.server.protocols.pypi.shared.python_package.repositories.ReleaseRepository;
 import io.repsy.os.server.protocols.pypi.shared.storage.services.PypiStorageService;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
@@ -59,8 +59,8 @@ class PypiPackageServiceImplVersionSortTest {
   private final PypiPackageRepository pypiPackageRepository = mock(PypiPackageRepository.class);
   private final ReleaseClassifierRepository releaseClassifierRepository =
       mock(ReleaseClassifierRepository.class);
-  private final ReleaseProjectURLRepository releaseProjectURLRepository =
-      mock(ReleaseProjectURLRepository.class);
+  private final ReleaseProjectUrlRepository releaseProjectURLRepository =
+      mock(ReleaseProjectUrlRepository.class);
 
   private final PypiPackageServiceImpl service =
       new PypiPackageServiceImpl(

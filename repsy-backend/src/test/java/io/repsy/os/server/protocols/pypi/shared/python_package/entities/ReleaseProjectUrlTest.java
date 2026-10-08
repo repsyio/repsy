@@ -22,25 +22,25 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-class ReleaseProjectURLTest extends AbstractEntityIdentityTest<ReleaseProjectURL> {
+class ReleaseProjectUrlTest extends AbstractEntityIdentityTest<ReleaseProjectUrl> {
 
   @Override
-  protected ReleaseProjectURL newEntity(final UUID id) {
-    final var releaseProjectURL = new ReleaseProjectURL();
+  protected ReleaseProjectUrl newEntity(final UUID id) {
+    final var releaseProjectURL = new ReleaseProjectUrl();
     releaseProjectURL.setId(id);
     releaseProjectURL.setLabel("Home");
     return releaseProjectURL;
   }
 
   @Override
-  protected void changeState(final ReleaseProjectURL releaseProjectURL) {
+  protected void changeState(final ReleaseProjectUrl releaseProjectURL) {
     releaseProjectURL.setLabel("Docs");
     releaseProjectURL.setUrl("https://example.org");
   }
 
   @Override
-  protected ReleaseProjectURL newProxy(final UUID id) {
-    return new ReleaseProjectURL() {
+  protected ReleaseProjectUrl newProxy(final UUID id) {
+    return new ReleaseProjectUrl() {
       @Override
       public UUID getId() {
         return id;
@@ -49,7 +49,7 @@ class ReleaseProjectURLTest extends AbstractEntityIdentityTest<ReleaseProjectURL
   }
 
   @Override
-  protected void assignId(final ReleaseProjectURL releaseProjectURL, final UUID id) {
+  protected void assignId(final ReleaseProjectUrl releaseProjectURL, final UUID id) {
     releaseProjectURL.setId(id);
   }
 
@@ -58,7 +58,7 @@ class ReleaseProjectURLTest extends AbstractEntityIdentityTest<ReleaseProjectURL
   void hashCodeAndToStringSkipAssociations() {
     final var releaseProjectURL = this.newEntity(UUID.randomUUID());
 
-    assertThat(releaseProjectURL.hashCode()).isEqualTo(ReleaseProjectURL.class.hashCode());
+    assertThat(releaseProjectURL.hashCode()).isEqualTo(ReleaseProjectUrl.class.hashCode());
     assertThat(releaseProjectURL.toString()).doesNotContain("release=");
   }
 }

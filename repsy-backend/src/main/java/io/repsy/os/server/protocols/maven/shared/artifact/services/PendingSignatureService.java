@@ -29,7 +29,7 @@ import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactV
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.PendingSignatureRepository;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreService;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.MavenPgpCaps;
-import io.repsy.os.server.protocols.maven.shared.keystore.services.PGPVerifierService;
+import io.repsy.os.server.protocols.maven.shared.keystore.services.PgpVerifierService;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
@@ -138,7 +138,7 @@ public class PendingSignatureService {
   private final ArtifactVersionRepository artifactVersionRepository;
   private final RepoRepository repoRepository;
   private final VersionSignatureService versionSignatureService;
-  private final PGPVerifierService pgpVerifierService;
+  private final PgpVerifierService pgpVerifierService;
   private final KeyStoreService keyStoreService;
   private final UsageUpdateService usageUpdateService;
   private final StorageStrategy storageStrategy;
@@ -152,7 +152,7 @@ public class PendingSignatureService {
       final ArtifactVersionRepository artifactVersionRepository,
       final RepoRepository repoRepository,
       final VersionSignatureService versionSignatureService,
-      final PGPVerifierService pgpVerifierService,
+      final PgpVerifierService pgpVerifierService,
       final KeyStoreService keyStoreService,
       final UsageUpdateService usageUpdateService,
       @Qualifier("osStorageStrategyMaven") final StorageStrategy storageStrategy,

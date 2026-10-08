@@ -16,7 +16,7 @@
 package io.repsy.os.server.protocols.pypi.shared.python_package.repositories;
 
 import io.repsy.os.server.protocols.pypi.shared.python_package.dtos.ReleaseProjectURLInfo;
-import io.repsy.os.server.protocols.pypi.shared.python_package.entities.ReleaseProjectURL;
+import io.repsy.os.server.protocols.pypi.shared.python_package.entities.ReleaseProjectUrl;
 import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
@@ -27,12 +27,12 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 @NullMarked
-public interface ReleaseProjectURLRepository extends JpaRepository<ReleaseProjectURL, UUID> {
+public interface ReleaseProjectUrlRepository extends JpaRepository<ReleaseProjectUrl, UUID> {
 
   List<ReleaseProjectURLInfo> findAllByReleaseId(UUID releaseId);
 
   @Modifying
   @Query(
-      "delete ReleaseProjectURL rpu where rpu.release in (select r from Release r where r.id = :releaseId)")
+      "delete ReleaseProjectUrl rpu where rpu.release in (select r from Release r where r.id = :releaseId)")
   void deleteAllByReleaseId(UUID releaseId);
 }

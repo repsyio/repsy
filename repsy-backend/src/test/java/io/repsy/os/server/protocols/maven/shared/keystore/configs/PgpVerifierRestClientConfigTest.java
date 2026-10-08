@@ -35,16 +35,16 @@ import org.springframework.web.client.ResourceAccessException;
 
 /**
  * RPS-1469: a key-server lookup ({@link
- * io.repsy.os.server.protocols.maven.shared.keystore.services.PGPVerifierService}) runs for a key
+ * io.repsy.os.server.protocols.maven.shared.keystore.services.PgpVerifierService}) runs for a key
  * that is not registered, so a slow or unreachable key server must not be able to hang a lookup
  * forever. A real, local HTTP server plays a slow or unreachable key server; the timeouts are the
- * ones {@link PGPVerifierRestClientConfig} actually configures, not a copy of them, so a change of
+ * ones {@link PgpVerifierRestClientConfig} actually configures, not a copy of them, so a change of
  * the configured values is caught here too.
  */
-@DisplayName("PGPVerifierRestClientConfig timeouts (RPS-1469)")
-class PGPVerifierRestClientConfigTest {
+@DisplayName("PgpVerifierRestClientConfig timeouts (RPS-1469)")
+class PgpVerifierRestClientConfigTest {
 
-  // Mirrors PGPVerifierRestClientConfig's own constants: kept a little above them so a bound that
+  // Mirrors PgpVerifierRestClientConfig's own constants: kept a little above them so a bound that
   // is
   // exactly right does not make the test flaky, and well below what an unbounded wait would take.
   private static final Duration RESPONSE_TIMEOUT = Duration.ofSeconds(5);
@@ -79,7 +79,7 @@ class PGPVerifierRestClientConfigTest {
         });
 
     final var answer =
-        new PGPVerifierRestClientConfig()
+        new PgpVerifierRestClientConfig()
             .pgpVerifierRestClient()
             .get()
             .uri(this.baseUrl() + "/pks/lookup")
@@ -105,7 +105,7 @@ class PGPVerifierRestClientConfigTest {
 
     assertThatThrownBy(
             () ->
-                new PGPVerifierRestClientConfig()
+                new PgpVerifierRestClientConfig()
                     .pgpVerifierRestClient()
                     .get()
                     .uri(this.baseUrl() + "/pks/lookup")
@@ -139,7 +139,7 @@ class PGPVerifierRestClientConfigTest {
           exchange.close();
         });
 
-    new PGPVerifierRestClientConfig()
+    new PgpVerifierRestClientConfig()
         .pgpVerifierRestClient()
         .get()
         .uri(this.baseUrl() + "/pks/lookup")
@@ -163,7 +163,7 @@ class PGPVerifierRestClientConfigTest {
 
     assertThatThrownBy(
             () ->
-                new PGPVerifierRestClientConfig()
+                new PgpVerifierRestClientConfig()
                     .pgpVerifierRestClient()
                     .get()
                     .uri(this.baseUrl() + "/pks/lookup")
@@ -185,7 +185,7 @@ class PGPVerifierRestClientConfigTest {
 
     assertThatThrownBy(
             () ->
-                new PGPVerifierRestClientConfig()
+                new PgpVerifierRestClientConfig()
                     .pgpVerifierRestClient()
                     .get()
                     .uri("http://127.0.0.1:" + closedPort + "/pks/lookup")

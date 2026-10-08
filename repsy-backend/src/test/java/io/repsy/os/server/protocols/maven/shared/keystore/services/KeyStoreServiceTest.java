@@ -69,7 +69,7 @@ class KeyStoreServiceTest {
   @Mock ApplicationEventPublisher eventPublisher;
   @Mock MavenPgpCaps caps;
 
-  private final PGPVerifierService verifier = new PGPVerifierService(RestClient.create());
+  private final PgpVerifierService verifier = new PgpVerifierService(RestClient.create());
   private KeyStoreService service;
   private final UUID repoId = UUID.randomUUID();
   private final RepoInfo repoInfo = RepoInfo.builder().storageKey(this.repoId).name("repo").build();

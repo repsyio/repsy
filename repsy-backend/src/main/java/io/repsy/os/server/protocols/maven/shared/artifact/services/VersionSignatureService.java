@@ -26,7 +26,7 @@ import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactV
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.VersionSignatureRepository;
 import io.repsy.os.server.protocols.maven.shared.keystore.dtos.PublicKeySources;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreService;
-import io.repsy.os.server.protocols.maven.shared.keystore.services.PGPVerifierService;
+import io.repsy.os.server.protocols.maven.shared.keystore.services.PgpVerifierService;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
 import java.time.Instant;
@@ -68,7 +68,7 @@ public class VersionSignatureService {
   private final StorageStrategy storageStrategy;
 
   private final KeyStoreService keyStoreService;
-  private final PGPVerifierService pgpVerifierService;
+  private final PgpVerifierService pgpVerifierService;
 
   /** Records that the signature of {@code signedFileName} verified now (an upsert). */
   public void recordVerified(final ArtifactVersion version, final String signedFileName) {

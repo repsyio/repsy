@@ -16,7 +16,7 @@
 package io.repsy.os.shared.user;
 
 import io.repsy.core.events.UserCreatedEvent;
-import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
+import io.repsy.os.shared.auth.utils.PasswordGeneratorUtils;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
@@ -80,7 +80,7 @@ public class AdminUserInitializer implements ApplicationRunner {
   private void resetAdminPassword(final @NonNull User adminUser) {
     log.debug("Admin user {} has an empty password hash, resetting...", adminUser.getUsername());
 
-    final var newPassword = PasswordGeneratorUtil.generatePassword();
+    final var newPassword = PasswordGeneratorUtils.generatePassword();
     final var hash = PasswordHasher.hash(newPassword);
 
     adminUser.setHash(hash);
@@ -98,7 +98,7 @@ public class AdminUserInitializer implements ApplicationRunner {
 
     final String password;
     if (this.adminInitialPassword == null || this.adminInitialPassword.isBlank()) {
-      password = PasswordGeneratorUtil.generatePassword();
+      password = PasswordGeneratorUtils.generatePassword();
     } else if (!this.adminInitialPassword.matches(COMPLEXITY_PATTERN)) {
       throw new IllegalStateException(
           "initial-password does not meet complexity requirements: " + COMPLEXITY_REQUIREMENTS);

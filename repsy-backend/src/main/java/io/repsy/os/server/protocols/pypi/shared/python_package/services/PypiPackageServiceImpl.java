@@ -29,11 +29,11 @@ import io.repsy.os.server.protocols.pypi.shared.python_package.dtos.ReleaseListI
 import io.repsy.os.server.protocols.pypi.shared.python_package.entities.PypiPackage;
 import io.repsy.os.server.protocols.pypi.shared.python_package.entities.Release;
 import io.repsy.os.server.protocols.pypi.shared.python_package.entities.ReleaseClassifier;
-import io.repsy.os.server.protocols.pypi.shared.python_package.entities.ReleaseProjectURL;
+import io.repsy.os.server.protocols.pypi.shared.python_package.entities.ReleaseProjectUrl;
 import io.repsy.os.server.protocols.pypi.shared.python_package.mappers.PypiPackageConverter;
 import io.repsy.os.server.protocols.pypi.shared.python_package.repositories.PypiPackageRepository;
 import io.repsy.os.server.protocols.pypi.shared.python_package.repositories.ReleaseClassifierRepository;
-import io.repsy.os.server.protocols.pypi.shared.python_package.repositories.ReleaseProjectURLRepository;
+import io.repsy.os.server.protocols.pypi.shared.python_package.repositories.ReleaseProjectUrlRepository;
 import io.repsy.os.server.protocols.pypi.shared.python_package.repositories.ReleaseRepository;
 import io.repsy.os.server.protocols.pypi.shared.storage.services.PypiStorageService;
 import io.repsy.os.server.shared.utils.RequestBaseUrlUtils;
@@ -84,7 +84,7 @@ public class PypiPackageServiceImpl implements PypiPackageService<UUID> {
   private final PypiPackageConverter pypiPackageConverter;
   private final PypiPackageRepository pypiPackageRepository;
   private final ReleaseClassifierRepository releaseClassifierRepository;
-  private final ReleaseProjectURLRepository releaseProjectURLRepository;
+  private final ReleaseProjectUrlRepository releaseProjectURLRepository;
 
   @Override
   public PackageInfo getPackage(final UUID repoId, final String packageNormalizedName) {
@@ -497,7 +497,7 @@ public class PypiPackageServiceImpl implements PypiPackageService<UUID> {
       return;
     }
 
-    final var releaseProjectURLs = new ArrayList<ReleaseProjectURL>();
+    final var releaseProjectURLs = new ArrayList<ReleaseProjectUrl>();
 
     for (final var projectURL : uploadForm.getProject_urls()) {
       if (projectURL == null || projectURL.isBlank()) {
@@ -510,7 +510,7 @@ public class PypiPackageServiceImpl implements PypiPackageService<UUID> {
         continue;
       }
 
-      final var releaseProjectURL = new ReleaseProjectURL();
+      final var releaseProjectURL = new ReleaseProjectUrl();
 
       releaseProjectURL.setRelease(release);
       releaseProjectURL.setLabel(split[0]);
