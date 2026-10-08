@@ -86,8 +86,8 @@ export interface UiCapabilities {
    */
   settingsPath: string;
   /**
-   * The page that holds the access token section (`access-tokens-section`): the OS Settings page. On Cloud it is
-   * still the account page (`/account`, RPS-1906); it becomes `settingsPath` when Cloud moves the section.
+   * The page that holds the access token section (`access-tokens-section`): the Settings page on both products
+   * (Cloud moves the section from its account page to `/settings`, RPS-2003).
    */
   accessTokensPath: string;
   /**
@@ -185,7 +185,7 @@ const CLOUD_UI: UiCapabilities = {
   },
   profilePath: '/account',
   settingsPath: '/settings',
-  accessTokensPath: '/account',
+  accessTokensPath: '/settings',
   profileApiUrl: null,
   hasUsersPage: false,
   loginField: 'usernameOrEmail',

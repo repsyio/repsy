@@ -387,7 +387,7 @@ capability, so a spec or the engine asks the capability and never the target's n
 | `ui.repoRoute(repo, ...segments)`        | `/<repo>/...`                         | `/<owner>/<repo>/...` (`REPSY_REPO_OWNER`, read when called)          |
 | `ui.profilePath`                         | `/profile`                            | `/account`                                                            |
 | `ui.settingsPath`                        | `/profile/settings`                   | `/settings`                                                           |
-| `ui.accessTokensPath`                    | `/profile/settings`                   | `/account` (the section moves to `/settings` with Cloud's Settings)   |
+| `ui.accessTokensPath`                    | `/profile/settings`                   | `/settings` (RPS-2003 moves the section there from `/account`)        |
 | `ui.hasUsersPage`                        | yes (`/users`)                        | no                                                                    |
 | `ui.loginField`                          | `username`                            | `usernameOrEmail`                                                     |
 | `ui.sessionStorageKeys`                  | `username`, `token`, `refresh-token`  | the same plus `email`                                                 |

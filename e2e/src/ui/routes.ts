@@ -50,8 +50,8 @@ export function settingsRoute(): string {
 }
 
 /**
- * The page that holds the access token section: the OS Settings page, and Cloud's account page until Cloud moves the
- * section to its Settings page (`target.ui.accessTokensPath`).
+ * The page that holds the access token section: the Settings page of Repsy OS (`/profile/settings`) and of Repsy
+ * Cloud (`/settings`, RPS-2003): `target.ui.accessTokensPath`.
  */
 export function accessTokensRoute(): string {
   return target.ui.accessTokensPath;
