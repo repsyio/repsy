@@ -121,6 +121,7 @@ import org.springframework.data.domain.Sort;
         + " RPS-1185)")
 class ArtifactServiceImplTest {
 
+  private static final UUID RECORDED_ID = UUID.fromString("00000000-0000-0000-0000-000000000007");
   private static final String SNAPSHOT_JAR =
       "com/acme/lib/1.0-SNAPSHOT/lib-1.0-20260921.101010-1.jar";
   private static final String RELEASE_JAR = "com/acme/lib/1.0/lib-1.0.jar";
@@ -1019,13 +1020,15 @@ class ArtifactServiceImplTest {
     final var version = new ArtifactVersion();
     when(this.artifactVersionRepository.findByArtifactIdAndVersionName(artifact.getId(), "1.0"))
         .thenReturn(Optional.of(version));
+    when(this.versionSignatureService.findRecordedId(version, "lib-1.0-sources.jar"))
+        .thenReturn(Optional.of(RECORDED_ID));
 
     this.artifactService.createOrUpdateArtifact(
         repoVerifyingAllSignatures(id),
         StoragePath.of(id, "com/acme/lib/1.0/lib-1.0-sources.jar"),
         new ByteArrayResource(new byte[0]));
 
-    verify(this.versionSignatureService).forget(version, "lib-1.0-sources.jar");
+    verify(this.versionSignatureService).forget(RECORDED_ID);
     verify(this.versionSignatureService).refreshSigned(id, version, "com/acme/lib/1.0", true);
   }
 
@@ -1038,7 +1041,8 @@ class ArtifactServiceImplTest {
     final var version = new ArtifactVersion();
     when(this.artifactVersionRepository.findByArtifactIdAndVersionName(artifact.getId(), "1.0"))
         .thenReturn(Optional.of(version));
-    when(this.versionSignatureService.isRecorded(version, "lib-1.0.jar")).thenReturn(true);
+    when(this.versionSignatureService.findRecordedId(version, "lib-1.0.jar"))
+        .thenReturn(Optional.of(RECORDED_ID));
     final var jar = new ByteArrayResource("jar".getBytes(UTF_8));
     final var signature = new ByteArrayResource(ARMORED_SIGNATURE.getBytes(UTF_8));
     when(this.storageStrategy.get(pathOfNullSafe("com/acme/lib/1.0/lib-1.0.jar"), eq("mvn")))
@@ -1066,7 +1070,8 @@ class ArtifactServiceImplTest {
     final var version = new ArtifactVersion();
     when(this.artifactVersionRepository.findByArtifactIdAndVersionName(artifact.getId(), "1.0"))
         .thenReturn(Optional.of(version));
-    when(this.versionSignatureService.isRecorded(version, "lib-1.0.jar")).thenReturn(true);
+    when(this.versionSignatureService.findRecordedId(version, "lib-1.0.jar"))
+        .thenReturn(Optional.of(RECORDED_ID));
     final var jar = new ByteArrayResource("another jar".getBytes(UTF_8));
     final var signature = new ByteArrayResource(ARMORED_SIGNATURE.getBytes(UTF_8));
     when(this.storageStrategy.get(pathOfNullSafe("com/acme/lib/1.0/lib-1.0.jar"), eq("mvn")))
@@ -1084,7 +1089,7 @@ class ArtifactServiceImplTest {
         StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.jar"),
         new ByteArrayResource(new byte[0]));
 
-    verify(this.versionSignatureService).forget(version, "lib-1.0.jar");
+    verify(this.versionSignatureService).forget(RECORDED_ID);
     verify(this.versionSignatureService).refreshSigned(id, version, "com/acme/lib/1.0", true);
   }
 
@@ -1096,7 +1101,8 @@ class ArtifactServiceImplTest {
     final var version = new ArtifactVersion();
     when(this.artifactVersionRepository.findByArtifactIdAndVersionName(artifact.getId(), "1.0"))
         .thenReturn(Optional.of(version));
-    when(this.versionSignatureService.isRecorded(version, "lib-1.0.jar")).thenReturn(true);
+    when(this.versionSignatureService.findRecordedId(version, "lib-1.0.jar"))
+        .thenReturn(Optional.of(RECORDED_ID));
     when(this.storageStrategy.get(any(StoragePath.class), eq("mvn"))).thenReturn(Optional.empty());
 
     this.artifactService.createOrUpdateArtifact(
@@ -1104,8 +1110,33 @@ class ArtifactServiceImplTest {
         StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.jar"),
         new ByteArrayResource(new byte[0]));
 
-    verify(this.versionSignatureService).forget(version, "lib-1.0.jar");
+    verify(this.versionSignatureService).forget(RECORDED_ID);
     verifyNoInteractions(this.pgpVerifierService);
+  }
+
+  @Test
+  @DisplayName(
+      "a file with nothing recorded forgets nothing, so a record committed meanwhile survives")
+  void aFileWithNothingRecordedForgetsNothing() {
+    final var id = UUID.randomUUID();
+    final var artifact = this.stubArtifact(id);
+    final var version = new ArtifactVersion();
+    when(this.artifactVersionRepository.findByArtifactIdAndVersionName(artifact.getId(), "1.0"))
+        .thenReturn(Optional.of(version));
+    when(this.versionSignatureService.findRecordedId(version, "lib-1.0.jar"))
+        .thenReturn(Optional.empty());
+
+    this.artifactService.createOrUpdateArtifact(
+        repoVerifyingAllSignatures(id),
+        StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.jar"),
+        new ByteArrayResource(new byte[0]));
+
+    // RPS-1984: a delete by file name here would take the record a signature request commits
+    // between this read and that delete.
+    verify(this.versionSignatureService, never()).forget(any(), any());
+    verify(this.versionSignatureService, never()).forget(any(UUID.class));
+    verifyNoInteractions(this.pgpVerifierService);
+    verify(this.versionSignatureService).refreshSigned(id, version, "com/acme/lib/1.0", true);
   }
 
   @Test

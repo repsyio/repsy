@@ -228,6 +228,37 @@ class VersionSignatureServiceTest {
   }
 
   @Test
+  @DisplayName("forgets exactly the record that was read, never a newer one of the same file")
+  void forgetByIdDeletesOnlyThatRecord() {
+    final var existing = new VersionSignature();
+    final var recordedId = UUID.randomUUID();
+    existing.setId(recordedId);
+    existing.setFileName("lib-1.0.jar");
+    when(this.versionSignatureRepository.findByArtifactVersionIdAndFileName(
+            this.version.getId(), "lib-1.0.jar"))
+        .thenReturn(Optional.of(existing));
+
+    final var id = this.service.findRecordedId(this.version, "lib-1.0.jar");
+    assertThat(id).contains(recordedId);
+
+    this.service.forget(id.get());
+
+    verify(this.versionSignatureRepository).deleteById(recordedId);
+    verify(this.versionSignatureRepository, never())
+        .deleteByArtifactVersionIdAndFileName(any(), any());
+  }
+
+  @Test
+  @DisplayName("has no recorded id for a file whose signature was not verified")
+  void findRecordedIdIsEmptyWithoutARecord() {
+    when(this.versionSignatureRepository.findByArtifactVersionIdAndFileName(
+            this.version.getId(), "lib-1.0.jar"))
+        .thenReturn(Optional.empty());
+
+    assertThat(this.service.findRecordedId(this.version, "lib-1.0.jar")).isEmpty();
+  }
+
+  @Test
   @DisplayName("without verify-all a version is signed by its POM's signature alone (RPS-1316)")
   void withoutVerifyAllOnlyThePomCounts() {
     this.verifiedFiles("lib-1.0.pom");

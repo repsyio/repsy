@@ -408,14 +408,23 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
       final ArtifactVersion version,
       final StoragePath storagePath) {
 
-    if (!this.stillVerifies(repoInfo, version, PendingSignatureService.pathOf(storagePath))) {
-      this.versionSignatureService.forget(version, storagePath.getRelativePath().getFileName());
+    final var fileName = storagePath.getRelativePath().getFileName();
+    final var recordedId = this.versionSignatureService.findRecordedId(version, fileName);
+
+    // Nothing recorded, nothing to forget. Deleting by file name here would take a record that a
+    // signature request commits after this read, and leave the version unsigned (RPS-1984).
+    if (recordedId.isEmpty()) {
+      return;
+    }
+
+    if (!this.stillVerifies(repoInfo, PendingSignatureService.pathOf(storagePath))) {
+      this.versionSignatureService.forget(recordedId.get());
     }
   }
 
   /**
    * Whether the verified signature recorded for a file that was just stored is the one of the bytes
-   * that are stored now, and not of the ones they replaced.
+   * that are stored now, and not of the ones they replaced. Called only when a record exists.
    *
    * <p>A signature is small and its request often runs whole between the moment the file it signs
    * is stored and the moment that file's own request gets here: it finds the file, verifies against
@@ -426,14 +435,7 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
    * (a redeploy) the record is, in general, the one of the old bytes, does not verify and goes; if
    * the same bytes were stored again it holds, and stays.
    */
-  private boolean stillVerifies(
-      final BaseRepoInfo<UUID> repoInfo, final ArtifactVersion version, final String filePath) {
-
-    final var fileName = filePath.substring(filePath.lastIndexOf('/') + 1);
-
-    if (!this.versionSignatureService.isRecorded(version, fileName)) {
-      return false;
-    }
+  private boolean stillVerifies(final BaseRepoInfo<UUID> repoInfo, final String filePath) {
 
     final var repoName = repoInfo.getName();
     final var file =
