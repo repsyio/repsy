@@ -70,6 +70,32 @@ describe('AccessTokenFormComponent', () => {
     expect(component.form.value.name.trim()).toBe('');
   });
 
+  it('is blocked, with the reason, while the limit is reached', () => {
+    init('cli', ['repo:read']);
+    component.blockedReason = 'limit';
+
+    expect(component.canSubmit).toBeFalse();
+    component.submit();
+    expect(api.createAccessToken).not.toHaveBeenCalled();
+  });
+
+  it('has no way to ask for a token without an expiry', () => {
+    init('cli', ['repo:read']);
+    component.form.patchValue({ expirationDate: null });
+
+    expect(component.canSubmit).toBeFalse();
+  });
+
+  it('allows the last day of the window and refuses the day after', () => {
+    init('cli', ['repo:read']);
+    component.form.patchValue({ expirationDate: component.maxDate });
+    expect(component.canSubmit).toBeTrue();
+
+    const dayAfter = new Date(Date.parse(component.maxDate + 'T00:00:00Z') + 86_400_000).toISOString().slice(0, 10);
+    component.form.patchValue({ expirationDate: dayAfter });
+    expect(component.canSubmit).toBeFalse();
+  });
+
   it('refuses a date outside tomorrow..one year', () => {
     init('cli', ['repo:read']);
     component.form.patchValue({ expirationDate: '2000-01-01' });
