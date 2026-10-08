@@ -277,6 +277,81 @@ for SonarCloud.
 - Commit messages: conventional commits, prefixed with the Jira key where there is one
   (for example `RPS-844: ...`).
 
+## Java naming
+
+The naming rules of Repsy OS and Repsy Cloud (RPS-2009). They are the target: some existing code still
+breaks them, and Jira stories under RPS-2009 migrate it. Do not add new exceptions. Cloud's
+`repsy-cloud-server` copies the OS backend classes, so a name changed here is changed in Cloud after the
+submodule bump: rename in this repository first. The same rules are in `repsy-mono`'s `AGENTS.md`; change
+them in both repositories together.
+
+### Types
+
+- `PascalCase` with a role suffix: `Controller`, `Service`, `Repository`, `Facade`, `Listener`, `Handler`,
+  `Resolver`, `Parser`, `Processor`, `Interceptor`, `Task` (scheduled), `Exception`. Settings are
+  `*Properties` (`@ConfigurationProperties`) and `*Config` (`@Configuration`), never `*ConfigProps` or
+  `*Configuration`. Static helper classes are `*Utils`, never `*Util`.
+- Abbreviations are written as words: `Pgp`, `Url`, `Otp`, `OAuth`, `NuGet`, `Go` (not `PGP`, `URL`, `OTP`,
+  `Oauth`, `Nuget`, `Golang`). The `golang` package keeps its name.
+- Protocol handlers are `<Format><Operation>ProtocolMethodHandler`, bases are `Abstract<...>`.
+- DTO roles: `Info` (detail or response), `Item` (list row), `Form` (request body), `Payload` (wire payload).
+  `Request` and `Response` are for calls to and from external HTTP services. No `Dto`, `DTO` or `Model`
+  suffix. New DTOs are records.
+- MapStruct mappers are `*Mapper`, in a `mappers` package (not `*Converter`).
+- No `Impl` suffix unless there are two implementations. A single implementation is a concrete class without
+  an interface. A second implementation gets a role name (`NoOp<Name>`, `Trivy<Name>`), not `Impl`.
+- **`*TxService`** (and `<Format>ProtocolTxFacade`) is the transactional persistence layer below a service or
+  facade. It is the only place for the `Tx` infix; do not add it elsewhere.
+- **Library interface and backend class share a name.** Each format splits into a library
+  (`io.repsy.protocols.<format>`: `<Format>ProtocolFacade` and `<Format>StorageService` interfaces, `Abstract*`
+  bases) and the backend (`io.repsy.os.server.protocols.<format>`: the concrete class of the same simple name).
+  The backend class extends the library `Abstract<...>` class, never implements the interface directly, has
+  only a constructor, and callers inject the interface. This pattern is deliberate; do not prefix the backend
+  classes.
+- One simple class name per concept. When two formats need the same word, prefix the format
+  (`NpmPackageUtils`, `PypiPackageListItem`). The library/backend pair above is the only allowed repeat.
+- Scanner classes copied between `repsy-scanner-trivy` and the backend are named after their side; the wire
+  records keep their names, because the HTTP and JSON contract is pinned by `e2e/src/stubs/scanner/contract.ts`.
+  There is no shared scanner module.
+
+### Methods and fields
+
+- `get*` returns the value or throws not found. `find*` returns `Optional` or a collection. `fetch*` and
+  `tryFetch*` call a remote service. `require*` throws and returns the resource.
+- `check*` and `validate*` throw and return nothing. `verify*` is a cryptographic or one-time-code check that
+  returns a boolean. `try*` returns whether it happened.
+- `create`, `update`, `delete` act on rows (not `remove`); `clear` and `evict` act on caches; `purge` is a
+  retention sweep. Boolean methods read as predicates (`is*`, `has*`, `can*`, `exists*`).
+- Listener methods are `on<Event>`.
+- Fields are `camelCase`. Boolean fields have no `is` prefix. Identifiers are `xxxId` (`repoId`, `tokenId`),
+  not `xxxUuid`.
+- Config keys are kebab-case under `repsy.<area>.<key>`, bound with `@ConfigurationProperties`; use `@Value`
+  only for a single key. Environment variable names (`STORAGE_BASE_PATH` and the others in `README.md`) are a
+  user contract and are never renamed.
+- A column name is the lowercase snake case of its field name; a mapping that differs says why.
+
+### Constants and error codes
+
+- Constants are `UPPER_SNAKE_CASE`, in a `*Constants` class in a `constants` package.
+- Error codes (`msgId`, later `code`) are `camelCase` strings and are a client contract: never rename or reuse
+  one. Declare a new one in the constants holder, not as an inline literal.
+
+### Packages and modules
+
+- Package names are lowercase; an underscore between words is allowed (`go_module`, `pre_processors`,
+  `error_handling`) and is not renamed (RPS-2019).
+- Layer packages are plural and hold only classes with that role: `services`, `controllers`, `repositories`,
+  `dtos`, `entities`, `mappers`, `listeners`, `configs`, `constants`, `utils`, `contracts`. A scheduled task
+  is in `tasks`, not `services`.
+- A Maven module's directory equals its `artifactId`; its `groupId` equals the root package and has no
+  hyphen.
+
+### Tests
+
+- `*Test` is a unit test, `*IT` an integration test (see "Testing"); abstract IT bases are `Abstract*IT`.
+- Test method names are a camelCase sentence about the behaviour, with no `should` or `test` prefix and no
+  underscores; `@DisplayName` carries the readable sentence.
+
 ## Merging to `main`
 
 Two PRs can each pass CI against an older `main`, merge without a textual conflict, and still break
