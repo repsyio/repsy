@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Supplier;
 import org.springframework.http.HttpMethod;
@@ -82,7 +83,10 @@ public class ProtocolRouterController {
         continue;
       }
 
-      final var provider = this.providerMap.get(specifiedHandler.protocolType());
+      final var provider =
+          Objects.requireNonNull(
+              this.providerMap.get(specifiedHandler.protocolType()),
+              "No provider registered for the protocol type");
       final var properties = handler.getProperties();
 
       final var preProcessorResult =

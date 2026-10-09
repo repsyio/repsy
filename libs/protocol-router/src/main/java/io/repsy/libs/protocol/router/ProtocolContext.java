@@ -18,6 +18,7 @@ package io.repsy.libs.protocol.router;
 import java.util.HashMap;
 import java.util.Map;
 import lombok.Getter;
+import org.jspecify.annotations.Nullable;
 
 @Getter
 public final class ProtocolContext {
@@ -35,7 +36,7 @@ public final class ProtocolContext {
   }
 
   @SuppressWarnings({"unchecked", "TypeParameterUnusedInFormals"})
-  public <T> T getProperty(final String key) {
+  public <T> @Nullable T getProperty(final String key) {
 
     return (T) this.contextMap.get(key);
   }

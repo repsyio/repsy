@@ -18,16 +18,15 @@ package io.repsy.libs.storage.core.dtos;
 import java.util.UUID;
 import lombok.Getter;
 import org.apache.commons.lang3.StringUtils;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 @Getter
 public class StoragePath {
   private final @Nullable UUID storageKey;
-  private final @NonNull RelativePath relativePath;
+  private final RelativePath relativePath;
   private final String path;
 
-  public StoragePath(final @NonNull UUID storageKey, final @NonNull RelativePath relativePath) {
+  public StoragePath(final UUID storageKey, final RelativePath relativePath) {
     this.storageKey = storageKey;
     this.relativePath = relativePath;
 
@@ -38,7 +37,7 @@ public class StoragePath {
     }
   }
 
-  public StoragePath(final @NonNull String directPath) {
+  public StoragePath(final String directPath) {
     this.storageKey = null;
     this.relativePath = new RelativePath(directPath);
     this.path = directPath;
@@ -50,20 +49,19 @@ public class StoragePath {
     this.path = "";
   }
 
-  public static @NonNull StoragePath of() {
+  public static StoragePath of() {
     return new StoragePath();
   }
 
-  public static @NonNull StoragePath of(final @NonNull UUID repoId) {
+  public static StoragePath of(final UUID repoId) {
     return StoragePath.of(repoId, "");
   }
 
-  public static @NonNull StoragePath of(
-      final @NonNull UUID repoId, final @NonNull String relativePath) {
+  public static StoragePath of(final UUID repoId, final String relativePath) {
     return new StoragePath(repoId, new RelativePath(relativePath));
   }
 
-  public static @NonNull StoragePath ofPath(final @NonNull String directPath) {
+  public static StoragePath ofPath(final String directPath) {
     return new StoragePath(directPath);
   }
 }

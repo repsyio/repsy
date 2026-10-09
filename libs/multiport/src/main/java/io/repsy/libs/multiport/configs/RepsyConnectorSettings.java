@@ -17,7 +17,6 @@ package io.repsy.libs.multiport.configs;
 
 import org.apache.catalina.connector.Connector;
 import org.apache.tomcat.util.buf.EncodedSolidusHandling;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.tomcat.CompressionConnectorCustomizer;
 import org.springframework.boot.web.server.Compression;
@@ -51,7 +50,7 @@ public final class RepsyConnectorSettings {
    * </ul>
    */
   public static void apply(
-      final @NonNull Connector connector,
+      final Connector connector,
       final int connectionTimeout,
       final int maxPartCount,
       final @Nullable Compression compression) {

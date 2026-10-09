@@ -13,21 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.libs.storage.core.dtos;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import lombok.experimental.SuperBuilder;
+@NullMarked
+package io.repsy.libs.storage.gateway.filesystem.configs;
 
-@Data
-@SuperBuilder
-@NoArgsConstructor
-@AllArgsConstructor
-public class BaseUsages {
-  private long diskUsage;
-
-  public static BaseUsages ofDisk(final long diskUsage) {
-    return BaseUsages.builder().diskUsage(diskUsage).build();
-  }
-}
+import org.jspecify.annotations.NullMarked;

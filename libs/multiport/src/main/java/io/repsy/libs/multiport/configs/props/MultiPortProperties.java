@@ -17,9 +17,9 @@ package io.repsy.libs.multiport.configs.props;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import lombok.Data;
-import org.jspecify.annotations.NonNull;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
@@ -32,16 +32,17 @@ public class MultiPortProperties {
   private static final int DEFAULT_CONNECTION_TIMEOUT = 12_000;
 
   private String mainPort = DEFAULT_MAIN_PORT;
-  private Map<String, Integer> ports;
+  private Map<String, Integer> ports = new HashMap<>();
   private Map<Integer, String> portAliases = new HashMap<>();
   private TomcatProperties tomcat = new TomcatProperties();
 
-  public int getPortFor(final @NonNull String logicalName) {
+  public int getPortFor(final String logicalName) {
 
-    return this.ports.get(logicalName);
+    return Objects.requireNonNull(
+        this.ports.get(logicalName), "No port is configured for " + logicalName);
   }
 
-  public @NonNull Map<String, Integer> getAdditionalPorts() {
+  public Map<String, Integer> getAdditionalPorts() {
 
     return this.ports.entrySet().stream()
         .filter(e -> !e.getValue().equals(Integer.parseInt(this.mainPort)))
@@ -63,7 +64,7 @@ public class MultiPortProperties {
     }
   }
 
-  private void checkPort(final @NonNull String name, final int port, final int mainPortNumber) {
+  private void checkPort(final String name, final int port, final int mainPortNumber) {
 
     if (port == mainPortNumber) {
       throw new IllegalStateException(
@@ -71,7 +72,7 @@ public class MultiPortProperties {
     }
   }
 
-  private void checkAlias(final int aliasPort, final @NonNull String logicalName) {
+  private void checkAlias(final int aliasPort, final String logicalName) {
 
     if (!logicalName.isEmpty() && !this.ports.containsKey(logicalName)) {
       throw new IllegalArgumentException(

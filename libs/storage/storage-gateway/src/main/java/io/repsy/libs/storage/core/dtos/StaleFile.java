@@ -15,8 +15,6 @@
  */
 package io.repsy.libs.storage.core.dtos;
 
-import org.jspecify.annotations.NonNull;
-
 /**
  * A regular file that has not been written to for a while, as answered by {@code
  * StorageStrategy.listStaleFiles}.
@@ -24,4 +22,4 @@ import org.jspecify.annotations.NonNull;
  * @param name the file name, without its directory
  * @param size the file size in bytes
  */
-public record StaleFile(@NonNull String name, long size) {}
+public record StaleFile(String name, long size) {}

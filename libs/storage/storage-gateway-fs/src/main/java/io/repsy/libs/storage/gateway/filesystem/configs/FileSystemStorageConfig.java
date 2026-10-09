@@ -27,6 +27,8 @@ import org.springframework.stereotype.Component;
     name = "storage-gateway.enabled",
     havingValue = "true",
     matchIfMissing = true)
+// Bound from the storage-gateway.fs properties after construction.
+@SuppressWarnings("NullAway.Init")
 public class FileSystemStorageConfig {
   private String basePath;
   private String trashPath;

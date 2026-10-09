@@ -18,17 +18,16 @@ package io.repsy.libs.storage.core.dtos;
 import io.repsy.libs.storage.core.exceptions.InvalidStoragePathException;
 import java.util.regex.Pattern;
 import lombok.Getter;
-import org.jspecify.annotations.NonNull;
 
 @Getter
 public class RelativePath {
   private static final Pattern DOT_DOT = Pattern.compile("(^|/)\\.\\.(/|$)");
   private static final String ERR_INVALID_PATH = "invalidStoragePath";
 
-  private final @NonNull String path;
-  private final @NonNull String fileName;
+  private final String path;
+  private final String fileName;
 
-  public RelativePath(final @NonNull String path) {
+  public RelativePath(final String path) {
     if (DOT_DOT.matcher(path).find()) {
       throw new InvalidStoragePathException(ERR_INVALID_PATH);
     }
