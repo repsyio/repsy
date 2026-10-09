@@ -1310,7 +1310,7 @@ class UserControllerIT extends AbstractIntegrationTest {
                       .header(AUTHORIZATION, token)));
 
       final String newPassword = new ObjectMapper().readValue(body, String.class);
-      // PasswordGeneratorUtil: 12 chars with at least one lower, upper, digit and special char.
+      // PasswordGeneratorUtils: 12 chars with at least one lower, upper, digit and special char.
       assertThat(newPassword)
           .hasSize(12)
           .matches("^(?=.*\\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&*]).{12}$");

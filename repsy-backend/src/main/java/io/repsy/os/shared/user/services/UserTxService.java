@@ -21,7 +21,7 @@ import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.generated.model.UserCreateForm;
 import io.repsy.os.generated.model.UserResponse;
 import io.repsy.os.generated.model.UserUpdateForm;
-import io.repsy.os.shared.auth.utils.PasswordGeneratorUtil;
+import io.repsy.os.shared.auth.utils.PasswordGeneratorUtils;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.user.dtos.UserInfo;
@@ -195,7 +195,7 @@ public class UserTxService {
   @Transactional
   public @NonNull String resetUserPassword(final @NonNull UUID userId) {
     final var user = this.findUserById(userId);
-    final var newPassword = PasswordGeneratorUtil.generatePassword();
+    final var newPassword = PasswordGeneratorUtils.generatePassword();
 
     user.setHash(PasswordHasher.hash(newPassword));
     user.setSalt(null);

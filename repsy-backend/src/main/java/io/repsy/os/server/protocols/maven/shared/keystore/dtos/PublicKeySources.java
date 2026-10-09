@@ -19,7 +19,7 @@ import java.util.List;
 
 /**
  * Everywhere a repo's Maven key store lets {@link
- * io.repsy.os.server.protocols.maven.shared.keystore.services.PGPVerifierService} look for a
+ * io.repsy.os.server.protocols.maven.shared.keystore.services.PgpVerifierService} look for a
  * signer's public key (RPS-1189): its own registered armored keys, tried first, then the key-server
  * hosts the repo allows (the two hardcoded defaults are tried after that, unless the repo switched
  * the key-server lookup off, RPS-1204, in which case no server is asked at all).

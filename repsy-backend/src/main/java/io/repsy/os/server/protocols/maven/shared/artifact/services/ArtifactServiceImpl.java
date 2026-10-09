@@ -37,7 +37,7 @@ import io.repsy.os.server.protocols.maven.shared.artifact.repositories.PendingSi
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.VersionDeveloperRepository;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.VersionLicenseRepository;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreService;
-import io.repsy.os.server.protocols.maven.shared.keystore.services.PGPVerifierService;
+import io.repsy.os.server.protocols.maven.shared.keystore.services.PgpVerifierService;
 import io.repsy.os.shared.error_handling.utils.ConstraintViolations;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.entities.Repo;
@@ -106,7 +106,7 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
   private final VersionDeveloperRepository versionDeveloperRepository;
   private final VersionLicenseRepository versionLicenseRepository;
   private final ArtifactConverter artifactConverter;
-  private final PGPVerifierService pgpVerifierService;
+  private final PgpVerifierService pgpVerifierService;
   private final KeyStoreService keyStoreService;
   private final ArtifactUpsertHelper artifactUpsertHelper;
   private final ArtifactVersionWriteService artifactVersionWriteService;

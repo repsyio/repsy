@@ -64,7 +64,7 @@ public class KeyStoreService {
   private final PgpPublicKeyRepository pgpPublicKeyRepository;
   private final ArtifactConverter artifactConverter;
   private final ApplicationEventPublisher eventPublisher;
-  private final PGPVerifierService pgpVerifierService;
+  private final PgpVerifierService pgpVerifierService;
   private final MavenPgpCaps caps;
 
   @Transactional
@@ -169,7 +169,7 @@ public class KeyStoreService {
       throw new BadRequestException("pgpPublicKeyInvalid");
     }
 
-    final var parsed = PGPVerifierService.parseArmoredPublicKey(form.getArmoredKey());
+    final var parsed = PgpVerifierService.parseArmoredPublicKey(form.getArmoredKey());
 
     // RPS-1796: the count and the insert are one step per repo, or concurrent registrations
     // would each see room for one more.
@@ -233,7 +233,7 @@ public class KeyStoreService {
   }
 
   /**
-   * Everywhere {@link PGPVerifierService#verify} may look for a repo's signers' public keys
+   * Everywhere {@link PgpVerifierService#verify} may look for a repo's signers' public keys
    * (RPS-1189): its registered armored keys, then its allowed key-server hosts. When {@code
    * keyServerLookupEnabled} is {@code false} (RPS-1204) the hosts are not even read: no key server
    * is going to be asked.

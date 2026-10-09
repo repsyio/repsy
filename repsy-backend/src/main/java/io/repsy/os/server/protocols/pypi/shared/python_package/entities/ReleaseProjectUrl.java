@@ -37,7 +37,7 @@ import org.hibernate.annotations.OnDeleteAction;
 @Table(name = "pypi_release_project_url")
 @NoArgsConstructor
 @ToString(exclude = {"release"})
-public class ReleaseProjectURL {
+public class ReleaseProjectUrl {
   @Id
   @UuidV7
   @Column(name = "id", columnDefinition = "uuid", nullable = false)
@@ -66,7 +66,7 @@ public class ReleaseProjectURL {
       return true;
     }
 
-    if (!(o instanceof final ReleaseProjectURL other)) {
+    if (!(o instanceof final ReleaseProjectUrl other)) {
       return false;
     }
 
@@ -80,6 +80,6 @@ public class ReleaseProjectURL {
    */
   @Override
   public int hashCode() {
-    return ReleaseProjectURL.class.hashCode();
+    return ReleaseProjectUrl.class.hashCode();
   }
 }

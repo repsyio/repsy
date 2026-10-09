@@ -51,7 +51,7 @@ import io.repsy.os.server.protocols.maven.shared.artifact.repositories.VersionDe
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.VersionLicenseRepository;
 import io.repsy.os.server.protocols.maven.shared.keystore.dtos.PublicKeySources;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreService;
-import io.repsy.os.server.protocols.maven.shared.keystore.services.PGPVerifierService;
+import io.repsy.os.server.protocols.maven.shared.keystore.services.PgpVerifierService;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
@@ -159,7 +159,7 @@ class ArtifactServiceImplTest {
   @Mock VersionDeveloperRepository versionDeveloperRepository;
   @Mock VersionLicenseRepository versionLicenseRepository;
   @Mock ArtifactConverter artifactConverter;
-  @Mock PGPVerifierService pgpVerifierService;
+  @Mock PgpVerifierService pgpVerifierService;
   @Mock KeyStoreService keyStoreService;
   @Mock ArtifactUpsertHelper artifactUpsertHelper;
   @Mock ArtifactVersionWriteService artifactVersionWriteService;

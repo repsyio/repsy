@@ -27,7 +27,7 @@ import io.repsy.os.server.protocols.maven.shared.keystore.entities.KeyStore;
 import io.repsy.os.server.protocols.maven.shared.keystore.repositories.AllowedKeyserverRepository;
 import io.repsy.os.server.protocols.maven.shared.keystore.repositories.KeyStoreRepository;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreService;
-import io.repsy.os.server.protocols.maven.shared.keystore.services.PGPVerifierService;
+import io.repsy.os.server.protocols.maven.shared.keystore.services.PgpVerifierService;
 import io.repsy.os.server.protocols.maven.shared.keystore.support.StubKeyServers;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -88,7 +88,7 @@ class KeyStoreHostsIT extends AbstractIntegrationTest {
     // The verifier asks the hosts of the lookup, and the stub records every request it gets.
     final var requested = new CopyOnWriteArrayList<String>();
     final var verifier =
-        new PGPVerifierService(
+        new PgpVerifierService(
             StubKeyServers.answering(
                 uri -> {
                   requested.add(uri.toString());

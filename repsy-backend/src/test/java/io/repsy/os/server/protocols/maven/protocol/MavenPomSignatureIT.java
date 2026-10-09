@@ -111,7 +111,7 @@ class MavenPomSignatureIT extends AbstractIntegrationTest {
   private static final AtomicInteger KEY_SERVER_REQUESTS = new AtomicInteger();
 
   /**
-   * Replaces the key-server client of {@code PGPVerifierRestClientConfig}, see {@link #keyServer}.
+   * Replaces the key-server client of {@code PgpVerifierRestClientConfig}, see {@link #keyServer}.
    */
   @TestBean(name = "pgpVerifierRestClient", methodName = "keyServer")
   private RestClient keyServer;

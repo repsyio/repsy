@@ -25,7 +25,7 @@ import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
 @Configuration
-public class PGPVerifierRestClientConfig {
+public class PgpVerifierRestClientConfig {
 
   private static final @NonNull Duration CONNECT_TIMEOUT = Duration.ofSeconds(3);
   private static final @NonNull Duration RESPONSE_TIMEOUT = Duration.ofSeconds(5);

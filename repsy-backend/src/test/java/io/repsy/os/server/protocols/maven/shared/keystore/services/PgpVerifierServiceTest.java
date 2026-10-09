@@ -66,8 +66,8 @@ import org.springframework.http.client.ClientHttpResponse;
  * signature's creation time, is refused the same way a bad signature is, whether the key came from
  * a registered key or a key server.
  */
-@DisplayName("PGPVerifierService")
-class PGPVerifierServiceTest {
+@DisplayName("PgpVerifierService")
+class PgpVerifierServiceTest {
 
   private static final byte[] POM = "<project>lib 1.0</project>".getBytes(UTF_8);
   private static final byte[] OTHER_POM = "<project>lib 2.0</project>".getBytes(UTF_8);
@@ -83,8 +83,8 @@ class PGPVerifierServiceTest {
     keys = PgpTestKeys.generate();
   }
 
-  private PGPVerifierService serviceAnswering(final Function<URI, ClientHttpResponse> answers) {
-    return new PGPVerifierService(
+  private PgpVerifierService serviceAnswering(final Function<URI, ClientHttpResponse> answers) {
+    return new PgpVerifierService(
         StubKeyServers.answering(
             uri -> {
               this.asked.add(uri);
@@ -93,7 +93,7 @@ class PGPVerifierServiceTest {
             }));
   }
 
-  private PGPVerifierService serviceWithTheKey() {
+  private PgpVerifierService serviceWithTheKey() {
     return this.serviceAnswering(uri -> keyResponse());
   }
 
@@ -202,7 +202,7 @@ class PGPVerifierServiceTest {
     final var signature = resource(keys.detachedSignature(POM));
     final var ticker = new ManualTicker();
     final var service =
-        new PGPVerifierService(
+        new PgpVerifierService(
             StubKeyServers.answering(
                 uri -> {
                   this.asked.add(uri);
@@ -754,7 +754,7 @@ class PGPVerifierServiceTest {
   @Test
   @DisplayName("parseArmoredPublicKey reads the primary key's id, a 40 hex char fingerprint")
   void parseArmoredPublicKeyReadsTheIdentity() {
-    final var parsed = PGPVerifierService.parseArmoredPublicKey(keys.armoredPublicKey());
+    final var parsed = PgpVerifierService.parseArmoredPublicKey(keys.armoredPublicKey());
 
     assertThat(parsed.keyIdHex()).isEqualTo("%016X".formatted(keys.keyId()));
     assertThat(parsed.fingerprintHex()).hasSize(40).matches("[0-9A-F]{40}");
@@ -763,7 +763,7 @@ class PGPVerifierServiceTest {
   @Test
   @DisplayName("parseArmoredPublicKey refuses plain text")
   void parseArmoredPublicKeyRefusesPlainText() {
-    assertThatThrownBy(() -> PGPVerifierService.parseArmoredPublicKey("hello"))
+    assertThatThrownBy(() -> PgpVerifierService.parseArmoredPublicKey("hello"))
         .isInstanceOf(BadRequestException.class)
         .hasMessage(INVALID_KEY);
   }
@@ -771,7 +771,7 @@ class PGPVerifierServiceTest {
   @Test
   @DisplayName("parseArmoredPublicKey refuses a signature block")
   void parseArmoredPublicKeyRefusesASignatureBlock() {
-    assertThatThrownBy(() -> PGPVerifierService.parseArmoredPublicKey(keys.detachedSignature(POM)))
+    assertThatThrownBy(() -> PgpVerifierService.parseArmoredPublicKey(keys.detachedSignature(POM)))
         .isInstanceOf(BadRequestException.class)
         .hasMessage(INVALID_KEY);
   }
@@ -782,7 +782,7 @@ class PGPVerifierServiceTest {
     final var privateKeyArmor =
         "-----BEGIN PGP PRIVATE KEY BLOCK-----\n\n" + keys.armoredPublicKey();
 
-    assertThatThrownBy(() -> PGPVerifierService.parseArmoredPublicKey(privateKeyArmor))
+    assertThatThrownBy(() -> PgpVerifierService.parseArmoredPublicKey(privateKeyArmor))
         .isInstanceOf(BadRequestException.class)
         .hasMessage(INVALID_KEY);
   }
@@ -793,7 +793,7 @@ class PGPVerifierServiceTest {
     final var otherKeys = PgpTestKeys.generate();
     final var twoRings = twoKeyRingArmor(keys, otherKeys);
 
-    assertThatThrownBy(() -> PGPVerifierService.parseArmoredPublicKey(twoRings))
+    assertThatThrownBy(() -> PgpVerifierService.parseArmoredPublicKey(twoRings))
         .isInstanceOf(BadRequestException.class)
         .hasMessage(INVALID_KEY);
   }
