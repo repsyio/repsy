@@ -30,8 +30,10 @@ import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.dtos.TrashCleanupResult;
 import io.repsy.libs.storage.core.exceptions.InvalidStoragePathException;
 import io.repsy.libs.storage.core.exceptions.IsADirectoryException;
+import io.repsy.libs.storage.core.exceptions.StorageUnavailableException;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import java.io.File;
+import java.io.FilterOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -311,9 +313,7 @@ public class FileSystemStorageStrategy implements StorageStrategy {
         Objects.requireNonNull(
             physicalPath.getParent(), "The storage path has no parent directory");
 
-    if (!Files.exists(directory)) {
-      Files.createDirectories(directory);
-    }
+    createDirectories(directory);
 
     final Path tempFile =
         directory.resolve(TEMP_FILE_PREFIX + UUID.randomUUID() + TEMP_FILE_SUFFIX);
@@ -321,19 +321,96 @@ public class FileSystemStorageStrategy implements StorageStrategy {
 
     try {
       try (final InputStream is = inputStream;
-          final OutputStream os = Files.newOutputStream(tempFile, CREATE_NEW, WRITE)) {
+          final OutputStream os = openForWrite(tempFile, CREATE_NEW, WRITE)) {
 
         bytesWritten = is.transferTo(os);
       }
 
       keepPermissions(physicalPath, tempFile);
-      moveIntoPlace(tempFile, physicalPath);
+      storageStep(() -> moveIntoPlace(tempFile, physicalPath));
     } catch (final IOException | RuntimeException | Error e) {
       deleteTempFile(tempFile, e);
       throw e;
     }
 
     return BaseUsages.builder().diskUsage(bytesWritten - existingFileLength).build();
+  }
+
+  /** A step of a write that touches the storage itself. */
+  @FunctionalInterface
+  private interface StorageWrite<T> {
+    T run() throws IOException;
+  }
+
+  /** A step of a write that touches the storage itself and answers nothing. */
+  @FunctionalInterface
+  private interface StorageWriteStep {
+    void run() throws IOException;
+  }
+
+  /**
+   * Runs a step that writes to the storage (creates a directory, opens a file for writing, moves a
+   * file into place), turning its {@link IOException} into a {@link StorageUnavailableException}
+   * (RPS-2104). Reads of the client's request body are not run through here: their failure is the
+   * client's, not the storage's.
+   */
+  private static <T> T storageWrite(final StorageWrite<T> step) {
+    try {
+      return step.run();
+    } catch (final IOException e) {
+      throw new StorageUnavailableException("The storage could not be written", e);
+    }
+  }
+
+  private static void storageStep(final StorageWriteStep step) {
+    storageWrite(
+        () -> {
+          step.run();
+          return null;
+        });
+  }
+
+  private static void createDirectories(final Path directory) {
+    if (!Files.exists(directory)) {
+      storageWrite(() -> Files.createDirectories(directory));
+    }
+  }
+
+  /**
+   * Opens the file for writing. A failure to open it, and every later failure to write, flush or
+   * close it, is a {@link StorageUnavailableException}; an {@link IOException} that reaches the
+   * caller of {@code transferTo} on it therefore comes from the input stream.
+   */
+  private static OutputStream openForWrite(final Path path, final StandardOpenOption... options) {
+    return new StorageOutputStream(storageWrite(() -> Files.newOutputStream(path, options)));
+  }
+
+  /** An output stream whose {@link IOException}s are storage outages. */
+  private static final class StorageOutputStream extends FilterOutputStream {
+
+    StorageOutputStream(final OutputStream out) {
+      super(out);
+    }
+
+    @Override
+    public void write(final int b) {
+      storageStep(() -> this.out.write(b));
+    }
+
+    @Override
+    public void write(final byte[] b, final int off, final int len) {
+      storageStep(() -> this.out.write(b, off, len));
+    }
+
+    @Override
+    public void flush() {
+      storageStep(this.out::flush);
+    }
+
+    @Override
+    public void close() {
+      storageStep(this.out::close);
+    }
   }
 
   private static void moveIntoPlace(final Path tempFile, final Path target) throws IOException {
@@ -384,13 +461,9 @@ public class FileSystemStorageStrategy implements StorageStrategy {
       final String repoName, final StoragePath storagePath, final byte[] data) {
 
     final Path physicalPath = this.toPhysicalPath(storagePath);
-    final Path directory = physicalPath.getParent();
+    createDirectories(physicalPath.getParent());
 
-    if (!Files.exists(directory)) {
-      Files.createDirectories(directory);
-    }
-
-    try (final var os = Files.newOutputStream(physicalPath, CREATE, APPEND)) {
+    try (final var os = openForWrite(physicalPath, CREATE, APPEND)) {
       os.write(data);
     }
 
@@ -403,17 +476,13 @@ public class FileSystemStorageStrategy implements StorageStrategy {
       final String repoName, final StoragePath storagePath, final InputStream inputStream) {
 
     final Path physicalPath = this.toPhysicalPath(storagePath);
-    final Path directory = physicalPath.getParent();
-
-    if (!Files.exists(directory)) {
-      Files.createDirectories(directory);
-    }
+    createDirectories(physicalPath.getParent());
 
     final long lengthBefore = Files.exists(physicalPath) ? Files.size(physicalPath) : 0;
     final long bytesAppended;
 
     try (final InputStream is = inputStream;
-        final OutputStream os = Files.newOutputStream(physicalPath, CREATE, APPEND)) {
+        final OutputStream os = openForWrite(physicalPath, CREATE, APPEND)) {
 
       bytesAppended = is.transferTo(os);
     } catch (final IOException | RuntimeException e) {
@@ -703,7 +772,8 @@ public class FileSystemStorageStrategy implements StorageStrategy {
       throw new InvalidStoragePathException("invalidStoragePath");
     }
     final Path basePathObj = this.toPhysicalPath(storagePath);
-    return this.moveOrDropDuplicate(basePathObj, basePathObj.resolveSibling(digest));
+    return storageWrite(
+        () -> this.moveOrDropDuplicate(basePathObj, basePathObj.resolveSibling(digest)));
   }
 
   private BaseUsages moveOrDropDuplicate(final Path source, final Path target) throws IOException {

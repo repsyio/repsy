@@ -22,6 +22,7 @@ import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
 import io.repsy.protocols.cargo.protocol.dtos.CargoErrorResponse;
 import io.repsy.protocols.cargo.protocol.facades.contracts.CargoProtocolFacade;
+import io.repsy.protocols.cargo.shared.constants.CargoConstants;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -99,8 +100,11 @@ public abstract class AbstractCargoPublishProtocolMethodHandler implements Proto
    * a validation failure, a crate or version that already exists, or the crate/its metadata being
    * larger than the configured limit. Anything else (an {@link IOException} from storage, a
    * database failure, ...) is a genuine server fault rather than something the client did wrong, so
-   * it is left to propagate to {@code ErrorHandler}, which answers 500 with a generic error code
-   * instead of the raw exception message that used to reach the client here.
+   * it is left to propagate to {@code ErrorHandler}, which picks the status (500, or 503 with
+   * {@code Retry-After} when the storage could not be written) and a generic error code instead of
+   * the raw exception message that used to reach the client here. The request is marked with {@link
+   * CargoConstants#ERROR_BODY_ATTRIBUTE}, so that answer, too, is in Cargo's error-body shape and
+   * not the RestResponse envelope (RPS-2104).
    */
   @Override
   public ResponseEntity<Object> handle(
@@ -108,6 +112,8 @@ public abstract class AbstractCargoPublishProtocolMethodHandler implements Proto
       final HttpServletRequest request,
       final HttpServletResponse response)
       throws IOException {
+
+    request.setAttribute(CargoConstants.ERROR_BODY_ATTRIBUTE, true);
 
     try {
       this.facade.publish(context, request.getInputStream());

@@ -30,6 +30,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
+import io.repsy.libs.storage.core.exceptions.StorageUnavailableException;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.server.protocols.cargo.shared.crate.storage.CargoStorageService;
 import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
@@ -71,6 +72,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockPart;
@@ -89,23 +91,25 @@ import tools.jackson.databind.ObjectMapper;
  * RPS-2093: what each publish handler answers when storage fails while it writes the artifact,
  * pinned for all nine formats in one place.
  *
- * <p>The failure is an {@link IOException} thrown by the storage service call that writes the
- * artifact (as an {@link UncheckedIOException} where the service method declares no checked
- * exception, which is what the real strategy throws). No format maps an {@code IOException} to a
- * 503: {@code ErrorHandler} has no handler for it, so it falls to the {@code Throwable} handler and
- * every format answers 500, in the body shape of its own route (the OCI routes use the OCI error
- * body, NuGet answers its own message, Cargo gets the panel envelope rather than a Cargo-shaped
- * {@code errors[].detail}). For each format the test asserts the status the client gets, that the
- * request left no row and no file behind (compared with what existed before the request: the Docker
- * manifest push keeps the blobs it was given) and that no usage was reported.
+ * <p>The failure is the {@link StorageUnavailableException} that the storage strategy throws when
+ * it cannot create, write or move an object, thrown by the storage service call that writes the
+ * artifact. Since RPS-2104 {@code ErrorHandler} answers it 503 with {@code Retry-After: 1} and the
+ * message id {@code errorOccurred} on every format, in the body shape of the format's own route.
+ * For each format the test asserts the status, the body shape and the header the client gets, that
+ * the request left no row and no file behind (compared with what existed before the request: the
+ * Docker manifest push keeps the blobs it was given) and that no usage was reported.
  *
- * <p>The status table (what each format answers today):
+ * <p>The table (status 503 and {@code Retry-After: 1} on every row):
  *
  * <pre>
- * Maven, npm, PyPI, Ruby, Cargo, Go, Helm classic: 500, RestResponse body msgId=errorOccurred
- * NuGet:                                             500, {"errors":[{"message":"Publish failed"}]} (the handler
- *                                                    catches the failure and answers it itself)
- * Docker blob finalize, Docker manifest push:        500, OCI body errors[0].code=UNKNOWN, detail=errorOccurred
+ * Maven, npm, PyPI, Ruby, Go, Helm classic, NuGet: RestResponse body msgId=errorOccurred (NuGet
+ *                                                  leaves the outage to ErrorHandler instead of
+ *                                                  its own "Publish failed")
+ * Cargo:                                           {"errors":[{"detail":"errorOccurred"}]}, the
+ *                                                  shape cargo prints (CargoErrorBodyAdvice)
+ * Docker blob finalize, Docker manifest push:      OCI body errors[0].code=UNKNOWN (the OCI
+ *                                                  specification has no code for an outage),
+ *                                                  detail=errorOccurred
  * </pre>
  *
  * <p>Runs without a test transaction, because a rollback is only observable when the request's own
@@ -178,7 +182,7 @@ class PublishStorageFailureIT extends AbstractIntegrationTest {
 
   /** One publish handler: its repo type, its request, its failing seam and what it answers. */
   enum Format {
-    MAVEN(RepoType.MAVEN, 500, "maven_artifact", "\"msgId\":\"errorOccurred\"") {
+    MAVEN(RepoType.MAVEN, 503, "maven_artifact", "\"msgId\":\"errorOccurred\"") {
       @Override
       MockHttpServletResponse publish(final PublishStorageFailureIT it, final Repo repo) {
         return it.send(
@@ -189,12 +193,10 @@ class PublishStorageFailureIT extends AbstractIntegrationTest {
 
       @Override
       void failStorage(final PublishStorageFailureIT it) {
-        doThrow(new UncheckedIOException(new IOException("storage went away")))
-            .when(it.mavenStorageService)
-            .writeInputStreamToPath(any(), any(), any());
+        doThrow(outage()).when(it.mavenStorageService).writeInputStreamToPath(any(), any(), any());
       }
     },
-    NPM(RepoType.NPM, 500, "npm_package", "\"msgId\":\"errorOccurred\"") {
+    NPM(RepoType.NPM, 503, "npm_package", "\"msgId\":\"errorOccurred\"") {
       @Override
       MockHttpServletResponse publish(final PublishStorageFailureIT it, final Repo repo) {
         return it.send(
@@ -205,12 +207,12 @@ class PublishStorageFailureIT extends AbstractIntegrationTest {
 
       @Override
       void failStorage(final PublishStorageFailureIT it) throws Exception {
-        doThrow(new IOException("storage went away"))
+        doThrow(outage())
             .when(it.npmStorageService)
             .writeTarballAndMetadata(any(), any(), any(), any(), any(), any());
       }
     },
-    NUGET(RepoType.NUGET, 500, "nuget_package", "\"message\":\"Publish failed\"") {
+    NUGET(RepoType.NUGET, 503, "nuget_package", "\"msgId\":\"errorOccurred\"") {
       @Override
       MockHttpServletResponse publish(final PublishStorageFailureIT it, final Repo repo) {
         return it.send(
@@ -220,12 +222,12 @@ class PublishStorageFailureIT extends AbstractIntegrationTest {
 
       @Override
       void failStorage(final PublishStorageFailureIT it) throws Exception {
-        doThrow(new IOException("storage went away"))
+        doThrow(outage())
             .when(it.nuGetStorageService)
             .writePackage(any(), any(), any(), any(), any());
       }
     },
-    PYPI(RepoType.PYPI, 500, "pypi_package", "\"msgId\":\"errorOccurred\"") {
+    PYPI(RepoType.PYPI, 503, "pypi_package", "\"msgId\":\"errorOccurred\"") {
       @Override
       MockHttpServletResponse publish(final PublishStorageFailureIT it, final Repo repo)
           throws Exception {
@@ -250,12 +252,12 @@ class PublishStorageFailureIT extends AbstractIntegrationTest {
 
       @Override
       void failStorage(final PublishStorageFailureIT it) throws Exception {
-        doThrow(new IOException("storage went away"))
+        doThrow(outage())
             .when(it.pypiStorageService)
             .writePackageArchive(any(), any(), any(), any());
       }
     },
-    RUBY(RepoType.RUBY, 500, "ruby_gem", "\"msgId\":\"errorOccurred\"") {
+    RUBY(RepoType.RUBY, 503, "ruby_gem", "\"msgId\":\"errorOccurred\"") {
       @Override
       MockHttpServletResponse publish(final PublishStorageFailureIT it, final Repo repo)
           throws Exception {
@@ -267,12 +269,12 @@ class PublishStorageFailureIT extends AbstractIntegrationTest {
 
       @Override
       void failStorage(final PublishStorageFailureIT it) {
-        doThrow(new UncheckedIOException(new IOException("storage went away")))
+        doThrow(outage())
             .when(it.rubyStorageService)
             .writeGem(any(), any(), any(), any(), any(), any());
       }
     },
-    CARGO(RepoType.CARGO, 500, "cargo_crate", "\"msgId\":\"errorOccurred\"") {
+    CARGO(RepoType.CARGO, 503, "cargo_crate", "{\"errors\":[{\"detail\":\"errorOccurred\"}]}") {
       @Override
       MockHttpServletResponse publish(final PublishStorageFailureIT it, final Repo repo) {
         return it.send(
@@ -282,12 +284,12 @@ class PublishStorageFailureIT extends AbstractIntegrationTest {
 
       @Override
       void failStorage(final PublishStorageFailureIT it) throws Exception {
-        doThrow(new IOException("storage went away"))
+        doThrow(outage())
             .when(it.cargoStorageService)
             .writeCrateAndIndex(any(), any(), any(), any(), any(), any());
       }
     },
-    GO(RepoType.GOLANG, 500, "go_module", "\"msgId\":\"errorOccurred\"") {
+    GO(RepoType.GOLANG, 503, "go_module", "\"msgId\":\"errorOccurred\"") {
       @Override
       MockHttpServletResponse publish(final PublishStorageFailureIT it, final Repo repo) {
         return it.send(
@@ -298,12 +300,10 @@ class PublishStorageFailureIT extends AbstractIntegrationTest {
 
       @Override
       void failStorage(final PublishStorageFailureIT it) {
-        doThrow(new UncheckedIOException(new IOException("storage went away")))
-            .when(it.goStorageService)
-            .writeInputStreamToPath(any(), any(), any());
+        doThrow(outage()).when(it.goStorageService).writeInputStreamToPath(any(), any(), any());
       }
     },
-    HELM_CLASSIC(RepoType.HELM, 500, "helm_chart", "\"msgId\":\"errorOccurred\"") {
+    HELM_CLASSIC(RepoType.HELM, 503, "helm_chart", "\"msgId\":\"errorOccurred\"") {
       @Override
       MockHttpServletResponse publish(final PublishStorageFailureIT it, final Repo repo) {
         return it.send(
@@ -313,12 +313,10 @@ class PublishStorageFailureIT extends AbstractIntegrationTest {
 
       @Override
       void failStorage(final PublishStorageFailureIT it) {
-        doThrow(new UncheckedIOException(new IOException("storage went away")))
-            .when(it.helmStorageService)
-            .saveChart(any(), any(), any());
+        doThrow(outage()).when(it.helmStorageService).saveChart(any(), any(), any());
       }
     },
-    DOCKER_BLOB(RepoType.DOCKER, 500, "docker_layer", "\"detail\":\"errorOccurred\"") {
+    DOCKER_BLOB(RepoType.DOCKER, 503, "docker_layer", "\"code\":\"UNKNOWN\"") {
       private String uploadId;
 
       @Override
@@ -339,12 +337,12 @@ class PublishStorageFailureIT extends AbstractIntegrationTest {
 
       @Override
       void failStorage(final PublishStorageFailureIT it) {
-        doThrow(new UncheckedIOException(new IOException("storage went away")))
+        doThrow(outage())
             .when(it.dockerStorageService)
             .appendInputStreamToPath(any(), any(), any());
       }
     },
-    DOCKER_MANIFEST(RepoType.DOCKER, 500, "docker_image", "\"detail\":\"errorOccurred\"") {
+    DOCKER_MANIFEST(RepoType.DOCKER, 503, "docker_image", "\"code\":\"UNKNOWN\"") {
       @Override
       void prepare(final PublishStorageFailureIT it, final Repo repo) throws Exception {
         it.pushBlob(repo, DOCKER_CONFIG);
@@ -362,9 +360,7 @@ class PublishStorageFailureIT extends AbstractIntegrationTest {
 
       @Override
       void failStorage(final PublishStorageFailureIT it) {
-        doThrow(new UncheckedIOException(new IOException("storage went away")))
-            .when(it.dockerStorageService)
-            .writeInputStreamToPath(any(), any(), any());
+        doThrow(outage()).when(it.dockerStorageService).writeInputStreamToPath(any(), any(), any());
       }
     };
 
@@ -391,7 +387,7 @@ class PublishStorageFailureIT extends AbstractIntegrationTest {
 
   @ParameterizedTest(name = "{0}")
   @EnumSource(Format.class)
-  @DisplayName("a storage failure while writing the artifact answers the format's own error")
+  @DisplayName("a storage failure while writing the artifact answers 503 in the format's own body")
   void storageFailureLeavesNothingBehind(final Format format) throws Exception {
     // Both create rows through helpers that flush, which needs a transaction; each commits here.
     final var inTransaction = new TransactionTemplate(this.transactionManager);
@@ -410,9 +406,22 @@ class PublishStorageFailureIT extends AbstractIntegrationTest {
 
     assertThat(response.getStatus()).as(response.getContentAsString()).isEqualTo(format.status);
     assertThat(response.getContentAsString()).contains(format.bodyMarker);
+    assertThat(response.getContentAsString()).contains("errorOccurred");
+    if (!format.bodyMarker.contains("msgId")) {
+      assertThat(response.getContentAsString())
+          .as("a %s client does not read the RestResponse envelope", format)
+          .doesNotContain("\"msgId\"");
+    }
+    assertThat(response.getHeader(HttpHeaders.RETRY_AFTER)).isEqualTo("1");
     assertThat(this.rows(format, repo)).as("%s rows", format.table).isEqualTo(rowsBefore);
     assertThat(storedFiles(repo)).as("files of %s", repo.getName()).isEqualTo(filesBefore);
     verifyNoInteractions(this.usageUpdateService);
+  }
+
+  /** What the storage strategy throws when it cannot write (RPS-2104). */
+  private static StorageUnavailableException outage() {
+    return new StorageUnavailableException(
+        "The storage could not be written", new IOException("storage went away"));
   }
 
   private MockHttpServletResponse send(final AbstractMockHttpServletRequestBuilder<?> request) {
