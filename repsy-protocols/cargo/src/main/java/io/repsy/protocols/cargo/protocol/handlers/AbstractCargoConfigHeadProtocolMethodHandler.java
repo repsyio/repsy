@@ -32,10 +32,12 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 /**
- * Answers a {@code HEAD} on {@code config.json} like its {@code GET} would, without the body
- * (RPS-1465). Like the {@code GET} it needs no credentials: cargo reads the file before it knows
- * whether the registry wants any. The {@code Content-Length} is not sent, the body is built from
- * the request's own URL.
+ * Handles {@code HEAD /{repo}/config.json}, which is served without authentication even on private
+ * repos (RPS-1465, RPS-2109). Cargo fetches {@code config.json} before it knows whether the
+ * registry requires authentication (RFC 3139, {@code auth-required: true}), so the route is
+ * deliberately kept open to all clients. Like the {@code GET}, it exposes only the {@code dl} and
+ * {@code api} base URLs and the {@code auth-required} flag, confirming that the registry exists.
+ * The {@code Content-Length} is not sent since the body is empty.
  */
 @NullMarked
 public abstract class AbstractCargoConfigHeadProtocolMethodHandler
