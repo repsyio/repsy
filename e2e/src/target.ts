@@ -106,6 +106,8 @@ export interface UiCapabilities {
   hasUsersPage: boolean;
   /** The login form's identifier field: see `UiLoginField`. */
   loginField: UiLoginField;
+  /** The accessible label of the login form's identifier field: `Username` (Repsy OS), `Username or Email` (Repsy Cloud). */
+  loginFieldLabel: string;
   /** The `localStorage` keys the panel keeps its session in: see `UiSessionStorageKeys`. */
   sessionStorageKeys: UiSessionStorageKeys;
   /**
@@ -164,6 +166,7 @@ const OS_UI: UiCapabilities = {
   profileApiUrl: /\/api\/profile(\?|$)/,
   hasUsersPage: true,
   loginField: 'username',
+  loginFieldLabel: 'Username',
   sessionStorageKeys: { username: 'username', token: 'token', refreshToken: 'refresh-token' },
   frontendBaseUrl: () => uiBaseUrlFrom(process.env, false),
 };
@@ -205,6 +208,7 @@ const CLOUD_UI: UiCapabilities = {
   profileApiUrl: null,
   hasUsersPage: false,
   loginField: 'usernameOrEmail',
+  loginFieldLabel: 'Username or Email',
   sessionStorageKeys: {
     username: 'username',
     token: 'token',

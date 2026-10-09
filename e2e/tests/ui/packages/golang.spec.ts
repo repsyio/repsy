@@ -20,10 +20,9 @@
  * zip built in code (never `go`).
  */
 import { RepoType } from '../../../src/api/panel-api.js';
-import { env } from '../../../src/env.js';
 import { repoUrl } from '../../../src/repo-url.js';
 import { expect, test } from '../../../src/ui/package-fixtures.js';
-import { repoRoute } from '../../../src/ui/routes.js';
+import { repoRoute, urlEndsWith } from '../../../src/ui/routes.js';
 import {
   asDetailPage,
   escapeRegExp,
@@ -56,7 +55,9 @@ test.describe('Go module routes', { tag: '@packages' }, () => {
     // The module row opens the versions page: the path is a query parameter, not a path segment.
     const versions = (await list.openRow(one)) as VersionsPage;
     await expect(adminPage).toHaveURL(
-      `${env.apiBaseUrl}/${repo.name}/modules?modulePath=${encodeURIComponent(modulePath)}`,
+      urlEndsWith(
+        `${repoRoute(repo.name, 'modules')}?modulePath=${encodeURIComponent(modulePath)}`,
+      ),
     );
     await versions.expectLoaded();
     await expect(versions.rows()).toHaveCount(2);
@@ -186,7 +187,9 @@ test.describe('Go module routes', { tag: '@packages' }, () => {
 
     // Still the module's versions page, on the page before: ten rows, the module and its other versions intact.
     await expect(adminPage).toHaveURL(
-      `${env.apiBaseUrl}/${repo.name}/modules?modulePath=${encodeURIComponent(oldest.name)}`,
+      urlEndsWith(
+        `${repoRoute(repo.name, 'modules')}?modulePath=${encodeURIComponent(oldest.name)}`,
+      ),
     );
     await expect(versions.rows()).toHaveCount(10);
     await versions.expectNoRow(oldest);
