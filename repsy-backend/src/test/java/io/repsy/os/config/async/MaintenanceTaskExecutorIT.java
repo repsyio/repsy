@@ -20,7 +20,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 
-import io.repsy.libs.storage.gateway.filesystem.service.FileSystemStorageStrategy;
+import io.repsy.libs.storage.gateway.filesystem.services.FileSystemStorageStrategy;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.server.protocols.docker.shared.layer.dtos.OrphanLayerInfo;
 import io.repsy.os.server.protocols.docker.shared.layer.services.OrphanLayerCleanupService;

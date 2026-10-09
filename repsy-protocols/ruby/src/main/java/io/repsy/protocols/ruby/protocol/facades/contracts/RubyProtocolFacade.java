@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.protocols.ruby.protocol.facades.contract;
+package io.repsy.protocols.ruby.protocol.facades.contracts;
 
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.shared.utils.SpooledUpload;

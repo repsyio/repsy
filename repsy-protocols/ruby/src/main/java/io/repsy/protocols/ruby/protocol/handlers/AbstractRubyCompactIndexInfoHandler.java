@@ -19,7 +19,7 @@ import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.ruby.protocol.RubyProtocolProvider;
-import io.repsy.protocols.ruby.protocol.facades.contract.RubyProtocolFacade;
+import io.repsy.protocols.ruby.protocol.facades.contracts.RubyProtocolFacade;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;

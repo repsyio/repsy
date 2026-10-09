@@ -13,16 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os;
+package io.repsy.protocols.golang.shared.dtos;
 
-import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.time.Instant;
+import lombok.Builder;
+import lombok.Data;
+import org.jspecify.annotations.NullMarked;
 
-@SpringBootTest(
-    classes = TestApplication.class,
-    webEnvironment = SpringBootTest.WebEnvironment.NONE)
-class RepsyApplicationTests {
+@Data
+@Builder
+@NullMarked
+public class GoVersionInfo {
 
-  @Test
-  void contextLoads() {}
+  @JsonProperty("Version")
+  private final String version;
+
+  @JsonProperty("Time")
+  private final Instant time;
 }

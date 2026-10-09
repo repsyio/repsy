@@ -18,7 +18,7 @@ package io.repsy.protocols.ruby.protocol.facades;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
-import io.repsy.protocols.ruby.protocol.facades.contract.RubyProtocolFacade;
+import io.repsy.protocols.ruby.protocol.facades.contracts.RubyProtocolFacade;
 import io.repsy.protocols.ruby.shared.gem.dtos.GemCompactEntry;
 import io.repsy.protocols.ruby.shared.gem.dtos.GemMetadata;
 import io.repsy.protocols.ruby.shared.gem.services.RubyGemProtocolService;

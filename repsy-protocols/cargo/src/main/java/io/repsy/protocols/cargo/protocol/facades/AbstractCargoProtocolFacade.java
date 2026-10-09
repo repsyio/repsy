@@ -17,7 +17,7 @@ package io.repsy.protocols.cargo.protocol.facades;
 
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
-import io.repsy.protocols.cargo.protocol.facades.contract.CargoProtocolFacade;
+import io.repsy.protocols.cargo.protocol.facades.contracts.CargoProtocolFacade;
 import io.repsy.protocols.cargo.protocol.utils.CrateUtils;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateIndexEntry;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateListItem;

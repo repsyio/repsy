@@ -30,7 +30,7 @@ import static io.repsy.protocols.nuget.shared.utils.NuGetServiceIndexResources.b
 
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
-import io.repsy.protocols.nuget.protocol.facades.contract.NuGetProtocolFacade;
+import io.repsy.protocols.nuget.protocol.facades.contracts.NuGetProtocolFacade;
 import io.repsy.protocols.nuget.protocol.facades.dtos.NuspecMetadata;
 import io.repsy.protocols.nuget.shared.dtos.NuGetAutocompleteResponse;
 import io.repsy.protocols.nuget.shared.dtos.NuGetRegistrationIndexResponse;

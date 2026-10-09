@@ -23,7 +23,7 @@ import static org.mockito.Mockito.when;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
-import io.repsy.protocols.cargo.protocol.facades.contract.CargoProtocolFacade;
+import io.repsy.protocols.cargo.protocol.facades.contracts.CargoProtocolFacade;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateIndexEntry;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.util.List;

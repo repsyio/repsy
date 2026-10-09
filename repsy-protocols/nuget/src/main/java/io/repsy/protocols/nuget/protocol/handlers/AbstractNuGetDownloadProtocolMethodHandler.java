@@ -25,7 +25,7 @@ import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.nuget.protocol.NuGetProtocolProvider;
-import io.repsy.protocols.nuget.protocol.facades.contract.NuGetProtocolFacade;
+import io.repsy.protocols.nuget.protocol.facades.contracts.NuGetProtocolFacade;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;

@@ -26,7 +26,7 @@ import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.protocols.ruby.protocol.RubyProtocolProvider;
-import io.repsy.protocols.ruby.protocol.facades.contract.RubyProtocolFacade;
+import io.repsy.protocols.ruby.protocol.facades.contracts.RubyProtocolFacade;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
 import java.util.List;
