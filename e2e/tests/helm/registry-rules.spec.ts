@@ -39,6 +39,7 @@ import {
   rawGetManifest,
   rawGetTagsList,
   rawHeadBlob,
+  rawHeadManifest,
   rawPing,
   rawPutManifest,
   rawStartUpload,
@@ -955,6 +956,68 @@ test.describe('helm registry rules (raw HTTP)', () => {
       // Verify the republished version is now accessible
       const republishedManifest = await rawGetManifest(layout.repoName, admin, ociChart, '0.1.0');
       expect(republishedManifest.status, 'republished manifest is accessible').toBe(200);
+    },
+  );
+
+  test(
+    'RPS-2089: HEAD manifest returns same headers as GET with empty body',
+    { tag: ['@negative'] },
+    async ({ seeder }) => {
+      const layout = await newRepo(seeder, 'head-manifest');
+      const admin = adminCredential();
+
+      // Push an OCI manifest
+      const ociBuilt = await buildChart({
+        name: layout.chart,
+        version: '1.0.0',
+        marker: 'rps-2089-head-test',
+      });
+
+      await rawUploadBlob(
+        layout.repoName,
+        admin,
+        layout.chart,
+        ociBuilt.tgzBytes,
+        ociBuilt.tgzDigest,
+      );
+
+      const ociManifest = Buffer.from(
+        JSON.stringify({
+          schemaVersion: 2,
+          mediaType: 'application/vnd.oci.image.manifest.v1+json',
+          config: { mediaType: 'x', digest: `sha256:${'1'.repeat(64)}`, size: 1 },
+          layers: [{ mediaType: 'x', digest: ociBuilt.tgzDigest, size: ociBuilt.tgzBytes.length }],
+        }),
+      );
+
+      const ociPush = await rawPutManifest(
+        layout.repoName,
+        admin,
+        layout.chart,
+        '1.0.0',
+        ociManifest,
+        'application/vnd.oci.image.manifest.v1+json',
+      );
+      expect(ociPush.status, 'manifest push succeeded').toBe(201);
+
+      // HEAD by tag mirrors GET headers with empty body
+      const head = await rawHeadManifest(layout.repoName, admin, layout.chart, '1.0.0');
+      const get = await rawGetManifest(layout.repoName, admin, layout.chart, '1.0.0');
+
+      expect(head.status, 'HEAD returns 200').toBe(200);
+      expect(head.body.length, 'HEAD has empty body').toBe(0);
+      expect(head.headers['docker-content-digest'], 'HEAD has Docker-Content-Digest').toBeDefined();
+
+      expect(head.status, 'HEAD and GET have same status').toBe(get.status);
+      expect(head.headers['docker-content-digest'], 'HEAD and GET have same Docker-Content-Digest').toBe(
+        get.headers['docker-content-digest'],
+      );
+      expect(head.headers['content-type'], 'HEAD and GET have same Content-Type').toBe(
+        get.headers['content-type'],
+      );
+      expect(head.headers['content-length'], 'HEAD and GET have same Content-Length').toBe(
+        get.headers['content-length'],
+      );
     },
   );
 });
