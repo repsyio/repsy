@@ -13,14 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.protocols.maven.shared.storage.configs;
+package io.repsy.os.server.protocols.golang.shared.storage.configs;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @Data
-@ConfigurationProperties(prefix = "os.app.storage.file-system.maven")
-public class MavenFileSystemStorageBackendConfigProps {
+@ConfigurationProperties(prefix = "os.app.storage.file-system.golang")
+public class GoFileSystemStorageProperties {
   private String basePath;
   private String trashPath;
 }

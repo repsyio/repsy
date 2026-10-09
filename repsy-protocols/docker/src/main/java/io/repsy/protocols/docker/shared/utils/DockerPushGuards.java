@@ -16,6 +16,7 @@
 package io.repsy.protocols.docker.shared.utils;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
+import io.repsy.protocols.docker.shared.constants.DockerConstants;
 import io.repsy.protocols.shared.utils.BlobDigests;
 import java.util.regex.Pattern;
 import lombok.experimental.UtilityClass;

@@ -15,11 +15,11 @@
  */
 package io.repsy.protocols.helm.shared.chart.services;
 
+import io.repsy.protocols.helm.shared.constants.HelmConstants;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestInfo;
 import io.repsy.protocols.helm.shared.oci.services.OciBlobService;
 import io.repsy.protocols.helm.shared.oci.services.OciManifestService;
 import io.repsy.protocols.helm.shared.storage.services.HelmStorageService;
-import io.repsy.protocols.helm.shared.utils.HelmConstants;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.HashSet;

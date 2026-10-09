@@ -13,14 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.protocols.ruby.shared.storage.configs;
+package io.repsy.os.server.protocols.nuget.shared.storage.configs;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @Data
-@ConfigurationProperties(prefix = "os.app.storage.file-system.ruby")
-public class RubyFileSystemStorageBackendConfigProps {
+@ConfigurationProperties(prefix = "os.app.storage.file-system.nuget")
+public class NuGetFileSystemStorageProperties {
   private String basePath;
   private String trashPath;
 }

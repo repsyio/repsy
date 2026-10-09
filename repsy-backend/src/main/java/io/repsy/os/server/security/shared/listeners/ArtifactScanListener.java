@@ -32,7 +32,7 @@ import io.repsy.os.server.security.scanner.trivy.TrivyScannerClientProperties;
 import io.repsy.os.shared.error_handling.utils.ConstraintViolations;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
-import io.repsy.protocols.helm.shared.utils.HelmConstants;
+import io.repsy.protocols.helm.shared.constants.HelmConstants;
 import io.repsy.protocols.shared.utils.BlobDigests;
 import java.time.Instant;
 import java.util.Map;

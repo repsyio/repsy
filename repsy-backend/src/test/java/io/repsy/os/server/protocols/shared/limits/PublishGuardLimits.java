@@ -16,9 +16,9 @@
 package io.repsy.os.server.protocols.shared.limits;
 
 import io.repsy.protocols.cargo.protocol.utils.CrateUtils;
-import io.repsy.protocols.docker.shared.utils.DockerConstants;
+import io.repsy.protocols.docker.shared.constants.DockerConstants;
 import io.repsy.protocols.golang.shared.utils.GoVersionUtils;
-import io.repsy.protocols.helm.shared.utils.HelmConstants;
+import io.repsy.protocols.helm.shared.constants.HelmConstants;
 import io.repsy.protocols.maven.shared.utils.MavenPublishLimits;
 import io.repsy.protocols.npm.shared.utils.NpmPublishLimits;
 import io.repsy.protocols.pypi.shared.utils.PypiPublishLimits;

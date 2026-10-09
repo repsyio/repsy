@@ -34,7 +34,7 @@ import com.jayway.jsonpath.JsonPath;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
-import io.repsy.protocols.helm.shared.utils.HelmConstants;
+import io.repsy.protocols.helm.shared.constants.HelmConstants;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;

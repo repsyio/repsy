@@ -33,7 +33,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  * are read by {@link RepoType#fromJson(String)}.
  */
 @Configuration
-public class RepoTypeConversionConfiguration implements WebMvcConfigurer {
+public class RepoTypeConversionConfig implements WebMvcConfigurer {
 
   @Override
   public void addFormatters(final @NonNull FormatterRegistry registry) {

@@ -22,7 +22,7 @@ import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
-public class PagingParameterConfiguration implements WebMvcConfigurer {
+public class PagingParameterConfig implements WebMvcConfigurer {
 
   @Override
   public void addInterceptors(final @NonNull InterceptorRegistry registry) {

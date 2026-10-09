@@ -32,13 +32,13 @@ import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestChild
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.TagRepository;
 import io.repsy.os.shared.utils.LikePatterns;
+import io.repsy.protocols.docker.shared.constants.DockerConstants;
 import io.repsy.protocols.docker.shared.image.dtos.BaseImageInfo;
 import io.repsy.protocols.docker.shared.image.exceptions.ImageDeletedException;
 import io.repsy.protocols.docker.shared.tag.dtos.BaseTagDetail;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestListManifest;
 import io.repsy.protocols.docker.shared.tag.dtos.TagForm;
 import io.repsy.protocols.docker.shared.tag.services.ManifestService;
-import io.repsy.protocols.docker.shared.utils.DockerConstants;
 import io.repsy.protocols.docker.shared.utils.DockerDigestCalculator;
 import io.repsy.protocols.docker.shared.utils.ManifestNameGenerator;
 import io.repsy.protocols.docker.shared.utils.MediaTypes;

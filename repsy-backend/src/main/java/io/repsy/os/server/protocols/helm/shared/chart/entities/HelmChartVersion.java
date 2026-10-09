@@ -16,7 +16,7 @@
 package io.repsy.os.server.protocols.helm.shared.chart.entities;
 
 import io.repsy.core.uuidv7.UuidV7;
-import io.repsy.protocols.helm.shared.utils.HelmConstants;
+import io.repsy.protocols.helm.shared.constants.HelmConstants;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
