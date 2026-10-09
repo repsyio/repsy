@@ -60,9 +60,9 @@ public class RepoTxService {
   /**
    * Repo types whose publish path actually consults the {@code releases}/{@code snapshots} settings
    * (RPS-1210): Maven ({@link
-   * io.repsy.os.server.protocols.maven.shared.artifact.services.ArtifactServiceImpl}) and NuGet
-   * ({@code NuGetPackageUtils}) gate a version's upload on them. Every other repo type stores and
-   * exposes the fields but never reads them, which silently misleads an operator into thinking they
+   * io.repsy.os.server.protocols.maven.shared.artifact.services.ArtifactService}) and NuGet ({@code
+   * NuGetPackageUtils}) gate a version's upload on them. Every other repo type stores and exposes
+   * the fields but never reads them, which silently misleads an operator into thinking they
    * restricted publishing when they did not.
    */
   private static final Set<RepoType> RELEASES_SNAPSHOTS_SUPPORTED_TYPES =

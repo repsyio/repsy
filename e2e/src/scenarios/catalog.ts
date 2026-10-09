@@ -54,7 +54,7 @@
  *    permissive defaults) the same coordinate the scenario's own publish targets, and only then
  *    applies the scenario's `repo` settings. Every other pre-publish lands on a separate coordinate.
  *  - cargo (step 3b) has no override rule at all: re-publishing an existing version is refused
- *    unconditionally with 400 (`rejected`) by `CargoCrateServiceImpl.checkExistsVersion`, reached via
+ *    unconditionally with 400 (`rejected`) by `CargoCrateService.checkExistsVersion`, reached via
  *    the publish handler's catch-all (`cargo-raw.ts`'s file header) -- `allowOverride` is settable
  *    and visible for a cargo repo (the panel exposes it) but the protocol never reads it. Both
  *    `no-override` and `override` therefore pin `expectByProtocol: { cargo: { publish: 'rejected' }
@@ -110,7 +110,7 @@
  *    and confirmed live: a `.dev0`/`a1`/`.post1` upload succeeds regardless of either switch).
  *  - golang (step 4d) needs one data change: `no-override`/`override` both pin `expectByProtocol: {
  *    golang: { publish: 'conflict' } }` -- confirmed live, a real, UNCONDITIONAL `409`
- *    ("goModuleVersionAlreadyExists", `GoModuleServiceImpl.publishModule`) for a duplicate version
+ *    ("goModuleVersionAlreadyExists", `GoModuleService.publishModule`) for a duplicate version
  *    regardless of `allowOverride`, which is never read anywhere in either Go package
  *    (grep-confirmed) -- like cargo's own "no override rule at all" bullet above, except Go's
  *    refusal is a real `409`, not cargo's unconditional `400`. Every auth scenario's shared `expect`

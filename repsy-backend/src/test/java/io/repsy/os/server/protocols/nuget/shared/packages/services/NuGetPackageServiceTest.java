@@ -47,16 +47,16 @@ import org.mockito.Mockito;
  * a dependency is a handful of plain strings, so the failure is injected through a mocked {@link
  * NuGetPackageUtils#toDependencyGroupsJson}) and assert the push now fails instead.
  */
-@DisplayName("NuGetPackageServiceImpl.publishVersion dependency serialization (RPS-1146)")
-class NuGetPackageServiceImplTest {
+@DisplayName("NuGetPackageService.publishVersion dependency serialization (RPS-1146)")
+class NuGetPackageServiceTest {
 
   private final NuGetPackageRepository packageRepository = mock(NuGetPackageRepository.class);
   private final NuGetPackageVersionRepository packageVersionRepository =
       mock(NuGetPackageVersionRepository.class);
   private final NuGetPackageMapper converter = mock(NuGetPackageMapper.class);
 
-  private final NuGetPackageServiceImpl service =
-      new NuGetPackageServiceImpl(
+  private final NuGetPackageService service =
+      new NuGetPackageService(
           this.packageRepository, this.packageVersionRepository, this.converter);
 
   private static final String NUSPEC_WITH_DEPENDENCY =

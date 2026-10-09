@@ -41,7 +41,7 @@ import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.os.shared.utils.VersionSortPaging;
 import io.repsy.protocols.pypi.shared.python_package.dtos.PackageUploadForm;
 import io.repsy.protocols.pypi.shared.python_package.dtos.ReleaseVersionRequiresPython;
-import io.repsy.protocols.pypi.shared.python_package.services.PypiPackageService;
+import io.repsy.protocols.pypi.shared.python_package.services.AbstractPypiPackageService;
 import io.repsy.protocols.pypi.shared.utils.Pep440Version;
 import io.repsy.protocols.pypi.shared.utils.PypiPackageUtils;
 import io.repsy.protocols.pypi.shared.utils.PypiVersionComparator;
@@ -72,7 +72,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
 @NullMarked
-public class PypiPackageServiceImpl implements PypiPackageService<UUID> {
+public class PypiPackageService extends AbstractPypiPackageService<UUID> {
 
   private static final String ERR_PACKAGE_NOT_FOUND = "packageNotFound";
 

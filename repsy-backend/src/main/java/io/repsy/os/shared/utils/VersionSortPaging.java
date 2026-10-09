@@ -32,9 +32,8 @@ import org.springframework.data.domain.Sort;
  * version} property needs this class, and only when a caller asks to sort by it.
  *
  * <p>Because the comparator's order is not a database order, the whole matching set has to be
- * fetched unpaged, sorted here, and sliced, the way {@code
- * ArtifactServiceImpl.sortByVersionAndPage} does for Maven and {@code
- * CrateUtils.resolveVersionSort} does for Cargo.
+ * fetched unpaged, sorted here, and sliced, the way {@code ArtifactService.sortByVersionAndPage}
+ * does for Maven and {@code CrateUtils.resolveVersionSort} does for Cargo.
  */
 public final class VersionSortPaging {
 

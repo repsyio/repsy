@@ -24,8 +24,8 @@ import static org.mockito.Mockito.when;
 
 import io.repsy.core.events.ArtifactVersionDeletedEvent;
 import io.repsy.os.generated.model.NuGetDeletedItem;
-import io.repsy.os.server.protocols.nuget.shared.packages.services.NuGetPackageServiceImpl;
-import io.repsy.os.server.protocols.nuget.shared.packages.services.NuGetPackageServiceImpl.VersionDeletion;
+import io.repsy.os.server.protocols.nuget.shared.packages.services.NuGetPackageService;
+import io.repsy.os.server.protocols.nuget.shared.packages.services.NuGetPackageService.VersionDeletion;
 import io.repsy.os.server.protocols.nuget.shared.storage.NuGetStorageService;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetPackageSearchResult;
@@ -58,7 +58,7 @@ class NuGetApiFacadeTest {
           .type(RepoType.NUGET)
           .build();
 
-  @Mock private NuGetPackageServiceImpl nugetPackageService;
+  @Mock private NuGetPackageService nugetPackageService;
   @Mock private NuGetStorageService nugetStorageService;
   @Mock private ApplicationEventPublisher eventPublisher;
 

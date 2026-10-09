@@ -25,7 +25,7 @@
  * evidence (the spec asserts the two agree: a refused deploy must fail the real client, an accepted
  * one must not) and is attached to the test on failure by `clients/exec.ts`.
  *
- * What the server judges on a deploy (`ArtifactServiceImpl.checkDeploymentRules`, RPS-1174/RPS-1176),
+ * What the server judges on a deploy (`ArtifactService.checkDeploymentRules`, RPS-1174/RPS-1176),
  * which the raw probe below and the catalog's pinned statuses depend on: the release/snapshot
  * switches (`releases`/`snapshots`) refuse an upload of that version kind with 403 whether the
  * version is new or already exists; `allowOverride: false` refuses re-uploading an existing file

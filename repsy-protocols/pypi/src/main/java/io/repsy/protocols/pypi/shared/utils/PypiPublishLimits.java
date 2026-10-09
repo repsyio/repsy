@@ -26,8 +26,8 @@ import org.jspecify.annotations.Nullable;
 /**
  * Guards the length of every value the PyPI publish path stores in a length-limited column, before
  * anything is written (RPS-1137). {@code AbstractPypiProtocolFacade.uploadPackage} writes the
- * archive to storage first (RPS-1124's ordering) and only then lets {@code PypiPackageServiceImpl}
- * copy unguarded upload-form fields into {@code pypi_package}, {@code pypi_release} and their child
+ * archive to storage first (RPS-1124's ordering) and only then lets {@code PypiPackageService} copy
+ * unguarded upload-form fields into {@code pypi_package}, {@code pypi_release} and their child
  * tables; an over-long one failed the row insert with SQLSTATE 22001, which {@code ErrorHandler}
  * (RPS-1012) turned into a generic 400 that named no field, and the archive was already left behind
  * in storage.
@@ -50,12 +50,12 @@ import org.jspecify.annotations.Nullable;
  *       both PostgreSQL and H2 (unbounded), so neither can overflow the row insert this guard
  *       exists to prevent.
  *   <li><b>Drop the entry</b> and keep the rest of the collection: a classifier whose category or
- *       value (split on the first {@code ::}, as {@code PypiPackageServiceImpl} splits it) does not
- *       fit {@code pypi_release_classifier}'s {@code classifier} / {@code value} columns (both
- *       {@code NOT NULL}, so neither half can be nulled instead), and a Project-URL entry whose
- *       label does not fit {@code pypi_release_project_url.label} ({@code varchar(32)}, {@code NOT
- *       NULL}). A Project-URL's own {@code url} needs no guard: the column is {@code text}
- *       (unbounded) in both databases.
+ *       value (split on the first {@code ::}, as {@code PypiPackageService} splits it) does not fit
+ *       {@code pypi_release_classifier}'s {@code classifier} / {@code value} columns (both {@code
+ *       NOT NULL}, so neither half can be nulled instead), and a Project-URL entry whose label does
+ *       not fit {@code pypi_release_project_url.label} ({@code varchar(32)}, {@code NOT NULL}). A
+ *       Project-URL's own {@code url} needs no guard: the column is {@code text} (unbounded) in
+ *       both databases.
  * </ul>
  *
  * <p>{@code pypi_release.version} is {@code varchar(255)}; {@link #MAX_VERSION_LENGTH} is set to
@@ -145,8 +145,8 @@ public final class PypiPublishLimits {
 
   /**
    * Drops every over-long descriptive value from the upload form, in place, so what reaches {@code
-   * PypiPackageServiceImpl} already fits its column. A classifier or Project-URL whose own field
-   * cannot be nulled loses only that one entry.
+   * PypiPackageService} already fits its column. A classifier or Project-URL whose own field cannot
+   * be nulled loses only that one entry.
    */
   public static void dropOverLongFields(final PackageUploadForm uploadForm) {
     uploadForm.setHome_page(dropIfTooLong(uploadForm.getHome_page(), MAX_HOME_PAGE_LENGTH));

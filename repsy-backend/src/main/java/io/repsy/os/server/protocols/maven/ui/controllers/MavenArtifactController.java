@@ -20,7 +20,7 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.generated.model.ArtifactListItem;
 import io.repsy.os.generated.model.ArtifactVersionInfo;
 import io.repsy.os.generated.model.ArtifactVersionListItem;
-import io.repsy.os.server.protocols.maven.shared.artifact.services.ArtifactServiceImpl;
+import io.repsy.os.server.protocols.maven.shared.artifact.services.ArtifactService;
 import io.repsy.os.server.protocols.maven.shared.artifact.services.components.ArtifactDeleter;
 import io.repsy.os.server.protocols.maven.ui.facades.MavenApiFacade;
 import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
@@ -64,7 +64,7 @@ public class MavenArtifactController {
       Set.of("id", "versionName", "lastUpdatedAt");
 
   private final UsageUpdateService usageUpdateService;
-  private final ArtifactServiceImpl artifactService;
+  private final ArtifactService artifactService;
   private final MavenApiFacade mavenApiFacade;
   private final ArtifactDeleter artifactDeleter;
 

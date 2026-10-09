@@ -44,7 +44,7 @@ import io.repsy.protocols.cargo.shared.crate.dtos.CrateListItem;
 import io.repsy.protocols.cargo.shared.crate.dtos.CratePublishDep;
 import io.repsy.protocols.cargo.shared.crate.dtos.CratePublishRequest;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateVersionListItem;
-import io.repsy.protocols.cargo.shared.crate.services.CargoCrateService;
+import io.repsy.protocols.cargo.shared.crate.services.AbstractCargoCrateService;
 import io.repsy.protocols.cargo.shared.crate.services.SemverComparator;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.IOException;
@@ -71,7 +71,7 @@ import tools.jackson.databind.ObjectMapper;
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
 @NullMarked
-public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
+public class CargoCrateService extends AbstractCargoCrateService<UUID> {
 
   private static final String ERR_REPO_NOT_FOUND = "repoNotFound";
   private static final String ERR_CRATE_NOT_FOUND = "crateNotFound";

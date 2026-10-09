@@ -19,7 +19,7 @@ import io.repsy.core.events.ArtifactVersionDeletedEvent;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.generated.model.PypiPackageInfo;
 import io.repsy.os.generated.model.ReleaseDetail;
-import io.repsy.os.server.protocols.pypi.shared.python_package.services.PypiPackageServiceImpl;
+import io.repsy.os.server.protocols.pypi.shared.python_package.services.PypiPackageService;
 import io.repsy.os.server.protocols.pypi.shared.storage.services.PypiStorageService;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
@@ -38,7 +38,7 @@ import org.springframework.stereotype.Component;
 public class PypiApiFacade implements ProtocolApiFacade {
 
   private final @NonNull PypiStorageService pypiStorageService;
-  private final @NonNull PypiPackageServiceImpl pypiPackageService;
+  private final @NonNull PypiPackageService pypiPackageService;
   private final @NonNull ApplicationEventPublisher eventPublisher;
 
   @Override
@@ -49,8 +49,8 @@ public class PypiApiFacade implements ProtocolApiFacade {
 
   /**
    * Deletes the package. The rows and the archives go in one transaction under the package's row
-   * lock, see {@link PypiPackageServiceImpl#deletePackage}. The events follow the commit, so a
-   * delete that rolled back reports nothing.
+   * lock, see {@link PypiPackageService#deletePackage}. The events follow the commit, so a delete
+   * that rolled back reports nothing.
    */
   public @NonNull BaseUsages deletePackage(
       final @NonNull RepoInfo repoInfo, final @NonNull String packageName) {

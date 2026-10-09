@@ -30,7 +30,7 @@ import io.repsy.os.shared.utils.OffsetPageRequest;
 import io.repsy.os.shared.utils.VersionSortPaging;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetPackageSearchResult;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetVersionInfo;
-import io.repsy.protocols.nuget.shared.packages.services.NuGetPackageService;
+import io.repsy.protocols.nuget.shared.packages.services.AbstractNuGetPackageService;
 import io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.IOException;
@@ -55,7 +55,7 @@ import org.springframework.web.server.ResponseStatusException;
 @Component
 @Transactional(readOnly = true)
 @NullMarked
-public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
+public class NuGetPackageService extends AbstractNuGetPackageService<UUID> {
 
   private static final String ERR_PACKAGE_NOT_FOUND = "packageNotFound";
   private static final String ERR_VERSION_NOT_FOUND = "versionNotFound";
@@ -66,7 +66,7 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
   private final NuGetPackageVersionRepository packageVersionRepository;
   private final NuGetPackageMapper converter;
 
-  public NuGetPackageServiceImpl(
+  public NuGetPackageService(
       final NuGetPackageRepository packageRepository,
       final NuGetPackageVersionRepository packageVersionRepository,
       final NuGetPackageMapper converter) {

@@ -52,7 +52,7 @@ import org.springframework.web.server.ResponseStatusException;
  * <p>This is the only class that covers NuGet dependency persistence; it replaces the overlapping
  * RPS-901 and RPS-904 regression tests (RPS-967).
  */
-@DisplayName("NuGetPackageServiceImpl publish/read on PostgreSQL")
+@DisplayName("NuGetPackageService publish/read on PostgreSQL")
 class NuGetPackageServiceIT extends AbstractIntegrationTest {
 
   private static final String PACKAGE_ID = "fixture.package";

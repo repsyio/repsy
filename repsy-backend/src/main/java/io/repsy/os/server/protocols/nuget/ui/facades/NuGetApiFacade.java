@@ -22,7 +22,7 @@ import io.repsy.os.generated.model.NuGetDeletedItem;
 import io.repsy.os.generated.model.NuGetPackageInfo;
 import io.repsy.os.generated.model.NuGetPackageListItem;
 import io.repsy.os.generated.model.NuGetVersionListItem;
-import io.repsy.os.server.protocols.nuget.shared.packages.services.NuGetPackageServiceImpl;
+import io.repsy.os.server.protocols.nuget.shared.packages.services.NuGetPackageService;
 import io.repsy.os.server.protocols.nuget.shared.storage.NuGetStorageService;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
@@ -47,7 +47,7 @@ import org.springframework.transaction.annotation.Transactional;
 @NullMarked
 public class NuGetApiFacade implements ProtocolApiFacade {
 
-  private final NuGetPackageServiceImpl nugetPackageService;
+  private final NuGetPackageService nugetPackageService;
   private final NuGetStorageService nugetStorageService;
   private final ApplicationEventPublisher eventPublisher;
 

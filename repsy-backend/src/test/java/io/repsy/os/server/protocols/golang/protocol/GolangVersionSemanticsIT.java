@@ -44,7 +44,7 @@ import org.springframework.mock.web.MockHttpServletResponse;
  * same or lower precedence; only when the module has no release at all does the highest tagged
  * pre-release win; only when it has no tagged version at all does a pseudo-version win.
  *
- * <p>Before this fix, {@code GoModuleServiceImpl.computeLatestVersion} was a plain {@code
+ * <p>Before this fix, {@code GoModuleService.computeLatestVersion} was a plain {@code
  * COMPARATOR.max()} over every version (so a pre-release outranked an older release), and {@code
  * AbstractGoProtocolFacade.listVersions} listed every {@code .info} file including pseudo-versions.
  *

@@ -20,7 +20,7 @@ import io.repsy.core.error_handling.exceptions.ErrorOccurredException;
 import io.repsy.libs.protocol.router.ProcessorResult;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolProcessor;
-import io.repsy.os.server.protocols.pypi.shared.python_package.services.PypiPackageServiceImpl;
+import io.repsy.os.server.protocols.pypi.shared.python_package.services.PypiPackageService;
 import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.pypi.protocol.PypiProtocolProvider;
@@ -53,7 +53,7 @@ public class PypiSimpleHandlerPreProcessor extends ProtocolProcessor {
 
   private final PypiProtocolProvider provider;
 
-  private final PypiPackageServiceImpl pypiPackageService;
+  private final PypiPackageService pypiPackageService;
 
   @PostConstruct
   public void register() {

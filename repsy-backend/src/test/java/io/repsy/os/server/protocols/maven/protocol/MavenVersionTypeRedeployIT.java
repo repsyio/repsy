@@ -46,7 +46,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The {@code releases} and {@code snapshots} repo settings refuse a version of that kind, whether
- * it is new or already exists (RPS-1174). {@code ArtifactServiceImpl} used to skip the check for a
+ * it is new or already exists (RPS-1174). {@code ArtifactService} used to skip the check for a
  * redeploy, so after {@code snapshots} was switched off an existing snapshot could still be
  * overwritten while a new snapshot coordinate got a 403.
  *

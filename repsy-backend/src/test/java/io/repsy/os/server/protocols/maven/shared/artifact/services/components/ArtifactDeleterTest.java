@@ -27,7 +27,7 @@ import static org.mockito.Mockito.when;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.os.server.protocols.maven.shared.artifact.dtos.DeletedItem;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.Artifact;
-import io.repsy.os.server.protocols.maven.shared.artifact.services.ArtifactServiceImpl;
+import io.repsy.os.server.protocols.maven.shared.artifact.services.ArtifactService;
 import io.repsy.os.server.protocols.maven.shared.storage.services.MavenStorageService;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -55,7 +55,7 @@ class ArtifactDeleterTest {
   private static final String GROUP = "com.acme";
 
   @Mock private MavenStorageService mavenStorageService;
-  @Mock private ArtifactServiceImpl artifactService;
+  @Mock private ArtifactService artifactService;
   @Mock private ApplicationEventPublisher eventPublisher;
 
   @InjectMocks private ArtifactDeleter component;

@@ -25,7 +25,7 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import io.repsy.os.AbstractIntegrationTest;
-import io.repsy.os.server.protocols.maven.shared.artifact.services.ArtifactServiceImpl;
+import io.repsy.os.server.protocols.maven.shared.artifact.services.ArtifactService;
 import io.repsy.os.server.protocols.maven.shared.storage.services.MavenStorageService;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
@@ -100,7 +100,7 @@ class MavenPostStoreFailureIT extends AbstractIntegrationTest {
       """;
 
   @MockitoBean private UsageUpdateService usageUpdateService;
-  @MockitoSpyBean private ArtifactServiceImpl artifactService;
+  @MockitoSpyBean private ArtifactService artifactService;
 
   @Autowired private RepoTxService repoTxService;
   @Autowired private MavenStorageService mavenStorageService;

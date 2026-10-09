@@ -81,7 +81,7 @@ class CargoCrateServiceTest {
   @Mock CargoCrateMapper crateConverter;
   @Mock ObjectMapper objectMapper;
 
-  @InjectMocks CargoCrateServiceImpl cargoCrateService;
+  @InjectMocks CargoCrateService cargoCrateService;
 
   @BeforeEach
   void stubGlobalRows() {

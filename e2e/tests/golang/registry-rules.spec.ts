@@ -19,7 +19,7 @@
  * `curl`/`go` client), the golang analogue of `tests/pypi/registry-rules.spec.ts`/
  * `tests/nuget/registry-rules.spec.ts`. Every status/detail here was read from
  * `AbstractGoProtocolFacade`/`GoVersionUtils`/`GoModFileValidator`/`GoModuleZipReader`/
- * `GoModuleServiceImpl`/`GolangAuthPreProcessor` first and then confirmed against a running instance
+ * `GoModuleService`/`GolangAuthPreProcessor` first and then confirmed against a running instance
  * (see `golang-raw.ts`'s file header and `README.md`'s "Go runner" section for the raw evidence and
  * every H/G number these tests reference).
  *

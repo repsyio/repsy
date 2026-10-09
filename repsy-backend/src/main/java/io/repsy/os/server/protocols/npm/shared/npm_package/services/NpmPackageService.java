@@ -45,7 +45,7 @@ import io.repsy.protocols.npm.shared.constants.NpmConstants;
 import io.repsy.protocols.npm.shared.npm_package.dtos.BaseNpmPackageInfo;
 import io.repsy.protocols.npm.shared.npm_package.dtos.NpmPackageSnapshot;
 import io.repsy.protocols.npm.shared.npm_package.dtos.PackageDistributionTagMapListItem;
-import io.repsy.protocols.npm.shared.npm_package.services.NpmPackageService;
+import io.repsy.protocols.npm.shared.npm_package.services.AbstractNpmPackageService;
 import io.repsy.protocols.npm.shared.utils.NpmPackageUtils;
 import io.repsy.protocols.npm.shared.utils.NpmVersionComparator;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
@@ -74,7 +74,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 @SuppressWarnings("unchecked")
 @NullMarked
-public class NpmPackageServiceImpl implements NpmPackageService<UUID> {
+public class NpmPackageService extends AbstractNpmPackageService<UUID> {
 
   private static final String PACKAGE_VERSION_ALREADY_EXISTS = "packageVersionAlreadyExists";
   private static final String VERSION_UNIQUE_CONSTRAINT =

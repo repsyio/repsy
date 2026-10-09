@@ -21,7 +21,7 @@ import io.repsy.os.generated.model.NpmPackageInfo;
 import io.repsy.os.generated.model.PackageVersionDetail;
 import io.repsy.os.generated.model.PackageVersionListItem;
 import io.repsy.os.server.protocols.npm.shared.npm_package.mappers.NpmPackageMapper;
-import io.repsy.os.server.protocols.npm.shared.npm_package.services.NpmPackageServiceImpl;
+import io.repsy.os.server.protocols.npm.shared.npm_package.services.NpmPackageService;
 import io.repsy.os.server.protocols.npm.shared.storage.services.NpmStorageService;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
@@ -47,7 +47,7 @@ public class NpmApiFacade implements ProtocolApiFacade {
 
   private static final Set<String> VERSION_SORT_PROPERTIES = Set.of("id", "version", "createdAt");
 
-  private final @NonNull NpmPackageServiceImpl npmPackageService;
+  private final @NonNull NpmPackageService npmPackageService;
   private final @NonNull NpmStorageService npmStorageService;
   private final @NonNull NpmPackageMapper npmPackageConverter;
   private final @NonNull ApplicationEventPublisher eventPublisher;
@@ -117,7 +117,7 @@ public class NpmApiFacade implements ProtocolApiFacade {
 
   /**
    * Deletes the package. The rows and the files go in one transaction under the package's row lock,
-   * see {@link NpmPackageServiceImpl#deletePackage}. The events follow the commit, so a delete that
+   * see {@link NpmPackageService#deletePackage}. The events follow the commit, so a delete that
    * rolled back reports nothing.
    */
   public @NonNull BaseUsages deletePackage(
@@ -141,7 +141,7 @@ public class NpmApiFacade implements ProtocolApiFacade {
 
   /**
    * Deletes the version, and the package with it when that was its last version, like {@link
-   * #deletePackage}: see {@link NpmPackageServiceImpl#deletePackageVersion}.
+   * #deletePackage}: see {@link NpmPackageService#deletePackageVersion}.
    */
   public @NonNull BaseUsages deletePackageVersion(
       final @NonNull RepoInfo repoInfo,

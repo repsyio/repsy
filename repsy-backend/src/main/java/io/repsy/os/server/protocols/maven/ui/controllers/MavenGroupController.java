@@ -17,7 +17,7 @@ package io.repsy.os.server.protocols.maven.ui.controllers;
 
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.os.generated.model.MavenGroupSummary;
-import io.repsy.os.server.protocols.maven.shared.artifact.services.ArtifactServiceImpl;
+import io.repsy.os.server.protocols.maven.shared.artifact.services.ArtifactService;
 import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.utils.MultiPortNames;
@@ -42,7 +42,7 @@ import org.springframework.web.bind.annotation.RestController;
 @SuppressWarnings("java:S6856")
 public class MavenGroupController {
 
-  private final ArtifactServiceImpl artifactService;
+  private final ArtifactService artifactService;
 
   @GetMapping("/{repoName}/{groupName}")
   @RepoOperation
