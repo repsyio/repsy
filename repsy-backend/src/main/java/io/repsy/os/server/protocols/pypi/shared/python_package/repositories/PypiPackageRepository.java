@@ -16,8 +16,8 @@
 package io.repsy.os.server.protocols.pypi.shared.python_package.repositories;
 
 import io.repsy.os.server.protocols.pypi.shared.python_package.dtos.PackageIndexListItem;
-import io.repsy.os.server.protocols.pypi.shared.python_package.dtos.PackageListItem;
 import io.repsy.os.server.protocols.pypi.shared.python_package.entities.PypiPackage;
+import io.repsy.protocols.pypi.shared.python_package.dtos.PypiPackageListItem;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
 import java.util.List;
@@ -93,7 +93,7 @@ public interface PypiPackageRepository extends JpaRepository<PypiPackage, UUID> 
           join p.releases r
           join p.repo re
           where re.id = :repoId and p.latestVersion = r.version""")
-  Page<PackageListItem> findAllByRepoId(UUID repoId, Pageable pageable);
+  Page<PypiPackageListItem> findAllByRepoId(UUID repoId, Pageable pageable);
 
   @Query(
       """
@@ -103,5 +103,6 @@ public interface PypiPackageRepository extends JpaRepository<PypiPackage, UUID> 
           join p.releases r
           join p.repo re
           where re.id = :repoId and p.latestVersion = r.version and p.name like %:name%""")
-  Page<PackageListItem> findAllByRepoIdContainsName(UUID repoId, String name, Pageable pageable);
+  Page<PypiPackageListItem> findAllByRepoIdContainsName(
+      UUID repoId, String name, Pageable pageable);
 }

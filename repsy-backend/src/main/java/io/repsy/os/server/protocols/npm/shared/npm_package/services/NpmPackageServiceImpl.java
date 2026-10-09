@@ -20,9 +20,7 @@ import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
-import io.repsy.os.server.protocols.npm.shared.constants.NpmConstants;
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageDistributionTagListItem;
-import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageInfo;
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageKeywordListItem;
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageMaintainerListItem;
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageVersionInfo;
@@ -43,9 +41,11 @@ import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.os.shared.utils.LikePatterns;
 import io.repsy.os.shared.utils.VersionSortPaging;
+import io.repsy.protocols.npm.shared.npm_package.dtos.BaseNpmPackageInfo;
 import io.repsy.protocols.npm.shared.npm_package.dtos.NpmPackageSnapshot;
 import io.repsy.protocols.npm.shared.npm_package.dtos.PackageDistributionTagMapListItem;
 import io.repsy.protocols.npm.shared.npm_package.services.NpmPackageService;
+import io.repsy.protocols.npm.shared.utils.NpmConstants;
 import io.repsy.protocols.npm.shared.utils.NpmPackageUtils;
 import io.repsy.protocols.npm.shared.utils.NpmVersionComparator;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
@@ -245,7 +245,7 @@ public class NpmPackageServiceImpl implements NpmPackageService<UUID> {
   }
 
   @Override
-  public PackageInfo getPackage(
+  public BaseNpmPackageInfo<UUID> getPackage(
       final UUID repoId, final @Nullable String scopeName, final String packageName) {
 
     final var npmPackage = this.findPackageByRepoIdAndScopeAndName(repoId, scopeName, packageName);

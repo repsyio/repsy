@@ -17,7 +17,6 @@ package io.repsy.os.server.protocols.docker.shared.utils;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.storage.core.dtos.RelativePath;
-import io.repsy.os.server.protocols.docker.shared.constants.DockerConstants;
 import io.repsy.protocols.shared.utils.BlobDigests;
 import java.util.regex.Pattern;
 import lombok.Builder;
@@ -30,13 +29,18 @@ import org.jspecify.annotations.Nullable;
 @UtilityClass
 public class PathParserUtils {
 
+  private static final String BLOBS = "/blobs";
+  private static final String MANIFESTS = "/manifests";
+  private static final String REPO_NAME_PATTERN = "(?<repoName>[a-zA-Z0-9_\\-]+)";
+  private static final String IMAGE_NAME_PATTERN = "/(?<imageName>[a-zA-Z0-9_\\-]+)";
+
   private static final @NonNull PathConfig LAYER_UPLOAD =
       PathConfig.builder()
-          .basePath(DockerConstants.BLOBS)
+          .basePath(BLOBS)
           .pattern(
               Pattern.compile(
-                  DockerConstants.REPO_NAME_PATTERN
-                      + DockerConstants.IMAGE_NAME_PATTERN
+                  REPO_NAME_PATTERN
+                      + IMAGE_NAME_PATTERN
                       + "/blobs"
                       + "(/uploads)?"
                       + "/(?<id>[a-zA-Z0-9_\\-]+)"))
@@ -46,11 +50,11 @@ public class PathParserUtils {
 
   private static final @NonNull PathConfig LAYER_CHECK =
       PathConfig.builder()
-          .basePath(DockerConstants.BLOBS)
+          .basePath(BLOBS)
           .pattern(
               Pattern.compile(
-                  DockerConstants.REPO_NAME_PATTERN
-                      + DockerConstants.IMAGE_NAME_PATTERN
+                  REPO_NAME_PATTERN
+                      + IMAGE_NAME_PATTERN
                       + "/blobs"
                       + "/(?<sha>"
                       + BlobDigests.DIGEST_REGEX
@@ -61,11 +65,11 @@ public class PathParserUtils {
 
   private static final @NonNull PathConfig MANIFEST_SHA =
       PathConfig.builder()
-          .basePath(DockerConstants.MANIFESTS)
+          .basePath(MANIFESTS)
           .pattern(
               Pattern.compile(
-                  DockerConstants.REPO_NAME_PATTERN
-                      + DockerConstants.IMAGE_NAME_PATTERN
+                  REPO_NAME_PATTERN
+                      + IMAGE_NAME_PATTERN
                       + "/manifests"
                       + "/(?<sha>"
                       + BlobDigests.DIGEST_REGEX
@@ -76,11 +80,11 @@ public class PathParserUtils {
 
   private static final @NonNull PathConfig MANIFEST_TAG =
       PathConfig.builder()
-          .basePath(DockerConstants.MANIFESTS)
+          .basePath(MANIFESTS)
           .pattern(
               Pattern.compile(
-                  DockerConstants.REPO_NAME_PATTERN
-                      + DockerConstants.IMAGE_NAME_PATTERN
+                  REPO_NAME_PATTERN
+                      + IMAGE_NAME_PATTERN
                       + "/manifests"
                       + "/(?<tag>[a-zA-Z0-9_.\\-]+)$"))
           .groupName("tag")

@@ -24,7 +24,7 @@
  * `npm publish` sent, so a successful client publish followed by the raw re-PUT is a harmless,
  * byte-identical override of the version it just created -- see `npm-raw.ts`'s file header for the
  * exact publish/download path shapes this depends on, all read from
- * `AbstractNpmProtocolFacade`/`AbstractNpmStorageService`/`PackageUtils`).
+ * `AbstractNpmProtocolFacade`/`AbstractNpmStorageService`/`NpmPackageUtils`).
  *
  * `resolve`'s `Outcome` is derived from a raw packument GET instead, so an authn/authz failure is
  * never confused with a client-side/content failure -- a clean signal of authn/authz alone,
@@ -39,7 +39,7 @@
  * file back out of `node_modules`.
  *
  * Correction #3, the bounded version scheme (`0.<seconds since 2026-01-01Z>.<seq>`, since
- * `PackageUtils.extractVersionNameFromPayload` parses with semver4j 3.1.0, which stores parts as
+ * `NpmPackageUtils.extractVersionNameFromPayload` parses with semver4j 3.1.0, which stores parts as
  * Java `Integer`s): moved to `scenarios/coordinates.ts`'s `boundedSemverVersion` (step 3b, RPS-294)
  * so `clients/cargo.ts` can reuse it verbatim -- Cargo's own `CrateUtils.validateVersion` parses with
  * the same semver4j version. Behaviour-neutral for npm.
@@ -515,7 +515,7 @@ export const npmAdapter: ProtocolAdapter<NpmFingerprint> = {
   fingerprint,
   expectNothingStored,
 
-  // RPS-1205 (fixed): `PackageUtils.fixTarballUrl` no longer mis-rewrites `dist.tarball` for Repsy
+  // RPS-1205 (fixed): `NpmPackageUtils.fixTarballUrl` no longer mis-rewrites `dist.tarball` for Repsy
   // OS's single-tenant layout, so `npm install` fetches the tarball like any other protocol. npm has
   // no `knownConsumeFailure` any more -- see maven's adapter, which never had one either.
 };

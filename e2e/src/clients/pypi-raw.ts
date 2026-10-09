@@ -28,7 +28,7 @@
  *    other handler on `POST /<repo>/`). The file part MUST be named `content`
  *    (`multipartRequest.getFile("content")`), else a bodyless `400` (confirmed live/H11). Every other
  *    multipart field is collected and Jackson-mapped onto `PackageUploadForm`
- *    (`PackageUtils.parseUploadForm`); unknown keys (`:action`, `protocol_version`, `dynamic`,
+ *    (`PypiPackageUtils.parseUploadForm`); unknown keys (`:action`, `protocol_version`, `dynamic`,
  *    `license_file`, `attestations`, ...) are silently ignored -- Jackson 3's
  *    `FAIL_ON_UNKNOWN_PROPERTIES` defaults to `false` -- confirmed live with the REAL twine form
  *    (H1): `200`, empty body, twine exit 0.

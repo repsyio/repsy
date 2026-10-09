@@ -45,7 +45,7 @@
  *    `deployTokenExpired` for an expired deploy token, `unauthorizedRequest` when no credentials
  *    came with a push scope; it used to be empty, so the client printed `unauthorized: `). It
  *    still differs from an operation-hop 401 (Bearer challenge instead of Basic). Success: `{"token": "<jwt>", "access_token": "<jwt>", "expires_in": 1800, ...}` (both
- *    keys, `LoginResponse`).
+ *    keys, `DockerTokenResponse`).
  *  - Blob upload (`AbstractDockerUploadStartProtocolMethodHandler`/`...UploadFinalize...`): `POST
  *    .../blobs/uploads/` (permission WRITE) writes nothing at all (no DB row, no file) and answers
  *    `202` + an absolute `Location`; `PUT <location>?digest=sha256:<hex>` (monolithic, or after one or

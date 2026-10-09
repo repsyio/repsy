@@ -27,9 +27,9 @@ import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import io.repsy.protocols.docker.protocol.parser.DockerScopeParser;
 import io.repsy.protocols.docker.protocol.parser.DockerScopes;
+import io.repsy.protocols.docker.shared.auth.dtos.DockerTokenResponse;
 import io.repsy.protocols.docker.shared.auth.services.DockerAuthService;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
-import io.repsy.protocols.shared.auth.dtos.LoginResponse;
 import io.repsy.protocols.shared.exceptions.TooManyRequestsException;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
@@ -262,8 +262,8 @@ public abstract class AbstractDockerTokenProtocolMethodHandler<ID>
     return scope.contains(":*:");
   }
 
-  private LoginResponse createLoginResponse(final String sessionToken) {
-    return LoginResponse.builder()
+  private DockerTokenResponse createLoginResponse(final String sessionToken) {
+    return DockerTokenResponse.builder()
         .token(sessionToken)
         .accessToken(sessionToken)
         .expiresIn(DEFAULT_TIMEOUT_ACCESS_TOKEN.get(ChronoUnit.SECONDS))

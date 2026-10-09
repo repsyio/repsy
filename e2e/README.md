@@ -1771,7 +1771,7 @@ a per-invocation isolated work directory (`clients/exec.ts`) and runs the real `
   name with a literal `&#x2F;` in it), and is exactly the kind of thing only running the real client
   against a real instance catches.
 - **Version scheme** (correction #3): `0.<seconds since 2026-01-01T00:00:00Z>.<seq>`, not a
-  14+-digit `Date.now()`-derived number — `PackageUtils.extractVersionNameFromPayload` parses with
+  14+-digit `Date.now()`-derived number — `NpmPackageUtils.extractVersionNameFromPayload` parses with
   semver4j 3.1.0, which stores each part as a Java `Integer`.
 - Because `npm` hides the HTTP status behind its own exit code, `clients/npm.ts` also does a raw HTTP
   companion probe with the same credential: `publish`'s is a `PUT` of the identical publish document
@@ -1797,7 +1797,7 @@ needed**: `ProtocolAuthService`/`ErrorHandler` (auth, throttle, status-code mapp
 maven verbatim, so every auth scenario's `Outcome` bucket (`unauthorized`/`forbidden`/`ok`) is
 identical, even though the exact msgId sometimes differs (see below). The override rule
 (`AbstractNpmProtocolFacade.publish`) and the malformed-version check
-(`PackageUtils.extractVersionNameFromPayload`) were read from source first and then confirmed live
+(`NpmPackageUtils.extractVersionNameFromPayload`) were read from source first and then confirmed live
 (`tests/npm/registry-rules.spec.ts`):
 
 | scenario (shared catalog)                                                       | real status observed              | msgId / note                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
@@ -1811,11 +1811,11 @@ identical, even though the exact msgId sometimes differs (see below). The overri
 | everything else (`password-admin`, `token-rw`, `anonymous-public`, ...)         | matches the shared `expect`       | unchanged from maven                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 
 `registry-rules.spec.ts` additionally pins an invalid/malformed version string at `400
-invalidPackageVersion` (`PackageUtils.extractVersionNameFromPayload`, before anything is stored).
+invalidPackageVersion` (`NpmPackageUtils.extractVersionNameFromPayload`, before anything is stored).
 
 ### RPS-1205 (fixed): the exact shape the bug used to have
 
-`PackageUtils.fixTarballUrl` (`repsy-protocols/npm/.../shared/utils/PackageUtils.java`) used to
+`NpmPackageUtils.fixTarballUrl` (`repsy-protocols/npm/.../shared/utils/NpmPackageUtils.java`) used to
 rewrite a version's `dist.tarball` at publish time by splicing the repo name into the URL's path at a
 fixed offset, a transform whose own javadoc described a cloud, multi-tenant path shape
 (`/npm/username/@foo/demo/-/@foo/demo-0.2.1.tgz`) Repsy OS does not have. On OS, a real npm client's
@@ -1846,7 +1846,7 @@ through `test.fail()`.
 
 Re-publishing (redeploying, `allowOverride: true`) an **existing** npm version whose manifest has no
 `keywords` field used to crash with `400 badRequest`, swallowing a `ClassCastException`:
-`PackageUtils.liftFieldsToTopLevel` defaulted an absent version `keywords` onto the **top-level**
+`NpmPackageUtils.liftFieldsToTopLevel` defaulted an absent version `keywords` onto the **top-level**
 packument as a native `new String[] {}`; `NpmPackageServiceImpl.updateVersionFromMetadata` (reached
 only on a re-publish of an _existing_ version, via `AbstractNpmProtocolFacade.publish`'s "already
 exists" branch) then called `addKeywords`/`addMaintainers` with that **top-level** payload instead of
@@ -1857,7 +1857,7 @@ passes the version's own sub-object, which legitimately has no `"keywords"` key,
 `null` and skipped safely); only a **redeploy of an already-existing version** did. This is **not**
 the same bug as RPS-1205 (a different bug, a different code path, no relation to tarball URLs).
 
-**Fixed**: `PackageUtils.liftFieldsToTopLevel` now defaults `keywords` to an empty `ArrayList`
+**Fixed**: `NpmPackageUtils.liftFieldsToTopLevel` now defaults `keywords` to an empty `ArrayList`
 instead of a `String[]` (same `[]` on the wire), and `NpmPackageServiceImpl.addKeywords`/
 `addMaintainers` read their input through an `instanceof Collection<?>` guard instead of an unchecked
 cast, so no shape can throw there again. `clients/npm-raw.ts`'s `buildPublishDocument` and
