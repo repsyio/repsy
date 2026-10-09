@@ -26,7 +26,7 @@ import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.events.PgpKeySourcesChangedEvent;
 import io.repsy.os.shared.repo.events.PgpVerifyAllSignaturesToggledEvent;
-import io.repsy.os.shared.repo.mappers.RepoConverter;
+import io.repsy.os.shared.repo.mappers.RepoMapper;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.os.shared.repo.utils.RepoUtils;
 import io.repsy.os.shared.utils.LikePatterns;
@@ -83,7 +83,7 @@ public class RepoTxService {
    */
   private static final Set<RepoType> PGP_SETTINGS_SUPPORTED_TYPES = EnumSet.of(RepoType.MAVEN);
 
-  private final @NonNull RepoConverter repoConverter;
+  private final @NonNull RepoMapper repoConverter;
   private final @NonNull RepoRepository repoRepository;
   private final @NonNull ApplicationEventPublisher eventPublisher;
 

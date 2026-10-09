@@ -21,7 +21,7 @@ import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.generated.model.PasswordForm;
 import io.repsy.os.shared.auth.services.LoginInfoFactory;
 import io.repsy.os.shared.constants.ErrorConstants;
-import io.repsy.os.shared.user.mappers.UserConverter;
+import io.repsy.os.shared.user.mappers.UserMapper;
 import io.repsy.os.shared.user.repositories.UserRepository;
 import io.repsy.os.shared.user.services.ReservedUsernameService;
 import io.repsy.os.shared.user.services.UserTxService;
@@ -44,7 +44,7 @@ class ProfileServiceTest {
       new ProfileService(
           Mockito.mock(LoginInfoFactory.class),
           Mockito.mock(ReservedUsernameService.class),
-          new UserTxService(Mockito.mock(UserRepository.class), Mockito.mock(UserConverter.class)));
+          new UserTxService(Mockito.mock(UserRepository.class), Mockito.mock(UserMapper.class)));
 
   private final UUID ghostId = UUID.randomUUID();
 

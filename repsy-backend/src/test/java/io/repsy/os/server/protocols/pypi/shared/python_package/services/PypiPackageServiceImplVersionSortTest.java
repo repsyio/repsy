@@ -24,7 +24,7 @@ import static org.mockito.Mockito.when;
 import freemarker.template.Configuration;
 import io.repsy.os.generated.model.ReleaseListItem;
 import io.repsy.os.server.protocols.pypi.shared.python_package.entities.PypiPackage;
-import io.repsy.os.server.protocols.pypi.shared.python_package.mappers.PypiPackageConverter;
+import io.repsy.os.server.protocols.pypi.shared.python_package.mappers.PypiPackageMapper;
 import io.repsy.os.server.protocols.pypi.shared.python_package.repositories.PypiPackageRepository;
 import io.repsy.os.server.protocols.pypi.shared.python_package.repositories.ReleaseClassifierRepository;
 import io.repsy.os.server.protocols.pypi.shared.python_package.repositories.ReleaseProjectUrlRepository;
@@ -55,7 +55,7 @@ class PypiPackageServiceImplVersionSortTest {
   private final ReleaseRepository releaseRepository = mock(ReleaseRepository.class);
   private final ConversionService conversionService = mock(ConversionService.class);
   private final Configuration freeMarkerConfiguration = mock(Configuration.class);
-  private final PypiPackageConverter pypiPackageConverter = mock(PypiPackageConverter.class);
+  private final PypiPackageMapper pypiPackageConverter = mock(PypiPackageMapper.class);
   private final PypiPackageRepository pypiPackageRepository = mock(PypiPackageRepository.class);
   private final ReleaseClassifierRepository releaseClassifierRepository =
       mock(ReleaseClassifierRepository.class);

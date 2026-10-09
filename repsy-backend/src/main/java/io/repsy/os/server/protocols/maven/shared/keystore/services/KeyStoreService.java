@@ -22,7 +22,7 @@ import io.repsy.os.generated.model.AllowedKeyserverItem;
 import io.repsy.os.generated.model.KeyStoreForm;
 import io.repsy.os.generated.model.PgpPublicKeyForm;
 import io.repsy.os.generated.model.PgpPublicKeyItem;
-import io.repsy.os.server.protocols.maven.shared.artifact.mappers.ArtifactConverter;
+import io.repsy.os.server.protocols.maven.shared.artifact.mappers.ArtifactMapper;
 import io.repsy.os.server.protocols.maven.shared.keystore.dtos.KeyStoreItem;
 import io.repsy.os.server.protocols.maven.shared.keystore.dtos.PublicKeySources;
 import io.repsy.os.server.protocols.maven.shared.keystore.entities.KeyStore;
@@ -62,7 +62,7 @@ public class KeyStoreService {
   private final KeyStoreRepository keyStoreRepository;
   private final RepoRepository repoRepository;
   private final PgpPublicKeyRepository pgpPublicKeyRepository;
-  private final ArtifactConverter artifactConverter;
+  private final ArtifactMapper artifactConverter;
   private final ApplicationEventPublisher eventPublisher;
   private final PgpVerifierService pgpVerifierService;
   private final MavenPgpCaps caps;

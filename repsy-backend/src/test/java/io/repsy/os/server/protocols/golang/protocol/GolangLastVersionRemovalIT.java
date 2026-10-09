@@ -29,8 +29,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.events.ArtifactVersionDeletedEvent;
 import io.repsy.os.AbstractIntegrationTest;
-import io.repsy.os.server.protocols.golang.shared.storage.services.GolangStorageService;
-import io.repsy.os.server.protocols.golang.ui.facades.GolangApiFacade;
+import io.repsy.os.server.protocols.golang.shared.storage.services.GoStorageService;
+import io.repsy.os.server.protocols.golang.ui.facades.GoApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
@@ -99,10 +99,10 @@ class GolangLastVersionRemovalIT extends AbstractIntegrationTest {
   @MockitoBean private UsageUpdateService usageUpdateService;
 
   /** A spy that calls through, so only the test that stubs it changes the storage behaviour. */
-  @MockitoSpyBean private GolangStorageService golangStorageService;
+  @MockitoSpyBean private GoStorageService golangStorageService;
 
   @Autowired private ApplicationEvents applicationEvents;
-  @Autowired private GolangApiFacade golangApiFacade;
+  @Autowired private GoApiFacade golangApiFacade;
   @Autowired private RepoTxService repoTxService;
 
   private final List<UUID> createdRepoIds = new ArrayList<>();

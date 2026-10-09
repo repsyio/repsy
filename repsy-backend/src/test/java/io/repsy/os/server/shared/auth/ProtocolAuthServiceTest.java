@@ -43,7 +43,7 @@ import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.UserRole;
-import io.repsy.os.shared.user.mappers.UserConverter;
+import io.repsy.os.shared.user.mappers.UserMapper;
 import io.repsy.os.shared.user.repositories.UserRepository;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.shared.exceptions.TooManyRequestsException;
@@ -684,8 +684,7 @@ class ProtocolAuthServiceTest {
     // A real UserTxService over an empty repository: the lookup itself is under test.
     private final ProtocolAuthService ghostAuthService =
         new ProtocolAuthService(
-            new UserTxService(
-                Mockito.mock(UserRepository.class), Mockito.mock(UserConverter.class)),
+            new UserTxService(Mockito.mock(UserRepository.class), Mockito.mock(UserMapper.class)),
             this.jwtUtils,
             Mockito.mock(DeployTokenService.class),
             new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),

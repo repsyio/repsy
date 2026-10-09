@@ -22,7 +22,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import io.repsy.os.generated.model.GemVersionListItem;
-import io.repsy.os.server.protocols.ruby.shared.ruby_gem.mappers.RubyGemConverter;
+import io.repsy.os.server.protocols.ruby.shared.ruby_gem.mappers.RubyGemMapper;
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.repositories.RubyGemDependencyRepository;
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.repositories.RubyGemRepository;
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.repositories.RubyGemVersionRepository;
@@ -49,7 +49,7 @@ class RubyGemServiceImplVersionSortTest {
   private final RubyGemDependencyRepository dependencyRepository =
       mock(RubyGemDependencyRepository.class);
   private final RepoRepository repoRepository = mock(RepoRepository.class);
-  private final RubyGemConverter converter = mock(RubyGemConverter.class);
+  private final RubyGemMapper converter = mock(RubyGemMapper.class);
 
   private final RubyGemServiceImpl service =
       new RubyGemServiceImpl(

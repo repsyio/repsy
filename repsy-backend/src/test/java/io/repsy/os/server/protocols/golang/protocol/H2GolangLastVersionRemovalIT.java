@@ -23,8 +23,8 @@ import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.os.H2IntegrationTest;
 import io.repsy.os.server.protocols.golang.shared.go_module.repositories.GoModuleRepository;
 import io.repsy.os.server.protocols.golang.shared.go_module.services.GoModuleServiceImpl;
-import io.repsy.os.server.protocols.golang.shared.storage.services.GolangStorageService;
-import io.repsy.os.server.protocols.golang.ui.facades.GolangApiFacade;
+import io.repsy.os.server.protocols.golang.shared.storage.services.GoStorageService;
+import io.repsy.os.server.protocols.golang.ui.facades.GoApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -74,8 +74,8 @@ class H2GolangLastVersionRemovalIT extends H2IntegrationTest {
   @Autowired private RepoTxService repoTxService;
   @Autowired private GoModuleServiceImpl goModuleService;
   @Autowired private GoModuleRepository goModuleRepository;
-  @Autowired private GolangApiFacade golangApiFacade;
-  @Autowired private GolangStorageService golangStorageService;
+  @Autowired private GoApiFacade golangApiFacade;
+  @Autowired private GoStorageService golangStorageService;
   @Autowired private JdbcTemplate jdbcTemplate;
   @Autowired private PlatformTransactionManager transactionManager;
 

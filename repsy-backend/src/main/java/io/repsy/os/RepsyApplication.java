@@ -19,7 +19,7 @@ import io.repsy.libs.multiport.annotations.EnableMultiport;
 import io.repsy.os.config.ssl.RepsySslProperties;
 import io.repsy.os.server.protocols.cargo.shared.crate.storage.configs.CargoFileSystemStorageBackendConfigProps;
 import io.repsy.os.server.protocols.docker.shared.storage.configs.DockerFileSystemStorageBackendConfigProps;
-import io.repsy.os.server.protocols.golang.shared.storage.configs.GolangFileSystemStorageBackendConfigProps;
+import io.repsy.os.server.protocols.golang.shared.storage.configs.GoFileSystemStorageBackendConfigProps;
 import io.repsy.os.server.protocols.helm.shared.storage.configs.HelmFileSystemStorageBackendConfigProps;
 import io.repsy.os.server.protocols.maven.shared.storage.configs.MavenFileSystemStorageBackendConfigProps;
 import io.repsy.os.server.protocols.npm.shared.storage.configs.NpmFileSystemStorageBackendConfigProps;
@@ -51,7 +51,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
   NpmFileSystemStorageBackendConfigProps.class,
   PypiFileSystemStorageBackendConfigProps.class,
   DockerFileSystemStorageBackendConfigProps.class,
-  GolangFileSystemStorageBackendConfigProps.class,
+  GoFileSystemStorageBackendConfigProps.class,
   CargoFileSystemStorageBackendConfigProps.class,
   HelmFileSystemStorageBackendConfigProps.class,
   NuGetFileSystemStorageBackendConfigProps.class,

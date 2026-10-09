@@ -21,7 +21,7 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.generated.model.NuGetDeletedItem;
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackage;
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackageVersion;
-import io.repsy.os.server.protocols.nuget.shared.packages.mappers.NuGetPackageConverter;
+import io.repsy.os.server.protocols.nuget.shared.packages.mappers.NuGetPackageMapper;
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageRepository;
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageVersionRepository;
 import io.repsy.os.shared.error_handling.utils.ConstraintViolations;
@@ -64,12 +64,12 @@ public class NuGetPackageServiceImpl implements NuGetPackageService<UUID> {
 
   private final NuGetPackageRepository packageRepository;
   private final NuGetPackageVersionRepository packageVersionRepository;
-  private final NuGetPackageConverter converter;
+  private final NuGetPackageMapper converter;
 
   public NuGetPackageServiceImpl(
       final NuGetPackageRepository packageRepository,
       final NuGetPackageVersionRepository packageVersionRepository,
-      final NuGetPackageConverter converter) {
+      final NuGetPackageMapper converter) {
 
     this.packageRepository = packageRepository;
     this.packageVersionRepository = packageVersionRepository;

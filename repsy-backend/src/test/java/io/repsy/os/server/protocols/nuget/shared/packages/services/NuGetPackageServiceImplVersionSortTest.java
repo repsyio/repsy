@@ -23,7 +23,7 @@ import static org.mockito.Mockito.when;
 
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackage;
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackageVersion;
-import io.repsy.os.server.protocols.nuget.shared.packages.mappers.NuGetPackageConverter;
+import io.repsy.os.server.protocols.nuget.shared.packages.mappers.NuGetPackageMapper;
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageRepository;
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageVersionRepository;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetVersionInfo;
@@ -52,7 +52,7 @@ class NuGetPackageServiceImplVersionSortTest {
   private final NuGetPackageRepository packageRepository = mock(NuGetPackageRepository.class);
   private final NuGetPackageVersionRepository packageVersionRepository =
       mock(NuGetPackageVersionRepository.class);
-  private final NuGetPackageConverter converter = mock(NuGetPackageConverter.class);
+  private final NuGetPackageMapper converter = mock(NuGetPackageMapper.class);
 
   private final NuGetPackageServiceImpl service =
       new NuGetPackageServiceImpl(

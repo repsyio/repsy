@@ -26,7 +26,7 @@ import io.repsy.os.server.protocols.docker.shared.image.repositories.ImageReposi
 import io.repsy.os.server.protocols.docker.shared.tag.entities.Tag;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.TagRepository;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
-import io.repsy.os.shared.repo.mappers.RepoConverter;
+import io.repsy.os.shared.repo.mappers.RepoMapper;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import java.time.Duration;
 import java.time.Instant;
@@ -59,7 +59,7 @@ public class CleanupPolicyService {
   private final TagRepository tagRepository;
   private final ImageRepository imageRepository;
   private final RepoRepository repoRepository;
-  private final RepoConverter repoConverter;
+  private final RepoMapper repoConverter;
 
   /** Reads the policy; a disabled default one is created the first time. */
   @Transactional

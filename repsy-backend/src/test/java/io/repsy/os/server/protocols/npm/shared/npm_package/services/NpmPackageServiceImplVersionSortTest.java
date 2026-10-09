@@ -23,7 +23,7 @@ import static org.mockito.Mockito.when;
 
 import io.repsy.os.generated.model.PackageVersionListItem;
 import io.repsy.os.server.protocols.npm.shared.npm_package.entities.NpmPackage;
-import io.repsy.os.server.protocols.npm.shared.npm_package.mappers.NpmPackageConverter;
+import io.repsy.os.server.protocols.npm.shared.npm_package.mappers.NpmPackageMapper;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.NpmPackageRepository;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageDistTagRepository;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageKeywordRepository;
@@ -58,7 +58,7 @@ class NpmPackageServiceImplVersionSortTest {
       mock(PackageMaintainerRepository.class);
   private final PackageKeywordRepository packageKeywordRepository =
       mock(PackageKeywordRepository.class);
-  private final NpmPackageConverter npmPackageConverter = mock(NpmPackageConverter.class);
+  private final NpmPackageMapper npmPackageConverter = mock(NpmPackageMapper.class);
 
   private final NpmPackageServiceImpl service =
       new NpmPackageServiceImpl(

@@ -19,7 +19,7 @@ import com.github.f4b6a3.uuid.UuidCreator;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.os.server.protocols.docker.shared.image.dtos.ImageInfo;
 import io.repsy.os.server.protocols.docker.shared.image.entities.Image;
-import io.repsy.os.server.protocols.docker.shared.image.mappers.ImageConverter;
+import io.repsy.os.server.protocols.docker.shared.image.mappers.ImageMapper;
 import io.repsy.os.server.protocols.docker.shared.image.repositories.ImageRepository;
 import io.repsy.os.server.protocols.docker.shared.layer.repositories.LayerRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.entities.Tag;
@@ -48,7 +48,7 @@ import org.springframework.transaction.annotation.Transactional;
 @NullMarked
 public class ImageTxService implements ImageService<UUID> {
 
-  private final ImageConverter imageConverter;
+  private final ImageMapper imageConverter;
   private final ImageRepository imageRepository;
   private final RepoRepository repoRepository;
   private final LayerRepository layerRepository;

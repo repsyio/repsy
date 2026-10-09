@@ -27,7 +27,7 @@ import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
-import io.repsy.os.shared.user.mappers.UserConverter;
+import io.repsy.os.shared.user.mappers.UserMapper;
 import io.repsy.os.shared.user.repositories.UserRepository;
 import java.time.Instant;
 import java.util.Optional;
@@ -54,7 +54,7 @@ public class UserTxService {
   private static final @NonNull String ERR_CANNOT_DEMOTE_LAST_ADMIN = "cannotDemoteLastAdminUser";
 
   private final @NonNull UserRepository userRepository;
-  private final @NonNull UserConverter userConverter;
+  private final @NonNull UserMapper userConverter;
 
   @Transactional
   public @NonNull UserInfo create(

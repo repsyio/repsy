@@ -23,7 +23,7 @@ import io.repsy.os.generated.model.CrateVersionInfo;
 import io.repsy.os.generated.model.CrateVersionListItem;
 import io.repsy.os.generated.model.RepoSettingsForm;
 import io.repsy.os.generated.model.RepoSettingsInfo;
-import io.repsy.os.server.protocols.cargo.shared.crate.mappers.CargoCrateConverter;
+import io.repsy.os.server.protocols.cargo.shared.crate.mappers.CargoCrateMapper;
 import io.repsy.os.server.protocols.cargo.shared.crate.services.CargoCrateServiceImpl;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
@@ -53,7 +53,7 @@ public class CargoApiFacade implements ProtocolApiFacade {
 
   private final RepoTxService repoTxService;
   private final CargoCrateServiceImpl cargoCrateService;
-  private final CargoCrateConverter cargoCrateConverter;
+  private final CargoCrateMapper cargoCrateConverter;
   private final CargoStorageService cargoStorageService;
   private final ObjectMapper objectMapper;
   private final ApplicationEventPublisher eventPublisher;

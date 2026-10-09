@@ -29,7 +29,7 @@ import io.repsy.os.server.protocols.ruby.shared.ruby_gem.dtos.GemVersionCompactI
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.entities.RubyGem;
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.entities.RubyGemDependency;
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.entities.RubyGemVersion;
-import io.repsy.os.server.protocols.ruby.shared.ruby_gem.mappers.RubyGemConverter;
+import io.repsy.os.server.protocols.ruby.shared.ruby_gem.mappers.RubyGemMapper;
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.repositories.RubyGemDependencyRepository;
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.repositories.RubyGemRepository;
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.repositories.RubyGemVersionRepository;
@@ -82,7 +82,7 @@ public class RubyGemServiceImpl implements RubyGemProtocolService<UUID> {
   private final RubyGemVersionRepository versionRepository;
   private final RubyGemDependencyRepository dependencyRepository;
   private final RepoRepository repoRepository;
-  private final RubyGemConverter converter;
+  private final RubyGemMapper converter;
 
   @Override
   public List<String> getGemNames(final BaseRepoInfo<UUID> repoInfo) {

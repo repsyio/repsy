@@ -22,7 +22,7 @@ import io.repsy.os.generated.model.TokenInfo;
 import io.repsy.os.server.shared.token.dtos.DeployTokenInfo;
 import io.repsy.os.server.shared.token.dtos.DeployTokenInfoListItem;
 import io.repsy.os.server.shared.token.entities.RepoDeployToken;
-import io.repsy.os.server.shared.token.mappers.DeployTokenConverter;
+import io.repsy.os.server.shared.token.mappers.DeployTokenMapper;
 import io.repsy.os.server.shared.token.repositories.RepoDeployTokenRepository;
 import io.repsy.os.server.shared.token.utils.DeployTokenHash;
 import io.repsy.os.server.shared.token.utils.DeployTokenUtils;
@@ -55,7 +55,7 @@ public class DeployTokenService {
 
   private final @NonNull RepoTxService repoTxService;
   private final @NonNull RepoDeployTokenRepository deployTokenRepository;
-  private final @NonNull DeployTokenConverter deployTokenConverter;
+  private final @NonNull DeployTokenMapper deployTokenConverter;
 
   public @NonNull Page<DeployTokenInfoListItem> getDeployTokensByRepoInfo(
       final @NonNull UUID repoId, final @NonNull Pageable pageable) {

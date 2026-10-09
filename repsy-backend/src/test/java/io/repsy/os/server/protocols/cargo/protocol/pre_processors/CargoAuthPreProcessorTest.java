@@ -40,7 +40,7 @@ import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
-import io.repsy.os.shared.user.mappers.UserConverter;
+import io.repsy.os.shared.user.mappers.UserMapper;
 import io.repsy.os.shared.user.repositories.UserRepository;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
@@ -72,8 +72,7 @@ class CargoAuthPreProcessorTest {
       new CargoAuthPreProcessor(
           new CargoAuthComponent(
               // A real UserTxService over an empty repository: the user of the token is gone.
-              new UserTxService(
-                  Mockito.mock(UserRepository.class), Mockito.mock(UserConverter.class)),
+              new UserTxService(Mockito.mock(UserRepository.class), Mockito.mock(UserMapper.class)),
               this.jwtUtils,
               Mockito.mock(DeployTokenService.class),
               new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),

@@ -35,7 +35,7 @@ import io.repsy.os.shared.auth.dtos.ProtocolUserClaims;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.constants.ErrorConstants;
-import io.repsy.os.shared.user.mappers.UserConverter;
+import io.repsy.os.shared.user.mappers.UserMapper;
 import io.repsy.os.shared.user.repositories.UserRepository;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.shared.repo.dtos.Permission;
@@ -108,8 +108,7 @@ class HelmAuthComponentTest {
     // A real UserTxService over an empty repository: the lookup itself is under test.
     final var component =
         new HelmAuthComponent(
-            new UserTxService(
-                Mockito.mock(UserRepository.class), Mockito.mock(UserConverter.class)),
+            new UserTxService(Mockito.mock(UserRepository.class), Mockito.mock(UserMapper.class)),
             this.jwtUtils,
             this.deployTokenService,
             new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),

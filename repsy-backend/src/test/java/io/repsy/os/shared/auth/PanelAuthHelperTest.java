@@ -27,7 +27,7 @@ import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.User;
-import io.repsy.os.shared.user.mappers.UserConverter;
+import io.repsy.os.shared.user.mappers.UserMapper;
 import io.repsy.os.shared.user.repositories.UserRepository;
 import io.repsy.os.shared.user.services.UserTxService;
 import java.time.Instant;
@@ -46,7 +46,7 @@ class PanelAuthHelperTest {
 
   private final JwtUtils jwtUtils = Mockito.mock(JwtUtils.class);
   private final UserRepository userRepository = Mockito.mock(UserRepository.class);
-  private final UserConverter userConverter = Mockito.mock(UserConverter.class);
+  private final UserMapper userConverter = Mockito.mock(UserMapper.class);
 
   // A real UserTxService over a mocked repository: the lookup itself is under test.
   private final PanelAuthHelper helper =

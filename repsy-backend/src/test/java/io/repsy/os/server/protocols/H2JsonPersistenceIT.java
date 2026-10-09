@@ -29,7 +29,7 @@ import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackageV
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageRepository;
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageVersionRepository;
 import io.repsy.os.shared.repo.entities.Repo;
-import io.repsy.os.shared.repo.mappers.RepoConverter;
+import io.repsy.os.shared.repo.mappers.RepoMapper;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.protocols.cargo.shared.crate.dtos.CratePublishRequest;
 import io.repsy.protocols.cargo.shared.crate.services.CargoCrateService;
@@ -57,7 +57,7 @@ class H2JsonPersistenceIT extends H2IntegrationTest {
   @Autowired private CargoCrateService<UUID> cargoCrateService;
   @Autowired private CargoCrateIndexRepository cargoCrateIndexRepository;
   @Autowired private KeyStoreService keyStoreService;
-  @Autowired private RepoConverter repoConverter;
+  @Autowired private RepoMapper repoConverter;
 
   @Test
   @DisplayName("publishes and reads NuGet dependency JSON")

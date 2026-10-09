@@ -24,7 +24,7 @@ import io.repsy.os.shared.auth.dtos.RefreshTokenClaims;
 import io.repsy.os.shared.auth.services.LoginInfoFactory;
 import io.repsy.os.shared.auth.services.RefreshTokenService;
 import io.repsy.os.shared.constants.ErrorConstants;
-import io.repsy.os.shared.user.mappers.UserConverter;
+import io.repsy.os.shared.user.mappers.UserMapper;
 import io.repsy.os.shared.user.repositories.UserRepository;
 import io.repsy.os.shared.user.services.UserTxService;
 import java.time.Instant;
@@ -40,7 +40,7 @@ class AuthUserServiceTest {
   // A real UserTxService over an empty repository: the lookup itself is under test.
   private final AuthUserService service =
       new AuthUserService(
-          new UserTxService(Mockito.mock(UserRepository.class), Mockito.mock(UserConverter.class)),
+          new UserTxService(Mockito.mock(UserRepository.class), Mockito.mock(UserMapper.class)),
           Mockito.mock(LoginInfoFactory.class),
           Mockito.mock(RefreshTokenService.class),
           Mockito.mock(ApplicationEventPublisher.class),

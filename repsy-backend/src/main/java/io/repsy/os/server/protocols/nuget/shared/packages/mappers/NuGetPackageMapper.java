@@ -1,0 +1,163 @@
+/*
+ * Copyright 2026 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.repsy.os.server.protocols.nuget.shared.packages.mappers;
+
+import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackage;
+import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackageVersion;
+import io.repsy.protocols.nuget.shared.packages.dtos.NuGetPackageSearchResult;
+import io.repsy.protocols.nuget.shared.packages.dtos.NuGetVersionInfo;
+import io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils;
+import java.util.Comparator;
+import java.util.List;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.MappingConstants;
+
+@Mapper(componentModel = MappingConstants.ComponentModel.SPRING)
+@NullMarked
+public interface NuGetPackageMapper {
+
+  @Mapping(source = "packageId", target = "packageId")
+  @Mapping(source = "v.version", target = "version")
+  @Mapping(source = "v.title", target = "title")
+  @Mapping(source = "v.description", target = "description")
+  @Mapping(source = "v.authors", target = "authors")
+  @Mapping(source = "v.tags", target = "tags")
+  @Mapping(source = "v.iconUrl", target = "iconUrl")
+  @Mapping(source = "v.licenseUrl", target = "licenseUrl")
+  @Mapping(source = "v.projectUrl", target = "projectUrl")
+  @Mapping(source = "v.repositoryUrl", target = "repositoryUrl")
+  @Mapping(source = "v.listed", target = "listed")
+  @Mapping(source = "v.downloadCount", target = "downloadCount")
+  @Mapping(source = "v.publishedAt", target = "publishedAt")
+  @Mapping(target = "dependencies", ignore = true)
+  @Mapping(target = "readme", ignore = true)
+  @Mapping(target = "dependencyGroups", ignore = true)
+  NuGetVersionInfo toVersionInfo(NuGetPackageVersion v, String packageId);
+
+  @Mapping(source = "version", target = "version")
+  @Mapping(source = "downloadCount", target = "downloads")
+  NuGetPackageSearchResult.VersionSummary toVersionSummary(NuGetPackageVersion v);
+
+  /**
+   * Adds the dependencies to the version: the registration index pages inline them in every leaf's
+   * catalog entry (RPS-1555). The README stays out, an index page holds up to 64 leaves.
+   */
+  default NuGetVersionInfo toRegistrationInfo(final NuGetPackageVersion v, final String packageId) {
+
+    return this.withDependencies(this.toVersionInfo(v, packageId), v, null);
+  }
+
+  /** Adds the fields only the single-version view needs: the dependencies and the README. */
+  default NuGetVersionInfo toVersionDetail(final NuGetPackageVersion v, final String packageId) {
+
+    return this.withDependencies(this.toVersionInfo(v, packageId), v, v.getReadme());
+  }
+
+  private NuGetVersionInfo withDependencies(
+      final NuGetVersionInfo base, final NuGetPackageVersion v, final @Nullable String readme) {
+
+    final var groups =
+        NuGetPackageUtils.parseDependencyGroupsJson(
+            v.getDependencies(), base.packageId(), v.getVersion());
+    final var deps = NuGetPackageUtils.flatten(groups);
+    return new NuGetVersionInfo(
+        base.packageId(),
+        base.version(),
+        base.title(),
+        base.description(),
+        base.authors(),
+        base.tags(),
+        base.iconUrl(),
+        base.licenseUrl(),
+        base.projectUrl(),
+        base.repositoryUrl(),
+        base.listed(),
+        base.downloadCount(),
+        base.publishedAt(),
+        deps.isEmpty() ? null : deps,
+        readme,
+        groups.isEmpty() ? null : groups);
+  }
+
+  default NuGetPackageSearchResult toSearchResult(
+      final NuGetPackage pkg,
+      final boolean prerelease,
+      final boolean semVer2,
+      final List<NuGetPackageVersion> listedVersions) {
+
+    // A client that did not opt in to SemVer 2.0.0 must not be handed a version it cannot parse.
+    final var allVersions =
+        listedVersions.stream()
+            .filter(v -> semVer2 || !NuGetPackageUtils.isSemVer2(v.getVersion()))
+            .toList();
+
+    // Highest version first, as NuGet orders versions: a backport published after a newer release
+    // (1.0.5 after 2.0.0) must not be reported as the latest.
+    final Comparator<NuGetPackageVersion> highestFirst =
+        Comparator.comparing(NuGetPackageVersion::getVersion, NuGetPackageUtils.VERSION_COMPARATOR)
+            .reversed();
+
+    final var filteredVersions =
+        allVersions.stream()
+            .filter(v -> !v.isPrerelease() || prerelease)
+            .sorted(highestFirst)
+            .toList();
+
+    // Only pre-releases exist and they were not asked for: the package still has to show one.
+    final var latestVersion =
+        filteredVersions.isEmpty()
+            ? allVersions.stream().min(highestFirst)
+            : filteredVersions.stream().findFirst();
+
+    final var versionSummaries = filteredVersions.stream().map(this::toVersionSummary).toList();
+
+    final long totalDownloads =
+        filteredVersions.stream().mapToLong(NuGetPackageVersion::getDownloadCount).sum();
+
+    return latestVersion
+        .map(
+            latest ->
+                new NuGetPackageSearchResult(
+                    pkg.getPackageId(),
+                    latest.getVersion(),
+                    latest.getTitle(),
+                    latest.getDescription(),
+                    latest.getAuthors(),
+                    latest.getTags(),
+                    latest.getIconUrl(),
+                    latest.getLicenseUrl(),
+                    latest.getProjectUrl(),
+                    totalDownloads,
+                    versionSummaries))
+        .orElseGet(
+            () ->
+                new NuGetPackageSearchResult(
+                    pkg.getPackageId(),
+                    "",
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    0L,
+                    List.of()));
+  }
+}

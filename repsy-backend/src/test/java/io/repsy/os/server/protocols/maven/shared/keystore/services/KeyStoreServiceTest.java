@@ -26,7 +26,7 @@ import static org.mockito.Mockito.when;
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.os.generated.model.KeyStoreForm;
 import io.repsy.os.generated.model.PgpPublicKeyForm;
-import io.repsy.os.server.protocols.maven.shared.artifact.mappers.ArtifactConverter;
+import io.repsy.os.server.protocols.maven.shared.artifact.mappers.ArtifactMapper;
 import io.repsy.os.server.protocols.maven.shared.keystore.PgpTestKeys;
 import io.repsy.os.server.protocols.maven.shared.keystore.entities.AllowedKeyserver;
 import io.repsy.os.server.protocols.maven.shared.keystore.entities.KeyStore;
@@ -65,7 +65,7 @@ class KeyStoreServiceTest {
   @Mock KeyStoreRepository keyStoreRepository;
   @Mock RepoRepository repoRepository;
   @Mock PgpPublicKeyRepository pgpPublicKeyRepository;
-  @Mock ArtifactConverter artifactConverter;
+  @Mock ArtifactMapper artifactConverter;
   @Mock ApplicationEventPublisher eventPublisher;
   @Mock MavenPgpCaps caps;
 

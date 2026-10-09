@@ -27,7 +27,7 @@ import io.repsy.os.server.protocols.docker.shared.tag.dtos.manifest.ManifestDeta
 import io.repsy.os.server.protocols.docker.shared.tag.entities.Manifest;
 import io.repsy.os.server.protocols.docker.shared.tag.entities.ManifestChild;
 import io.repsy.os.server.protocols.docker.shared.tag.entities.Tag;
-import io.repsy.os.server.protocols.docker.shared.tag.mappers.ManifestConverter;
+import io.repsy.os.server.protocols.docker.shared.tag.mappers.ManifestMapper;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestChildRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.TagRepository;
@@ -90,7 +90,7 @@ public class ManifestTxService implements ManifestService<UUID> {
   private static final Map<String, Comparator<ManifestRow>> SORTS =
       Map.of("id", BY_ID, "name", BY_NAME, "createdAt", BY_CREATED_AT);
 
-  private final ManifestConverter manifestConverter;
+  private final ManifestMapper manifestConverter;
   private final ImageRepository imageRepository;
   private final LayerRepository layerRepository;
   private final ManifestRepository manifestRepository;
