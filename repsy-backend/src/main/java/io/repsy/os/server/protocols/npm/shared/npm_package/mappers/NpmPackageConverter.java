@@ -19,7 +19,6 @@ import io.repsy.os.generated.model.NpmPackageInfo;
 import io.repsy.os.generated.model.PackageVersionDetail;
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.NpmPackageListItem;
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageDistributionTagListItem;
-import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageInfo;
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageKeywordListItem;
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageMaintainerListItem;
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageVersionInfo;
@@ -27,10 +26,12 @@ import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageVersionLi
 import io.repsy.os.server.protocols.npm.shared.npm_package.entities.NpmPackage;
 import io.repsy.os.server.protocols.npm.shared.npm_package.entities.PackageVersion;
 import io.repsy.os.shared.repo.entities.Repo;
+import io.repsy.protocols.npm.shared.npm_package.dtos.BaseNpmPackageInfo;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.UUID;
 import java.util.function.Function;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -60,7 +61,7 @@ public interface NpmPackageConverter {
       PackageDistributionTagListItem source);
 
   default PackageVersionDetail toPackageVersionDetail(
-      final PackageInfo packageInfo,
+      final BaseNpmPackageInfo<UUID> packageInfo,
       final PackageVersionInfo packageVersionInfo,
       final List<PackageKeywordListItem> keywords,
       final List<PackageMaintainerListItem> maintainers,
@@ -116,8 +117,8 @@ public interface NpmPackageConverter {
         .build();
   }
 
-  default PackageInfo toPackageInfo(final NpmPackage npmPackage, final Repo repo) {
-    return PackageInfo.builder()
+  default BaseNpmPackageInfo<UUID> toPackageInfo(final NpmPackage npmPackage, final Repo repo) {
+    return BaseNpmPackageInfo.<UUID>builder()
         .id(npmPackage.getId())
         .registryName(repo.getName())
         .scopeName(npmPackage.getScope())
@@ -127,7 +128,7 @@ public interface NpmPackageConverter {
         .build();
   }
 
-  default NpmPackageInfo toNpmPackageInfo(final PackageInfo packageInfo) {
+  default NpmPackageInfo toNpmPackageInfo(final BaseNpmPackageInfo<UUID> packageInfo) {
     return NpmPackageInfo.builder()
         .scopeName(packageInfo.getScopeName())
         .packageName(packageInfo.getPackageName())

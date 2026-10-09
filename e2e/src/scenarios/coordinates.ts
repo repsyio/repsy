@@ -27,7 +27,7 @@ export function slugify(id: string): string {
 
 /**
  * 2026-01-01T00:00:00Z: correction #3 (npm, plan section 2.3/step 3a) -- a bounded version scheme,
- * since npm's `PackageUtils.extractVersionNameFromPayload` and Cargo's `CrateUtils.validateVersion`
+ * since npm's `NpmPackageUtils.extractVersionNameFromPayload` and Cargo's `CrateUtils.validateVersion`
  * both parse with semver4j 3.1.0, which stores parts as Java `Integer`s (still `int` in the newer
  * 6.0.0 jar too, per `javap`). A raw millisecond timestamp (maven's `0.0.<Date.now()>` scheme)
  * overflows that. Seconds since this epoch stays well under 2^31 for the lifetime of this harness.

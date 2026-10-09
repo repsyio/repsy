@@ -17,7 +17,7 @@
 /**
  * The npm server's registry rules, pinned at the protocol level with raw HTTP PUTs/GETs (no `npm`
  * client), the npm analogue of `tests/maven/upload-rules.spec.ts`. Every status/msgId here was read
- * from `AbstractNpmProtocolFacade.publish`/`PackageUtils.extractVersionNameFromPayload` first and
+ * from `AbstractNpmProtocolFacade.publish`/`NpmPackageUtils.extractVersionNameFromPayload` first and
  * then confirmed against a running instance (see this repo's e2e run report for the raw evidence):
  *
  *  - `allowOverride: false` refuses re-publishing a version that already exists (403
@@ -26,7 +26,7 @@
  *    accepted regardless of `allowOverride` (`AbstractNpmProtocolFacade.publish` only checks
  *    override for a version that is already present).
  *  - A malformed/invalid semver version string is refused with 400 `invalidPackageVersion`
- *    (`PackageUtils.extractVersionNameFromPayload`, before anything is read from the payload beyond
+ *    (`NpmPackageUtils.extractVersionNameFromPayload`, before anything is read from the payload beyond
  *    the version name) and stores nothing.
  *  - RPS-1205 (fixed): a packument's own `dist.tarball` (computed by the registry, RPS-1333) and the tarball's real, canonical stored path
  *    (`<packagePath>/-/<tarballFilename>`) are fetched and compared directly, live -- both now serve
@@ -260,7 +260,7 @@ test.describe('npm registry rules (raw HTTP)', () => {
       ).toBe(sha256Hex(bytes));
 
       // RPS-1205 (fixed): the packument's own dist.tarball used to be corrupted by
-      // PackageUtils.fixTarballUrl, which spliced the repo name into the path at an offset that
+      // NpmPackageUtils.fixTarballUrl, which spliced the repo name into the path at an offset that
       // assumed a cloud, multi-tenant URL shape Repsy OS does not have, so it always answered 404
       // `itemNotFound` here instead of the real bytes -- even though the canonical path above always
       // had them (a URL-construction bug, not a storage one). fixTarballUrl now rebuilds only the

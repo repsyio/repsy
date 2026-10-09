@@ -31,8 +31,8 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import io.repsy.protocols.docker.protocol.parser.DockerScopeParser;
+import io.repsy.protocols.docker.shared.auth.dtos.DockerTokenResponse;
 import io.repsy.protocols.docker.shared.auth.services.DockerAuthService;
-import io.repsy.protocols.shared.auth.dtos.LoginResponse;
 import io.repsy.protocols.shared.exceptions.TooManyRequestsException;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.nio.charset.StandardCharsets;
@@ -104,8 +104,8 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
             new ProtocolContext(), this.tokenRequest(), new MockHttpServletResponse());
 
     assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
-    assertThat(result.getBody()).isInstanceOf(LoginResponse.class);
-    assertThat(((LoginResponse) result.getBody()).getToken()).isEqualTo("tok-123");
+    assertThat(result.getBody()).isInstanceOf(DockerTokenResponse.class);
+    assertThat(((DockerTokenResponse) result.getBody()).getToken()).isEqualTo("tok-123");
   }
 
   /**
@@ -127,7 +127,7 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
         this.handler.handle(new ProtocolContext(), request, new MockHttpServletResponse());
 
     assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
-    assertThat(((LoginResponse) result.getBody()).getToken()).isEqualTo("tok-scoped");
+    assertThat(((DockerTokenResponse) result.getBody()).getToken()).isEqualTo("tok-scoped");
   }
 
   @Test
@@ -232,7 +232,7 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
             new ProtocolContext(), this.anonymousTokenRequest(), new MockHttpServletResponse());
 
     assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
-    assertThat(((LoginResponse) result.getBody()).getToken()).isEqualTo("anon-tok");
+    assertThat(((DockerTokenResponse) result.getBody()).getToken()).isEqualTo("anon-tok");
     verify(this.authService).authorizePublicRead(repo);
   }
 
@@ -336,7 +336,7 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
             new MockHttpServletResponse());
 
     assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
-    assertThat(((LoginResponse) result.getBody()).getToken()).isEqualTo("user-tok-123");
+    assertThat(((DockerTokenResponse) result.getBody()).getToken()).isEqualTo("user-tok-123");
     verify(this.authService).authenticateUserDockerCli(PASSWORD_GRANT_BASIC_HEADER, PULL_GRANTS);
     verify(this.authService, never()).createAnonymousUser();
   }
@@ -373,7 +373,7 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
             new MockHttpServletResponse());
 
     assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
-    assertThat(((LoginResponse) result.getBody()).getToken()).isEqualTo("anon-tok");
+    assertThat(((DockerTokenResponse) result.getBody()).getToken()).isEqualTo("anon-tok");
     verify(this.authService, never()).authenticateUserDockerCli(any(), any());
   }
 
@@ -389,7 +389,7 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
             new ProtocolContext(), this.anonymousTokenRequest(), new MockHttpServletResponse());
 
     assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
-    assertThat(((LoginResponse) result.getBody()).getToken()).isEqualTo("anon-tok");
+    assertThat(((DockerTokenResponse) result.getBody()).getToken()).isEqualTo("anon-tok");
   }
 
   @Test
@@ -404,7 +404,7 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
         this.handler.handle(new ProtocolContext(), request, new MockHttpServletResponse());
 
     assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
-    assertThat(((LoginResponse) result.getBody()).getToken()).isEqualTo("header-tok");
+    assertThat(((DockerTokenResponse) result.getBody()).getToken()).isEqualTo("header-tok");
     verify(this.authService).authenticateUserDockerCli(AUTH_HEADER, PULL_GRANTS);
     verify(this.authService, never())
         .authenticateUserDockerCli(PASSWORD_GRANT_BASIC_HEADER, PULL_GRANTS);

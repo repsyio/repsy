@@ -30,12 +30,12 @@
  *    get-publish-config.js`/`libnpmpublish`), and how `NpmPathParser` + `ExtractPath.extractPathVars`
  *    expect it (Spring decodes `%2f` back to `/` before the path parser sees it).
  *  - Packument GET: same path, `Accept: application/vnd.npm.install-v1+json` for the abbreviated
- *    form (`PackageUtils.isRequestedAbbreviatedMetadata`).
+ *    form (`NpmPackageUtils.isRequestedAbbreviatedMetadata`).
  *  - Tarball GET (canonical): `GET /<repoName>/<packagePath>/-/<tarballFilename>`, matched by
  *    `AbstractNpmPackageDownloadProtocolMethodHandler`'s `^/(.+?)/-/(.+)`; `packagePath` here uses a
  *    literal, un-encoded `/` (`@scope/name`, not `@scope%2fname`) since it is genuinely two path
  *    segments, not one escaped one. `tarballFilename` never carries the scope
- *    (`PackageUtils.getTarballFilename(packageName, version)` is given the bare name), matching real
+ *    (`NpmPackageUtils.getTarballFilename(packageName, version)` is given the bare name), matching real
  *    npm's own convention (`@scope/name` -> `.../-/name-version.tgz`).
  *  - `dist.tarball` (RPS-1333) is the registry's own address, computed at publish and again on every
  *    packument read from `REPO_BASE_URL` (or the request), never what the publisher sent.
@@ -45,7 +45,7 @@
  * The override rule (`AbstractNpmProtocolFacade.publish`): a version that already exists is refused
  * with `403 packageVersionAlreadyExists` when `allowOverride` is off; a NEW version of an existing
  * package is always accepted regardless of `allowOverride`, since only re-publishing an *existing*
- * version is checked. `PackageUtils.extractVersionNameFromPayload` refuses a malformed version with
+ * version is checked. `NpmPackageUtils.extractVersionNameFromPayload` refuses a malformed version with
  * `400 invalidPackageVersion` before anything is stored.
  */
 import { createHash } from 'node:crypto';

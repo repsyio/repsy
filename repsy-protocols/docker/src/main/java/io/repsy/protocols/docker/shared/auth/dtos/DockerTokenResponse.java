@@ -13,16 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.protocols.pypi.shared.python_package.dtos;
+package io.repsy.protocols.docker.shared.auth.dtos;
 
-import java.time.LocalDateTime;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.time.Instant;
+import lombok.Builder;
+import lombok.Data;
 
-public interface PackageListItem {
-  String getName();
+@Data
+@Builder
+public class DockerTokenResponse {
+  private String token;
 
-  String getLatestVersion();
+  @JsonProperty("issued_at")
+  private Instant issuedAt;
 
-  String getStableVersion();
+  @JsonProperty("expires_in")
+  private long expiresIn;
 
-  LocalDateTime getUpdatedAt();
+  @JsonProperty("access_token")
+  private String accessToken;
 }
