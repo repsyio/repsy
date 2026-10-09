@@ -485,11 +485,11 @@ class RubyGemApiControllerIT extends AbstractIntegrationTest {
       RubyGemApiControllerIT.this
           .mockMvc
           .perform(post("/api/ruby/gems/{repo}", repo.getName()).with(apiPort()))
-          .andExpect(status().isNotFound());
+          .andExpect(status().isMethodNotAllowed());
       RubyGemApiControllerIT.this
           .mockMvc
           .perform(post("/api/ruby/gems/{repo}/{gem}", repo.getName(), "missing").with(apiPort()))
-          .andExpect(status().isNotFound());
+          .andExpect(status().isMethodNotAllowed());
     }
   }
 

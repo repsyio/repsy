@@ -657,17 +657,17 @@ class CargoCrateControllerIT extends AbstractIntegrationTest {
   }
 
   @Test
-  void unsupportedVerbsReturnItemNotFound() throws Exception {
+  void unsupportedVerbsReturnMethodNotAllowed() throws Exception {
     final var repo = this.seedRepo(RepoType.CARGO, false);
     this.mockMvc
         .perform(post("/api/cargo/crates/" + repo.getName()).with(apiPort()))
-        .andExpect(status().isNotFound());
+        .andExpect(status().isMethodNotAllowed());
     this.mockMvc
         .perform(put("/api/cargo/crates/" + repo.getName()).with(apiPort()))
-        .andExpect(status().isNotFound());
+        .andExpect(status().isMethodNotAllowed());
     this.mockMvc
         .perform(patch("/api/cargo/crates/" + repo.getName()).with(apiPort()))
-        .andExpect(status().isNotFound());
+        .andExpect(status().isMethodNotAllowed());
   }
 
   @Nested

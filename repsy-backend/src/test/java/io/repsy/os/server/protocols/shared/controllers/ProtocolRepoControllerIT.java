@@ -2055,19 +2055,35 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
   @DisplayName("routing")
   class Routing {
 
-    static Stream<Arguments> unmappedRoutes() {
+    static Stream<Arguments> wrongVerbRoutes() {
       return Stream.of(
           Arguments.of("PUT /api/repos", "PUT", "/api/repos"),
           Arguments.of("DELETE /api/repos", "DELETE", "/api/repos"),
           Arguments.of("PUT /api/repos/{repoName}", "PUT", "/api/repos/some-repo"),
           Arguments.of("POST /api/repos/{repoName}", "POST", "/api/repos/some-repo"),
-          // The per-type routes RPS-1268 removed: GET /api/repos/{repoType}/info and /count, and
-          // POST /api/repos/{repoType}. Their replacements are GET /api/repos, GET
-          // /api/repos/counts and POST /api/repos.
-          Arguments.of("GET /api/repos/MAVEN/info (removed)", "GET", "/api/repos/MAVEN/info"),
-          Arguments.of("GET /api/repos/MAVEN/count (removed)", "GET", "/api/repos/MAVEN/count"),
+          // POST /api/repos/{repoType} was removed by RPS-1268: its replacement is POST /api/repos,
+          // and the path now only maps the verbs of /api/repos/{repoName}.
           Arguments.of("POST /api/repos/MAVEN (removed)", "POST", "/api/repos/MAVEN"),
           Arguments.of("POST /api/repos/maven (removed)", "POST", "/api/repos/maven"),
+          Arguments.of(
+              "PATCH /api/repos/{repoName}/settings", "PATCH", "/api/repos/some-repo/settings"),
+          Arguments.of(
+              "POST /api/repos/{repoName}/settings", "POST", "/api/repos/some-repo/settings"),
+          Arguments.of("POST /api/repos/{repoName}/usage", "POST", "/api/repos/some-repo/usage"),
+          Arguments.of(
+              "DELETE /api/repos/{repoName}/permissions",
+              "DELETE",
+              "/api/repos/some-repo/permissions"),
+          Arguments.of(
+              "PUT /api/repos/{repoName}/contents", "PUT", "/api/repos/some-repo/contents"));
+    }
+
+    static Stream<Arguments> unmappedRoutes() {
+      return Stream.of(
+          // The per-type routes RPS-1268 removed: GET /api/repos/{repoType}/info and /count.
+          // Their replacements are GET /api/repos and GET /api/repos/counts.
+          Arguments.of("GET /api/repos/MAVEN/info (removed)", "GET", "/api/repos/MAVEN/info"),
+          Arguments.of("GET /api/repos/MAVEN/count (removed)", "GET", "/api/repos/MAVEN/count"),
           Arguments.of("DELETE /api/repos/MAVEN/info", "DELETE", "/api/repos/MAVEN/info"),
           Arguments.of("POST /api/repos/MAVEN/info", "POST", "/api/repos/MAVEN/info"),
           Arguments.of("PUT /api/repos/MAVEN/count", "PUT", "/api/repos/MAVEN/count"),
@@ -2086,23 +2102,25 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
           Arguments.of("POST /api/repos/{repoName}/name", "POST", "/api/repos/some-repo/name"),
           Arguments.of(
               "PUT /api/repos/{repoName}/description", "PUT", "/api/repos/some-repo/description"),
-          Arguments.of(
-              "PATCH /api/repos/{repoName}/settings", "PATCH", "/api/repos/some-repo/settings"),
-          Arguments.of(
-              "POST /api/repos/{repoName}/settings", "POST", "/api/repos/some-repo/settings"),
-          Arguments.of("POST /api/repos/{repoName}/usage", "POST", "/api/repos/some-repo/usage"),
-          Arguments.of(
-              "DELETE /api/repos/{repoName}/permissions",
-              "DELETE",
-              "/api/repos/some-repo/permissions"),
-          Arguments.of(
-              "PUT /api/repos/{repoName}/contents", "PUT", "/api/repos/some-repo/contents"),
           Arguments.of("GET /api/repos/{repoName}/unknown", "GET", "/api/repos/some-repo/unknown"));
     }
 
     @ParameterizedTest(name = "{0}")
+    @MethodSource("wrongVerbRoutes")
+    @DisplayName("answers a verb the path does not map with 405 methodNotSupported, whoever asks")
+    void wrongVerbRoute(final String label, final String method, final String url)
+        throws Exception {
+      // Neither credentials nor an existing repo are needed: routing fails before the interceptor.
+      expectMethodNotAllowed(ProtocolRepoControllerIT.this.perform(request(method, url)));
+      expectMethodNotAllowed(
+          ProtocolRepoControllerIT.this.perform(
+              request(method, url)
+                  .header(AUTHORIZATION, ProtocolRepoControllerIT.this.adminBearerToken())));
+    }
+
+    @ParameterizedTest(name = "{0}")
     @MethodSource("unmappedRoutes")
-    @DisplayName("answers an unmapped route or verb with 404 itemNotFound, whoever asks")
+    @DisplayName("answers a route nothing maps with 404 itemNotFound, whoever asks")
     void unmappedRoute(final String label, final String method, final String url) throws Exception {
       // Neither credentials nor an existing repo are needed: routing fails before the interceptor.
       expectError(

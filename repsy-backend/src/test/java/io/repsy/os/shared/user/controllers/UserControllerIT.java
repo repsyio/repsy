@@ -1418,20 +1418,31 @@ class UserControllerIT extends AbstractIntegrationTest {
   class Routing {
 
     /**
-     * The port-based handler mapping does not raise {@code HttpRequestMethodNotSupportedException}
-     * for a verb the path does not map, so the request falls through to the static-resource handler
-     * and fails with the servlet {@code NoResourceFoundException}, which {@code ErrorHandler}
-     * answers with 404 {@code itemNotFound}.
+     * A verb the path does not map is answered 405 {@code methodNotSupported} with an {@code Allow}
+     * header (RPS-2094).
      */
     @ParameterizedTest(name = "{0}")
     @MethodSource("unsupportedMethods")
-    @DisplayName("answers 404 itemNotFound for a route or verb nothing maps")
+    @DisplayName("answers 405 methodNotSupported with Allow for a verb the path does not map")
     void unsupportedMethod(final String name, final MockHttpServletRequestBuilder request)
         throws Exception {
       final var token = UserControllerIT.this.adminBearerToken();
 
+      expectMethodNotAllowed(UserControllerIT.this.perform(request.header(AUTHORIZATION, token)));
+    }
+
+    /**
+     * A path nothing maps falls through to the static-resource handler and fails with the servlet
+     * {@code NoResourceFoundException}, which {@code ErrorHandler} answers with 404 {@code
+     * itemNotFound}.
+     */
+    @Test
+    @DisplayName("answers 404 itemNotFound for a route nothing maps")
+    void unknownRoute() throws Exception {
+      final var token = UserControllerIT.this.adminBearerToken();
+
       expectError(
-          UserControllerIT.this.perform(request.header(AUTHORIZATION, token)),
+          UserControllerIT.this.perform(get("/api/no-such-route").header(AUTHORIZATION, token)),
           HttpStatus.NOT_FOUND,
           "itemNotFound",
           null,
@@ -1444,8 +1455,7 @@ class UserControllerIT extends AbstractIntegrationTest {
           Arguments.of("GET /api/users/{userId}", get("/api/users/" + id)),
           Arguments.of("PATCH /api/users/{userId}", patch("/api/users/" + id)),
           Arguments.of("DELETE /api/users", delete("/api/users")),
-          Arguments.of("PUT /api/users", put("/api/users")),
-          Arguments.of("GET /api/no-such-route", get("/api/no-such-route")));
+          Arguments.of("PUT /api/users", put("/api/users")));
     }
   }
 }

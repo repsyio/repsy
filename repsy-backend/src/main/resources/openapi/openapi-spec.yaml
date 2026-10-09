@@ -19,6 +19,13 @@ info:
     and, for a validation failure, `errors`.
 
 
+    A request to a path of this API with a verb the path does not map is answered with 405
+    `methodNotSupported` and an `Allow` header that lists the verbs it does map (RPS-2094); an
+    `Accept` header the route cannot produce is answered 406 and an unsupported request body type
+    415. A path nothing maps is 404 `itemNotFound`. These statuses belong to the path, so they are
+    not repeated on every operation.
+
+
     Authenticate with the access token that `login` returns, as `Authorization: Bearer <token>`.
     Operations that act on one repository (`/api/repos/{repoName}/...` and the per-format
     `/api/{format}/...` routes) also accept HTTP Basic with a username and password, which is meant

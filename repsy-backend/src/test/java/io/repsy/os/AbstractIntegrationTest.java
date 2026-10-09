@@ -550,6 +550,21 @@ public abstract class AbstractIntegrationTest {
     }
   }
 
+  /**
+   * Asserts a wrong verb on a mapped panel path (RPS-2094): 405 {@code methodNotSupported} as
+   * problem+json, with an {@code Allow} header that lists the verbs the path does map.
+   */
+  protected static void expectMethodNotAllowed(final ResultActions result) throws Exception {
+    expectError(
+        result,
+        HttpStatus.METHOD_NOT_ALLOWED,
+        "methodNotSupported",
+        null,
+        "Requested HTTP method is not supported.");
+    result.andExpect(
+        org.springframework.test.web.servlet.result.MockMvcResultMatchers.header().exists("Allow"));
+  }
+
   /** A protocol route keeps the old ERROR envelope; it is not an RFC 9457 problem. */
   private static void expectLegacyEnvelope(
       final String body, final String msgId, final String data, final String text) {

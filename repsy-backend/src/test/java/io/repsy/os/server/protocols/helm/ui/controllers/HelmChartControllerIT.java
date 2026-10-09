@@ -1765,15 +1765,12 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       assertThat(dataMap(it.detail(repo, "routing", "tags", token)))
           .containsEntry("version", "tags");
 
-      // DELETE .../tags is not a route any more; the version is deleted under /versions.
-      expectError(
+      // DELETE .../tags is not a route any more (the path maps GET only, so it is a 405); the
+      // version is deleted under /versions.
+      expectMethodNotAllowed(
           it.perform(
               delete("/api/helm/charts/{repo}/{name}/tags", repo.getName(), "routing")
-                  .header(AUTHORIZATION, token)),
-          HttpStatus.NOT_FOUND,
-          "itemNotFound",
-          null,
-          "The requested item is not found.");
+                  .header(AUTHORIZATION, token)));
       assertThat(it.storedVersions(repo, "routing")).containsExactlyInAnyOrder("1.0.0", "tags");
 
       expectDeleted(it.deleteVersionRequest(repo, "routing", "tags", token));
@@ -2711,7 +2708,23 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
   @DisplayName("unsupported verbs and routes")
   class Routing {
 
-    /** Pins the RPS-849 behavior: unmapped verbs and routes answer 404 itemNotFound. */
+    /** A verb the path does not map is answered 405 methodNotSupported with Allow (RPS-2094). */
+    @ParameterizedTest(name = "{0} {1}")
+    @MethodSource("wrongVerbRequests")
+    @DisplayName("answers 405 methodNotSupported and changes nothing")
+    void wrongVerb(final HttpMethod method, final String path) throws Exception {
+      final var it = HelmChartControllerIT.this;
+      final var token = it.adminBearerToken();
+      final var repo = it.helmRepo();
+      it.upload(repo, ChartSpec.of("payments", "1.0.0"), token);
+
+      expectMethodNotAllowed(
+          it.perform(request(method, path.formatted(repo.getName())).header(AUTHORIZATION, token)));
+
+      assertThat(it.storedVersions(repo, "payments")).containsExactly("1.0.0");
+    }
+
+    /** A route nothing maps (or the old routes that are gone) answers 404 itemNotFound. */
     @ParameterizedTest(name = "{0} {1}")
     @MethodSource("unmappedRequests")
     @DisplayName("answers 404 itemNotFound and changes nothing")
@@ -2731,7 +2744,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
       assertThat(it.storedVersions(repo, "payments")).containsExactly("1.0.0");
     }
 
-    static Stream<Arguments> unmappedRequests() {
+    static Stream<Arguments> wrongVerbRequests() {
       return Stream.of(
           Arguments.of(HttpMethod.POST, "/api/helm/charts/%s"),
           Arguments.of(HttpMethod.PUT, "/api/helm/charts/%s"),
@@ -2747,12 +2760,17 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
           Arguments.of(HttpMethod.POST, "/api/helm/charts/%s/payments/versions/1.0.0"),
           Arguments.of(HttpMethod.PUT, "/api/helm/charts/%s/payments/versions/1.0.0"),
           Arguments.of(HttpMethod.PATCH, "/api/helm/charts/%s/payments/versions/1.0.0"),
+          // The old {name}/tags delete is gone: the path only maps GET (the tag list).
+          Arguments.of(HttpMethod.DELETE, "/api/helm/charts/%s/payments/tags"),
+          Arguments.of(HttpMethod.POST, "/api/helm/charts/%s/payments/tags"),
+          Arguments.of(HttpMethod.PUT, "/api/helm/charts/%s/payments/tags"));
+    }
+
+    static Stream<Arguments> unmappedRequests() {
+      return Stream.of(
           // The old version routes (/{name}/{version}) are gone: the version lives under /versions.
           Arguments.of(HttpMethod.GET, "/api/helm/charts/%s/payments/1.0.0"),
           Arguments.of(HttpMethod.DELETE, "/api/helm/charts/%s/payments/1.0.0"),
-          Arguments.of(HttpMethod.DELETE, "/api/helm/charts/%s/payments/tags"),
-          Arguments.of(HttpMethod.POST, "/api/helm/charts/%s/payments/tags"),
-          Arguments.of(HttpMethod.PUT, "/api/helm/charts/%s/payments/tags"),
           Arguments.of(HttpMethod.GET, "/api/helm/charts/%s/payments/versions/1.0.0/extra"),
           Arguments.of(HttpMethod.DELETE, "/api/helm/charts/%s/payments/versions/1.0.0/extra"));
     }
