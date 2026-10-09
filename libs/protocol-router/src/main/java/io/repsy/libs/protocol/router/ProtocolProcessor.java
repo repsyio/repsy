@@ -42,19 +42,17 @@ public abstract class ProtocolProcessor implements Comparable<ProtocolProcessor>
 
   @Override
   public int compareTo(final ProtocolProcessor processor) {
+    final int priorityComparison = Integer.compare(this.getPriority(), processor.getPriority());
+    if (priorityComparison != 0) {
+      return priorityComparison;
+    }
 
-    return Integer.compare(this.getPriority(), processor.getPriority());
-  }
+    final int classNameComparison =
+        this.getClass().getName().compareTo(processor.getClass().getName());
+    if (classNameComparison != 0) {
+      return classNameComparison;
+    }
 
-  @Override
-  public boolean equals(final Object obj) {
-
-    return obj instanceof final ProtocolProcessor pp && this.compareTo(pp) == 0;
-  }
-
-  @Override
-  public int hashCode() {
-
-    return this.getPriority();
+    return Integer.compare(System.identityHashCode(this), System.identityHashCode(processor));
   }
 }
