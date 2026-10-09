@@ -28,7 +28,7 @@ import io.repsy.libs.protocol.router.ProcessorResult;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.os.server.core.UrlParserProperties;
-import io.repsy.os.server.protocols.cargo.shared.auth.services.CargoAuthComponent;
+import io.repsy.os.server.protocols.cargo.shared.auth.services.CargoAuthenticator;
 import io.repsy.os.server.shared.auth.AuthFailureThrottle;
 import io.repsy.os.server.shared.auth.AuthThrottleProperties;
 import io.repsy.os.server.shared.auth.BasicAuthCacheProperties;
@@ -57,7 +57,7 @@ import org.springframework.mock.web.MockHttpServletResponse;
 /**
  * RPS-1027: what the Cargo protocol does with a valid token of a user who no longer exists. It is
  * tested through the pre-processor, the path a request takes, because {@code
- * CargoAuthComponent.resolveBearerAuthUser} that used to hold this decision had no caller
+ * CargoAuthenticator.resolveBearerAuthUser} that used to hold this decision had no caller
  * (RPS-979).
  */
 @DisplayName("CargoAuthPreProcessor")
@@ -70,7 +70,7 @@ class CargoAuthPreProcessorTest {
 
   private final CargoAuthPreProcessor preProcessor =
       new CargoAuthPreProcessor(
-          new CargoAuthComponent(
+          new CargoAuthenticator(
               // A real UserTxService over an empty repository: the user of the token is gone.
               new UserTxService(Mockito.mock(UserRepository.class), Mockito.mock(UserMapper.class)),
               this.jwtUtils,

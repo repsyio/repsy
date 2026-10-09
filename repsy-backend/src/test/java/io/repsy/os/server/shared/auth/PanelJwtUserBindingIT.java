@@ -39,7 +39,7 @@ import org.springframework.test.web.servlet.ResultActions;
  * token_version} and by the subject (the user id), on every route that takes it. That includes the
  * {@code @RepoOperation} routes ({@code /api/repos/**}, {@code /api/<format>/**}) and the Docker
  * panel routes, which resolve the caller through {@code ProtocolAuthService} and {@code
- * DockerAuthComponent} and used to look at the username claim alone: an access token kept working
+ * DockerAuthenticator} and used to look at the username claim alone: an access token kept working
  * there for up to 30 minutes after a password change, and a reused username inherited it.
  */
 @DisplayName("A panel access token ends with the credentials it was issued for (RPS-1604)")
@@ -56,7 +56,7 @@ class PanelJwtUserBindingIT extends AbstractIntegrationTest {
         return "/api/repos/" + repoName + "/settings";
       }
     },
-    /** {@code DockerAuthComponent.authenticateUser}. */
+    /** {@code DockerAuthenticator.authenticateUser}. */
     DOCKER(RepoType.DOCKER) {
       @Override
       String path(final String repoName) {

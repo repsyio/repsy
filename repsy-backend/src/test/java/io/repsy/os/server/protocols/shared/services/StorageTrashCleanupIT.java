@@ -20,6 +20,7 @@ import static org.awaitility.Awaitility.await;
 
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.server.protocols.shared.tasks.StorageTrashCleanupTask;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.IOException;
 import java.nio.file.Files;

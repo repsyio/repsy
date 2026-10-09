@@ -23,7 +23,7 @@ import io.repsy.libs.protocol.router.ProcessorResult;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.os.server.core.UrlParserProperties;
-import io.repsy.os.server.protocols.npm.shared.auth.services.NpmAuthComponentImpl;
+import io.repsy.os.server.protocols.npm.shared.auth.services.NpmAuthenticatorImpl;
 import io.repsy.os.server.shared.auth.AuthChallenges;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
@@ -63,7 +63,7 @@ public class NpmAuthPreProcessor extends ProtocolProcessor {
   private static final String WRITE_OPERATION_KEY = "writeOperation";
   private static final String REQUIRE_AUTHENTICATION_KEY = "requireAuthentication";
 
-  private final NpmAuthComponentImpl authComponent;
+  private final NpmAuthenticatorImpl authenticator;
   private final NpmProtocolProvider provider;
 
   @PostConstruct
@@ -91,7 +91,7 @@ public class NpmAuthPreProcessor extends ProtocolProcessor {
 
     final var permission = (Permission) properties.get(PERMISSION_KEY);
 
-    final var authHeader = this.authComponent.emulateAuthHeader(request);
+    final var authHeader = this.authenticator.emulateAuthHeader(request);
 
     try {
       this.authenticate(authHeader, repoInfo.getStorageKey(), permission);
@@ -123,9 +123,9 @@ public class NpmAuthPreProcessor extends ProtocolProcessor {
 
     switch (authHeader) {
       case final String header when header.startsWith(AUTH_BASIC) ->
-          this.authComponent.handleBasicAuth(header, permission, repoId);
+          this.authenticator.handleBasicAuth(header, permission, repoId);
       case final String header when header.startsWith(AUTH_BEARER) ->
-          this.authComponent.handleBearerAuth(header, repoId, permission);
+          this.authenticator.handleBearerAuth(header, repoId, permission);
       default -> throw new UnAuthorizedException("unAuthorized");
     }
   }

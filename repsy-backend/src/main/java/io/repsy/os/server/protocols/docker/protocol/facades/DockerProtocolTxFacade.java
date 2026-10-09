@@ -18,7 +18,7 @@ package io.repsy.os.server.protocols.docker.protocol.facades;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
-import io.repsy.os.server.protocols.docker.shared.tag.services.ManifestDeletionComponent;
+import io.repsy.os.server.protocols.docker.shared.tag.services.ManifestDeleter;
 import io.repsy.os.server.protocols.docker.shared.utils.PathParserUtils;
 import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
 import io.repsy.protocols.docker.protocol.facades.AbstractDockerProtocolTxFacade;
@@ -46,7 +46,7 @@ import tools.jackson.databind.ObjectMapper;
 @NullMarked
 public class DockerProtocolTxFacade extends AbstractDockerProtocolTxFacade<UUID> {
 
-  private final ManifestDeletionComponent manifestDeletionComponent;
+  private final ManifestDeleter manifestDeleter;
 
   public DockerProtocolTxFacade(
       final ImageService<UUID> imageTxService,
@@ -54,11 +54,11 @@ public class DockerProtocolTxFacade extends AbstractDockerProtocolTxFacade<UUID>
       final ManifestService<UUID> manifestTxService,
       final DockerStorageService<UUID> dockerStorageService,
       final ObjectMapper objectMapper,
-      final ManifestDeletionComponent manifestDeletionComponent) {
+      final ManifestDeleter manifestDeleter) {
 
     super(dockerStorageService, layerTxService, imageTxService, manifestTxService, objectMapper);
 
-    this.manifestDeletionComponent = manifestDeletionComponent;
+    this.manifestDeleter = manifestDeleter;
   }
 
   @Override
@@ -146,7 +146,7 @@ public class DockerProtocolTxFacade extends AbstractDockerProtocolTxFacade<UUID>
 
     final var repoInfo = UrlPropertiesUtils.getRepoInfo(context);
 
-    final var freed = this.manifestDeletionComponent.delete(repoInfo, imageName, reference);
+    final var freed = this.manifestDeleter.delete(repoInfo, imageName, reference);
 
     if (freed != 0L) {
       ProtocolContextUtils.addUsages(context, BaseUsages.ofDisk(-freed));

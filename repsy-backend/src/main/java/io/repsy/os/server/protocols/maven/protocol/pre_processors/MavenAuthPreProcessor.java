@@ -21,7 +21,7 @@ import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.libs.protocol.router.ProcessorResult;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolProcessor;
-import io.repsy.os.server.protocols.maven.shared.auth.services.MavenAuthComponent;
+import io.repsy.os.server.protocols.maven.shared.auth.services.MavenAuthenticator;
 import io.repsy.os.server.shared.auth.AuthChallenges;
 import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
@@ -53,13 +53,13 @@ public class MavenAuthPreProcessor extends ProtocolProcessor {
   private static final @NonNull String PERMISSION_KEY = "permission";
   private static final @NonNull String WRITE_OPERATION_KEY = "writeOperation";
 
-  private final @NonNull MavenAuthComponent authComponent;
+  private final @NonNull MavenAuthenticator authenticator;
 
   public MavenAuthPreProcessor(
-      final @NonNull MavenAuthComponent authComponent,
+      final @NonNull MavenAuthenticator authenticator,
       final @NonNull MavenProtocolProvider provider) {
 
-    this.authComponent = authComponent;
+    this.authenticator = authenticator;
     provider.registerPreProcessor(this);
   }
 
@@ -99,7 +99,7 @@ public class MavenAuthPreProcessor extends ProtocolProcessor {
     final var downloadToken = request.getParameter(DOWNLOAD_TOKEN_PARAMETER);
 
     if (downloadToken != null) {
-      this.authComponent.handleDownloadToken(
+      this.authenticator.handleDownloadToken(
           downloadToken,
           repoInfo.getStorageKey(),
           UrlPropertiesUtils.getRelativePath(context).getPath(),
@@ -108,7 +108,7 @@ public class MavenAuthPreProcessor extends ProtocolProcessor {
       return ProcessorResult.next();
     }
 
-    final var authHeader = this.authComponent.emulateAuthHeader(request);
+    final var authHeader = this.authenticator.emulateAuthHeader(request);
 
     if (authHeader == null) {
       return ProcessorResult.of(
@@ -129,9 +129,9 @@ public class MavenAuthPreProcessor extends ProtocolProcessor {
 
     switch (authHeader) {
       case final String header when header.startsWith(AUTH_BASIC) ->
-          this.authComponent.handleBasicAuth(header, permission, repoId);
+          this.authenticator.handleBasicAuth(header, permission, repoId);
       case final String header when header.startsWith(AUTH_BEARER) ->
-          this.authComponent.handleBearerAuth(header, repoId, permission);
+          this.authenticator.handleBearerAuth(header, repoId, permission);
       default -> throw new UnAuthorizedException("unAuthorized");
     }
   }

@@ -18,7 +18,7 @@ package io.repsy.os.server.protocols.npm.protocol.handlers;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
 import io.repsy.protocols.npm.protocol.handlers.AbstractNpmLoginProtocolMethodHandler;
-import io.repsy.protocols.npm.shared.auth.services.NpmAuthComponent;
+import io.repsy.protocols.npm.shared.auth.services.NpmAuthenticator;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -31,10 +31,10 @@ public class NpmLoginProtocolMethodHandler extends AbstractNpmLoginProtocolMetho
 
   public NpmLoginProtocolMethodHandler(
       @Qualifier("osNpmPathParser") final PathParser basePathParser,
-      final NpmAuthComponent<UUID> npmAuthComponent,
+      final NpmAuthenticator<UUID> npmAuthenticator,
       final ObjectMapper objectMapper,
       final NpmProtocolProvider provider) {
 
-    super(basePathParser, npmAuthComponent, objectMapper, provider);
+    super(basePathParser, npmAuthenticator, objectMapper, provider);
   }
 }

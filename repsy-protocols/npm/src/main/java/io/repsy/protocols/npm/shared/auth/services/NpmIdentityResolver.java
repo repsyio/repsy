@@ -21,7 +21,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Tells who a request's credentials belong to, for {@code GET /-/whoami}. It is a separate
- * interface, and not a method of {@link NpmAuthComponent}, so that an implementation of that
+ * interface, and not a method of {@link NpmAuthenticator}, so that an implementation of that
  * component outside this repository keeps compiling.
  */
 @NullMarked

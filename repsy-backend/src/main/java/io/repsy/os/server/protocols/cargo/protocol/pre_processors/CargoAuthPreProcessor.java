@@ -21,7 +21,7 @@ import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.libs.protocol.router.ProcessorResult;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolProcessor;
-import io.repsy.os.server.protocols.cargo.shared.auth.services.CargoAuthComponent;
+import io.repsy.os.server.protocols.cargo.shared.auth.services.CargoAuthenticator;
 import io.repsy.os.server.shared.auth.AuthChallenges;
 import io.repsy.os.server.shared.utils.PreProcessorUtils;
 import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
@@ -51,7 +51,7 @@ public class CargoAuthPreProcessor extends ProtocolProcessor {
   private static final String PERMISSION_KEY = "permission";
   private static final String WRITE_OPERATION_KEY = "writeOperation";
 
-  private final CargoAuthComponent authComponent;
+  private final CargoAuthenticator authenticator;
   private final CargoProtocolProvider provider;
 
   @PostConstruct
@@ -78,7 +78,7 @@ public class CargoAuthPreProcessor extends ProtocolProcessor {
       return ProcessorResult.next();
     }
 
-    final var rawAuthHeader = this.authComponent.emulateAuthHeader(request);
+    final var rawAuthHeader = this.authenticator.emulateAuthHeader(request);
 
     if (rawAuthHeader == null) {
       return ProcessorResult.of(
@@ -106,9 +106,9 @@ public class CargoAuthPreProcessor extends ProtocolProcessor {
 
     switch (authHeader) {
       case final String header when header.startsWith(AUTH_BASIC) ->
-          this.authComponent.handleBasicAuth(header, permission, repoId);
+          this.authenticator.handleBasicAuth(header, permission, repoId);
       case final String header when header.startsWith(AUTH_BEARER) ->
-          this.authComponent.handleBearerAuth(header, repoId, permission);
+          this.authenticator.handleBearerAuth(header, repoId, permission);
       default -> throw new UnAuthorizedException("unAuthorized");
     }
   }

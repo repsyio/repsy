@@ -23,7 +23,7 @@ import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.protocol.router.ProcessorResult;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolProcessor;
-import io.repsy.os.server.protocols.helm.shared.auth.HelmAuthComponent;
+import io.repsy.os.server.protocols.helm.shared.auth.HelmAuthenticator;
 import io.repsy.os.server.shared.auth.AuthChallenges;
 import io.repsy.os.server.shared.utils.PreProcessorUtils;
 import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
@@ -52,7 +52,7 @@ public class HelmAuthPreProcessor extends ProtocolProcessor {
 
   private final HelmProtocolProvider provider;
   private final RestResponseFactory resp;
-  private final HelmAuthComponent authComponent;
+  private final HelmAuthenticator authenticator;
 
   @PostConstruct
   public void register() {
@@ -78,7 +78,7 @@ public class HelmAuthPreProcessor extends ProtocolProcessor {
       return ProcessorResult.next();
     }
 
-    final var authHeader = this.authComponent.emulateAuthHeader(request);
+    final var authHeader = this.authenticator.emulateAuthHeader(request);
 
     if (authHeader == null) {
       return ProcessorResult.of(OciErrors.challenge(request, BasicAuthChallenge.REPSY, this.resp));
@@ -100,9 +100,9 @@ public class HelmAuthPreProcessor extends ProtocolProcessor {
 
     switch (authHeader) {
       case final String h when h.startsWith(AUTH_BASIC) ->
-          this.authComponent.handleBasicAuth(h, permission, repoId);
+          this.authenticator.handleBasicAuth(h, permission, repoId);
       case final String h when h.startsWith(AUTH_BEARER) ->
-          this.authComponent.handleBearerAuth(h, repoId, permission);
+          this.authenticator.handleBearerAuth(h, repoId, permission);
       default -> throw new UnAuthorizedException("unAuthorized");
     }
   }

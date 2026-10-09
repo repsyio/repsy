@@ -25,7 +25,7 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.os.server.core.UrlParserProperties;
-import io.repsy.os.server.protocols.docker.shared.tag.services.ManifestDeletionComponent;
+import io.repsy.os.server.protocols.docker.shared.tag.services.ManifestDeleter;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.docker.shared.image.services.ImageService;
 import io.repsy.protocols.docker.shared.layer.services.LayerService;
@@ -42,7 +42,7 @@ class DockerProtocolTxFacadeTest {
   private static final String IMAGE = "app";
   private static final String REFERENCE = "sha256:" + "ab".repeat(32);
 
-  private final ManifestDeletionComponent deletion = mock(ManifestDeletionComponent.class);
+  private final ManifestDeleter deletion = mock(ManifestDeleter.class);
 
   @SuppressWarnings("unchecked")
   private final DockerProtocolTxFacade facade =

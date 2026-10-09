@@ -35,15 +35,15 @@ public class ProtocolBundleConfig {
 
   @Bean
   public Map<RepoType, ProtocolAuthService> protocolAuthServiceMap(
-      @Qualifier("cargoAuthComponent") final ProtocolAuthService cargo,
-      @Qualifier("mavenAuthComponent") final ProtocolAuthService maven,
-      @Qualifier("npmAuthComponentImpl") final ProtocolAuthService npm,
-      @Qualifier("dockerAuthComponent") final ProtocolAuthService docker,
-      @Qualifier("pypiAuthComponent") final ProtocolAuthService pypi,
-      @Qualifier("goAuthComponent") final ProtocolAuthService golang,
-      @Qualifier("helmAuthComponent") final ProtocolAuthService helm,
-      @Qualifier("nuGetAuthComponent") final ProtocolAuthService nuget,
-      @Qualifier("rubyAuthComponent") final ProtocolAuthService ruby) {
+      @Qualifier("cargoAuthenticator") final ProtocolAuthService cargo,
+      @Qualifier("mavenAuthenticator") final ProtocolAuthService maven,
+      @Qualifier("npmAuthenticatorImpl") final ProtocolAuthService npm,
+      @Qualifier("dockerAuthenticator") final ProtocolAuthService docker,
+      @Qualifier("pypiAuthenticator") final ProtocolAuthService pypi,
+      @Qualifier("goAuthenticator") final ProtocolAuthService golang,
+      @Qualifier("helmAuthenticator") final ProtocolAuthService helm,
+      @Qualifier("nuGetAuthenticator") final ProtocolAuthService nuget,
+      @Qualifier("rubyAuthenticator") final ProtocolAuthService ruby) {
 
     final var map = new HashMap<RepoType, ProtocolAuthService>();
     map.put(RepoType.CARGO, cargo);

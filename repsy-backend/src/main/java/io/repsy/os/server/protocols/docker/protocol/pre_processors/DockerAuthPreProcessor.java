@@ -19,7 +19,7 @@ import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.libs.protocol.router.ProcessorResult;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolProcessor;
-import io.repsy.os.server.protocols.docker.shared.auth.services.DockerAuthComponent;
+import io.repsy.os.server.protocols.docker.shared.auth.services.DockerAuthenticator;
 import io.repsy.os.server.shared.auth.AuthChallenges;
 import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
 import io.repsy.os.shared.constants.ErrorConstants;
@@ -47,7 +47,7 @@ public class DockerAuthPreProcessor extends ProtocolProcessor {
   private static final String PERMISSION_KEY = "permission";
 
   private final DockerProtocolProvider provider;
-  private final DockerAuthComponent authComponent;
+  private final DockerAuthenticator authenticator;
 
   @PostConstruct
   public void register() {
@@ -97,7 +97,7 @@ public class DockerAuthPreProcessor extends ProtocolProcessor {
       final Map<String, Object> properties) {
 
     final var permission = (Permission) properties.get(PERMISSION_KEY);
-    final var authHeader = this.authComponent.emulateAuthHeader(request);
+    final var authHeader = this.authenticator.emulateAuthHeader(request);
 
     if (permission != Permission.MANAGE || authHeader == null) {
       return;
@@ -108,7 +108,7 @@ public class DockerAuthPreProcessor extends ProtocolProcessor {
             DockerAuthChallenge.requestedName(context, repoInfo), repoInfo.getName());
 
     try {
-      this.authComponent.authorizeGrantedAccess(authHeader, name, permission);
+      this.authenticator.authorizeGrantedAccess(authHeader, name, permission);
     } catch (final UnAuthorizedException ex) {
       throw AuthChallenges.challenged(
           ex, DockerAuthChallenge.insufficientScope(request, "repository:" + name + ":delete"));
@@ -118,7 +118,7 @@ public class DockerAuthPreProcessor extends ProtocolProcessor {
   private void authenticate(
       final HttpServletRequest request, final UUID repoId, final Map<String, Object> properties) {
 
-    final var authHeader = this.authComponent.emulateAuthHeader(request);
+    final var authHeader = this.authenticator.emulateAuthHeader(request);
 
     if (authHeader == null) {
       throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
@@ -136,7 +136,7 @@ public class DockerAuthPreProcessor extends ProtocolProcessor {
 
     final var permission = (Permission) properties.get(PERMISSION_KEY);
 
-    this.authComponent.handleBearerAuth(authHeader, repoId, permission);
+    this.authenticator.handleBearerAuth(authHeader, repoId, permission);
   }
 
   private boolean shouldSkipAuthentication(

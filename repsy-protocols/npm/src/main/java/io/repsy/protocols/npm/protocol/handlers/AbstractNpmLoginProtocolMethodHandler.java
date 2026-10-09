@@ -24,7 +24,7 @@ import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
 import io.repsy.protocols.npm.shared.auth.dtos.LoginRequest;
 import io.repsy.protocols.npm.shared.auth.dtos.NpmLoginResponse;
-import io.repsy.protocols.npm.shared.auth.services.NpmAuthComponent;
+import io.repsy.protocols.npm.shared.auth.services.NpmAuthenticator;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
@@ -47,17 +47,17 @@ public abstract class AbstractNpmLoginProtocolMethodHandler<ID> implements Proto
   private static final Pattern LOGIN_PATTERN = Pattern.compile("^/-/user/.*");
 
   private final PathParser basePathParser;
-  private final NpmAuthComponent<ID> authComponent;
+  private final NpmAuthenticator<ID> authenticator;
   private final ObjectMapper objectMapper;
 
   public AbstractNpmLoginProtocolMethodHandler(
       @Qualifier("npmPathParser") final PathParser basePathParser,
-      final NpmAuthComponent<ID> authComponent,
+      final NpmAuthenticator<ID> authenticator,
       final ObjectMapper objectMapper,
       final NpmProtocolProvider provider) {
 
     this.basePathParser = basePathParser;
-    this.authComponent = authComponent;
+    this.authenticator = authenticator;
     this.objectMapper = objectMapper;
 
     provider.registerMethodHandler(this);
@@ -112,7 +112,7 @@ public abstract class AbstractNpmLoginProtocolMethodHandler<ID> implements Proto
       final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
 
       final var sessionToken =
-          this.authComponent.authenticateRepoUser(
+          this.authenticator.authenticateRepoUser(
               repoInfo, loginRequest.getName(), loginRequest.getPassword());
 
       final var loginResponse =

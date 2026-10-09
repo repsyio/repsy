@@ -35,7 +35,7 @@
  *    image, so its challenge carries NO `scope`; a request that addresses one carries the scope it
  *    needs, `repository:<repo>/<image>:pull` (READ), `:pull,push` (WRITE) or `:delete` (MANAGE), which
  *    containerd, oras-go and crane copy into their token request (RPS-1588).
- *  - Token endpoint (`AbstractDockerTokenProtocolMethodHandler`/`DockerAuthComponent
+ *  - Token endpoint (`AbstractDockerTokenProtocolMethodHandler`/`DockerAuthenticator
  *    .handleBearerAuth`): with `Authorization: Basic`, a deploy-token lookup by the password value
  *    runs FIRST regardless of username; not found falls through to username/password. The scope is
  *    NOT checked at issuance -- a read-only token, or a token of a different repo, still gets a JWT;
@@ -83,7 +83,7 @@
  *    for EVERY blob (confirmed live: a layer blob's own GET reports the CONFIG media type) -- an
  *    observation, not filed (no real client reads a blob's `Content-Type` to decide what it is; the
  *    digest in the URL already says that).
- *  - Auth per operation (`DockerAuthPreProcessor`/`DockerAuthComponent.handleBearerAuth`): a deploy
+ *  - Auth per operation (`DockerAuthPreProcessor`/`DockerAuthenticator.handleBearerAuth`): a deploy
  *    token's JWT is authorized only for ITS OWN repo and, for a write, only when `!readOnly` --
  *    confirmed live: a read-only token's own token-endpoint issuance still answers `200`, but its
  *    first WRITE request (`POST blobs/uploads/`) is refused `401` (Bearer challenge + OCI body), while

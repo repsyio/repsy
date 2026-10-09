@@ -83,7 +83,7 @@
  *  - Auth (`PypiAuthPreProcessor`, priority 100): skipped only for a public-repo READ
  *    (`!privateRepo && !writeOperation`). Otherwise a missing/unparseable `Authorization` is a flat
  *    `401 unAuthorized` + `WWW-Authenticate: Basic realm="Repsy"`.
- *    `PypiAuthComponent.handleBasicAuthWithToken` tries a deploy token by PASSWORD first (username
+ *    `PypiAuthenticator.handleBasicAuthWithToken` tries a deploy token by PASSWORD first (username
  *    ignored), then falls back to username/password auth -- so a read-only deploy token attempting a
  *    WRITE is the same flat `401` every other protocol in this harness gives (confirmed live/H5, not
  *    a `403`), while the SAME token's READ (the project page) is `200`. Single-hop Basic, no token
