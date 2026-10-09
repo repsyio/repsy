@@ -27,15 +27,15 @@ import io.repsy.protocols.helm.shared.chart.services.AbstractHelmChartFilesServi
 import io.repsy.protocols.helm.shared.chart.services.AbstractHelmChartFilesService.DeletedChart;
 import io.repsy.protocols.helm.shared.chart.services.ChartService;
 import io.repsy.protocols.helm.shared.constants.HelmConstants;
-import io.repsy.protocols.helm.shared.index.dtos.HelmIndexDto;
-import io.repsy.protocols.helm.shared.index.dtos.HelmIndexEntryDto;
+import io.repsy.protocols.helm.shared.index.dtos.HelmIndexEntryInfo;
+import io.repsy.protocols.helm.shared.index.dtos.HelmIndexInfo;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciBlobForm;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciBlobInfo;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestForm;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestInfo;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestPushForm;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestPushResult;
-import io.repsy.protocols.helm.shared.oci.dtos.HelmOciTagListDto;
+import io.repsy.protocols.helm.shared.oci.dtos.HelmOciTagListInfo;
 import io.repsy.protocols.helm.shared.oci.services.OciBlobService;
 import io.repsy.protocols.helm.shared.oci.services.OciManifestService;
 import io.repsy.protocols.helm.shared.storage.services.HelmStorageService;
@@ -91,7 +91,7 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmProtocolFa
   protected final AbstractHelmChartFilesService<ID> chartFilesService;
 
   @Override
-  public HelmIndexDto generateIndex(final ProtocolContext context) {
+  public HelmIndexInfo generateIndex(final ProtocolContext context) {
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     // The rows come back in the order the database keeps them, which changes with every update of
     // a row. The index is listed the way `helm repo index` writes it (RPS-1614): the charts by
@@ -99,7 +99,7 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmProtocolFa
     final var charts =
         this.chartService.findAllByRepoId(repoInfo.getId()).stream().sorted(INDEX_ORDER).toList();
 
-    final Map<String, List<HelmIndexEntryDto>> entries = new LinkedHashMap<>();
+    final Map<String, List<HelmIndexEntryInfo>> entries = new LinkedHashMap<>();
 
     for (final var chart : charts) {
       final var url =
@@ -110,7 +110,7 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmProtocolFa
               + chart.version()
               + HelmConstants.TGZ_EXTENSION;
       final var entry =
-          HelmIndexEntryDto.builder()
+          HelmIndexEntryInfo.builder()
               .name(chart.name())
               .version(chart.version())
               .description(chart.description())
@@ -125,7 +125,7 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmProtocolFa
       entries.computeIfAbsent(chart.name(), _ -> new ArrayList<>()).add(entry);
     }
 
-    return HelmIndexDto.builder()
+    return HelmIndexInfo.builder()
         .apiVersion(HelmConstants.API_VERSION)
         .entries(entries)
         .generated(Instant.now().toString())
@@ -605,7 +605,7 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmProtocolFa
   }
 
   @Override
-  public HelmOciTagListDto listTags(final ProtocolContext context, final String name) {
+  public HelmOciTagListInfo listTags(final ProtocolContext context, final String name) {
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     // listTagsByName's references include pushes by digest (sha256:...), which the distribution
     // spec's tags/list must not return, and are ordered newest-first, where the spec wants
@@ -619,6 +619,6 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmProtocolFa
             .toList();
     // The distribution spec's name is the whole repository name, <repo>/<chart> here, as the
     // Docker registry answers it (RPS-1489); the bare chart name was ambiguous between repos.
-    return HelmOciTagListDto.builder().name(repoInfo.getName() + "/" + name).tags(tags).build();
+    return HelmOciTagListInfo.builder().name(repoInfo.getName() + "/" + name).tags(tags).build();
   }
 }

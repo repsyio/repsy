@@ -20,7 +20,7 @@
  * What the 500 limit counts, read from the code and then asserted:
  *  - the panel forms: `Validators.maxLength(500)` and the `n/500` counter (`description.validators.ts`) use JS
  *    `String.length`, UTF-16 code units;
- *  - the backend: `maxLength: 500` of `RepoCreateRequest`, `RepoDescriptionForm` and `DeployTokenForm`
+ *  - the backend: `maxLength: 500` of `RepoCreateForm`, `RepoDescriptionForm` and `DeployTokenForm`
  *    (`openapi-spec.yaml`) becomes `@Size(max = 500)` on a `String`, which Hibernate Validator also counts in
  *    UTF-16 units; the column is `varchar(500)` (V0001), which counts characters and so is never stricter.
  * So the limit is neither bytes (500 x "e-acute" is 1000 bytes of UTF-8 and fits) nor code points (an emoji

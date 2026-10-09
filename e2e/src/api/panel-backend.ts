@@ -35,7 +35,7 @@ import type { DeployTokenInfoListItem } from './generated/models/DeployTokenInfo
 import type { ImageListItem } from './generated/models/ImageListItem.js';
 import type { LoginInfo } from './generated/models/LoginInfo.js';
 import type { PgpPublicKeyItem } from './generated/models/PgpPublicKeyItem.js';
-import type { RepoCreateRequest } from './generated/models/RepoCreateRequest.js';
+import type { RepoCreateForm as RepoCreateFormModel } from './generated/models/RepoCreateForm.js';
 import type { RepoListInfo } from './generated/models/RepoListInfo.js';
 import type { RepoSecuritySummary } from './generated/models/RepoSecuritySummary.js';
 import type { RepoSettingsForm } from './generated/models/RepoSettingsForm.js';
@@ -95,7 +95,7 @@ export const UserRole = {
 export type UserRole = (typeof UserRole)[keyof typeof UserRole];
 
 /** The body of `POST /api/repos` without its `type`, which `createRepo` takes as its own argument. */
-export type RepoCreateForm = Omit<RepoCreateRequest, 'type'>;
+export type RepoCreateForm = Omit<RepoCreateFormModel, 'type'>;
 
 /** The query of the repository list; every field is optional. */
 export interface RepoListParams {

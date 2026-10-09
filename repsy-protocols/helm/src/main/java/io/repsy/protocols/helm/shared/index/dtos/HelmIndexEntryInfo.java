@@ -13,18 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.protocols.helm.shared.oci.dtos;
+package io.repsy.protocols.helm.shared.index.dtos;
 
 import java.util.List;
+import java.util.Map;
 import lombok.Builder;
 import lombok.Value;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
+/** A single chart entry inside the Helm index.yaml entries map. */
 @Value
 @Builder
 @NullMarked
-public class HelmOciTagListDto {
+public class HelmIndexEntryInfo {
 
   String name;
-  List<String> tags;
+  String version;
+  @Nullable String description;
+  @Nullable String appVersion;
+  @Nullable String type;
+  @Nullable String apiVersion;
+  @Nullable List<Map<String, Object>> dependencies;
+  String digest;
+  List<String> urls;
+  String created;
 }

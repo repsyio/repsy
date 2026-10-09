@@ -18,7 +18,7 @@ package io.repsy.os.shared.configs;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import io.repsy.os.generated.model.RepoCreateRequest;
+import io.repsy.os.generated.model.RepoCreateForm;
 import io.repsy.os.server.security.scan.dtos.ScanStatus;
 import io.repsy.os.server.security.scan.dtos.Severity;
 import io.repsy.os.shared.user.entities.UserRole;
@@ -75,8 +75,8 @@ class RepoTypeConversionTest {
     final var lower = "{\"name\":\"a\",\"type\":\"" + type.name().toLowerCase() + "\"}";
     final var upper = "{\"name\":\"a\",\"type\":\"" + type.name() + "\"}";
 
-    assertThat(this.json.readValue(lower, RepoCreateRequest.class).getType()).isEqualTo(type);
-    assertThat(this.json.readValue(upper, RepoCreateRequest.class).getType()).isEqualTo(type);
+    assertThat(this.json.readValue(lower, RepoCreateForm.class).getType()).isEqualTo(type);
+    assertThat(this.json.readValue(upper, RepoCreateForm.class).getType()).isEqualTo(type);
     assertThat(this.json.writeValueAsString(type)).isEqualTo("\"" + type.name() + "\"");
   }
 
@@ -84,15 +84,14 @@ class RepoTypeConversionTest {
   @DisplayName("a JSON body with an unknown type is refused")
   void jsonUnknownType() {
     assertThatThrownBy(
-            () -> this.json.readValue("{\"name\":\"a\",\"type\":\"mvn\"}", RepoCreateRequest.class))
+            () -> this.json.readValue("{\"name\":\"a\",\"type\":\"mvn\"}", RepoCreateForm.class))
         .isInstanceOf(tools.jackson.core.JacksonException.class);
   }
 
   @Test
   @DisplayName("the generated request DTO uses the hand-written RepoType, not a copy of it")
   void generatedModelUsesTheSharedEnum() throws Exception {
-    assertThat(RepoCreateRequest.class.getMethod("getType").getReturnType())
-        .isSameAs(RepoType.class);
+    assertThat(RepoCreateForm.class.getMethod("getType").getReturnType()).isSameAs(RepoType.class);
   }
 
   @Test

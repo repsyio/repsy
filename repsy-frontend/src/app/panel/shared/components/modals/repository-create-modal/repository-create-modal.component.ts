@@ -20,7 +20,7 @@ import { ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { finalize } from 'rxjs/operators';
 
-import { RepoCreateRequest, RepoListInfo, ReposApi } from '../../../../../../generated/api';
+import { RepoCreateForm, RepoListInfo, ReposApi } from '../../../../../../generated/api';
 import { idFactory } from '../../../../../shared/util/unique-id';
 import {
   DESCRIPTION_MAX_LENGTH,
@@ -112,7 +112,7 @@ export class RepositoryCreateModalComponent implements OnInit {
     this.form.disable();
 
     const type = toApiRepoType(this.selectedOption);
-    const body: RepoCreateRequest = { ...this.form.getRawValue(), type };
+    const body: RepoCreateForm = { ...this.form.getRawValue(), type };
 
     this.reposApi
       .createRepository(body)
