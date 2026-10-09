@@ -41,6 +41,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.retry.annotation.EnableRetry;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
@@ -68,6 +69,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
   PasswordResetMarkerProperties.class,
 })
 @EnableAsync
+@EnableRetry
 @EnableScheduling
 @SpringBootApplication(
     scanBasePackages = {"io.repsy.os", "io.repsy.core", "io.repsy.libs", "io.repsy.protocols"})

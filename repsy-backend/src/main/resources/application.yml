@@ -180,7 +180,10 @@ repsy:
     # Limits the failed password checks (HTTP Basic and panel login) of one client, so wrong
     # credentials cannot keep the CPU busy with BCrypt. The client is the remote address, which
     # behind a reverse proxy is the X-Forwarded-For entry of a trusted proxy.
+    # mode: off, observe (log and count repsy.auth.throttle_would_block, never refuse) or enforce.
+    # AUTH_THROTTLE_ENABLED=false is the older spelling of mode off.
     auth-throttle:
+      mode: ${AUTH_THROTTLE_MODE:enforce}
       enabled: ${AUTH_THROTTLE_ENABLED:true}
       max-failures: ${AUTH_THROTTLE_MAX_FAILURES:20}
       window-seconds: ${AUTH_THROTTLE_WINDOW_SECONDS:60}

@@ -26,6 +26,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.server.shared.auth.AuthFailureThrottle;
@@ -78,7 +79,7 @@ class DockerAuthenticatorTest {
           Mockito.mock(JwtUtils.class),
           Mockito.mock(DeployTokenService.class),
           new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
-          new AuthFailureThrottle(AuthThrottleProperties.disabled()));
+          new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()));
 
   private static String basicAuth(final String username, final String password) {
     final var raw = (username + ":" + password).getBytes(StandardCharsets.UTF_8);
@@ -129,7 +130,7 @@ class DockerAuthenticatorTest {
             jwtUtils,
             Mockito.mock(DeployTokenService.class),
             new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
-            new AuthFailureThrottle(AuthThrottleProperties.disabled()));
+            new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()));
 
     assertUnauthorized(() -> component.authenticateUser("Bearer signed.jwt.token"));
   }
@@ -159,7 +160,7 @@ class DockerAuthenticatorTest {
             this.jwtUtils,
             Mockito.mock(DeployTokenService.class),
             new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
-            new AuthFailureThrottle(AuthThrottleProperties.disabled()));
+            new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()));
 
     PanelBearerBinding() {
       when(this.users.getAuthenticatedUserByUsername(USERNAME)).thenReturn(this.user);
@@ -268,7 +269,7 @@ class DockerAuthenticatorTest {
             this.jwtUtils,
             Mockito.mock(DeployTokenService.class),
             new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
-            new AuthFailureThrottle(AuthThrottleProperties.disabled()));
+            new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()));
 
     private void issuedFor(final List<String> grants) {
       when(this.jwtUtils.extractAccess(BEARER, TokenRealm.PROTOCOL)).thenReturn(grants);
@@ -373,7 +374,7 @@ class DockerAuthenticatorTest {
             this.jwtUtils,
             Mockito.mock(DeployTokenService.class),
             new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
-            new AuthFailureThrottle(AuthThrottleProperties.disabled()));
+            new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()));
 
     private final UUID ghostId = UUID.randomUUID();
 
@@ -433,7 +434,7 @@ class DockerAuthenticatorTest {
             this.jwtUtils,
             Mockito.mock(DeployTokenService.class),
             new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
-            new AuthFailureThrottle(AuthThrottleProperties.disabled()));
+            new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()));
 
     AnonymousToken() {
       when(this.jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
@@ -502,7 +503,7 @@ class DockerAuthenticatorTest {
             this.jwtUtils,
             this.deployTokenService,
             new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
-            new AuthFailureThrottle(AuthThrottleProperties.disabled()));
+            new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()));
 
     @Test
     @DisplayName("handleBearerAuth never looks the value up as a deploy token")
@@ -541,7 +542,7 @@ class DockerAuthenticatorTest {
             this.jwtUtils,
             Mockito.mock(DeployTokenService.class),
             new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
-            new AuthFailureThrottle(AuthThrottleProperties.disabled()));
+            new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()));
 
     ScannerToken() {
       when(this.jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
@@ -596,7 +597,7 @@ class DockerAuthenticatorTest {
             this.jwtUtils,
             this.deployTokenService,
             new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
-            new AuthFailureThrottle(AuthThrottleProperties.disabled()));
+            new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()));
 
     private final UUID repoId = UUID.randomUUID();
     private final UUID tokenId = UUID.randomUUID();

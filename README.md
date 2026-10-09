@@ -645,6 +645,7 @@ Deleting `1.0.0+a` when there is no such entry (the usual case) still deletes `1
 | `BASIC_AUTH_CACHE_TTL_SECONDS` | How long a remembered password check stays valid | `300` |
 | `BASIC_AUTH_CACHE_MAX_ENTRIES` | How many remembered password checks are kept | `10000` |
 | `AUTH_THROTTLE_ENABLED` | Limit the failed password checks of one client (HTTP Basic, unrecognised Bearer tokens and web UI login), so a flood of wrong credentials cannot keep the CPU busy with password verification. A client over the limit is answered with `429 Too Many Requests`. See [Authenticating from CI](#authenticating-from-ci). | `true` |
+| `AUTH_THROTTLE_MODE` | `enforce`, `observe` or `off`. In `observe` a client over the limit is logged at `WARN` and counted in the `repsy.auth.throttle_would_block` meter but never refused, to tune the limits before enforcing. `AUTH_THROTTLE_ENABLED=false` is the older spelling of `off` | `enforce` |
 | `AUTH_THROTTLE_MAX_FAILURES` | How many failed password checks one client may make per window before its next password check is refused | `20` |
 | `AUTH_THROTTLE_WINDOW_SECONDS` | Length of the window in seconds. When it ends, the client starts again with a clean count | `60` |
 | `AUTH_THROTTLE_MAX_CLIENTS` | How many clients are tracked at once | `10000` |

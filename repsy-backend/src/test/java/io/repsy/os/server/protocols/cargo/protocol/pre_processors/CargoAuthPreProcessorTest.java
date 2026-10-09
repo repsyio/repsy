@@ -23,6 +23,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.libs.protocol.router.ProcessorResult;
 import io.repsy.libs.protocol.router.ProtocolContext;
@@ -76,7 +77,8 @@ class CargoAuthPreProcessorTest {
               this.jwtUtils,
               Mockito.mock(DeployTokenService.class),
               new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
-              new AuthFailureThrottle(AuthThrottleProperties.disabled())),
+              new AuthFailureThrottle(
+                  AuthThrottleProperties.disabled(), new SimpleMeterRegistry())),
           Mockito.mock(CargoProtocolProvider.class));
 
   CargoAuthPreProcessorTest() {

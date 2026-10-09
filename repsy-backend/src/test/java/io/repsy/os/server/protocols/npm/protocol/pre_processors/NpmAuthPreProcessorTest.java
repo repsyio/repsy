@@ -21,6 +21,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
@@ -69,7 +70,7 @@ class NpmAuthPreProcessorTest {
               this.jwtUtils,
               Mockito.mock(DeployTokenService.class),
               new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
-              new AuthFailureThrottle(AuthThrottleProperties.disabled()),
+              new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()),
               Mockito.mock(RevokedProtocolTokenService.class)),
           Mockito.mock(NpmProtocolProvider.class));
 

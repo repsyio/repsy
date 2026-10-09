@@ -20,6 +20,7 @@ import com.google.common.base.Ticker;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.net.InetAddresses;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.repsy.protocols.shared.exceptions.TooManyRequestsException;
 import java.net.Inet6Address;
 import java.net.InetAddress;
@@ -58,10 +59,13 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  *       validly signed JWT is recognized and does not count. A success never resets the count, so a
  *       client cannot clear it by logging in with an account of its own; only the end of the window
  *       does.
- *   <li>A fixed window per client: after {@code maxFailures} failures the next password check is
- *       refused until the window ends. A refused attempt costs no BCrypt, but it is counted too, so
- *       a client that keeps sending guesses reaches {@link #isSaturated() saturation} after {@value
- *       #SATURATION_FACTOR} times the limit.
+ *   <li>A fixed window per client: after {@code maxFailures} failures the next password check would
+ *       be refused. In {@link AuthThrottleMode#ENFORCE} (the default) it is refused, with {@code
+ *       429} and {@code Retry-After}; in {@link AuthThrottleMode#OBSERVE} it is logged and counted
+ *       against {@value #WOULD_BLOCK_METRIC} instead, and let through exactly as {@link
+ *       AuthThrottleMode#OFF} would. A refused (or would-refuse) attempt costs no BCrypt, but it is
+ *       counted too, so a client that keeps sending guesses reaches {@link #isSaturated()
+ *       saturation} after {@value #SATURATION_FACTOR} times the limit.
  *   <li>The clients are held in a bounded cache, so an attacker cannot fill the memory with
  *       addresses.
  * </ul>
@@ -80,41 +84,55 @@ public class AuthFailureThrottle {
    */
   static final int SATURATION_FACTOR = 10;
 
+  /** Counted in {@link AuthThrottleMode#OBSERVE} for a client that {@code enforce} would refuse. */
+  static final String WOULD_BLOCK_METRIC = "repsy.auth.throttle_would_block";
+
   private final @Nullable Cache<String, Window> windows;
+  private final @NonNull AuthThrottleMode mode;
+  private final @NonNull MeterRegistry meterRegistry;
   private final @NonNull Ticker ticker;
   private final long maxFailures;
   private final long saturationLimit;
   private final long windowNanos;
 
   @Autowired
-  public AuthFailureThrottle(final @NonNull AuthThrottleProperties properties) {
+  public AuthFailureThrottle(
+      final @NonNull AuthThrottleProperties properties,
+      final @NonNull MeterRegistry meterRegistry) {
 
-    this(properties, Ticker.systemTicker());
+    this(properties, meterRegistry, Ticker.systemTicker());
   }
 
   @VisibleForTesting
   AuthFailureThrottle(
-      final @NonNull AuthThrottleProperties properties, final @NonNull Ticker ticker) {
+      final @NonNull AuthThrottleProperties properties,
+      final @NonNull MeterRegistry meterRegistry,
+      final @NonNull Ticker ticker) {
 
     this.ticker = ticker;
+    this.mode = properties.mode();
+    this.meterRegistry = meterRegistry;
     this.maxFailures = properties.maxFailures();
     this.saturationLimit = properties.maxFailures() * (long) SATURATION_FACTOR;
     this.windowNanos = TimeUnit.SECONDS.toNanos(properties.windowSeconds());
 
     this.windows =
-        properties.enabled()
-            ? CacheBuilder.newBuilder()
+        this.mode == AuthThrottleMode.OFF
+            ? null
+            : CacheBuilder.newBuilder()
                 .maximumSize(properties.maxClients())
                 .expireAfterWrite(Duration.ofSeconds(properties.windowSeconds()))
                 .ticker(ticker)
-                .build()
-            : null;
+                .build();
   }
 
   /**
-   * Refuses the request when its client has used up its failures for the current window.
+   * Refuses the request when its client has used up its failures for the current window and the
+   * mode is {@link AuthThrottleMode#ENFORCE}. In {@link AuthThrottleMode#OBSERVE} the same client
+   * is logged and counted instead of refused; in {@link AuthThrottleMode#OFF} nothing is tracked at
+   * all.
    *
-   * @throws TooManyRequestsException when the client is blocked
+   * @throws TooManyRequestsException when the client is blocked and the mode is {@code enforce}
    */
   public void checkAllowed() {
 
@@ -131,8 +149,18 @@ public class AuthFailureThrottle {
       return;
     }
 
-    // The refused attempt is counted, see SATURATION_FACTOR.
+    // The refused (or would-refuse) attempt is counted, see SATURATION_FACTOR.
     this.windows.asMap().computeIfPresent(client, (key, current) -> this.next(current, now));
+
+    if (this.mode == AuthThrottleMode.OBSERVE) {
+      log.warn(
+          "repsy.security.auth-throttle.mode=observe: client {} would be refused (429) for {}"
+              + " failed password checks; letting it through",
+          client,
+          this.maxFailures);
+      this.meterRegistry.counter(WOULD_BLOCK_METRIC, "network", client).increment();
+      return;
+    }
 
     throw new TooManyRequestsException(this.secondsLeft(window, now));
   }
@@ -155,17 +183,20 @@ public class AuthFailureThrottle {
       // Once per window, because the count only grows. The address is logged individually, even
       // though IPv6 clients are throttled per network, so an operator can still see it.
       log.warn(
-          "Client {} (network {}) made {} failed password checks, refusing its password checks"
-              + " until its window ends",
+          "Client {} (network {}) made {} failed password checks ({})",
           remoteAddr,
           client,
-          this.maxFailures);
+          this.maxFailures,
+          this.mode == AuthThrottleMode.ENFORCE
+              ? "refusing its password checks until its window ends"
+              : "would be refused if repsy.security.auth-throttle.mode were enforce");
     }
   }
 
   /**
-   * Tells whether the client of the current request has kept guessing after it was blocked, so that
-   * not even a remembered password is let through any more.
+   * Tells whether the client of the current request has kept guessing after it was blocked (or
+   * would have been, in {@code observe}), so that not even a remembered password is let through any
+   * more.
    */
   public boolean isSaturated() {
 
