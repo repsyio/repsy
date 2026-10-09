@@ -305,23 +305,32 @@ export class AuthService {
   private async _withStorageLock<T>(task: () => Promise<T>): Promise<T> {
     const mine = `${this.tabId}:`;
     const giveUpAt = Date.now() + LOCK_MAX_WAIT_MS;
+    const release = (): void => {
+      if (localStorage.getItem(REFRESH_LOCK_KEY)?.startsWith(mine)) {
+        localStorage.removeItem(REFRESH_LOCK_KEY);
+      }
+    };
+    // A page that is reloaded or closed while it holds (or has just written) the entry would leave it behind for the
+    // whole TTL, and the next page of the tab would wait that long for a lock nobody holds.
+    window.addEventListener('pagehide', release);
     let held = false;
-    while (!held && Date.now() < giveUpAt) {
-      const expiresAt = Number(localStorage.getItem(REFRESH_LOCK_KEY)?.split(':')[1]);
-      if (!(expiresAt > Date.now())) {
-        localStorage.setItem(REFRESH_LOCK_KEY, `${mine}${Date.now() + LOCK_TTL_MS}`);
-        await sleep(LOCK_SETTLE_MS);
-        held = !!localStorage.getItem(REFRESH_LOCK_KEY)?.startsWith(mine);
-      }
-      if (!held) {
-        await sleep(LOCK_POLL_MS);
-      }
-    }
     try {
+      while (!held && Date.now() < giveUpAt) {
+        const expiresAt = Number(localStorage.getItem(REFRESH_LOCK_KEY)?.split(':')[1]);
+        if (!(expiresAt > Date.now())) {
+          localStorage.setItem(REFRESH_LOCK_KEY, `${mine}${Date.now() + LOCK_TTL_MS}`);
+          await sleep(LOCK_SETTLE_MS);
+          held = !!localStorage.getItem(REFRESH_LOCK_KEY)?.startsWith(mine);
+        }
+        if (!held) {
+          await sleep(LOCK_POLL_MS);
+        }
+      }
       return await task();
     } finally {
-      if (held && localStorage.getItem(REFRESH_LOCK_KEY)?.startsWith(mine)) {
-        localStorage.removeItem(REFRESH_LOCK_KEY);
+      window.removeEventListener('pagehide', release);
+      if (held) {
+        release();
       }
     }
   }
