@@ -17,6 +17,7 @@ package io.repsy.protocols.nuget.protocol.handlers;
 
 import static io.repsy.protocols.nuget.NuGetTestContexts.context;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -24,6 +25,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import io.repsy.libs.protocol.router.PathParser;
+import io.repsy.libs.storage.core.exceptions.StorageUnavailableException;
 import io.repsy.protocols.nuget.protocol.NuGetProtocolProvider;
 import io.repsy.protocols.nuget.protocol.dtos.NuGetErrorResponse;
 import io.repsy.protocols.nuget.protocol.facades.contracts.NuGetProtocolFacade;
@@ -152,5 +154,19 @@ class AbstractNuGetPublishProtocolMethodHandlerTest {
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
     assertThat(response.getBody()).isEqualTo(NuGetErrorResponse.of("Publish failed"));
+  }
+
+  @Test
+  @DisplayName("leaves a storage outage to the error handler (RPS-2104)")
+  void rethrowsStorageUnavailable() throws IOException {
+    final var ctx = context("/v3/package");
+    final var request = multipartRequest(MULTIPART);
+    request.addPart(nupkgPart());
+    final var outage =
+        new StorageUnavailableException("storage down", new IOException("no space left"));
+    doThrow(outage).when(facade).publish(eq(ctx), any(InputStream.class));
+
+    assertThatThrownBy(() -> handler.handle(ctx, request, new MockHttpServletResponse()))
+        .isSameAs(outage);
   }
 }

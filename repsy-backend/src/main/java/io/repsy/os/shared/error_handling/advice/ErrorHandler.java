@@ -33,6 +33,7 @@ import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.libs.multiport.configs.props.MultiPortProperties;
 import io.repsy.libs.storage.core.exceptions.InvalidStoragePathException;
+import io.repsy.libs.storage.core.exceptions.StorageUnavailableException;
 import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.error_handling.dtos.ProblemField;
 import io.repsy.os.shared.error_handling.exceptions.InvalidPagingParameterException;
@@ -1165,6 +1166,43 @@ public class ErrorHandler {
         .contentType(this.contentType(request))
         .header(HttpHeaders.RETRY_AFTER, LOCK_FAILURE_RETRY_AFTER)
         .body(body);
+  }
+
+  /**
+   * Handles a storage write that failed (RPS-2104): the storage strategy could not create, write or
+   * move the object of an upload. The request kept nothing, so the client is told to repeat it: 503
+   * with {@code Retry-After}, like a lock that could not be taken. The message id stays {@code
+   * errorOccurred}, the one this failure answered as a 500 before, and the body goes the format's
+   * own way (the RestResponse envelope that the OCI and Cargo advices rewrite, problem+json on the
+   * panel).
+   *
+   * <p>Only {@link StorageUnavailableException} is mapped, never a bare {@code IOException}: reads,
+   * a client that went away mid-upload and everything else keep the 500 of {@link
+   * #defaultExceptionHandler}. A failure that does not pass with time (a full disk) is answered as
+   * retry-later too; it is logged as an error with its cause so that it is seen.
+   */
+  @ExceptionHandler(StorageUnavailableException.class)
+  @Nullable ResponseEntity<Object> handleException(
+      final @NonNull StorageUnavailableException ex,
+      final @NonNull HttpServletRequest request,
+      final @Nullable HttpServletResponse response) {
+
+    if (response == null) {
+      log.debug("Storage unavailable", ex);
+      return null;
+    }
+
+    log.error(exceptionToString(ex, request));
+
+    if (response.isCommitted()) {
+      log.warn("Response already committed, skipping error body write for a storage failure");
+      return null;
+    }
+
+    response.resetBuffer();
+
+    return this.retryLater(
+        this.error(request, HttpStatus.SERVICE_UNAVAILABLE, ERR_ERROR_OCCURRED), request);
   }
 
   @ExceptionHandler(RetryableException.class)

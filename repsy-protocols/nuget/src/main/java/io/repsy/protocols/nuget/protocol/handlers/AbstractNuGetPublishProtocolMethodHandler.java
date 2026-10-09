@@ -18,6 +18,7 @@ package io.repsy.protocols.nuget.protocol.handlers;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
+import io.repsy.libs.storage.core.exceptions.StorageUnavailableException;
 import io.repsy.protocols.nuget.protocol.NuGetProtocolProvider;
 import io.repsy.protocols.nuget.protocol.dtos.NuGetErrorResponse;
 import io.repsy.protocols.nuget.protocol.facades.contracts.NuGetProtocolFacade;
@@ -82,6 +83,12 @@ public abstract class AbstractNuGetPublishProtocolMethodHandler implements Proto
     };
   }
 
+  /**
+   * Publishes the package. A validation failure is a 400 and an existing version a 409, in NuGet's
+   * error body. A storage outage ({@link StorageUnavailableException}) is rethrown so that {@code
+   * ErrorHandler} answers it 503 with {@code Retry-After}, the same as on every other format
+   * (RPS-2104); any other failure is logged and answered 500.
+   */
   @Override
   public ResponseEntity<Object> handle(
       final ProtocolContext context,
@@ -105,9 +112,17 @@ public abstract class AbstractNuGetPublishProtocolMethodHandler implements Proto
     } catch (final ResponseStatusException e) {
       return this.handleConflict(e);
     } catch (final Exception e) {
-      log.error("NuGet publish failed", e);
-      return this.createErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Publish failed");
+      return this.unexpectedFailure(e);
     }
+  }
+
+  private ResponseEntity<Object> unexpectedFailure(final Exception e) {
+    if (e instanceof final StorageUnavailableException outage) {
+      throw outage;
+    }
+
+    log.error("NuGet publish failed", e);
+    return this.createErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Publish failed");
   }
 
   private void validateRequest(final HttpServletRequest request) {
