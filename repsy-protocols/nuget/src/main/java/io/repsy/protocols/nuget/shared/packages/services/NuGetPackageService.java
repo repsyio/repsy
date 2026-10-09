@@ -75,6 +75,8 @@ public interface NuGetPackageService<ID> {
   List<NuGetVersionInfo> getAllVersionInfos(BaseRepoInfo<ID> repoInfo, String packageId);
 
   /**
+   * @param prerelease whether pre-release versions count: when they do not, a package that only has
+   *     pre-releases is left out
    * @param semVer2 whether SemVer 2.0.0-only versions count: when they do not, a package that only
    *     has such versions is left out
    */
@@ -94,6 +96,8 @@ public interface NuGetPackageService<ID> {
       BaseRepoInfo<ID> repoInfo, String packageId, String query, Pageable pageable);
 
   /**
+   * @param prerelease whether pre-release versions count: when they do not, they are left out of
+   *     each result's versions, and a package that only has pre-releases is not a result
    * @param semVer2 whether SemVer 2.0.0-only versions count: when they do not, they are left out of
    *     each result's versions, and a package that only has such versions is not a result
    */
