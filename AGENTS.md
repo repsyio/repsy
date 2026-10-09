@@ -666,6 +666,18 @@ Old springdoc tag to new tag. Several old tags may map to one new tag (one area,
   `-- migration-check: allow <rule> <reason>` (rules: `indexConcurrently`, `concurrentlyConf`,
   `concurrentlyOnly`, `lockTimeout`, `tableRewrite`, `unbatchedUpdate`, `h2Twin`, `h2Syntax`), so the
   reviewer sees it with the file.
+- **A `CONCURRENTLY` migration needs Flyway's PostgreSQL transactional advisory lock off, in every
+  place Flyway runs.** With `executeInTransaction=false` Flyway's own session still holds that lock in
+  an open transaction (`idle in transaction`), and the `CONCURRENTLY` statement waits for its
+  virtual transaction id forever (confirmed with `pg_locks`, RPS-2112). Set
+  `spring.flyway.postgresql.transactional-lock=false` in `application.yml` (property
+  `flyway.postgresql.transactional.lock`, env `FLYWAY_POSTGRESQL_TRANSACTIONAL_LOCK`); an IT that
+  runs Flyway itself with `Flyway.configure` passes
+  `.configuration(Map.of("flyway.postgresql.transactional.lock", "false"))`; Helm values need it
+  only if they override `spring.flyway`. The root `pom.xml` Apache RAT plugin also needs an exclude
+  for `**/db/migration/**/*.sql.conf` (a `.conf` cannot carry a licence header). Neither the setting
+  nor the exclude exists yet in OS or Cloud: both come with the RPS-2112 PRs (the first
+  `CONCURRENTLY` migration), not with the convention.
 - **`MigrationConventionTest` enforces this** (RPS-2119; a plain unit test that reads the scripts, no
   database). It lists the violations of the migrations merged before it existed in
   `EXISTING_VIOLATIONS`; that list may only shrink (a stale entry fails the build) and a new entry is
