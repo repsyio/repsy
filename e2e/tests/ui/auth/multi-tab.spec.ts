@@ -34,6 +34,7 @@ import { expect, test } from '../../../src/ui/fixtures.js';
 import { DashboardPage } from '../../../src/ui/pages/dashboard.js';
 import { LoginPage } from '../../../src/ui/pages/login.js';
 import { RepositoriesPage } from '../../../src/ui/pages/repositories.js';
+import { loginRoute } from '../../../src/ui/routes.js';
 import { Shell } from '../../../src/ui/pages/shell.js';
 import {
   countRefreshCalls,
@@ -203,8 +204,8 @@ test.describe('AUTH-13 two tabs, one session', () => {
   test('logging in in one tab signs the other tab in', async ({ page }) => {
     // The other way round: a visitor with two tabs on the login form signs in in one of them.
     const tabB = await page.context().newPage();
-    await page.goto('/');
-    await tabB.goto('/');
+    await page.goto(loginRoute());
+    await tabB.goto(loginRoute());
     await expect(new LoginPage(page).submit).toBeVisible();
     await expect(new LoginPage(tabB).submit).toBeVisible();
 

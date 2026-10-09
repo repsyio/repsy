@@ -57,6 +57,11 @@ export function formatApiPattern(prefix: string, ...segments: string[]): RegExp 
   return new RegExp(`${path}(\\?|$)`);
 }
 
+/** Where an anonymous visitor gets the login form: `/` (Repsy OS) or `/login` (Repsy Cloud, whose `/` is a landing page). */
+export function loginRoute(): string {
+  return target.ui.loginPath;
+}
+
 /** The signed-in account's own page: `/profile` (Repsy OS) or `/account` (Repsy Cloud). */
 export function profileRoute(): string {
   return target.ui.profilePath;

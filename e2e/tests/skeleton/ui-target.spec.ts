@@ -66,6 +66,7 @@ test.describe('UI capabilities per target (RPS-1638)', () => {
       expect(ui.repoRoute('r'), name).toBe('/r');
       expect(ui.repoRoute('r', 'settings'), name).toBe('/r/settings');
       expect(ui.repoRoute('r', 'g', 'a', '1.0'), name).toBe('/r/g/a/1.0');
+      expect(ui.loginPath, name).toBe('/');
       expect(ui.profilePath, name).toBe('/profile');
       expect(ui.settingsPath, name).toBe('/profile/settings');
       expect(ui.accessTokensPath, name).toBe('/profile/settings');
@@ -86,6 +87,7 @@ test.describe('UI capabilities per target (RPS-1638)', () => {
 
         expect(ui.repoRoute('r'), name).toBe('/acme/r');
         expect(ui.repoRoute('r', 'settings'), name).toBe('/acme/r/settings');
+        expect(ui.loginPath, name).toBe('/login');
         expect(ui.profilePath, name).toBe('/account');
         expect(ui.settingsPath, name).toBe('/settings');
         expect(ui.accessTokensPath, name).toBe('/settings');
