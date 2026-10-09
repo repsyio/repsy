@@ -28,7 +28,8 @@
  *    -- unlike a real registry's multi-segment names), lower-case (Docker's own reference grammar
  *    requires it). `GET|HEAD /v2` or `/v2/` is the registry-level ping, no repo context.
  *  - Ping (`AbstractDockerRegistryCheckProtocolMethodHandler`): unauthenticated `GET /v2/` answers a
- *    bare `200`; any request WITHOUT a `Bearer ` `Authorization` header instead gets short-circuited
+ *    `200` with `Docker-Distribution-API-Version: registry/2.0` (RPS-2103; the 401 below carries it
+ *    too, the API port does not); any request WITHOUT a `Bearer ` `Authorization` header instead gets short-circuited
  *    by `DockerHeaderPreProcessor` (priority 50) into a `401` + `WWW-Authenticate: Bearer
  *    realm="<scheme>://<host[:port]>/v2/token",service="repsy"` + an OCI `UNAUTHORIZED` body --
  *    confirmed live: this is what a real client's own `GET /v2/` "ping" sees. The ping names no
