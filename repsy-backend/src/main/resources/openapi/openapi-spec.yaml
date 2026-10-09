@@ -5924,8 +5924,10 @@ components:
           type: string
           format: date-time
           description: >-
-            When the token stops working. At most 365 days ahead (by UTC calendar day), otherwise the
-            answer is 400 `deployTokenExpirationTooLate`. Defaults to 365 days from now.
+            When the token stops working. It has to be in the future and at most 365 days ahead (by
+            UTC calendar day), otherwise the answer is 400 `deployTokenExpirationInPast` or
+            `deployTokenExpirationTooLate`. Defaults to 365 days from now. The date is truncated to
+            microseconds before it is checked and stored.
       required:
         - name
     TokenInfo:

@@ -379,8 +379,8 @@ capability, so a spec or the engine asks the capability and never the target's n
 | `urlScheme`                              | `repo` (`/<repo>/...`)                | `owner-repo` (`/<owner>/<repo>/...`, `src/repo-url.ts`)               |
 | `supportsUserRole`                       | yes (`USER`/`ADMIN`)                  | no                                                                    |
 | `supportsRepoUsers`                      | no                                    | yes (collaborators of a repo)                                         |
-| `supportsExpiredTokenSeed`               | yes (past date accepted)              | no (an expiration date has to be in the future)                       |
-| `expiredTokenStrategy`                   | `past-date`                           | `short-ttl-wait` (short lifetime, then wait); or `unsupported`        |
+| `supportsExpiredTokenSeed`               | yes (short lifetime, then wait)       | no (the FREE plan holds one token per repo)                           |
+| `expiredTokenStrategy`                   | `short-ttl-wait`                      | `short-ttl-wait` (short lifetime, then wait); or `unsupported`        |
 | `maxDeployTokensPerRepo`                 | unlimited                             | 1 (FREE plan)                                                         |
 | `supportsDirectoryListing`               | yes                                   | no (Maven repos list, no other protocol does: one flag, kept off)     |
 | `supportsVersionAllowanceSettings(type)` | Maven, NuGet                          | the same                                                              |
@@ -574,7 +574,7 @@ against both while what only Repsy OS has is tagged `@cloud-skip`:
   scenarios of the shared package template); the OS login form's validation (`AUTH-03`), wrong-credentials
   (`AUTH-02`) and throttle (`AUTH-11`) specs; the dashboard's cards and count rows; the tests that open the
   Users page (`ERR-02`/`ERR-03` on `/users`, the a11y user dialogs, the mobile sidebar's Users link,
-  `NET-01` signed in); and the deploy-token specs that seed more than one token or a past-dated one, which
+  `NET-01` signed in); and the deploy-token specs that seed more than one token or an expired one, which
   the Cloud FREE plan cannot (`maxDeployTokensPerRepo`, `supportsExpiredTokenSeed`). The rest, the portable
   core, is untagged. `seededUser` also skips itself with a reason on a target without `supportsUserRole`, as
   a net under a test somebody forgot to tag. What Repsy Cloud's panel turns out to differ in beyond this
@@ -6335,7 +6335,7 @@ How the tests are written, and what they had to work around:
   `tooltip-text`; rows are keyed by the raw name through `token-row-<name>`.
 - **Expiry colours.** The UI can only create a token between tomorrow and a year out, so TOK-02 makes
   the "within 7 days" token in the UI (today + 3 days, UTC, the form's zone) and seeds the already
-  expired one and a far-off one through the API (`seeder.createToken`, which accepts a past date).
+  expired one and a far-off one through the API (`seeder.createToken` and `seeder.createExpiredToken`, a 3 s lifetime that is waited out).
 - **Clipboard.** TOK-01 grants `clipboard-read`/`clipboard-write` to the context and compares
   `navigator.clipboard.readText()` with the token and username, and asserts the button's
   `data-copied`.

@@ -21,6 +21,7 @@ import {
   type RepoType,
   UserRole,
 } from '../api/panel-backend.js';
+import { env } from '../env.js';
 import { password, repoName, RUN_PREFIX, userName } from './run-id.js';
 
 const NOT_FOUND = 404;
@@ -58,10 +59,14 @@ export interface CreateRepoOptions {
   privateRepo?: boolean;
 }
 
+/** How long a token made by `createExpiredToken` lives, and how long past that the seeder waits for it. */
+const EXPIRED_TOKEN_TTL_MS = 3_000;
+const EXPIRED_TOKEN_WAIT_MS = 10_000;
+
 export interface CreateTokenOptions {
   name?: string;
   readOnly?: boolean;
-  /** Accepts a past date: the server does not reject it, which is how an expired token is seeded. */
+  /** Has to be in the future (RPS-1995); `createExpiredToken` is how an expired token is seeded. */
   expirationDate?: Date | string;
   username?: string;
 }
@@ -169,6 +174,31 @@ export class Seeder {
   async setSettings(repoName: string, form: RepoSettingsForm): Promise<void> {
     // Settings live on the repo row, so they are removed along with it; nothing to track here.
     await this.api.updateSettings(repoName, form);
+  }
+
+  /**
+   * A deploy token that no longer authenticates. The server refuses an expiration date that is not in the
+   * future (`400 deployTokenExpirationInPast`), so the token lives `EXPIRED_TOKEN_TTL_MS` and this waits until
+   * the SERVER's clock (the `Date` header of its answer) is a second past that.
+   */
+  async createExpiredToken(
+    repoName: string,
+    opts: Omit<CreateTokenOptions, 'expirationDate'> = {},
+  ): Promise<SeededToken> {
+    const expiresAt = new Date(Date.now() + EXPIRED_TOKEN_TTL_MS);
+    const token = await this.createToken(repoName, { ...opts, expirationDate: expiresAt });
+    const deadline = Date.now() + EXPIRED_TOKEN_TTL_MS + EXPIRED_TOKEN_WAIT_MS;
+    while (Date.now() < deadline) {
+      const res = await fetch(env.apiBaseUrl);
+      const serverNow = Date.parse(res.headers.get('date') ?? '') || Date.now();
+      if (serverNow >= expiresAt.getTime() + 1_000) {
+        return token;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    throw new Error(
+      `the deploy token of "${repoName}" is still valid ${EXPIRED_TOKEN_WAIT_MS} ms after it expired`,
+    );
   }
 
   async createToken(repoName: string, opts: CreateTokenOptions = {}): Promise<SeededToken> {

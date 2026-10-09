@@ -30,7 +30,6 @@ import { target } from '../../src/target.js';
 
 const UNAUTHORIZED = 401;
 const OK = 200;
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 
 async function repoRootStatus(repoName: string, token: string): Promise<number> {
   // Any username is accepted alongside a deploy token as the Basic password (ProtocolAuthService).
@@ -51,11 +50,7 @@ test(
     const seedTokens = [
       () => seeder.createToken(repo.name, { readOnly: false }),
       () => seeder.createToken(repo.name, { readOnly: true }),
-      () =>
-        seeder.createToken(repo.name, {
-          readOnly: false,
-          expirationDate: new Date(Date.now() - ONE_DAY_MS),
-        }),
+      () => seeder.createExpiredToken(repo.name, { readOnly: false }),
     ].slice(0, tokenCount);
     const seededTokens = [];
     for (const seedToken of seedTokens) {
@@ -90,14 +85,11 @@ test(
     // eslint-disable-next-line playwright/no-skipped-test -- a target that cannot seed this (Repsy Cloud) skips it
     test.skip(
       !target.supportsExpiredTokenSeed || target.maxDeployTokensPerRepo < 2,
-      'needs an expired and a valid token in one repo, seeded with a past expiration date',
+      'needs an expired and a valid token in one repo',
     );
     const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
     const rwToken = await seeder.createToken(repo.name, { readOnly: false });
-    const expiredToken = await seeder.createToken(repo.name, {
-      readOnly: false,
-      expirationDate: new Date(Date.now() - ONE_DAY_MS),
-    });
+    const expiredToken = await seeder.createExpiredToken(repo.name, { readOnly: false });
 
     const expiredStatus = await repoRootStatus(repo.name, expiredToken.token);
     const rwStatus = await repoRootStatus(repo.name, rwToken.token);

@@ -35,13 +35,31 @@ import { RepoSettingsPage } from '../../../src/ui/pages/repo-settings/page.js';
 
 const SETTINGS = '@settings';
 
-// 30 minutes before UTC midnight, so both zones below are on the "wrong" side of it.
-const FROZEN_INSTANT = '2026-03-15T23:30:00.000Z';
-const YESTERDAY_UTC = '2026-03-14';
-const TODAY_UTC = '2026-03-15';
-const TOMORROW_UTC = '2026-03-16';
-const ONE_YEAR_LATER_UTC = '2027-03-15';
-const ONE_DAY_PAST_MAX_UTC = '2027-03-16';
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// 30 minutes before UTC midnight, so both zones below are on the "wrong" side of it. It is the end of the NEXT
+// UTC day, never a fixed date: the server checks the date it is sent against its own, real clock (it has to
+// be in the future, RPS-1995), so the frozen browser clock must not be in the past.
+const frozenDay = Date.UTC(
+  new Date().getUTCFullYear(),
+  new Date().getUTCMonth(),
+  new Date().getUTCDate() + 1,
+);
+const FROZEN_INSTANT = new Date(frozenDay + 23.5 * 60 * 60 * 1000).toISOString();
+const utcDay = (offsetDays: number): string =>
+  new Date(frozenDay + offsetDays * DAY_MS).toISOString().slice(0, 10);
+const YESTERDAY_UTC = utcDay(-1);
+const TODAY_UTC = utcDay(0);
+const TOMORROW_UTC = utcDay(1);
+// One calendar year ahead of the frozen day, as moment.utc().add(1, 'year') computes it.
+const ONE_YEAR_LATER_UTC = (() => {
+  const d = new Date(frozenDay);
+  d.setUTCFullYear(d.getUTCFullYear() + 1);
+  return d.toISOString().slice(0, 10);
+})();
+const ONE_DAY_PAST_MAX_UTC = new Date(Date.parse(ONE_YEAR_LATER_UTC) + DAY_MS)
+  .toISOString()
+  .slice(0, 10);
 const RANGE_MESSAGE = 'Must be between tomorrow and one year from today';
 
 const ZONES = ['Pacific/Kiritimati', 'America/Los_Angeles'] as const;

@@ -702,23 +702,45 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
       assertThat((String) JsonPath.read(body, "$.username")).matches(DEPLOY_USERNAME_PATTERN);
     }
 
-    /** {@code expirationDate} in the past is not validated; the duration is clamped to 1 day. */
-    @Test
-    @DisplayName("accepts an expiration date in the past and stores an already-expired token")
-    void expirationInThePastIsAccepted() throws Exception {
+    /** RPS-1995: a token that is already expired is never stored, as for access tokens. */
+    @ParameterizedTest(name = "{0} second(s) from now")
+    @ValueSource(longs = {-432_000, -1, 0})
+    @DisplayName("returns 400 deployTokenExpirationInPast for a date that is not in the future")
+    void expirationNotInTheFutureIsRejected(final long offsetSeconds) throws Exception {
       final var it = ProtocolDeployTokenControllerIT.this;
       final var repo = it.createRepo(RepoType.MAVEN);
-      final var past = Instant.now().minus(5, ChronoUnit.DAYS).truncatedTo(ChronoUnit.MICROS);
+      final var date = Instant.now().plusSeconds(offsetSeconds).truncatedTo(ChronoUnit.MICROS);
+
+      expectError(
+          it.perform(
+              post(tokensUrl(repo))
+                  .header(AUTHORIZATION, it.adminBearerToken())
+                  .contentType(MediaType.APPLICATION_JSON)
+                  .content("{\"name\":\"past\",\"expirationDate\":\"%s\"}".formatted(date))),
+          HttpStatus.BAD_REQUEST,
+          "deployTokenExpirationInPast",
+          "deployTokenExpirationInPast",
+          "The expiration date of a deploy token has to be in the future.");
+
+      assertThat(it.tokensOf(repo)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("accepts a date a minute ahead and stores a one day duration")
+    void expirationAMinuteAheadIsAccepted() throws Exception {
+      final var it = ProtocolDeployTokenControllerIT.this;
+      final var repo = it.createRepo(RepoType.MAVEN);
+      final var soon = Instant.now().plusSeconds(60).truncatedTo(ChronoUnit.MICROS);
 
       expectCreated(
           it.perform(
               post(tokensUrl(repo))
                   .header(AUTHORIZATION, it.adminBearerToken())
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content("{\"name\":\"past\",\"expirationDate\":\"%s\"}".formatted(past))));
+                  .content("{\"name\":\"soon\",\"expirationDate\":\"%s\"}".formatted(soon))));
 
       final var row = it.tokensOf(repo).getFirst();
-      assertThat(row.getExpirationDate()).isEqualTo(past);
+      assertThat(row.getExpirationDate()).isEqualTo(soon);
       assertThat(row.getTokenDurationDay()).isEqualTo(1);
     }
 

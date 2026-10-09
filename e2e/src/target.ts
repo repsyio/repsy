@@ -30,7 +30,8 @@ const URL_SCHEMES: readonly UrlScheme[] = ['repo', 'owner-repo'];
 
 /**
  * How the harness gets an expired deploy-token credential (`token-expired`):
- *  - `past-date`: create the token with an expiration date in the past (needs `supportsExpiredTokenSeed`).
+ *  - `past-date`: create the token with an expiration date in the past (needs `supportsExpiredTokenSeed`). No
+ *    product accepts that since RPS-1995, so none uses it.
  *  - `short-ttl-wait`: create it with a short lifetime and wait until that has passed.
  *  - `unsupported`: there is no way; a scenario needing it is skipped with a reason.
  */
@@ -138,7 +139,7 @@ export interface TargetCapabilities {
   supportsUserRole: boolean;
   /** A user is a collaborator of a repository (Repsy Cloud), not an account with a role. */
   supportsRepoUsers: boolean;
-  /** A deploy token can be created with an expiration date in the past. */
+  /** The harness can seed an already-expired deploy token (see `expiredTokenStrategy`). */
   supportsExpiredTokenSeed: boolean;
   expiredTokenStrategy: ExpiredTokenStrategy;
   /** How many deploy tokens one repo may have (`Infinity` on OS; the Repsy Cloud FREE plan allows 1). */
@@ -226,7 +227,7 @@ const OS_CAPABILITIES: ProductCapabilities = {
   supportsUserRole: true,
   supportsRepoUsers: false,
   supportsExpiredTokenSeed: true,
-  expiredTokenStrategy: 'past-date',
+  expiredTokenStrategy: 'short-ttl-wait',
   maxDeployTokensPerRepo: Number.POSITIVE_INFINITY,
   supportsDirectoryListing: true,
   supportsVersionAllowanceSettings,
