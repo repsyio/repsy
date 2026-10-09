@@ -17,6 +17,15 @@ package io.repsy.os;
 
 import io.repsy.libs.multiport.annotations.EnableMultiport;
 import io.repsy.os.config.ssl.RepsySslProperties;
+import io.repsy.os.server.protocols.cargo.shared.crate.storage.configs.CargoFileSystemStorageProperties;
+import io.repsy.os.server.protocols.docker.shared.storage.configs.DockerFileSystemStorageProperties;
+import io.repsy.os.server.protocols.golang.shared.storage.configs.GoFileSystemStorageProperties;
+import io.repsy.os.server.protocols.helm.shared.storage.configs.HelmFileSystemStorageProperties;
+import io.repsy.os.server.protocols.maven.shared.storage.configs.MavenFileSystemStorageProperties;
+import io.repsy.os.server.protocols.npm.shared.storage.configs.NpmFileSystemStorageProperties;
+import io.repsy.os.server.protocols.nuget.shared.storage.configs.NuGetFileSystemStorageProperties;
+import io.repsy.os.server.protocols.pypi.shared.storage.configs.PypiFileSystemStorageProperties;
+import io.repsy.os.server.protocols.ruby.shared.storage.configs.RubyFileSystemStorageProperties;
 import io.repsy.os.server.protocols.shared.configs.StorageTrashProperties;
 import io.repsy.os.server.security.scanner.trivy.DockerRegistryProperties;
 import io.repsy.os.server.security.scanner.trivy.TrivyAdvisoryLookupProperties;

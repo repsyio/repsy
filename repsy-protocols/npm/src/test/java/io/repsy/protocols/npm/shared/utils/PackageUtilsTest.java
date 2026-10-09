@@ -20,8 +20,8 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
-import io.repsy.protocols.npm.shared.constants.NpmConstants;
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
+import io.repsy.protocols.npm.shared.constants.NpmConstants;
 import java.net.URISyntaxException;
 import java.time.Instant;
 import java.util.ArrayList;

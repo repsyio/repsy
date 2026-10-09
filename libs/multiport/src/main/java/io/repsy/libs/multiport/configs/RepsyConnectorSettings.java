@@ -27,8 +27,8 @@ import org.springframework.boot.web.server.Compression;
  *
  * <p>Spring Boot applies its connector customizers, and the {@code server.*} properties behind
  * them, to the primary connector only. A connector added with {@code addAdditionalConnectors} (the
- * plain ports of {@link TomcatMultiPortConfig} and any TLS listener an application adds
- * itself) starts bare, so it takes what it needs from here.
+ * plain ports of {@link TomcatMultiPortConfig} and any TLS listener an application adds itself)
+ * starts bare, so it takes what it needs from here.
  */
 public final class RepsyConnectorSettings {
 

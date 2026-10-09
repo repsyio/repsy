@@ -22,8 +22,8 @@ import org.junit.jupiter.api.Test;
 
 /**
  * RPS-1102: {@code allowedOriginList()} must resolve an unset {@code APP_ALLOWED_ORIGINS} to an
- * empty list, not a one-element list holding an empty origin, or {@code CorsGlobalConfig}
- * would silently open CORS to a blank origin.
+ * empty list, not a one-element list holding an empty origin, or {@code CorsGlobalConfig} would
+ * silently open CORS to a blank origin.
  */
 @DisplayName("AppCorsProperties")
 class AppCorsPropertiesTest {
