@@ -43,6 +43,11 @@ spring:
     locations: classpath:db/migration/{vendor}
     schemas: public
     default-schema: public
+    postgresql:
+      # Must stay false: the default transactional advisory lock keeps one transaction open for the
+      # whole migration run, and CREATE INDEX CONCURRENTLY (V0035 and later index migrations, with
+      # executeInTransaction=false) waits for every open transaction, i.e. for Flyway itself.
+      transactional-lock: false
 
   servlet:
     multipart:

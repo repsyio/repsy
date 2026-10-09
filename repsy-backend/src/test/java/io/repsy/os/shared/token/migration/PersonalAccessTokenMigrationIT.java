@@ -60,6 +60,9 @@ class PersonalAccessTokenMigrationIT {
         Flyway.configure()
             .dataSource(dataSource)
             .locations("classpath:db/migration/postgresql")
+            // Same as the application: the default transactional lock would block V0035
+            // (CONCURRENTLY).
+            .configuration(java.util.Map.of("flyway.postgresql.transactional.lock", "false"))
             .schemas("public")
             .defaultSchema("public");
 
