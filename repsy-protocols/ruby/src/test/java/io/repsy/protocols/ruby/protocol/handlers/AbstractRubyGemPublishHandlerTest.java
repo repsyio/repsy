@@ -26,7 +26,7 @@ import static org.mockito.Mockito.verify;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.ruby.protocol.RubyProtocolProvider;
-import io.repsy.protocols.ruby.protocol.facades.contract.RubyProtocolFacade;
+import io.repsy.protocols.ruby.protocol.facades.contracts.RubyProtocolFacade;
 import io.repsy.protocols.shared.utils.SpooledUpload;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;

@@ -21,7 +21,7 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.protocols.golang.protocol.facades.contracts.GoProtocolFacade;
-import io.repsy.protocols.golang.shared.dto.GoVersionInfo;
+import io.repsy.protocols.golang.shared.dtos.GoVersionInfo;
 import io.repsy.protocols.golang.shared.module.services.GoModuleService;
 import io.repsy.protocols.golang.shared.module.validators.GoModFileValidator;
 import io.repsy.protocols.golang.shared.storage.services.GoStorageService;

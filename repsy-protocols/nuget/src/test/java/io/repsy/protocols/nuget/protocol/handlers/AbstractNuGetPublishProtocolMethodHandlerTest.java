@@ -26,7 +26,7 @@ import static org.mockito.Mockito.verify;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.protocols.nuget.protocol.NuGetProtocolProvider;
 import io.repsy.protocols.nuget.protocol.dtos.NuGetErrorResponse;
-import io.repsy.protocols.nuget.protocol.facades.contract.NuGetProtocolFacade;
+import io.repsy.protocols.nuget.protocol.facades.contracts.NuGetProtocolFacade;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;

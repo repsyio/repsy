@@ -16,7 +16,7 @@
 package io.repsy.os.server.protocols.pypi.shared.storage.configs;
 
 import io.repsy.libs.storage.core.services.StorageStrategy;
-import io.repsy.libs.storage.gateway.filesystem.service.FileSystemStorageStrategy;
+import io.repsy.libs.storage.gateway.filesystem.services.FileSystemStorageStrategy;
 import io.repsy.os.server.protocols.shared.configs.StorageTrashProperties;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
