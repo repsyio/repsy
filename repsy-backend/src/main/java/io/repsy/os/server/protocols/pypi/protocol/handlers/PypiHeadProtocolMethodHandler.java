@@ -16,7 +16,7 @@
 package io.repsy.os.server.protocols.pypi.protocol.handlers;
 
 import io.repsy.libs.protocol.router.PathParser;
-import io.repsy.os.server.protocols.pypi.protocol.facades.PypiProtocolFacadeImpl;
+import io.repsy.os.server.protocols.pypi.protocol.facades.PypiProtocolFacade;
 import io.repsy.os.server.shared.utils.RequestBaseUrlUtils;
 import io.repsy.protocols.pypi.protocol.PypiProtocolProvider;
 import io.repsy.protocols.pypi.protocol.handlers.AbstractPypiHeadProtocolMethodHandler;
@@ -35,7 +35,7 @@ public class PypiHeadProtocolMethodHandler extends AbstractPypiHeadProtocolMetho
 
   public PypiHeadProtocolMethodHandler(
       @Qualifier("osPypiPathParser") final PathParser pathParser,
-      final PypiProtocolFacadeImpl pypiProtocolFacade,
+      final PypiProtocolFacade pypiProtocolFacade,
       final PypiProtocolProvider provider) {
 
     super(pathParser, pypiProtocolFacade, provider);

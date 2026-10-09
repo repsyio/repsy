@@ -23,8 +23,8 @@ import freemarker.template.TemplateException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.generated.model.ReleaseDetail;
-import io.repsy.os.server.protocols.pypi.shared.python_package.dtos.PackageInfo;
 import io.repsy.os.server.protocols.pypi.shared.python_package.dtos.PypiDeletion;
+import io.repsy.os.server.protocols.pypi.shared.python_package.dtos.PypiPackageInfo;
 import io.repsy.os.server.protocols.pypi.shared.python_package.dtos.ReleaseListItem;
 import io.repsy.os.server.protocols.pypi.shared.python_package.entities.PypiPackage;
 import io.repsy.os.server.protocols.pypi.shared.python_package.entities.Release;
@@ -42,8 +42,8 @@ import io.repsy.os.shared.utils.VersionSortPaging;
 import io.repsy.protocols.pypi.shared.python_package.dtos.PackageUploadForm;
 import io.repsy.protocols.pypi.shared.python_package.dtos.ReleaseVersionRequiresPython;
 import io.repsy.protocols.pypi.shared.python_package.services.PypiPackageService;
-import io.repsy.protocols.pypi.shared.utils.PackageUtils;
 import io.repsy.protocols.pypi.shared.utils.Pep440Version;
+import io.repsy.protocols.pypi.shared.utils.PypiPackageUtils;
 import io.repsy.protocols.pypi.shared.utils.PypiVersionComparator;
 import io.repsy.protocols.pypi.shared.utils.ReleaseVersion;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
@@ -87,7 +87,7 @@ public class PypiPackageServiceImpl implements PypiPackageService<UUID> {
   private final ReleaseProjectUrlRepository releaseProjectURLRepository;
 
   @Override
-  public PackageInfo getPackage(final UUID repoId, final String packageNormalizedName) {
+  public PypiPackageInfo getPackage(final UUID repoId, final String packageNormalizedName) {
 
     final var pythonPypiPackage =
         this.pypiPackageRepository
@@ -95,7 +95,7 @@ public class PypiPackageServiceImpl implements PypiPackageService<UUID> {
             .orElseThrow(() -> new ItemNotFoundException(ERR_PACKAGE_NOT_FOUND));
 
     return Objects.requireNonNull(
-        this.conversionService.convert(pythonPypiPackage, PackageInfo.class));
+        this.conversionService.convert(pythonPypiPackage, PypiPackageInfo.class));
   }
 
   @Override
@@ -281,7 +281,8 @@ public class PypiPackageServiceImpl implements PypiPackageService<UUID> {
 
     final var pythonPypiPackage =
         this.pypiPackageRepository
-            .findByRepoIdAndNormalizedName(repoId, PackageUtils.normalizePackageName(packageName))
+            .findByRepoIdAndNormalizedName(
+                repoId, PypiPackageUtils.normalizePackageName(packageName))
             .orElseThrow(() -> new ItemNotFoundException(ERR_PACKAGE_NOT_FOUND));
 
     final var versionOrder = VersionSortPaging.directionFor(pageable, "version");
@@ -303,7 +304,8 @@ public class PypiPackageServiceImpl implements PypiPackageService<UUID> {
 
     final var pythonPypiPackage =
         this.pypiPackageRepository
-            .findByRepoIdAndNormalizedName(repoId, PackageUtils.normalizePackageName(packageName))
+            .findByRepoIdAndNormalizedName(
+                repoId, PypiPackageUtils.normalizePackageName(packageName))
             .orElseThrow(() -> new ItemNotFoundException(ERR_PACKAGE_NOT_FOUND));
 
     final var versionOrder = VersionSortPaging.directionFor(pageable, "version");

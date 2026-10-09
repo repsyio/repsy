@@ -21,7 +21,7 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.os.server.protocols.docker.shared.auth.services.DockerAuthComponent;
 import io.repsy.os.server.shared.auth.AuthChallenges;
-import io.repsy.os.server.shared.utils.ProtocolContextUtils;
+import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
 import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
@@ -68,7 +68,7 @@ public class DockerAuthPreProcessor extends ProtocolProcessor {
       final HttpServletResponse response,
       final Map<String, Object> properties) {
 
-    final var repoInfo = ProtocolContextUtils.getRepoInfo(context);
+    final var repoInfo = UrlPropertiesUtils.getRepoInfo(context);
 
     if (this.shouldSkipAuthentication(repoInfo, properties)) {
       return ProcessorResult.next();

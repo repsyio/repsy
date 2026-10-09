@@ -24,7 +24,7 @@ import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.os.server.protocols.ruby.shared.auth.services.RubyAuthComponent;
 import io.repsy.os.server.shared.auth.AuthChallenges;
 import io.repsy.os.server.shared.utils.PreProcessorUtils;
-import io.repsy.os.server.shared.utils.ProtocolContextUtils;
+import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
 import io.repsy.protocols.ruby.protocol.RubyProtocolProvider;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
 import io.repsy.protocols.shared.repo.dtos.Permission;
@@ -70,7 +70,7 @@ public class RubyAuthPreProcessor extends ProtocolProcessor {
       final HttpServletResponse response,
       final Map<String, Object> properties) {
 
-    final var repoInfo = ProtocolContextUtils.getRepoInfo(context);
+    final var repoInfo = UrlPropertiesUtils.getRepoInfo(context);
 
     if (PreProcessorUtils.shouldSkipAuthentication(
         SKIP_PRE_PROCESSOR_KEY, WRITE_OPERATION_KEY, repoInfo, properties)) {

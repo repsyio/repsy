@@ -48,7 +48,7 @@ import tools.jackson.databind.ObjectMapper;
 @SuppressWarnings("unchecked")
 @UtilityClass
 @NullMarked
-public final class PackageUtils {
+public final class NpmPackageUtils {
   private static final ObjectMapper ETAG_MAPPER = new ObjectMapper();
   private static final String TARBALL_EXTENSION = "tgz";
   private static final String ABBREVIATED_METADATA_HEADER_VALUE =
@@ -58,7 +58,7 @@ public final class PackageUtils {
     final var timeField = (Map<String, String>) metadata.get("time");
 
     if (timeField != null) {
-      timeField.put("modified", PackageUtils.getFormattedCurrentTime());
+      timeField.put("modified", NpmPackageUtils.getFormattedCurrentTime());
     }
   }
 
@@ -145,7 +145,7 @@ public final class PackageUtils {
 
     if (length == null) {
       final var binaryData =
-          Base64.decodeBase64(PackageUtils.extractTarballDataFromPayload(payload));
+          Base64.decodeBase64(NpmPackageUtils.extractTarballDataFromPayload(payload));
       length = binaryData.length;
     }
 
@@ -240,7 +240,7 @@ public final class PackageUtils {
     final var packageName = (String) version.get("name");
     final var versionName = (String) version.get("version");
     final var fileName =
-        PackageUtils.getTarballFilename(PackageUtils.bareName(packageName), versionName);
+        NpmPackageUtils.getTarballFilename(NpmPackageUtils.bareName(packageName), versionName);
 
     dist.put(
         "tarball",
@@ -344,15 +344,15 @@ public final class PackageUtils {
       final @Nullable String scopeName,
       final String packageName) {
 
-    final var expected = PackageUtils.buildFullName(scopeName, packageName);
+    final var expected = NpmPackageUtils.buildFullName(scopeName, packageName);
 
-    PackageUtils.checkNameMatches(expected, payload.get(NpmConstants.NAME));
-    PackageUtils.checkNameMatches(expected, payload.get(NpmConstants.ID));
+    NpmPackageUtils.checkNameMatches(expected, payload.get(NpmConstants.NAME));
+    NpmPackageUtils.checkNameMatches(expected, payload.get(NpmConstants.ID));
 
     if (payload.get(NpmConstants.VERSIONS) instanceof final Map<?, ?> versions) {
       for (final var entry : versions.values()) {
         if (entry instanceof final Map<?, ?> version) {
-          PackageUtils.checkNameMatches(expected, version.get(NpmConstants.NAME));
+          NpmPackageUtils.checkNameMatches(expected, version.get(NpmConstants.NAME));
         }
       }
     }
@@ -523,7 +523,7 @@ public final class PackageUtils {
   public static void liftFieldsToTopLevel(
       final Map<String, Object> payload, final String versionName) {
 
-    final var versionPair = PackageUtils.extractVersionFromPayload(payload, versionName);
+    final var versionPair = NpmPackageUtils.extractVersionFromPayload(payload, versionName);
 
     final var version = versionPair.getSecond();
 

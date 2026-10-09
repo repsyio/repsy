@@ -24,7 +24,7 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.server.core.UrlParserProperties;
-import io.repsy.os.server.protocols.pypi.protocol.facades.PypiProtocolFacadeImpl;
+import io.repsy.os.server.protocols.pypi.protocol.facades.PypiProtocolFacade;
 import io.repsy.os.server.protocols.pypi.ui.facades.PypiApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
@@ -50,7 +50,7 @@ import org.springframework.test.web.servlet.request.AbstractMockHttpServletReque
  * main port: {@code GET/HEAD /{repo}/simple/} (RPS-1221) and {@code HEAD} mirroring {@code GET}'s
  * status on the project page and the archive download (RPS-1226).
  *
- * <p>Packages are seeded through {@link PypiProtocolFacadeImpl#uploadPackage} directly (the same
+ * <p>Packages are seeded through {@link PypiProtocolFacade#uploadPackage} directly (the same
  * pattern {@code PypiUploadDigestIT}/{@code PypiUploadValidationIT} use), not a wire multipart
  * {@code POST}: this class's own subject is the read side, and every read assertion below still
  * goes through the real protocol router via {@link #protocol}.
@@ -60,7 +60,7 @@ class PypiWireReadIT extends AbstractIntegrationTest {
 
   @Autowired private RepoTxService repoTxService;
   @Autowired private PypiApiFacade pypiApiFacade;
-  @Autowired private PypiProtocolFacadeImpl pypiProtocolFacade;
+  @Autowired private PypiProtocolFacade pypiProtocolFacade;
   @MockitoBean private UsageUpdateService usageUpdateService;
 
   private ResultActions protocol(final AbstractMockHttpServletRequestBuilder<?> request)

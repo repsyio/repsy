@@ -17,7 +17,7 @@ package io.repsy.os.server.protocols.helm.protocol.handlers.oci;
 
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
-import io.repsy.os.server.shared.utils.ProtocolContextUtils;
+import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
 import io.repsy.protocols.helm.protocol.handlers.oci.AbstractHelmOciVersionCheckProtocolMethodHandler;
 import java.util.Optional;
@@ -35,6 +35,6 @@ public class HelmOciVersionCheckProtocolMethodHandler
 
   @Override
   protected Optional<ProtocolContext> createWithEmptyRepo() {
-    return Optional.of(ProtocolContextUtils.createWithEmptyRepo("", new RelativePath("")));
+    return Optional.of(UrlPropertiesUtils.createWithEmptyRepo("", new RelativePath("")));
   }
 }

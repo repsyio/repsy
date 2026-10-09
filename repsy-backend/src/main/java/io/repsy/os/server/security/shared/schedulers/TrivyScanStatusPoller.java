@@ -21,7 +21,7 @@ import io.repsy.os.server.security.scan.repositories.VulnerabilityScanRepository
 import io.repsy.os.server.security.scan.services.VulnerabilityScanTxService;
 import io.repsy.os.server.security.scanner.trivy.ScanJobNotFoundException;
 import io.repsy.os.server.security.scanner.trivy.ScanJobStatusResponse;
-import io.repsy.os.server.security.scanner.trivy.TrivyScannerProperties;
+import io.repsy.os.server.security.scanner.trivy.TrivyScannerClientProperties;
 import io.repsy.os.server.security.scanner.trivy.TrivyScannerStatusClient;
 import java.time.Duration;
 import java.time.Instant;
@@ -46,7 +46,7 @@ public class TrivyScanStatusPoller {
   private final @NonNull VulnerabilityScanRepository vulnerabilityScanRepository;
   private final @NonNull VulnerabilityScanTxService scanTxService;
   private final @NonNull TrivyScannerStatusClient statusClient;
-  private final @NonNull TrivyScannerProperties properties;
+  private final @NonNull TrivyScannerClientProperties properties;
 
   @Scheduled(fixedDelayString = "${repsy.security.trivy.poll-interval-ms:3000}")
   public void pollActiveScans() {

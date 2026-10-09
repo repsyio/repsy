@@ -21,7 +21,7 @@ import io.repsy.libs.protocol.router.ProcessorResult;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.os.server.protocols.pypi.shared.python_package.services.PypiPackageServiceImpl;
-import io.repsy.os.server.shared.utils.ProtocolContextUtils;
+import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.pypi.protocol.PypiProtocolProvider;
 import jakarta.annotation.PostConstruct;
@@ -77,7 +77,7 @@ public class PypiSimpleHandlerPreProcessor extends ProtocolProcessor {
       return ProcessorResult.next();
     }
 
-    final var relativePath = ProtocolContextUtils.getRelativePath(context).getPath();
+    final var relativePath = UrlPropertiesUtils.getRelativePath(context).getPath();
 
     final var matcher = SIMPLE_PATTERN.matcher(relativePath);
 
@@ -92,7 +92,7 @@ public class PypiSimpleHandlerPreProcessor extends ProtocolProcessor {
 
   private ProcessorResult process(final ProtocolContext context, final String packageName) {
 
-    final var repoInfo = ProtocolContextUtils.getRepoInfo(context);
+    final var repoInfo = UrlPropertiesUtils.getRepoInfo(context);
 
     final var packageListResourceOpt = this.getPackageListResourceOpt(packageName, repoInfo);
 

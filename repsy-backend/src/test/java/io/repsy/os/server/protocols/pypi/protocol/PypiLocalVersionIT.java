@@ -27,7 +27,7 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.server.core.UrlParserProperties;
-import io.repsy.os.server.protocols.pypi.protocol.facades.PypiProtocolFacadeImpl;
+import io.repsy.os.server.protocols.pypi.protocol.facades.PypiProtocolFacade;
 import io.repsy.os.server.protocols.pypi.ui.facades.PypiApiFacade;
 import io.repsy.os.server.security.shared.resolvers.PypiArtifactStorageResolver;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
@@ -58,7 +58,7 @@ import org.springframework.web.util.UriUtils;
  * pkg-1.0+cu118-...whl} as release {@code 1.0}, so deleting {@code 1.0} deleted the local builds
  * too.
  *
- * <p>Packages are seeded through {@link PypiProtocolFacadeImpl#uploadPackage} directly, the same
+ * <p>Packages are seeded through {@link PypiProtocolFacade#uploadPackage} directly, the same
  * pattern {@code PypiWireReadIT} uses, and every read goes through the real protocol router.
  */
 @DisplayName("PyPI local versions are separate releases (RPS-1662)")
@@ -66,7 +66,7 @@ class PypiLocalVersionIT extends AbstractIntegrationTest {
 
   @Autowired private RepoTxService repoTxService;
   @Autowired private PypiApiFacade pypiApiFacade;
-  @Autowired private PypiProtocolFacadeImpl pypiProtocolFacade;
+  @Autowired private PypiProtocolFacade pypiProtocolFacade;
   @Autowired private PypiArtifactStorageResolver pypiArtifactStorageResolver;
   @MockitoBean private UsageUpdateService usageUpdateService;
 

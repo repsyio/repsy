@@ -30,7 +30,7 @@ import org.springframework.context.annotation.Import;
 class TrivyScannerApiKeyCheckTest {
 
   @Configuration
-  @EnableConfigurationProperties(TrivyScannerProperties.class)
+  @EnableConfigurationProperties(TrivyScannerClientProperties.class)
   @Import(TrivyScannerApiKeyCheck.class)
   static class CheckConfiguration {}
 

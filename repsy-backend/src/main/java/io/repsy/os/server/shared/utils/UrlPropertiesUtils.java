@@ -24,7 +24,7 @@ import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.NonNull;
 
 @UtilityClass
-public class ProtocolContextUtils {
+public class UrlPropertiesUtils {
 
   private static final @NonNull String URL_PROPERTIES = "urlProperties";
 

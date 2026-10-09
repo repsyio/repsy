@@ -34,7 +34,7 @@ public class UriUtils {
 
     final var requestURI = httpServletRequest.getRequestURI();
 
-    if ((packageName != null && !PackageUtils.isPackageNameNormalized(packageName))
+    if ((packageName != null && !PypiPackageUtils.isPackageNameNormalized(packageName))
         || !requestURI.endsWith("/")) {
 
       final var builder = UriComponentsBuilder.fromUriString(repoOrigin).path(requestURI);
@@ -42,7 +42,7 @@ public class UriUtils {
       if (packageName != null) {
         return builder
             .pathSegment("..")
-            .pathSegment(PackageUtils.normalizePackageName(packageName))
+            .pathSegment(PypiPackageUtils.normalizePackageName(packageName))
             .path("/")
             .build()
             .normalize()

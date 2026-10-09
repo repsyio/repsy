@@ -15,7 +15,7 @@
  */
 package io.repsy.os.server.protocols.npm.shared.npm_package.repositories;
 
-import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageListItem;
+import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.NpmPackageListItem;
 import io.repsy.os.server.protocols.npm.shared.npm_package.entities.NpmPackage;
 import jakarta.persistence.LockModeType;
 import java.time.Instant;
@@ -74,7 +74,7 @@ public interface NpmPackageRepository extends JpaRepository<NpmPackage, UUID> {
       join p.packageVersions pv
       join p.repo r
       where r.id = :repoId and p.scope is null and p.latest = pv.version and lower(p.name) like :name escape '\\'""")
-  Page<PackageListItem> findAllByRepoIdAndLatestVersionAndScopeIsNullContainsName(
+  Page<NpmPackageListItem> findAllByRepoIdAndLatestVersionAndScopeIsNullContainsName(
       UUID repoId, String name, Pageable pageable);
 
   /**
@@ -89,7 +89,7 @@ public interface NpmPackageRepository extends JpaRepository<NpmPackage, UUID> {
       join p.repo r
       where r.id = :repoId and p.scope = :scope and p.latest = pv.version
       and lower(concat(p.scope, '/', p.name)) like :name escape '\\'""")
-  Page<PackageListItem> findAllByRepoIdAndLatestVersionAndScopeContainsName(
+  Page<NpmPackageListItem> findAllByRepoIdAndLatestVersionAndScopeContainsName(
       UUID repoId, String scope, String name, Pageable pageable);
 
   /**
@@ -106,6 +106,6 @@ public interface NpmPackageRepository extends JpaRepository<NpmPackage, UUID> {
       and (:pattern is null
         or lower(case when p.scope is null then p.name else concat(p.scope, '/', p.name) end)
           like :pattern escape '\\')""")
-  Page<PackageListItem> findAllByRepoIdAndLatestVersionContainsScope(
+  Page<NpmPackageListItem> findAllByRepoIdAndLatestVersionContainsScope(
       UUID repoId, @Nullable String pattern, Pageable pageable);
 }

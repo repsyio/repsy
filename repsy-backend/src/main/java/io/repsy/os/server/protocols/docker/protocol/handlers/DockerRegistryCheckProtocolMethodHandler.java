@@ -17,7 +17,7 @@ package io.repsy.os.server.protocols.docker.protocol.handlers;
 
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
-import io.repsy.os.server.shared.utils.ProtocolContextUtils;
+import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import io.repsy.protocols.docker.protocol.handlers.AbstractDockerRegistryCheckProtocolMethodHandler;
 import java.util.Optional;
@@ -36,6 +36,6 @@ public class DockerRegistryCheckProtocolMethodHandler
   @Override
   protected Optional<ProtocolContext> createWithEmptyRepo() {
 
-    return Optional.of(ProtocolContextUtils.createWithEmptyRepo("", new RelativePath("")));
+    return Optional.of(UrlPropertiesUtils.createWithEmptyRepo("", new RelativePath("")));
   }
 }

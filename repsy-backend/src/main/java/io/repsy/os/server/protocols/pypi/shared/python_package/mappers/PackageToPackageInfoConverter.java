@@ -15,7 +15,7 @@
  */
 package io.repsy.os.server.protocols.pypi.shared.python_package.mappers;
 
-import io.repsy.os.server.protocols.pypi.shared.python_package.dtos.PackageInfo;
+import io.repsy.os.server.protocols.pypi.shared.python_package.dtos.PypiPackageInfo;
 import io.repsy.os.server.protocols.pypi.shared.python_package.entities.PypiPackage;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.core.convert.converter.Converter;
@@ -24,14 +24,14 @@ import org.springframework.stereotype.Component;
 
 @Component
 @NullMarked
-public class PackageToPackageInfoConverter implements Converter<PypiPackage, PackageInfo> {
+public class PackageToPackageInfoConverter implements Converter<PypiPackage, PypiPackageInfo> {
   PackageToPackageInfoConverter(final GenericConversionService conversionService) {
     conversionService.addConverter(this);
   }
 
   @Override
-  public PackageInfo convert(final PypiPackage source) {
-    return PackageInfo.builder()
+  public PypiPackageInfo convert(final PypiPackage source) {
+    return PypiPackageInfo.builder()
         .id(source.getId())
         .name(source.getName())
         .normalizedName(source.getNormalizedName())

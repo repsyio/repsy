@@ -13,17 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.protocols.pypi.shared.python_package.dtos;
+package io.repsy.protocols.pypi.shared.python_package.dtos;
 
-import io.repsy.protocols.pypi.shared.python_package.dtos.BasePackageInfo;
-import java.util.UUID;
-import lombok.Getter;
-import lombok.Setter;
+import java.time.Instant;
+import lombok.Data;
 import lombok.experimental.SuperBuilder;
 
-@Getter
-@Setter
+@Data
 @SuperBuilder
-public class PackageInfo extends BasePackageInfo<UUID> {
-  private UUID repoId;
+public class BasePypiPackageInfo<ID> {
+  private ID id;
+  private String name;
+  private String normalizedName;
+  private String latestVersion;
+  private String stableVersion;
+  private String repoName;
+  private Instant createdAt;
 }

@@ -23,7 +23,7 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.os.server.protocols.maven.shared.auth.services.MavenAuthComponent;
 import io.repsy.os.server.shared.auth.AuthChallenges;
-import io.repsy.os.server.shared.utils.ProtocolContextUtils;
+import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.maven.protocol.MavenProtocolProvider;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
@@ -75,7 +75,7 @@ public class MavenAuthPreProcessor extends ProtocolProcessor {
       @NonNull final HttpServletResponse response,
       @NonNull final Map<@NonNull String, @NonNull Object> properties) {
 
-    final var repoInfo = ProtocolContextUtils.getRepoInfo(context);
+    final var repoInfo = UrlPropertiesUtils.getRepoInfo(context);
 
     if (this.shouldSkipAuthentication(repoInfo, properties)) {
       return ProcessorResult.next();
@@ -102,7 +102,7 @@ public class MavenAuthPreProcessor extends ProtocolProcessor {
       this.authComponent.handleDownloadToken(
           downloadToken,
           repoInfo.getStorageKey(),
-          ProtocolContextUtils.getRelativePath(context).getPath(),
+          UrlPropertiesUtils.getRelativePath(context).getPath(),
           permission);
 
       return ProcessorResult.next();

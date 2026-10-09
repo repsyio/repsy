@@ -29,7 +29,7 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.server.core.UrlParserProperties;
-import io.repsy.os.server.protocols.pypi.protocol.facades.PypiProtocolFacadeImpl;
+import io.repsy.os.server.protocols.pypi.protocol.facades.PypiProtocolFacade;
 import io.repsy.os.server.protocols.pypi.shared.storage.services.PypiStorageService;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.entities.Repo;
@@ -72,7 +72,7 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Runs without a test transaction, unlike the other PyPI upload ITs: a failed row write aborts a
  * PostgreSQL transaction, so inside a test transaction the state afterwards could not be read, and
  * a race between two uploads needs both to commit. It deletes the repos it commits. Uploads go
- * through {@link PypiProtocolFacadeImpl#uploadPackage}, the same call the wire handler makes.
+ * through {@link PypiProtocolFacade#uploadPackage}, the same call the wire handler makes.
  *
  * <p>Replacing a file whose write fails part-way is not covered beyond keeping its row: the file
  * system strategy truncates the file in place, so its old bytes cannot be restored.
@@ -89,7 +89,7 @@ class PypiPublishStorageConsistencyIT extends AbstractIntegrationTest {
   /** A spy that calls through, so only the test that stubs it changes the storage behaviour. */
   @MockitoSpyBean private PypiStorageService pypiStorageService;
 
-  @Autowired private PypiProtocolFacadeImpl pypiProtocolFacade;
+  @Autowired private PypiProtocolFacade pypiProtocolFacade;
   @Autowired private RepoTxService repoTxService;
 
   private final List<UUID> createdRepoIds = new ArrayList<>();

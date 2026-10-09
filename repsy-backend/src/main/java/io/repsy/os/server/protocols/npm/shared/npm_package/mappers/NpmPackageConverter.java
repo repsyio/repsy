@@ -17,10 +17,10 @@ package io.repsy.os.server.protocols.npm.shared.npm_package.mappers;
 
 import io.repsy.os.generated.model.NpmPackageInfo;
 import io.repsy.os.generated.model.PackageVersionDetail;
+import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.NpmPackageListItem;
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageDistributionTagListItem;
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageInfo;
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageKeywordListItem;
-import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageListItem;
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageMaintainerListItem;
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageVersionInfo;
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageVersionListItem;
@@ -138,7 +138,7 @@ public interface NpmPackageConverter {
 
   @Mapping(target = "latestVersion", source = "latest")
   @Mapping(target = "updatedAt", source = "updatedAt")
-  io.repsy.os.generated.model.NpmPackageListItem toPackageListItemDto(PackageListItem source);
+  io.repsy.os.generated.model.NpmPackageListItem toPackageListItemDto(NpmPackageListItem source);
 
   @Mapping(target = "createdAt", source = "createdAt")
   io.repsy.os.generated.model.PackageVersionListItem toPackageVersionListItemDto(

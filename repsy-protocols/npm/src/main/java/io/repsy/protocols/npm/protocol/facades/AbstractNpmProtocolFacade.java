@@ -27,9 +27,9 @@ import io.repsy.protocols.npm.shared.npm_package.services.NpmPackageService;
 import io.repsy.protocols.npm.shared.npm_package.services.NpmPackageService.PublishKind;
 import io.repsy.protocols.npm.shared.storage.services.AbstractNpmStorageService;
 import io.repsy.protocols.npm.shared.storage.services.NpmStorageService.MetadataChange;
+import io.repsy.protocols.npm.shared.utils.NpmPackageUtils;
 import io.repsy.protocols.npm.shared.utils.NpmPublishLimits;
 import io.repsy.protocols.npm.shared.utils.NpmRevPath;
-import io.repsy.protocols.npm.shared.utils.PackageUtils;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import java.io.IOException;
@@ -68,9 +68,9 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
       final Map<String, Object> payload)
       throws IOException {
 
-    PackageUtils.checkPackageNameMatchesUrl(payload, scopeName, packageName);
+    NpmPackageUtils.checkPackageNameMatchesUrl(payload, scopeName, packageName);
 
-    if (PackageUtils.isMetadataHasDeprecatedVersions(payload)) {
+    if (NpmPackageUtils.isMetadataHasDeprecatedVersions(payload)) {
       this.deprecate(context, scopeName, packageName, payload);
     } else {
       this.publish(context, scopeName, packageName, payload);
@@ -94,7 +94,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
             repoInfo.getName(),
             packageBasePath,
             this.snapshotOf(repoInfo, scopeName, packageName));
-    final var unpublishedVersion = PackageUtils.findUnpublishedVersion(metadata, payload);
+    final var unpublishedVersion = NpmPackageUtils.findUnpublishedVersion(metadata, payload);
 
     this.deletePackageVersion(context, scopeName, packageName, unpublishedVersion);
 
@@ -191,7 +191,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
       throws IOException {
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-    final var isAbbreviated = PackageUtils.isRequestedAbbreviatedMetadata(acceptHeader);
+    final var isAbbreviated = NpmPackageUtils.isRequestedAbbreviatedMetadata(acceptHeader);
 
     // A package the database has and storage lost is served from the rows (RPS-1300): it is what a
     // client reads before it unpublishes, deprecates or tags the package.
@@ -425,7 +425,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
             repoInfo.getName(),
             packageBasePath,
             this.snapshotOf(repoInfo, scopeName, packageName));
-    final var deprecations = PackageUtils.findDeprecatedVersions(metadata, payload);
+    final var deprecations = NpmPackageUtils.findDeprecatedVersions(metadata, payload);
     deprecations.forEach(entry -> NpmPublishLimits.checkDeprecationMessage(entry.getSecond()));
 
     // The deprecation rows are written first and the package metadata second, in one transaction
@@ -463,7 +463,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
 
     try {
       final var packageBasePath = this.npmStorageService.getPackageBasePath(scopeName, packageName);
-      final var versionName = PackageUtils.extractVersionNameFromPayload(payload);
+      final var versionName = NpmPackageUtils.extractVersionNameFromPayload(payload);
 
       // Guard every length-limited value before anything is written (RPS-1136): a publish this
       // refuses leaves no orphan tarball, and one it lets through never fails the row insert.
@@ -471,7 +471,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
       NpmPublishLimits.checkVersion(versionName);
       NpmPublishLimits.checkDistTags(payload);
       NpmPublishLimits.dropOverLongFields(
-          PackageUtils.extractVersionFromPayload(payload).getSecond());
+          NpmPackageUtils.extractVersionFromPayload(payload).getSecond());
 
       // The rows are written first and the files second, in one transaction (RPS-1124): see
       // NpmPackageService#publishVersion.
@@ -497,7 +497,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
       context.addProperty(
           STORAGE_PATH,
           packageBasePath
-              .resolve(PackageUtils.getTarballFilename(packageName, versionName))
+              .resolve(NpmPackageUtils.getTarballFilename(packageName, versionName))
               .toString());
       context.addProperty(USAGES, usages);
 
@@ -641,6 +641,6 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
   }
 
   private String buildArtifactName(final @Nullable String scopeName, final String packageName) {
-    return PackageUtils.buildFullName(scopeName, packageName);
+    return NpmPackageUtils.buildFullName(scopeName, packageName);
   }
 }

@@ -32,7 +32,7 @@ import tools.jackson.databind.json.JsonMapper;
 @Slf4j
 @UtilityClass
 @NullMarked
-public final class PackageUtils {
+public final class PypiPackageUtils {
   private static final String MINIMUM_REQUIRED_PYTHON_VERSION = ">=2.4";
 
   private static final JsonMapper MAPPER =
@@ -62,7 +62,7 @@ public final class PackageUtils {
 
   static boolean isPackageNameNormalized(final String packageName) {
 
-    return packageName.equals(PackageUtils.normalizePackageName(packageName));
+    return packageName.equals(PypiPackageUtils.normalizePackageName(packageName));
   }
 
   public static Map<String, Object> parseMultipartUploadRequestParameters(
@@ -74,7 +74,7 @@ public final class PackageUtils {
 
       final var parameter = parameters.nextElement();
 
-      if (PackageUtils.isParameterValueIsArray(parameter)) {
+      if (PypiPackageUtils.isParameterValueIsArray(parameter)) {
         parameterMap.put(parameter, request.getParameterValues(parameter));
       } else {
         parameterMap.put(parameter, request.getParameter(parameter));

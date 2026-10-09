@@ -16,8 +16,8 @@
 package io.repsy.os.server.protocols.docker.protocol.pre_processors;
 
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.os.server.shared.utils.ProtocolContextUtils;
 import io.repsy.os.server.shared.utils.RequestBaseUrlUtils;
+import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
@@ -80,7 +80,7 @@ final class DockerAuthChallenge {
 
     return of(
         request,
-        requestedName(context, ProtocolContextUtils.getRepoInfo(context)),
+        requestedName(context, UrlPropertiesUtils.getRepoInfo(context)),
         (Permission) properties.get("permission"));
   }
 
@@ -92,7 +92,7 @@ final class DockerAuthChallenge {
   static @Nullable String requestedName(final ProtocolContext context, final RepoInfo repoInfo) {
 
     final var segments =
-        StringUtils.split(ProtocolContextUtils.getRelativePath(context).getPath(), '/');
+        StringUtils.split(UrlPropertiesUtils.getRelativePath(context).getPath(), '/');
 
     if (StringUtils.isBlank(repoInfo.getName()) || segments == null || segments.length == 0) {
       return null;

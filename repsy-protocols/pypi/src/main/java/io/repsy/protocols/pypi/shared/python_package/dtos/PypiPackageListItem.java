@@ -13,16 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.protocols.npm.shared.auth.dtos;
+package io.repsy.protocols.pypi.shared.python_package.dtos;
 
-import lombok.Builder;
-import lombok.Data;
+import java.time.LocalDateTime;
 
-@Data
-@Builder
-public class LoginResponse {
-  private String rev;
-  private String id;
-  private boolean ok;
-  private String token;
+public interface PypiPackageListItem {
+  String getName();
+
+  String getLatestVersion();
+
+  String getStableVersion();
+
+  LocalDateTime getUpdatedAt();
 }
