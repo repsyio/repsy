@@ -29,11 +29,11 @@ import org.springframework.web.multipart.MultipartFile;
 
 @NullMarked
 public interface PypiStorageService<ID> {
-  long deletePackage(UUID repoUuid, String packageNormalizedName);
+  long deletePackage(UUID repoId, String packageNormalizedName);
 
-  long deleteRelease(UUID repoUuid, String packageNormalizedName, String releaseVersion);
+  long deleteRelease(UUID repoId, String packageNormalizedName, String releaseVersion);
 
-  Resource getArchiveFile(UUID repoUuid, String repoName, String packageName, String fileName);
+  Resource getArchiveFile(UUID repoId, String repoName, String packageName, String fileName);
 
   ByteArrayResource getPackageArchiveFileList(
       BaseRepoInfo<ID> repoInfo,
@@ -41,9 +41,9 @@ public interface PypiStorageService<ID> {
       Map<String, String> versionAndRequiresPythonMap)
       throws IOException, TemplateException;
 
-  void deleteRepo(UUID repoUuid);
+  void deleteRepo(UUID repoId);
 
-  void createRepo(UUID repoUuid);
+  void createRepo(UUID repoId);
 
   void clearTrash();
 

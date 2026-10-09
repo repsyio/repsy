@@ -61,9 +61,9 @@ public abstract class AbstractPypiStorageService<ID> implements PypiStorageServi
 
   /** mark package directory as deleted ands return its usage */
   @Override
-  public long deletePackage(final UUID repoUuid, final String packageNormalizedName) {
+  public long deletePackage(final UUID repoId, final String packageNormalizedName) {
 
-    final var storagePath = StoragePath.of(repoUuid, packageNormalizedName);
+    final var storagePath = StoragePath.of(repoId, packageNormalizedName);
 
     final var usage = this.storageStrategy.calculatePathUsage(storagePath);
 
@@ -75,14 +75,14 @@ public abstract class AbstractPypiStorageService<ID> implements PypiStorageServi
   /** mark archive files belongs to given release version as deleted and return total usage */
   @Override
   public long deleteRelease(
-      final UUID repoUuid, final String packageNormalizedName, final String releaseVersion) {
+      final UUID repoId, final String packageNormalizedName, final String releaseVersion) {
 
     final var normalizedPackagePath =
         packageNormalizedName.endsWith("/")
             ? packageNormalizedName
             : packageNormalizedName + PATH_DELIMITER;
 
-    final var storagePath = StoragePath.of(repoUuid, normalizedPackagePath);
+    final var storagePath = StoragePath.of(repoId, normalizedPackagePath);
 
     final Predicate<StorageItemInfo> predicate =
         si -> isFileBelongsRelease(si.getName(), releaseVersion);
@@ -112,7 +112,7 @@ public abstract class AbstractPypiStorageService<ID> implements PypiStorageServi
       final var normalizedPath =
           Paths.get(packageNormalizedName, archiveResource.getName()).toString();
 
-      final var sp = StoragePath.of(repoUuid, normalizedPath);
+      final var sp = StoragePath.of(repoId, normalizedPath);
 
       this.storageStrategy.delete(sp);
     }
@@ -122,9 +122,9 @@ public abstract class AbstractPypiStorageService<ID> implements PypiStorageServi
 
   @Override
   public Resource getArchiveFile(
-      final UUID repoUuid, final String repoName, final String packageName, final String fileName) {
+      final UUID repoId, final String repoName, final String packageName, final String fileName) {
 
-    final var storagePath = StoragePath.of(repoUuid, Paths.get(packageName, fileName).toString());
+    final var storagePath = StoragePath.of(repoId, Paths.get(packageName, fileName).toString());
 
     return this.storageStrategy
         .get(storagePath, repoName)
@@ -231,15 +231,15 @@ public abstract class AbstractPypiStorageService<ID> implements PypiStorageServi
 
   /** mark repo directory as deleted */
   @Override
-  public void deleteRepo(final UUID repoUuid) {
-    final var storagePath = StoragePath.of(repoUuid);
+  public void deleteRepo(final UUID repoId) {
+    final var storagePath = StoragePath.of(repoId);
     this.storageStrategy.delete(storagePath);
   }
 
   @Override
-  public void createRepo(final UUID repoUuid) {
+  public void createRepo(final UUID repoId) {
 
-    this.storageStrategy.createDirectory(repoUuid.toString());
+    this.storageStrategy.createDirectory(repoId.toString());
   }
 
   @Override

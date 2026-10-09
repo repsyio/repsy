@@ -120,9 +120,9 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
   }
 
   @Override
-  public void createRepo(final UUID repoUuid) {
+  public void createRepo(final UUID repoId) {
 
-    this.storageStrategy.createDirectory(repoUuid.toString());
+    this.storageStrategy.createDirectory(repoId.toString());
   }
 
   @Override
@@ -272,10 +272,10 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
   }
 
   @Override
-  public long deleteArtifact(final UUID repoUuid, final String groupId, final String artifactId) {
+  public long deleteArtifact(final UUID repoId, final String groupId, final String artifactId) {
 
     final var artifactPath = this.getPath(groupId, artifactId);
-    final var storagePath = StoragePath.of(repoUuid, artifactPath.toString());
+    final var storagePath = StoragePath.of(repoId, artifactPath.toString());
     final var usage = this.storageStrategy.calculatePathUsage(storagePath);
 
     this.storageStrategy.delete(storagePath);
@@ -285,13 +285,10 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
 
   @Override
   public long deleteArtifactVersion(
-      final UUID repoUuid,
-      final String groupId,
-      final String artifactId,
-      final String versionName) {
+      final UUID repoId, final String groupId, final String artifactId, final String versionName) {
 
     final var versionPath = this.getPath(groupId, artifactId, versionName);
-    final var storagePath = StoragePath.of(repoUuid, versionPath.toString());
+    final var storagePath = StoragePath.of(repoId, versionPath.toString());
 
     // An earlier partial delete or a manual cleanup can leave the DB row without a directory
     // (RPS-1190): the usage of a directory that is gone is zero and deleting it is a no-op, so the
@@ -338,16 +335,16 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
    */
   @Override
   public long deleteGroup(
-      final UUID repoUuid, final String groupId, final List<String> artifactNames) {
+      final UUID repoId, final String groupId, final List<String> artifactNames) {
 
     final var groupPaths = this.getPath(groupId);
     final var groupPath = groupPaths[0];
 
-    var usage = this.deleteGroupLevelMetadataFiles(repoUuid, groupPath);
+    var usage = this.deleteGroupLevelMetadataFiles(repoId, groupPath);
 
     for (final var artifactName : artifactNames) {
       final var artifactStoragePath =
-          StoragePath.of(repoUuid, groupPath.resolve(artifactName).normalize().toString());
+          StoragePath.of(repoId, groupPath.resolve(artifactName).normalize().toString());
 
       usage += this.storageStrategy.calculatePathUsage(artifactStoragePath);
       this.storageStrategy.delete(artifactStoragePath);
@@ -357,7 +354,7 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
     // still has content — a nested sibling group's directory, or anything else this group's
     // deletion has no business touching.
     for (final var path : groupPaths) {
-      final var sp = StoragePath.of(repoUuid, path + "/");
+      final var sp = StoragePath.of(repoId, path + "/");
 
       if (!this.listDirectoryOrEmpty(sp).isEmpty()) {
         break;
@@ -374,9 +371,9 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
    * siblings, if present directly in the group's own directory. Never looks inside a subdirectory,
    * so an artifact's or a nested group's files are never considered here.
    */
-  private long deleteGroupLevelMetadataFiles(final UUID repoUuid, final Path groupPath) {
+  private long deleteGroupLevelMetadataFiles(final UUID repoId, final Path groupPath) {
 
-    final var groupStoragePath = StoragePath.of(repoUuid, groupPath + "/");
+    final var groupStoragePath = StoragePath.of(repoId, groupPath + "/");
 
     var usage = 0L;
 
@@ -386,7 +383,7 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
       }
 
       final var itemStoragePath =
-          StoragePath.of(repoUuid, groupPath.resolve(item.getName()).toString());
+          StoragePath.of(repoId, groupPath.resolve(item.getName()).toString());
 
       usage += item.getSize() == null ? 0L : item.getSize();
       this.storageStrategy.delete(itemStoragePath);
@@ -396,8 +393,8 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
   }
 
   @Override
-  public void deleteRepo(final UUID repoUuid) {
-    final var storagePath = StoragePath.of(repoUuid);
+  public void deleteRepo(final UUID repoId) {
+    final var storagePath = StoragePath.of(repoId);
     this.storageStrategy.delete(storagePath);
   }
 
@@ -712,13 +709,12 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
    * delta (subtracted, same sign convention as the metadata rewrite itself).
    */
   private long deleteStaleMetadataSignature(
-      final UUID repoUuid, final Path artifactBasePath, final String repoName) {
+      final UUID repoId, final Path artifactBasePath, final String repoName) {
 
     var freedBytes = 0L;
 
     for (final var fileName : METADATA_SIGNATURE_FAMILY) {
-      final var storagePath =
-          StoragePath.of(repoUuid, artifactBasePath.resolve(fileName).toString());
+      final var storagePath = StoragePath.of(repoId, artifactBasePath.resolve(fileName).toString());
 
       final var optionalResource = this.storageStrategy.get(storagePath, repoName);
 
@@ -755,7 +751,7 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
       final StoragePath metadataStoragePath, final Path artifactBasePath, final String repoName)
       throws IOException {
 
-    final var repoUuid = metadataStoragePath.getStorageKey();
+    final var repoId = metadataStoragePath.getStorageKey();
 
     final var resource =
         this.storageStrategy
@@ -777,7 +773,7 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
     for (final var entry : hashFunctions.entrySet()) {
       delta +=
           this.writeChecksumIfExists(
-              Objects.requireNonNull(repoUuid),
+              Objects.requireNonNull(repoId),
               artifactBasePath,
               repoName,
               metadataContent,
@@ -789,7 +785,7 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
   }
 
   private long writeChecksumIfExists(
-      final UUID repoUuid,
+      final UUID repoId,
       final Path artifactBasePath,
       final String repoName,
       final String content,
@@ -799,7 +795,7 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
 
     final var checksumFile = artifactBasePath.resolve(METADATA_FILENAME + "." + extension);
 
-    final var storagePath = StoragePath.of(repoUuid, checksumFile.toString());
+    final var storagePath = StoragePath.of(repoId, checksumFile.toString());
 
     final var optionalResource = this.storageStrategy.get(storagePath, repoName);
 

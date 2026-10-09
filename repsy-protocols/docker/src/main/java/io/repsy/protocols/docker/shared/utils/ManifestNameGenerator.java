@@ -46,19 +46,18 @@ public final class ManifestNameGenerator {
    *     generated from, or {@code null} once the file lives at its digest
    */
   public static String fileName(
-      final UUID repoUuid,
+      final UUID repoId,
       final String imageName,
       final String digest,
       final @Nullable String storageName) {
 
-    return storageName == null ? digest : generate(repoUuid, imageName, storageName);
+    return storageName == null ? digest : generate(repoId, imageName, storageName);
   }
 
-  public static String generate(
-      final UUID repoUuid, final String imageName, final String reference) {
+  public static String generate(final UUID repoId, final String imageName, final String reference) {
 
     try {
-      final var uniqueString = String.format("%s:%s:%s", repoUuid, imageName, reference);
+      final var uniqueString = String.format("%s:%s:%s", repoId, imageName, reference);
 
       final var digest = MessageDigest.getInstance("SHA-256");
       final var digestHash = digest.digest(uniqueString.getBytes(StandardCharsets.UTF_8));
@@ -71,7 +70,7 @@ public final class ManifestNameGenerator {
     } catch (final NoSuchAlgorithmException e) {
       return String.format(
           "manifest_%s_%s_%s",
-          repoUuid.toString().substring(0, UUID_LENGTH),
+          repoId.toString().substring(0, UUID_LENGTH),
           sanitizeFileName(imageName),
           sanitizeFileName(reference));
     }

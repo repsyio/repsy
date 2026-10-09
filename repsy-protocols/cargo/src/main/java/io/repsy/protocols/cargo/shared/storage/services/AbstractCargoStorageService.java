@@ -161,8 +161,8 @@ public abstract class AbstractCargoStorageService implements CargoStorageService
   }
 
   @Override
-  public void deleteRepo(final UUID repoUuid) {
-    final var storagePath = StoragePath.of(repoUuid);
+  public void deleteRepo(final UUID repoId) {
+    final var storagePath = StoragePath.of(repoId);
     this.storageStrategy.delete(storagePath);
   }
 
