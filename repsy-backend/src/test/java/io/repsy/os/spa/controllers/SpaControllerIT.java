@@ -332,4 +332,53 @@ class SpaControllerIT extends AbstractStaticFrontendIntegrationTest {
         .andExpect(
             header().string(HttpHeaders.CONTENT_TYPE, containsString(MediaType.TEXT_HTML_VALUE)));
   }
+
+  @Test
+  @DisplayName("robots.txt on the protocol port is a plain-text file that disallows everything")
+  void robotsTxtIsPlainText() throws Exception {
+
+    this.mockMvc
+        .perform(get("/robots.txt").with(protocolPort()))
+        .andExpect(status().isOk())
+        .andExpect(
+            header().string(HttpHeaders.CONTENT_TYPE, containsString(MediaType.TEXT_PLAIN_VALUE)))
+        .andExpect(content().string(containsString("User-agent: *")))
+        .andExpect(content().string(containsString("Disallow: /")));
+  }
+
+  @Test
+  @DisplayName("favicon.ico on the protocol port is 204 with no body")
+  void faviconIsNoContent() throws Exception {
+
+    this.mockMvc
+        .perform(get("/favicon.ico").with(protocolPort()))
+        .andExpect(status().isNoContent())
+        .andExpect(content().string(""));
+  }
+
+  @Test
+  @DisplayName("robots.txt and favicon.ico are not answered on a nested path (RPS-2091)")
+  void staticFilesAreOnlyAtTheRoot() throws Exception {
+
+    this.mockMvc
+        .perform(get("/some-repo/robots.txt").with(protocolPort()))
+        .andExpect(
+            result ->
+                org.assertj.core.api.Assertions.assertThat(
+                        result.getResponse().getContentAsString())
+                    .doesNotContain("User-agent"));
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @DisplayName("a repo cannot be named after a router static file, so none can shadow it")
+  @ValueSource(strings = {"robots.txt", "favicon.ico"})
+  void repoNamedLikeAStaticFileIsRefused(final String name) throws Exception {
+
+    this.perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/repos")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"%s\",\"type\":\"MAVEN\"}".formatted(name))
+                .header(HttpHeaders.AUTHORIZATION, this.adminBearerToken()))
+        .andExpect(status().isBadRequest());
+  }
 }

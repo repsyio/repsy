@@ -908,6 +908,126 @@ class ProtocolRepoControllerIT extends AbstractIntegrationTest {
           "Invalid storage path.");
     }
 
+    /** A file and a folder next to the repo's own storage folder and above it (RPS-2091). */
+    private static final String OUTSIDE_FILE = "outside-secret-file.txt";
+
+    private static final String OUTSIDE_DIR = "outside-secret-dir";
+
+    /**
+     * Hostile {@code path} values, already decoded the way the servlet container hands them over,
+     * so each one reaches the facade as is. None may list anything outside the repo.
+     */
+    private static Stream<String> hostilePaths() {
+      return Stream.of(
+          "..",
+          "../",
+          "../..",
+          "..\\..",
+          "com/../../" + OUTSIDE_DIR,
+          "/../" + OUTSIDE_DIR,
+          "../" + OUTSIDE_DIR,
+          "/etc",
+          "/etc/",
+          "/etc/passwd",
+          "//etc",
+          "file:///etc",
+          "com/%2e%2e/%2e%2e",
+          "..%2F..",
+          "..%2f..%2f" + OUTSIDE_DIR,
+          "%2e%2e%2f",
+          "com/\u0000",
+          "\u0000",
+          "..\u0000/..",
+          "a".repeat(2048),
+          "com/" + "a/".repeat(1024));
+    }
+
+    private void seedOutsideRepo(final Repo repo) throws IOException {
+      final var repoDir = storageDirOf(repo);
+      Files.createDirectories(repoDir.resolveSibling(OUTSIDE_DIR));
+      Files.writeString(repoDir.resolveSibling(OUTSIDE_DIR).resolve("inner.txt"), "x");
+      Files.writeString(repoDir.resolveSibling(OUTSIDE_FILE), "x");
+      Files.writeString(repoDir.getParent().getParent().resolve(OUTSIDE_FILE), "x");
+    }
+
+    private void assertNothingOutsideListed(final String body) {
+      assertThat(body)
+          .doesNotContain(OUTSIDE_DIR, OUTSIDE_FILE, "inner.txt", "passwd", "passwd/")
+          .doesNotContain("root:");
+    }
+
+    @ParameterizedTest(name = "path=\"{0}\"")
+    @MethodSource("hostilePaths")
+    @DisplayName("never lists anything outside the repo for a hostile path (RPS-2091)")
+    void hostilePathNeverListsOutsideTheRepo(final String path) throws Exception {
+      final var repo = this.repoWithContent();
+      this.seedOutsideRepo(repo);
+
+      final var response =
+          ProtocolRepoControllerIT.this
+              .perform(
+                  get(repoUrl(repo, "/contents"))
+                      .param("path", path)
+                      .header(AUTHORIZATION, ProtocolRepoControllerIT.this.userBearerToken()))
+              .andReturn()
+              .getResponse();
+
+      final var body = response.getContentAsString();
+      assertThat(response.getStatus()).as("status for %s", path).isIn(400, 404);
+      this.assertNothingOutsideListed(body);
+      assertThat(body).doesNotContain("root.txt", "lib-1.0.jar");
+    }
+
+    @ParameterizedTest(name = "query=\"{0}\"")
+    @ValueSource(
+        strings = {
+          "path=..%2F..",
+          "path=..%2F..%2F" + OUTSIDE_DIR,
+          "path=%2Fetc",
+          "path=%2e%2e",
+          "path=%252e%252e",
+          "path=com%2F..%2F..",
+          "path=com%00",
+          "path=%00"
+        })
+    @DisplayName("never lists anything outside the repo for a percent-encoded path (RPS-2091)")
+    void encodedHostilePathNeverListsOutsideTheRepo(final String query) throws Exception {
+      final var repo = this.repoWithContent();
+      this.seedOutsideRepo(repo);
+
+      final var response =
+          ProtocolRepoControllerIT.this
+              .perform(
+                  get(java.net.URI.create(repoUrl(repo, "/contents") + "?" + query))
+                      .header(AUTHORIZATION, ProtocolRepoControllerIT.this.userBearerToken()))
+              .andReturn()
+              .getResponse();
+
+      assertThat(response.getStatus()).as("status for %s", query).isIn(400, 404);
+      this.assertNothingOutsideListed(response.getContentAsString());
+      assertThat(response.getContentAsString()).doesNotContain("root.txt", "lib-1.0.jar");
+    }
+
+    @Test
+    @DisplayName("a path that climbs out and back in does not reach a sibling repo (RPS-2091)")
+    void climbingOutAndBackInDoesNotReachASiblingRepo() throws Exception {
+      final var repo = this.repoWithContent();
+      final var sibling = ProtocolRepoControllerIT.this.seedMaven();
+      writeFile(sibling, "sibling-only.txt", "x");
+
+      final var response =
+          ProtocolRepoControllerIT.this
+              .perform(
+                  get(repoUrl(repo, "/contents"))
+                      .param("path", "../" + sibling.getId())
+                      .header(AUTHORIZATION, ProtocolRepoControllerIT.this.userBearerToken()))
+              .andReturn()
+              .getResponse();
+
+      assertThat(response.getStatus()).isIn(400, 404);
+      assertThat(response.getContentAsString()).doesNotContain("sibling-only.txt");
+    }
+
     @ParameterizedTest(name = "path=\"{0}\"")
     @ValueSource(strings = {"nope", "com/nope", "com/acme/lib/1.0/lib-1.0.jar"})
     @DisplayName("returns 404 resourceNotFound for a missing path and for a path to a file")
