@@ -29,9 +29,31 @@ import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 
+/**
+ * The registry ping {@code GET|HEAD /v2/}. It serves every repo type (Docker, Helm OCI), because
+ * the ping carries no repo. It answers {@code Docker-Distribution-API-Version: registry/2.0}, the
+ * header that tells a client the endpoint implements the Registry HTTP API V2 (RPS-2103).
+ */
 @NullMarked
 public abstract class AbstractDockerRegistryCheckProtocolMethodHandler
     implements ProtocolMethodHandler {
+
+  /** The header that names the registry API version. */
+  public static final String API_VERSION_HEADER = "Docker-Distribution-API-Version";
+
+  /** The value of {@link #API_VERSION_HEADER}. */
+  public static final String API_VERSION = "registry/2.0";
+
+  /**
+   * Tells whether a servlet path is the registry ping.
+   *
+   * @param path The servlet path of the request
+   * @return {@code true} for {@code /v2} and {@code /v2/}
+   */
+  public static boolean isPingPath(final String path) {
+
+    return "/v2".equals(path) || "/v2/".equals(path);
+  }
 
   public AbstractDockerRegistryCheckProtocolMethodHandler(final DockerProtocolProvider provider) {
 
@@ -63,7 +85,7 @@ public abstract class AbstractDockerRegistryCheckProtocolMethodHandler
       final HttpServletRequest request,
       final HttpServletResponse response) {
 
-    return ResponseEntity.ok().build();
+    return ResponseEntity.ok().header(API_VERSION_HEADER, API_VERSION).build();
   }
 
   private Optional<ProtocolContext> createProtocolContext(final HttpServletRequest request) {
@@ -76,7 +98,7 @@ public abstract class AbstractDockerRegistryCheckProtocolMethodHandler
 
     final var path = request.getServletPath();
 
-    if (!"/v2".equals(path) && !"/v2/".equals(path)) {
+    if (!isPingPath(path)) {
       return Optional.empty();
     }
 

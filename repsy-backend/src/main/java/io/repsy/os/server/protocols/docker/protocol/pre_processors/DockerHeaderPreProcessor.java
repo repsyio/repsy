@@ -23,6 +23,7 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.os.shared.error_handling.utils.OciErrors;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
+import io.repsy.protocols.docker.protocol.handlers.AbstractDockerRegistryCheckProtocolMethodHandler;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -64,6 +65,13 @@ public class DockerHeaderPreProcessor extends ProtocolProcessor {
 
     if (this.isPreProcessorNotEnabled(request, properties)) {
       return ProcessorResult.next();
+    }
+
+    if (AbstractDockerRegistryCheckProtocolMethodHandler.isPingPath(request.getServletPath())) {
+      // The ping's 401 names the registry API version like its 200 does (RPS-2103).
+      response.setHeader(
+          AbstractDockerRegistryCheckProtocolMethodHandler.API_VERSION_HEADER,
+          AbstractDockerRegistryCheckProtocolMethodHandler.API_VERSION);
     }
 
     return ProcessorResult.of(
