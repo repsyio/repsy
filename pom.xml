@@ -129,7 +129,7 @@
           <compilerArgs combine.self="override">
             <arg>-parameters</arg>
             <arg>-XDcompilePolicy=simple</arg>
-            <arg>-Xplugin:ErrorProne -Xep:UnicodeInCode:OFF -Xep:MissingOverride:ERROR -Xep:StringCaseLocaleUsage:ERROR -Xep:InlineFormatString:ERROR -Xep:StringSplitter:ERROR -Xep:BadImport:ERROR -Xep:EmptyCatch:ERROR -Xep:UnusedMethod:ERROR -Xep:DefaultCharset:ERROR -Xep:EnumOrdinal:ERROR -Xep:TypeParameterUnusedInFormals:ERROR -Xep:NonApiType:ERROR -Xep:PatternMatchingInstanceof:ERROR -Xep:LoopOverCharArray:ERROR -Xep:ReferenceEquality:ERROR -XepExcludedPaths:(.*/src/test/.*|.*/target/.*)</arg>
+            <arg>-Xplugin:ErrorProne -Xep:UnicodeInCode:OFF -Xep:NullAway:WARN -XepOpt:NullAway:OnlyNullMarked=true -XepOpt:NullAway:JSpecifyMode=true -XepOpt:NullAway:TreatGeneratedAsUnannotated=true -Xep:MissingOverride:ERROR -Xep:StringCaseLocaleUsage:ERROR -Xep:InlineFormatString:ERROR -Xep:StringSplitter:ERROR -Xep:BadImport:ERROR -Xep:EmptyCatch:ERROR -Xep:UnusedMethod:ERROR -Xep:DefaultCharset:ERROR -Xep:EnumOrdinal:ERROR -Xep:TypeParameterUnusedInFormals:ERROR -Xep:NonApiType:ERROR -Xep:PatternMatchingInstanceof:ERROR -Xep:LoopOverCharArray:ERROR -Xep:ReferenceEquality:ERROR -XepExcludedPaths:(.*/src/test/.*|.*/target/.*)</arg>
             <arg>--should-stop=ifError=FLOW</arg>
           </compilerArgs>
         </configuration>
