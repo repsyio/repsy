@@ -24,7 +24,7 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.server.core.UrlParserProperties;
-import io.repsy.os.server.protocols.pypi.protocol.facades.PypiProtocolFacadeImpl;
+import io.repsy.os.server.protocols.pypi.protocol.facades.PypiProtocolFacade;
 import io.repsy.os.server.protocols.pypi.ui.facades.PypiApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
@@ -51,7 +51,7 @@ class PypiUploadOverrideIT extends AbstractIntegrationTest {
 
   @Autowired private RepoTxService repoTxService;
   @Autowired private PypiApiFacade pypiApiFacade;
-  @Autowired private PypiProtocolFacadeImpl pypiProtocolFacade;
+  @Autowired private PypiProtocolFacade pypiProtocolFacade;
   @MockitoBean private UsageUpdateService usageUpdateService;
 
   private static String unique(final String prefix) {

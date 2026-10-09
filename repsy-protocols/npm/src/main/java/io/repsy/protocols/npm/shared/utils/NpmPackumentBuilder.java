@@ -71,7 +71,7 @@ public final class NpmPackumentBuilder {
       final @Nullable String packageUrl,
       final Instant modified) {
 
-    final var fullName = PackageUtils.buildFullName(snapshot.scope(), snapshot.name());
+    final var fullName = NpmPackageUtils.buildFullName(snapshot.scope(), snapshot.name());
     final var versions = new LinkedHashMap<String, Object>();
     final var time = new LinkedHashMap<String, Object>();
 
@@ -118,7 +118,7 @@ public final class NpmPackumentBuilder {
     final var latest = distTagsOf(snapshot).get(NpmConstants.LATEST);
 
     if (latest != null && ((Map<?, ?>) packument.get(NpmConstants.VERSIONS)).containsKey(latest)) {
-      PackageUtils.liftFieldsToTopLevel(packument, latest);
+      NpmPackageUtils.liftFieldsToTopLevel(packument, latest);
     }
   }
 
@@ -248,7 +248,7 @@ public final class NpmPackumentBuilder {
     if (packageUrl != null && !packageUrl.isBlank()) {
       dist.put(
           NpmConstants.TARBALL,
-          packageUrl + "/-/" + PackageUtils.getTarballFilename(bareName, version));
+          packageUrl + "/-/" + NpmPackageUtils.getTarballFilename(bareName, version));
     }
 
     if (tarball != null) {

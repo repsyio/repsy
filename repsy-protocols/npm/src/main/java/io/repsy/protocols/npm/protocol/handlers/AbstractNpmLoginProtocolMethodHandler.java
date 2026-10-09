@@ -23,7 +23,7 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
 import io.repsy.protocols.npm.shared.auth.dtos.LoginRequest;
-import io.repsy.protocols.npm.shared.auth.dtos.LoginResponse;
+import io.repsy.protocols.npm.shared.auth.dtos.NpmLoginResponse;
 import io.repsy.protocols.npm.shared.auth.services.NpmAuthComponent;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
 import io.repsy.protocols.shared.repo.dtos.Permission;
@@ -116,7 +116,7 @@ public abstract class AbstractNpmLoginProtocolMethodHandler<ID> implements Proto
               repoInfo, loginRequest.getName(), loginRequest.getPassword());
 
       final var loginResponse =
-          LoginResponse.builder()
+          NpmLoginResponse.builder()
               .rev("_we_dont_use_revs_any_more")
               .id("org.couchdb.user:undefined")
               .ok(true)
@@ -126,7 +126,7 @@ public abstract class AbstractNpmLoginProtocolMethodHandler<ID> implements Proto
       return ResponseEntity.status(HttpStatus.CREATED).body(loginResponse);
 
     } catch (final UnAuthorizedException e) {
-      final var loginResponse = LoginResponse.builder().ok(false).build();
+      final var loginResponse = NpmLoginResponse.builder().ok(false).build();
 
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
           .header(WWW_AUTHENTICATE, BasicAuthChallenge.REPSY)

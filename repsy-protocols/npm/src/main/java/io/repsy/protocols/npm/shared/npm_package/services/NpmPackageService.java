@@ -16,7 +16,7 @@
 package io.repsy.protocols.npm.shared.npm_package.services;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
-import io.repsy.protocols.npm.shared.npm_package.dtos.BasePackageInfo;
+import io.repsy.protocols.npm.shared.npm_package.dtos.BaseNpmPackageInfo;
 import io.repsy.protocols.npm.shared.npm_package.dtos.NpmPackageSnapshot;
 import io.repsy.protocols.npm.shared.npm_package.dtos.PackageDistributionTagMapListItem;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
@@ -78,7 +78,7 @@ public interface NpmPackageService<ID> {
     @NonNull BaseUsages write(@NonNull PublishKind kind) throws IOException, URISyntaxException;
   }
 
-  BasePackageInfo<ID> getPackage(
+  BaseNpmPackageInfo<ID> getPackage(
       UUID storageKey, @Nullable String scopeName, @NonNull String packageName);
 
   /**

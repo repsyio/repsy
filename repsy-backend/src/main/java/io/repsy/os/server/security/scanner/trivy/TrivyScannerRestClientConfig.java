@@ -49,7 +49,7 @@ public class TrivyScannerRestClientConfig {
 
   @Bean
   public @NonNull RestClient trivyScannerRestClient(
-      final @NonNull TrivyScannerProperties properties) {
+      final @NonNull TrivyScannerClientProperties properties) {
 
     return build(Duration.ofSeconds(properties.requestTimeoutSeconds()))
         .requestInterceptor(new ResponseSizeLimitInterceptor(MAX_RESPONSE_BYTES))
@@ -58,7 +58,7 @@ public class TrivyScannerRestClientConfig {
 
   @Bean
   public @NonNull RestClient trivyScannerUploadRestClient(
-      final @NonNull TrivyScannerProperties properties) {
+      final @NonNull TrivyScannerClientProperties properties) {
 
     // No interceptor here: any interceptor makes RestClient buffer the whole request body, and the
     // artifact must be streamed. The answer is bodiless, so there is nothing to cap either.

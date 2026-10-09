@@ -22,8 +22,8 @@ import org.jspecify.annotations.NullMarked;
  * Orders npm version strings by semver precedence ({@link NpmSemver}) instead of as plain text
  * (RPS-1688, the npm counterpart of Maven's {@code VersionComparator} from RPS-1665): a database
  * {@code ORDER BY} on the {@code version} column would sort {@code "10.0.0"} above {@code "9.0.0"}.
- * {@code PackageUtils} already refuses a publish whose version does not parse as semver, so every
- * stored version is one {@link NpmSemver#parse(String)} accepts.
+ * {@code NpmPackageUtils} already refuses a publish whose version does not parse as semver, so
+ * every stored version is one {@link NpmSemver#parse(String)} accepts.
  */
 @NullMarked
 public class NpmVersionComparator implements Comparator<String> {

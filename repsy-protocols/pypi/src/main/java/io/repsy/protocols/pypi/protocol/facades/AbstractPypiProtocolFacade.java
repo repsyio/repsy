@@ -15,7 +15,7 @@
  */
 package io.repsy.protocols.pypi.protocol.facades;
 
-import static io.repsy.protocols.pypi.shared.utils.PackageUtils.parseUploadForm;
+import static io.repsy.protocols.pypi.shared.utils.PypiPackageUtils.parseUploadForm;
 
 import freemarker.template.TemplateException;
 import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
@@ -27,7 +27,7 @@ import io.repsy.protocols.pypi.shared.python_package.dtos.ReleaseVersionRequires
 import io.repsy.protocols.pypi.shared.python_package.services.PypiPackageService;
 import io.repsy.protocols.pypi.shared.storage.services.PypiStorageService;
 import io.repsy.protocols.pypi.shared.utils.PackageStorageUtils;
-import io.repsy.protocols.pypi.shared.utils.PackageUtils;
+import io.repsy.protocols.pypi.shared.utils.PypiPackageUtils;
 import io.repsy.protocols.pypi.shared.utils.PypiPublishLimits;
 import io.repsy.protocols.pypi.shared.utils.ReleaseVersion;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
@@ -74,7 +74,7 @@ public abstract class AbstractPypiProtocolFacade<ID> implements PypiProtocolFaca
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
 
     final var uploadForm = parseUploadForm(parameterMap);
-    uploadForm.setNormalizedName(PackageUtils.normalizePackageName(uploadForm.getName()));
+    uploadForm.setNormalizedName(PypiPackageUtils.normalizePackageName(uploadForm.getName()));
 
     // Guard every length-limited value before anything is written (RPS-1137): a publish this
     // refuses leaves no orphan archive, and one it lets through never fails the row insert.

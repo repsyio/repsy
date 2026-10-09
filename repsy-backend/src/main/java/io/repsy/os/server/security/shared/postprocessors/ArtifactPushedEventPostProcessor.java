@@ -21,7 +21,7 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.libs.protocol.router.ProtocolProvider;
 import io.repsy.os.server.security.scanner.VulnerabilityScannerRegistry;
-import io.repsy.os.server.shared.utils.ProtocolContextUtils;
+import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
 import io.repsy.protocols.shared.utils.BlobDigests;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -76,7 +76,7 @@ public class ArtifactPushedEventPostProcessor extends ProtocolProcessor {
       return ProcessorResult.next();
     }
 
-    final var repoInfo = ProtocolContextUtils.getRepoInfo(context);
+    final var repoInfo = UrlPropertiesUtils.getRepoInfo(context);
 
     if (!repoInfo.isSecurityScanEnabled()) {
       return ProcessorResult.next();
@@ -92,7 +92,7 @@ public class ArtifactPushedEventPostProcessor extends ProtocolProcessor {
       return ProcessorResult.next();
     }
 
-    final var relativePath = ProtocolContextUtils.getRelativePath(context);
+    final var relativePath = UrlPropertiesUtils.getRelativePath(context);
     final var storagePathOverride = context.<String>getProperty(STORAGE_PATH);
     final var storagePath =
         storagePathOverride != null ? storagePathOverride : relativePath.getPath();

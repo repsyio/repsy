@@ -42,7 +42,7 @@ import io.repsy.os.server.security.scan.services.VulnerabilityScanTxService;
 import io.repsy.os.server.security.scanner.VulnerabilityScanner;
 import io.repsy.os.server.security.scanner.VulnerabilityScannerRegistry;
 import io.repsy.os.server.security.scanner.dtos.ScanRequest;
-import io.repsy.os.server.security.scanner.trivy.TrivyScannerProperties;
+import io.repsy.os.server.security.scanner.trivy.TrivyScannerClientProperties;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import java.net.ConnectException;
@@ -95,8 +95,8 @@ class ArtifactScanListenerTest {
   @Mock private VulnerabilityScanner scanner;
 
   private static final Instant NOW = Instant.parse("2026-09-26T10:00:00Z");
-  private static final TrivyScannerProperties PROPERTIES =
-      new TrivyScannerProperties("http://scanner", "key", 10, 3000, 330, 3, 15, 60);
+  private static final TrivyScannerClientProperties PROPERTIES =
+      new TrivyScannerClientProperties("http://scanner", "key", 10, 3000, 330, 3, 15, 60);
 
   private ArtifactScanListener listener;
   private Logger listenerLogger;
@@ -521,7 +521,7 @@ class ArtifactScanListenerTest {
             this.repoTxService,
             this.dockerScanTokenIssuer,
             this.taskScheduler,
-            new TrivyScannerProperties("http://scanner", "key", 10, 3000, 330, 1, 15, 60),
+            new TrivyScannerClientProperties("http://scanner", "key", 10, 3000, 330, 1, 15, 60),
             this.scanTaskExecutor,
             Map.<String, StorageStrategy>of());
     this.givenDockerScanIsQueued();

@@ -46,8 +46,8 @@ import io.repsy.os.shared.utils.VersionSortPaging;
 import io.repsy.protocols.npm.shared.npm_package.dtos.NpmPackageSnapshot;
 import io.repsy.protocols.npm.shared.npm_package.dtos.PackageDistributionTagMapListItem;
 import io.repsy.protocols.npm.shared.npm_package.services.NpmPackageService;
+import io.repsy.protocols.npm.shared.utils.NpmPackageUtils;
 import io.repsy.protocols.npm.shared.utils.NpmVersionComparator;
-import io.repsy.protocols.npm.shared.utils.PackageUtils;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -198,7 +198,7 @@ public class NpmPackageServiceImpl implements NpmPackageService<UUID> {
     }
 
     this.replaceVersion(
-        existing.get(), PackageUtils.extractVersionFromPayload(payload).getSecond());
+        existing.get(), NpmPackageUtils.extractVersionFromPayload(payload).getSecond());
 
     return PublishKind.REPLACES_VERSION;
   }
@@ -209,8 +209,8 @@ public class NpmPackageServiceImpl implements NpmPackageService<UUID> {
       final Map<String, Object> payload,
       final boolean firstVersion) {
 
-    final var distTag = PackageUtils.extractFirstDistTagFromPayload(payload);
-    final var versionData = PackageUtils.extractVersionFromPayload(payload).getSecond();
+    final var distTag = NpmPackageUtils.extractFirstDistTagFromPayload(payload);
+    final var versionData = NpmPackageUtils.extractVersionFromPayload(payload).getSecond();
     final var packageVersion = this.addVersion(versionData, versionName, npmPackage);
 
     this.addMaintainers(versionData, packageVersion);
@@ -435,7 +435,7 @@ public class NpmPackageServiceImpl implements NpmPackageService<UUID> {
 
     final var remaining = all.stream().filter(version -> !version.equals(removed)).toList();
     final var latestName =
-        PackageUtils.resolveLatestVersion(
+        NpmPackageUtils.resolveLatestVersion(
             remaining.stream().map(PackageVersion::getVersion).toList());
 
     return remaining.stream()

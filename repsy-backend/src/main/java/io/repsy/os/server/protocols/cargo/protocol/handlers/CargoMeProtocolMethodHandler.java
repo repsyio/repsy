@@ -18,7 +18,7 @@ package io.repsy.os.server.protocols.cargo.protocol.handlers;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.os.server.protocols.cargo.shared.auth.services.CargoAuthComponent;
-import io.repsy.os.server.shared.utils.ProtocolContextUtils;
+import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
 import io.repsy.protocols.cargo.protocol.handlers.AbstractCargoMeProtocolMethodHandler;
 import java.util.Optional;
@@ -36,6 +36,6 @@ public class CargoMeProtocolMethodHandler extends AbstractCargoMeProtocolMethodH
 
   @Override
   protected Optional<ProtocolContext> getProtocolContext(final RelativePath relativePath) {
-    return Optional.of(ProtocolContextUtils.createWithEmptyRepo("", relativePath));
+    return Optional.of(UrlPropertiesUtils.createWithEmptyRepo("", relativePath));
   }
 }

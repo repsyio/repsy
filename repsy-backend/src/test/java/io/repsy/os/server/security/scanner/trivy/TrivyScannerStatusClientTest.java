@@ -109,7 +109,7 @@ class TrivyScannerStatusClientTest {
 
   private @NonNull TrivyScannerStatusClient client() {
     final var properties =
-        new TrivyScannerProperties(
+        new TrivyScannerClientProperties(
             "http://127.0.0.1:" + this.server.getAddress().getPort(),
             API_KEY,
             5,

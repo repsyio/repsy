@@ -31,16 +31,16 @@ import org.springframework.boot.test.context.ConfigDataApplicationContextInitial
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 import org.springframework.context.annotation.Configuration;
 
-@DisplayName("TrivyScannerProperties")
+@DisplayName("TrivyScannerClientProperties")
 class TrivyScannerPropertiesTest {
 
   private static final String PREFIX = "repsy.security.trivy";
 
   @Configuration
-  @EnableConfigurationProperties(TrivyScannerProperties.class)
+  @EnableConfigurationProperties(TrivyScannerClientProperties.class)
   static class PropertiesConfiguration {}
 
-  private static TrivyScannerProperties bind(final Map<String, Object> overrides) {
+  private static TrivyScannerClientProperties bind(final Map<String, Object> overrides) {
     final Map<String, Object> properties = new HashMap<>();
     properties.put(PREFIX + ".scanner-base-url", "http://scanner");
     properties.put(PREFIX + ".api-key", "key");
@@ -50,7 +50,7 @@ class TrivyScannerPropertiesTest {
     overrides.forEach((key, value) -> properties.put(PREFIX + "." + key, value));
 
     return new Binder(new MapConfigurationPropertySource(properties))
-        .bind(PREFIX, TrivyScannerProperties.class)
+        .bind(PREFIX, TrivyScannerClientProperties.class)
         .get();
   }
 
@@ -68,7 +68,7 @@ class TrivyScannerPropertiesTest {
   @DisplayName("the delay grows fourfold and stops at the maximum")
   void delayGrowsAndIsCapped() {
     final var properties =
-        new TrivyScannerProperties("http://scanner", "key", 10, 3000, 330, 5, 1, 30);
+        new TrivyScannerClientProperties("http://scanner", "key", 10, 3000, 330, 5, 1, 30);
 
     assertThat(properties.submitRetryDelay(1)).isEqualTo(Duration.ofSeconds(1));
     assertThat(properties.submitRetryDelay(2)).isEqualTo(Duration.ofSeconds(4));
@@ -92,7 +92,7 @@ class TrivyScannerPropertiesTest {
         .withUserConfiguration(PropertiesConfiguration.class)
         .run(
             context -> {
-              final var properties = context.getBean(TrivyScannerProperties.class);
+              final var properties = context.getBean(TrivyScannerClientProperties.class);
 
               assertThat(properties.submitMaxAttempts()).isEqualTo(3);
               assertThat(properties.submitRetryBudgetSeconds())

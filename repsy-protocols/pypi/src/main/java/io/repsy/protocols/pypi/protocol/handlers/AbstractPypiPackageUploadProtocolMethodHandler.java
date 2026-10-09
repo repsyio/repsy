@@ -20,7 +20,7 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.libs.protocol.router.ProtocolProvider;
 import io.repsy.protocols.pypi.protocol.facades.PypiProtocolFacade;
-import io.repsy.protocols.pypi.shared.utils.PackageUtils;
+import io.repsy.protocols.pypi.shared.utils.PypiPackageUtils;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -109,7 +109,7 @@ public abstract class AbstractPypiPackageUploadProtocolMethodHandler<ID>
     }
 
     this.pypiProtocolFacade.uploadPackage(
-        context, PackageUtils.parseMultipartUploadRequestParameters(multipartRequest), file);
+        context, PypiPackageUtils.parseMultipartUploadRequestParameters(multipartRequest), file);
 
     return ResponseEntity.ok().build();
   }

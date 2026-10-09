@@ -13,20 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.protocols.pypi.shared.python_package.dtos;
+package io.repsy.protocols.npm.shared.auth.dtos;
 
-import java.time.Instant;
+import lombok.Builder;
 import lombok.Data;
-import lombok.experimental.SuperBuilder;
 
 @Data
-@SuperBuilder
-public class BasePackageInfo<ID> {
-  private ID id;
-  private String name;
-  private String normalizedName;
-  private String latestVersion;
-  private String stableVersion;
-  private String repoName;
-  private Instant createdAt;
+@Builder
+public class NpmLoginResponse {
+  private String rev;
+  private String id;
+  private boolean ok;
+  private String token;
 }

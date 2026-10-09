@@ -95,8 +95,8 @@ public final class PypiPublishLimits {
 
   /**
    * Refuses a package name longer than {@link #MAX_NAME_LENGTH}, matching {@code
-   * pypi_package.name}. {@code PackageUtils.normalizePackageName} only collapses separator runs, so
-   * it never grows the name, and this bounds {@code pypi_package.normalized_name} too.
+   * pypi_package.name}. {@code PypiPackageUtils.normalizePackageName} only collapses separator
+   * runs, so it never grows the name, and this bounds {@code pypi_package.normalized_name} too.
    *
    * @throws BadRequestException With {@code pypiPackageNameTooLong}.
    */

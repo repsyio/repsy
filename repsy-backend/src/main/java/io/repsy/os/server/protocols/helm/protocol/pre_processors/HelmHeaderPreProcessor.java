@@ -21,7 +21,7 @@ import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.protocol.router.ProcessorResult;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolProcessor;
-import io.repsy.os.server.shared.utils.ProtocolContextUtils;
+import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
 import io.repsy.os.shared.error_handling.utils.OciErrors;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
@@ -90,7 +90,7 @@ public class HelmHeaderPreProcessor extends ProtocolProcessor {
     }
 
     final var permission = (Permission) properties.get(PERMISSION_KEY);
-    final var repoInfo = ProtocolContextUtils.getRepoInfo(context);
+    final var repoInfo = UrlPropertiesUtils.getRepoInfo(context);
 
     return !repoInfo.isPrivateRepo() && !this.isWritePermission(permission);
   }

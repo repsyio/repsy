@@ -26,7 +26,7 @@ import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.os.server.protocols.helm.shared.auth.HelmAuthComponent;
 import io.repsy.os.server.shared.auth.AuthChallenges;
 import io.repsy.os.server.shared.utils.PreProcessorUtils;
-import io.repsy.os.server.shared.utils.ProtocolContextUtils;
+import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
 import io.repsy.os.shared.error_handling.utils.OciErrors;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
@@ -71,7 +71,7 @@ public class HelmAuthPreProcessor extends ProtocolProcessor {
       final HttpServletResponse response,
       final Map<String, Object> properties) {
 
-    final var repoInfo = ProtocolContextUtils.getRepoInfo(context);
+    final var repoInfo = UrlPropertiesUtils.getRepoInfo(context);
 
     if (PreProcessorUtils.shouldSkipAuthentication(
         SKIP_PRE_PROCESSOR_KEY, WRITE_OPERATION_KEY, repoInfo, properties)) {

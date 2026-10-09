@@ -20,6 +20,7 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.os.server.protocols.docker.shared.tag.services.ManifestDeletionComponent;
 import io.repsy.os.server.protocols.docker.shared.utils.PathParserUtils;
+import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
 import io.repsy.protocols.docker.protocol.facades.AbstractDockerProtocolTxFacade;
 import io.repsy.protocols.docker.shared.image.services.ImageService;
 import io.repsy.protocols.docker.shared.layer.dtos.LayerInfo;
@@ -143,7 +144,7 @@ public class DockerProtocolTxFacade extends AbstractDockerProtocolTxFacade<UUID>
   public void deleteManifest(
       final ProtocolContext context, final String imageName, final String reference) {
 
-    final var repoInfo = io.repsy.os.server.shared.utils.ProtocolContextUtils.getRepoInfo(context);
+    final var repoInfo = UrlPropertiesUtils.getRepoInfo(context);
 
     final var freed = this.manifestDeletionComponent.delete(repoInfo, imageName, reference);
 

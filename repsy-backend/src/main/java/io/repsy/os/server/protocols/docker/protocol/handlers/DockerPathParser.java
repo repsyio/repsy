@@ -19,7 +19,7 @@ import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.os.server.core.UrlParserProperties;
-import io.repsy.os.server.shared.utils.ProtocolContextUtils;
+import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -56,7 +56,7 @@ public class DockerPathParser implements PathParser {
     final var path = request.getServletPath();
 
     if (REGISTRY_LEVEL_PATTERN.matcher(path).matches()) {
-      return Optional.of(ProtocolContextUtils.createWithEmptyRepo("", new RelativePath(path)));
+      return Optional.of(UrlPropertiesUtils.createWithEmptyRepo("", new RelativePath(path)));
     }
 
     final var matcher = NORMAL_PATTERN.matcher(path);

@@ -19,7 +19,7 @@ import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.os.server.security.shared.ArtifactStorageResolver;
 import io.repsy.protocols.npm.shared.storage.services.NpmStorageService;
-import io.repsy.protocols.npm.shared.utils.PackageUtils;
+import io.repsy.protocols.npm.shared.utils.NpmPackageUtils;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -61,7 +61,7 @@ public class NpmArtifactStorageResolver implements ArtifactStorageResolver {
     }
 
     final var packageBasePath = this.npmStorageService.getPackageBasePath(scopeName, packageName);
-    final var tarballFilename = PackageUtils.getTarballFilename(packageName, artifactVersion);
+    final var tarballFilename = NpmPackageUtils.getTarballFilename(packageName, artifactVersion);
 
     final var tarballPath = packageBasePath.resolve(tarballFilename).toString();
 

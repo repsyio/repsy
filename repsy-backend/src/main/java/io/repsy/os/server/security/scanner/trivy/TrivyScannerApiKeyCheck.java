@@ -36,7 +36,7 @@ public class TrivyScannerApiKeyCheck {
 
   private static final Pattern PLACEHOLDER = Pattern.compile("\\$\\{.*}", Pattern.DOTALL);
 
-  public TrivyScannerApiKeyCheck(final @NonNull TrivyScannerProperties properties) {
+  public TrivyScannerApiKeyCheck(final @NonNull TrivyScannerClientProperties properties) {
     final var apiKey = properties.apiKey();
 
     if (apiKey.isBlank() || PLACEHOLDER.matcher(apiKey).find()) {

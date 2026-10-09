@@ -16,7 +16,7 @@
 package io.repsy.protocols.pypi.shared.python_package.services;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
-import io.repsy.protocols.pypi.shared.python_package.dtos.BasePackageInfo;
+import io.repsy.protocols.pypi.shared.python_package.dtos.BasePypiPackageInfo;
 import io.repsy.protocols.pypi.shared.python_package.dtos.PackageUploadForm;
 import io.repsy.protocols.pypi.shared.python_package.dtos.ReleaseVersionRequiresPython;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
@@ -44,7 +44,7 @@ public interface PypiPackageService<ID> {
       BaseRepoInfo<ID> repoInfo, PackageUploadForm uploadForm, ReleaseFileWriter fileWriter)
       throws IOException;
 
-  BasePackageInfo<ID> getPackage(ID repoId, String packageNormalizedName);
+  BasePypiPackageInfo<ID> getPackage(ID repoId, String packageNormalizedName);
 
   /** Existence-only check, never {@link #getPackage}: used to answer {@code HEAD}. */
   boolean packageExists(ID repoId, String packageNormalizedName);

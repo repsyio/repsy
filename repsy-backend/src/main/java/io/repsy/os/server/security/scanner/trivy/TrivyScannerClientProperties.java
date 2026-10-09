@@ -34,7 +34,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param submitRetryMaxDelaySeconds upper bound of the wait before any retry
  */
 @ConfigurationProperties(prefix = "repsy.security.trivy")
-public record TrivyScannerProperties(
+public record TrivyScannerClientProperties(
     @NonNull String scannerBaseUrl,
     @NonNull String apiKey,
     long requestTimeoutSeconds,
@@ -49,7 +49,7 @@ public record TrivyScannerProperties(
 
   private static final int DELAY_GROWTH_FACTOR = 4;
 
-  public TrivyScannerProperties {
+  public TrivyScannerClientProperties {
     requireBetween(
         "submit-max-attempts (TRIVY_SUBMIT_MAX_ATTEMPTS)",
         submitMaxAttempts,

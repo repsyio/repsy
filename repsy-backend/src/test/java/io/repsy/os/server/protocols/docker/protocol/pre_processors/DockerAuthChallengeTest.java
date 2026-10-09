@@ -20,7 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.os.server.core.UrlParserProperties;
-import io.repsy.os.server.shared.utils.ProtocolContextUtils;
+import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.util.Map;
@@ -110,7 +110,7 @@ class DockerAuthChallengeTest {
   @DisplayName("names no scope on the ping, which has an empty repo and no image")
   void namesNoScopeOnThePing() {
     final var request = request("GET", "/v2/");
-    final var context = ProtocolContextUtils.createWithEmptyRepo("", new RelativePath("/v2"));
+    final var context = UrlPropertiesUtils.createWithEmptyRepo("", new RelativePath("/v2"));
 
     assertThat(DockerAuthChallenge.of(context, request, Map.of("permission", Permission.NONE)))
         .doesNotContain("scope=");

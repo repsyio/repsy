@@ -33,7 +33,7 @@ public class TrivyScannerStatusClient {
   private static final String SCAN_PATH = "/scan/";
   private static final String API_KEY_HEADER = "X-Scanner-Api-Key";
 
-  private final @NonNull TrivyScannerProperties properties;
+  private final @NonNull TrivyScannerClientProperties properties;
 
   @Qualifier("trivyScannerRestClient")
   private final @NonNull RestClient restClient;

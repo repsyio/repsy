@@ -31,7 +31,7 @@ import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
-import io.repsy.protocols.npm.shared.npm_package.dtos.BasePackageInfo;
+import io.repsy.protocols.npm.shared.npm_package.dtos.BaseNpmPackageInfo;
 import io.repsy.protocols.npm.shared.npm_package.dtos.NpmPackageSnapshot;
 import io.repsy.protocols.npm.shared.npm_package.services.NpmPackageService;
 import io.repsy.protocols.npm.shared.npm_package.services.NpmPackageService.PackageDeletion;
@@ -216,8 +216,8 @@ class AbstractNpmProtocolFacadeDeleteTest {
         .deletePackageVersion(any(), any(), any(), any(), any(), any());
   }
 
-  private BasePackageInfo<UUID> packageInfo() {
-    return BasePackageInfo.<UUID>builder().id(PACKAGE_ID).build();
+  private BaseNpmPackageInfo<UUID> packageInfo() {
+    return BaseNpmPackageInfo.<UUID>builder().id(PACKAGE_ID).build();
   }
 
   @Test

@@ -13,18 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.protocols.npm.shared.npm_package.dtos;
+package io.repsy.protocols.npm.shared.npm_package.dtos;
 
-import java.time.LocalDateTime;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
+import java.time.Instant;
+import lombok.Data;
+import lombok.experimental.SuperBuilder;
 
-public interface PackageListItem {
-  @Nullable String getScope();
-
-  @NonNull String getName();
-
-  @NonNull String getLatest();
-
-  @NonNull LocalDateTime getUpdatedAt();
+@Data
+@SuperBuilder
+public class BaseNpmPackageInfo<ID> {
+  private ID id;
+  private String registryName;
+  private String scopeName;
+  private String packageName;
+  private String latest;
+  private boolean deleted;
+  private Instant createdAt;
 }

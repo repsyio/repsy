@@ -33,7 +33,7 @@ import io.repsy.os.server.security.scanner.dtos.ScanOutcome;
 import io.repsy.os.server.security.scanner.trivy.ScanJobNotFoundException;
 import io.repsy.os.server.security.scanner.trivy.ScanJobStatus;
 import io.repsy.os.server.security.scanner.trivy.ScanJobStatusResponse;
-import io.repsy.os.server.security.scanner.trivy.TrivyScannerProperties;
+import io.repsy.os.server.security.scanner.trivy.TrivyScannerClientProperties;
 import io.repsy.os.server.security.scanner.trivy.TrivyScannerStatusClient;
 import java.time.Instant;
 import java.util.List;
@@ -61,7 +61,7 @@ class TrivyScanStatusPollerTest {
             this.repository,
             this.txService,
             this.statusClient,
-            new TrivyScannerProperties(
+            new TrivyScannerClientProperties(
                 "http://scanner", "key", 5, 3000, MAX_SCAN_DURATION_SECONDS, 3, 15, 60));
   }
 

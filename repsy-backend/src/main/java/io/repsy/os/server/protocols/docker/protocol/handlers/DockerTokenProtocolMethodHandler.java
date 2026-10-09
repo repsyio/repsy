@@ -17,7 +17,7 @@ package io.repsy.os.server.protocols.docker.protocol.handlers;
 
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
-import io.repsy.os.server.shared.utils.ProtocolContextUtils;
+import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import io.repsy.protocols.docker.protocol.handlers.AbstractDockerTokenProtocolMethodHandler;
 import io.repsy.protocols.docker.protocol.parser.DockerScopeParser;
@@ -41,6 +41,6 @@ public class DockerTokenProtocolMethodHandler
 
   @Override
   protected Optional<ProtocolContext> getProtocolContext(final RelativePath relativePath) {
-    return Optional.of(ProtocolContextUtils.createWithEmptyRepo("", relativePath));
+    return Optional.of(UrlPropertiesUtils.createWithEmptyRepo("", relativePath));
   }
 }

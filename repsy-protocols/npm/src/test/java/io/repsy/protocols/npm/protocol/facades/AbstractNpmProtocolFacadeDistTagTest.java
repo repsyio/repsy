@@ -28,7 +28,7 @@ import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
-import io.repsy.protocols.npm.shared.npm_package.dtos.BasePackageInfo;
+import io.repsy.protocols.npm.shared.npm_package.dtos.BaseNpmPackageInfo;
 import io.repsy.protocols.npm.shared.npm_package.dtos.NpmPackageSnapshot;
 import io.repsy.protocols.npm.shared.npm_package.dtos.PackageDistributionTagMapListItem;
 import io.repsy.protocols.npm.shared.npm_package.services.NpmPackageService;
@@ -231,7 +231,7 @@ class AbstractNpmProtocolFacadeDistTagTest {
   @Test
   @DisplayName("the mapped tags keep the order the service returns them in (RPS-1614)")
   void mappedTagsKeepTheServiceOrder() {
-    final var packageInfo = BasePackageInfo.<UUID>builder().id(REPO_ID).build();
+    final var packageInfo = BaseNpmPackageInfo.<UUID>builder().id(REPO_ID).build();
     when(this.packageService.getPackage(REPO_ID, null, PACKAGE)).thenReturn(packageInfo);
     // A HashMap keeps these three as zulu, beta, latest.
     when(this.packageService.getDistributionTags(REPO_ID))

@@ -23,7 +23,7 @@ import io.repsy.os.server.protocols.pypi.shared.python_package.services.PypiPack
 import io.repsy.os.server.protocols.pypi.shared.storage.services.PypiStorageService;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
-import io.repsy.protocols.pypi.shared.utils.PackageUtils;
+import io.repsy.protocols.pypi.shared.utils.PypiPackageUtils;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -55,7 +55,7 @@ public class PypiApiFacade implements ProtocolApiFacade {
   public @NonNull BaseUsages deletePackage(
       final @NonNull RepoInfo repoInfo, final @NonNull String packageName) {
 
-    final var normalizedName = PackageUtils.normalizePackageName(packageName);
+    final var normalizedName = PypiPackageUtils.normalizePackageName(packageName);
 
     final var deletion =
         this.pypiPackageService.deletePackage(repoInfo.getStorageKey(), normalizedName);
@@ -71,7 +71,7 @@ public class PypiApiFacade implements ProtocolApiFacade {
       final @NonNull String packageName,
       final @NonNull String version) {
 
-    final var normalizedName = PackageUtils.normalizePackageName(packageName);
+    final var normalizedName = PypiPackageUtils.normalizePackageName(packageName);
 
     final var deletion =
         this.pypiPackageService.deleteRelease(repoInfo.getStorageKey(), normalizedName, version);
@@ -110,7 +110,8 @@ public class PypiApiFacade implements ProtocolApiFacade {
       final @NonNull UUID repoId, final @NonNull String packageName) {
 
     final var packageInfo =
-        this.pypiPackageService.getPackage(repoId, PackageUtils.normalizePackageName(packageName));
+        this.pypiPackageService.getPackage(
+            repoId, PypiPackageUtils.normalizePackageName(packageName));
 
     return PypiPackageInfo.builder()
         .name(packageInfo.getName())
@@ -126,7 +127,8 @@ public class PypiApiFacade implements ProtocolApiFacade {
       final @NonNull String releaseVersion) {
 
     final var packageInfo =
-        this.pypiPackageService.getPackage(repoId, PackageUtils.normalizePackageName(packageName));
+        this.pypiPackageService.getPackage(
+            repoId, PypiPackageUtils.normalizePackageName(packageName));
 
     final var releaseDetail =
         this.pypiPackageService.getReleaseDetail(packageInfo.getId(), releaseVersion);

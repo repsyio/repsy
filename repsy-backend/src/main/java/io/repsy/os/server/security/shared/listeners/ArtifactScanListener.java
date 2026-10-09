@@ -28,7 +28,7 @@ import io.repsy.os.server.security.scanner.ResourceArtifactContent;
 import io.repsy.os.server.security.scanner.VulnerabilityScanner;
 import io.repsy.os.server.security.scanner.VulnerabilityScannerRegistry;
 import io.repsy.os.server.security.scanner.dtos.ScanRequest;
-import io.repsy.os.server.security.scanner.trivy.TrivyScannerProperties;
+import io.repsy.os.server.security.scanner.trivy.TrivyScannerClientProperties;
 import io.repsy.os.shared.error_handling.utils.ConstraintViolations;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
@@ -66,7 +66,7 @@ public class ArtifactScanListener {
   private final @NonNull RepoTxService repoTxService;
   private final @NonNull DockerScanTokenIssuer dockerScanTokenIssuer;
   private final @NonNull TaskScheduler taskScheduler;
-  private final @NonNull TrivyScannerProperties scannerProperties;
+  private final @NonNull TrivyScannerClientProperties scannerProperties;
 
   @Qualifier("scanTaskExecutor")
   private final @NonNull Executor scanTaskExecutor;
@@ -260,7 +260,8 @@ public class ArtifactScanListener {
    * <p>A retry that is waiting lives in memory only. When the backend restarts meanwhile it is
    * lost, and {@code TrivyScanStatusPoller} fails the row once {@code max-scan-duration-seconds}
    * have passed since it was created, which is the same recovery as for any other stuck scan. The
-   * retry budget ({@link TrivyScannerProperties#submitRetryBudgetSeconds()}) is well below that.
+   * retry budget ({@link TrivyScannerClientProperties#submitRetryBudgetSeconds()}) is well below
+   * that.
    */
   private void handleScannerUnreachable(
       final @NonNull ArtifactPushedEvent event,

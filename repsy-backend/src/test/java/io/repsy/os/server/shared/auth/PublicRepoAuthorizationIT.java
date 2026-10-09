@@ -39,7 +39,7 @@ import io.repsy.os.server.protocols.npm.shared.npm_package.entities.NpmPackage;
 import io.repsy.os.server.protocols.npm.shared.npm_package.entities.PackageVersion;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.NpmPackageRepository;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageVersionRepository;
-import io.repsy.os.server.protocols.pypi.protocol.facades.PypiProtocolFacadeImpl;
+import io.repsy.os.server.protocols.pypi.protocol.facades.PypiProtocolFacade;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
@@ -114,7 +114,7 @@ class PublicRepoAuthorizationIT extends AbstractIntegrationTest {
   @MockitoBean private UsageUpdateService usageUpdateService;
 
   @Autowired private RepoTxService repoTxService;
-  @Autowired private PypiProtocolFacadeImpl pypiProtocolFacade;
+  @Autowired private PypiProtocolFacade pypiProtocolFacade;
   @Autowired private GoModuleRepository goModuleRepository;
   @Autowired private GoModuleVersionRepository goModuleVersionRepository;
   @Autowired private NpmPackageRepository npmPackageRepository;

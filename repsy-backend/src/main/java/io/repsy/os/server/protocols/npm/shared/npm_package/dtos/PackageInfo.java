@@ -15,9 +15,9 @@
  */
 package io.repsy.os.server.protocols.npm.shared.npm_package.dtos;
 
-import io.repsy.protocols.npm.shared.npm_package.dtos.BasePackageInfo;
+import io.repsy.protocols.npm.shared.npm_package.dtos.BaseNpmPackageInfo;
 import java.util.UUID;
 import lombok.experimental.SuperBuilder;
 
 @SuperBuilder
-public class PackageInfo extends BasePackageInfo<UUID> {}
+public class PackageInfo extends BaseNpmPackageInfo<UUID> {}
