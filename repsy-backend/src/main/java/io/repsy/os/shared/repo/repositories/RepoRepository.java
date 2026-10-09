@@ -50,6 +50,23 @@ public interface RepoRepository extends JpaRepository<Repo, UUID> {
   int updateDiskUsage(@NonNull UUID repoId, long diskUsageDiff);
 
   /**
+   * Adds the diff in one statement, unless that would take the usage below zero (RPS-2113).
+   *
+   * <p>The guard and the addition are evaluated against the same row version under the row lock the
+   * {@code UPDATE} takes, so concurrent updates cannot interleave between a read and a write. A
+   * result of 0 means the repo is gone or the diff does not fit; the caller tells them apart.
+   *
+   * @return the number of rows updated, 0 or 1
+   */
+  @Modifying
+  @Query(
+      """
+      update Repo r
+      set r.diskUsage = r.diskUsage + :diskUsageDiff
+      where r.id = :repoId and r.diskUsage + :diskUsageDiff >= 0""")
+  int addDiskUsageUnlessNegative(@NonNull UUID repoId, long diskUsageDiff);
+
+  /**
    * Reads the disk usage and locks the row until the surrounding transaction ends, so a concurrent
    * {@link #updateDiskUsage} on the same repo waits and the value read here stays current.
    */
