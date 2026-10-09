@@ -38,7 +38,7 @@
  *    of the body is read. Success: `200 text/plain`, `"Successfully registered gem: <name>
  *    (<version>)"`. An unparseable gem (a bad tar, a `metadata.gz` GemspecParser cannot load) is `400
  *    text/plain "invalidGemFile"`.
- *  - Upload pipeline (`GemspecParser.parse` -> `RubyGemServiceImpl.publishGem` ->
+ *  - Upload pipeline (`GemspecParser.parse` -> `RubyGemService.publishGem` ->
  *    `AbstractRubyProtocolFacade.storeGem`, confirmed live and read from source):
  *    `metadata.gz` is gzipped **YAML** (`Gem::Specification#to_yaml`/`Gem::Specification.from_yaml`),
  *    loaded through SnakeYAML's `SafeConstructor` with every `!ruby/...` mapping tag retagged to a
