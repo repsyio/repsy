@@ -31,7 +31,7 @@ import org.springframework.data.domain.Sort;
  * for two executions of the same query: a row then shows on two pages, or on none. Ending the sort
  * on the primary key breaks every tie.
  *
- * <p>{@link StablePagingConfiguration} applies this to every repository method that takes a {@link
+ * <p>{@link StablePagingConfig} applies this to every repository method that takes a {@link
  * Pageable}, so no query or controller has to remember it.
  */
 public final class StablePaging {

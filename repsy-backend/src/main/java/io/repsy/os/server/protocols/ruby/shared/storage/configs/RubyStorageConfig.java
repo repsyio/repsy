@@ -27,7 +27,7 @@ import org.springframework.context.annotation.Configuration;
 @RequiredArgsConstructor
 public class RubyStorageConfig {
 
-  private final @NonNull RubyFileSystemStorageBackendConfigProps fileSystemStorageProps;
+  private final @NonNull RubyFileSystemStorageProperties fileSystemStorageProps;
   private final @NonNull StorageTrashProperties trashProperties;
 
   @Bean("osStorageStrategyRuby")

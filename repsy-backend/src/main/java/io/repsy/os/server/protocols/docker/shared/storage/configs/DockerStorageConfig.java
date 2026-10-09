@@ -27,7 +27,7 @@ import org.springframework.context.annotation.Configuration;
 @RequiredArgsConstructor
 public class DockerStorageConfig {
 
-  private final @NonNull DockerFileSystemStorageBackendConfigProps fileSystemProps;
+  private final @NonNull DockerFileSystemStorageProperties fileSystemProps;
   private final @NonNull StorageTrashProperties trashProperties;
 
   @Bean("osStorageStrategyDocker")

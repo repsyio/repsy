@@ -26,7 +26,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @RequiredArgsConstructor
 public class PypiStorageConfig {
-  private final @NonNull PypiFileSystemStorageBackendConfigProps fileSystemStorageProps;
+  private final @NonNull PypiFileSystemStorageProperties fileSystemStorageProps;
   private final @NonNull StorageTrashProperties trashProperties;
 
   @Bean("osStorageStrategyPypi")

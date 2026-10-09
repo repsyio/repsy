@@ -28,7 +28,7 @@ import org.springframework.context.annotation.Configuration;
 @NullMarked
 public class HelmStorageConfig {
 
-  private final HelmFileSystemStorageBackendConfigProps fileSystemProps;
+  private final HelmFileSystemStorageProperties fileSystemProps;
   private final StorageTrashProperties trashProperties;
 
   @Bean("osStorageStrategyHelm")

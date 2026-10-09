@@ -47,7 +47,7 @@ import org.springframework.test.util.ReflectionTestUtils;
  * requests to both, on a running embedded Tomcat, so the pin does not depend on how {@link
  * RepsyConnectorSettings#apply} happens to be implemented.
  */
-class TomcatMultiPortConfigurationMaxPartCountTest {
+class TomcatMultiPortConfigMaxPartCountTest {
 
   // Deliberately not 50 (Tomcat's own bare-connector default): if this test used 50 the
   // additional connector would happen to enforce the right limit even without the fix, since an

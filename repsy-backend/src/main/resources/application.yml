@@ -82,7 +82,7 @@ multiport:
   tomcat:
     connection-timeout: ${server.tomcat.connection-timeout}
     # Spring Boot applies server.tomcat.max-part-count to the primary connector only; the
-    # additional connectors (TomcatMultiPortConfiguration's plain aliases, and the TLS listeners
+    # additional connectors (TomcatMultiPortConfig's plain aliases, and the TLS listeners
     # of SslConnectorCustomizer) take it from here through RepsyConnectorSettings.apply (RPS-1657).
     max-part-count: ${server.tomcat.max-part-count}
   ports:
@@ -265,7 +265,7 @@ app:
   # same-origin only: no CORS header at all (RPS-1590), which is what the Docker image needs (the SPA
   # and the API share an origin). Comma-separated, exact origins only (e.g. https://panel.example.com),
   # for a SPA served from elsewhere. `mvn spring-boot:run` sets http://localhost:4200 through
-  # application-dev.yml. See CorsGlobalConfiguration.
+  # application-dev.yml. See CorsGlobalConfig.
   # The repository-serving (protocol) port sends no CORS header at all (RPS-1514).
   allowed-origins: ${APP_ALLOWED_ORIGINS:}
 

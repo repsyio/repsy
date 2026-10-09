@@ -27,7 +27,7 @@ import org.springframework.context.annotation.Configuration;
 @RequiredArgsConstructor
 public class CargoStorageConfig {
 
-  private final @NonNull CargoFileSystemStorageBackendConfigProps fileSystemProps;
+  private final @NonNull CargoFileSystemStorageProperties fileSystemProps;
   private final @NonNull StorageTrashProperties trashProperties;
 
   @Bean("osStorageStrategyCargo")

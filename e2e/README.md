@@ -5175,7 +5175,7 @@ certificate`; with `NODE_EXTRA_CA_CERTS` and `SSL_CERT_FILE` withheld every npm 
 certificate in certificate chain`; the untrusted-child case above pins the same thing permanently.
 
 **RPS-1559 (fixed): Repsy's own https connectors used to miss settings the plain ones get.** `SslConnectorCustomizer` built a
-bare connector, without `EncodedSolidusHandling.DECODE` and the connection timeout that `TomcatMultiPortConfiguration`
+bare connector, without `EncodedSolidusHandling.DECODE` and the connection timeout that `TomcatMultiPortConfig`
 sets on the others, and response compression did not reach it (Spring Boot applies its connector customizers, and
 `server.compression`, to the primary connector only). Observed on 9443 against 9090: a request path with `%2F` (an npm
 **scoped** package, `@scope%2Fname`, which is how `npm publish`/`install` spell it) was answered by Tomcat with a bodyless

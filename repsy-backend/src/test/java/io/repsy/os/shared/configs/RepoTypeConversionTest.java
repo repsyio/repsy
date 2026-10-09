@@ -38,7 +38,7 @@ class RepoTypeConversionTest {
 
   private static DefaultFormattingConversionService conversionService() {
     final var service = new DefaultFormattingConversionService();
-    new RepoTypeConversionConfiguration().addFormatters(service);
+    new RepoTypeConversionConfig().addFormatters(service);
 
     return service;
   }

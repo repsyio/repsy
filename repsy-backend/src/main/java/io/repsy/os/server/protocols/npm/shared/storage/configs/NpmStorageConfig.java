@@ -26,7 +26,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @RequiredArgsConstructor
 public class NpmStorageConfig {
-  private final @NonNull NpmFileSystemStorageBackendConfigProps fileSystemStorageProps;
+  private final @NonNull NpmFileSystemStorageProperties fileSystemStorageProps;
   private final @NonNull StorageTrashProperties trashProperties;
 
   @Bean("osStorageStrategyNpm")

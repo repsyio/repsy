@@ -27,7 +27,7 @@ import org.springframework.context.annotation.Configuration;
 @RequiredArgsConstructor
 public class GoStorageConfig {
 
-  private final @NonNull GoFileSystemStorageBackendConfigProps fileSystemStorageProps;
+  private final @NonNull GoFileSystemStorageProperties fileSystemStorageProps;
   private final @NonNull StorageTrashProperties trashProperties;
 
   @Bean("osStorageStrategyGolang")

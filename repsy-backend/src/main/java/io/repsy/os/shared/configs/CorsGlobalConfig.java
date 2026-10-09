@@ -52,7 +52,7 @@ public class CorsGlobalConfig extends OncePerRequestFilter {
   private final @NonNull ApiPortMatcher apiPortMatcher;
   private final @Nullable CorsFilter apiCorsFilter;
 
-  public CorsGlobalConfiguration(
+  public CorsGlobalConfig(
       final @NonNull AppCorsProperties appCorsProperties,
       final @NonNull ApiPortMatcher apiPortMatcher) {
 

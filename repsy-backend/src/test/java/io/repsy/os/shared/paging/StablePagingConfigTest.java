@@ -29,8 +29,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
-@DisplayName("StablePagingConfiguration")
-class StablePagingConfigurationTest {
+@DisplayName("StablePagingConfig")
+class StablePagingConfigTest {
 
   /** A repository shape: one method that pages, one that does not. */
   @SuppressWarnings("unused")
@@ -41,8 +41,8 @@ class StablePagingConfigurationTest {
     List<String> findAll(UUID repoId);
   }
 
-  private final StablePagingConfiguration.TieBreakerInterceptor interceptor =
-      new StablePagingConfiguration.TieBreakerInterceptor();
+  private final StablePagingConfig.TieBreakerInterceptor interceptor =
+      new StablePagingConfig.TieBreakerInterceptor();
 
   private static MethodInvocation invocation(final Method method, final Object[] arguments)
       throws Throwable {
