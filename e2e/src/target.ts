@@ -78,6 +78,13 @@ export interface UiCapabilities {
    * repository (`/api/repos/counts`, `/api/repos/security-summary`) stay literals.
    */
   repoApiPath(repo: string, ...segments: string[]): string;
+  /**
+   * The panel REST API path of a repository under a per-format prefix: `formatApiPath('/api/mvn/key-stores', 'r')`
+   * is `/api/mvn/key-stores/r` on Repsy OS and `/api/mvn/key-stores/<owner>/r` on Repsy Cloud; further `segments`
+   * are appended as they are. Like `repoApiPath`, it reads `env.repoOwner` when it is called and throws on Repsy
+   * Cloud when `REPSY_REPO_OWNER` is unset.
+   */
+  formatApiPath(prefix: string, repo: string, ...segments: string[]): string;
   /** The route of the signed-in account's own page: `/profile` (OS) or `/account` (Cloud). */
   profilePath: string;
   /**
@@ -150,6 +157,7 @@ const supportsVersionAllowanceSettings = (repoType: RepoType): boolean =>
 const OS_UI: UiCapabilities = {
   repoRoute: (repo, ...segments) => ['', repo, ...segments].join('/'),
   repoApiPath: (repo, ...segments) => ['', 'api', 'repos', repo, ...segments].join('/'),
+  formatApiPath: (prefix, repo, ...segments) => [prefix, repo, ...segments].join('/'),
   profilePath: '/profile',
   settingsPath: '/profile/settings',
   accessTokensPath: '/profile/settings',
@@ -182,6 +190,14 @@ const CLOUD_UI: UiCapabilities = {
       );
     }
     return ['', 'api', 'repos', env.repoOwner, repo, ...segments].join('/');
+  },
+  formatApiPath: (prefix, repo, ...segments) => {
+    if (!env.repoOwner) {
+      throw new Error(
+        'The panel API of Repsy Cloud addresses a repository as <prefix>/<owner>/<repo>, but REPSY_REPO_OWNER is not set.',
+      );
+    }
+    return [prefix, env.repoOwner, repo, ...segments].join('/');
   },
   profilePath: '/account',
   settingsPath: '/settings',
