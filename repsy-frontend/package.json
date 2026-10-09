@@ -37,7 +37,7 @@
     "github-markdown-css": "^5.9.0",
     "highlight.js": "^11.12.0",
     "jwt-decode": "^4.0.0",
-    "marked": "^18.0.14",
+    "marked": "^18.1.0",
     "moment": "^2.31.0",
     "ngx-highlightjs": "^14.0.1",
     "ngx-markdown": "^21.3.0",
@@ -60,8 +60,8 @@
     "@tailwindcss/nesting": "0.0.0-insiders.565cd3e",
     "@types/jasmine": "~7.0.0",
     "@types/node": "^26.6.4",
-    "@typescript-eslint/eslint-plugin": "^8.71.0",
-    "@typescript-eslint/parser": "^8.71.0",
+    "@typescript-eslint/eslint-plugin": "^8.71.1",
+    "@typescript-eslint/parser": "^8.71.1",
     "angular-eslint": "^22.5.0",
     "autoprefixer": "^10.6.1",
     "daisyui": "^5.7.47",
@@ -82,7 +82,7 @@
     "tailwind-scrollbar": "^4.0.2",
     "tailwindcss": "^4.3.3",
     "typescript": "~5.9.3",
-    "typescript-eslint": "^8.71.0"
+    "typescript-eslint": "^8.71.1"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
