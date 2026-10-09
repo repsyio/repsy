@@ -17,7 +17,7 @@
 import { HttpContext, HttpErrorResponse } from '@angular/common/http';
 import { PLATFORM_ID } from '@angular/core';
 import { fakeAsync, flushMicrotasks, TestBed, tick } from '@angular/core/testing';
-import { EMPTY, firstValueFrom, from, of, throwError } from 'rxjs';
+import { EMPTY, firstValueFrom, from, NEVER, of, throwError } from 'rxjs';
 
 import { AuthApi, LoginInfo } from '../../../../generated/api';
 import { SILENT_ERROR } from '../../../shared/interceptor/error-handler.interceptor';
@@ -647,6 +647,27 @@ describe('AuthService', () => {
 
           expect(seen.tokens).toEqual(['access-2']);
           // It never held the lock, so it does not remove somebody else's.
+          expect(localStorage.getItem(LOCK_KEY)).toMatch(/^someone-else:/);
+        }));
+
+        it('gives its lock back when the page is hidden mid-refresh (a reload)', fakeAsync(() => {
+          refreshToken.and.callFake(() => NEVER);
+          start(createService());
+
+          tick(1000);
+          expect(localStorage.getItem(LOCK_KEY)).toMatch(/^[0-9a-f]{16}:\d+$/);
+          window.dispatchEvent(new Event('pagehide'));
+
+          expect(localStorage.getItem(LOCK_KEY)).toBeNull();
+        }));
+
+        it("does not remove another tab's lock on pagehide", fakeAsync(() => {
+          localStorage.setItem(LOCK_KEY, `someone-else:${Date.now() + 15_000}`);
+          start(createService());
+
+          tick(1000);
+          window.dispatchEvent(new Event('pagehide'));
+
           expect(localStorage.getItem(LOCK_KEY)).toMatch(/^someone-else:/);
         }));
 
