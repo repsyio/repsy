@@ -25,6 +25,11 @@
     </dependency>
 
     <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-lang3</artifactId>
+    </dependency>
+
+    <dependency>
       <groupId>io.repsy.core</groupId>
       <artifactId>core-error-handling</artifactId>
       <version>${project.version}</version>
