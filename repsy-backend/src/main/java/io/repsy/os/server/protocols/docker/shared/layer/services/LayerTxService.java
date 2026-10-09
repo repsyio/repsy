@@ -46,7 +46,7 @@ public class LayerTxService implements LayerService<UUID> {
 
   @Override
   @Transactional
-  public @NonNull LayerInfo findOrCreate(
+  public @NonNull LayerInfo getOrCreate(
       final @NonNull LayerForm layerForm, final @NonNull UUID repoId) {
 
     final var layerOpt = this.findLayerInfoByRepoIdAndDigest(repoId, layerForm.getDigest());

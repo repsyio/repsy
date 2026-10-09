@@ -73,7 +73,7 @@ public abstract class AbstractDockerStorageService<ID> implements DockerStorageS
   }
 
   @Override
-  public Optional<Resource> getResource(final StoragePath storagePath, final String repoName) {
+  public Optional<Resource> findResource(final StoragePath storagePath, final String repoName) {
 
     return this.storageStrategy.get(storagePath, repoName);
   }

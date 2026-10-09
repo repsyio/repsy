@@ -139,8 +139,8 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
                 configDigest,
                 LAYER_MEDIA_TYPE,
                 layerDigest);
-    final var image = this.imageService.findOrCreateImage(repo.getId(), imageName);
-    this.layerService.findOrCreate(
+    final var image = this.imageService.getOrCreateImage(repo.getId(), imageName);
+    this.layerService.getOrCreate(
         LayerForm.builder()
             .imageName(imageName)
             .mediaType(CONFIG_MEDIA_TYPE)
@@ -148,7 +148,7 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
             .size(configJson.length())
             .build(),
         repo.getId());
-    this.layerService.findOrCreate(
+    this.layerService.getOrCreate(
         LayerForm.builder()
             .imageName(imageName)
             .mediaType(LAYER_MEDIA_TYPE)
@@ -189,8 +189,8 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
       final Repo repo, final String imageName, final String tag) throws Exception {
     final String layerDigest = "sha256:" + "2".repeat(64);
     final String listDigest = "sha256:" + "c".repeat(64);
-    final var image = this.imageService.findOrCreateImage(repo.getId(), imageName);
-    this.layerService.findOrCreate(
+    final var image = this.imageService.getOrCreateImage(repo.getId(), imageName);
+    this.layerService.getOrCreate(
         LayerForm.builder()
             .imageName(imageName)
             .mediaType(LAYER_MEDIA_TYPE)
@@ -220,7 +220,7 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
                   configDigest,
                   LAYER_MEDIA_TYPE,
                   layerDigest);
-      this.layerService.findOrCreate(
+      this.layerService.getOrCreate(
           LayerForm.builder()
               .imageName(imageName)
               .mediaType(CONFIG_MEDIA_TYPE)
@@ -1021,7 +1021,7 @@ class DockerImageControllerIT extends AbstractIntegrationTest {
       // A tag is only a pointer: its manifest stays stored, with its file, and pullable by digest
       // (RPS-1216).
       final var image =
-          DockerImageControllerIT.this.imageService.findImageInfoByRepoIdAndName(
+          DockerImageControllerIT.this.imageService.getImageInfoByRepoIdAndName(
               repo.getId(), fixture.imageName);
       assertThat(DockerImageControllerIT.this.manifestRepository.findAllByImageId(image.getId()))
           .extracting(manifest -> manifest.getDigest())

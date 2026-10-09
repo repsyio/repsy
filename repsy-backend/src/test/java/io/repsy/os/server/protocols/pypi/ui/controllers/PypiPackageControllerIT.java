@@ -108,7 +108,7 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
   private void upload(
       final RepoInfo repo, final String packageName, final String version, final String filename)
       throws Exception {
-    assertThat(this.repoTxService.getRepoByNameAndType(repo.getName(), RepoType.PYPI)).isPresent();
+    assertThat(this.repoTxService.findRepoByNameAndType(repo.getName(), RepoType.PYPI)).isPresent();
     final var content = archiveContent(filename, packageName + "-" + version + "\n");
     final var sha256 = java.security.MessageDigest.getInstance("SHA-256").digest(content);
     final var digest = java.util.HexFormat.of().formatHex(sha256);

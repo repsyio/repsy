@@ -66,7 +66,7 @@
  * for per-platform manifests of multi-platform tags", filed independently, status Done) is about the
  * DIFFERENT panel UI endpoint (`/api/docker/images/.../manifests/{reference}`), not the registry
  * protocol path `crane`/this file exercise -- its own description says the registry path "already
- * resolves such digests" (`ManifestService.findManifestByRepoIdAndImageNameAndDigest`), which is
+ * resolves such digests" (`ManifestService.getManifestByRepoIdAndImageNameAndDigest`), which is
  * exactly what the tests below confirm live, end to end, with a real client.
  *
  * Every credential here is `token-rw` (a fresh read-write deploy token), the same hand-built

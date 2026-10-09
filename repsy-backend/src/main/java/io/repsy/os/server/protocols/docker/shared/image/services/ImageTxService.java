@@ -68,7 +68,7 @@ public class ImageTxService implements ImageService<UUID> {
    */
   @Override
   @Transactional
-  public ImageInfo findOrCreateImage(final UUID repoId, final String imageName) {
+  public ImageInfo getOrCreateImage(final UUID repoId, final String imageName) {
 
     final var existing = this.imageRepository.findByRepoIdAndName(repoId, imageName);
 
@@ -209,7 +209,7 @@ public class ImageTxService implements ImageService<UUID> {
    *
    * @throws ItemNotFoundException {@code imageNotFound}
    */
-  public io.repsy.os.generated.model.ImageListItem findListItemByRepoIdAndName(
+  public io.repsy.os.generated.model.ImageListItem getListItemByRepoIdAndName(
       final UUID repoId, final String imageName) {
 
     return this.imageRepository
@@ -251,7 +251,7 @@ public class ImageTxService implements ImageService<UUID> {
   }
 
   @Override
-  public ImageInfo findImageInfoByRepoIdAndName(final UUID repoId, final String imageName) {
+  public ImageInfo getImageInfoByRepoIdAndName(final UUID repoId, final String imageName) {
 
     final var image = this.findByRepoIdAndName(repoId, imageName);
 

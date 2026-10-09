@@ -65,8 +65,8 @@ class H2DockerImageQueriesIT extends H2IntegrationTest {
   void findOrCreateImageIsIdempotent() {
     final var repo = this.repo("h2dockerimage");
 
-    final var first = this.imageTxService.findOrCreateImage(repo.getId(), "app");
-    final var second = this.imageTxService.findOrCreateImage(repo.getId(), "app");
+    final var first = this.imageTxService.getOrCreateImage(repo.getId(), "app");
+    final var second = this.imageTxService.getOrCreateImage(repo.getId(), "app");
 
     assertThat(second.getId()).isEqualTo(first.getId());
     assertThat(this.imageRepository.findAllByRepoId(repo.getId())).hasSize(1);
@@ -78,7 +78,7 @@ class H2DockerImageQueriesIT extends H2IntegrationTest {
     final var repo = this.repo("h2dockernested");
     final var image =
         this.imageRepository
-            .findById(this.imageTxService.findOrCreateImage(repo.getId(), "app").getId())
+            .findById(this.imageTxService.getOrCreateImage(repo.getId(), "app").getId())
             .orElseThrow();
     final var leafLayer = this.layer(repo, "leaf", 100);
     final var plainLayer = this.layer(repo, "plain", 7);
@@ -146,7 +146,7 @@ class H2DockerImageQueriesIT extends H2IntegrationTest {
   private io.repsy.os.server.protocols.docker.shared.image.entities.Image image(
       final Repo repo, final String name) {
     return this.imageRepository
-        .findById(this.imageTxService.findOrCreateImage(repo.getId(), name).getId())
+        .findById(this.imageTxService.getOrCreateImage(repo.getId(), name).getId())
         .orElseThrow();
   }
 

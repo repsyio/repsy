@@ -311,7 +311,7 @@ public class DockerManifestLayoutRepairService {
         StoragePath.of(repo.getId(), Paths.get(MANIFESTS_DIRECTORY, name).toString());
 
     return this.dockerStorageService
-        .getResource(storagePath, repo.getName())
+        .findResource(storagePath, repo.getName())
         .filter(Resource::exists)
         .map(
             resource -> {

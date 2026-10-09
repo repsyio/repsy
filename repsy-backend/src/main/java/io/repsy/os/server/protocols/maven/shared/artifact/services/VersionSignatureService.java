@@ -329,7 +329,7 @@ public class VersionSignatureService {
     final Supplier<PublicKeySources> sources =
         Suppliers.memoize(
             () ->
-                this.keyStoreService.findPublicKeySources(
+                this.keyStoreService.getPublicKeySources(
                     repo.getId(), repo.isPgpKeyServerLookupEnabled()));
 
     for (final var fileName : fileNames) {

@@ -59,7 +59,7 @@ public abstract class AbstractHelmStorageService<ID> implements HelmStorageServi
   }
 
   @Override
-  public Optional<Resource> getResource(final StoragePath storagePath, final String repoName)
+  public Optional<Resource> findResource(final StoragePath storagePath, final String repoName)
       throws IOException {
     return this.storageStrategy.get(storagePath, repoName);
   }
@@ -165,14 +165,15 @@ public abstract class AbstractHelmStorageService<ID> implements HelmStorageServi
   }
 
   @Override
-  public Optional<Resource> getBlob(final UUID repoId, final String digest, final String repoName) {
+  public Optional<Resource> findBlob(
+      final UUID repoId, final String digest, final String repoName) {
     final var storagePath = StoragePath.of(repoId, "oci/blobs/" + digest);
     return this.storageStrategy.get(storagePath, repoName);
   }
 
   @Override
   public boolean blobExists(final UUID repoId, final String digest, final String repoName) {
-    final var resourceOpt = this.getBlob(repoId, digest, repoName);
+    final var resourceOpt = this.findBlob(repoId, digest, repoName);
     return resourceOpt.isPresent() && resourceOpt.get().exists();
   }
 
@@ -192,7 +193,7 @@ public abstract class AbstractHelmStorageService<ID> implements HelmStorageServi
   }
 
   @Override
-  public Optional<Resource> getManifest(
+  public Optional<Resource> findManifest(
       final UUID repoId, final String name, final String reference, final String repoName) {
     final var storagePath = StoragePath.of(repoId, "oci/manifests/" + name + "/" + reference);
     return this.storageStrategy.get(storagePath, repoName);
@@ -201,7 +202,7 @@ public abstract class AbstractHelmStorageService<ID> implements HelmStorageServi
   @Override
   public boolean manifestExists(
       final UUID repoId, final String name, final String reference, final String repoName) {
-    final var resourceOpt = this.getManifest(repoId, name, reference, repoName);
+    final var resourceOpt = this.findManifest(repoId, name, reference, repoName);
     return resourceOpt.isPresent() && resourceOpt.get().exists();
   }
 }

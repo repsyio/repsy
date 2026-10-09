@@ -54,7 +54,7 @@ import org.springframework.data.util.Pair;
 
 /**
  * RPS-1272: {@link AbstractNpmProtocolFacade#addDistributionTag} and {@link
- * AbstractNpmProtocolFacade#removeDistributionTag} hand the package metadata write to {@link
+ * AbstractNpmProtocolFacade#deleteDistributionTag} hand the package metadata write to {@link
  * NpmPackageService}, which writes the tag row first, and the metadata change to {@link
  * AbstractNpmStorageService#changeMetadata}, which puts the metadata back when that write fails.
  */
@@ -117,7 +117,7 @@ class AbstractNpmProtocolFacadeDistTagTest {
   }
 
   private void removeRuns() throws IOException {
-    when(this.packageService.removeDistributionTag(any(), any(), eq(PACKAGE), eq(TAG), any()))
+    when(this.packageService.deleteDistributionTag(any(), any(), eq(PACKAGE), eq(TAG), any()))
         .thenAnswer(
             invocation -> invocation.<NpmPackageService.MetadataWriter>getArgument(4).write());
   }
@@ -195,10 +195,10 @@ class AbstractNpmProtocolFacadeDistTagTest {
     this.basePath();
     this.removeRuns();
     this.metadataChangesRun();
-    when(this.storageService.removeDistributionTag(REPO_ID, REPO_NAME, BASE_PATH, TAG))
+    when(this.storageService.deleteDistributionTag(REPO_ID, REPO_NAME, BASE_PATH, TAG))
         .thenReturn(-9L);
 
-    this.facade.removeDistributionTag(this.context, null, PACKAGE, TAG);
+    this.facade.deleteDistributionTag(this.context, null, PACKAGE, TAG);
 
     assertThat(this.context.<BaseUsages>getProperty("usages").getDiskUsage()).isEqualTo(-9L);
   }
@@ -210,9 +210,9 @@ class AbstractNpmProtocolFacadeDistTagTest {
     this.basePath();
     this.removeRuns();
     this.metadataChangesRun();
-    when(this.storageService.removeDistributionTag(any(), any(), any(), any())).thenThrow(failure);
+    when(this.storageService.deleteDistributionTag(any(), any(), any(), any())).thenThrow(failure);
 
-    assertThatThrownBy(() -> this.facade.removeDistributionTag(this.context, null, PACKAGE, TAG))
+    assertThatThrownBy(() -> this.facade.deleteDistributionTag(this.context, null, PACKAGE, TAG))
         .isSameAs(failure);
 
     assertThat(this.context.<BaseUsages>getProperty("usages")).isNull();
@@ -222,10 +222,10 @@ class AbstractNpmProtocolFacadeDistTagTest {
   @DisplayName("the latest tag cannot be removed and nothing is locked or written")
   void latestCannotBeRemoved() throws Exception {
     assertThatThrownBy(
-            () -> this.facade.removeDistributionTag(this.context, null, PACKAGE, "latest"))
+            () -> this.facade.deleteDistributionTag(this.context, null, PACKAGE, "latest"))
         .isInstanceOf(BadRequestException.class);
 
-    verify(this.packageService, never()).removeDistributionTag(any(), any(), any(), any(), any());
+    verify(this.packageService, never()).deleteDistributionTag(any(), any(), any(), any(), any());
   }
 
   @Test

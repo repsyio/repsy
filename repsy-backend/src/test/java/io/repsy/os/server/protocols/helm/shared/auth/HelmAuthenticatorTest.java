@@ -82,7 +82,7 @@ class HelmAuthenticatorTest {
 
     assertUnauthorized(
         () -> this.authenticator.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.READ));
-    verify(this.userTxService, never()).getUserByUsernameOptional(anyString());
+    verify(this.userTxService, never()).findUserInfoByUsername(anyString());
     verify(this.userTxService, never()).getAuthenticatedUserByUsername(anyString());
   }
 

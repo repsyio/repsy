@@ -544,7 +544,7 @@ class ProtocolAuthServicePatTest {
 
       assertUnauthorized(() -> authService.authorizeUserRequest(repo, basic, Permission.READ));
 
-      verify(userTxService, never()).getUserByUsernameOptional(any());
+      verify(userTxService, never()).findUserInfoByUsername(any());
     }
   }
 

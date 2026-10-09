@@ -75,7 +75,7 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
         new AbstractDockerTokenProtocolMethodHandler<>(
             this.authService, this.scopeParser, this.provider) {
           @Override
-          protected Optional<ProtocolContext> getProtocolContext(final RelativePath relativePath) {
+          protected Optional<ProtocolContext> findProtocolContext(final RelativePath relativePath) {
             return Optional.of(new ProtocolContext());
           }
         };
@@ -224,7 +224,7 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
   @DisplayName("hands an anonymous token to a caller without credentials for a public repo")
   void anonymousTokenForPublicRepo() throws Exception {
     final var repo = repo(false);
-    doReturn(Optional.of(repo)).when(this.scopeParser).getRepoInfoByScope(PULL_SCOPE);
+    doReturn(Optional.of(repo)).when(this.scopeParser).findRepoInfoByScope(PULL_SCOPE);
     when(this.authService.createAnonymousUser()).thenReturn("anon-tok");
 
     final var result =
@@ -240,7 +240,7 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
   @DisplayName("answers 401 with a challenge, and no token, when the repo is not public")
   void noAnonymousTokenForPrivateRepo() throws Exception {
     final var repo = repo(true);
-    doReturn(Optional.of(repo)).when(this.scopeParser).getRepoInfoByScope(PULL_SCOPE);
+    doReturn(Optional.of(repo)).when(this.scopeParser).findRepoInfoByScope(PULL_SCOPE);
     doThrow(new ItemNotFoundException("repoNotFound"))
         .when(this.authService)
         .authorizePublicRead(repo);
@@ -287,7 +287,7 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
   @ValueSource(strings = {"repository:repo/delete-me:pull", "repository:repo/undelete:pull"})
   @DisplayName("an image merely named like the action is still a public pull")
   void imageNamedDeleteIsStillAPublicPull(final String scope) throws Exception {
-    doReturn(Optional.of(repo(false))).when(this.scopeParser).getRepoInfoByScope(scope);
+    doReturn(Optional.of(repo(false))).when(this.scopeParser).findRepoInfoByScope(scope);
     when(this.authService.createAnonymousUser()).thenReturn("anon-tok");
 
     final var result =
@@ -363,7 +363,7 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
   @DisplayName("grant_type=password with a blank username falls through to the anonymous path")
   void passwordGrantWithBlankUsernameFallsThroughToAnonymous() throws Exception {
     final var repo = repo(false);
-    doReturn(Optional.of(repo)).when(this.scopeParser).getRepoInfoByScope(PULL_SCOPE);
+    doReturn(Optional.of(repo)).when(this.scopeParser).findRepoInfoByScope(PULL_SCOPE);
     when(this.authService.createAnonymousUser()).thenReturn("anon-tok");
 
     final var result =
@@ -381,7 +381,7 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
   @DisplayName("no grant_type at all is unchanged: still the anonymous 200 for a public scope")
   void noGrantTypeStaysAnonymous() throws Exception {
     final var repo = repo(false);
-    doReturn(Optional.of(repo)).when(this.scopeParser).getRepoInfoByScope(PULL_SCOPE);
+    doReturn(Optional.of(repo)).when(this.scopeParser).findRepoInfoByScope(PULL_SCOPE);
     when(this.authService.createAnonymousUser()).thenReturn("anon-tok");
 
     final var result =
@@ -471,7 +471,7 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
     final var repo = repo(false);
     doReturn(Optional.of(repo))
         .when(this.scopeParser)
-        .getRepoInfoByScope("repository:*:pull " + PULL_SCOPE);
+        .findRepoInfoByScope("repository:*:pull " + PULL_SCOPE);
     when(this.authService.createAnonymousUser()).thenReturn("anon-tok");
 
     final var result =
@@ -490,7 +490,7 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
     final var repo = repo(true);
     doReturn(Optional.of(repo))
         .when(this.scopeParser)
-        .getRepoInfoByScope("repository:*:pull " + PULL_SCOPE);
+        .findRepoInfoByScope("repository:*:pull " + PULL_SCOPE);
     doThrow(new ItemNotFoundException("repoNotFound"))
         .when(this.authService)
         .authorizePublicRead(repo);

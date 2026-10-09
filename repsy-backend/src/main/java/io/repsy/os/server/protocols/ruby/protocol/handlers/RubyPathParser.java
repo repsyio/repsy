@@ -56,7 +56,7 @@ public class RubyPathParser implements PathParser {
     }
 
     final var repoName = matcher.group(REPO_NAME).toLowerCase(Locale.getDefault());
-    final var repoInfoOpt = this.repoTxService.getRepoByNameAndType(repoName, RepoType.RUBY);
+    final var repoInfoOpt = this.repoTxService.findRepoByNameAndType(repoName, RepoType.RUBY);
 
     return repoInfoOpt.flatMap(repoInfo -> this.createContext(repoInfo, repoName, matcher));
   }

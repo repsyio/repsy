@@ -100,7 +100,7 @@ public interface HelmProtocolFacade<ID> {
   Optional<HelmChartInfo> findChartByNameAndVersion(
       ProtocolContext context, String name, String version);
 
-  HelmOciBlobInfo findOrCreateBlob(HelmOciBlobForm form, ID repoId);
+  HelmOciBlobInfo getOrCreateBlob(HelmOciBlobForm form, ID repoId);
 
   /**
    * Writes the chart version, the manifest that points at it and the manifest file as one unit

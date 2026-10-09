@@ -31,7 +31,7 @@ public class UserLoginListener {
 
   @Async
   @EventListener
-  public void handleUserLogin(final @NonNull UserLoginEvent event) {
+  public void onUserLogin(final @NonNull UserLoginEvent event) {
     this.userTxService.updateLastLoginAt(event.username());
   }
 }

@@ -95,7 +95,7 @@ class CargoAuthenticatorTest {
             .hash(PASSWORD_HASH)
             .role(UserRole.USER)
             .build();
-    when(this.userTxService.getUserByUsernameOptional(USERNAME)).thenReturn(Optional.of(alice));
+    when(this.userTxService.findUserInfoByUsername(USERNAME)).thenReturn(Optional.of(alice));
   }
 
   @Test

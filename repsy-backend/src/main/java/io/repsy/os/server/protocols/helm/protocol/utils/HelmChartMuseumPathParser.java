@@ -56,7 +56,7 @@ public class HelmChartMuseumPathParser implements PathParser {
     final var relativePath = rawSuffix != null ? "/api" + rawSuffix : "";
 
     return this.repoTxService
-        .getRepoByNameAndType(repoName, RepoType.HELM)
+        .findRepoByNameAndType(repoName, RepoType.HELM)
         .flatMap(repoInfo -> this.createProtocolContext(repoInfo, repoName, relativePath));
   }
 

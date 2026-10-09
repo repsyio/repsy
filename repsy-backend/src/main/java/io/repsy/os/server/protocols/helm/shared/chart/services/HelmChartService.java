@@ -55,7 +55,7 @@ public class HelmChartService implements ChartService<UUID> {
 
   @Override
   @Transactional
-  public HelmChartInfo findOrCreate(final HelmChartForm form, final UUID repoId) {
+  public HelmChartInfo getOrCreate(final HelmChartForm form, final UUID repoId) {
     final var chart = this.lockOrCreateChart(repoId, form.getName());
     final var version = this.findOrCreateVersion(chart, form);
     return this.toDetail(version);
@@ -129,7 +129,7 @@ public class HelmChartService implements ChartService<UUID> {
   }
 
   @Override
-  public HelmChartInfo findByRepoIdAndNameAndVersion(
+  public HelmChartInfo getByRepoIdAndNameAndVersion(
       final UUID repoId, final String name, final String version) {
     return this.helmChartVersionRepository
         .findByRepoIdAndNameAndVersion(repoId, name, version)
@@ -166,7 +166,7 @@ public class HelmChartService implements ChartService<UUID> {
   }
 
   /** The latest version of the chart, or 404 {@code chartNotFound} when there is no such chart. */
-  public HelmChartInfo findLatestByName(final UUID repoId, final String name) {
+  public HelmChartInfo getLatestByName(final UUID repoId, final String name) {
     return this.helmChartRepository
         .findByRepoIdAndName(repoId, name)
         .flatMap(this.helmChartVersionRepository::findFirstByChartOrderByCreatedAtDescIdDesc)
@@ -296,7 +296,7 @@ public class HelmChartService implements ChartService<UUID> {
       // same way ChartService.update() refreshes the classic override path -- otherwise an
       // accepted OCI override with different bytes leaves the row pointing at superseded content.
       // The classic route never reaches this branch: pushChart() pre-checks and calls update()
-      // itself before ever calling findOrCreate().
+      // itself before ever calling getOrCreate().
       final var version = existing.get();
       version.setDescription(form.getDescription());
       version.setAppVersion(form.getAppVersion());

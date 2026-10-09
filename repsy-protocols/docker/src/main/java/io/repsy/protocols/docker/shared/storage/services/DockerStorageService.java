@@ -42,7 +42,7 @@ public interface DockerStorageService<ID> {
 
   List<StorageItemInfo> getItems(UUID repoId, RelativePath relativePath);
 
-  Optional<Resource> getResource(StoragePath storagePath, String repoName);
+  Optional<Resource> findResource(StoragePath storagePath, String repoName);
 
   BaseUsages getUsages(StoragePath storagePath, String name, long contentLength) throws IOException;
 

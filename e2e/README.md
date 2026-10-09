@@ -3420,7 +3420,7 @@ createdAt DESC`, could pick a DB-only "this manifest is also part of that multi-
   5 known docker/OCI types) answers a flat `500 UNKNOWN`, not a `4xx`: `saveManifest`'s `switch`
   throws a bare `IllegalArgumentException("unsupportedMediaType")`, which has no `ErrorHandler`
   mapping. The repo's `Image` row for that image name is ALSO already created by this point
-  (`findOrCreateImage` runs before the `Content-Type` switch), so even the failed attempt leaves
+  (`getOrCreateImage` runs before the `Content-Type` switch), so even the failed attempt leaves
   a row behind. Confirmed live: `registry-rules.spec.ts`'s R5.
 - **B5 (fixed by RPS-1116; R12 now pins `400 MANIFEST_INVALID`; the text below is the original finding) (pre-existing story, [RPS-1116](https://repsyio.atlassian.net/browse/RPS-1116) — commented with
   this live evidence, not a new ticket)** — A config blob missing BOTH `os` and `architecture`
@@ -3504,7 +3504,7 @@ getMediaType()`) instead of the pushed, required, already-validated `Content-Typ
   Done) turned out to be about the _different_ panel UI endpoint
   (`/api/docker/images/.../manifests/{reference}`), not the registry protocol path `crane`/this
   suite exercises — its own description says the registry path "already resolves such digests"
-  (`ManifestService.findManifestByRepoIdAndImageNameAndDigest`), which is exactly what this suite
+  (`ManifestService.getManifestByRepoIdAndImageNameAndDigest`), which is exactly what this suite
   confirms live, end to end, with a real client.
 
 ### Docker registry API pins: tags/list (RPS-1489), `_catalog`, referrers, `mount=` (RPS-1478 part A)

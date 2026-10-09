@@ -40,7 +40,7 @@ public class DockerTokenProtocolMethodHandler
   }
 
   @Override
-  protected Optional<ProtocolContext> getProtocolContext(final RelativePath relativePath) {
+  protected Optional<ProtocolContext> findProtocolContext(final RelativePath relativePath) {
     return Optional.of(UrlPropertiesUtils.createWithEmptyRepo("", relativePath));
   }
 }

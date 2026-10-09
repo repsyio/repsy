@@ -67,7 +67,7 @@ public class DockerPathParser implements PathParser {
 
     final var repoName = matcher.group(REPO_NAME).toLowerCase(Locale.getDefault());
 
-    final var repoInfoOpt = this.repoTxService.getRepoByNameAndType(repoName, RepoType.DOCKER);
+    final var repoInfoOpt = this.repoTxService.findRepoByNameAndType(repoName, RepoType.DOCKER);
 
     return repoInfoOpt.flatMap(repoInfo -> this.createProtocolContext(repoInfo, repoName, matcher));
   }

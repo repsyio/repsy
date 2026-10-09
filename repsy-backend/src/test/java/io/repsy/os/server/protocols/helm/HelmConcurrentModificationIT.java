@@ -951,7 +951,7 @@ class HelmConcurrentModificationIT extends AbstractIntegrationTest {
   private byte @Nullable [] manifestFile(final Repo repo, final String name, final String tag)
       throws Exception {
     final var resource =
-        this.helmStorageService.getManifest(repo.getId(), name, tag, repo.getName());
+        this.helmStorageService.findManifest(repo.getId(), name, tag, repo.getName());
     if (resource.isEmpty() || !resource.get().exists()) {
       return null;
     }

@@ -79,7 +79,7 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
             name, io.repsy.protocols.shared.repo.dtos.RepoType.GOLANG, privateRepo, null);
     this.entityManager.flush();
     assertThat(
-            this.repoTxService.getRepoByNameAndType(
+            this.repoTxService.findRepoByNameAndType(
                 name, io.repsy.protocols.shared.repo.dtos.RepoType.GOLANG))
         .isPresent();
     this.golangApiFacade.createRepo(repoInfo.getStorageKey());

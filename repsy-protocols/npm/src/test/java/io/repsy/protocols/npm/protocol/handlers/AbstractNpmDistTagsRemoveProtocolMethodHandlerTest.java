@@ -164,7 +164,7 @@ class AbstractNpmDistTagsRemoveProtocolMethodHandlerTest {
         this.handler().handle(context, new MockHttpServletRequest(), new MockHttpServletResponse());
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-    verify(this.facade).removeDistributionTag(context, null, "left-pad", "next");
+    verify(this.facade).deleteDistributionTag(context, null, "left-pad", "next");
   }
 
   @Test
@@ -191,7 +191,7 @@ class AbstractNpmDistTagsRemoveProtocolMethodHandlerTest {
 
     this.handler().handle(context, new MockHttpServletRequest(), new MockHttpServletResponse());
 
-    verify(this.facade).removeDistributionTag(context, "scope", "left-pad", "beta");
+    verify(this.facade).deleteDistributionTag(context, "scope", "left-pad", "beta");
   }
 
   @Test

@@ -364,7 +364,7 @@ class PublicRepoAuthorizationIT extends AbstractIntegrationTest {
     final var user = this.panelToken(UserRole.USER);
     final var images = "/api/docker/images/" + repo.getName();
 
-    this.imageTxService.findOrCreateImage(repo.getId(), "app");
+    this.imageTxService.getOrCreateImage(repo.getId(), "app");
 
     this.perform(delete(images + "/app").header(AUTHORIZATION, user))
         .andExpect(status().isForbidden());
@@ -548,7 +548,7 @@ class PublicRepoAuthorizationIT extends AbstractIntegrationTest {
   private void uploadPypiPackage(final Repo repo, final String name, final String version)
       throws Exception {
 
-    final var repoInfo = this.repoTxService.getRepoByNameAndType(repo.getName(), RepoType.PYPI);
+    final var repoInfo = this.repoTxService.findRepoByNameAndType(repo.getName(), RepoType.PYPI);
     final var filename = name + "-" + version + ".tar.gz";
     final var content = sdist();
     final var digest =

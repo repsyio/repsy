@@ -36,7 +36,7 @@ public interface HelmStorageService<ID> {
 
   void saveChart(String repoName, StoragePath storagePath, InputStream chartStream);
 
-  Optional<Resource> getResource(StoragePath storagePath, String repoName) throws IOException;
+  Optional<Resource> findResource(StoragePath storagePath, String repoName) throws IOException;
 
   long deleteChart(StoragePath storagePath, String repoName) throws IOException;
 
@@ -83,7 +83,7 @@ public interface HelmStorageService<ID> {
    */
   long deleteBlob(UUID repoId, String digest, String repoName) throws IOException;
 
-  Optional<Resource> getBlob(UUID repoId, String digest, String repoName);
+  Optional<Resource> findBlob(UUID repoId, String digest, String repoName);
 
   boolean blobExists(UUID repoId, String digest, String repoName);
 
@@ -94,7 +94,7 @@ public interface HelmStorageService<ID> {
   BaseUsages saveManifest(
       UUID repoId, String name, String reference, byte[] content, String repoName);
 
-  Optional<Resource> getManifest(UUID repoId, String name, String reference, String repoName);
+  Optional<Resource> findManifest(UUID repoId, String name, String reference, String repoName);
 
   boolean manifestExists(UUID repoId, String name, String reference, String repoName);
 }

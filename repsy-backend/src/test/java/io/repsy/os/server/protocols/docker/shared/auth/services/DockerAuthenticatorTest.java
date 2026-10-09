@@ -214,7 +214,7 @@ class DockerAuthenticatorTest {
               .hash(PASSWORD_HASH)
               .role(UserRole.USER)
               .build();
-      when(DockerAuthenticatorTest.this.userTxService.getUserByUsernameOptional(USERNAME))
+      when(DockerAuthenticatorTest.this.userTxService.findUserInfoByUsername(USERNAME))
           .thenReturn(Optional.of(alice));
     }
 
@@ -245,7 +245,7 @@ class DockerAuthenticatorTest {
           () -> component.authenticateUserDockerCli("Bearer signed.jwt.token", List.of()));
       verify(DockerAuthenticatorTest.this.userTxService, never()).getUserByUsername(anyString());
       verify(DockerAuthenticatorTest.this.userTxService, never())
-          .getUserByUsernameOptional(anyString());
+          .findUserInfoByUsername(anyString());
     }
   }
 
@@ -342,7 +342,7 @@ class DockerAuthenticatorTest {
   void authorizePublicReadAllowsPublicRepo() {
     assertThatCode(() -> this.authenticator.authorizePublicRead(repo(false)))
         .doesNotThrowAnyException();
-    verify(this.userTxService, never()).getUserByUsernameOptional(anyString());
+    verify(this.userTxService, never()).findUserInfoByUsername(anyString());
   }
 
   @Test
@@ -382,7 +382,7 @@ class DockerAuthenticatorTest {
           .thenReturn(AuthenticationType.USERNAME_PASSWORD);
       when(this.jwtUtils.extractProtocolUserClaims(anyString()))
           .thenReturn(new ProtocolUserClaims(this.ghostId, "ghost", null));
-      when(DockerAuthenticatorTest.this.userTxService.getUserByUsernameOptional("ghost"))
+      when(DockerAuthenticatorTest.this.userTxService.findUserInfoByUsername("ghost"))
           .thenReturn(Optional.empty());
       // What the real service does for a name nobody has.
       doThrow(new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED))
@@ -441,7 +441,7 @@ class DockerAuthenticatorTest {
       // The claim names a real admin; it must not be looked at.
       when(this.jwtUtils.extractProtocolUserClaims(anyString()))
           .thenReturn(new ProtocolUserClaims(UUID.randomUUID(), "anonymous", null));
-      when(DockerAuthenticatorTest.this.userTxService.getUserByUsernameOptional("anonymous"))
+      when(DockerAuthenticatorTest.this.userTxService.findUserInfoByUsername("anonymous"))
           .thenReturn(
               Optional.of(
                   UserInfo.builder()
@@ -478,7 +478,7 @@ class DockerAuthenticatorTest {
       assertUnauthorized(
           () -> this.component.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.WRITE));
       verify(DockerAuthenticatorTest.this.userTxService, never())
-          .getUserByUsernameOptional(anyString());
+          .findUserInfoByUsername(anyString());
     }
   }
 

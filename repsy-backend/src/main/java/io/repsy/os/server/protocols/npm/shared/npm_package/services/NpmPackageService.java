@@ -338,7 +338,7 @@ public class NpmPackageService extends AbstractNpmPackageService<UUID> {
     // Flush so a rejection by the database fails here, before any file is removed.
     this.npmPackageRepository.flush();
 
-    return new PackageDeletion(versions, remover.removePackage());
+    return new PackageDeletion(versions, remover.deletePackage());
   }
 
   @Override
@@ -419,7 +419,7 @@ public class NpmPackageService extends AbstractNpmPackageService<UUID> {
 
     return new PackageDeletion(
         List.of(versionName),
-        versionRemover.removeVersion(newLatest == null ? null : newLatest.getVersion()));
+        versionRemover.deleteVersion(newLatest == null ? null : newLatest.getVersion()));
   }
 
   /**
@@ -514,7 +514,7 @@ public class NpmPackageService extends AbstractNpmPackageService<UUID> {
 
   @Transactional(rollbackFor = IOException.class)
   @Override
-  public BaseUsages removeDistributionTag(
+  public BaseUsages deleteDistributionTag(
       final BaseRepoInfo<UUID> repoInfo,
       final @Nullable String scopeName,
       final String packageName,

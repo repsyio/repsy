@@ -22,5 +22,5 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public interface DockerScopeParser<ID> {
 
-  Optional<? extends BaseRepoInfo<ID>> getRepoInfoByScope(String scope);
+  Optional<? extends BaseRepoInfo<ID>> findRepoInfoByScope(String scope);
 }

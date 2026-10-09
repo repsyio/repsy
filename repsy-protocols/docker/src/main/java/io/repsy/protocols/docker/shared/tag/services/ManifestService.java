@@ -62,7 +62,7 @@ public interface ManifestService<ID> {
    *
    * @throws io.repsy.core.error_handling.exceptions.ItemNotFoundException {@code manifestNotFound}
    */
-  BaseManifestDetail<ID> findManifestByRepoIdAndImageNameAndDigest(
+  BaseManifestDetail<ID> getManifestByRepoIdAndImageNameAndDigest(
       ID repoId, BaseImageInfo<ID> imageInfo, String digest);
 
   /**

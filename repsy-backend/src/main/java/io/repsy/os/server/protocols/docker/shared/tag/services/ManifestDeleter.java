@@ -81,7 +81,7 @@ public class ManifestDeleter {
       final RepoInfo repoInfo, final String imageName, final String digest) {
 
     final var imageInfo =
-        this.imageService.findImageInfoByRepoIdAndName(repoInfo.getStorageKey(), imageName);
+        this.imageService.getImageInfoByRepoIdAndName(repoInfo.getStorageKey(), imageName);
 
     // First, as in every transaction that deletes rows of the image: it waits for a push that is
     // writing to the image, and holds off the next one until the count below is done.

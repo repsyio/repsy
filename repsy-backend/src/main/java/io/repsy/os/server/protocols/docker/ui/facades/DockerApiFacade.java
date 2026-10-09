@@ -89,7 +89,7 @@ public class DockerApiFacade implements ProtocolApiFacade {
 
   // The event is published after the DB image delete but before the storage manifest delete, and
   // that is safe: this facade is @Transactional, and the listener
-  // (ArtifactScanListener.handleArtifactVersionDeleted) is synchronous and calls a @Transactional
+  // (ArtifactScanListener.onArtifactVersionDeleted) is synchronous and calls a @Transactional
   // (REQUIRED) method, so the scan cleanup joins this transaction. If deleteManifests() below
   // fails, the exception rolls back the image, tag and manifest rows and the scan rows together
   // (DockerDeleteStorageFailureIT), and the usage is only updated by the caller once this returns.
@@ -97,7 +97,7 @@ public class DockerApiFacade implements ProtocolApiFacade {
       final @NonNull RepoInfo repoInfo, final @NonNull String imageName) {
 
     final var imageInfo =
-        this.imageTxService.findImageInfoByRepoIdAndName(repoInfo.getStorageKey(), imageName);
+        this.imageTxService.getImageInfoByRepoIdAndName(repoInfo.getStorageKey(), imageName);
 
     final var tags = this.manifestService.findAllTags(repoInfo.getStorageKey(), imageInfo.getId());
 
@@ -137,13 +137,13 @@ public class DockerApiFacade implements ProtocolApiFacade {
   }
 
   @Transactional(readOnly = true)
-  public @NonNull LayerInfo findConfigLayerByImageAndDigest(
+  public @NonNull LayerInfo getConfigLayerByImageAndDigest(
       final @NonNull RepoInfo repoInfo,
       final @NonNull String imageName,
       final @NonNull String configDigest) {
 
     final var imageInfo =
-        this.imageTxService.findImageInfoByRepoIdAndName(repoInfo.getStorageKey(), imageName);
+        this.imageTxService.getImageInfoByRepoIdAndName(repoInfo.getStorageKey(), imageName);
 
     if (!this.manifestService.existsByImageIdAndConfigDigest(imageInfo.getId(), configDigest)) {
       throw new ItemNotFoundException("layerNotFound");
@@ -190,7 +190,7 @@ public class DockerApiFacade implements ProtocolApiFacade {
   public @NonNull TagDetail getTagDetail(
       final @NonNull UUID repoId, final @NonNull String imageName, final @NonNull String tagName) {
 
-    final var imageInfo = this.imageTxService.findImageInfoByRepoIdAndName(repoId, imageName);
+    final var imageInfo = this.imageTxService.getImageInfoByRepoIdAndName(repoId, imageName);
 
     final var tagDetail = this.manifestService.getTagDetail(repoId, imageInfo.getId(), tagName);
     tagDetail.setImageName(imageInfo.getName());
@@ -207,9 +207,9 @@ public class DockerApiFacade implements ProtocolApiFacade {
       final @NonNull Pageable pageable) {
 
     final var imageInfo =
-        this.imageTxService.findImageInfoByRepoIdAndName(repoInfo.getStorageKey(), imageName);
+        this.imageTxService.getImageInfoByRepoIdAndName(repoInfo.getStorageKey(), imageName);
     final var tag =
-        this.manifestService.findTag(repoInfo.getStorageKey(), imageInfo.getId(), tagName);
+        this.manifestService.getTag(repoInfo.getStorageKey(), imageInfo.getId(), tagName);
 
     return this.manifestService.findManifestsByTagContainsName(tag, name, pageable);
   }
@@ -220,7 +220,7 @@ public class DockerApiFacade implements ProtocolApiFacade {
     final var storagePath = StoragePath.of(repoInfo.getStorageKey(), relativePath.getPath());
 
     return this.dockerStorageService
-        .getResource(storagePath, repoInfo.getName())
+        .findResource(storagePath, repoInfo.getName())
         .orElseThrow(() -> new ItemNotFoundException("manifestNotFound"));
   }
 

@@ -131,7 +131,7 @@ class AbstractNpmProtocolFacadeDeleteTest {
     when(this.storageService.readMetadataOrRebuild(
             eq(REPO_ID), eq(REPO_NAME), eq(BASE_PATH), any()))
         .thenReturn(metadataWithVersions("1.0.0", "1.1.0"));
-    when(this.storageService.removeVersion(
+    when(this.storageService.deleteVersion(
             eq(REPO_ID),
             eq(REPO_NAME),
             eq(BASE_PATH),
@@ -146,7 +146,7 @@ class AbstractNpmProtocolFacadeDeleteTest {
             invocation ->
                 new PackageDeletion(
                     List.of("1.1.0"),
-                    invocation.<VersionRemover>getArgument(4).removeVersion("1.0.0")));
+                    invocation.<VersionRemover>getArgument(4).deleteVersion("1.0.0")));
 
     final var unpublished =
         this.facade.unPublishPackageVersion(
@@ -169,12 +169,12 @@ class AbstractNpmProtocolFacadeDeleteTest {
         .thenAnswer(
             invocation ->
                 new PackageDeletion(
-                    List.of("1.0.0"), invocation.<PackageRemover>getArgument(5).removePackage()));
+                    List.of("1.0.0"), invocation.<PackageRemover>getArgument(5).deletePackage()));
 
     this.facade.unPublishPackageVersion(this.context, null, PACKAGE, metadataWithVersions());
 
     verify(this.storageService, never())
-        .removeVersion(any(), any(), any(), any(), any(), any(), any());
+        .deleteVersion(any(), any(), any(), any(), any(), any(), any());
     assertThat(this.context.<BaseUsages>getProperty("usages").getDiskUsage()).isEqualTo(-300L);
   }
 
@@ -279,7 +279,7 @@ class AbstractNpmProtocolFacadeDeleteTest {
         .thenAnswer(
             invocation ->
                 new PackageDeletion(
-                    List.of("1.0.0"), invocation.<PackageRemover>getArgument(3).removePackage()));
+                    List.of("1.0.0"), invocation.<PackageRemover>getArgument(3).deletePackage()));
 
     this.facade.deletePackage(this.context, null, PACKAGE);
 

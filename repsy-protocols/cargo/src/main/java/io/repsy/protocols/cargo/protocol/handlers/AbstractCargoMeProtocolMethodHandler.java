@@ -51,7 +51,7 @@ public abstract class AbstractCargoMeProtocolMethodHandler implements ProtocolMe
     provider.registerMethodHandler(this);
   }
 
-  protected abstract Optional<ProtocolContext> getProtocolContext(RelativePath relativePath);
+  protected abstract Optional<ProtocolContext> findProtocolContext(RelativePath relativePath);
 
   @FunctionalInterface
   public interface CargoAuthenticator {
@@ -85,7 +85,7 @@ public abstract class AbstractCargoMeProtocolMethodHandler implements ProtocolMe
         return Optional.empty();
       }
 
-      return this.getProtocolContext(new RelativePath("/me"));
+      return this.findProtocolContext(new RelativePath("/me"));
     };
   }
 

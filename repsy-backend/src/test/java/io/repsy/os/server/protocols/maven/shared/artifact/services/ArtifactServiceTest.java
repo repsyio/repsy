@@ -1050,7 +1050,7 @@ class ArtifactServiceTest {
     when(this.storageStrategy.get(pathOfNullSafe("com/acme/lib/1.0/lib-1.0.jar.asc"), eq("mvn")))
         .thenReturn(Optional.of(signature));
     final var sources = new PublicKeySources(List.of(), List.of(), true);
-    when(this.keyStoreService.findPublicKeySources(id, true)).thenReturn(sources);
+    when(this.keyStoreService.getPublicKeySources(id, true)).thenReturn(sources);
 
     this.artifactService.createOrUpdateArtifact(
         repoVerifyingAllSignatures(id),
@@ -1079,7 +1079,7 @@ class ArtifactServiceTest {
     when(this.storageStrategy.get(pathOfNullSafe("com/acme/lib/1.0/lib-1.0.jar.asc"), eq("mvn")))
         .thenReturn(Optional.of(signature));
     final var sources = new PublicKeySources(List.of(), List.of(), true);
-    when(this.keyStoreService.findPublicKeySources(id, true)).thenReturn(sources);
+    when(this.keyStoreService.getPublicKeySources(id, true)).thenReturn(sources);
     doThrow(new SignatureNotVerifiedException("artifactSignatureNotVerified"))
         .when(this.pgpVerifierService)
         .verify(jar, signature, sources);
@@ -1184,7 +1184,7 @@ class ArtifactServiceTest {
         .thenReturn(Optional.of(pom));
     this.stubVersion(this.stubArtifact(id), "1.0", true);
     final var sources = new PublicKeySources(List.of(), List.of("keys.acme.com"), true);
-    when(this.keyStoreService.findPublicKeySources(id, true)).thenReturn(sources);
+    when(this.keyStoreService.getPublicKeySources(id, true)).thenReturn(sources);
 
     this.artifactService.verifySignature(
         repo(id, true, true, true),
@@ -1204,7 +1204,7 @@ class ArtifactServiceTest {
         .thenReturn(Optional.of(jar));
     this.stubVersion(this.stubArtifact(id), "1.0", true);
     final var sources = new PublicKeySources(List.of(), List.of(), false);
-    when(this.keyStoreService.findPublicKeySources(id, false)).thenReturn(sources);
+    when(this.keyStoreService.getPublicKeySources(id, false)).thenReturn(sources);
     final var lookupOff =
         RepoInfo.builder()
             .id(id)
@@ -1295,7 +1295,7 @@ class ArtifactServiceTest {
     when(this.artifactVersionRepository.findByArtifactIdAndVersionName(artifact.getId(), "1.0"))
         .thenReturn(Optional.of(new ArtifactVersion()));
     final var sources = PublicKeySources.none();
-    when(this.keyStoreService.findPublicKeySources(id, true)).thenReturn(sources);
+    when(this.keyStoreService.getPublicKeySources(id, true)).thenReturn(sources);
     final var signature = new ByteArrayResource("sig".getBytes(UTF_8));
 
     final var outcome =
@@ -1320,7 +1320,7 @@ class ArtifactServiceTest {
     final var artifact = this.stubArtifact(id);
     when(this.artifactVersionRepository.findByArtifactIdAndVersionName(artifact.getId(), "1.0"))
         .thenReturn(Optional.of(new ArtifactVersion()));
-    when(this.keyStoreService.findPublicKeySources(id, true)).thenReturn(PublicKeySources.none());
+    when(this.keyStoreService.getPublicKeySources(id, true)).thenReturn(PublicKeySources.none());
     doThrow(new SignatureNotVerifiedException("artifactSignatureNotVerified"))
         .when(this.pgpVerifierService)
         .verify(any(), any(), any());
@@ -1535,7 +1535,7 @@ class ArtifactServiceTest {
         .thenReturn(Optional.of(pom));
     this.stubVersion(this.stubArtifact(id), "1.0", true);
     final var sources = PublicKeySources.none();
-    when(this.keyStoreService.findPublicKeySources(id, true)).thenReturn(sources);
+    when(this.keyStoreService.getPublicKeySources(id, true)).thenReturn(sources);
     doThrow(new SignatureNotVerifiedException("artifactSignatureNotVerified"))
         .when(this.pgpVerifierService)
         .verify(pom, signature, sources);
@@ -1616,7 +1616,7 @@ class ArtifactServiceTest {
     final var signature = new ByteArrayResource(new byte[0]);
     this.stubVersion(this.stubArtifact(id), "1.0-SNAPSHOT", true);
     final var sources = PublicKeySources.none();
-    when(this.keyStoreService.findPublicKeySources(id, true)).thenReturn(sources);
+    when(this.keyStoreService.getPublicKeySources(id, true)).thenReturn(sources);
 
     this.artifactService.verifySignature(
         repo(id, true, true, true),

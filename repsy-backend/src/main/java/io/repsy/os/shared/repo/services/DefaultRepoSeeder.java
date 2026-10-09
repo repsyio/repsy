@@ -92,7 +92,7 @@ public class DefaultRepoSeeder {
     } catch (final ItemAlreadyExistException | DataIntegrityViolationException e) {
       log.debug("Default {} repo '{}' was created concurrently", type, name);
 
-      return this.repoTxService.getRepoByNameAndType(name, type).orElseThrow(() -> e);
+      return this.repoTxService.findRepoByNameAndType(name, type).orElseThrow(() -> e);
     }
   }
 }

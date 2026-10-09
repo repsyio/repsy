@@ -36,7 +36,7 @@ public class CargoMeProtocolMethodHandler extends AbstractCargoMeProtocolMethodH
   }
 
   @Override
-  protected Optional<ProtocolContext> getProtocolContext(final RelativePath relativePath) {
+  protected Optional<ProtocolContext> findProtocolContext(final RelativePath relativePath) {
     return Optional.of(UrlPropertiesUtils.createWithEmptyRepo("", relativePath));
   }
 }

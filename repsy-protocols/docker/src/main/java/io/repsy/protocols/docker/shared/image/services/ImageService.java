@@ -21,9 +21,9 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public interface ImageService<ID> {
 
-  BaseImageInfo<ID> findOrCreateImage(ID repoId, String imageName);
+  BaseImageInfo<ID> getOrCreateImage(ID repoId, String imageName);
 
-  BaseImageInfo<ID> findImageInfoByRepoIdAndName(ID repoId, String imageName);
+  BaseImageInfo<ID> getImageInfoByRepoIdAndName(ID repoId, String imageName);
 
   /**
    * Recomputes the size and the digest the image is listed with from the tags it has now: the size

@@ -162,7 +162,7 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmProtocolFa
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     final var storagePath =
         StoragePath.of(repoInfo.getStorageKey(), HelmConstants.CHARTS_PATH + "/" + filename);
-    final var classic = this.helmStorageService.getResource(storagePath, repoInfo.getName());
+    final var classic = this.helmStorageService.findResource(storagePath, repoInfo.getName());
     if (classic.isPresent()) {
       return classic.get();
     }
@@ -174,7 +174,7 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmProtocolFa
     return this.findChartByArchiveFileName(repoInfo, filename)
         .flatMap(
             chart ->
-                this.helmStorageService.getBlob(
+                this.helmStorageService.findBlob(
                     repoInfo.getStorageKey(), chart.digest(), repoInfo.getName()))
         .orElseThrow(() -> new ItemNotFoundException("chartNotFound"));
   }
@@ -271,7 +271,7 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmProtocolFa
     this.chartService.lockChart(repoInfo.getId(), name);
 
     final var chartInfo =
-        this.chartService.findByRepoIdAndNameAndVersion(repoInfo.getId(), name, version);
+        this.chartService.getByRepoIdAndNameAndVersion(repoInfo.getId(), name, version);
 
     final var manifests = this.ociManifestService.findAllByChartId(chartInfo.id());
 
@@ -314,7 +314,7 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmProtocolFa
   public long getUploadSize(final ProtocolContext context, final UUID uploadId) throws IOException {
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     return this.helmStorageService
-        .getBlob(repoInfo.getStorageKey(), uploadId.toString(), repoInfo.getName())
+        .findBlob(repoInfo.getStorageKey(), uploadId.toString(), repoInfo.getName())
         .orElseThrow(() -> new ItemNotFoundException("blobNotFound"))
         .contentLength();
   }
@@ -344,7 +344,7 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmProtocolFa
     ProtocolContextUtils.addUsages(context, finalizeUsages);
     final var resource =
         this.helmStorageService
-            .getBlob(repoInfo.getStorageKey(), digest, repoInfo.getName())
+            .findBlob(repoInfo.getStorageKey(), digest, repoInfo.getName())
             .orElseThrow(() -> new ItemNotFoundException("blobNotFound"));
     final var form =
         HelmOciBlobForm.builder()
@@ -352,7 +352,7 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmProtocolFa
             .size(resource.contentLength())
             .mediaType(mediaType)
             .build();
-    return this.ociBlobService.findOrCreate(form, repoInfo.getId());
+    return this.ociBlobService.getOrCreate(form, repoInfo.getId());
   }
 
   /** Refuses an upload that does not hash to the digest the client claims for it. */
@@ -361,7 +361,7 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmProtocolFa
       throws IOException {
     final var upload =
         this.helmStorageService
-            .getBlob(repoInfo.getStorageKey(), uploadId.toString(), repoInfo.getName())
+            .findBlob(repoInfo.getStorageKey(), uploadId.toString(), repoInfo.getName())
             .orElseThrow(() -> new ItemNotFoundException("blobNotFound"));
 
     if (!BlobDigests.matches(digest, upload.getInputStream())) {
@@ -386,7 +386,7 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmProtocolFa
   public Resource getBlob(final ProtocolContext context, final String digest) throws IOException {
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     return this.helmStorageService
-        .getBlob(repoInfo.getStorageKey(), digest, repoInfo.getName())
+        .findBlob(repoInfo.getStorageKey(), digest, repoInfo.getName())
         .orElseThrow(() -> new ItemNotFoundException("blobNotFound"));
   }
 
@@ -414,13 +414,13 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmProtocolFa
   }
 
   @Override
-  public HelmOciBlobInfo findOrCreateBlob(final HelmOciBlobForm form, final ID repoId) {
-    return this.ociBlobService.findOrCreate(form, repoId);
+  public HelmOciBlobInfo getOrCreateBlob(final HelmOciBlobForm form, final ID repoId) {
+    return this.ociBlobService.getOrCreate(form, repoId);
   }
 
   /**
    * Writes the chart version, the manifest and the manifest file in the one transaction the caller
-   * opened (RPS-1354). The chart row is locked first ({@link ChartService#findOrCreate}), which is
+   * opened (RPS-1354). The chart row is locked first ({@link ChartService#getOrCreate}), which is
    * what makes pushes of one chart take turns (RPS-1273) and now also holds the turn until the
    * manifest is written. Both rows are flushed before the file is written, the order RPS-1124 set
    * for the classic upload: a row the database refuses never reaches storage, and a file that
@@ -434,7 +434,7 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmProtocolFa
       throws IOException {
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
 
-    final var chart = this.chartService.findOrCreate(form.getChart(), repoInfo.getId());
+    final var chart = this.chartService.getOrCreate(form.getChart(), repoInfo.getId());
     // Looked up after the chart lock: a push that waited for another one must see the manifest
     // that one committed, not the row as it was before the wait.
     final var replaced =
@@ -563,7 +563,7 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmProtocolFa
 
     try {
       final var resource =
-          this.helmStorageService.getManifest(
+          this.helmStorageService.findManifest(
               repoInfo.getStorageKey(), form.getName(), form.getReference(), repoInfo.getName());
       if (resource.isEmpty() || !resource.get().exists()) {
         return null;

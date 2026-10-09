@@ -108,7 +108,7 @@ public class DockerImageController {
       @RequestParam(name = "image", required = false) final String image) {
 
     final var item =
-        this.imageService.findListItemByRepoIdAndName(
+        this.imageService.getListItemByRepoIdAndName(
             repoInfo.getStorageKey(), imageNameOf(imageName, image));
 
     return ResponseEntity.ok(item);
@@ -143,7 +143,7 @@ public class DockerImageController {
 
     // An image that does not exist answers 404 imageNotFound like every other image route, not an
     // empty page (RPS-1579).
-    this.imageService.findImageInfoByRepoIdAndName(repoInfo.getStorageKey(), resolvedName);
+    this.imageService.getImageInfoByRepoIdAndName(repoInfo.getStorageKey(), resolvedName);
 
     final var imageTags =
         this.manifestService.getImageTagsContainsName(
@@ -231,7 +231,7 @@ public class DockerImageController {
       throws IOException {
 
     final var layer =
-        this.dockerApiFacade.findConfigLayerByImageAndDigest(
+        this.dockerApiFacade.getConfigLayerByImageAndDigest(
             repoInfo, imageNameOf(imageName, image), digest);
 
     return ResponseEntities.jsonString(this.dockerApiFacade.getConfig(repoInfo, layer.getDigest()));

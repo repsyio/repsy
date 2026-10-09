@@ -654,7 +654,7 @@ Old springdoc tag to new tag. Several old tags may map to one new tag (one area,
   (`V0024DockerContentAddressedManifestsTest` on H2, `DockerManifestMigrationIT` on PostgreSQL, which
   owns its container instead of extending `AbstractIntegrationTest`).
 - A Docker image (`docker_image`) exists while it stores a manifest. A manifest push creates it in the
-  same transaction that saves the manifest (`ImageTxService.findOrCreateImage`, an insert that skips an
+  same transaction that saves the manifest (`ImageTxService.getOrCreateImage`, an insert that skips an
   existing row), so a push that fails leaves no image behind; what the tags and untagged manifests reach
   is one recursive walk over the index edges, in `UntaggedManifestFinder` and in the recursive CTEs of
   `ImageRepository` and `LayerRepository`, and they must agree (`DockerUntaggedManifestCleanupIT`).

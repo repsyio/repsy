@@ -178,7 +178,7 @@ public abstract class AbstractDockerUploadFinalizeProtocolMethodHandler<ID>
   private LayerInfo findOrCreateLayer(
       final ID repoId, final LayerForm layerForm, final int counter) {
     try {
-      return this.layerService.findOrCreate(layerForm, repoId);
+      return this.layerService.getOrCreate(layerForm, repoId);
     } catch (final DataIntegrityViolationException e) {
       if (counter == RETRY_COUNT) {
         throw e;

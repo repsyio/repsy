@@ -90,7 +90,7 @@ public class UserTxService {
    * fails with {@code unAuthorized} and the client re-authenticates.
    */
   public @NonNull UserInfo getAuthenticatedUserByUsername(final @NonNull String username) {
-    return this.getUserByUsernameOptional(username)
+    return this.findUserInfoByUsername(username)
         .orElseThrow(() -> new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED));
   }
 
@@ -102,7 +102,7 @@ public class UserTxService {
         .orElseThrow(() -> new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED));
   }
 
-  public @NonNull Optional<UserInfo> getUserByUsernameOptional(final @NonNull String username) {
+  public @NonNull Optional<UserInfo> findUserInfoByUsername(final @NonNull String username) {
     return this.userRepository.findByUsername(username).map(this.userConverter::toUserInfo);
   }
 
