@@ -15,10 +15,8 @@
  */
 package io.repsy.libs.storage.core.exceptions;
 
-import org.jspecify.annotations.NonNull;
-
 public final class InvalidStoragePathException extends RuntimeException {
-  public InvalidStoragePathException(final @NonNull String message) {
+  public InvalidStoragePathException(final String message) {
     super(message);
   }
 }

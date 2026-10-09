@@ -27,12 +27,11 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import org.jspecify.annotations.NonNull;
 import org.springframework.core.io.Resource;
 
 public interface StorageStrategy {
 
-  void createDirectory(@NonNull String name) throws IsADirectoryException;
+  void createDirectory(String name) throws IsADirectoryException;
 
   /**
    * Soft-deletes the file or directory at {@code storagePath}: it is moved out of the way, not
@@ -43,7 +42,7 @@ public interface StorageStrategy {
    * <p>Idempotent: an object that does not exist (any more) counts as deleted and the call returns
    * without doing anything. An object that exists but cannot be removed still fails.
    */
-  void delete(@NonNull StoragePath storagePath);
+  void delete(StoragePath storagePath);
 
   /**
    * Permanently removes the trashed files and directories whose retention period has elapsed. Does
@@ -53,21 +52,20 @@ public interface StorageStrategy {
    * @return a future that completes with what the pass actually removed, or completes exceptionally
    *     if the pass failed partway through
    */
-  @NonNull CompletableFuture<TrashCleanupResult> clearTrash();
+  CompletableFuture<TrashCleanupResult> clearTrash();
 
-  long calculatePathUsage(@NonNull StoragePath paths);
+  long calculatePathUsage(StoragePath paths);
 
-  long getFileUsage(@NonNull StoragePath storagePath, @NonNull String repoName) throws IOException;
+  long getFileUsage(StoragePath storagePath, String repoName) throws IOException;
 
   /**
    * Renames the object to {@code digest}. Answers the disk usage the rename changed: zero when the
    * object was moved, and minus its size when the digest already existed and the object was dropped
    * as a redundant copy.
    */
-  @NonNull BaseUsages renameObject(@NonNull StoragePath storagePath, @NonNull String digest);
+  BaseUsages renameObject(StoragePath storagePath, String digest);
 
-  @NonNull BaseUsages write(
-      @NonNull String repoName, @NonNull StoragePath storagePath, @NonNull InputStream inputStream);
+  BaseUsages write(String repoName, StoragePath storagePath, InputStream inputStream);
 
   BaseUsages append(String repoName, StoragePath path, byte[] data);
 
@@ -78,31 +76,27 @@ public interface StorageStrategy {
    * adds up to the size of the object. A copy that fails halfway leaves the object as it was before
    * the call, so a client can send the chunk again.
    */
-  @NonNull BaseUsages appendStream(
-      @NonNull String repoName, @NonNull StoragePath storagePath, @NonNull InputStream inputStream);
+  BaseUsages appendStream(String repoName, StoragePath storagePath, InputStream inputStream);
 
   /**
    * Lists the regular files directly under {@code directory} whose last modification is before
    * {@code notModifiedSince}. Subdirectories are skipped, and a directory that does not exist has
    * no stale files.
    */
-  @NonNull List<StaleFile> listStaleFiles(
-      @NonNull StoragePath directory, @NonNull Instant notModifiedSince);
+  List<StaleFile> listStaleFiles(StoragePath directory, Instant notModifiedSince);
 
-  @NonNull Optional<Resource> get(@NonNull StoragePath path, @NonNull String repoName)
-      throws IsADirectoryException;
+  Optional<Resource> get(StoragePath path, String repoName) throws IsADirectoryException;
 
   /** List all items in the storage path. (not including subdirectories) */
-  @NonNull List<StorageItemInfo> listDirectoryContents(@NonNull StoragePath storagePath);
+  List<StorageItemInfo> listDirectoryContents(StoragePath storagePath);
 
   /**
    * List all items in the storage path including subdirectories if repoId is not null, this method
    * lists all items in the repository, including items in all subdirectories. If repoId is null,
    * only lists items in the storage path.
    */
-  @NonNull List<StorageItemInfo> listStorageItems(@NonNull StoragePath storagePath);
+  List<StorageItemInfo> listStorageItems(StoragePath storagePath);
 
-  @NonNull BaseUsages getUsages(
-      @NonNull StoragePath storagePath, @NonNull String repoName, long contentLength)
+  BaseUsages getUsages(StoragePath storagePath, String repoName, long contentLength)
       throws IOException;
 }

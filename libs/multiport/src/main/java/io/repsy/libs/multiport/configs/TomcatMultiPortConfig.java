@@ -20,7 +20,6 @@ import java.util.ArrayList;
 import lombok.RequiredArgsConstructor;
 import org.apache.catalina.connector.Connector;
 import org.apache.tomcat.util.buf.EncodedSolidusHandling;
-import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.tomcat.servlet.TomcatServletWebServerFactory;
@@ -33,7 +32,7 @@ import org.springframework.stereotype.Component;
 @ConditionalOnClass(TomcatServletWebServerFactory.class)
 public class TomcatMultiPortConfig {
 
-  private final @NonNull MultiPortProperties multiPortProperties;
+  private final MultiPortProperties multiPortProperties;
 
   @Value("${multiport.tomcat.connection-timeout:120000}")
   private int connectionTimeout;
@@ -45,8 +44,7 @@ public class TomcatMultiPortConfig {
   private int maxPartCount;
 
   @Bean
-  public WebServerFactoryCustomizer<@NonNull TomcatServletWebServerFactory>
-      repsyTomcatCustomizer() {
+  public WebServerFactoryCustomizer<TomcatServletWebServerFactory> repsyTomcatCustomizer() {
 
     this.multiPortProperties.validatePorts();
 
@@ -56,8 +54,7 @@ public class TomcatMultiPortConfig {
   }
 
   private void customizeTomcat(
-      final @NonNull TomcatServletWebServerFactory factory,
-      final @NonNull Connector[] additionalConnectors) {
+      final TomcatServletWebServerFactory factory, final Connector[] additionalConnectors) {
 
     factory.addConnectorCustomizers(
         connector -> connector.setEncodedSolidusHandling(EncodedSolidusHandling.DECODE.getValue()));
@@ -67,7 +64,7 @@ public class TomcatMultiPortConfig {
     }
   }
 
-  private @NonNull Connector[] createAdditionalConnectors() {
+  private Connector[] createAdditionalConnectors() {
 
     final var connectors = new ArrayList<Connector>();
 
@@ -82,7 +79,7 @@ public class TomcatMultiPortConfig {
     return connectors.toArray(new Connector[0]);
   }
 
-  private @NonNull Connector createConnector(final int port) {
+  private Connector createConnector(final int port) {
 
     final var connector = new Connector("org.apache.coyote.http11.Http11NioProtocol");
 

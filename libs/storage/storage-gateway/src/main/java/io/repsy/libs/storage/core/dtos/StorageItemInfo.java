@@ -18,7 +18,6 @@ package io.repsy.libs.storage.core.dtos;
 import java.util.Date;
 import lombok.Builder;
 import lombok.Data;
-import org.jspecify.annotations.NonNull;
 
 @Data
 @Builder
@@ -30,7 +29,7 @@ public class StorageItemInfo implements Comparable<StorageItemInfo> {
   private String path;
 
   @Override
-  public int compareTo(final @NonNull StorageItemInfo o) {
+  public int compareTo(final StorageItemInfo o) {
     return this.name.compareTo(o.getName());
   }
 }

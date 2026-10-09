@@ -55,6 +55,7 @@ import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
@@ -64,7 +65,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Stream;
 import lombok.SneakyThrows;
-import org.jspecify.annotations.NonNull;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.scheduling.annotation.Async;
@@ -89,21 +89,18 @@ public class FileSystemStorageStrategy implements StorageStrategy {
    */
   private static final Duration ORPHANED_TEMP_FILE_AGE = Duration.ofDays(1);
 
-  private final @NonNull Path basePath;
-  private final @NonNull Path trashPath;
-  private final @NonNull Duration trashRetentionPeriod;
+  private final Path basePath;
+  private final Path trashPath;
+  private final Duration trashRetentionPeriod;
 
   public FileSystemStorageStrategy(
-      final @NonNull String basePath,
-      final @NonNull String trashPath,
-      final @NonNull Duration trashRetentionPeriod) {
+      final String basePath, final String trashPath, final Duration trashRetentionPeriod) {
     this.basePath = Path.of(basePath);
     this.trashPath = Path.of(trashPath);
     this.trashRetentionPeriod = trashRetentionPeriod;
   }
 
-  public FileSystemStorageStrategy(
-      final @NonNull String basePath, final @NonNull String trashPath) {
+  public FileSystemStorageStrategy(final String basePath, final String trashPath) {
     this.basePath = Path.of(basePath);
     this.trashPath = Path.of(trashPath);
     this.trashRetentionPeriod = Duration.ZERO;
@@ -111,8 +108,7 @@ public class FileSystemStorageStrategy implements StorageStrategy {
 
   @Override
   @SneakyThrows
-  public @NonNull Optional<Resource> get(
-      final @NonNull StoragePath storagePath, final @NonNull String repoName)
+  public Optional<Resource> get(final StoragePath storagePath, final String repoName)
       throws IsADirectoryException {
     final Path physicalPath = this.toPhysicalPath(storagePath);
     final UrlResource urlResource = new UrlResource(physicalPath.toUri());
@@ -137,8 +133,8 @@ public class FileSystemStorageStrategy implements StorageStrategy {
    */
   @Override
   @SneakyThrows
-  public @NonNull List<StaleFile> listStaleFiles(
-      final @NonNull StoragePath directory, final @NonNull Instant notModifiedSince) {
+  public List<StaleFile> listStaleFiles(
+      final StoragePath directory, final Instant notModifiedSince) {
     final Path path = this.toPhysicalPath(directory);
 
     if (!Files.isDirectory(path)) {
@@ -166,8 +162,7 @@ public class FileSystemStorageStrategy implements StorageStrategy {
 
   @Override
   @SneakyThrows
-  public @NonNull List<StorageItemInfo> listDirectoryContents(
-      final @NonNull StoragePath storagePath) {
+  public List<StorageItemInfo> listDirectoryContents(final StoragePath storagePath) {
     final Path folderPath = this.toPhysicalPath(storagePath);
     final File folder = folderPath.toFile();
 
@@ -202,7 +197,7 @@ public class FileSystemStorageStrategy implements StorageStrategy {
    */
   @SneakyThrows
   @Override
-  public @NonNull List<StorageItemInfo> listStorageItems(final @NonNull StoragePath storagePath) {
+  public List<StorageItemInfo> listStorageItems(final StoragePath storagePath) {
     final Path path = this.toPhysicalPath(storagePath);
 
     final List<Path> entries = new ArrayList<>();
@@ -229,22 +224,21 @@ public class FileSystemStorageStrategy implements StorageStrategy {
         root,
         new SimpleFileVisitor<>() {
           @Override
-          public @NonNull FileVisitResult preVisitDirectory(
-              final @NonNull Path dir, final @NonNull BasicFileAttributes attrs) {
+          public FileVisitResult preVisitDirectory(
+              final Path dir, final BasicFileAttributes attrs) {
             entries.add(dir);
             return FileVisitResult.CONTINUE;
           }
 
           @Override
-          public @NonNull FileVisitResult visitFile(
-              final @NonNull Path file, final @NonNull BasicFileAttributes attrs) {
+          public FileVisitResult visitFile(final Path file, final BasicFileAttributes attrs) {
             entries.add(file);
             return FileVisitResult.CONTINUE;
           }
 
           @Override
-          public @NonNull FileVisitResult visitFileFailed(
-              final @NonNull Path file, final @NonNull IOException exc) throws IOException {
+          public FileVisitResult visitFileFailed(final Path file, final IOException exc)
+              throws IOException {
             if (exc instanceof NoSuchFileException && !file.equals(root)) {
               return FileVisitResult.CONTINUE;
             }
@@ -255,7 +249,7 @@ public class FileSystemStorageStrategy implements StorageStrategy {
   }
 
   @SneakyThrows
-  private Optional<StorageItemInfo> toStorageItemInfoIfPresent(final @NonNull Path path) {
+  private Optional<StorageItemInfo> toStorageItemInfoIfPresent(final Path path) {
     try {
       return Optional.of(this.readStorageItemInfo(path));
     } catch (final NoSuchFileException _) {
@@ -263,7 +257,7 @@ public class FileSystemStorageStrategy implements StorageStrategy {
     }
   }
 
-  private StorageItemInfo readStorageItemInfo(final @NonNull Path path) throws IOException {
+  private StorageItemInfo readStorageItemInfo(final Path path) throws IOException {
     final File file = path.toFile();
 
     final var fileAttributes = Files.readAttributes(file.toPath(), BasicFileAttributes.class);
@@ -297,10 +291,8 @@ public class FileSystemStorageStrategy implements StorageStrategy {
    */
   @Override
   @SneakyThrows
-  public @NonNull BaseUsages write(
-      final @NonNull String repoName,
-      final @NonNull StoragePath storagePath,
-      final @NonNull InputStream inputStream) {
+  public BaseUsages write(
+      final String repoName, final StoragePath storagePath, final InputStream inputStream) {
     long existingFileLength = 0;
 
     final Optional<Resource> existingFile = this.get(storagePath, repoName);
@@ -315,7 +307,9 @@ public class FileSystemStorageStrategy implements StorageStrategy {
       throw new InvalidStoragePathException("invalidStoragePath");
     }
 
-    final Path directory = physicalPath.getParent();
+    final Path directory =
+        Objects.requireNonNull(
+            physicalPath.getParent(), "The storage path has no parent directory");
 
     if (!Files.exists(directory)) {
       Files.createDirectories(directory);
@@ -386,8 +380,8 @@ public class FileSystemStorageStrategy implements StorageStrategy {
 
   @Override
   @SneakyThrows
-  public @NonNull BaseUsages append(
-      final @NonNull String repoName, final @NonNull StoragePath storagePath, final byte[] data) {
+  public BaseUsages append(
+      final String repoName, final StoragePath storagePath, final byte[] data) {
 
     final Path physicalPath = this.toPhysicalPath(storagePath);
     final Path directory = physicalPath.getParent();
@@ -405,10 +399,8 @@ public class FileSystemStorageStrategy implements StorageStrategy {
 
   @Override
   @SneakyThrows
-  public @NonNull BaseUsages appendStream(
-      final @NonNull String repoName,
-      final @NonNull StoragePath storagePath,
-      final @NonNull InputStream inputStream) {
+  public BaseUsages appendStream(
+      final String repoName, final StoragePath storagePath, final InputStream inputStream) {
 
     final Path physicalPath = this.toPhysicalPath(storagePath);
     final Path directory = physicalPath.getParent();
@@ -449,11 +441,11 @@ public class FileSystemStorageStrategy implements StorageStrategy {
   }
 
   @Override
-  public void createDirectory(final @NonNull String name) throws IsADirectoryException {
+  public void createDirectory(final String name) throws IsADirectoryException {
     this.basePath.resolve(name).toFile().mkdirs();
   }
 
-  private long calculatePathUsage(final @NonNull StoragePath paths, final long size) {
+  private long calculatePathUsage(final StoragePath paths, final long size) {
     final File file = this.toPhysicalPath(paths).toFile();
 
     if (file.isFile()) {
@@ -468,15 +460,15 @@ public class FileSystemStorageStrategy implements StorageStrategy {
       return totalUsage;
     }
 
-    for (final @NonNull File subFile : files) {
+    for (final File subFile : files) {
       if (isTempFileName(subFile.getName())) {
         continue;
       }
 
+      final String subPath = paths.getRelativePath().getPath() + PATH_DELIMITER + subFile.getName();
+      final UUID storageKey = paths.getStorageKey();
       final StoragePath storagePath =
-          StoragePath.of(
-              paths.getStorageKey(),
-              paths.getRelativePath().getPath() + PATH_DELIMITER + subFile.getName());
+          storageKey == null ? new StoragePath(subPath) : StoragePath.of(storageKey, subPath);
       totalUsage = this.calculatePathUsage(storagePath, totalUsage);
     }
 
@@ -484,7 +476,7 @@ public class FileSystemStorageStrategy implements StorageStrategy {
   }
 
   @Override
-  public long calculatePathUsage(final @NonNull StoragePath paths) {
+  public long calculatePathUsage(final StoragePath paths) {
     return this.calculatePathUsage(paths, 0L);
   }
 
@@ -502,7 +494,7 @@ public class FileSystemStorageStrategy implements StorageStrategy {
    */
   @SneakyThrows
   @Override
-  public void delete(final @NonNull StoragePath storagePath) {
+  public void delete(final StoragePath storagePath) {
     final Path basePathObj = this.toPhysicalPath(storagePath);
     final String relativePath =
         String.join(
@@ -547,7 +539,7 @@ public class FileSystemStorageStrategy implements StorageStrategy {
   @SneakyThrows
   @Async("maintenanceTaskExecutor")
   @Override
-  public @NonNull CompletableFuture<TrashCleanupResult> clearTrash() {
+  public CompletableFuture<TrashCleanupResult> clearTrash() {
     this.deleteOrphanedTempFiles();
 
     if (!Files.exists(this.trashPath) || !Files.isDirectory(this.trashPath)) {
@@ -589,16 +581,15 @@ public class FileSystemStorageStrategy implements StorageStrategy {
         this.basePath,
         new SimpleFileVisitor<>() {
           @Override
-          public @NonNull FileVisitResult preVisitDirectory(
-              final Path dir, final @NonNull BasicFileAttributes attrs) {
+          public FileVisitResult preVisitDirectory(
+              final Path dir, final BasicFileAttributes attrs) {
             return dir.normalize().equals(FileSystemStorageStrategy.this.trashPath.normalize())
                 ? FileVisitResult.SKIP_SUBTREE
                 : FileVisitResult.CONTINUE;
           }
 
           @Override
-          public @NonNull FileVisitResult visitFile(
-              final Path file, final @NonNull BasicFileAttributes attrs) {
+          public FileVisitResult visitFile(final Path file, final BasicFileAttributes attrs) {
             if (isTempFile(file) && attrs.lastModifiedTime().compareTo(threshold) < 0) {
               try {
                 Files.deleteIfExists(file);
@@ -610,7 +601,7 @@ public class FileSystemStorageStrategy implements StorageStrategy {
           }
 
           @Override
-          public @NonNull FileVisitResult visitFileFailed(final Path file, final IOException exc) {
+          public FileVisitResult visitFileFailed(final Path file, final IOException exc) {
             return FileVisitResult.CONTINUE;
           }
         });
@@ -622,7 +613,7 @@ public class FileSystemStorageStrategy implements StorageStrategy {
    * this call actually deleted.
    */
   @SneakyThrows
-  private static @NonNull TrashCleanupResult deleteRecursivelyWithStats(final Path directory) {
+  private static TrashCleanupResult deleteRecursivelyWithStats(final Path directory) {
     final AtomicInteger directoriesDeleted = new AtomicInteger();
     final AtomicInteger filesDeleted = new AtomicInteger();
     final AtomicLong bytesFreed = new AtomicLong();
@@ -631,8 +622,8 @@ public class FileSystemStorageStrategy implements StorageStrategy {
         directory,
         new SimpleFileVisitor<>() {
           @Override
-          public @NonNull FileVisitResult visitFile(
-              final Path file, final @NonNull BasicFileAttributes attrs) throws IOException {
+          public FileVisitResult visitFile(final Path file, final BasicFileAttributes attrs)
+              throws IOException {
             bytesFreed.addAndGet(attrs.size());
             filesDeleted.incrementAndGet();
             Files.delete(file);
@@ -640,7 +631,7 @@ public class FileSystemStorageStrategy implements StorageStrategy {
           }
 
           @Override
-          public @NonNull FileVisitResult postVisitDirectory(final Path dir, final IOException exc)
+          public FileVisitResult postVisitDirectory(final Path dir, final IOException exc)
               throws IOException {
             if (exc != null) {
               throw exc;
@@ -666,10 +657,8 @@ public class FileSystemStorageStrategy implements StorageStrategy {
   }
 
   @Override
-  public @NonNull BaseUsages getUsages(
-      final @NonNull StoragePath storagePath,
-      final @NonNull String repoName,
-      final long contentLength)
+  public BaseUsages getUsages(
+      final StoragePath storagePath, final String repoName, final long contentLength)
       throws IOException {
     final Optional<Resource> file = this.get(storagePath, repoName);
 
@@ -683,7 +672,7 @@ public class FileSystemStorageStrategy implements StorageStrategy {
   }
 
   @Override
-  public long getFileUsage(final @NonNull StoragePath storagePath, final @NonNull String repoName)
+  public long getFileUsage(final StoragePath storagePath, final String repoName)
       throws IOException {
     final Optional<Resource> file = this.get(storagePath, repoName);
 
@@ -705,8 +694,7 @@ public class FileSystemStorageStrategy implements StorageStrategy {
    */
   @SneakyThrows
   @Override
-  public @NonNull BaseUsages renameObject(
-      final @NonNull StoragePath storagePath, final @NonNull String digest) {
+  public BaseUsages renameObject(final StoragePath storagePath, final String digest) {
     if (digest.isEmpty()
         || digest.equals(".")
         || digest.contains("..")
@@ -729,7 +717,7 @@ public class FileSystemStorageStrategy implements StorageStrategy {
     }
   }
 
-  private @NonNull Path toPhysicalPath(final @NonNull StoragePath storagePath) {
+  private Path toPhysicalPath(final StoragePath storagePath) {
     final var normalized = this.basePath.normalize();
     final var resolved = normalized.resolve(storagePath.getPath()).normalize();
     if (!resolved.startsWith(normalized)) {
@@ -739,11 +727,11 @@ public class FileSystemStorageStrategy implements StorageStrategy {
   }
 
   private void addItems(
-      final @NonNull File @NonNull [] files,
-      final @NonNull Set<StorageItemInfo> directoryList,
-      final @NonNull Set<StorageItemInfo> fileList)
+      final File[] files,
+      final Set<StorageItemInfo> directoryList,
+      final Set<StorageItemInfo> fileList)
       throws IOException {
-    for (final @NonNull File file : files) {
+    for (final File file : files) {
       final String fileName = file.getName();
 
       if (isTempFileName(fileName) || file.getPath().equals(this.trashPath.toString())) {

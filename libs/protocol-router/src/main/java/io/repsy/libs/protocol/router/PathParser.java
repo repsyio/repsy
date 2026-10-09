@@ -17,9 +17,8 @@ package io.repsy.libs.protocol.router;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Optional;
-import org.jspecify.annotations.Nullable;
 
 public interface PathParser {
 
-  Optional<@Nullable ProtocolContext> parse(HttpServletRequest request);
+  Optional<ProtocolContext> parse(HttpServletRequest request);
 }

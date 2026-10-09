@@ -15,8 +15,6 @@
  */
 package io.repsy.libs.storage.core.dtos;
 
-import org.jspecify.annotations.NonNull;
-
 /**
  * The outcome of one {@code StorageStrategy.clearTrash()} pass: what was permanently removed from
  * the trash because it was older than the retention period.
@@ -29,10 +27,10 @@ import org.jspecify.annotations.NonNull;
 public record TrashCleanupResult(int directoriesDeleted, int filesDeleted, long bytesFreed) {
 
   /** The result of a pass that found nothing old enough to remove. */
-  public static final @NonNull TrashCleanupResult EMPTY = new TrashCleanupResult(0, 0, 0);
+  public static final TrashCleanupResult EMPTY = new TrashCleanupResult(0, 0, 0);
 
   /** Answers the combined totals of this result and {@code other}. */
-  public @NonNull TrashCleanupResult plus(final @NonNull TrashCleanupResult other) {
+  public TrashCleanupResult plus(final TrashCleanupResult other) {
     return new TrashCleanupResult(
         this.directoriesDeleted + other.directoriesDeleted,
         this.filesDeleted + other.filesDeleted,

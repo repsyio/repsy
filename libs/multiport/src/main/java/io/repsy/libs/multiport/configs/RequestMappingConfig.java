@@ -26,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.webmvc.autoconfigure.WebMvcRegistrations;
 import org.springframework.context.annotation.Bean;
@@ -41,32 +40,30 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 @RequiredArgsConstructor
 public class RequestMappingConfig {
 
-  private final @NonNull MultiPortProperties multiPortProperties;
+  private final MultiPortProperties multiPortProperties;
 
   @Bean
-  public @NonNull WebMvcRegistrations webMvcRegistrations() {
+  public WebMvcRegistrations webMvcRegistrations() {
 
     return new WebMvcRegistrations() {
       @Override
-      public @NonNull RequestMappingHandlerMapping getRequestMappingHandlerMapping() {
+      public RequestMappingHandlerMapping getRequestMappingHandlerMapping() {
         return new PortBasedRequestMappingHandlerMapping();
       }
     };
   }
 
-  private record MatchedHandler(
-      @NonNull RequestMappingInfo mappingInfo, @NonNull HandlerMethod handlerMethod) {}
+  private record MatchedHandler(RequestMappingInfo mappingInfo, HandlerMethod handlerMethod) {}
 
   private final class PortBasedRequestMappingHandlerMapping extends RequestMappingHandlerMapping {
 
-    private final @NonNull Map<@NonNull Integer, @NonNull List<@NonNull MatchedHandler>>
-        portHandlerCache = new HashMap<>();
+    private final Map<Integer, List<MatchedHandler>> portHandlerCache = new HashMap<>();
 
     private volatile boolean cacheReady = false;
 
     @Override
     protected @Nullable HandlerMethod lookupHandlerMethod(
-        final @NonNull String lookupPath, final @NonNull HttpServletRequest request) {
+        final String lookupPath, final HttpServletRequest request) {
 
       this.ensureCacheReady();
 
@@ -153,7 +150,7 @@ public class RequestMappingConfig {
       }
     }
 
-    private int resolvePort(final @NonNull HandlerMethod handlerMethod, final int mainPort) {
+    private int resolvePort(final HandlerMethod handlerMethod, final int mainPort) {
 
       final var annotation =
           this.findRestApiPort(handlerMethod.getBeanType(), handlerMethod.getMethod());
@@ -171,7 +168,7 @@ public class RequestMappingConfig {
     }
 
     private @Nullable RestApiPort findRestApiPort(
-        final @NonNull Class<?> controllerClass, final @NonNull Method method) {
+        final Class<?> controllerClass, final Method method) {
 
       final var methodAnnotation = AnnotationUtils.findAnnotation(method, RestApiPort.class);
 
@@ -182,7 +179,7 @@ public class RequestMappingConfig {
       return AnnotationUtils.findAnnotation(controllerClass, RestApiPort.class);
     }
 
-    private void clearPathAttributes(final @NonNull HttpServletRequest request) {
+    private void clearPathAttributes(final HttpServletRequest request) {
       request.removeAttribute(HandlerMapping.URI_TEMPLATE_VARIABLES_ATTRIBUTE);
       request.removeAttribute(HandlerMapping.MATRIX_VARIABLES_ATTRIBUTE);
     }
