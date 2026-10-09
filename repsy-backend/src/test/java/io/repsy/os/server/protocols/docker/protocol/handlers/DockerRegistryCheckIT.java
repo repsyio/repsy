@@ -38,10 +38,11 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
  * Before this class only {@code DockerAuthChallengeTest} (a unit test of the header builder) and
  * the opt-in e2e suite covered it.
  *
- * <p>The ping handler is registered by the Docker and the Helm provider; both answer the same
- * route, so this class pins what a client sees whichever one the router picks ({@code
- * HelmOciVersionCheckIT} repeats the contract from the Helm side). The ping addresses no repo or
- * image, so its challenge names no scope (RPS-1588).
+ * <p>The Docker provider's handler is the only ping handler and serves every repo type (RPS-2103
+ * removed the identical Helm one, which was unreachable), so a Helm OCI client gets the contract
+ * pinned here. The ping addresses no repo or image, so its challenge names no scope (RPS-1588).
+ * Both the 200 and the 401 carry {@code Docker-Distribution-API-Version: registry/2.0} on the
+ * protocol port; the API port does not.
  *
  * <p>The realm is built from the request's scheme, server name and port, and from {@code
  * X-Forwarded-Host} / {@code X-Forwarded-Port} (RPS-1515: a port embedded in {@code
@@ -52,6 +53,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 class DockerRegistryCheckIT extends AbstractIntegrationTest {
 
   private static final String SERVICE = "service=\"repsy\"";
+  private static final String API_VERSION_HEADER = "Docker-Distribution-API-Version";
 
   private static RequestPostProcessor publicUrl(
       final String scheme, final String host, final int port) {
@@ -99,6 +101,42 @@ class DockerRegistryCheckIT extends AbstractIntegrationTest {
     assertThat(response.getStatus()).isEqualTo(200);
     assertThat(response.getContentAsByteArray()).isEmpty();
     assertThat(response.getHeader(WWW_AUTHENTICATE)).isNull();
+    assertThat(response.getHeader(API_VERSION_HEADER)).isEqualTo("registry/2.0");
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @ValueSource(strings = {"/v2/", "/v2"})
+  @DisplayName("the 401 challenge of the ping names the registry API version too (RPS-2103)")
+  void challengeCarriesTheApiVersion(final String path) throws Exception {
+    final var response = this.ping(path, null);
+
+    assertThat(response.getStatus()).isEqualTo(401);
+    assertThat(response.getHeader(API_VERSION_HEADER)).isEqualTo("registry/2.0");
+  }
+
+  @Test
+  @DisplayName("HEAD /v2/ carries the registry API version (RPS-2103)")
+  void headCarriesTheApiVersion() throws Exception {
+    final var response =
+        this.mockMvc
+            .perform(
+                head("/v2/")
+                    .header(AUTHORIZATION, this.adminProtocolBearerToken())
+                    .with(protocolPort()))
+            .andReturn()
+            .getResponse();
+
+    assertThat(response.getStatus()).isEqualTo(200);
+    assertThat(response.getHeader(API_VERSION_HEADER)).isEqualTo("registry/2.0");
+  }
+
+  @Test
+  @DisplayName("the API port does not answer the registry API version (RPS-2103)")
+  void apiPortHasNoApiVersion() throws Exception {
+    final var response =
+        this.mockMvc.perform(get("/v2/").with(apiPort())).andReturn().getResponse();
+
+    assertThat(response.getHeader(API_VERSION_HEADER)).isNull();
   }
 
   @Test
