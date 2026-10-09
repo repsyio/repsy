@@ -50,6 +50,12 @@ async function openTwoTabs(first: Page): Promise<{ tabA: Page; tabB: Page }> {
   const tabB = await first.context().newPage();
   await new DashboardPage(first).goto();
   await new DashboardPage(tabB).goto();
+  // The dashboard shows its welcome card before its per-repository usage calls are all out. One that fires after the
+  // test planted a stale token makes the page that is about to be reloaded refresh with the real refresh token; the
+  // reload kills that request after the server spent the token, the reloaded tab spends it again and the server
+  // revokes the whole family (a flake on loaded CI runners, RPS-2025).
+  await first.waitForLoadState('networkidle');
+  await tabB.waitForLoadState('networkidle');
   return { tabA: first, tabB };
 }
 
