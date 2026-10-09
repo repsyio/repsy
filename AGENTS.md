@@ -647,6 +647,46 @@ Old springdoc tag to new tag. Several old tags may map to one new tag (one area,
   scripts under `postgresql/`), named `V{version}__{description}.sql`. Add a new migration rather
   than editing an existing one.
 - Use `postgres:18` in any Dockerfile, compose file, README snippet or test you add.
+- **Indexes on a populated table are built `CONCURRENTLY`.** `CREATE INDEX` and `DROP INDEX` on a
+  table that already exists use `CONCURRENTLY` and `IF [NOT] EXISTS`, in a file of their own with a
+  companion `V{version}__{description}.sql.conf` that holds exactly `executeInTransaction=false`
+  (Flyway community runs it; PostgreSQL rejects `CONCURRENTLY` inside a transaction). Never mix a
+  `CONCURRENTLY` statement with other DDL or DML in one file: without a transaction a failure
+  half-way leaves the earlier statements applied, so each statement is idempotent. A failed build
+  leaves an `INVALID` index, so a migration IT asserts `pg_index.indisvalid` of every index it
+  creates. A table that the same file creates is empty and needs none of this.
+- **A statement that takes an `ACCESS EXCLUSIVE` lock starts with `SET lock_timeout = '5s';`**
+  (`ADD COLUMN`, `DROP COLUMN`, `SET NOT NULL`, `ADD CONSTRAINT`, `ALTER COLUMN ... TYPE`), so a
+  waiting migration fails fast instead of queueing every query on the table behind it.
+- **No table rewrite and no unbounded backfill in one transaction.** `ALTER COLUMN ... TYPE`,
+  `VACUUM FULL` and `CLUSTER` rewrite the table; an `UPDATE` without `WHERE` touches every row. Add the
+  column in one migration and backfill in id-range batches (`UPDATE ... WHERE id BETWEEN`) in the
+  next, or say in the script why the table is small.
+- **A deliberate exception is written in the script**, as a line
+  `-- migration-check: allow <rule> <reason>` (rules: `indexConcurrently`, `concurrentlyConf`,
+  `concurrentlyOnly`, `lockTimeout`, `tableRewrite`, `unbatchedUpdate`, `h2Twin`, `h2Syntax`), so the
+  reviewer sees it with the file.
+- **A `CONCURRENTLY` migration needs Flyway's PostgreSQL transactional advisory lock off, in every
+  place Flyway runs.** With `executeInTransaction=false` Flyway's own session still holds that lock in
+  an open transaction (`idle in transaction`), and the `CONCURRENTLY` statement waits for its
+  virtual transaction id forever (confirmed with `pg_locks`, RPS-2112). Set
+  `spring.flyway.postgresql.transactional-lock=false` in `application.yml` (property
+  `flyway.postgresql.transactional.lock`, env `FLYWAY_POSTGRESQL_TRANSACTIONAL_LOCK`); an IT that
+  runs Flyway itself with `Flyway.configure` passes
+  `.configuration(Map.of("flyway.postgresql.transactional.lock", "false"))`; Helm values need it
+  only if they override `spring.flyway`. The root `pom.xml` Apache RAT plugin also needs an exclude
+  for `**/db/migration/**/*.sql.conf` (a `.conf` cannot carry a licence header). Neither the setting
+  nor the exclude exists yet in OS or Cloud: both come with the RPS-2112 PRs (the first
+  `CONCURRENTLY` migration), not with the convention.
+- **`MigrationConventionTest` enforces this** (RPS-2119; a plain unit test that reads the scripts, no
+  database). It lists the violations of the migrations merged before it existed in
+  `EXISTING_VIOLATIONS`; that list may only shrink (a stale entry fails the build) and a new entry is
+  never the answer: fix the new migration or add the marker above.
+- **Two dialect chains.** Every PostgreSQL migration has an H2 twin of the same version under
+  `db/migration/h2/` (or a Java migration of that version in `src/main/java/db/migration/h2/`). The H2
+  file is plain DDL: no `CONCURRENTLY`, `lock_timeout`, `.sql.conf`, partial index, `gin`/`gist` or
+  `pg_trgm`; an object H2 has no equivalent for (a trigram index) is a comment-only file. A new
+  column exists in both (`H2EntitySchemaAnnotationIT`).
 - A Docker manifest (`docker_manifest`) is content-addressed: one row per image and `sha256` digest,
   its file at `<repoUuid>/manifests/<digest>` (shared by the images of a repo, deleted only when no row
   of the repo has the digest), and a tag (`docker_tag`) is a pointer to it. A migration that changes
