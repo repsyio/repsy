@@ -37,11 +37,13 @@ import { RepositoriesPage } from '../../../src/ui/pages/repositories.js';
 import { Toasts } from '../../../src/ui/pages/components.js';
 import { UsersPage } from '../../../src/ui/pages/users.js';
 import { errorToasts } from '../../../src/ui/page-errors.js';
+import { formatApiPattern } from '../../../src/ui/routes.js';
 import { errorBody, fulfillJson, type ErrorResponse } from '../../../src/ui/stub-responses.js';
 
 const LIST_URL = /\/api\/repos(\?|$)/;
 const USERS_URL = /\/api\/users(\?|$)/;
-const NUGET_LIST_URL = /\/api\/nuget\/packages\/[^/?]+(\?|$)/;
+// Built at use, not at import: Repsy Cloud's path carries the owner (README, "Import time is not run time").
+const nugetListUrl = (): RegExp => formatApiPattern('/api/nuget/packages');
 const SCANS_URL = /\/api\/security\/scans(\?|$)/;
 
 type Handler = (route: Route) => Promise<void>;
@@ -169,7 +171,7 @@ test.describe('Error handling', () => {
     // exist, only the repository, because the list call is stubbed.
     const repo = await seeder.createRepo(RepoType.NUGET);
     const list = protocolPages(adminPage, DESCRIPTORS.nuget, repo.name).list();
-    await withRoute(adminPage, NUGET_LIST_URL, respondWith(500), async () => {
+    await withRoute(adminPage, nugetListUrl(), respondWith(500), async () => {
       const raised = expectToastLater(list.toasts, 'Server error');
       await adminPage.goto(list.path());
       await raised;

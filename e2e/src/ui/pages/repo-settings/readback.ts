@@ -23,7 +23,7 @@
  */
 import { env } from '../../../env.js';
 import { repoUrl } from '../../../repo-url.js';
-import { repoApiPath } from '../../routes.js';
+import { formatApiPath, repoApiPath } from '../../routes.js';
 
 export interface RepoPermissions {
   repoName?: string;
@@ -82,7 +82,7 @@ export class RepoSettingsReadback {
   /** The key servers registered on a Maven repo (first page of 50). */
   async keyStores(repoName: string): Promise<KeyStore[]> {
     const page = await this.getBare<{ content?: KeyStore[] }>(
-      `/api/mvn/key-stores/${encodeURIComponent(repoName)}?page=0&size=50`,
+      `${formatApiPath('/api/mvn/key-stores', encodeURIComponent(repoName))}?page=0&size=50`,
     );
     return page.content ?? [];
   }

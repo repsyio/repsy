@@ -20,6 +20,7 @@
  * With the e2e stack's scanner off the real answer has no severity anywhere, so the card reads 0; the
  * stubbed answers prove it counts what it is given. DASH-01 already compares the total with the API.
  */
+import { env } from '../../../src/env.js';
 import { DashboardPage } from '../../../src/ui/pages/dashboard.js';
 import { expect, test } from '../../../src/ui/security-fixtures.js';
 import { Severity, stubRepoSecuritySummary } from '../../../src/ui/security-stubs.js';
@@ -32,7 +33,7 @@ test.describe('SEC-02e Security Overview', { tag: MOCKED }, () => {
     adminSession,
   }) => {
     const dashboard = new DashboardPage(adminPage);
-    const response = await adminPage.request.get('/api/repos/security-summary', {
+    const response = await adminPage.request.get(`${env.apiBaseUrl}/api/repos/security-summary`, {
       headers: { Authorization: `Bearer ${adminSession.token}` },
     });
     const real = (await response.json()) as Record<string, { severity?: string | null }>;

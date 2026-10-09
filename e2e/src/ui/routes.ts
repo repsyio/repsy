@@ -39,6 +39,24 @@ export function repoApiPath(repo: string, ...segments: string[]): string {
   return target.ui.repoApiPath(repo, ...segments);
 }
 
+/**
+ * `<prefix>/<repo>` (Repsy OS) or `<prefix>/<owner>/<repo>` (Repsy Cloud), then `segments`: the per-format panel
+ * routes (`/api/mvn/key-stores`, `/api/nuget/packages`): `target.ui.formatApiPath`.
+ */
+export function formatApiPath(prefix: string, repo: string, ...segments: string[]): string {
+  return target.ui.formatApiPath(prefix, repo, ...segments);
+}
+
+/**
+ * A regular expression for `formatApiPath(prefix, <any repo>, ...segments)`, ending at the query string or the end of
+ * the URL, for `page.route`. The owner of Repsy Cloud is part of it.
+ */
+export function formatApiPattern(prefix: string, ...segments: string[]): RegExp {
+  const mark = 'REPOMARK';
+  const path = escapeRegExp(formatApiPath(prefix, mark, ...segments)).replace(mark, '[^/?]+');
+  return new RegExp(`${path}(\\?|$)`);
+}
+
 /** The signed-in account's own page: `/profile` (Repsy OS) or `/account` (Repsy Cloud). */
 export function profileRoute(): string {
   return target.ui.profilePath;

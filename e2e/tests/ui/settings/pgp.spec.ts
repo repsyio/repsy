@@ -30,6 +30,7 @@ import type {
 } from '../../../src/api/generated/index.js';
 import { generateKeyPair } from '../../../src/clients/pgp.js';
 import { expect, test } from '../../../src/ui/fixtures.js';
+import { escapeRegExp, formatApiPath } from '../../../src/ui/routes.js';
 import { fulfillJson } from '../../../src/ui/stub-responses.js';
 import { RepoSettingsPage } from '../../../src/ui/pages/repo-settings/page.js';
 import { RepoSettingsReadback } from '../../../src/ui/pages/repo-settings/readback.js';
@@ -37,7 +38,8 @@ import { RepoSettingsReadback } from '../../../src/ui/pages/repo-settings/readba
 const SETTINGS = '@settings';
 
 const ALLOWED_SERVERS_URL = /\/api\/mvn\/allowed-key-servers/;
-const keyStoresUrl = (repoName: string) => new RegExp(`/api/mvn/key-stores/${repoName}(\\?|$)`);
+const keyStoresUrl = (repoName: string) =>
+  new RegExp(`${escapeRegExp(formatApiPath('/api/mvn/key-stores', repoName))}(\\?|$)`);
 
 function allowedKeyserversBody(data: AllowedKeyserverItem[]): AllowedKeyserverItem[] {
   return data;
