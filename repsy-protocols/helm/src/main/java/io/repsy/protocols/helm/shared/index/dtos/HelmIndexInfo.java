@@ -20,22 +20,14 @@ import java.util.Map;
 import lombok.Builder;
 import lombok.Value;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 
-/** A single chart entry inside the Helm index.yaml entries map. */
+/** Represents the full Helm index.yaml structure. */
 @Value
 @Builder
 @NullMarked
-public class HelmIndexEntryDto {
+public class HelmIndexInfo {
 
-  String name;
-  String version;
-  @Nullable String description;
-  @Nullable String appVersion;
-  @Nullable String type;
-  @Nullable String apiVersion;
-  @Nullable List<Map<String, Object>> dependencies;
-  String digest;
-  List<String> urls;
-  String created;
+  String apiVersion;
+  Map<String, List<HelmIndexEntryInfo>> entries;
+  String generated;
 }

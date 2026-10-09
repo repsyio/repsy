@@ -22,7 +22,7 @@ import io.repsy.protocols.helm.shared.chart.dtos.HelmChartInfo;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartMetadata;
 import io.repsy.protocols.helm.shared.chart.services.AbstractHelmChartFilesService;
 import io.repsy.protocols.helm.shared.chart.services.ChartService;
-import io.repsy.protocols.helm.shared.index.dtos.HelmIndexDto;
+import io.repsy.protocols.helm.shared.index.dtos.HelmIndexInfo;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciBlobForm;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciBlobInfo;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestPushForm;
@@ -59,7 +59,7 @@ public class HelmProtocolTxFacade extends AbstractHelmProtocolTxFacade<UUID> {
   }
 
   @Override
-  public HelmIndexDto generateIndex(final ProtocolContext context) {
+  public HelmIndexInfo generateIndex(final ProtocolContext context) {
     return super.generateIndex(context);
   }
 

@@ -18,13 +18,13 @@ package io.repsy.protocols.helm.protocol.facades;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartInfo;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartMetadata;
-import io.repsy.protocols.helm.shared.index.dtos.HelmIndexDto;
+import io.repsy.protocols.helm.shared.index.dtos.HelmIndexInfo;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciBlobForm;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciBlobInfo;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestInfo;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestPushForm;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestPushResult;
-import io.repsy.protocols.helm.shared.oci.dtos.HelmOciTagListDto;
+import io.repsy.protocols.helm.shared.oci.dtos.HelmOciTagListInfo;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Optional;
@@ -35,7 +35,7 @@ import org.springframework.core.io.Resource;
 @NullMarked
 public interface HelmProtocolFacade<ID> {
 
-  HelmIndexDto generateIndex(ProtocolContext context);
+  HelmIndexInfo generateIndex(ProtocolContext context);
 
   Resource getChart(ProtocolContext context, String filename) throws IOException;
 
@@ -123,5 +123,5 @@ public interface HelmProtocolFacade<ID> {
       ProtocolContext context, HelmOciManifestPushForm form, byte[] contentBytes)
       throws IOException;
 
-  HelmOciTagListDto listTags(ProtocolContext context, String name);
+  HelmOciTagListInfo listTags(ProtocolContext context, String name);
 }

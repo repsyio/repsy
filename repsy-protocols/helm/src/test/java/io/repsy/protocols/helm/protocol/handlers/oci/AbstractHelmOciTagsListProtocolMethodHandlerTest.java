@@ -23,7 +23,7 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
 import io.repsy.protocols.helm.protocol.facades.HelmProtocolFacade;
-import io.repsy.protocols.helm.shared.oci.dtos.HelmOciTagListDto;
+import io.repsy.protocols.helm.shared.oci.dtos.HelmOciTagListInfo;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
 import java.util.List;
@@ -132,7 +132,7 @@ class AbstractHelmOciTagsListProtocolMethodHandlerTest {
   void handleReturnsFacadeTagList() throws Exception {
     final var context = context("/payments/tags/list");
     final var dto =
-        HelmOciTagListDto.builder().name("helm/payments").tags(List.of("0.9.0", "1.0.0")).build();
+        HelmOciTagListInfo.builder().name("helm/payments").tags(List.of("0.9.0", "1.0.0")).build();
     when(this.facade.listTags(context, "payments")).thenReturn(dto);
 
     final var response =

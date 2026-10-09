@@ -364,7 +364,7 @@ export interface ParsedIndex {
 /** Parses `index.yaml` with the real `yaml` package (added for this step, `pnpm add yaml`) rather
  *  than a hand-rolled reader: the shape `HelmIndexGenerator` produces is small but this is a real
  *  YAML document (quoted/unquoted scalars, ISO instants), and a real parser is the safer choice --
- *  mirrors every field `HelmIndexEntryDto` writes (`name`, `version`, `digest`, `urls`,
+ *  mirrors every field `HelmIndexEntryInfo` writes (`name`, `version`, `digest`, `urls`,
  *  `description?`, `appVersion?`, `type?`, `apiVersion`, `dependencies?`, `created`). */
 export function parseIndex(yamlText: string): ParsedIndex {
   const doc = parseYaml(yamlText) as {

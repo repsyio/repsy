@@ -21,8 +21,8 @@ import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
 import io.repsy.protocols.helm.protocol.facades.HelmProtocolFacade;
 import io.repsy.protocols.helm.shared.constants.HelmConstants;
-import io.repsy.protocols.helm.shared.index.dtos.HelmIndexDto;
-import io.repsy.protocols.helm.shared.index.dtos.HelmIndexEntryDto;
+import io.repsy.protocols.helm.shared.index.dtos.HelmIndexEntryInfo;
+import io.repsy.protocols.helm.shared.index.dtos.HelmIndexInfo;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -106,7 +106,7 @@ public abstract class AbstractHelmIndexPullProtocolMethodHandler<ID>
         .body(yamlBody);
   }
 
-  protected static String serializeToYaml(final HelmIndexDto dto) {
+  protected static String serializeToYaml(final HelmIndexInfo dto) {
     final var options = new DumperOptions();
     options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
     options.setPrettyFlow(false);
@@ -139,7 +139,7 @@ public abstract class AbstractHelmIndexPullProtocolMethodHandler<ID>
     }
   }
 
-  private static Map<String, Object> entryToMap(final HelmIndexEntryDto entry) {
+  private static Map<String, Object> entryToMap(final HelmIndexEntryInfo entry) {
     final Map<String, Object> map = new LinkedHashMap<>();
     map.put("name", entry.getName());
     map.put("version", entry.getVersion());

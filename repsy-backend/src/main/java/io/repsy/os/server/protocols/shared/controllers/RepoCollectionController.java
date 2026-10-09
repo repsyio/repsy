@@ -18,7 +18,7 @@ package io.repsy.os.server.protocols.shared.controllers;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 
 import io.repsy.libs.multiport.annotations.RestApiPort;
-import io.repsy.os.generated.model.RepoCreateRequest;
+import io.repsy.os.generated.model.RepoCreateForm;
 import io.repsy.os.generated.model.RepoListInfo;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.auth.PanelAuthHelper;
@@ -97,7 +97,7 @@ public class RepoCollectionController {
   @PostMapping
   public ResponseEntity<RepoListInfo> create(
       @RequestHeader(AUTHORIZATION) final String authHeader,
-      @RequestBody @Valid final RepoCreateRequest form) {
+      @RequestBody @Valid final RepoCreateForm form) {
 
     final var user = this.panelAuthHelper.authenticateRepoCreator(authHeader);
     this.panelAuthHelper.requireAdmin(user);

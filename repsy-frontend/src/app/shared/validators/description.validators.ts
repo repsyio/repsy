@@ -24,7 +24,7 @@ import { ValidatorFn, Validators } from '@angular/forms';
  * <pre>
  * Field                                Backend (form)                   Panel (this file)
  * ----------------------------------   ------------------------------   ---------------------------
- * repository description, create       RepoCreateRequest: up to 500     DESCRIPTION_*: at most 500
+ * repository description, create       RepoCreateForm: up to 500     DESCRIPTION_*: at most 500
  * repository description, settings     RepoDescriptionForm: up to 500   characters, optional
  * deploy token description             DeployTokenForm: up to 500
  * </pre>

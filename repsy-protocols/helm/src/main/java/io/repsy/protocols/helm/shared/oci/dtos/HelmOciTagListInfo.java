@@ -13,21 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.protocols.helm.shared.index.dtos;
+package io.repsy.protocols.helm.shared.oci.dtos;
 
 import java.util.List;
-import java.util.Map;
 import lombok.Builder;
 import lombok.Value;
 import org.jspecify.annotations.NullMarked;
 
-/** Represents the full Helm index.yaml structure. */
 @Value
 @Builder
 @NullMarked
-public class HelmIndexDto {
+public class HelmOciTagListInfo {
 
-  String apiVersion;
-  Map<String, List<HelmIndexEntryDto>> entries;
-  String generated;
+  String name;
+  List<String> tags;
 }

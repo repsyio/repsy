@@ -41,7 +41,7 @@ import io.repsy.protocols.helm.shared.chart.dtos.HelmChartMetadata;
 import io.repsy.protocols.helm.shared.chart.services.AbstractHelmChartFilesService;
 import io.repsy.protocols.helm.shared.chart.services.AbstractHelmChartFilesService.DeletedChart;
 import io.repsy.protocols.helm.shared.chart.services.ChartService;
-import io.repsy.protocols.helm.shared.index.dtos.HelmIndexEntryDto;
+import io.repsy.protocols.helm.shared.index.dtos.HelmIndexEntryInfo;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciBlobInfo;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestForm;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestInfo;
@@ -953,7 +953,7 @@ class AbstractHelmProtocolTxFacadeTest {
       return chart;
     }
 
-    private HelmIndexEntryDto entryOf(final HelmChartInfo chart) {
+    private HelmIndexEntryInfo entryOf(final HelmChartInfo chart) {
       final var it = AbstractHelmProtocolTxFacadeTest.this;
       when(it.chartService.findAllByRepoId(REPO_ID)).thenReturn(List.of(chart));
 
@@ -1029,7 +1029,7 @@ class AbstractHelmProtocolTxFacadeTest {
 
       assertThat(entries.keySet()).containsExactly("alpha", "beta", "zeta");
       assertThat(entries.get("alpha"))
-          .extracting(HelmIndexEntryDto::getVersion)
+          .extracting(HelmIndexEntryInfo::getVersion)
           .containsExactly("2.0.0", "1.10.0", "1.10.0-rc.1", "1.9.0");
     }
   }
