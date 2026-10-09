@@ -505,8 +505,8 @@ class PypiPackageControllerIT extends AbstractIntegrationTest {
             this.perform(
                     post("/api/pypi/packages/" + repo.getName() + "/keep-package")
                         .header(AUTHORIZATION, adminToken))
-                .andExpect(status().isNotFound()));
-    assertProblem(unsupportedResponse, "itemNotFound");
+                .andExpect(status().isMethodNotAllowed()));
+    assertProblem(unsupportedResponse, "methodNotSupported");
     verify(this.usageUpdateService, atLeastOnce()).updateUsage(any(UsageChangedInfo.class));
   }
 
