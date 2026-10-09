@@ -276,7 +276,11 @@ public class NuGetPackageService extends AbstractNuGetPackageService<UUID> {
 
     final var pkgPage =
         this.packageRepository.search(
-            repoInfo.getId(), LikePatterns.of("%", query, "%"), semVer2, sortedPageable);
+            repoInfo.getId(),
+            LikePatterns.of("%", query, "%"),
+            prerelease,
+            semVer2,
+            sortedPageable);
 
     return pkgPage.map(pkg -> this.toSearchResult(pkg, prerelease, semVer2));
   }
@@ -301,7 +305,7 @@ public class NuGetPackageService extends AbstractNuGetPackageService<UUID> {
         PageRequest.of(
             0, Math.max(Math.addExact(skip, take), 1), Sort.by(Sort.Direction.ASC, "packageId"));
     return this.packageRepository
-        .search(repoInfo.getId(), LikePatterns.of("", query, "%"), semVer2, pageable)
+        .search(repoInfo.getId(), LikePatterns.of("", query, "%"), prerelease, semVer2, pageable)
         .stream()
         .skip(skip)
         .limit(take)

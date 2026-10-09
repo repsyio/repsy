@@ -314,7 +314,7 @@ class NuGetSearchProtocolIT extends AbstractIntegrationTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.totalHits").value(2))
         .andExpect(jsonPath("$.data[*].id", contains("search.semver.d")));
-    this.search("?q=search.semver&skip=1&take=1&semVerLevel=2.0.0")
+    this.search("?q=search.semver&skip=1&take=1&prerelease=true&semVerLevel=2.0.0")
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.totalHits").value(4))
         .andExpect(jsonPath("$.data[*].id", contains("search.semver.b")));

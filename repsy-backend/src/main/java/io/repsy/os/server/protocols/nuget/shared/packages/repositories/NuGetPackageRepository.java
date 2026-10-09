@@ -38,28 +38,32 @@ public interface NuGetPackageRepository extends JpaRepository<NuGetPackage, UUID
    * The packages of the repo whose id matches {@code pattern}, a lower-cased {@code LIKE} pattern
    * that escapes its wildcards with a backslash.
    *
-   * <p>Unless {@code includeSemVer2}, a package is left out when it has listed SemVer 2.0.0-only
-   * versions (build metadata, or a pre-release label with dot-separated identifiers) and no listed
-   * version that is not: a client that did not opt in to SemVer 2.0.0 could not use it.
+   * <p>A package is a result when it has at least one listed version the client can use, or no
+   * listed version at all. Unless {@code includeSemVer2}, a SemVer 2.0.0-only version (build
+   * metadata, or a pre-release label with dot-separated identifiers) is not usable; unless {@code
+   * includePrerelease}, a pre-release is not. So a package whose only versions are pre-releases is
+   * left out of a search without {@code prerelease=true}, as the NuGet V3 search specification says
+   * (RPS-2105).
    */
   @Query(
       """
       select p from NuGetPackage p
       where p.repo.id = :repoId
         and lower(p.packageId) like :pattern escape '\\'
-        and (:includeSemVer2 = true
+        and (not exists (
+            select 1 from NuGetPackageVersion a
+            where a.nugetPackage = p and a.isListed = true)
           or exists (
             select 1 from NuGetPackageVersion v
             where v.nugetPackage = p and v.isListed = true
-              and v.version not like '%+%' and v.version not like '%-%.%')
-          or not exists (
-            select 1 from NuGetPackageVersion v
-            where v.nugetPackage = p and v.isListed = true
-              and (v.version like '%+%' or v.version like '%-%.%')))
+              and (:includePrerelease = true or v.isPrerelease = false)
+              and (:includeSemVer2 = true
+                or (v.version not like '%+%' and v.version not like '%-%.%'))))
       """)
   Page<NuGetPackage> search(
       @Param("repoId") UUID repoId,
       @Param("pattern") String pattern,
+      @Param("includePrerelease") boolean includePrerelease,
       @Param("includeSemVer2") boolean includeSemVer2,
       Pageable pageable);
 
