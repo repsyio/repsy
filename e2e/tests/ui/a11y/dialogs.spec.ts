@@ -29,6 +29,7 @@
 import type { Locator, Page } from '@playwright/test';
 
 import { RepoType } from '../../../src/api/panel-api.js';
+import { target } from '../../../src/target.js';
 import { expect, test } from '../../../src/ui/security-fixtures.js';
 import { LoginPage } from '../../../src/ui/pages/login.js';
 import { DESCRIPTORS, protocolPages } from '../../../src/ui/pages/protocol.js';
@@ -331,7 +332,7 @@ test.describe('Forms: labels, names and unique ids', { tag: '@a11y' }, () => {
     await login.goto();
 
     expect(await idProblems(page)).toEqual({ duplicates: [], brokenLabels: [] });
-    await page.getByLabel('Username', { exact: true }).fill('by-label');
+    await page.getByLabel(target.ui.loginFieldLabel, { exact: true }).fill('by-label');
     await expect(login.username).toHaveValue('by-label');
     await page.getByLabel('Password', { exact: true }).fill('by-label');
     await expect(login.password).toHaveValue('by-label');
@@ -345,6 +346,16 @@ test.describe('Forms: labels, names and unique ids', { tag: '@a11y' }, () => {
 
   test('A11Y-07: icon-only controls have names', async ({ adminPage, seeder }) => {
     const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
+
+    // Every modal's X is named. The create-token modal is opened first, before a token exists: a plan that
+    // allows a single deploy token (Repsy Cloud Free) refuses to open it once one is seeded.
+    const settings = new RepoSettingsPage(adminPage, repo.name);
+    await settings.goto();
+    const modal = await settings.tokens.openCreateModal();
+    await expect(modal.closeButton).toHaveAccessibleName('Close dialog');
+    await modal.closeButton.click();
+    await expect(modal.root).toBeHidden();
+
     const token = await seeder.createToken(repo.name);
 
     const repos = new RepositoriesPage(adminPage);
@@ -355,7 +366,6 @@ test.describe('Forms: labels, names and unique ids', { tag: '@a11y' }, () => {
     await list.goto();
     await expect(list.refreshButton).toHaveAccessibleName('Refresh');
 
-    const settings = new RepoSettingsPage(adminPage, repo.name);
     await settings.goto();
     await expect(settings.pgp.addButton).toHaveAccessibleName('Add keyserver');
     await expect(settings.tokens.rotateButton(token.name)).toHaveAccessibleName(
@@ -367,10 +377,6 @@ test.describe('Forms: labels, names and unique ids', { tag: '@a11y' }, () => {
     await expect(settings.tokens.revokeButton(token.name)).toHaveAccessibleName(
       `Revoke deploy token ${token.name}`,
     );
-
-    // Every modal's X is named.
-    const modal = await settings.tokens.openCreateModal();
-    await expect(modal.closeButton).toHaveAccessibleName('Close dialog');
   });
 
   // @cloud-skip: the Users page (and its modals) exist on Repsy OS only.

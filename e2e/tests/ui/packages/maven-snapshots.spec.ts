@@ -50,7 +50,7 @@ import { errorToasts } from '../../../src/ui/page-errors.js';
 import { expect, test } from '../../../src/ui/package-fixtures.js';
 import { expectVersionNotFound } from '../../../src/ui/package-scenarios.js';
 import { DESCRIPTORS, protocolPages, type VersionsPage } from '../../../src/ui/pages/protocol.js';
-import { repoApiPath } from '../../../src/ui/routes.js';
+import { repoApiPath, repoRoute } from '../../../src/ui/routes.js';
 import { errorBody, fulfillJson, type ErrorResponse } from '../../../src/ui/stub-responses.js';
 
 const maven = DESCRIPTORS.maven;
@@ -107,7 +107,7 @@ function directories(name: string, version: string): string[] {
 const browserItem = (name: string): string => `maven-browser-item-${name}`;
 
 async function openBrowser(page: Page, repoName: string): Promise<void> {
-  await page.goto(`/${repoName}/browser`);
+  await page.goto(repoRoute(repoName, 'browser'));
   await expect(
     page
       .getByTestId('maven-browser-grid')
@@ -536,7 +536,7 @@ test.describe('Maven file browser states', { tag: '@packages' }, () => {
       await new Promise((resolve) => setTimeout(resolve, 800));
       await route.continue();
     });
-    await adminPage.goto(`/${repo.name}/browser`);
+    await adminPage.goto(repoRoute(repo.name, 'browser'));
     const top = directories(pkg.name, pkg.version)[0];
     await adminPage
       .getByTestId(browserItem(`${top}/`))

@@ -53,7 +53,7 @@ import { Shell } from '../../../src/ui/pages/shell.js';
 import { UsersPage } from '../../../src/ui/pages/users.js';
 import { uiRepoType } from '../../../src/ui/repo-types.js';
 import { rowLinkPoint } from '../../../src/ui/row-click.js';
-import { urlEndsWith } from '../../../src/ui/routes.js';
+import { profileRoute, urlEndsWith } from '../../../src/ui/routes.js';
 
 /** The URL ends in `path`, with or without the fragment the detail pages add (`#security`). */
 function endsWith(path: string): RegExp {
@@ -480,14 +480,14 @@ test.describe('Browser history: modals and menus', { tag: NAV }, () => {
   test('NAV-08: Back with the create-repository modal open closes it, Forward does not bring it back', async ({
     adminPage,
   }) => {
-    await adminPage.goto('/profile');
+    await adminPage.goto(profileRoute());
     await expect(adminPage.getByTestId('profile-title')).toBeVisible();
     const repos = new RepositoriesPage(adminPage);
     await repos.goto();
     await repos.openCreateModal();
 
     await step(adminPage, 'back');
-    await expect(adminPage).toHaveURL(/\/profile$/);
+    await expect(adminPage).toHaveURL(urlEndsWith(profileRoute()));
     await expect(repos.modal.root).toHaveCount(0);
     expect(await adminPage.evaluate(() => document.body.style.overflow)).toBe('');
 
@@ -530,7 +530,7 @@ test.describe('Browser history: modals and menus', { tag: NAV }, () => {
     const shell = new Shell(page);
     await page.goto('/repositories');
     await expect(new RepositoriesPage(page).title).toBeVisible();
-    await page.goto('/profile');
+    await page.goto(profileRoute());
     await shell.header.burger.click();
     await expect(shell.mobileSidebar.root).toBeVisible();
     expect(await page.evaluate(() => document.body.style.overflow)).toBe('hidden');
@@ -547,12 +547,12 @@ test.describe('Browser history: modals and menus', { tag: NAV }, () => {
   test('NAV-08: Back with a row menu open closes it', async ({ adminPage, seeder }) => {
     const repo = await seeder.createRepo(RepoType.MAVEN);
     const repos = new RepositoriesPage(adminPage);
-    await adminPage.goto('/profile');
+    await adminPage.goto(profileRoute());
     await repos.goto();
     await repos.search(repo.name);
     await repos.list.openRowMenu(repo.name);
     await step(adminPage, 'back');
-    await expect(adminPage).toHaveURL(/\/profile$/);
+    await expect(adminPage).toHaveURL(urlEndsWith(profileRoute()));
     await step(adminPage, 'forward');
     await expect(repos.title).toBeVisible();
     await expect(adminPage.getByTestId('dropdown-menu')).toHaveCount(0);

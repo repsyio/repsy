@@ -41,6 +41,7 @@ import { RepositoriesPage } from '../../../src/ui/pages/repositories.js';
 import { RepoSettingsPage } from '../../../src/ui/pages/repo-settings/page.js';
 import { Shell } from '../../../src/ui/pages/shell.js';
 import { UsersPage } from '../../../src/ui/pages/users.js';
+import { profileRoute, repoRoute } from '../../../src/ui/routes.js';
 import { uiRepoType } from '../../../src/ui/repo-types.js';
 
 const A11Y = '@a11y';
@@ -134,8 +135,8 @@ test.describe('Keyboard: login and landmarks', { tag: A11Y }, () => {
     const pages: [string, string, RegExp][] = [
       ['/', 'the dashboard', /Dashboard/],
       ['/repositories', 'the repository list', /Repositories/],
-      [`/${repo.name}/settings`, 'the settings page', /.+/],
-      ['/profile', 'the profile', /Account/],
+      [repoRoute(repo.name, 'settings'), 'the settings page', /.+/],
+      [profileRoute(), 'the profile', /Account/],
     ];
     const titles = new Set<string>();
     for (const [path, label, title] of pages) {
