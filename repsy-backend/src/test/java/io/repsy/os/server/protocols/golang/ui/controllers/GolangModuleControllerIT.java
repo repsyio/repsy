@@ -432,10 +432,10 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
 
     this.mockMvc
         .perform(post("/api/go/modules/{repo}", repo).with(apiPort()).header(AUTHORIZATION, token))
-        .andExpect(status().isNotFound());
+        .andExpect(status().isMethodNotAllowed());
     this.mockMvc
         .perform(patch("/api/go/modules/{repo}", repo).with(apiPort()).header(AUTHORIZATION, token))
-        .andExpect(status().isNotFound());
+        .andExpect(status().isMethodNotAllowed());
     this.mockMvc
         .perform(get("/api/go/modules/{repo}/sumdb/supported", repo).with(apiPort()))
         .andExpect(status().isNotFound());

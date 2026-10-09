@@ -1546,20 +1546,15 @@ class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
   @DisplayName("routing")
   class Routing {
 
-    /** Pins the RPS-849 behavior: unmapped verbs and routes answer 404 itemNotFound. */
+    /** A verb the path does not map is answered 405 methodNotSupported with Allow (RPS-2094). */
     @ParameterizedTest(name = "{0}")
     @MethodSource("unsupportedMethods")
-    @DisplayName("answers 404 itemNotFound for a route or verb nothing maps")
+    @DisplayName("answers 405 methodNotSupported with Allow for a verb the path does not map")
     void unsupportedMethod(final String label, final MockHttpServletRequestBuilder request)
         throws Exception {
       final var it = ProtocolDeployTokenControllerIT.this;
 
-      expectError(
-          it.perform(request.header(AUTHORIZATION, it.adminBearerToken())),
-          HttpStatus.NOT_FOUND,
-          "itemNotFound",
-          null,
-          "The requested item is not found.");
+      expectMethodNotAllowed(it.perform(request.header(AUTHORIZATION, it.adminBearerToken())));
     }
 
     static Stream<Arguments> unsupportedMethods() {

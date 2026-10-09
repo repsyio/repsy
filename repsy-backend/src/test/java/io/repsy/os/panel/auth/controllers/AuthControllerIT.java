@@ -1522,22 +1522,16 @@ class AuthControllerIT extends AbstractIntegrationTest {
   class Routing {
 
     /**
-     * The port-based handler mapping does not raise {@code HttpRequestMethodNotSupportedException}
-     * for a verb the path does not map, so the request falls through to the static-resource handler
-     * and fails with the servlet {@code NoResourceFoundException}, which {@code ErrorHandler}
-     * answers with 404 {@code itemNotFound} (RPS-849).
+     * A verb the path does not map is answered 405 {@code methodNotSupported} with an {@code Allow}
+     * header (RPS-2094); the port-based handler mapping used to leave it to the static-resource
+     * handler, which answered 404 {@code itemNotFound}.
      */
     @ParameterizedTest(name = "{0}")
     @MethodSource("unsupportedMethods")
-    @DisplayName("answers 404 itemNotFound for a verb the path does not map")
+    @DisplayName("answers 405 methodNotSupported with Allow for a verb the path does not map")
     void unsupportedMethod(final String name, final MockHttpServletRequestBuilder request)
         throws Exception {
-      expectError(
-          AuthControllerIT.this.perform(request),
-          HttpStatus.NOT_FOUND,
-          "itemNotFound",
-          null,
-          "The requested item is not found.");
+      expectMethodNotAllowed(AuthControllerIT.this.perform(request));
     }
 
     static Stream<Arguments> unsupportedMethods() {

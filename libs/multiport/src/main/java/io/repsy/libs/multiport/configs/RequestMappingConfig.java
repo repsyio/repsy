@@ -22,9 +22,11 @@ import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.webmvc.autoconfigure.WebMvcRegistrations;
@@ -63,7 +65,7 @@ public class RequestMappingConfig {
 
     @Override
     protected @Nullable HandlerMethod lookupHandlerMethod(
-        final String lookupPath, final HttpServletRequest request) {
+        final String lookupPath, final HttpServletRequest request) throws Exception {
 
       this.ensureCacheReady();
 
@@ -88,7 +90,18 @@ public class RequestMappingConfig {
       this.clearPathAttributes(request);
 
       if (handlerOptional.isEmpty()) {
-        return null;
+        // No mapping of this port accepts the request. When some of them match the path but not the
+        // verb (or the media types), Spring's handleNoMatch raises the 405, 415 or 406 exception so
+        // the error advice answers it and the Allow header lists this port's verbs only (RPS-2094).
+        // When no mapping matches the path it returns null, and the request falls through to the
+        // next handler mapping (the protocol router, the static resources) as before. Only this
+        // port's candidates are considered, so a mapping of another port never adds a verb.
+        return this.handleNoMatch(
+            candidates.stream()
+                .map(MatchedHandler::mappingInfo)
+                .collect(Collectors.toCollection(LinkedHashSet::new)),
+            lookupPath,
+            request);
       }
 
       final var handler = handlerOptional.get();

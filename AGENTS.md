@@ -474,7 +474,7 @@ rule changes, change it in both repositories together. Every API change follows 
 | Authenticated but not allowed | 403 | |
 | No such resource, or a private one the caller may not know exists | 404 | |
 | Name already taken, state conflict | 409 | |
-| Wrong method | 405 | |
+| Wrong method | 405 | `methodNotSupported` with an `Allow` header listing the verbs the path maps (RPS-2094); an unmapped path stays 404. |
 | Cannot produce the requested media type | 406 | |
 | Unsupported request content type | 415 | |
 | Body above the multipart limit | 413 | `MaxUploadSizeExceededException`. |

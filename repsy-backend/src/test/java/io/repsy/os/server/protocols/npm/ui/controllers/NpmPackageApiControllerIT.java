@@ -759,11 +759,9 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
   }
 
   /**
-   * The port-based handler mapping does not raise {@code HttpRequestMethodNotSupportedException}
-   * for a verb the path does not map, so the request falls through to the static-resource handler
-   * and fails with {@code NoResourceFoundException}, which {@code ErrorHandler} answers with 404
-   * {@code itemNotFound} (RPS-849). Publishing verbs on these read/delete routes must never reach
-   * the generic error handler and answer 500 (RPS-900).
+   * A verb the path does not map is answered 405 {@code methodNotSupported} with an {@code Allow}
+   * header (RPS-2094, formerly 404 {@code itemNotFound}, RPS-849). Publishing verbs on these
+   * read/delete routes must never reach the generic error handler and answer 500 (RPS-900).
    */
   @Nested
   @DisplayName("unsupported verbs")
@@ -771,25 +769,28 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
 
     @ParameterizedTest(name = "{0} {1}")
     @MethodSource("unsupportedRequests")
-    @DisplayName("answers 404 itemNotFound in the standard error envelope")
+    @DisplayName("answers 405 methodNotSupported in the standard error envelope")
     void answersClientErrorWithStandardEnvelope(final HttpMethod method, final String pathTemplate)
         throws Exception {
       final var path = pathTemplate.formatted(repoName);
 
       perform(request(method, path).contentType(MediaType.APPLICATION_JSON).content("{}"))
-          .andExpect(status().isNotFound())
+          .andExpect(status().isMethodNotAllowed())
           .andExpect(
               org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
                   .string(
                       "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
-          .andExpect(jsonPath("$.code").value("itemNotFound"))
+          .andExpect(
+              org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
+                  .exists("Allow"))
+          .andExpect(jsonPath("$.code").value("methodNotSupported"))
           .andExpect(jsonPath("$.traceId").value(matchesPattern(UUID_PATTERN)))
-          .andExpect(jsonPath("$.detail").value("The requested item is not found."));
+          .andExpect(jsonPath("$.detail").value("Requested HTTP method is not supported."));
     }
 
     @ParameterizedTest(name = "{0} {1} with an admin token")
     @MethodSource("unsupportedRequests")
-    @DisplayName("answers the same 404 to an authenticated admin and leaves the package alone")
+    @DisplayName("answers the same 405 to an authenticated admin and leaves the package alone")
     void answersSameErrorToAdminAndKeepsPackage(final HttpMethod method, final String pathTemplate)
         throws Exception {
       final var path = pathTemplate.formatted(repoName);
@@ -799,12 +800,12 @@ class NpmPackageApiControllerIT extends AbstractIntegrationTest {
                   .header(AUTHORIZATION, bearerToken(admin, Duration.ofMinutes(30)))
                   .contentType(MediaType.APPLICATION_JSON)
                   .content("{}"))
-          .andExpect(status().isNotFound())
+          .andExpect(status().isMethodNotAllowed())
           .andExpect(
               org.springframework.test.web.servlet.result.MockMvcResultMatchers.header()
                   .string(
                       "Content-Type", org.hamcrest.Matchers.startsWith("application/problem+json")))
-          .andExpect(jsonPath("$.code").value("itemNotFound"))
+          .andExpect(jsonPath("$.code").value("methodNotSupported"))
           .andExpect(jsonPath("$.traceId").value(matchesPattern(UUID_PATTERN)));
 
       org.assertj.core.api.Assertions.assertThat(

@@ -1972,38 +1972,27 @@ class SecurityScanControllerIT extends AbstractIntegrationTest {
   class Routing {
 
     /**
-     * The port-based handler mapping does not raise {@code HttpRequestMethodNotSupportedException}
-     * for a verb the path does not map, so the request falls through to the static-resource handler
-     * and fails with the servlet {@code NoResourceFoundException}, which {@code ErrorHandler}
-     * answers with 404 {@code itemNotFound} (RPS-849). The answer is the same with and without a
-     * valid admin token, because no handler is ever reached.
+     * A verb the path does not map is answered 405 {@code methodNotSupported} with an {@code Allow}
+     * header (RPS-2094). The answer is the same with and without a valid admin token, because no
+     * handler is ever reached.
      */
     @ParameterizedTest(name = "{0}")
     @MethodSource("unsupportedMethods")
-    @DisplayName("answers 404 itemNotFound for a verb the path does not map")
+    @DisplayName("answers 405 methodNotSupported with Allow for a verb the path does not map")
     void unsupportedMethod(final String name, final MockHttpServletRequestBuilder request)
         throws Exception {
       final var token = SecurityScanControllerIT.this.seededAdminBearerToken();
 
-      expectError(
-          SecurityScanControllerIT.this.perform(request.header(AUTHORIZATION, token)),
-          HttpStatus.NOT_FOUND,
-          "itemNotFound",
-          null,
-          "The requested item is not found.");
+      expectMethodNotAllowed(
+          SecurityScanControllerIT.this.perform(request.header(AUTHORIZATION, token)));
     }
 
     @ParameterizedTest(name = "{0} without a token")
     @MethodSource("unsupportedMethods")
-    @DisplayName("answers 404 itemNotFound for an unmapped verb even without a token")
+    @DisplayName("answers 405 methodNotSupported for an unmapped verb even without a token")
     void unsupportedMethodWithoutToken(
         final String name, final MockHttpServletRequestBuilder request) throws Exception {
-      expectError(
-          SecurityScanControllerIT.this.perform(request),
-          HttpStatus.NOT_FOUND,
-          "itemNotFound",
-          null,
-          "The requested item is not found.");
+      expectMethodNotAllowed(SecurityScanControllerIT.this.perform(request));
     }
 
     static Stream<Arguments> unsupportedMethods() {

@@ -571,8 +571,8 @@ class NuGetPackageControllerIT extends AbstractIntegrationTest {
       NuGetPackageControllerIT.this
           .mockMvc
           .perform(post("/api/nuget/packages/{repo}", repo.getName()).with(apiPort()))
-          // RPS-849 owns the unsupported-verb behavior; pin today's error-handler response.
-          .andExpect(status().isNotFound());
+          // A verb the path does not map is a 405 (RPS-2094).
+          .andExpect(status().isMethodNotAllowed());
     }
   }
 

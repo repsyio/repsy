@@ -683,14 +683,10 @@ class RepoCollectionControllerIT extends AbstractIntegrationTest {
       final var name = uniqueRepoName("oldurl");
       final var dirsBefore = directoryCount(RepoType.MAVEN);
 
-      expectError(
+      expectMethodNotAllowed(
           RepoCollectionControllerIT.this.perform(
               json(post("/api/repos/MAVEN"), "{\"name\":\"%s\"}".formatted(name))
-                  .header(AUTHORIZATION, RepoCollectionControllerIT.this.adminBearerToken())),
-          HttpStatus.NOT_FOUND,
-          "itemNotFound",
-          null,
-          "The requested item is not found.");
+                  .header(AUTHORIZATION, RepoCollectionControllerIT.this.adminBearerToken())));
 
       assertThat(RepoCollectionControllerIT.this.repoRepository.findByName(name)).isEmpty();
       assertThat(directoryCount(RepoType.MAVEN)).isEqualTo(dirsBefore);
