@@ -21,7 +21,7 @@ import io.repsy.os.generated.model.ArtifactListItem;
 import io.repsy.os.generated.model.ArtifactVersionInfo;
 import io.repsy.os.generated.model.ArtifactVersionListItem;
 import io.repsy.os.server.protocols.maven.shared.artifact.services.ArtifactServiceImpl;
-import io.repsy.os.server.protocols.maven.shared.artifact.services.components.ArtifactDeletionComponent;
+import io.repsy.os.server.protocols.maven.shared.artifact.services.components.ArtifactDeleter;
 import io.repsy.os.server.protocols.maven.ui.facades.MavenApiFacade;
 import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
 import io.repsy.os.shared.http.ResponseEntities;
@@ -66,7 +66,7 @@ public class MavenArtifactController {
   private final UsageUpdateService usageUpdateService;
   private final ArtifactServiceImpl artifactService;
   private final MavenApiFacade mavenApiFacade;
-  private final ArtifactDeletionComponent artifactDeletionComponent;
+  private final ArtifactDeleter artifactDeleter;
 
   @DeleteMapping("/{repoName}/{groupName}/{artifactName}")
   @RepoOperation(permission = Permission.MANAGE)
@@ -76,7 +76,7 @@ public class MavenArtifactController {
       @PathVariable final String artifactName) {
 
     final var deletedItemPair =
-        this.artifactDeletionComponent.deleteArtifact(repoInfo, groupName, artifactName);
+        this.artifactDeleter.deleteArtifact(repoInfo, groupName, artifactName);
 
     this.updateUsage(repoInfo, deletedItemPair.getSecond());
 
@@ -93,8 +93,7 @@ public class MavenArtifactController {
       throws IOException, XmlPullParserException {
 
     final var deletedItemPair =
-        this.artifactDeletionComponent.deleteArtifactVersion(
-            repoInfo, groupName, artifactName, version);
+        this.artifactDeleter.deleteArtifactVersion(repoInfo, groupName, artifactName, version);
 
     this.updateUsage(repoInfo, deletedItemPair.getSecond());
 
@@ -106,7 +105,7 @@ public class MavenArtifactController {
   public ResponseEntity<Void> deleteGroup(
       final RepoInfo repoInfo, @PathVariable final String groupName) {
 
-    final var deletedItemPair = this.artifactDeletionComponent.deleteGroup(repoInfo, groupName);
+    final var deletedItemPair = this.artifactDeleter.deleteGroup(repoInfo, groupName);
 
     this.updateUsage(repoInfo, deletedItemPair.getSecond());
 

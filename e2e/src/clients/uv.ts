@@ -25,7 +25,7 @@
  *
  *  - Credentials: `uv publish` reads `UV_PUBLISH_USERNAME`/`UV_PUBLISH_PASSWORD` (a `password`-kind
  *    credential) or `UV_PUBLISH_TOKEN` (a `token`-kind one: uv then sends the username `__token__`,
- *    which Repsy ignores, `PypiAuthComponent` tries the deploy token by its secret alone). The
+ *    which Repsy ignores, `PypiAuthenticator` tries the deploy token by its secret alone). The
  *    consume side does NOT put the credential in a URL (as pip's `PIP_INDEX_URL` does): the project
  *    names its index (`[[tool.uv.index]] name = "repsy"`) and uv's own `UV_INDEX_REPSY_USERNAME`/
  *    `UV_INDEX_REPSY_PASSWORD` carry it, so neither `pyproject.toml` nor `uv.lock` ever holds it.

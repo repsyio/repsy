@@ -47,7 +47,7 @@
  * Credential mapping (both `twine`/`pip` share the plain "username + secret" shape every credential
  * kind in this harness carries): `TWINE_USERNAME`/`TWINE_PASSWORD` and the `PIP_INDEX_URL`'s
  * URL-embedded Basic credentials are both fed the SAME `credential.username`/`credential.password`
- * (a `token`-kind credential's username is ignored server-side either way -- `PypiAuthComponent
+ * (a `token`-kind credential's username is ignored server-side either way -- `PypiAuthenticator
  * .handleBasicAuthWithToken` tries the deploy token by PASSWORD alone first). `anonymous` leaves
  * `TWINE_USERNAME`/`TWINE_PASSWORD` UNSET entirely (never set to empty strings), matching a real
  * invocation with no credentials configured at all, and `PIP_INDEX_URL` carries no credentials

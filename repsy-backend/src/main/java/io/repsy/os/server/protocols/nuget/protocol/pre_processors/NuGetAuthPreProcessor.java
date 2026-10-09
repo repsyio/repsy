@@ -23,7 +23,7 @@ import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.libs.protocol.router.ProcessorResult;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolProcessor;
-import io.repsy.os.server.protocols.nuget.shared.auth.services.NuGetAuthComponent;
+import io.repsy.os.server.protocols.nuget.shared.auth.services.NuGetAuthenticator;
 import io.repsy.os.server.shared.utils.PreProcessorUtils;
 import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
 import io.repsy.protocols.nuget.protocol.NuGetProtocolProvider;
@@ -54,7 +54,7 @@ public class NuGetAuthPreProcessor extends ProtocolProcessor {
   private static final String PERMISSION_KEY = "permission";
   private static final String WRITE_OPERATION_KEY = "writeOperation";
 
-  private final NuGetAuthComponent authComponent;
+  private final NuGetAuthenticator authenticator;
   private final NuGetProtocolProvider provider;
 
   @PostConstruct
@@ -131,9 +131,9 @@ public class NuGetAuthPreProcessor extends ProtocolProcessor {
 
     switch (authHeader) {
       case final String header when header.startsWith(AUTH_BASIC) ->
-          this.authComponent.handleBasicAuth(header, permission, repoId);
+          this.authenticator.handleBasicAuth(header, permission, repoId);
       case final String header when header.startsWith(AUTH_BEARER) ->
-          this.authComponent.handleBearerAuth(header, repoId, permission);
+          this.authenticator.handleBearerAuth(header, repoId, permission);
       default -> throw new UnAuthorizedException("unAuthorized");
     }
   }

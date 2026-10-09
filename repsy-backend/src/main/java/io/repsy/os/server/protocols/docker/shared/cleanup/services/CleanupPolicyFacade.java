@@ -17,7 +17,7 @@ package io.repsy.os.server.protocols.docker.shared.cleanup.services;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.server.protocols.docker.shared.layer.dtos.OrphanLayerInfo;
-import io.repsy.os.server.protocols.docker.shared.tag.services.TagDeletionComponent;
+import io.repsy.os.server.protocols.docker.shared.tag.services.TagDeleter;
 import io.repsy.os.server.protocols.docker.shared.tag.services.UntaggedManifestCleanupService;
 import io.repsy.os.server.protocols.docker.ui.facades.DockerApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
@@ -44,7 +44,7 @@ import org.springframework.stereotype.Service;
 public class CleanupPolicyFacade {
 
   private final CleanupPolicyService cleanupPolicyService;
-  private final TagDeletionComponent tagDeletionComponent;
+  private final TagDeleter tagDeleter;
   private final UntaggedManifestCleanupService untaggedManifestCleanupService;
   private final DockerApiFacade dockerApiFacade;
   private final UsageUpdateService usageUpdateService;
@@ -61,7 +61,7 @@ public class CleanupPolicyFacade {
 
     for (final var info : deletions) {
       try {
-        this.tagDeletionComponent.deleteTag(info.repoInfo(), info.imageName(), info.tagName());
+        this.tagDeleter.deleteTag(info.repoInfo(), info.imageName(), info.tagName());
 
         touched
             .computeIfAbsent(info.repoInfo(), repo -> new LinkedHashMap<>())

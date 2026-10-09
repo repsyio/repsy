@@ -21,7 +21,7 @@ import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.libs.protocol.router.ProcessorResult;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolProcessor;
-import io.repsy.os.server.protocols.golang.shared.auth.services.GoAuthComponent;
+import io.repsy.os.server.protocols.golang.shared.auth.services.GoAuthenticator;
 import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.golang.protocol.GolangProtocolProvider;
@@ -50,15 +50,15 @@ public class GoAuthPreProcessor extends ProtocolProcessor {
   private static final @NonNull String PERMISSION_KEY = "permission";
   private static final @NonNull String WRITE_OPERATION_KEY = "writeOperation";
 
-  private final @NonNull GoAuthComponent authComponent;
+  private final @NonNull GoAuthenticator authenticator;
   private final @NonNull MessageSource messageSource;
 
   public GoAuthPreProcessor(
-      final @NonNull GoAuthComponent authComponent,
+      final @NonNull GoAuthenticator authenticator,
       final @NonNull MessageSource messageSource,
       final @NonNull GolangProtocolProvider provider) {
 
-    this.authComponent = authComponent;
+    this.authenticator = authenticator;
     this.messageSource = messageSource;
     provider.registerPreProcessor(this);
   }
@@ -81,7 +81,7 @@ public class GoAuthPreProcessor extends ProtocolProcessor {
       return ProcessorResult.next();
     }
 
-    final var authHeader = this.authComponent.emulateAuthHeader(request);
+    final var authHeader = this.authenticator.emulateAuthHeader(request);
 
     if (authHeader == null) {
       return ProcessorResult.of(this.unauthorized("unauthorizedRequest"));
@@ -122,9 +122,9 @@ public class GoAuthPreProcessor extends ProtocolProcessor {
 
     switch (authHeader) {
       case final String header when header.startsWith(AUTH_BASIC) ->
-          this.authComponent.handleBasicAuth(header, permission, repoId);
+          this.authenticator.handleBasicAuth(header, permission, repoId);
       case final String header when header.startsWith(AUTH_BEARER) ->
-          this.authComponent.handleBearerAuth(header, repoId, permission);
+          this.authenticator.handleBearerAuth(header, repoId, permission);
       default -> throw new UnAuthorizedException("unAuthorized");
     }
   }

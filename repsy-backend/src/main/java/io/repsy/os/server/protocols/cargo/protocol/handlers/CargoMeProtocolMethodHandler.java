@@ -17,7 +17,6 @@ package io.repsy.os.server.protocols.cargo.protocol.handlers;
 
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
-import io.repsy.os.server.protocols.cargo.shared.auth.services.CargoAuthComponent;
 import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
 import io.repsy.protocols.cargo.protocol.handlers.AbstractCargoMeProtocolMethodHandler;
@@ -30,8 +29,10 @@ import org.springframework.stereotype.Component;
 public class CargoMeProtocolMethodHandler extends AbstractCargoMeProtocolMethodHandler {
 
   public CargoMeProtocolMethodHandler(
-      final CargoAuthComponent authComponent, final CargoProtocolProvider provider) {
-    super(authComponent::authenticateAndCreateToken, provider);
+      final io.repsy.os.server.protocols.cargo.shared.auth.services.CargoAuthenticator
+          authenticator,
+      final CargoProtocolProvider provider) {
+    super(authenticator::authenticateAndCreateToken, provider);
   }
 
   @Override

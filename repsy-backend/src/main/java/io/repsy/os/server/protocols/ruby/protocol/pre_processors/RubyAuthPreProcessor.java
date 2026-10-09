@@ -21,7 +21,7 @@ import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.libs.protocol.router.ProcessorResult;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolProcessor;
-import io.repsy.os.server.protocols.ruby.shared.auth.services.RubyAuthComponent;
+import io.repsy.os.server.protocols.ruby.shared.auth.services.RubyAuthenticator;
 import io.repsy.os.server.shared.auth.AuthChallenges;
 import io.repsy.os.server.shared.utils.PreProcessorUtils;
 import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
@@ -50,7 +50,7 @@ public class RubyAuthPreProcessor extends ProtocolProcessor {
   private static final String PERMISSION_KEY = "permission";
   private static final String WRITE_OPERATION_KEY = "writeOperation";
 
-  private final RubyAuthComponent authComponent;
+  private final RubyAuthenticator authenticator;
   private final RubyProtocolProvider provider;
 
   @PostConstruct
@@ -77,7 +77,7 @@ public class RubyAuthPreProcessor extends ProtocolProcessor {
       return ProcessorResult.next();
     }
 
-    final var rawAuthHeader = this.authComponent.emulateAuthHeader(request);
+    final var rawAuthHeader = this.authenticator.emulateAuthHeader(request);
 
     if (rawAuthHeader == null) {
       return ProcessorResult.of(
@@ -103,9 +103,9 @@ public class RubyAuthPreProcessor extends ProtocolProcessor {
 
     switch (authHeader) {
       case final String h when h.startsWith(AUTH_BASIC) ->
-          this.authComponent.handleBasicAuth(h, permission, repoId);
+          this.authenticator.handleBasicAuth(h, permission, repoId);
       case final String h when h.startsWith(AUTH_BEARER) ->
-          this.authComponent.handleBearerAuth(h, repoId, permission);
+          this.authenticator.handleBearerAuth(h, repoId, permission);
       default -> throw new UnAuthorizedException("unAuthorized");
     }
   }

@@ -49,7 +49,7 @@
  * Credential mapping (`ruby-raw.ts`'s `apiKeyFor`/`bundleCredentialsValue`, both confirmed live):
  * `GEM_HOST_API_KEY` for `gem push` (the raw deploy-token secret for a `token`-kind credential, `Basic
  * <base64(user:pass)>` for a `password`-kind one -- both dispatched correctly by
- * `RubyAuthComponent`'s bare `ProtocolAuthService`); `BUNDLE_<HOSTKEY>=user:secret` (host-keyed, NOT
+ * `RubyAuthenticator`'s bare `ProtocolAuthService`); `BUNDLE_<HOSTKEY>=user:secret` (host-keyed, NOT
  * URI-keyed -- `Bundler::Settings#credentials_for` checks the full-URI key first but this harness
  * never sets that one) for a credentialed `bundle install`. `anonymous` leaves both entirely unset
  * (never an empty string): a real `gem push` with no key configured and closed stdin exits 1 promptly

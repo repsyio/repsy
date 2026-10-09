@@ -22,7 +22,7 @@ import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.libs.protocol.router.ProcessorResult;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolProcessor;
-import io.repsy.os.server.protocols.pypi.shared.auth.services.PypiAuthComponent;
+import io.repsy.os.server.protocols.pypi.shared.auth.services.PypiAuthenticator;
 import io.repsy.os.server.shared.auth.AuthChallenges;
 import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
@@ -44,12 +44,12 @@ public class PypiAuthPreProcessor extends ProtocolProcessor {
   private static final String PERMISSION_KEY = "permission";
   private static final String WRITE_OPERATION_KEY = "writeOperation";
 
-  private final PypiAuthComponent authComponent;
+  private final PypiAuthenticator authenticator;
 
   public PypiAuthPreProcessor(
-      final PypiAuthComponent authComponent, final PypiProtocolProvider provider) {
+      final PypiAuthenticator authenticator, final PypiProtocolProvider provider) {
 
-    this.authComponent = authComponent;
+    this.authenticator = authenticator;
     provider.registerPreProcessor(this);
   }
 
@@ -86,7 +86,7 @@ public class PypiAuthPreProcessor extends ProtocolProcessor {
   private void authenticate(
       final HttpServletRequest request, final UUID repoId, final Permission permission) {
 
-    final var authHeader = this.authComponent.emulateAuthHeader(request);
+    final var authHeader = this.authenticator.emulateAuthHeader(request);
 
     if (authHeader == null) {
       throw new UnAuthorizedException("unAuthorized");
@@ -100,9 +100,9 @@ public class PypiAuthPreProcessor extends ProtocolProcessor {
 
     switch (authHeader) {
       case final String header when header.startsWith(AUTH_BASIC) ->
-          this.authComponent.handleBasicAuthWithToken(header, permission, repoId);
+          this.authenticator.handleBasicAuthWithToken(header, permission, repoId);
       case final String header when header.startsWith(AUTH_BEARER) ->
-          this.authComponent.handleBearerAuth(header, repoId, permission);
+          this.authenticator.handleBearerAuth(header, repoId, permission);
       default -> throw new UnAuthorizedException("unAuthorized");
     }
   }

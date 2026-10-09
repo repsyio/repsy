@@ -25,7 +25,7 @@ import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.os.server.core.UrlParserProperties;
-import io.repsy.os.server.protocols.npm.shared.auth.services.NpmAuthComponentImpl;
+import io.repsy.os.server.protocols.npm.shared.auth.services.NpmAuthenticatorImpl;
 import io.repsy.os.server.shared.auth.AuthFailureThrottle;
 import io.repsy.os.server.shared.auth.AuthThrottleProperties;
 import io.repsy.os.server.shared.auth.BasicAuthCacheProperties;
@@ -64,7 +64,7 @@ class NpmAuthPreProcessorTest {
 
   private final NpmAuthPreProcessor preProcessor =
       new NpmAuthPreProcessor(
-          new NpmAuthComponentImpl(
+          new NpmAuthenticatorImpl(
               Mockito.mock(UserTxService.class),
               this.jwtUtils,
               Mockito.mock(DeployTokenService.class),

@@ -4284,7 +4284,7 @@ against `https://` (a remote target), never needs the shim at all (H2).
 ### Scenario mapping onto the shared catalog
 
 Every catalog scenario that is not maven/nuget-restricted applies to golang unchanged, with the SAME
-`unauthorized`/`ok` buckets maven already pins — `GolangAuthComponent` is a bare `ProtocolAuthService`
+`unauthorized`/`ok` buckets maven already pins — `GoAuthenticator` is a bare `ProtocolAuthService`
 subclass with no overrides, so every auth outcome (a read-only token's flat 401 on WRITE, an expired/
 revoked/rotated/wrong-repo token, a wrong password, anonymous-on-private) matches byte-for-byte,
 confirmed live. The ONE data change needed: `no-override`/`override` both get `expectByProtocol: {
@@ -4537,7 +4537,7 @@ now fixed and `publish-consume.spec.ts`'s dedicated `gem fetch` test asserts a r
 ### Scenario mapping onto the shared catalog
 
 Every catalog scenario that is not maven/nuget-restricted applies to ruby unchanged, with the SAME
-`unauthorized`/`ok` buckets maven already pins — `RubyAuthComponent` is a bare `ProtocolAuthService`
+`unauthorized`/`ok` buckets maven already pins — `RubyAuthenticator` is a bare `ProtocolAuthService`
 subclass with no overrides (`normalizeAuthHeader` Bearer-prefixes a bare value, the cargo/golang
 trick), so every auth outcome (a read-only token's flat 401 on WRITE, an expired/revoked/rotated/
 wrong-repo token, a wrong password, anonymous-on-private) matches byte-for-byte, confirmed live. The

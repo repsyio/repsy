@@ -23,7 +23,7 @@ import io.repsy.os.generated.model.ManifestListItem;
 import io.repsy.os.generated.model.TagDetail;
 import io.repsy.os.server.protocols.docker.shared.image.services.ImageTxService;
 import io.repsy.os.server.protocols.docker.shared.tag.services.ManifestTxService;
-import io.repsy.os.server.protocols.docker.shared.tag.services.TagDeletionComponent;
+import io.repsy.os.server.protocols.docker.shared.tag.services.TagDeleter;
 import io.repsy.os.server.protocols.docker.ui.facades.DockerApiFacade;
 import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
 import io.repsy.os.shared.http.ResponseEntities;
@@ -67,7 +67,7 @@ public class DockerImageController {
   private final @NonNull ImageTxService imageService;
   private final @NonNull ManifestTxService manifestService;
   private final @NonNull DockerApiFacade dockerApiFacade;
-  private final @NonNull TagDeletionComponent tagDeletionComponent;
+  private final @NonNull TagDeleter tagDeleter;
   private final @NonNull UsageUpdateService usageUpdateService;
 
   /**
@@ -175,7 +175,7 @@ public class DockerImageController {
       @RequestParam(name = "image", required = false) final String image,
       @PathVariable final String tagName) {
 
-    this.tagDeletionComponent.deleteTag(repoInfo, imageNameOf(imageName, image), tagName);
+    this.tagDeleter.deleteTag(repoInfo, imageNameOf(imageName, image), tagName);
 
     return ResponseEntities.noContent();
   }

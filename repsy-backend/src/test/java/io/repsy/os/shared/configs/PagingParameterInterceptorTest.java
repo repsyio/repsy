@@ -21,7 +21,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.repsy.core.response.services.RestResponseFactory;
-import io.repsy.os.shared.error_handling.services.ErrorHandler;
+import io.repsy.os.shared.error_handling.advice.ErrorHandler;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

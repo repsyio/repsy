@@ -19,6 +19,7 @@ import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.os.generated.model.CleanupPolicyForm;
 import io.repsy.os.generated.model.CleanupPolicyItem;
+import io.repsy.os.server.protocols.docker.shared.cleanup.dtos.TagDeletionInfo;
 import io.repsy.os.server.protocols.docker.shared.cleanup.entities.CleanupCadence;
 import io.repsy.os.server.protocols.docker.shared.cleanup.entities.CleanupPolicy;
 import io.repsy.os.server.protocols.docker.shared.cleanup.repositories.CleanupPolicyRepository;

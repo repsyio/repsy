@@ -22,7 +22,7 @@ import org.jspecify.annotations.Nullable;
 /**
  * Revokes a login token, for {@code DELETE /-/user/token/<token>}, which {@code npm logout} and
  * {@code pnpm logout} call. It is a separate interface, and not a method of {@link
- * NpmAuthComponent}, so that an implementation of that component outside this repository keeps
+ * NpmAuthenticator}, so that an implementation of that component outside this repository keeps
  * compiling.
  */
 @NullMarked

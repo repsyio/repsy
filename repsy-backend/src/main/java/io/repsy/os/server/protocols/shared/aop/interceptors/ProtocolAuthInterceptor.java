@@ -78,13 +78,13 @@ public class ProtocolAuthInterceptor implements HandlerInterceptor {
 
     final var repoInfo = repoInfoOpt.get();
     final var authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
-    final var authComponent = this.authComponents.get(repoInfo.getType());
+    final var authenticator = this.authComponents.get(repoInfo.getType());
 
     request.setAttribute(REPO_INFO, repoInfo);
 
     // Authorize before checking the scope, so a caller who may not access the repo cannot learn
     // its type from a scope mismatch either.
-    this.putRepoPermission(authComponent, methodHandler, repoInfo, request, authHeader);
+    this.putRepoPermission(authenticator, methodHandler, repoInfo, request, authHeader);
     this.checkRepoScope(methodHandler, repoInfo);
 
     return true;
@@ -107,13 +107,13 @@ public class ProtocolAuthInterceptor implements HandlerInterceptor {
       throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
     }
 
-    final var authComponent = this.getUnknownRepoAuthComponent(methodHandler);
-    authComponent.authorizeUnknownRepoRequest(authHeader, this.getPermission(methodHandler));
+    final var authenticator = this.getUnknownRepoAuthenticator(methodHandler);
+    authenticator.authorizeUnknownRepoRequest(authHeader, this.getPermission(methodHandler));
 
     return new ItemNotFoundException("repoNotFound");
   }
 
-  private ProtocolAuthService getUnknownRepoAuthComponent(final HandlerMethod methodHandler) {
+  private ProtocolAuthService getUnknownRepoAuthenticator(final HandlerMethod methodHandler) {
 
     // Only Docker authenticates differently. Use the endpoint's own type where it has one, and any
     // other protocol's generic authentication otherwise.
@@ -136,14 +136,14 @@ public class ProtocolAuthInterceptor implements HandlerInterceptor {
   }
 
   private void putRepoPermission(
-      final ProtocolAuthService authComponent,
+      final ProtocolAuthService authenticator,
       final HandlerMethod handler,
       final RepoInfo repoInfo,
       final HttpServletRequest request,
       final String authHeader) {
 
     final var permission = this.getPermission(handler);
-    final var permissionInfo = authComponent.authorizeUserRequest(repoInfo, authHeader, permission);
+    final var permissionInfo = authenticator.authorizeUserRequest(repoInfo, authHeader, permission);
 
     request.setAttribute(REPO_PERMISSION_INFO, permissionInfo);
   }

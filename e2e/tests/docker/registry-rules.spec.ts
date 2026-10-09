@@ -17,7 +17,7 @@
 /**
  * The docker server's registry rules, pinned at the protocol level with raw HTTP (no `crane`
  * client), the docker analogue of `tests/nuget/registry-rules.spec.ts`. Every status/detail here was
- * read from `AbstractDockerProtocolTxFacade`/`DockerAuthComponent`/`DockerHeaderPreProcessor` first
+ * read from `AbstractDockerProtocolTxFacade`/`DockerAuthenticator`/`DockerHeaderPreProcessor` first
  * and then confirmed against a running instance (see `docker-raw.ts`'s file header and README.md's
  * "Docker runner" section for the raw evidence and the full H1-H14 write-up). Sections R1-R13 mirror
  * the implementation plan's own hypothesis numbering 1:1; R14 (RPS-1244) pins the sha512 manifest
@@ -1271,7 +1271,7 @@ test.describe('docker registry rules (raw HTTP)', () => {
 
       // A raw deploy-token secret handed to a registry request AS the Bearer value itself (skipping
       // the /v2/token exchange every real docker client does) must be refused: Docker's own
-      // `acceptsRawDeployTokenBearer()` is false (`DockerAuthComponent`, RPS-1171) -- unlike every
+      // `acceptsRawDeployTokenBearer()` is false (`DockerAuthenticator`, RPS-1171) -- unlike every
       // other protocol in this harness, which DOES accept a raw deploy-token Bearer. Confirmed live:
       // this is a 401, not the silent-accept that would be a real security hole.
       const rw = await seeder.createToken(layout.repoName, { readOnly: false });
