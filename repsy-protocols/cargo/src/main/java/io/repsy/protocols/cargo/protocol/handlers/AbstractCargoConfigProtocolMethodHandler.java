@@ -36,6 +36,14 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
+/**
+ * Handles {@code GET /{repo}/config.json}, which is served without authentication even on private
+ * repos. Cargo fetches {@code config.json} before it knows whether the registry requires
+ * authentication (RFC 3139, {@code auth-required: true}), so the route is deliberately kept open to
+ * all clients. The exposed information is limited to the {@code dl} and {@code api} base URLs and
+ * the {@code auth-required} flag, which confirm that the registry exists; they do not reveal
+ * contents or grant any write access. RPS-2109: documented and pinned (keep open on purpose).
+ */
 @NullMarked
 public abstract class AbstractCargoConfigProtocolMethodHandler implements ProtocolMethodHandler {
 
