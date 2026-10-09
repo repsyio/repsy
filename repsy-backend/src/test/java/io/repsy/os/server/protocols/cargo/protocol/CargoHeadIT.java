@@ -246,7 +246,14 @@ class CargoHeadIT extends AbstractIntegrationTest {
             .getResponse();
 
     assertThat(withoutCreds.getStatus()).isEqualTo(200);
-    assertThat(withoutCreds.getStatus()).isEqualTo(getWithoutCreds.getStatus());
+    assertThat(withoutCreds.getContentAsByteArray()).isEmpty();
+    assertThat(withoutCreds.getHeader("Content-Length")).isNull();
+
+    assertThat(getWithoutCreds.getStatus()).isEqualTo(200);
+    assertThat(getWithoutCreds.getContentAsString())
+        .as("private repo GET config.json must expose auth-required true")
+        .contains("\"auth-required\": true");
+
     assertThat(this.headConfigJson(repo, token).getStatus()).isEqualTo(200);
   }
 
@@ -341,6 +348,23 @@ class CargoHeadIT extends AbstractIntegrationTest {
 
     final var withCreds = this.headDownload(repo, CRATE_NAME, "1.0.0", token);
     assertThat(withCreds.getStatus()).isEqualTo(200);
+  }
+
+  @Test
+  @DisplayName("GET config.json of unknown repo is 404")
+  void getConfigJsonUnknownRepoIs404() throws Exception {
+    final var token = this.adminProtocolBearerToken();
+
+    final var result =
+        this.mockMvc
+            .perform(
+                get("/{repo}/config.json", "unknown-repo")
+                    .header(AUTHORIZATION, token)
+                    .with(protocolPort()))
+            .andReturn()
+            .getResponse();
+
+    assertThat(result.getStatus()).isEqualTo(404);
   }
 
   @Test
