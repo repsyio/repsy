@@ -165,6 +165,8 @@
             <exclude>e2e/src/packages/**</exclude>
             <exclude>e2e/test-results/**</exclude>
             <exclude>e2e/playwright-report/**</exclude>
+            <!-- Flyway script config (executeInTransaction=false): one property, no place for a header. -->
+            <exclude>**/db/migration/**/*.sql.conf</exclude>
           </excludes>
         </configuration>
       </plugin>
