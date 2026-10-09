@@ -15,6 +15,7 @@
  */
 package io.repsy.protocols.npm.shared.utils;
 
+import io.repsy.protocols.npm.shared.constants.NpmConstants;
 import io.repsy.protocols.npm.shared.npm_package.dtos.NpmPackageSnapshot;
 import io.repsy.protocols.npm.shared.npm_package.dtos.NpmPackageSnapshot.Maintainer;
 import io.repsy.protocols.npm.shared.npm_package.dtos.NpmPackageSnapshot.Version;
