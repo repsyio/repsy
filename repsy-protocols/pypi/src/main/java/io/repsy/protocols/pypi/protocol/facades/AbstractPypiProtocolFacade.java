@@ -32,6 +32,7 @@ import io.repsy.protocols.pypi.shared.utils.PypiPublishLimits;
 import io.repsy.protocols.pypi.shared.utils.ReleaseVersion;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
+import io.repsy.protocols.shared.utils.StoredUpload;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.Map;
@@ -40,6 +41,7 @@ import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
+import org.slf4j.event.Level;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.web.multipart.MultipartFile;
@@ -215,36 +217,19 @@ public abstract class AbstractPypiProtocolFacade<ID> implements PypiProtocolFaca
       throw new AccessNotAllowedException(FILE_ALREADY_EXISTS);
     }
 
-    try {
-      return this.pypiStorageService.writePackageArchive(
-          repoInfo.getStorageKey(), repoInfo.getName(), uploadForm, file);
-    } catch (final IOException | RuntimeException e) {
-      if (!replacesExisting) {
-        this.discardPartialArchive(repoInfo, uploadForm, file, e);
-      }
-      throw e;
-    }
-  }
-
-  private void discardPartialArchive(
-      final BaseRepoInfo<ID> repoInfo,
-      final PackageUploadForm uploadForm,
-      final MultipartFile file,
-      final Exception cause) {
-
-    try {
-      this.pypiStorageService.discardArchive(
-          repoInfo.getStorageKey(),
-          repoInfo.getName(),
-          uploadForm.getNormalizedName(),
-          Objects.requireNonNull(file.getOriginalFilename()));
-    } catch (final RuntimeException e) {
-      log.warn(
-          "Could not remove the partly written archive {} of package {}: {}",
-          file.getOriginalFilename(),
-          uploadForm.getNormalizedName(),
-          e.getMessage());
-      cause.addSuppressed(e);
-    }
+    return StoredUpload.storeOrDiscard(
+        () ->
+            this.pypiStorageService.writePackageArchive(
+                repoInfo.getStorageKey(), repoInfo.getName(), uploadForm, file),
+        () ->
+            this.pypiStorageService.discardArchive(
+                repoInfo.getStorageKey(),
+                repoInfo.getName(),
+                uploadForm.getNormalizedName(),
+                Objects.requireNonNull(file.getOriginalFilename())),
+        replacesExisting,
+        log,
+        Level.WARN,
+        "archive " + file.getOriginalFilename() + " of package " + uploadForm.getNormalizedName());
   }
 }

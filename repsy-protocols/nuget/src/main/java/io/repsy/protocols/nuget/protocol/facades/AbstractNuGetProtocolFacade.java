@@ -43,6 +43,7 @@ import io.repsy.protocols.nuget.shared.storage.services.NuGetStorageService;
 import io.repsy.protocols.nuget.shared.utils.NuGetUrlBuilder;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
+import io.repsy.protocols.shared.utils.StoredUpload;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -336,38 +337,24 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
 
     final var nuspecBytes = metadata.nuspecXml().getBytes(StandardCharsets.UTF_8);
 
-    try (final var nuPkgStream = Files.newInputStream(tempFile)) {
-
-      return this.storageService.writePackage(
-          repoInfo.getStorageKey(),
-          metadata.packageId(),
-          metadata.version(),
-          nuPkgStream,
-          nuspecBytes);
-    } catch (final IOException | RuntimeException e) {
-      // The row is rolled back with this failure, so a half-written new version would be
-      // orphaned files. A version being replaced keeps its row, so its files are left alone.
-      if (!replacesExisting) {
-        this.discardPartialFiles(repoInfo, metadata, e);
-      }
-      throw e;
-    }
-  }
-
-  private void discardPartialFiles(
-      final BaseRepoInfo<ID> repoInfo, final NuspecMetadata metadata, final Exception cause) {
-
-    try {
-      this.storageService.deletePackageVersion(
-          repoInfo.getStorageKey(), metadata.packageId(), metadata.version());
-    } catch (final IOException | RuntimeException e) {
-      // Nothing to delete when the failure came before the first file was created.
-      log.debug(
-          "No partial files removed for NuGet package {} {}: {}",
-          metadata.packageId(),
-          metadata.version(),
-          e.getMessage());
-      cause.addSuppressed(e);
-    }
+    // The row is rolled back with a failure, so a half-written new version would be orphaned
+    // files. A version being replaced keeps its row, so its files are left alone.
+    return StoredUpload.storeOrDiscard(
+        () -> {
+          try (final var nuPkgStream = Files.newInputStream(tempFile)) {
+            return this.storageService.writePackage(
+                repoInfo.getStorageKey(),
+                metadata.packageId(),
+                metadata.version(),
+                nuPkgStream,
+                nuspecBytes);
+          }
+        },
+        () ->
+            this.storageService.deletePackageVersion(
+                repoInfo.getStorageKey(), metadata.packageId(), metadata.version()),
+        replacesExisting,
+        log,
+        "NuGet package " + metadata.packageId() + " " + metadata.version());
   }
 }

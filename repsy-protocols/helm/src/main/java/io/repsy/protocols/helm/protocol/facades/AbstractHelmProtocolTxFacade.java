@@ -43,6 +43,7 @@ import io.repsy.protocols.helm.shared.utils.HelmVersionComparator;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.BlobDigests;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
+import io.repsy.protocols.shared.utils.StoredUpload;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.Instant;
@@ -59,6 +60,7 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.event.Level;
 import org.springframework.core.io.Resource;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -245,32 +247,19 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmProtocolFa
       final HelmChartForm form,
       final @Nullable HelmChartInfo replaced) {
 
-    try {
-      this.helmStorageService.saveChart(repoInfo.getName(), storagePath, chartStream);
-    } catch (final RuntimeException e) {
-      if (replaced == null) {
-        this.discardPartialChart(repoInfo, storagePath, e);
-      }
-      throw e;
-    }
+    StoredUpload.runOrDiscard(
+        () -> this.helmStorageService.saveChart(repoInfo.getName(), storagePath, chartStream),
+        () -> this.helmStorageService.deleteChart(storagePath, repoInfo.getName()),
+        replaced != null,
+        log,
+        Level.DEBUG,
+        "chart " + storagePath);
 
     context.addProperty(ARTIFACT_NAME, form.getName());
     context.addProperty(ARTIFACT_VERSION, form.getVersion());
     context.addProperty(STORAGE_PATH, storagePath.getRelativePath().getPath());
     context.addProperty(
         "usages", BaseUsages.ofDisk(form.getSize() - (replaced == null ? 0 : replaced.size())));
-  }
-
-  private void discardPartialChart(
-      final BaseRepoInfo<ID> repoInfo, final StoragePath storagePath, final Exception cause) {
-
-    try {
-      this.helmStorageService.deleteChart(storagePath, repoInfo.getName());
-    } catch (final IOException | RuntimeException e) {
-      // Nothing to delete when the failure came before the file was created.
-      log.debug("No partial chart removed at {}: {}", storagePath, e.getMessage());
-      cause.addSuppressed(e);
-    }
   }
 
   @Override
@@ -467,22 +456,25 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmProtocolFa
     // What a replaced manifest's file held, to be put back when the transaction does not commit.
     final var previous = replaced ? this.readManifestFile(repoInfo, form) : null;
 
-    try {
-      final var usages =
-          this.helmStorageService.saveManifest(
-              repoInfo.getStorageKey(),
-              form.getName(),
-              form.getReference(),
-              contentBytes,
-              repoInfo.getName());
-      this.undoManifestFileUnlessCommitted(repoInfo, form, contentBytes, previous, replaced);
-      return new HelmOciManifestPushResult(manifest, usages);
-    } catch (final RuntimeException e) {
-      if (!replaced) {
-        this.discardPartialManifest(repoInfo, form, e);
-      }
-      throw e;
-    }
+    return StoredUpload.storeOrDiscard(
+        () -> {
+          final var usages =
+              this.helmStorageService.saveManifest(
+                  repoInfo.getStorageKey(),
+                  form.getName(),
+                  form.getReference(),
+                  contentBytes,
+                  repoInfo.getName());
+          this.undoManifestFileUnlessCommitted(repoInfo, form, contentBytes, previous, replaced);
+          return new HelmOciManifestPushResult(manifest, usages);
+        },
+        () ->
+            this.helmStorageService.deleteManifestFile(
+                repoInfo.getStorageKey(), form.getName(), form.getReference(), repoInfo.getName()),
+        replaced,
+        log,
+        Level.DEBUG,
+        "manifest " + form.getName() + ":" + form.getReference());
   }
 
   /**
@@ -585,22 +577,6 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmProtocolFa
           form.getReference(),
           e.getMessage());
       return null;
-    }
-  }
-
-  private void discardPartialManifest(
-      final BaseRepoInfo<ID> repoInfo, final HelmOciManifestPushForm form, final Exception cause) {
-
-    try {
-      this.helmStorageService.deleteManifestFile(
-          repoInfo.getStorageKey(), form.getName(), form.getReference(), repoInfo.getName());
-    } catch (final IOException | RuntimeException e) {
-      log.debug(
-          "No partial manifest removed for {}:{}: {}",
-          form.getName(),
-          form.getReference(),
-          e.getMessage());
-      cause.addSuppressed(e);
     }
   }
 

@@ -656,6 +656,29 @@ class AbstractCargoProtocolFacadeTest {
     }
 
     @Test
+    @DisplayName(
+        "republishing an existing version fails with crateVersionAlreadyExists and never deletes"
+            + " the existing crate file (RPS-2051)")
+    void republishingAnExistingVersionNeverDeletesTheCrate() throws Exception {
+      when(objectMapper.readValue(any(byte[].class), eq(CratePublishRequest.class)))
+          .thenReturn(minimalRequest("my_crate", "1.0.0"));
+      doThrow(new ItemAlreadyExistException("crateVersionAlreadyExists"))
+          .when(crateService)
+          .publish(any(), any(), any(), any());
+
+      assertThatThrownBy(
+              () ->
+                  facade.publish(
+                      context("/api/v1/crates/new"),
+                      stream(publishPayload("{}", minimalCrateBytes()))))
+          .isInstanceOf(ItemAlreadyExistException.class)
+          .hasMessage("crateVersionAlreadyExists");
+
+      verify(storageService, never()).deleteCrate(any(), any(), any(), any());
+      verify(storageService, never()).writeCrateAndIndex(any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
     @DisplayName("removes the partly written crate and reports no usage when the write fails")
     void removesThePartialCrateWhenTheWriteFails() throws Exception {
       when(objectMapper.readValue(any(byte[].class), eq(CratePublishRequest.class)))
