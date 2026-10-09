@@ -4542,7 +4542,7 @@ subclass with no overrides (`normalizeAuthHeader` Bearer-prefixes a bare value, 
 trick), so every auth outcome (a read-only token's flat 401 on WRITE, an expired/revoked/rotated/
 wrong-repo token, a wrong password, anonymous-on-private) matches byte-for-byte, confirmed live. The
 ONE data change needed: `no-override` gets `expectByProtocol: { ruby: { publish: 'conflict' } }` — a
-REAL `409` (`gemVersionAlreadyExists`, `RubyGemServiceImpl.upsertVersion`: an existing version that is
+REAL `409` (`gemVersionAlreadyExists`, `RubyGemService.upsertVersion`: an existing version that is
 either yanked or published under `allowOverride:false` is refused), confirmed live. `override` needs
 no data change: an existing, non-yanked version under `allowOverride:true` is overwritten in place, so
 the shared `ok` pin already matches. ruby is never added to `maven-releases-off`/`maven-snapshots-off`/
@@ -4720,7 +4720,7 @@ unknownPath`. Broke `gem install --source`/`gem fetch`; did NOT break `bundle in
 
 ### RB-0 — RPS-1060 re-verified, no regression
 
-`RubyGemServiceImpl.publishGem` still creates/updates and FLUSHES the DB row (a concurrent duplicate-
+`RubyGemService.publishGem` still creates/updates and FLUSHES the DB row (a concurrent duplicate-
 version race becomes a real `409` via the unique index) strictly BEFORE `AbstractRubyProtocolFacade
 .storeGem` writes the file, and a storage write failure rolls the transaction back, deleting a
 half-written NEW version's file (existing versions being replaced keep their row, so their file is

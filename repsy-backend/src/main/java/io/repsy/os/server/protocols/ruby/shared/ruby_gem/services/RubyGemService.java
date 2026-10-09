@@ -69,7 +69,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
 @NullMarked
-public class RubyGemServiceImpl implements RubyGemProtocolService<UUID> {
+public class RubyGemService implements RubyGemProtocolService<UUID> {
 
   private static final String GEM_NOT_FOUND = "gemNotFound";
   private static final String GEM_VERSION_NOT_FOUND = "gemVersionNotFound";

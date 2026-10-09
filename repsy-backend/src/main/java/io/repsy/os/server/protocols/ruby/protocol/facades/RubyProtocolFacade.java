@@ -15,7 +15,7 @@
  */
 package io.repsy.os.server.protocols.ruby.protocol.facades;
 
-import io.repsy.os.server.protocols.ruby.shared.ruby_gem.services.RubyGemServiceImpl;
+import io.repsy.os.server.protocols.ruby.shared.ruby_gem.services.RubyGemService;
 import io.repsy.os.server.protocols.ruby.shared.storage.services.RubyStorageService;
 import io.repsy.protocols.ruby.protocol.facades.AbstractRubyProtocolFacade;
 import java.util.UUID;
@@ -27,7 +27,7 @@ import org.springframework.stereotype.Component;
 public class RubyProtocolFacade extends AbstractRubyProtocolFacade<UUID> {
 
   public RubyProtocolFacade(
-      final RubyGemServiceImpl gemService, final RubyStorageService storageService) {
+      final RubyGemService gemService, final RubyStorageService storageService) {
     super(gemService, storageService);
   }
 }

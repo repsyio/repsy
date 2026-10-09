@@ -21,7 +21,7 @@ import io.repsy.os.generated.model.GemListItem;
 import io.repsy.os.generated.model.GemPackageInfo;
 import io.repsy.os.generated.model.GemVersionInfo;
 import io.repsy.os.generated.model.GemVersionListItem;
-import io.repsy.os.server.protocols.ruby.shared.ruby_gem.services.RubyGemServiceImpl;
+import io.repsy.os.server.protocols.ruby.shared.ruby_gem.services.RubyGemService;
 import io.repsy.os.server.protocols.ruby.shared.storage.services.RubyStorageService;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
@@ -39,7 +39,7 @@ import org.springframework.transaction.annotation.Transactional;
 @NullMarked
 public class RubyApiFacade implements ProtocolApiFacade {
 
-  private final RubyGemServiceImpl gemService;
+  private final RubyGemService gemService;
   private final RubyStorageService storageService;
   private final ApplicationEventPublisher eventPublisher;
 

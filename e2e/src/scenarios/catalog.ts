@@ -121,7 +121,7 @@
  *    either repo setting) and no SNAPSHOT-file concept.
  *  - ruby (step 4e, the LAST protocol of step 4) needs one data change: `no-override` pins
  *    `expectByProtocol: { ruby: { publish: 'conflict' } }` -- confirmed live, a real `409`
- *    ("gemVersionAlreadyExists", `RubyGemServiceImpl.upsertVersion`: an existing version that is
+ *    ("gemVersionAlreadyExists", `RubyGemService.upsertVersion`: an existing version that is
  *    EITHER yanked OR published under `allowOverride:false` is refused) -- like nuget/helm/golang,
  *    this is a genuine conflict, not maven's 403. `override` needs no data change: an existing,
  *    non-yanked version under `allowOverride:true` is overwritten in place, so the shared `expect`

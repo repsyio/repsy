@@ -41,8 +41,8 @@ import org.springframework.data.domain.Sort;
  * {@code "9.0.0"}). A mocked repository returns the versions in an order neither a plain string
  * sort nor insertion order would produce, and the page must still come back correct.
  */
-@DisplayName("RubyGemServiceImpl.findAllVersions version sort (RPS-1688)")
-class RubyGemServiceImplVersionSortTest {
+@DisplayName("RubyGemService.findAllVersions version sort (RPS-1688)")
+class RubyGemServiceVersionSortTest {
 
   private final RubyGemRepository gemRepository = mock(RubyGemRepository.class);
   private final RubyGemVersionRepository versionRepository = mock(RubyGemVersionRepository.class);
@@ -51,8 +51,8 @@ class RubyGemServiceImplVersionSortTest {
   private final RepoRepository repoRepository = mock(RepoRepository.class);
   private final RubyGemMapper converter = mock(RubyGemMapper.class);
 
-  private final RubyGemServiceImpl service =
-      new RubyGemServiceImpl(
+  private final RubyGemService service =
+      new RubyGemService(
           this.gemRepository,
           this.versionRepository,
           this.dependencyRepository,

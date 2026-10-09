@@ -18,7 +18,7 @@
  * The Ruby gem server's registry rules, pinned at the protocol level with raw HTTP POSTs/GETs (no
  * `gem`/`bundle` client), the ruby analogue of `tests/pypi/registry-rules.spec.ts`/
  * `tests/golang/registry-rules.spec.ts`. Every status/detail here was read from
- * `RubyGemServiceImpl`/`AbstractRubyProtocolFacade`/`GemspecParser`/`CompactIndexFormatter`/
+ * `RubyGemService`/`AbstractRubyProtocolFacade`/`GemspecParser`/`CompactIndexFormatter`/
  * `RubySpecsIndexWriter`/`RubyAuthPreProcessor` first and then confirmed against a running instance
  * (see `ruby-raw.ts`'s file header and `README.md`'s "Ruby runner" section for the raw evidence and
  * every H/RB-number these tests reference).
