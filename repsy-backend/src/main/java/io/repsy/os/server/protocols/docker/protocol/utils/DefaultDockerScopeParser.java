@@ -18,6 +18,7 @@ package io.repsy.os.server.protocols.docker.protocol.utils;
 import com.google.common.base.Splitter;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
+import io.repsy.protocols.docker.protocol.parser.DockerScopeParser;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.Optional;
 import java.util.UUID;
@@ -28,8 +29,7 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 @NullMarked
-public class DockerScopeParser
-    implements io.repsy.protocols.docker.protocol.parser.DockerScopeParser<UUID> {
+public class DefaultDockerScopeParser implements DockerScopeParser<UUID> {
 
   private static final int MIN_SCOPE_ARGS = 2;
 
