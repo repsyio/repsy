@@ -24,7 +24,7 @@ import org.springframework.stereotype.Component;
 /**
  * Tells whether a request was served on the panel API port (see {@code MultiPortNames#PORT_API}),
  * including a TLS listener aliased to it, as opposed to the repository-serving (protocol) port.
- * {@link SecurityHeadersFilter} and {@link CorsGlobalConfiguration} scope their behaviour with it.
+ * {@link SecurityHeadersFilter} and {@link CorsGlobalConfig} scope their behaviour with it.
  */
 @Component
 @RequiredArgsConstructor

@@ -15,7 +15,7 @@
 ///
 
 /**
- * RPS-1480, RPS-1514: the browser-facing headers at the real edge (`CorsGlobalConfiguration`,
+ * RPS-1480, RPS-1514: the browser-facing headers at the real edge (`CorsGlobalConfig`,
  * `SecurityHeadersFilter`), which MockMvc-level tests bypass.
  *
  *  - CSP is a property of the single-page app: sent on the api port for every non-`/api/` path (the
