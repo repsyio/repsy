@@ -17,6 +17,7 @@ package io.repsy.os.panel.auth.services;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.server.shared.auth.AuthFailureThrottle;
 import io.repsy.os.server.shared.auth.AuthThrottleProperties;
@@ -44,7 +45,7 @@ class AuthUserServiceTest {
           Mockito.mock(LoginInfoFactory.class),
           Mockito.mock(RefreshTokenService.class),
           Mockito.mock(ApplicationEventPublisher.class),
-          new AuthFailureThrottle(AuthThrottleProperties.disabled()));
+          new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()));
 
   /** RPS-962: a refresh token of a deleted user is an authentication failure, not a 404. */
   @Test

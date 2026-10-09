@@ -27,6 +27,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
@@ -87,7 +88,7 @@ class ProtocolAuthServiceTest {
           Mockito.mock(JwtUtils.class),
           Mockito.mock(DeployTokenService.class),
           new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
-          new AuthFailureThrottle(AuthThrottleProperties.disabled()));
+          new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()));
 
   private static final UserInfo ALICE =
       UserInfo.builder()
@@ -339,7 +340,7 @@ class ProtocolAuthServiceTest {
             Mockito.mock(JwtUtils.class),
             Mockito.mock(DeployTokenService.class),
             this.cache,
-            new AuthFailureThrottle(AuthThrottleProperties.disabled()));
+            new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()));
 
     private final UserInfo carol =
         UserInfo.builder()
@@ -443,7 +444,8 @@ class ProtocolAuthServiceTest {
     private final VerifiedPasswordCache cache =
         new VerifiedPasswordCache(new BasicAuthCacheProperties(true, 300, 100));
     private final AuthFailureThrottle throttle =
-        new AuthFailureThrottle(new AuthThrottleProperties(true, LIMIT, 60, 100));
+        new AuthFailureThrottle(
+            AuthThrottleProperties.enforcing(LIMIT, 60, 100), new SimpleMeterRegistry());
     private final JwtUtils jwt = Mockito.mock(JwtUtils.class);
     private final DeployTokenService deployTokens = Mockito.mock(DeployTokenService.class);
     private final ProtocolAuthService service =
@@ -688,7 +690,7 @@ class ProtocolAuthServiceTest {
             this.jwtUtils,
             Mockito.mock(DeployTokenService.class),
             new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
-            new AuthFailureThrottle(AuthThrottleProperties.disabled()));
+            new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()));
 
     TokenUserNoLongerExists() {
       when(this.jwtUtils.extractProtocolUserClaims(anyString()))
@@ -733,7 +735,7 @@ class ProtocolAuthServiceTest {
             this.jwtUtils,
             this.deployTokenService,
             new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
-            new AuthFailureThrottle(AuthThrottleProperties.disabled()));
+            new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()));
 
     DeployTokenJwt() {
       when(this.jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
@@ -1032,7 +1034,7 @@ class ProtocolAuthServiceTest {
             this.jwtUtils,
             mock(DeployTokenService.class),
             new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
-            new AuthFailureThrottle(AuthThrottleProperties.disabled()));
+            new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()));
 
     @Test
     @DisplayName("a read is checked against the repo and path of the token")
@@ -1131,7 +1133,7 @@ class ProtocolAuthServiceTest {
             this.jwtUtils,
             this.deployTokens,
             new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
-            new AuthFailureThrottle(AuthThrottleProperties.disabled()));
+            new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()));
 
     RevokedProtocolJwt() {
       this.service.setRevokedTokens(this.revoked);

@@ -25,6 +25,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.server.shared.auth.AuthFailureThrottle;
 import io.repsy.os.server.shared.auth.AuthThrottleProperties;
@@ -73,7 +74,7 @@ class CargoAuthenticatorTest {
           Mockito.mock(JwtUtils.class),
           Mockito.mock(DeployTokenService.class),
           new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
-          new AuthFailureThrottle(AuthThrottleProperties.disabled()));
+          new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()));
 
   private static String basicAuth(final String username, final String password) {
     final var raw = (username + ":" + password).getBytes(StandardCharsets.UTF_8);
@@ -124,7 +125,7 @@ class CargoAuthenticatorTest {
             jwtUtils,
             Mockito.mock(DeployTokenService.class),
             new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
-            new AuthFailureThrottle(AuthThrottleProperties.disabled()));
+            new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()));
 
     assertUnauthorized(() -> component.authenticateAndCreateToken("Bearer signed.jwt.token"));
   }
@@ -147,7 +148,7 @@ class CargoAuthenticatorTest {
             jwtUtils,
             Mockito.mock(DeployTokenService.class),
             new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
-            new AuthFailureThrottle(AuthThrottleProperties.disabled()));
+            new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()));
 
     assertUnauthorized(() -> component.authenticateAndCreateToken("Bearer signed.jwt.token"));
     verify(this.userTxService, never()).getAuthenticatedUserByUsername(anyString());
@@ -232,6 +233,6 @@ class CargoAuthenticatorTest {
         jwtUtils,
         Mockito.mock(DeployTokenService.class),
         new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
-        new AuthFailureThrottle(AuthThrottleProperties.disabled()));
+        new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()));
   }
 }

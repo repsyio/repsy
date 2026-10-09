@@ -23,6 +23,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.server.shared.auth.AuthFailureThrottle;
 import io.repsy.os.server.shared.auth.AuthThrottleProperties;
@@ -65,7 +66,7 @@ class HelmAuthenticatorTest {
           this.jwtUtils,
           this.deployTokenService,
           new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
-          new AuthFailureThrottle(AuthThrottleProperties.disabled()));
+          new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()));
 
   private static void assertUnauthorized(final ThrowingCallable call) {
     assertThatThrownBy(call)
@@ -112,7 +113,7 @@ class HelmAuthenticatorTest {
             this.jwtUtils,
             this.deployTokenService,
             new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
-            new AuthFailureThrottle(AuthThrottleProperties.disabled()));
+            new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()));
 
     assertUnauthorized(
         () -> component.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.READ));

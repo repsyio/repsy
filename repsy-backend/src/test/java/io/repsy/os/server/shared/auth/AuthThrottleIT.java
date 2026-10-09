@@ -253,7 +253,7 @@ class AuthThrottleIT extends AbstractIntegrationTest {
   @DisplayName("is on by default, with the documented limits")
   void defaults() {
     assertThat(this.properties)
-        .isEqualTo(new AuthThrottleProperties(true, MAX_FAILURES, 60, 10_000));
+        .isEqualTo(AuthThrottleProperties.enforcing(MAX_FAILURES, 60, 10_000));
   }
 
   @Test

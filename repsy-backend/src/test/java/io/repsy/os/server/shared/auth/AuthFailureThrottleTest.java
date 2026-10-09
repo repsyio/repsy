@@ -23,6 +23,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.google.common.base.Ticker;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.repsy.protocols.shared.exceptions.TooManyRequestsException;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -34,6 +35,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.properties.bind.Binder;
@@ -67,9 +69,13 @@ class AuthFailureThrottleTest {
         }
       };
 
+  private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+
   private final AuthFailureThrottle throttle =
       new AuthFailureThrottle(
-          new AuthThrottleProperties(true, MAX_FAILURES, WINDOW_SECONDS, 100), this.ticker);
+          AuthThrottleProperties.enforcing(MAX_FAILURES, WINDOW_SECONDS, 100),
+          this.meterRegistry,
+          this.ticker);
 
   private final ListAppender<ILoggingEvent> logs = new ListAppender<>();
   private final Logger logger = (Logger) LoggerFactory.getLogger(AuthFailureThrottle.class);
@@ -263,7 +269,9 @@ class AuthFailureThrottleTest {
   void isBounded() {
     final var bounded =
         new AuthFailureThrottle(
-            new AuthThrottleProperties(true, MAX_FAILURES, WINDOW_SECONDS, 1), this.ticker);
+            AuthThrottleProperties.enforcing(MAX_FAILURES, WINDOW_SECONDS, 1),
+            this.meterRegistry,
+            this.ticker);
 
     requestFrom(CLIENT);
     for (var i = 0; i < MAX_FAILURES; i++) {
@@ -281,7 +289,8 @@ class AuthFailureThrottleTest {
   @Test
   @DisplayName("limits nothing when disabled")
   void disabled() {
-    final var disabled = new AuthFailureThrottle(AuthThrottleProperties.disabled());
+    final var disabled =
+        new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry());
 
     requestFrom(CLIENT);
     for (var i = 0; i < 1_000; i++) {
@@ -326,7 +335,9 @@ class AuthFailureThrottleTest {
     for (final var limit : List.of(total, total + 1)) {
       final var shared =
           new AuthFailureThrottle(
-              new AuthThrottleProperties(true, limit, WINDOW_SECONDS, 100), this.ticker);
+              AuthThrottleProperties.enforcing(limit, WINDOW_SECONDS, 100),
+              this.meterRegistry,
+              this.ticker);
       final var start = new CountDownLatch(1);
       final var pool = Executors.newFixedThreadPool(threads);
       final var results = new ArrayList<java.util.concurrent.Future<?>>();
@@ -360,13 +371,78 @@ class AuthFailureThrottleTest {
     }
   }
 
+  /**
+   * {@code observe} (port of Repsy Cloud): a wrong limit or a shared client address is seen, not
+   * enforced, before anyone is refused.
+   */
+  @Nested
+  @DisplayName("observe mode")
+  class ObserveMode {
+
+    private final AuthFailureThrottle observing =
+        new AuthFailureThrottle(
+            AuthThrottleProperties.observing(MAX_FAILURES, WINDOW_SECONDS, 100),
+            AuthFailureThrottleTest.this.meterRegistry,
+            AuthFailureThrottleTest.this.ticker);
+
+    @Test
+    @DisplayName("never throws, even past the limit — this is the proof enforce is what blocks")
+    void neverThrows() {
+      requestFrom(CLIENT);
+
+      for (var i = 0; i < MAX_FAILURES * 5; i++) {
+        this.observing.recordFailure();
+        assertThatCode(this.observing::checkAllowed).doesNotThrowAnyException();
+      }
+    }
+
+    @Test
+    @DisplayName("still tracks failures: isSaturated turns true exactly as it would in enforce")
+    void stillTracksSaturation() {
+      requestFrom(CLIENT);
+
+      final var saturationLimit = MAX_FAILURES * AuthFailureThrottle.SATURATION_FACTOR;
+
+      for (var i = 0; i < saturationLimit; i++) {
+        this.observing.recordFailure();
+        this.observing.checkAllowed();
+      }
+
+      assertThat(this.observing.isSaturated()).isTrue();
+    }
+
+    @Test
+    @DisplayName("counts a would-be-refused client against the metric, tagged by network")
+    void countsTheWouldBlockMetric() {
+      requestFrom(CLIENT);
+      this.observing.recordFailure();
+      this.observing.checkAllowed(); // still open (1 failure < MAX_FAILURES)
+
+      for (var i = 1; i < MAX_FAILURES; i++) {
+        this.observing.recordFailure();
+      }
+      // Now saturated for the window: the next checkAllowed is where enforce would refuse.
+      this.observing.checkAllowed();
+      this.observing.checkAllowed();
+
+      final var counter =
+          AuthFailureThrottleTest.this
+              .meterRegistry
+              .find(AuthFailureThrottle.WOULD_BLOCK_METRIC)
+              .counter();
+
+      assertThat(counter).isNotNull();
+      assertThat(counter.count()).isGreaterThanOrEqualTo(1.0);
+    }
+  }
+
   @Test
   @DisplayName("binds the settings from repsy.security.auth-throttle")
   void bindsProperties() {
     final var source =
         new MapConfigurationPropertySource(
             java.util.Map.of(
-                "repsy.security.auth-throttle.enabled", "true",
+                "repsy.security.auth-throttle.mode", "enforce",
                 "repsy.security.auth-throttle.max-failures", "5",
                 "repsy.security.auth-throttle.window-seconds", "30",
                 "repsy.security.auth-throttle.max-clients", "50"));
@@ -374,18 +450,37 @@ class AuthFailureThrottleTest {
     final var bound =
         new Binder(source).bind("repsy.security.auth-throttle", AuthThrottleProperties.class);
 
-    assertThat(bound.get()).isEqualTo(new AuthThrottleProperties(true, 5, 30, 50));
+    assertThat(bound.get()).isEqualTo(AuthThrottleProperties.enforcing(5, 30, 50));
   }
 
   @Test
-  @DisplayName("refuses settings that could not hold a window")
+  @DisplayName("defaults to enforce when the mode is not set at all")
+  void defaultsToEnforce() {
+    assertThat(new AuthThrottleProperties(null, null, 5, 30L, 50L).mode())
+        .isEqualTo(AuthThrottleMode.ENFORCE);
+  }
+
+  @Test
+  @DisplayName("the legacy enabled=false switches the throttle off whatever the mode says")
+  void legacyEnabledFalseMeansOff() {
+    assertThat(new AuthThrottleProperties(AuthThrottleMode.ENFORCE, false, 5, 30L, 50L).mode())
+        .isEqualTo(AuthThrottleMode.OFF);
+    assertThat(new AuthThrottleProperties(null, true, 5, 30L, 50L).mode())
+        .isEqualTo(AuthThrottleMode.ENFORCE);
+  }
+
+  @Test
+  @DisplayName("refuses settings that could not hold a window, unless the mode is off")
   void rejectsNonPositiveSettings() {
-    assertThatThrownBy(() -> new AuthThrottleProperties(true, 0, 60, 10))
-        .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(() -> new AuthThrottleProperties(true, 10, 0, 10))
-        .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(() -> new AuthThrottleProperties(true, 10, 60, 0))
-        .isInstanceOf(IllegalArgumentException.class);
-    assertThat(new AuthThrottleProperties(false, 0, 0, 0).enabled()).isFalse();
+    for (final var mode : List.of(AuthThrottleMode.OBSERVE, AuthThrottleMode.ENFORCE)) {
+      assertThatThrownBy(() -> new AuthThrottleProperties(mode, null, 0, 60L, 10L))
+          .isInstanceOf(IllegalArgumentException.class);
+      assertThatThrownBy(() -> new AuthThrottleProperties(mode, null, 10, 0L, 10L))
+          .isInstanceOf(IllegalArgumentException.class);
+      assertThatThrownBy(() -> new AuthThrottleProperties(mode, null, 10, 60L, 0L))
+          .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    assertThat(AuthThrottleProperties.disabled().mode()).isEqualTo(AuthThrottleMode.OFF);
   }
 }

@@ -25,6 +25,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
@@ -85,7 +86,7 @@ class NpmAuthenticatorImplTest {
           this.jwtUtils,
           this.deployTokenService,
           new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
-          new AuthFailureThrottle(AuthThrottleProperties.disabled()),
+          new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()),
           this.revokedTokens);
 
   private final BaseRepoInfo<UUID> repo =
