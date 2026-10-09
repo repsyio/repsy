@@ -22,7 +22,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * Origins the panel API accepts cross-origin requests from (see {@code CorsGlobalConfiguration}).
+ * Origins the panel API accepts cross-origin requests from (see {@code CorsGlobalConfig}).
  *
  * <p>Unset (the default) means same-origin only: the panel API sends no CORS header, so a browser
  * blocks a page on another origin from reading its responses (RPS-1590). The Docker image serves

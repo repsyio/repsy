@@ -35,8 +35,8 @@ import org.springframework.mock.web.MockHttpServletResponse;
  * header, and no {@code 403 Invalid CORS request} either); only the configured origins are opened,
  * and only on the API port.
  */
-@DisplayName("CorsGlobalConfiguration")
-class CorsGlobalConfigurationTest {
+@DisplayName("CorsGlobalConfig")
+class CorsGlobalConfigTest {
 
   private static final int API_PORT = 8080;
   private static final int PROTOCOL_PORT = 9090;
@@ -51,8 +51,8 @@ class CorsGlobalConfigurationTest {
     this.multiPortProperties.setPortAliases(Map.of(8443, "api"));
   }
 
-  private CorsGlobalConfiguration filter(final String allowedOrigins) {
-    return new CorsGlobalConfiguration(
+  private CorsGlobalConfig filter(final String allowedOrigins) {
+    return new CorsGlobalConfig(
         new AppCorsProperties(allowedOrigins), new ApiPortMatcher(this.multiPortProperties));
   }
 

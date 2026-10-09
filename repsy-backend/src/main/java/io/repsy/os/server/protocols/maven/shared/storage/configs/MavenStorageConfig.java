@@ -26,7 +26,7 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 @RequiredArgsConstructor
 public class MavenStorageConfig {
-  private final @NonNull MavenFileSystemStorageBackendConfigProps fileSystemStorageProps;
+  private final @NonNull MavenFileSystemStorageProperties fileSystemStorageProps;
   private final @NonNull StorageTrashProperties trashProperties;
 
   @Bean("osStorageStrategyMaven")

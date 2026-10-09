@@ -26,7 +26,7 @@ import io.repsy.os.server.protocols.docker.shared.image.repositories.ImageReposi
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestRepository;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
-import io.repsy.protocols.docker.shared.utils.DockerConstants;
+import io.repsy.protocols.docker.shared.constants.DockerConstants;
 import io.repsy.protocols.docker.shared.utils.MediaTypes;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.nio.charset.StandardCharsets;

@@ -15,7 +15,7 @@
  */
 package io.repsy.os.server.protocols.docker.shared.tag.entities;
 
-import io.repsy.protocols.docker.shared.utils.DockerConstants;
+import io.repsy.protocols.docker.shared.constants.DockerConstants;
 import jakarta.persistence.Column;
 import jakarta.persistence.EmbeddedId;
 import jakarta.persistence.Entity;

@@ -18,7 +18,7 @@ package io.repsy.os.server.protocols.docker.shared.image.entities;
 import io.repsy.core.uuidv7.UuidV7;
 import io.repsy.os.server.protocols.docker.shared.tag.entities.Tag;
 import io.repsy.os.shared.repo.entities.Repo;
-import io.repsy.protocols.docker.shared.utils.DockerConstants;
+import io.repsy.protocols.docker.shared.constants.DockerConstants;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;

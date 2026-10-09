@@ -17,15 +17,15 @@ package io.repsy.os;
 
 import io.repsy.libs.multiport.annotations.EnableMultiport;
 import io.repsy.os.config.ssl.RepsySslProperties;
-import io.repsy.os.server.protocols.cargo.shared.crate.storage.configs.CargoFileSystemStorageBackendConfigProps;
-import io.repsy.os.server.protocols.docker.shared.storage.configs.DockerFileSystemStorageBackendConfigProps;
-import io.repsy.os.server.protocols.golang.shared.storage.configs.GoFileSystemStorageBackendConfigProps;
-import io.repsy.os.server.protocols.helm.shared.storage.configs.HelmFileSystemStorageBackendConfigProps;
-import io.repsy.os.server.protocols.maven.shared.storage.configs.MavenFileSystemStorageBackendConfigProps;
-import io.repsy.os.server.protocols.npm.shared.storage.configs.NpmFileSystemStorageBackendConfigProps;
-import io.repsy.os.server.protocols.nuget.shared.storage.configs.NuGetFileSystemStorageBackendConfigProps;
-import io.repsy.os.server.protocols.pypi.shared.storage.configs.PypiFileSystemStorageBackendConfigProps;
-import io.repsy.os.server.protocols.ruby.shared.storage.configs.RubyFileSystemStorageBackendConfigProps;
+import io.repsy.os.server.protocols.cargo.shared.crate.storage.configs.CargoFileSystemStorageProperties;
+import io.repsy.os.server.protocols.docker.shared.storage.configs.DockerFileSystemStorageProperties;
+import io.repsy.os.server.protocols.golang.shared.storage.configs.GoFileSystemStorageProperties;
+import io.repsy.os.server.protocols.helm.shared.storage.configs.HelmFileSystemStorageProperties;
+import io.repsy.os.server.protocols.maven.shared.storage.configs.MavenFileSystemStorageProperties;
+import io.repsy.os.server.protocols.npm.shared.storage.configs.NpmFileSystemStorageProperties;
+import io.repsy.os.server.protocols.nuget.shared.storage.configs.NuGetFileSystemStorageProperties;
+import io.repsy.os.server.protocols.pypi.shared.storage.configs.PypiFileSystemStorageProperties;
+import io.repsy.os.server.protocols.ruby.shared.storage.configs.RubyFileSystemStorageProperties;
 import io.repsy.os.server.protocols.shared.configs.StorageTrashProperties;
 import io.repsy.os.server.security.scanner.trivy.DockerRegistryProperties;
 import io.repsy.os.server.security.scanner.trivy.TrivyAdvisoryLookupProperties;
@@ -47,15 +47,15 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @Slf4j
 @EnableConfigurationProperties({
   RepsySslProperties.class,
-  MavenFileSystemStorageBackendConfigProps.class,
-  NpmFileSystemStorageBackendConfigProps.class,
-  PypiFileSystemStorageBackendConfigProps.class,
-  DockerFileSystemStorageBackendConfigProps.class,
-  GoFileSystemStorageBackendConfigProps.class,
-  CargoFileSystemStorageBackendConfigProps.class,
-  HelmFileSystemStorageBackendConfigProps.class,
-  NuGetFileSystemStorageBackendConfigProps.class,
-  RubyFileSystemStorageBackendConfigProps.class,
+  MavenFileSystemStorageProperties.class,
+  NpmFileSystemStorageProperties.class,
+  PypiFileSystemStorageProperties.class,
+  DockerFileSystemStorageProperties.class,
+  GoFileSystemStorageProperties.class,
+  CargoFileSystemStorageProperties.class,
+  HelmFileSystemStorageProperties.class,
+  NuGetFileSystemStorageProperties.class,
+  RubyFileSystemStorageProperties.class,
   StorageTrashProperties.class,
   TrivyScannerClientProperties.class,
   TrivyAdvisoryLookupProperties.class,

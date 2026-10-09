@@ -24,7 +24,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.boot.tomcat.servlet.TomcatServletWebServerFactory;
 import org.springframework.test.util.ReflectionTestUtils;
 
-class TomcatMultiPortConfigurationTest {
+class TomcatMultiPortConfigTest {
 
   private static final int API_PORT = 8081;
   private static final int TIMEOUT = 45_000;
@@ -36,7 +36,7 @@ class TomcatMultiPortConfigurationTest {
     final var properties = new MultiPortProperties();
     properties.setMainPort("9090");
     properties.setPorts(Map.of("api", API_PORT));
-    final var configuration = new TomcatMultiPortConfiguration(properties);
+    final var configuration = new TomcatMultiPortConfig(properties);
     ReflectionTestUtils.setField(configuration, "connectionTimeout", TIMEOUT);
     ReflectionTestUtils.setField(configuration, "maxPartCount", MAX_PART_COUNT);
     final var factory = new TomcatServletWebServerFactory();

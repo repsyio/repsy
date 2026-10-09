@@ -20,7 +20,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @Data
 @ConfigurationProperties(prefix = "os.app.storage.file-system.docker")
-public class DockerFileSystemStorageBackendConfigProps {
+public class DockerFileSystemStorageProperties {
   private String basePath;
   private String trashPath;
 }

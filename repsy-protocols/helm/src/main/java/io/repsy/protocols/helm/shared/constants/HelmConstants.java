@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.protocols.helm.shared.utils;
+package io.repsy.protocols.helm.shared.constants;
 
 import org.jspecify.annotations.NullMarked;
 

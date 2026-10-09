@@ -17,6 +17,7 @@ package io.repsy.protocols.npm.shared.utils;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
+import io.repsy.protocols.npm.shared.constants.NpmConstants;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;

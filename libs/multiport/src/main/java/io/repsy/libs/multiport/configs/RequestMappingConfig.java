@@ -39,7 +39,7 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 
 @Configuration
 @RequiredArgsConstructor
-public class RequestMappingConfiguration {
+public class RequestMappingConfig {
 
   private final @NonNull MultiPortProperties multiPortProperties;
 
@@ -123,7 +123,7 @@ public class RequestMappingConfiguration {
     private void buildCache() {
 
       final var mainPort =
-          Integer.parseInt(RequestMappingConfiguration.this.multiPortProperties.getMainPort());
+          Integer.parseInt(RequestMappingConfig.this.multiPortProperties.getMainPort());
 
       for (final var entry : this.getHandlerMethods().entrySet()) {
         final var mappingInfo = entry.getKey();
@@ -139,14 +139,14 @@ public class RequestMappingConfiguration {
       // validatePorts() guarantees every non-empty alias name exists in multiport.ports,
       // so getPortFor() is null-safe here.
       for (final var alias :
-          RequestMappingConfiguration.this.multiPortProperties.getPortAliases().entrySet()) {
+          RequestMappingConfig.this.multiPortProperties.getPortAliases().entrySet()) {
 
         final var aliasPort = alias.getKey();
         final var targetName = alias.getValue();
         final var targetPort =
             targetName.isEmpty()
                 ? mainPort
-                : RequestMappingConfiguration.this.multiPortProperties.getPortFor(targetName);
+                : RequestMappingConfig.this.multiPortProperties.getPortFor(targetName);
 
         this.portHandlerCache.put(
             aliasPort, this.portHandlerCache.getOrDefault(targetPort, List.of()));
@@ -167,7 +167,7 @@ public class RequestMappingConfiguration {
             "Missing value in @RestApiPort annotation for " + handlerMethod.getBeanType());
       }
 
-      return RequestMappingConfiguration.this.multiPortProperties.getPortFor(annotation.value());
+      return RequestMappingConfig.this.multiPortProperties.getPortFor(annotation.value());
     }
 
     private @Nullable RestApiPort findRestApiPort(

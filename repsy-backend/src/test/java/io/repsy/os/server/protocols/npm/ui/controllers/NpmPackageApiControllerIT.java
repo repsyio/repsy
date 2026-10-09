@@ -42,7 +42,7 @@ import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
-import io.repsy.protocols.npm.shared.utils.NpmConstants;
+import io.repsy.protocols.npm.shared.constants.NpmConstants;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;

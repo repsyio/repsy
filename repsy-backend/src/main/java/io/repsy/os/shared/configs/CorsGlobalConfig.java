@@ -47,12 +47,12 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * which port a request arrived on.
  */
 @Component
-public class CorsGlobalConfiguration extends OncePerRequestFilter {
+public class CorsGlobalConfig extends OncePerRequestFilter {
 
   private final @NonNull ApiPortMatcher apiPortMatcher;
   private final @Nullable CorsFilter apiCorsFilter;
 
-  public CorsGlobalConfiguration(
+  public CorsGlobalConfig(
       final @NonNull AppCorsProperties appCorsProperties,
       final @NonNull ApiPortMatcher apiPortMatcher) {
 

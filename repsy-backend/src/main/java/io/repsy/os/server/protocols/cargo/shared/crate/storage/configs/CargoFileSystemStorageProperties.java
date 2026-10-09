@@ -13,14 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.protocols.pypi.shared.storage.configs;
+package io.repsy.os.server.protocols.cargo.shared.crate.storage.configs;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @Data
-@ConfigurationProperties(prefix = "os.app.storage.file-system.pypi")
-public class PypiFileSystemStorageBackendConfigProps {
+@ConfigurationProperties(prefix = "os.app.storage.file-system.cargo")
+public class CargoFileSystemStorageProperties {
   private String basePath;
   private String trashPath;
 }

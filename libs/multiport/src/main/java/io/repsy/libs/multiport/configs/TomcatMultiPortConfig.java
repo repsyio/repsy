@@ -31,7 +31,7 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 @ConditionalOnClass(TomcatServletWebServerFactory.class)
-public class TomcatMultiPortConfiguration {
+public class TomcatMultiPortConfig {
 
   private final @NonNull MultiPortProperties multiPortProperties;
 

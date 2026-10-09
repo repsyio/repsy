@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.protocols.npm.shared.utils;
+package io.repsy.protocols.npm.shared.constants;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
