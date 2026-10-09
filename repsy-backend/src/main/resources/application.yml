@@ -29,6 +29,14 @@ spring:
       hibernate:
         globally_quoted_identifiers: true
         default_schema: ${os.app.schema}
+        jdbc:
+          # Bulk inserts (scan findings, PyPI classifiers and project URLs, Ruby dependencies)
+          # go out in JDBC batches of 50 instead of one round trip per row. Every id is an
+          # application assigned UUID (@UuidV7), so no insert has to fetch a generated key
+          # and none is excluded from batching.
+          batch_size: 50
+        order_inserts: true
+        order_updates: true
 
   flyway:
     enabled: true
