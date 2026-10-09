@@ -39,9 +39,13 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.web.servlet.HandlerExceptionResolver;
 
 /**
  * RPS-1224: a missing {@code sha256_digest} form field is a {@code 400 sha256DigestMissing}, not an
@@ -58,6 +62,19 @@ class PypiUploadValidationIT extends AbstractIntegrationTest {
   @Autowired private PypiApiFacade pypiApiFacade;
   @Autowired private PypiProtocolFacade pypiProtocolFacade;
   @MockitoBean private UsageUpdateService usageUpdateService;
+
+  @Autowired
+  @Qualifier("handlerExceptionResolver")
+  private HandlerExceptionResolver handlerExceptionResolver;
+
+  /** The status the panel and protocol {@code ErrorHandler} answers for {@code failure}. */
+  private int statusOf(final Throwable failure) {
+    final var response = new MockHttpServletResponse();
+    this.handlerExceptionResolver.resolveException(
+        new MockHttpServletRequest("POST", "/pypi-repo/"), response, null, (Exception) failure);
+
+    return response.getStatus();
+  }
 
   private static String unique(final String prefix) {
     return prefix + UUID.randomUUID().toString().replace("-", "").substring(0, 10);
@@ -102,7 +119,8 @@ class PypiUploadValidationIT extends AbstractIntegrationTest {
 
     assertThatThrownBy(() -> this.pypiProtocolFacade.uploadPackage(context(repo), parameters, file))
         .isInstanceOf(BadRequestException.class)
-        .hasMessage("sha256DigestMissing");
+        .hasMessage("sha256DigestMissing")
+        .satisfies(e -> assertThat(this.statusOf(e)).isEqualTo(400));
   }
 
   @Test
@@ -122,13 +140,15 @@ class PypiUploadValidationIT extends AbstractIntegrationTest {
             "content", filename, MediaType.APPLICATION_OCTET_STREAM_VALUE, content);
 
     assertThatThrownBy(() -> this.pypiProtocolFacade.uploadPackage(context(repo), parameters, file))
-        .isInstanceOf(BadRequestException.class);
+        .isInstanceOf(BadRequestException.class)
+        .satisfies(e -> assertThat(this.statusOf(e)).isEqualTo(400));
 
     assertThatThrownBy(
             () ->
                 this.pypiProtocolFacade.downloadArchiveFile(context(repo), "my-package", filename))
         .isInstanceOf(ItemNotFoundException.class)
-        .hasMessage("itemNotFound");
+        .hasMessage("itemNotFound")
+        .satisfies(e -> assertThat(this.statusOf(e)).isEqualTo(404));
   }
 
   private static String repeat(final char c, final int length) {
@@ -157,7 +177,8 @@ class PypiUploadValidationIT extends AbstractIntegrationTest {
 
     assertThatThrownBy(() -> this.pypiProtocolFacade.uploadPackage(context(repo), parameters, file))
         .isInstanceOf(BadRequestException.class)
-        .hasMessage("pypiPackageNameTooLong");
+        .hasMessage("pypiPackageNameTooLong")
+        .satisfies(e -> assertThat(this.statusOf(e)).isEqualTo(400));
   }
 
   @Test
@@ -178,7 +199,8 @@ class PypiUploadValidationIT extends AbstractIntegrationTest {
 
     assertThatThrownBy(() -> this.pypiProtocolFacade.uploadPackage(context(repo), parameters, file))
         .isInstanceOf(BadRequestException.class)
-        .hasMessage("pypiVersionTooLong");
+        .hasMessage("pypiVersionTooLong")
+        .satisfies(e -> assertThat(this.statusOf(e)).isEqualTo(400));
   }
 
   @Test
@@ -202,7 +224,8 @@ class PypiUploadValidationIT extends AbstractIntegrationTest {
 
     assertThatThrownBy(() -> this.pypiProtocolFacade.uploadPackage(context(repo), parameters, file))
         .isInstanceOf(BadRequestException.class)
-        .hasMessage("pypiArchiveFileNameTooLong");
+        .hasMessage("pypiArchiveFileNameTooLong")
+        .satisfies(e -> assertThat(this.statusOf(e)).isEqualTo(400));
   }
 
   @Test
@@ -223,7 +246,8 @@ class PypiUploadValidationIT extends AbstractIntegrationTest {
 
     assertThatThrownBy(() -> this.pypiProtocolFacade.uploadPackage(context(repo), parameters, file))
         .isInstanceOf(BadRequestException.class)
-        .hasMessage("pypiRequiresPythonTooLong");
+        .hasMessage("pypiRequiresPythonTooLong")
+        .satisfies(e -> assertThat(this.statusOf(e)).isEqualTo(400));
   }
 
   @Test
@@ -244,13 +268,15 @@ class PypiUploadValidationIT extends AbstractIntegrationTest {
             "content", filename, MediaType.APPLICATION_OCTET_STREAM_VALUE, content);
 
     assertThatThrownBy(() -> this.pypiProtocolFacade.uploadPackage(context(repo), parameters, file))
-        .isInstanceOf(BadRequestException.class);
+        .isInstanceOf(BadRequestException.class)
+        .satisfies(e -> assertThat(this.statusOf(e)).isEqualTo(400));
 
     assertThatThrownBy(
             () ->
                 this.pypiProtocolFacade.downloadArchiveFile(context(repo), "my-package", filename))
         .isInstanceOf(ItemNotFoundException.class)
-        .hasMessage("itemNotFound");
+        .hasMessage("itemNotFound")
+        .satisfies(e -> assertThat(this.statusOf(e)).isEqualTo(404));
   }
 
   @Test
