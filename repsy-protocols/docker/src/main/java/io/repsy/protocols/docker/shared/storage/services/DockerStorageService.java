@@ -34,13 +34,13 @@ import org.springframework.core.io.Resource;
 @NullMarked
 public interface DockerStorageService<ID> {
 
-  void createRepo(UUID repoUuid);
+  void createRepo(UUID repoId);
 
-  void deleteRepo(UUID repoUuid);
+  void deleteRepo(UUID repoId);
 
   boolean existsResource(StoragePath storagePath, String repoName);
 
-  List<StorageItemInfo> getItems(UUID repoUuid, RelativePath relativePath);
+  List<StorageItemInfo> getItems(UUID repoId, RelativePath relativePath);
 
   Optional<Resource> getResource(StoragePath storagePath, String repoName);
 
@@ -60,22 +60,22 @@ public interface DockerStorageService<ID> {
 
   long deleteManifest(BaseRepoInfo<ID> repoInfo, String manifestName);
 
-  void deleteBlob(UUID repoUuid, String digest);
+  void deleteBlob(UUID repoId, String digest);
 
   /**
    * Lists the files under the repo's {@code blobs} directory that were last written before {@code
    * notModifiedSince}: finalized blobs (named by digest) and upload temp files (named by upload
    * session) alike, so the caller has to tell them apart.
    */
-  List<StaleFile> listStaleBlobFiles(UUID repoUuid, Instant notModifiedSince);
+  List<StaleFile> listStaleBlobFiles(UUID repoId, Instant notModifiedSince);
 
   /**
    * Deletes one file of the repo's {@code blobs} directory and answers the bytes it held, so the
    * caller can release them from the repo's disk usage.
    */
-  long deleteBlobFile(UUID repoUuid, String repoName, String fileName) throws IOException;
+  long deleteBlobFile(UUID repoId, String repoName, String fileName) throws IOException;
 
-  BaseUsages rename(UUID repoUuid, RelativePath relativePath, String digest);
+  BaseUsages rename(UUID repoId, RelativePath relativePath, String digest);
 
   void clearTrash();
 }

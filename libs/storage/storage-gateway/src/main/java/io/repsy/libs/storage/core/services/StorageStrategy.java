@@ -96,9 +96,9 @@ public interface StorageStrategy {
   @NonNull List<StorageItemInfo> listDirectoryContents(@NonNull StoragePath storagePath);
 
   /**
-   * List all items in the storage path including subdirectories if repoUuid is not null, this
-   * method lists all items in the repository, including items in all subdirectories. If repoUuid is
-   * null, only lists items in the storage path.
+   * List all items in the storage path including subdirectories if repoId is not null, this method
+   * lists all items in the repository, including items in all subdirectories. If repoId is null,
+   * only lists items in the storage path.
    */
   @NonNull List<StorageItemInfo> listStorageItems(@NonNull StoragePath storagePath);
 

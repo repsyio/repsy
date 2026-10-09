@@ -52,8 +52,8 @@ public abstract class AbstractGoStorageService<ID> implements GoStorageService<I
   }
 
   @Override
-  public void createRepo(final UUID repoUuid) {
-    this.storageStrategy.createDirectory(repoUuid.toString());
+  public void createRepo(final UUID repoId) {
+    this.storageStrategy.createDirectory(repoId.toString());
   }
 
   @Override
@@ -148,8 +148,8 @@ public abstract class AbstractGoStorageService<ID> implements GoStorageService<I
   }
 
   @Override
-  public void deleteRepo(final UUID repoUuid) {
-    final var storagePath = StoragePath.of(repoUuid);
+  public void deleteRepo(final UUID repoId) {
+    final var storagePath = StoragePath.of(repoId);
     this.storageStrategy.delete(storagePath);
   }
 }

@@ -54,13 +54,13 @@ public class StoragePath {
     return new StoragePath();
   }
 
-  public static @NonNull StoragePath of(final @NonNull UUID repoUuid) {
-    return StoragePath.of(repoUuid, "");
+  public static @NonNull StoragePath of(final @NonNull UUID repoId) {
+    return StoragePath.of(repoId, "");
   }
 
   public static @NonNull StoragePath of(
-      final @NonNull UUID repoUuid, final @NonNull String relativePath) {
-    return new StoragePath(repoUuid, new RelativePath(relativePath));
+      final @NonNull UUID repoId, final @NonNull String relativePath) {
+    return new StoragePath(repoId, new RelativePath(relativePath));
   }
 
   public static @NonNull StoragePath ofPath(final @NonNull String directPath) {

@@ -42,13 +42,13 @@ public abstract class AbstractHelmStorageService<ID> implements HelmStorageServi
   private final StorageStrategy storageStrategy;
 
   @Override
-  public void createRepo(final UUID repoUuid) {
-    this.storageStrategy.createDirectory(repoUuid.toString());
+  public void createRepo(final UUID repoId) {
+    this.storageStrategy.createDirectory(repoId.toString());
   }
 
   @Override
-  public void deleteRepo(final UUID repoUuid) {
-    final var storagePath = StoragePath.of(repoUuid);
+  public void deleteRepo(final UUID repoId) {
+    final var storagePath = StoragePath.of(repoId);
     this.storageStrategy.delete(storagePath);
   }
 
@@ -74,16 +74,16 @@ public abstract class AbstractHelmStorageService<ID> implements HelmStorageServi
 
   @Override
   public long deleteChartFile(
-      final UUID repoUuid, final String filename, final String digest, final String repoName)
+      final UUID repoId, final String filename, final String digest, final String repoName)
       throws IOException {
-    final var classicPath = StoragePath.of(repoUuid, HelmConstants.CHARTS_PATH + "/" + filename);
+    final var classicPath = StoragePath.of(repoId, HelmConstants.CHARTS_PATH + "/" + filename);
     final var classicUsage = this.storageStrategy.getFileUsage(classicPath, repoName);
     if (classicUsage > 0) {
       log.debug("Deleting classic chart at {} ({} bytes)", classicPath, classicUsage);
       this.storageStrategy.delete(classicPath);
       return classicUsage;
     }
-    final var ociPath = StoragePath.of(repoUuid, "oci/blobs/" + digest);
+    final var ociPath = StoragePath.of(repoId, "oci/blobs/" + digest);
     final var ociUsage = this.storageStrategy.getFileUsage(ociPath, repoName);
     if (ociUsage > 0) {
       log.debug("Deleting OCI blob at {} ({} bytes)", ociPath, ociUsage);
@@ -94,9 +94,9 @@ public abstract class AbstractHelmStorageService<ID> implements HelmStorageServi
 
   @Override
   public long deleteManifestFile(
-      final UUID repoUuid, final String name, final String reference, final String repoName)
+      final UUID repoId, final String name, final String reference, final String repoName)
       throws IOException {
-    final var path = StoragePath.of(repoUuid, "oci/manifests/" + name + "/" + reference);
+    final var path = StoragePath.of(repoId, "oci/manifests/" + name + "/" + reference);
     final var usage = this.storageStrategy.getFileUsage(path, repoName);
     if (usage > 0) {
       log.debug("Deleting OCI manifest file at {} ({} bytes)", path, usage);
@@ -117,43 +117,43 @@ public abstract class AbstractHelmStorageService<ID> implements HelmStorageServi
 
   @Override
   public BaseUsages saveBlobChunk(
-      final UUID repoUuid, final UUID uploadId, final InputStream chunk, final String repoName) {
-    final var storagePath = StoragePath.of(repoUuid, "oci/blobs/" + uploadId);
+      final UUID repoId, final UUID uploadId, final InputStream chunk, final String repoName) {
+    final var storagePath = StoragePath.of(repoId, "oci/blobs/" + uploadId);
     return this.storageStrategy.appendStream(repoName, storagePath, chunk);
   }
 
   @Override
-  public long getBlobSize(final UUID repoUuid, final UUID uploadId, final String repoName)
+  public long getBlobSize(final UUID repoId, final UUID uploadId, final String repoName)
       throws IOException {
-    final var storagePath = StoragePath.of(repoUuid, "oci/blobs/" + uploadId);
+    final var storagePath = StoragePath.of(repoId, "oci/blobs/" + uploadId);
     return this.storageStrategy.getFileUsage(storagePath, repoName);
   }
 
   @Override
-  public BaseUsages finalizeBlob(final UUID repoUuid, final UUID uploadId, final String digest) {
-    final var storagePath = StoragePath.of(repoUuid, "oci/blobs/" + uploadId);
+  public BaseUsages finalizeBlob(final UUID repoId, final UUID uploadId, final String digest) {
+    final var storagePath = StoragePath.of(repoId, "oci/blobs/" + uploadId);
     return this.storageStrategy.renameObject(storagePath, digest);
   }
 
   @Override
-  public List<StaleFile> listStaleBlobFiles(final UUID repoUuid, final Instant notModifiedSince) {
+  public List<StaleFile> listStaleBlobFiles(final UUID repoId, final Instant notModifiedSince) {
     return this.storageStrategy.listStaleFiles(
-        StoragePath.of(repoUuid, OCI_BLOBS_PATH), notModifiedSince);
+        StoragePath.of(repoId, OCI_BLOBS_PATH), notModifiedSince);
   }
 
   @Override
-  public long deleteBlobFile(final UUID repoUuid, final String repoName, final String fileName)
+  public long deleteBlobFile(final UUID repoId, final String repoName, final String fileName)
       throws IOException {
-    final var storagePath = StoragePath.of(repoUuid, OCI_BLOBS_PATH + "/" + fileName);
+    final var storagePath = StoragePath.of(repoId, OCI_BLOBS_PATH + "/" + fileName);
     final var usage = this.storageStrategy.getFileUsage(storagePath, repoName);
     this.storageStrategy.delete(storagePath);
     return usage;
   }
 
   @Override
-  public long deleteBlob(final UUID repoUuid, final String digest, final String repoName)
+  public long deleteBlob(final UUID repoId, final String digest, final String repoName)
       throws IOException {
-    final var storagePath = StoragePath.of(repoUuid, OCI_BLOBS_PATH + "/" + digest);
+    final var storagePath = StoragePath.of(repoId, OCI_BLOBS_PATH + "/" + digest);
     final var blob = this.storageStrategy.get(storagePath, repoName);
     if (blob.isEmpty()) {
       return 0;
@@ -165,26 +165,25 @@ public abstract class AbstractHelmStorageService<ID> implements HelmStorageServi
   }
 
   @Override
-  public Optional<Resource> getBlob(
-      final UUID repoUuid, final String digest, final String repoName) {
-    final var storagePath = StoragePath.of(repoUuid, "oci/blobs/" + digest);
+  public Optional<Resource> getBlob(final UUID repoId, final String digest, final String repoName) {
+    final var storagePath = StoragePath.of(repoId, "oci/blobs/" + digest);
     return this.storageStrategy.get(storagePath, repoName);
   }
 
   @Override
-  public boolean blobExists(final UUID repoUuid, final String digest, final String repoName) {
-    final var resourceOpt = this.getBlob(repoUuid, digest, repoName);
+  public boolean blobExists(final UUID repoId, final String digest, final String repoName) {
+    final var resourceOpt = this.getBlob(repoId, digest, repoName);
     return resourceOpt.isPresent() && resourceOpt.get().exists();
   }
 
   @Override
   public BaseUsages saveManifest(
-      final UUID repoUuid,
+      final UUID repoId,
       final String name,
       final String reference,
       final byte[] content,
       final String repoName) {
-    final var storagePath = StoragePath.of(repoUuid, "oci/manifests/" + name + "/" + reference);
+    final var storagePath = StoragePath.of(repoId, "oci/manifests/" + name + "/" + reference);
     try (final var inputStream = new ByteArrayInputStream(content)) {
       return this.storageStrategy.write(repoName, storagePath, inputStream);
     } catch (final IOException e) {
@@ -194,15 +193,15 @@ public abstract class AbstractHelmStorageService<ID> implements HelmStorageServi
 
   @Override
   public Optional<Resource> getManifest(
-      final UUID repoUuid, final String name, final String reference, final String repoName) {
-    final var storagePath = StoragePath.of(repoUuid, "oci/manifests/" + name + "/" + reference);
+      final UUID repoId, final String name, final String reference, final String repoName) {
+    final var storagePath = StoragePath.of(repoId, "oci/manifests/" + name + "/" + reference);
     return this.storageStrategy.get(storagePath, repoName);
   }
 
   @Override
   public boolean manifestExists(
-      final UUID repoUuid, final String name, final String reference, final String repoName) {
-    final var resourceOpt = this.getManifest(repoUuid, name, reference, repoName);
+      final UUID repoId, final String name, final String reference, final String repoName) {
+    final var resourceOpt = this.getManifest(repoId, name, reference, repoName);
     return resourceOpt.isPresent() && resourceOpt.get().exists();
   }
 }

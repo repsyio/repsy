@@ -28,7 +28,7 @@ import org.springframework.core.io.Resource;
 @NullMarked
 public interface GoStorageService<ID> {
 
-  void createRepo(UUID repoUuid);
+  void createRepo(UUID repoId);
 
   BaseUsages getUsages(StoragePath storagePath, String repoName, long contentLength)
       throws IOException;
@@ -54,7 +54,7 @@ public interface GoStorageService<ID> {
    */
   long deleteVersionFiles(StoragePath atVVersionBasePath, String repoName);
 
-  void deleteRepo(UUID repoUuid);
+  void deleteRepo(UUID repoId);
 
   String getModuleZipRelativePath(String modulePath, String version);
 }

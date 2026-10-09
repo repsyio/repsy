@@ -45,14 +45,14 @@ public abstract class AbstractDockerStorageService<ID> implements DockerStorageS
   private final StorageStrategy storageStrategy;
 
   @Override
-  public void createRepo(final UUID repoUuid) {
+  public void createRepo(final UUID repoId) {
 
-    this.storageStrategy.createDirectory(repoUuid.toString());
+    this.storageStrategy.createDirectory(repoId.toString());
   }
 
   @Override
-  public void deleteRepo(final UUID repoUuid) {
-    final var storagePath = StoragePath.of(repoUuid);
+  public void deleteRepo(final UUID repoId) {
+    final var storagePath = StoragePath.of(repoId);
     this.storageStrategy.delete(storagePath);
   }
 
@@ -65,9 +65,9 @@ public abstract class AbstractDockerStorageService<ID> implements DockerStorageS
   }
 
   @Override
-  public List<StorageItemInfo> getItems(final UUID repoUuid, final RelativePath relativePath) {
+  public List<StorageItemInfo> getItems(final UUID repoId, final RelativePath relativePath) {
 
-    final var storagePath = StoragePath.of(repoUuid, relativePath.getPath());
+    final var storagePath = StoragePath.of(repoId, relativePath.getPath());
 
     return this.storageStrategy.listDirectoryContents(storagePath);
   }
@@ -137,25 +137,25 @@ public abstract class AbstractDockerStorageService<ID> implements DockerStorageS
   }
 
   @Override
-  public void deleteBlob(final UUID repoUuid, final String digest) {
+  public void deleteBlob(final UUID repoId, final String digest) {
 
-    final var storagePath = StoragePath.of(repoUuid, Paths.get(BLOBS_PATH, digest).toString());
+    final var storagePath = StoragePath.of(repoId, Paths.get(BLOBS_PATH, digest).toString());
 
     this.storageStrategy.delete(storagePath);
   }
 
   @Override
-  public List<StaleFile> listStaleBlobFiles(final UUID repoUuid, final Instant notModifiedSince) {
+  public List<StaleFile> listStaleBlobFiles(final UUID repoId, final Instant notModifiedSince) {
 
     return this.storageStrategy.listStaleFiles(
-        StoragePath.of(repoUuid, BLOBS_PATH), notModifiedSince);
+        StoragePath.of(repoId, BLOBS_PATH), notModifiedSince);
   }
 
   @Override
-  public long deleteBlobFile(final UUID repoUuid, final String repoName, final String fileName)
+  public long deleteBlobFile(final UUID repoId, final String repoName, final String fileName)
       throws IOException {
 
-    final var storagePath = StoragePath.of(repoUuid, Paths.get(BLOBS_PATH, fileName).toString());
+    final var storagePath = StoragePath.of(repoId, Paths.get(BLOBS_PATH, fileName).toString());
 
     final var usage = this.storageStrategy.getFileUsage(storagePath, repoName);
 
@@ -166,9 +166,9 @@ public abstract class AbstractDockerStorageService<ID> implements DockerStorageS
 
   @Override
   public BaseUsages rename(
-      final UUID repoUuid, final RelativePath relativePath, final String digest) {
+      final UUID repoId, final RelativePath relativePath, final String digest) {
 
-    final var storagePath = StoragePath.of(repoUuid, relativePath.getPath());
+    final var storagePath = StoragePath.of(repoId, relativePath.getPath());
 
     return this.storageStrategy.renameObject(storagePath, digest);
   }

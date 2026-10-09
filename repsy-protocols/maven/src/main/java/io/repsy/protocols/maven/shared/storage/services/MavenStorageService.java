@@ -35,7 +35,7 @@ import org.springframework.core.io.Resource;
 @NullMarked
 public interface MavenStorageService<ID> {
 
-  void createRepo(UUID repoUuid);
+  void createRepo(UUID repoId);
 
   BaseUsages getUsages(StoragePath storagePath, String repoName, long contentLength)
       throws IOException;
@@ -60,9 +60,9 @@ public interface MavenStorageService<ID> {
    */
   void deleteFile(StoragePath storagePath);
 
-  long deleteArtifact(UUID repoUuid, String groupId, String artifactId);
+  long deleteArtifact(UUID repoId, String groupId, String artifactId);
 
-  long deleteArtifactVersion(UUID repoUuid, String groupId, String artifactId, String versionName);
+  long deleteArtifactVersion(UUID repoId, String groupId, String artifactId, String versionName);
 
   /**
    * Deletes only {@code artifactNames}' own {@code g/a} directories and this group's own
@@ -71,9 +71,9 @@ public interface MavenStorageService<ID> {
    * in {@code artifactNames}, so a nested or sibling group sharing a path prefix (e.g. {@code
    * com.acme.sub} next to {@code com.acme}) is left untouched (RPS-1190).
    */
-  long deleteGroup(UUID repoUuid, String groupId, List<String> artifactNames);
+  long deleteGroup(UUID repoId, String groupId, List<String> artifactNames);
 
-  void deleteRepo(UUID repoUuid);
+  void deleteRepo(UUID repoId);
 
   BaseUsages deleteVersionFromMetadata(
       BaseRepoInfo<ID> repoInfo, String groupId, String artifactId, String versionName)
