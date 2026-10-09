@@ -33,6 +33,7 @@ import io.repsy.protocols.shared.utils.EntryTooLargeException;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import io.repsy.protocols.shared.utils.RequestBodies;
 import io.repsy.protocols.shared.utils.SpooledUpload;
+import io.repsy.protocols.shared.utils.StoredUpload;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -41,8 +42,10 @@ import java.time.Instant;
 import java.util.Locale;
 import java.util.stream.Collectors;
 import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.event.Level;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
@@ -52,6 +55,7 @@ import tools.jackson.databind.cfg.DateTimeFeature;
 import tools.jackson.databind.json.JsonMapper;
 
 @NullMarked
+@Slf4j
 public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I> {
 
   private static final String PATH_SEPARATOR = "/";
@@ -199,30 +203,35 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
       final SpooledUpload spool)
       throws IOException {
 
-    try {
-      final var modUsages = this.writeModFile(repoInfo, escapedPath, version, modContent);
+    return StoredUpload.storeOrDiscard(
+        () -> {
+          final var modUsages = this.writeModFile(repoInfo, escapedPath, version, modContent);
 
-      final var zipStoragePath =
-          StoragePath.of(
-              repoInfo.getStorageKey(),
-              this.goStorageService.getModuleZipRelativePath(escapedPath, version));
-      final BaseUsages zipUsages;
-      try (final var zipStream = spool.openStream()) {
-        zipUsages =
-            this.goStorageService.writeInputStreamToPath(
-                zipStoragePath, zipStream, repoInfo.getName());
-      }
+          final var zipStoragePath =
+              StoragePath.of(
+                  repoInfo.getStorageKey(),
+                  this.goStorageService.getModuleZipRelativePath(escapedPath, version));
+          final BaseUsages zipUsages;
+          try (final var zipStream = spool.openStream()) {
+            zipUsages =
+                this.goStorageService.writeInputStreamToPath(
+                    zipStoragePath, zipStream, repoInfo.getName());
+          }
 
-      final var infoUsages = this.writeInfoFile(repoInfo, escapedPath, version);
+          final var infoUsages = this.writeInfoFile(repoInfo, escapedPath, version);
 
-      return BaseUsages.ofDisk(
-          modUsages.getDiskUsage() + zipUsages.getDiskUsage() + infoUsages.getDiskUsage());
-    } catch (final IOException | RuntimeException e) {
-      this.goStorageService.deleteVersionFiles(
-          StoragePath.of(repoInfo.getStorageKey(), PATH_SEPARATOR + escapedPath + "/@v/" + version),
-          repoInfo.getName());
-      throw e;
-    }
+          return BaseUsages.ofDisk(
+              modUsages.getDiskUsage() + zipUsages.getDiskUsage() + infoUsages.getDiskUsage());
+        },
+        () ->
+            this.goStorageService.deleteVersionFiles(
+                StoragePath.of(
+                    repoInfo.getStorageKey(), PATH_SEPARATOR + escapedPath + "/@v/" + version),
+                repoInfo.getName()),
+        false,
+        log,
+        Level.WARN,
+        "Go module version " + escapedPath + " " + version);
   }
 
   /**

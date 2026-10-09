@@ -31,6 +31,7 @@ import io.repsy.protocols.ruby.shared.utils.RubySpecsIndexWriter;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import io.repsy.protocols.shared.utils.SpooledUpload;
+import io.repsy.protocols.shared.utils.StoredUpload;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
@@ -176,43 +177,30 @@ public abstract class AbstractRubyProtocolFacade<ID> implements RubyProtocolFaca
 
     this.refreshVersionsChecksum(repoInfo, metadata.getName());
 
-    try (final var in = gem.openStream()) {
-      return this.storageService.writeGem(
-          repoInfo.getStorageKey(),
-          repoInfo.getName(),
-          metadata.getName(),
-          metadata.getVersion(),
-          metadata.getPlatform(),
-          in);
-    } catch (final IOException | RuntimeException e) {
-      // The row is rolled back with this failure, so a half-written new version would be an
-      // orphaned file. A version being replaced keeps its row, so its file is left alone.
-      if (!replacesExisting) {
-        this.discardPartialGem(repoInfo, metadata, e);
-      }
-      throw e;
-    }
-  }
-
-  private void discardPartialGem(
-      final BaseRepoInfo<ID> repoInfo, final GemMetadata metadata, final Exception cause) {
-
-    try {
-      this.storageService.deleteGem(
-          repoInfo.getStorageKey(),
-          repoInfo.getName(),
-          metadata.getName(),
-          metadata.getVersion(),
-          metadata.getPlatform());
-    } catch (final RuntimeException e) {
-      // Nothing to delete when the failure came before the file was created.
-      log.debug(
-          "No partial file removed for gem {} {}: {}",
-          metadata.getName(),
-          metadata.getVersion(),
-          e.getMessage());
-      cause.addSuppressed(e);
-    }
+    // The row is rolled back with a failure, so a half-written new version would be an orphaned
+    // file. A version being replaced keeps its row, so its file is left alone.
+    return StoredUpload.storeOrDiscard(
+        () -> {
+          try (final var in = gem.openStream()) {
+            return this.storageService.writeGem(
+                repoInfo.getStorageKey(),
+                repoInfo.getName(),
+                metadata.getName(),
+                metadata.getVersion(),
+                metadata.getPlatform(),
+                in);
+          }
+        },
+        () ->
+            this.storageService.deleteGem(
+                repoInfo.getStorageKey(),
+                repoInfo.getName(),
+                metadata.getName(),
+                metadata.getVersion(),
+                metadata.getPlatform()),
+        replacesExisting,
+        log,
+        "gem " + metadata.getName() + " " + metadata.getVersion());
   }
 
   @Override

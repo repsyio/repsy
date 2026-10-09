@@ -24,10 +24,12 @@ import io.repsy.protocols.cargo.shared.crate.dtos.CrateListItem;
 import io.repsy.protocols.cargo.shared.crate.services.CargoCrateService;
 import io.repsy.protocols.cargo.shared.storage.services.CargoStorageService;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import io.repsy.protocols.shared.utils.BoundedLengthInputStream;
 import io.repsy.protocols.shared.utils.EntryTooLargeException;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import io.repsy.protocols.shared.utils.RequestBodies;
 import io.repsy.protocols.shared.utils.SpooledUpload;
+import io.repsy.protocols.shared.utils.StoredUpload;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
@@ -191,83 +193,26 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
       final String indexJsonLine)
       throws IOException {
 
-    try (final var crateStream = spool.openStream()) {
-      return this.cargoStorageService.writeCrateAndIndex(
-          repoInfo.getStorageKey(),
-          repoInfo.getName(),
-          crateName,
-          version,
-          crateStream,
-          indexJsonLine);
-    } catch (final IOException | RuntimeException e) {
-      this.discardPartialCrate(repoInfo, crateName, version, e);
-      throw e;
-    }
-  }
-
-  private void discardPartialCrate(
-      final BaseRepoInfo<ID> repoInfo,
-      final String crateName,
-      final String version,
-      final Exception cause) {
-
-    try {
-      this.cargoStorageService.deleteCrate(
-          repoInfo.getStorageKey(), repoInfo.getName(), crateName, version);
-    } catch (final IOException | RuntimeException e) {
-      // Nothing to delete when the failure came before the file was created.
-      log.debug("No partial crate removed for {} {}: {}", crateName, version, e.getMessage());
-      cause.addSuppressed(e);
-    }
-  }
-
-  /**
-   * Reads at most {@code maxBytes} from {@code delegate}, then reports end-of-stream whatever the
-   * delegate still has left. Wraps the request body before it is spooled (RPS-1119), so a {@code
-   * .crate} whose declared length is shorter than what the client actually sends never pulls the
-   * extra bytes into the spool; a body that ends early is instead reported by the spooled size
-   * coming out shorter than the declared length. The delegate is not closed here: it is the
-   * protocol's own request stream, which the caller owns.
-   */
-  private static final class BoundedLengthInputStream extends InputStream {
-
-    private final InputStream delegate;
-    private long remaining;
-
-    private BoundedLengthInputStream(final InputStream delegate, final long maxBytes) {
-      this.delegate = delegate;
-      this.remaining = maxBytes;
-    }
-
-    @Override
-    public int read() throws IOException {
-      if (this.remaining <= 0) {
-        return -1;
-      }
-
-      final var b = this.delegate.read();
-      if (b >= 0) {
-        this.remaining--;
-      }
-
-      return b;
-    }
-
-    @Override
-    public int read(final byte[] b, final int off, final int len) throws IOException {
-      if (this.remaining <= 0) {
-        return -1;
-      }
-
-      final var toRead = (int) Math.min(len, this.remaining);
-      final var read = this.delegate.read(b, off, toRead);
-
-      if (read > 0) {
-        this.remaining -= read;
-      }
-
-      return read;
-    }
+    // A crate version is never replaced: CargoCrateService#publish refuses an existing version
+    // before this runs, so the file removed on failure is always the new version's own.
+    return StoredUpload.storeOrDiscard(
+        () -> {
+          try (final var crateStream = spool.openStream()) {
+            return this.cargoStorageService.writeCrateAndIndex(
+                repoInfo.getStorageKey(),
+                repoInfo.getName(),
+                crateName,
+                version,
+                crateStream,
+                indexJsonLine);
+          }
+        },
+        () ->
+            this.cargoStorageService.deleteCrate(
+                repoInfo.getStorageKey(), repoInfo.getName(), crateName, version),
+        false,
+        log,
+        "crate " + crateName + " " + version);
   }
 
   @Override

@@ -32,6 +32,7 @@ import io.repsy.protocols.npm.shared.utils.NpmPublishLimits;
 import io.repsy.protocols.npm.shared.utils.NpmRevPath;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
+import io.repsy.protocols.shared.utils.StoredUpload;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
@@ -44,6 +45,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.event.Level;
 import org.springframework.core.io.Resource;
 
 @Slf4j
@@ -533,17 +535,30 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
                 repoInfo.getStorageKey(), repoInfo.getName(), packageBasePath)
             : null;
 
+    // The rows are rolled back with a failure. A version being replaced keeps its row, so its
+    // files are left alone.
     try {
-      return this.writeFiles(
-          repoInfo, scopeName, packageBasePath, packageName, versionName, payload, kind);
+      return StoredUpload.storeOrDiscard(
+          () ->
+              this.writeFiles(
+                  repoInfo, scopeName, packageBasePath, packageName, versionName, payload, kind),
+          () ->
+              this.npmStorageService.discardPublishedVersion(
+                  repoInfo.getStorageKey(),
+                  repoInfo.getName(),
+                  packageBasePath,
+                  packageName,
+                  versionName,
+                  previousMetadata),
+          kind == PublishKind.REPLACES_VERSION,
+          log,
+          Level.WARN,
+          "npm package " + packageName + " " + versionName);
     } catch (final IOException | URISyntaxException | RuntimeException e) {
-      // The rows are rolled back with this failure. A version being replaced keeps its row, so
-      // its files are left alone.
-      if (kind != PublishKind.REPLACES_VERSION) {
-        this.discardPartialVersion(
-            repoInfo, packageBasePath, packageName, versionName, previousMetadata, e);
-      }
       throw e;
+    } catch (final Exception e) {
+      // storeOrDiscard throws only what the write throws, which is covered above.
+      throw new IllegalStateException(e);
     }
   }
 
@@ -611,33 +626,6 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
     this.npmStorageService.processPackagePayload(payload, repoInfo.getName());
 
     return payload;
-  }
-
-  private void discardPartialVersion(
-      final BaseRepoInfo<ID> repoInfo,
-      final Path packageBasePath,
-      final String packageName,
-      final String versionName,
-      final byte @Nullable [] previousMetadata,
-      final Exception cause) {
-
-    try {
-      this.npmStorageService.discardPublishedVersion(
-          repoInfo.getStorageKey(),
-          repoInfo.getName(),
-          packageBasePath,
-          packageName,
-          versionName,
-          previousMetadata);
-    } catch (final IOException | RuntimeException e) {
-      // The publish's own failure is the one to report; the leftover is noted on it.
-      log.warn(
-          "Could not remove the partly written files of npm package {} {}",
-          packageName,
-          versionName,
-          e);
-      cause.addSuppressed(e);
-    }
   }
 
   private String buildArtifactName(final @Nullable String scopeName, final String packageName) {
