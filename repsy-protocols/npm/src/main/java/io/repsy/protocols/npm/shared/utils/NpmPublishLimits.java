@@ -16,6 +16,7 @@
 package io.repsy.protocols.npm.shared.utils;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
+import io.repsy.protocols.npm.shared.constants.NpmConstants;
 import java.util.Collection;
 import java.util.Map;
 import lombok.AccessLevel;

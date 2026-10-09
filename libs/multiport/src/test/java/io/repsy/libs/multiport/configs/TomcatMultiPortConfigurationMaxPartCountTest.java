@@ -41,8 +41,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 /**
  * RPS-1657: {@code server.tomcat.max-part-count} (a protection limit, not something connector-
- * specific) must hold on the additional connector {@link TomcatMultiPortConfiguration} creates (the
- * plain, aliased port), exactly as it holds on the primary connector Spring Boot's own {@code
+ * specific) must hold on the additional connector {@link TomcatMultiPortConfig} creates (the plain,
+ * aliased port), exactly as it holds on the primary connector Spring Boot's own {@code
  * TomcatServletWebServerFactoryCustomizer} configures from the same property. Sends real multipart
  * requests to both, on a running embedded Tomcat, so the pin does not depend on how {@link
  * RepsyConnectorSettings#apply} happens to be implemented.
@@ -73,7 +73,7 @@ class TomcatMultiPortConfigurationMaxPartCountTest {
     final var properties = new MultiPortProperties();
     properties.setMainPort(String.valueOf(primaryPort));
     properties.setPorts(Map.of("api", additionalPort));
-    final var configuration = new TomcatMultiPortConfiguration(properties);
+    final var configuration = new TomcatMultiPortConfig(properties);
     ReflectionTestUtils.setField(configuration, "connectionTimeout", TIMEOUT);
     ReflectionTestUtils.setField(configuration, "maxPartCount", MAX_PART_COUNT);
 

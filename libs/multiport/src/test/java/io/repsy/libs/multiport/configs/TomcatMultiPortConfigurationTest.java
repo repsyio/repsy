@@ -36,7 +36,7 @@ class TomcatMultiPortConfigurationTest {
     final var properties = new MultiPortProperties();
     properties.setMainPort("9090");
     properties.setPorts(Map.of("api", API_PORT));
-    final var configuration = new TomcatMultiPortConfiguration(properties);
+    final var configuration = new TomcatMultiPortConfig(properties);
     ReflectionTestUtils.setField(configuration, "connectionTimeout", TIMEOUT);
     ReflectionTestUtils.setField(configuration, "maxPartCount", MAX_PART_COUNT);
     final var factory = new TomcatServletWebServerFactory();
