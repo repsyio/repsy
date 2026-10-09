@@ -26,21 +26,25 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 @NullMarked
-public abstract class AbstractRubyCompactIndexVersionsHandler implements ProtocolMethodHandler {
+public abstract class AbstractRubyCompactIndexInfoProtocolMethodHandler
+    implements ProtocolMethodHandler {
 
-  private static final String VERSIONS_PATH = "/versions";
+  private static final Pattern INFO_PATTERN = Pattern.compile("^/info/(.+)$");
 
   private final PathParser basePathParser;
   private final RubyProtocolFacade facade;
 
-  protected AbstractRubyCompactIndexVersionsHandler(
+  protected AbstractRubyCompactIndexInfoProtocolMethodHandler(
       final PathParser basePathParser,
       final RubyProtocolFacade facade,
       final RubyProtocolProvider provider) {
@@ -70,7 +74,7 @@ public abstract class AbstractRubyCompactIndexVersionsHandler implements Protoco
         return Optional.empty();
       }
       final var relativePath = ProtocolContextUtils.getRelativePath(parsedOpt.get()).getPath();
-      return VERSIONS_PATH.equals(relativePath) ? parsedOpt : Optional.empty();
+      return INFO_PATTERN.matcher(relativePath).matches() ? parsedOpt : Optional.empty();
     };
   }
 
@@ -79,7 +83,20 @@ public abstract class AbstractRubyCompactIndexVersionsHandler implements Protoco
       final ProtocolContext context,
       final HttpServletRequest request,
       final HttpServletResponse response) {
-    final var body = this.facade.getVersionsIndex(context);
-    return ResponseEntity.ok().contentType(MediaType.TEXT_PLAIN).body(body);
+    final var relativePath = ProtocolContextUtils.getRelativePath(context).getPath();
+    final var matcher = INFO_PATTERN.matcher(relativePath);
+    if (!matcher.matches()) {
+      return ResponseEntity.notFound().build();
+    }
+    final var gemName = matcher.group(1);
+    final var body = this.facade.getGemInfo(context, gemName);
+    // A gem name with a dot ("foo.rb") reads as an extension to Spring, which then names the
+    // response "f.txt" (RPS-1442).
+    return ResponseEntity.ok()
+        .contentType(MediaType.TEXT_PLAIN)
+        .header(
+            HttpHeaders.CONTENT_DISPOSITION,
+            Objects.requireNonNull(RubyContentDisposition.forPath(relativePath)))
+        .body(body);
   }
 }

@@ -40,7 +40,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 @NullMarked
-public abstract class AbstractRubySpecsIndexHandler implements ProtocolMethodHandler {
+public abstract class AbstractRubySpecsIndexProtocolMethodHandler implements ProtocolMethodHandler {
 
   private static final String SPECS_PATH = "/specs.4.8.gz";
   private static final String LATEST_SPECS_PATH = "/latest_specs.4.8.gz";
@@ -51,7 +51,7 @@ public abstract class AbstractRubySpecsIndexHandler implements ProtocolMethodHan
   private final PathParser basePathParser;
   private final RubyProtocolFacade facade;
 
-  protected AbstractRubySpecsIndexHandler(
+  protected AbstractRubySpecsIndexProtocolMethodHandler(
       final PathParser basePathParser,
       final RubyProtocolFacade facade,
       final RubyProtocolProvider provider) {

@@ -41,11 +41,11 @@ import io.repsy.protocols.docker.shared.layer.services.LayerService;
 import io.repsy.protocols.docker.shared.storage.services.DockerStorageService;
 import io.repsy.protocols.docker.shared.tag.dtos.BaseManifestDetail;
 import io.repsy.protocols.docker.shared.tag.dtos.BaseTagDetail;
-import io.repsy.protocols.docker.shared.tag.dtos.Config;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestDetails;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestForm;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestInfo;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestList;
+import io.repsy.protocols.docker.shared.tag.dtos.OciImageConfig;
 import io.repsy.protocols.docker.shared.tag.dtos.SavedManifest;
 import io.repsy.protocols.docker.shared.tag.dtos.TagForm;
 import io.repsy.protocols.docker.shared.tag.dtos.TagPage;
@@ -368,7 +368,7 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
    * architecture}: any other config media type is an OCI artifact, legitimately without either, and
    * is stored under {@link DockerConstants#UNKNOWN_PLATFORM} (RPS-1116).
    */
-  private String extractPlatform(final BaseRepoInfo<ID> repoInfo, final Config config)
+  private String extractPlatform(final BaseRepoInfo<ID> repoInfo, final OciImageConfig config)
       throws IOException {
 
     if (!isImageConfigMediaType(config.getMediaType())) {

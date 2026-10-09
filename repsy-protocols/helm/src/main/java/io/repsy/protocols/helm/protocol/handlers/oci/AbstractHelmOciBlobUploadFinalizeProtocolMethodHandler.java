@@ -24,7 +24,7 @@ import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
-import io.repsy.protocols.helm.protocol.facades.HelmFacade;
+import io.repsy.protocols.helm.protocol.facades.HelmProtocolFacade;
 import io.repsy.protocols.helm.shared.utils.HelmConstants;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.BlobDigests;
@@ -54,11 +54,11 @@ public abstract class AbstractHelmOciBlobUploadFinalizeProtocolMethodHandler<ID>
   private static final String DEFAULT_BLOB_MEDIA_TYPE = "application/octet-stream";
 
   private final PathParser basePathParser;
-  private final HelmFacade<ID> helmFacade;
+  private final HelmProtocolFacade<ID> helmFacade;
 
   public AbstractHelmOciBlobUploadFinalizeProtocolMethodHandler(
       final PathParser basePathParser,
-      final HelmFacade<ID> helmFacade,
+      final HelmProtocolFacade<ID> helmFacade,
       final HelmProtocolProvider provider) {
     this.basePathParser = basePathParser;
     this.helmFacade = helmFacade;

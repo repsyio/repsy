@@ -28,7 +28,7 @@
  * ticket, see README.md's "Ruby runner" section for why):
  *  - **RPS-1233** (fixed): `quick/Marshal.4.8/<name>-<version>.gemspec.rz` had no backend route at
  *    all (`404 unknownPath`) -- broke `gem install`/`gem fetch`, though NOT `bundle install` (H1,
- *    see `ruby-raw.ts`'s file header). A concrete `RubyGemspecHandler` now registers the route.
+ *    see `ruby-raw.ts`'s file header). A concrete `RubyGemspecProtocolMethodHandler` now registers the route.
  *  - **RB-2** (observation): `/info/<gem>` never advertises `ruby:`/`rubygems:` requirement keys,
  *    even though `required_ruby_version` is parsed and stored.
  *  - **RPS-1234** (fixed): `specs.4.8.gz`/`latest_specs.4.8.gz`/`prerelease_specs.4.8.gz` are now

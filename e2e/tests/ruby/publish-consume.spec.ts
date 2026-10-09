@@ -25,7 +25,7 @@
  *  - "gem install succeeds using the quick/Marshal.4.8/*.gemspec.rz route" (RPS-1233, fixed, via
  *    `gem`): unlike the catalog loop's own consumer (real `bundle install`, which never needs this
  *    route -- H1's refutation, `ruby-raw.ts`'s file header), a real `gem install` DOES need it, and
- *    a concrete `RubyGemspecHandler` now registers it.
+ *    a concrete `RubyGemspecProtocolMethodHandler` now registers it.
  *  - "gem fetch" (RPS-1234, fixed, via `gem`): the specs.4.8.gz zlib/gzip mismatch is fixed
  *    (asserted directly, not just via the exit code) and, with RPS-1233 also now merged, the
  *    shared gemspec.rz route it depends on is fixed too -- confirmed live below.

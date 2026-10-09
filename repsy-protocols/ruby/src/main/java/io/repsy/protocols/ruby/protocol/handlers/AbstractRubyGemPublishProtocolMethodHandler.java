@@ -37,7 +37,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 @NullMarked
-public abstract class AbstractRubyGemPublishHandler implements ProtocolMethodHandler {
+public abstract class AbstractRubyGemPublishProtocolMethodHandler implements ProtocolMethodHandler {
 
   private static final String PUBLISH_PATH = "/api/v1/gems";
   private static final String GEM_NAME = "gemName";
@@ -51,7 +51,7 @@ public abstract class AbstractRubyGemPublishHandler implements ProtocolMethodHan
    * @param maxGemBytes The largest gem a push may carry. The body is a raw request body, which no
    *     multipart limit applies to, so a larger one is refused with 413 instead of being read.
    */
-  protected AbstractRubyGemPublishHandler(
+  protected AbstractRubyGemPublishProtocolMethodHandler(
       final PathParser basePathParser,
       final RubyProtocolFacade facade,
       final RubyProtocolProvider provider,

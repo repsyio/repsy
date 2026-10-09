@@ -44,8 +44,8 @@ import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("AbstractRubyGemPublishHandler")
-class AbstractRubyGemPublishHandlerTest {
+@DisplayName("AbstractRubyGemPublishProtocolMethodHandler")
+class AbstractRubyGemPublishProtocolMethodHandlerTest {
 
   private static final long MAX_GEM_BYTES = 1_000;
   private static final byte[] GEM = "gem-bytes".repeat(50).getBytes(StandardCharsets.UTF_8);
@@ -54,7 +54,7 @@ class AbstractRubyGemPublishHandlerTest {
   @Mock private RubyProtocolFacade facade;
   @Mock private RubyProtocolProvider provider;
 
-  private static class TestHandler extends AbstractRubyGemPublishHandler {
+  private static class TestHandler extends AbstractRubyGemPublishProtocolMethodHandler {
 
     TestHandler(
         final PathParser basePathParser,

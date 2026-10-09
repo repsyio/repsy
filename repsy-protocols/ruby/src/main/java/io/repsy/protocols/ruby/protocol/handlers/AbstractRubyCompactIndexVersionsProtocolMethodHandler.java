@@ -26,25 +26,22 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
-import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 @NullMarked
-public abstract class AbstractRubyGemDownloadHandler implements ProtocolMethodHandler {
+public abstract class AbstractRubyCompactIndexVersionsProtocolMethodHandler
+    implements ProtocolMethodHandler {
 
-  private static final Pattern DOWNLOAD_PATTERN = Pattern.compile("^/gems/(.+\\.gem)$");
+  private static final String VERSIONS_PATH = "/versions";
 
   private final PathParser basePathParser;
   private final RubyProtocolFacade facade;
 
-  protected AbstractRubyGemDownloadHandler(
+  protected AbstractRubyCompactIndexVersionsProtocolMethodHandler(
       final PathParser basePathParser,
       final RubyProtocolFacade facade,
       final RubyProtocolProvider provider) {
@@ -74,7 +71,7 @@ public abstract class AbstractRubyGemDownloadHandler implements ProtocolMethodHa
         return Optional.empty();
       }
       final var relativePath = ProtocolContextUtils.getRelativePath(parsedOpt.get()).getPath();
-      return DOWNLOAD_PATTERN.matcher(relativePath).matches() ? parsedOpt : Optional.empty();
+      return VERSIONS_PATH.equals(relativePath) ? parsedOpt : Optional.empty();
     };
   }
 
@@ -83,24 +80,7 @@ public abstract class AbstractRubyGemDownloadHandler implements ProtocolMethodHa
       final ProtocolContext context,
       final HttpServletRequest request,
       final HttpServletResponse response) {
-    final var relativePath = ProtocolContextUtils.getRelativePath(context).getPath();
-    final var matcher = DOWNLOAD_PATTERN.matcher(relativePath);
-    if (!matcher.matches()) {
-      return ResponseEntity.notFound().build();
-    }
-    try {
-      final var filename = matcher.group(1);
-      final var resource = this.facade.downloadGem(context, filename);
-      // Without a header of its own Spring names the download "f.txt" and shows it inline
-      // (RPS-1389).
-      return ResponseEntity.ok()
-          .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_OCTET_STREAM_VALUE)
-          .header(
-              HttpHeaders.CONTENT_DISPOSITION,
-              Objects.requireNonNull(RubyContentDisposition.forPath(relativePath)))
-          .body(resource);
-    } catch (final Exception e) {
-      return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-    }
+    final var body = this.facade.getVersionsIndex(context);
+    return ResponseEntity.ok().contentType(MediaType.TEXT_PLAIN).body(body);
   }
 }

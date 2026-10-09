@@ -24,7 +24,7 @@ import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
-import io.repsy.protocols.helm.protocol.facades.HelmFacade;
+import io.repsy.protocols.helm.protocol.facades.HelmProtocolFacade;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
 import java.util.UUID;
@@ -48,7 +48,7 @@ class AbstractHelmOciBlobUploadStatusProtocolMethodHandlerTest {
   private static final String UPLOAD_URI = "/v2/charts/app/blobs/uploads/" + UPLOAD_ID;
 
   @Mock private PathParser basePathParser;
-  @Mock private HelmFacade<UUID> helmFacade;
+  @Mock private HelmProtocolFacade<UUID> helmFacade;
   @Mock private HelmProtocolProvider provider;
 
   private static class TestHandler
@@ -56,7 +56,7 @@ class AbstractHelmOciBlobUploadStatusProtocolMethodHandlerTest {
 
     TestHandler(
         final PathParser basePathParser,
-        final HelmFacade<UUID> helmFacade,
+        final HelmProtocolFacade<UUID> helmFacade,
         final HelmProtocolProvider provider) {
       super(basePathParser, helmFacade, provider);
     }

@@ -24,23 +24,32 @@ import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.regex.Pattern;
+import java.util.zip.DeflaterOutputStream;
 import org.jspecify.annotations.NullMarked;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 @NullMarked
-public abstract class AbstractRubyCompactIndexNamesHandler implements ProtocolMethodHandler {
+public abstract class AbstractRubyGemspecProtocolMethodHandler implements ProtocolMethodHandler {
 
-  private static final String NAMES_PATH = "/names";
+  private static final Pattern GEMSPEC_PATH_PATTERN =
+      Pattern.compile("^/quick/Marshal\\.4\\.8/(.+)\\.gemspec\\.rz$");
 
   private final PathParser basePathParser;
   private final RubyProtocolFacade facade;
 
-  protected AbstractRubyCompactIndexNamesHandler(
+  protected AbstractRubyGemspecProtocolMethodHandler(
       final PathParser basePathParser,
       final RubyProtocolFacade facade,
       final RubyProtocolProvider provider) {
@@ -70,7 +79,7 @@ public abstract class AbstractRubyCompactIndexNamesHandler implements ProtocolMe
         return Optional.empty();
       }
       final var relativePath = ProtocolContextUtils.getRelativePath(parsedOpt.get()).getPath();
-      return NAMES_PATH.equals(relativePath) ? parsedOpt : Optional.empty();
+      return GEMSPEC_PATH_PATTERN.matcher(relativePath).matches() ? parsedOpt : Optional.empty();
     };
   }
 
@@ -79,7 +88,34 @@ public abstract class AbstractRubyCompactIndexNamesHandler implements ProtocolMe
       final ProtocolContext context,
       final HttpServletRequest request,
       final HttpServletResponse response) {
-    final var body = this.facade.getNames(context);
-    return ResponseEntity.ok().contentType(MediaType.TEXT_PLAIN).body(body);
+    final var relativePath = ProtocolContextUtils.getRelativePath(context).getPath();
+    final var matcher = GEMSPEC_PATH_PATTERN.matcher(relativePath);
+    if (!matcher.matches()) {
+      return ResponseEntity.notFound().build();
+    }
+    try {
+      final var raw = this.facade.getGemspec(context, matcher.group(1));
+      // Without a header of its own Spring names the download "f.txt" (RPS-1442).
+      return ResponseEntity.ok()
+          .contentType(MediaType.APPLICATION_OCTET_STREAM)
+          .header(
+              HttpHeaders.CONTENT_DISPOSITION,
+              Objects.requireNonNull(RubyContentDisposition.forPath(relativePath)))
+          .body(deflate(raw));
+    } catch (final Exception e) {
+      return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+    }
+  }
+
+  private static byte[] deflate(final byte[] raw) {
+    try {
+      final var out = new ByteArrayOutputStream(raw.length);
+      try (final var deflate = new DeflaterOutputStream(out)) {
+        deflate.write(raw);
+      }
+      return out.toByteArray();
+    } catch (final IOException e) {
+      throw new UncheckedIOException(e);
+    }
   }
 }

@@ -18,22 +18,19 @@ package io.repsy.os.server.protocols.ruby.protocol.handlers;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.protocols.ruby.protocol.RubyProtocolProvider;
 import io.repsy.protocols.ruby.protocol.facades.contracts.RubyProtocolFacade;
-import io.repsy.protocols.ruby.protocol.handlers.AbstractRubyGemPublishHandler;
+import io.repsy.protocols.ruby.protocol.handlers.AbstractRubyHeadProtocolMethodHandler;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import org.springframework.util.unit.DataSize;
 
 @Component
 @NullMarked
-public class RubyGemPublishHandler extends AbstractRubyGemPublishHandler {
+public class RubyHeadProtocolMethodHandler extends AbstractRubyHeadProtocolMethodHandler {
 
-  public RubyGemPublishHandler(
+  public RubyHeadProtocolMethodHandler(
       @Qualifier("osRubyPathParser") final PathParser basePathParser,
       final RubyProtocolFacade facade,
-      final RubyProtocolProvider provider,
-      @Value("${repsy.ruby.max-gem-size:500MB}") final DataSize maxGemSize) {
-    super(basePathParser, facade, provider, maxGemSize.toBytes());
+      final RubyProtocolProvider provider) {
+    super(basePathParser, facade, provider);
   }
 }

@@ -24,33 +24,24 @@ import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
-/**
- * {@code GET /api/v1/dependencies?gems=name1,name2}: the legacy Marshal dependency-resolution
- * endpoint older RubyGems clients and some tools (including some Bundler resolution paths) still
- * call, backed by {@link io.repsy.protocols.ruby.shared.utils.RubyMarshalWriter#dumpDependencies}
- * (RPS-1554). Before this handler existed, the request matched no route and answered {@code 404
- * unknownPath}, so {@code dumpDependencies} was dead code with nothing serving it.
- */
 @NullMarked
-public abstract class AbstractRubyDependenciesHandler implements ProtocolMethodHandler {
+public abstract class AbstractRubyCompactIndexNamesProtocolMethodHandler
+    implements ProtocolMethodHandler {
 
-  private static final String DEPENDENCIES_PATH = "/api/v1/dependencies";
-  private static final String GEMS_PARAM = "gems";
+  private static final String NAMES_PATH = "/names";
 
   private final PathParser basePathParser;
   private final RubyProtocolFacade facade;
 
-  protected AbstractRubyDependenciesHandler(
+  protected AbstractRubyCompactIndexNamesProtocolMethodHandler(
       final PathParser basePathParser,
       final RubyProtocolFacade facade,
       final RubyProtocolProvider provider) {
@@ -80,7 +71,7 @@ public abstract class AbstractRubyDependenciesHandler implements ProtocolMethodH
         return Optional.empty();
       }
       final var relativePath = ProtocolContextUtils.getRelativePath(parsedOpt.get()).getPath();
-      return DEPENDENCIES_PATH.equals(relativePath) ? parsedOpt : Optional.empty();
+      return NAMES_PATH.equals(relativePath) ? parsedOpt : Optional.empty();
     };
   }
 
@@ -89,22 +80,7 @@ public abstract class AbstractRubyDependenciesHandler implements ProtocolMethodH
       final ProtocolContext context,
       final HttpServletRequest request,
       final HttpServletResponse response) {
-    final var gemNames = parseGemNames(request.getParameter(GEMS_PARAM));
-    final var body = this.facade.getDependencies(context, gemNames);
-    return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM).body(body);
-  }
-
-  /**
-   * {@code gems} is a comma-separated list of names, matching the real RubyGems API; a missing or
-   * blank value is an empty request (no gems to resolve), not an error.
-   */
-  private static List<String> parseGemNames(final @Nullable String gems) {
-    if (gems == null || gems.isBlank()) {
-      return List.of();
-    }
-    return Arrays.stream(gems.split(","))
-        .map(String::trim)
-        .filter(name -> !name.isEmpty())
-        .toList();
+    final var body = this.facade.getNames(context);
+    return ResponseEntity.ok().contentType(MediaType.TEXT_PLAIN).body(body);
   }
 }

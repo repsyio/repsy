@@ -226,8 +226,9 @@ class RubyGemProtocolIT extends AbstractIntegrationTest {
 
   /**
    * RPS-1233: {@code quick/Marshal.4.8/*.gemspec.rz} had no registered handler ({@link
-   * io.repsy.os.server.protocols.ruby.protocol.handlers.RubyGemspecHandler} was missing), so real
-   * {@code gem install}/{@code gem fetch} clients always 404'd fetching the quick gemspec.
+   * io.repsy.os.server.protocols.ruby.protocol.handlers.RubyGemspecProtocolMethodHandler} was
+   * missing), so real {@code gem install}/{@code gem fetch} clients always 404'd fetching the quick
+   * gemspec.
    */
   @Test
   @DisplayName("GET /{repo}/quick/Marshal.4.8/<gem>.gemspec.rz serves the deflated Marshal gemspec")

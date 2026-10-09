@@ -19,7 +19,7 @@ import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
-import io.repsy.protocols.helm.protocol.facades.HelmFacade;
+import io.repsy.protocols.helm.protocol.facades.HelmProtocolFacade;
 import io.repsy.protocols.helm.shared.index.dtos.HelmIndexDto;
 import io.repsy.protocols.helm.shared.index.dtos.HelmIndexEntryDto;
 import io.repsy.protocols.helm.shared.utils.HelmConstants;
@@ -48,11 +48,11 @@ public abstract class AbstractHelmIndexPullProtocolMethodHandler<ID>
   private static final Pattern INDEX_PATTERN = Pattern.compile("^/index\\.yaml$");
 
   private final PathParser basePathParser;
-  protected final HelmFacade<ID> helmFacade;
+  protected final HelmProtocolFacade<ID> helmFacade;
 
   public AbstractHelmIndexPullProtocolMethodHandler(
       final PathParser basePathParser,
-      final HelmFacade<ID> helmFacade,
+      final HelmProtocolFacade<ID> helmFacade,
       final HelmProtocolProvider provider) {
     this.basePathParser = basePathParser;
     this.helmFacade = helmFacade;

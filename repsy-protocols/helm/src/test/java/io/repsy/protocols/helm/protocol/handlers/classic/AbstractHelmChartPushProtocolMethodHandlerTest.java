@@ -29,7 +29,7 @@ import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
-import io.repsy.protocols.helm.protocol.facades.HelmFacade;
+import io.repsy.protocols.helm.protocol.facades.HelmProtocolFacade;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartInfo;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartMetadata;
 import jakarta.servlet.ServletException;
@@ -60,7 +60,7 @@ import org.springframework.mock.web.MockPart;
 class AbstractHelmChartPushProtocolMethodHandlerTest {
 
   @Mock private PathParser basePathParser;
-  @Mock private HelmFacade<UUID> helmFacade;
+  @Mock private HelmProtocolFacade<UUID> helmFacade;
   @Mock private HelmProtocolProvider provider;
   @Mock private HelmChartInfo chartInfo;
 
@@ -68,7 +68,7 @@ class AbstractHelmChartPushProtocolMethodHandlerTest {
 
     TestHandler(
         final PathParser basePathParser,
-        final HelmFacade<UUID> helmFacade,
+        final HelmProtocolFacade<UUID> helmFacade,
         final HelmProtocolProvider provider) {
       super(basePathParser, helmFacade, provider);
     }

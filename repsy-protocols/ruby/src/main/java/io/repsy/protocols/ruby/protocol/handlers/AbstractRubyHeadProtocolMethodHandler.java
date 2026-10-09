@@ -41,13 +41,14 @@ import org.springframework.http.ResponseEntity;
  * whole body) or {@code downloadGem} (opens the storage resource).
  *
  * <p>The path patterns below intentionally mirror, rather than share, the private patterns in
- * {@link AbstractRubyCompactIndexInfoHandler}, {@link AbstractRubyGemDownloadHandler} and {@link
- * AbstractRubyGemspecHandler}: those GET handlers keep their own copies, so this class keeps its
- * own rather than reaching into them. The {@code Content-Type} it sends is the one of the {@code
- * GET} (RPS-1465).
+ * {@link AbstractRubyCompactIndexInfoProtocolMethodHandler}, {@link
+ * AbstractRubyGemDownloadProtocolMethodHandler} and {@link
+ * AbstractRubyGemspecProtocolMethodHandler}: those GET handlers keep their own copies, so this
+ * class keeps its own rather than reaching into them. The {@code Content-Type} it sends is the one
+ * of the {@code GET} (RPS-1465).
  */
 @NullMarked
-public abstract class AbstractRubyHeadHandler implements ProtocolMethodHandler {
+public abstract class AbstractRubyHeadProtocolMethodHandler implements ProtocolMethodHandler {
 
   private static final Set<String> ALWAYS_EXISTING_PATHS =
       Set.of(
@@ -64,7 +65,7 @@ public abstract class AbstractRubyHeadHandler implements ProtocolMethodHandler {
   private final PathParser pathParser;
   private final RubyProtocolFacade facade;
 
-  protected AbstractRubyHeadHandler(
+  protected AbstractRubyHeadProtocolMethodHandler(
       final PathParser basePathParser,
       final RubyProtocolFacade facade,
       final RubyProtocolProvider provider) {

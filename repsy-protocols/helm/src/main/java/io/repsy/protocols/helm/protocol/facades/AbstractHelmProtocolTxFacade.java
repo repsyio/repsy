@@ -69,7 +69,7 @@ import tools.jackson.databind.ObjectMapper;
 @Slf4j
 @NullMarked
 @RequiredArgsConstructor
-public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmFacade<ID> {
+public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmProtocolFacade<ID> {
 
   private static final String ARTIFACT_NAME = "artifactName";
   private static final String ARTIFACT_VERSION = "artifactVersion";
