@@ -93,7 +93,7 @@ public class KeyStoreController {
   public ResponseEntity<KeyStoreItem> get(
       final RepoInfo repoInfo, @PathVariable final UUID keyStoreId) {
 
-    return ResponseEntity.ok(this.keyStoreService.find(repoInfo, keyStoreId));
+    return ResponseEntity.ok(this.keyStoreService.get(repoInfo, keyStoreId));
   }
 
   @DeleteMapping("/key-stores/{repoName}/{keyStoreId}")
@@ -147,7 +147,7 @@ public class KeyStoreController {
   public ResponseEntity<PgpPublicKeyItem> getPublicKey(
       final RepoInfo repoInfo, @PathVariable final UUID publicKeyId) {
 
-    return ResponseEntity.ok(this.keyStoreService.findPublicKey(repoInfo, publicKeyId));
+    return ResponseEntity.ok(this.keyStoreService.getPublicKey(repoInfo, publicKeyId));
   }
 
   @DeleteMapping("/key-stores/{repoName}/public-keys/{publicKeyId}")

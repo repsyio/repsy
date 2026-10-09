@@ -96,7 +96,7 @@ class KeyStoreHostsIT extends AbstractIntegrationTest {
                   return StubKeyServers.notFound();
                 }));
     final var file = "content".getBytes(UTF_8);
-    final var sources = this.keyStoreService.findPublicKeySources(repo.getId(), true);
+    final var sources = this.keyStoreService.getPublicKeySources(repo.getId(), true);
 
     assertThatThrownBy(
             () ->

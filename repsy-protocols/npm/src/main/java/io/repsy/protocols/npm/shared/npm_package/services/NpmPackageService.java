@@ -121,7 +121,7 @@ public interface NpmPackageService<ID> {
    *
    * <p>When the version was the latest, the row of the {@code latest} tag and the package's latest
    * move to the highest remaining version before the files are touched, and that version is what
-   * {@link VersionRemover#removeVersion} is told.
+   * {@link VersionRemover#deleteVersion} is told.
    *
    * @throws io.repsy.core.error_handling.exceptions.ItemNotFoundException when the package or the
    *     version does not exist
@@ -149,7 +149,7 @@ public interface NpmPackageService<ID> {
      * Removes every file of the package. Nothing is put back when this fails afterwards, so it is
      * the last thing that runs in the transaction.
      */
-    @NonNull BaseUsages removePackage();
+    @NonNull BaseUsages deletePackage();
   }
 
   /** Removes the files of a version whose rows {@link #deletePackageVersion} has just deleted. */
@@ -164,7 +164,7 @@ public interface NpmPackageService<ID> {
      *
      * @param newLatest the version {@code latest} moved to, or {@code null} when it did not move
      */
-    @NonNull BaseUsages removeVersion(@Nullable String newLatest) throws IOException;
+    @NonNull BaseUsages deleteVersion(@Nullable String newLatest) throws IOException;
   }
 
   /**
@@ -219,7 +219,7 @@ public interface NpmPackageService<ID> {
    * @throws io.repsy.core.error_handling.exceptions.ItemNotFoundException when the package does not
    *     exist
    */
-  @NonNull BaseUsages removeDistributionTag(
+  @NonNull BaseUsages deleteDistributionTag(
       @NonNull BaseRepoInfo<ID> repoInfo,
       @Nullable String scopeName,
       @NonNull String packageName,

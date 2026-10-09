@@ -60,7 +60,7 @@ class HelmOciManifestNameRepairServiceIT extends AbstractIntegrationTest {
   }
 
   private HelmChartInfo chart(final Repo repo, final String name, final String version) {
-    return this.helmChartService.findOrCreate(
+    return this.helmChartService.getOrCreate(
         HelmChartForm.builder()
             .name(name)
             .version(version)

@@ -71,7 +71,7 @@ public class NuGetPathParser implements PathParser {
     final String repoName = matcher.group(REPO_NAME).toLowerCase(Locale.getDefault());
 
     return this.repoTxService
-        .getRepoByNameAndType(repoName, RepoType.NUGET)
+        .findRepoByNameAndType(repoName, RepoType.NUGET)
         .flatMap(repoInfo -> this.createProtocolContext(repoInfo, repoName, matcher));
   }
 

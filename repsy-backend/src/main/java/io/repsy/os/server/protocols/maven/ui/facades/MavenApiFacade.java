@@ -103,7 +103,7 @@ public class MavenApiFacade implements ProtocolApiFacadeMavenAdapter {
     }
   }
 
-  public @NonNull ArtifactVersionInfo findArtifactVersion(
+  public @NonNull ArtifactVersionInfo getArtifactVersion(
       final @NonNull RepoInfo repoInfo,
       final @NonNull String groupName,
       final @NonNull String artifactName,

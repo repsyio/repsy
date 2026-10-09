@@ -62,7 +62,7 @@ public class PypiPathParser implements PathParser {
   private Optional<ProtocolContext> buildProtocolContext(final Matcher matcher) {
     final var repoName = matcher.group(REPO_NAME).toLowerCase(Locale.getDefault());
 
-    final var repoInfoOpt = this.repoTxService.getRepoByNameAndType(repoName, RepoType.PYPI);
+    final var repoInfoOpt = this.repoTxService.findRepoByNameAndType(repoName, RepoType.PYPI);
 
     return repoInfoOpt.flatMap(repoInfo -> this.createProtocolContext(repoInfo, repoName, matcher));
   }

@@ -398,7 +398,7 @@ class AbstractNpmStorageServicePackumentTest {
     this.stored(WITH_ATTACHMENTS);
     this.recordWrites();
 
-    this.service.removeDistributionTag(REPO_ID, REPO_NAME, BASE_PATH, "old");
+    this.service.deleteDistributionTag(REPO_ID, REPO_NAME, BASE_PATH, "old");
 
     this.assertRewrittenWithoutAttachmentsAndUntouched();
     assertThat(this.writtenPackument().get("dist-tags")).isEqualTo(Map.of("latest", "1.1.0"));
@@ -444,7 +444,7 @@ class AbstractNpmStorageServicePackumentTest {
     this.stored(WITH_ATTACHMENTS);
     this.recordWrites();
 
-    this.service.removeVersion(REPO_ID, REPO_NAME, BASE_PATH, "demo", "1.0.0", null, NO_ROWS);
+    this.service.deleteVersion(REPO_ID, REPO_NAME, BASE_PATH, "demo", "1.0.0", null, NO_ROWS);
 
     final var packument = this.writtenPackument();
     assertThat(packument).doesNotContainKey("_attachments");

@@ -75,7 +75,7 @@ public class ArtifactScanListener {
   private final @NonNull Map<String, StorageStrategy> storageStrategiesByRepoType;
 
   @EventListener
-  public void handleArtifactPushed(final @NonNull ArtifactPushedEvent event) {
+  public void onArtifactPushed(final @NonNull ArtifactPushedEvent event) {
 
     if (isArtifactCoordinateMissing(event)) {
       log.debug(
@@ -105,7 +105,7 @@ public class ArtifactScanListener {
   }
 
   @EventListener
-  public void handleArtifactVersionDeleted(final @NonNull ArtifactVersionDeletedEvent event) {
+  public void onArtifactVersionDeleted(final @NonNull ArtifactVersionDeletedEvent event) {
     this.scanTxService.deleteScansForVersion(
         event.repoId(), event.artifactName(), event.artifactVersion());
   }

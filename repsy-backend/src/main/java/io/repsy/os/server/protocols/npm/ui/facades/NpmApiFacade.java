@@ -162,7 +162,7 @@ public class NpmApiFacade implements ProtocolApiFacade {
             versionName,
             newLatest ->
                 BaseUsages.ofDisk(
-                    this.npmStorageService.removeVersion(
+                    this.npmStorageService.deleteVersion(
                         repoInfo.getStorageKey(),
                         repoInfo.getName(),
                         packageBasePath,

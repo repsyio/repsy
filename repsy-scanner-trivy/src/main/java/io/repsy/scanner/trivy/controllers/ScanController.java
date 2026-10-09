@@ -79,7 +79,7 @@ public class ScanController {
   @GetMapping("/scan/{scanId}")
   public @NonNull ScanJobStatusResponse getStatus(@PathVariable final @NonNull String scanId) {
     return this.trivyScanService
-        .getStatus(scanId)
+        .findStatus(scanId)
         .map(ScanJobStatusResponse::from)
         .orElseThrow(() -> new ScanJobNotFoundException(scanId));
   }

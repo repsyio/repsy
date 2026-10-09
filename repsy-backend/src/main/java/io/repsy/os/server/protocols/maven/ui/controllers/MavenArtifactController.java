@@ -125,7 +125,7 @@ public class MavenArtifactController {
       throws IOException, XmlPullParserException {
 
     final var artifactVersion =
-        this.mavenApiFacade.findArtifactVersion(repoInfo, groupName, artifactName, version);
+        this.mavenApiFacade.getArtifactVersion(repoInfo, groupName, artifactName, version);
 
     return ResponseEntity.ok(artifactVersion);
   }

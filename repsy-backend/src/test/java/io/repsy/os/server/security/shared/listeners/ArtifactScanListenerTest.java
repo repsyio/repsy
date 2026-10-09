@@ -137,8 +137,7 @@ class ArtifactScanListenerTest {
     when(this.scanTxService.createPendingScan(REPO_ID, "artifact", "1.0.0", "none"))
         .thenThrow(new ItemNotFoundException("repoNotFound"));
 
-    assertThatCode(() -> this.listener.handleArtifactPushed(this.event()))
-        .doesNotThrowAnyException();
+    assertThatCode(() -> this.listener.onArtifactPushed(this.event())).doesNotThrowAnyException();
 
     verifyNoInteractions(this.scanTaskExecutor);
     assertThat(this.logAppender.list)
@@ -155,7 +154,7 @@ class ArtifactScanListenerTest {
         .thenReturn(SCAN_ID);
     doThrow(new RejectedExecutionException()).when(this.scanTaskExecutor).execute(any());
 
-    this.listener.handleArtifactPushed(event);
+    this.listener.onArtifactPushed(event);
 
     verify(this.scanTxService).recordScanFailure(SCAN_ID, SATURATED_MESSAGE);
   }
@@ -178,7 +177,7 @@ class ArtifactScanListenerTest {
     this.givenDockerScanIsQueued();
     when(this.repoTxService.getRepo(REPO_ID)).thenThrow(new ItemNotFoundException("repoNotFound"));
 
-    assertThatCode(() -> this.listener.handleArtifactPushed(this.dockerEvent()))
+    assertThatCode(() -> this.listener.onArtifactPushed(this.dockerEvent()))
         .doesNotThrowAnyException();
 
     verify(this.scanner, never()).scan(any());
@@ -197,7 +196,7 @@ class ArtifactScanListenerTest {
     this.givenDockerRepo(false);
     doThrow(new ItemNotFoundException("vulnerabilityScanNotFound")).when(this.scanner).scan(any());
 
-    assertThatCode(() -> this.listener.handleArtifactPushed(this.dockerEvent()))
+    assertThatCode(() -> this.listener.onArtifactPushed(this.dockerEvent()))
         .doesNotThrowAnyException();
 
     verify(this.scanTxService, never()).recordScanFailure(any(), any());
@@ -218,7 +217,7 @@ class ArtifactScanListenerTest {
     this.givenDockerRepo(false);
     doThrow(new ItemNotFoundException("artifactNotFound")).when(this.scanner).scan(any());
 
-    this.listener.handleArtifactPushed(this.dockerEvent());
+    this.listener.onArtifactPushed(this.dockerEvent());
 
     verify(this.scanTxService).recordScanFailure(SCAN_ID, "artifactNotFound");
     assertThat(this.logAppender.list)
@@ -238,7 +237,7 @@ class ArtifactScanListenerTest {
     when(this.scanTxService.scanExists(SCAN_ID)).thenReturn(false);
     doThrow(optimisticLockFailure()).when(this.scanner).scan(any());
 
-    assertThatCode(() -> this.listener.handleArtifactPushed(this.dockerEvent()))
+    assertThatCode(() -> this.listener.onArtifactPushed(this.dockerEvent()))
         .doesNotThrowAnyException();
 
     verify(this.scanTxService, never()).recordScanFailure(any(), any());
@@ -260,7 +259,7 @@ class ArtifactScanListenerTest {
     when(this.scanTxService.scanExists(SCAN_ID)).thenReturn(true);
     doThrow(optimisticLockFailure()).when(this.scanner).scan(any());
 
-    this.listener.handleArtifactPushed(this.dockerEvent());
+    this.listener.onArtifactPushed(this.dockerEvent());
 
     verify(this.scanTxService).recordScanFailure(eq(SCAN_ID), any());
     assertThat(this.logAppender.list)
@@ -280,7 +279,7 @@ class ArtifactScanListenerTest {
     when(this.scanTxService.scanExists(SCAN_ID)).thenReturn(false);
     doThrow(integrityViolation("23503")).when(this.scanner).scan(any());
 
-    this.listener.handleArtifactPushed(this.dockerEvent());
+    this.listener.onArtifactPushed(this.dockerEvent());
 
     verify(this.scanTxService, never()).recordScanFailure(any(), any());
     assertThat(this.logAppender.list)
@@ -297,7 +296,7 @@ class ArtifactScanListenerTest {
     this.givenDockerRepo(false);
     doThrow(integrityViolation("23505")).when(this.scanner).scan(any());
 
-    this.listener.handleArtifactPushed(this.dockerEvent());
+    this.listener.onArtifactPushed(this.dockerEvent());
 
     verify(this.scanTxService).recordScanFailure(eq(SCAN_ID), any());
     verify(this.scanTxService, never()).scanExists(any());
@@ -310,7 +309,7 @@ class ArtifactScanListenerTest {
     this.givenDockerScanIsQueued();
     this.givenDockerRepo(false);
 
-    this.listener.handleArtifactPushed(this.dockerEvent());
+    this.listener.onArtifactPushed(this.dockerEvent());
 
     final var request = this.capturedScanRequest();
     assertThat(request.dockerRegistryReference()).isEqualTo("repo/image:1.0");
@@ -326,7 +325,7 @@ class ArtifactScanListenerTest {
     this.givenDockerScanIsQueued(digest);
     this.givenDockerRepo(false);
 
-    this.listener.handleArtifactPushed(this.dockerEvent(digest));
+    this.listener.onArtifactPushed(this.dockerEvent(digest));
 
     assertThat(this.capturedScanRequest().dockerRegistryReference())
         .isEqualTo("repo/image@" + digest);
@@ -339,7 +338,7 @@ class ArtifactScanListenerTest {
     this.givenDockerRepo(true);
     when(this.dockerScanTokenIssuer.mintReadOnlyPullToken(REPO_ID, "repo")).thenReturn("token");
 
-    this.listener.handleArtifactPushed(this.dockerEvent());
+    this.listener.onArtifactPushed(this.dockerEvent());
 
     final var request = this.capturedScanRequest();
     assertThat(request.dockerRegistryReference()).isEqualTo("repo/image:1.0");
@@ -357,7 +356,7 @@ class ArtifactScanListenerTest {
     when(this.scanTxService.scanExists(SCAN_ID)).thenReturn(true);
     doThrow(unreachable()).when(this.scanner).scan(any());
 
-    this.listener.handleArtifactPushed(this.dockerEvent());
+    this.listener.onArtifactPushed(this.dockerEvent());
 
     verify(this.scanTxService, never()).recordScanFailure(any(), any());
     final var firstRetry = this.captureScheduled(1);
@@ -391,7 +390,7 @@ class ArtifactScanListenerTest {
     when(this.scanTxService.scanExists(SCAN_ID)).thenReturn(true);
     doThrow(unreachable()).when(this.scanner).scan(any());
 
-    this.listener.handleArtifactPushed(this.dockerEvent());
+    this.listener.onArtifactPushed(this.dockerEvent());
     this.captureScheduled(1).tasks().getFirst().run();
     final var scheduled = this.captureScheduled(2);
     scheduled.tasks().get(1).run();
@@ -415,7 +414,7 @@ class ArtifactScanListenerTest {
     when(this.scanTxService.scanExists(SCAN_ID)).thenReturn(true);
     doThrow(unreachable()).doNothing().when(this.scanner).scan(any());
 
-    this.listener.handleArtifactPushed(this.dockerEvent());
+    this.listener.onArtifactPushed(this.dockerEvent());
     this.captureScheduled(1).tasks().getFirst().run();
 
     verify(this.scanner, times(2)).scan(any());
@@ -433,7 +432,7 @@ class ArtifactScanListenerTest {
     this.givenDockerRepo(false);
     doThrow(failure).when(this.scanner).scan(any());
 
-    this.listener.handleArtifactPushed(this.dockerEvent());
+    this.listener.onArtifactPushed(this.dockerEvent());
 
     verify(this.scanner, times(1)).scan(any());
     verifyNoInteractions(this.taskScheduler);
@@ -462,7 +461,7 @@ class ArtifactScanListenerTest {
     this.givenSchedulerAt(NOW);
     doThrow(unreachable()).when(this.scanner).scan(any());
 
-    this.listener.handleArtifactPushed(this.dockerEvent());
+    this.listener.onArtifactPushed(this.dockerEvent());
     doThrow(new RejectedExecutionException()).when(this.scanTaskExecutor).execute(any());
     this.captureScheduled(1).tasks().getFirst().run();
 
@@ -486,7 +485,7 @@ class ArtifactScanListenerTest {
         .schedule(any(Runnable.class), any(Instant.class));
     doThrow(unreachable()).when(this.scanner).scan(any());
 
-    this.listener.handleArtifactPushed(this.dockerEvent());
+    this.listener.onArtifactPushed(this.dockerEvent());
 
     final var message = ArgumentCaptor.forClass(String.class);
     verify(this.scanTxService).recordScanFailure(eq(SCAN_ID), message.capture());
@@ -502,7 +501,7 @@ class ArtifactScanListenerTest {
     when(this.scanTxService.scanExists(SCAN_ID)).thenReturn(false);
     doThrow(unreachable()).when(this.scanner).scan(any());
 
-    this.listener.handleArtifactPushed(this.dockerEvent());
+    this.listener.onArtifactPushed(this.dockerEvent());
     this.captureScheduled(1).tasks().getFirst().run();
 
     verify(this.scanner, times(1)).scan(any());
@@ -529,7 +528,7 @@ class ArtifactScanListenerTest {
     final var failure = unreachable();
     doThrow(failure).when(this.scanner).scan(any());
 
-    listener.handleArtifactPushed(this.dockerEvent());
+    listener.onArtifactPushed(this.dockerEvent());
 
     verifyNoInteractions(this.taskScheduler);
     verify(this.scanTxService).recordScanFailure(SCAN_ID, failure.getMessage());
@@ -593,7 +592,7 @@ class ArtifactScanListenerTest {
         .when(this.scanTaskExecutor)
         .execute(any());
 
-    helmListener.handleArtifactPushed(
+    helmListener.onArtifactPushed(
         new ArtifactPushedEvent(
             REPO_ID, "HELM", "repo", "oci/blobs/sha256:abc", "payments", "1.0.0", true, false));
 

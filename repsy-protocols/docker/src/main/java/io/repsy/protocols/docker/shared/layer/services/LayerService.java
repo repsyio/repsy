@@ -23,7 +23,7 @@ import org.jspecify.annotations.NonNull;
 
 public interface LayerService<ID> {
 
-  @NonNull LayerInfo findOrCreate(@NonNull LayerForm form, @NonNull ID repoId);
+  @NonNull LayerInfo getOrCreate(@NonNull LayerForm form, @NonNull ID repoId);
 
   void update(@NonNull LayerInfo layerInfo, @NonNull ID repoId);
 

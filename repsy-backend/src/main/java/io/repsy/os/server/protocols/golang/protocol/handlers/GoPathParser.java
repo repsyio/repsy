@@ -54,7 +54,7 @@ public class GoPathParser implements PathParser {
     }
 
     final var repoName = matcher.group(REPO_NAME).toLowerCase(Locale.getDefault());
-    final var repoInfoOpt = this.repoTxService.getRepoByNameAndType(repoName, RepoType.GOLANG);
+    final var repoInfoOpt = this.repoTxService.findRepoByNameAndType(repoName, RepoType.GOLANG);
 
     return repoInfoOpt.flatMap(
         repoInfo -> {

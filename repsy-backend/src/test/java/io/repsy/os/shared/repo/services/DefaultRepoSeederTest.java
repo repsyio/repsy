@@ -110,7 +110,7 @@ class DefaultRepoSeederTest {
     when(this.repoTxService.findRepoByName(NAME)).thenReturn(Optional.empty());
     when(this.repoTxService.createRepo(NAME, RepoType.MAVEN, true, null))
         .thenThrow(new ItemAlreadyExistException("repoExists"));
-    when(this.repoTxService.getRepoByNameAndType(NAME, RepoType.MAVEN))
+    when(this.repoTxService.findRepoByNameAndType(NAME, RepoType.MAVEN))
         .thenReturn(Optional.of(repoInfo(RepoType.MAVEN)));
 
     assertThatCode(this::seedMaven).doesNotThrowAnyException();
@@ -124,7 +124,7 @@ class DefaultRepoSeederTest {
     when(this.repoTxService.findRepoByName(NAME)).thenReturn(Optional.empty());
     when(this.repoTxService.createRepo(NAME, RepoType.MAVEN, true, null))
         .thenThrow(new DataIntegrityViolationException("ux_repo__name"));
-    when(this.repoTxService.getRepoByNameAndType(NAME, RepoType.MAVEN))
+    when(this.repoTxService.findRepoByNameAndType(NAME, RepoType.MAVEN))
         .thenReturn(Optional.of(repoInfo(RepoType.MAVEN)));
 
     assertThatCode(this::seedMaven).doesNotThrowAnyException();
@@ -138,7 +138,7 @@ class DefaultRepoSeederTest {
     final var failure = new ItemAlreadyExistException("repoExists");
     when(this.repoTxService.findRepoByName(NAME)).thenReturn(Optional.empty());
     when(this.repoTxService.createRepo(NAME, RepoType.MAVEN, true, null)).thenThrow(failure);
-    when(this.repoTxService.getRepoByNameAndType(NAME, RepoType.MAVEN))
+    when(this.repoTxService.findRepoByNameAndType(NAME, RepoType.MAVEN))
         .thenReturn(Optional.empty());
 
     assertThatThrownBy(this::seedMaven).isSameAs(failure);
@@ -155,7 +155,7 @@ class DefaultRepoSeederTest {
 
     assertThatThrownBy(this::seedMaven).isSameAs(failure);
 
-    verify(this.repoTxService, never()).getRepoByNameAndType(any(), any());
+    verify(this.repoTxService, never()).findRepoByNameAndType(any(), any());
     verifyNoInteractions(this.storageCreator);
   }
 

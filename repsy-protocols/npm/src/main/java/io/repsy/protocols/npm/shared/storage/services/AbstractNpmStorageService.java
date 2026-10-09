@@ -91,7 +91,7 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
   }
 
   @Override
-  public long removeDistributionTag(
+  public long deleteDistributionTag(
       final UUID repoId, final String repoName, final Path packageBasePath, final String tagName)
       throws IOException {
 
@@ -611,7 +611,7 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
   }
 
   @Override
-  public long removeVersion(
+  public long deleteVersion(
       final UUID repoId,
       final String repoName,
       final Path packageBasePath,

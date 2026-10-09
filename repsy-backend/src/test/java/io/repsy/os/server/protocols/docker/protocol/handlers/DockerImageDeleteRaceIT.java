@@ -229,7 +229,7 @@ class DockerImageDeleteRaceIT extends AbstractIntegrationTest {
               return found;
             })
         .when(this.imageTxService)
-        .findOrCreateImage(any(), eq(IMAGE));
+        .getOrCreateImage(any(), eq(IMAGE));
 
     final var response = this.push(repo, "new", "layer-new");
 
@@ -250,7 +250,7 @@ class DockerImageDeleteRaceIT extends AbstractIntegrationTest {
     final var repo = this.dockerRepo();
     this.wire.pushBlobsOf(repo, IMAGE, "layer-one");
     // What a push that failed after it created the image leaves behind: an image with no manifest.
-    final var emptyImageId = this.imageTxService.findOrCreateImage(repo.getId(), IMAGE).getId();
+    final var emptyImageId = this.imageTxService.getOrCreateImage(repo.getId(), IMAGE).getId();
 
     // The lookup of the push finds it, and then the cleanup deletes it (it has no manifest).
     final var lookups = new AtomicInteger();
@@ -269,7 +269,7 @@ class DockerImageDeleteRaceIT extends AbstractIntegrationTest {
               return found;
             })
         .when(this.imageTxService)
-        .findOrCreateImage(any(), eq(IMAGE));
+        .getOrCreateImage(any(), eq(IMAGE));
 
     final var response = this.push(repo, "latest", "layer-one");
 

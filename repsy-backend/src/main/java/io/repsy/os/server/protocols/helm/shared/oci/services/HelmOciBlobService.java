@@ -52,7 +52,7 @@ public class HelmOciBlobService implements OciBlobService<UUID> {
    */
   @Override
   @Transactional
-  public HelmOciBlobInfo findOrCreate(final HelmOciBlobForm form, final UUID repoId) {
+  public HelmOciBlobInfo getOrCreate(final HelmOciBlobForm form, final UUID repoId) {
     final var existing = this.helmOciBlobRepository.findByRepoIdAndDigest(repoId, form.getDigest());
 
     if (existing.isPresent()) {

@@ -486,7 +486,7 @@ class NpmDistTagStorageConsistencyIT extends AbstractIntegrationTest {
               throw new IllegalStateException("storage went away after the write");
             })
         .when(this.npmStorageService)
-        .removeDistributionTag(any(), any(), any(), any());
+        .deleteDistributionTag(any(), any(), any(), any());
 
     final var response = this.removeTag(repo, name, "beta", token);
 

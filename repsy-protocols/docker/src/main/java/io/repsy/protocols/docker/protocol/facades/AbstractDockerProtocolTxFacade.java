@@ -156,7 +156,7 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
     // Created in this transaction, after every check that needs no image: a push that fails from
     // here on rolls the new image back with everything else, so it never leaves an image that
     // stores no manifest (RPS-1350).
-    final var imageInfo = this.imageService.findOrCreateImage(repoInfo.getId(), imageName);
+    final var imageInfo = this.imageService.getOrCreateImage(repoInfo.getId(), imageName);
 
     // DockerManifestValidator.validate already refused a Content-Type the registry does not
     // store, before anything for this push was looked up or written.
@@ -218,7 +218,7 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
 
     final var imageInfo =
-        this.imageService.findImageInfoByRepoIdAndName(repoInfo.getId(), imageName);
+        this.imageService.getImageInfoByRepoIdAndName(repoInfo.getId(), imageName);
 
     return DockerTagPaging.page(
         this.manifestService.findTagNamesByImageId(imageInfo.getId()), limit, last);
@@ -292,7 +292,7 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
     final var storagePath = StoragePath.of(repoInfo.getStorageKey(), relativePath.getPath());
 
     return this.dockerStorageService
-        .getResource(storagePath, repoInfo.getName())
+        .findResource(storagePath, repoInfo.getName())
         .orElseThrow(() -> new ItemNotFoundException("resourceNotFound"));
   }
 
@@ -506,12 +506,12 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
 
     final var imageInfo =
-        this.imageService.findImageInfoByRepoIdAndName(repoInfo.getId(), imageName);
+        this.imageService.getImageInfoByRepoIdAndName(repoInfo.getId(), imageName);
 
     final var digest = this.resolveManifestDigest(repoInfo, imageName, manifestReference);
 
     final var manifest =
-        this.manifestService.findManifestByRepoIdAndImageNameAndDigest(
+        this.manifestService.getManifestByRepoIdAndImageNameAndDigest(
             repoInfo.getId(), imageInfo, digest);
 
     final var manifestResource =

@@ -65,7 +65,7 @@ public interface NpmProtocolFacade {
       String versionName)
       throws IOException;
 
-  void removeDistributionTag(
+  void deleteDistributionTag(
       ProtocolContext context, @Nullable String scopeName, String packageName, String tagName)
       throws IOException;
 

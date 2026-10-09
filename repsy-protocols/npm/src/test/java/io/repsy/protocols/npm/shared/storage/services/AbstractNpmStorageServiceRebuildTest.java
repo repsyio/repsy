@@ -405,7 +405,7 @@ class AbstractNpmStorageServiceRebuildTest {
     tarballIsStored("1.0.0", new byte[60]);
 
     final var growth =
-        this.service.removeVersion(
+        this.service.deleteVersion(
             REPO_ID, REPO_NAME, BASE_PATH, PACKAGE, "1.0.0", null, this.rows);
 
     assertThat(growth).as("rebuilt 300, then -40 for the metadata and 60 freed").isEqualTo(200L);

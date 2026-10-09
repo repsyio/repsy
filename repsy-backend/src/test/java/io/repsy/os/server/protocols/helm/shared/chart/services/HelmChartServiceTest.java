@@ -103,7 +103,7 @@ class HelmChartServiceTest {
   }
 
   @Test
-  @DisplayName("findOrCreate() for an absent version creates a row from every form field")
+  @DisplayName("getOrCreate() for an absent version creates a row from every form field")
   void findOrCreateCreatesForAnAbsentVersion() {
     final var chart = chartRow();
     when(this.helmChartRepository.findWithLockByRepoIdAndName(REPO_ID, NAME))
@@ -113,7 +113,7 @@ class HelmChartServiceTest {
     this.stubSaveReturnsItsArgument();
 
     final var form = form("sha256:" + "a".repeat(64), 100L, "desc", "1.0", "application");
-    final var info = this.service.findOrCreate(form, REPO_ID);
+    final var info = this.service.getOrCreate(form, REPO_ID);
 
     assertThat(info.name()).isEqualTo(NAME);
     assertThat(info.version()).isEqualTo(VERSION);
@@ -128,7 +128,7 @@ class HelmChartServiceTest {
 
   @Test
   @DisplayName(
-      "findOrCreate() for an existing version refreshes its digest and size (regression pin)")
+      "getOrCreate() for an existing version refreshes its digest and size (regression pin)")
   void findOrCreateRefreshesDigestAndSizeOnOverride() {
     final var chart = chartRow();
     final var existing = new HelmChartVersion();
@@ -146,7 +146,7 @@ class HelmChartServiceTest {
 
     final var newDigest = "sha256:" + "2".repeat(64);
     final var form = form(newDigest, 999L, "desc", "1.0", "application");
-    final var info = this.service.findOrCreate(form, REPO_ID);
+    final var info = this.service.getOrCreate(form, REPO_ID);
 
     assertThat(info.digest()).isEqualTo(newDigest);
     assertThat(info.size()).isEqualTo(999L);
@@ -158,7 +158,7 @@ class HelmChartServiceTest {
   }
 
   @Test
-  @DisplayName("findOrCreate() for an existing version also refreshes description/appVersion/type")
+  @DisplayName("getOrCreate() for an existing version also refreshes description/appVersion/type")
   void findOrCreateRefreshesOtherMetadataOnOverride() {
     final var chart = chartRow();
     final var existing = new HelmChartVersion();
@@ -178,7 +178,7 @@ class HelmChartServiceTest {
     this.stubSaveReturnsItsArgument();
 
     final var form = form("sha256:" + "2".repeat(64), 20L, "new description", "2.0", "application");
-    final var info = this.service.findOrCreate(form, REPO_ID);
+    final var info = this.service.getOrCreate(form, REPO_ID);
 
     assertThat(info.description()).isEqualTo("new description");
     assertThat(info.appVersion()).isEqualTo("2.0");
@@ -186,7 +186,7 @@ class HelmChartServiceTest {
   }
 
   @Test
-  @DisplayName("findOrCreate() reuses an existing chart parent instead of creating a duplicate")
+  @DisplayName("getOrCreate() reuses an existing chart parent instead of creating a duplicate")
   void findOrCreateReusesExistingChartParent() {
     final var chart = chartRow();
     when(this.helmChartRepository.findWithLockByRepoIdAndName(REPO_ID, NAME))
@@ -195,7 +195,7 @@ class HelmChartServiceTest {
         .thenReturn(Optional.empty());
     this.stubSaveReturnsItsArgument();
 
-    this.service.findOrCreate(form("sha256:" + "a".repeat(64), 1L, null, null, null), REPO_ID);
+    this.service.getOrCreate(form("sha256:" + "a".repeat(64), 1L, null, null, null), REPO_ID);
 
     verify(this.helmChartRepository, never()).save(any(HelmChart.class));
   }
@@ -249,7 +249,7 @@ class HelmChartServiceTest {
   }
 
   @Test
-  @DisplayName("findOrCreate() inserts an absent chart parent without failing on the unique index")
+  @DisplayName("getOrCreate() inserts an absent chart parent without failing on the unique index")
   void findOrCreateInsertsAnAbsentChartParentIfAbsent() {
     final var chart = chartRow();
     when(this.helmChartRepository.findWithLockByRepoIdAndName(REPO_ID, NAME))
@@ -258,7 +258,7 @@ class HelmChartServiceTest {
         .thenReturn(Optional.empty());
     this.stubSaveReturnsItsArgument();
 
-    this.service.findOrCreate(newForm(), REPO_ID);
+    this.service.getOrCreate(newForm(), REPO_ID);
 
     verify(this.helmChartRepository).insertIfAbsent(any(), eq(REPO_ID), eq(NAME), any());
     verify(this.helmChartRepository, never()).save(any(HelmChart.class));

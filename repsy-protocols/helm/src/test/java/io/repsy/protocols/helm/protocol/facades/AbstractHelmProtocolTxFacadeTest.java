@@ -152,15 +152,15 @@ class AbstractHelmProtocolTxFacadeTest {
   }
 
   private void uploadHolds(final byte[] bytes) {
-    when(this.helmStorageService.getBlob(REPO_ID, UPLOAD_ID.toString(), REPO_NAME))
+    when(this.helmStorageService.findBlob(REPO_ID, UPLOAD_ID.toString(), REPO_NAME))
         .thenReturn(Optional.of(new ByteArrayResource(bytes)));
   }
 
   private void blobIsStoredUnderDigest() {
     this.uploadHolds(new byte[BLOB_SIZE]);
-    when(this.helmStorageService.getBlob(REPO_ID, DIGEST, REPO_NAME))
+    when(this.helmStorageService.findBlob(REPO_ID, DIGEST, REPO_NAME))
         .thenReturn(Optional.of(new ByteArrayResource(new byte[BLOB_SIZE])));
-    when(this.ociBlobService.findOrCreate(any(), eq(REPO_ID))).thenReturn(this.blobInfo);
+    when(this.ociBlobService.getOrCreate(any(), eq(REPO_ID))).thenReturn(this.blobInfo);
   }
 
   private static InputStream body() {
@@ -209,7 +209,7 @@ class AbstractHelmProtocolTxFacadeTest {
     @Test
     @DisplayName("refuses an upload session that was never written")
     void refusesAMissingSession() {
-      when(AbstractHelmProtocolTxFacadeTest.this.helmStorageService.getBlob(
+      when(AbstractHelmProtocolTxFacadeTest.this.helmStorageService.findBlob(
               REPO_ID, UPLOAD_ID.toString(), REPO_NAME))
           .thenReturn(Optional.empty());
 
@@ -316,7 +316,7 @@ class AbstractHelmProtocolTxFacadeTest {
       verify(AbstractHelmProtocolTxFacadeTest.this.helmStorageService, never())
           .finalizeBlob(any(), any(), any());
       verify(AbstractHelmProtocolTxFacadeTest.this.ociBlobService, never())
-          .findOrCreate(any(), any());
+          .getOrCreate(any(), any());
     }
 
     @Test
@@ -342,7 +342,7 @@ class AbstractHelmProtocolTxFacadeTest {
     @Test
     @DisplayName("answers not found for an upload that holds no data")
     void refusesUnknownUpload() {
-      when(AbstractHelmProtocolTxFacadeTest.this.helmStorageService.getBlob(
+      when(AbstractHelmProtocolTxFacadeTest.this.helmStorageService.findBlob(
               REPO_ID, UPLOAD_ID.toString(), REPO_NAME))
           .thenReturn(Optional.empty());
 
@@ -547,7 +547,7 @@ class AbstractHelmProtocolTxFacadeTest {
     private void rowsAreWritten(final boolean manifestExists) {
       final var it = AbstractHelmProtocolTxFacadeTest.this;
       when(it.chartInfo.id()).thenReturn(this.chartId);
-      when(it.chartService.findOrCreate(any(HelmChartForm.class), eq(REPO_ID)))
+      when(it.chartService.getOrCreate(any(HelmChartForm.class), eq(REPO_ID)))
           .thenReturn(it.chartInfo);
       when(it.ociManifestService.findByNameAndReference(REPO_ID, "payments", "1.0.0"))
           .thenReturn(manifestExists ? Optional.of(this.manifestInfo) : Optional.empty());
@@ -574,7 +574,7 @@ class AbstractHelmProtocolTxFacadeTest {
 
       assertThat(result.manifest()).isSameAs(this.manifestInfo);
       final var order = inOrder(it.chartService, it.ociManifestService, it.helmStorageService);
-      order.verify(it.chartService).findOrCreate(any(HelmChartForm.class), eq(REPO_ID));
+      order.verify(it.chartService).getOrCreate(any(HelmChartForm.class), eq(REPO_ID));
       final var manifestForm = ArgumentCaptor.forClass(HelmOciManifestForm.class);
       order.verify(it.ociManifestService).save(manifestForm.capture(), eq(REPO_ID));
       assertThat(manifestForm.getValue().getChartId()).isEqualTo(this.chartId);
@@ -667,7 +667,7 @@ class AbstractHelmProtocolTxFacadeTest {
         reads.add(Optional.of(new ByteArrayResource(bytes)));
       }
       final var first = reads.remove(0);
-      when(it.helmStorageService.getManifest(REPO_ID, "payments", "1.0.0", REPO_NAME))
+      when(it.helmStorageService.findManifest(REPO_ID, "payments", "1.0.0", REPO_NAME))
           .thenReturn(first, reads.toArray(new Optional[0]));
     }
 
@@ -692,7 +692,7 @@ class AbstractHelmProtocolTxFacadeTest {
       this.pushThenComplete(TransactionSynchronization.STATUS_COMMITTED);
 
       verify(it.helmStorageService, never()).deleteManifestFile(any(), any(), any(), any());
-      verify(it.helmStorageService, never()).getManifest(any(), any(), any(), any());
+      verify(it.helmStorageService, never()).findManifest(any(), any(), any(), any());
     }
 
     @Test
@@ -738,7 +738,7 @@ class AbstractHelmProtocolTxFacadeTest {
     void leavesAReplacedFileWithNoPreviousBytes() throws Exception {
       final var it = AbstractHelmProtocolTxFacadeTest.this;
       this.rowsAreWritten(true);
-      when(it.helmStorageService.getManifest(REPO_ID, "payments", "1.0.0", REPO_NAME))
+      when(it.helmStorageService.findManifest(REPO_ID, "payments", "1.0.0", REPO_NAME))
           .thenReturn(Optional.empty(), Optional.of(new ByteArrayResource(this.content)));
 
       this.pushThenComplete(TransactionSynchronization.STATUS_ROLLED_BACK);
@@ -767,7 +767,7 @@ class AbstractHelmProtocolTxFacadeTest {
       final var it = AbstractHelmProtocolTxFacadeTest.this;
       final var lost = new OptimisticLockingFailureException("lost");
       when(it.chartInfo.id()).thenReturn(this.chartId);
-      when(it.chartService.findOrCreate(any(HelmChartForm.class), eq(REPO_ID)))
+      when(it.chartService.getOrCreate(any(HelmChartForm.class), eq(REPO_ID)))
           .thenReturn(it.chartInfo);
       when(it.ociManifestService.findByNameAndReference(REPO_ID, "payments", "1.0.0"))
           .thenReturn(Optional.empty());
@@ -784,7 +784,7 @@ class AbstractHelmProtocolTxFacadeTest {
     void writesNothingWhenTheChartRowIsRefused() {
       final var it = AbstractHelmProtocolTxFacadeTest.this;
       final var lost = new DataIntegrityViolationException("unique index");
-      when(it.chartService.findOrCreate(any(HelmChartForm.class), eq(REPO_ID))).thenThrow(lost);
+      when(it.chartService.getOrCreate(any(HelmChartForm.class), eq(REPO_ID))).thenThrow(lost);
 
       assertThatThrownBy(() -> it.facade.pushManifest(it.context, this.form(), this.content))
           .isSameAs(lost);
@@ -804,13 +804,13 @@ class AbstractHelmProtocolTxFacadeTest {
     void classicResourcePresentIsReturnedDirectly() throws Exception {
       final var it = AbstractHelmProtocolTxFacadeTest.this;
       final var classicResource = new ByteArrayResource(new byte[] {1, 2, 3});
-      when(it.helmStorageService.getResource(any(), eq(REPO_NAME)))
+      when(it.helmStorageService.findResource(any(), eq(REPO_NAME)))
           .thenReturn(Optional.of(classicResource));
 
       final var result = it.facade.getChart(it.context, FILENAME);
 
       assertThat(result).isSameAs(classicResource);
-      verify(it.helmStorageService, never()).getBlob(any(), any(), any());
+      verify(it.helmStorageService, never()).findBlob(any(), any(), any());
       verify(it.chartService, never()).findAllByRepoId(any());
     }
 
@@ -820,25 +820,25 @@ class AbstractHelmProtocolTxFacadeTest {
     void classicAbsentFallsBackToOciBlob() throws Exception {
       final var it = AbstractHelmProtocolTxFacadeTest.this;
       final var blobResource = new ByteArrayResource(new byte[] {4, 5, 6});
-      when(it.helmStorageService.getResource(any(), eq(REPO_NAME))).thenReturn(Optional.empty());
+      when(it.helmStorageService.findResource(any(), eq(REPO_NAME))).thenReturn(Optional.empty());
       when(it.chartInfo.name()).thenReturn("payments");
       when(it.chartInfo.version()).thenReturn("1.0.0");
       when(it.chartInfo.digest()).thenReturn(DIGEST);
       when(it.chartService.findAllByRepoId(REPO_ID)).thenReturn(List.of(it.chartInfo));
-      when(it.helmStorageService.getBlob(REPO_ID, DIGEST, REPO_NAME))
+      when(it.helmStorageService.findBlob(REPO_ID, DIGEST, REPO_NAME))
           .thenReturn(Optional.of(blobResource));
 
       final var result = it.facade.getChart(it.context, FILENAME);
 
       assertThat(result).isSameAs(blobResource);
-      verify(it.helmStorageService).getBlob(REPO_ID, DIGEST, REPO_NAME);
+      verify(it.helmStorageService).findBlob(REPO_ID, DIGEST, REPO_NAME);
     }
 
     @Test
     @DisplayName("answers chartNotFound when no chart row matches the filename")
     void classicAbsentNoMatchingRow() throws Exception {
       final var it = AbstractHelmProtocolTxFacadeTest.this;
-      when(it.helmStorageService.getResource(any(), eq(REPO_NAME))).thenReturn(Optional.empty());
+      when(it.helmStorageService.findResource(any(), eq(REPO_NAME))).thenReturn(Optional.empty());
       when(it.chartService.findAllByRepoId(REPO_ID)).thenReturn(List.of());
 
       assertThatThrownBy(() -> it.facade.getChart(it.context, FILENAME))
@@ -850,12 +850,12 @@ class AbstractHelmProtocolTxFacadeTest {
     @DisplayName("answers chartNotFound when the matching row's blob is also absent")
     void classicAbsentRowMatchesButBlobAbsent() throws Exception {
       final var it = AbstractHelmProtocolTxFacadeTest.this;
-      when(it.helmStorageService.getResource(any(), eq(REPO_NAME))).thenReturn(Optional.empty());
+      when(it.helmStorageService.findResource(any(), eq(REPO_NAME))).thenReturn(Optional.empty());
       when(it.chartInfo.name()).thenReturn("payments");
       when(it.chartInfo.version()).thenReturn("1.0.0");
       when(it.chartInfo.digest()).thenReturn(DIGEST);
       when(it.chartService.findAllByRepoId(REPO_ID)).thenReturn(List.of(it.chartInfo));
-      when(it.helmStorageService.getBlob(REPO_ID, DIGEST, REPO_NAME)).thenReturn(Optional.empty());
+      when(it.helmStorageService.findBlob(REPO_ID, DIGEST, REPO_NAME)).thenReturn(Optional.empty());
 
       assertThatThrownBy(() -> it.facade.getChart(it.context, FILENAME))
           .isInstanceOf(ItemNotFoundException.class)
@@ -869,12 +869,12 @@ class AbstractHelmProtocolTxFacadeTest {
       final var it = AbstractHelmProtocolTxFacadeTest.this;
       final var blobResource = new ByteArrayResource(new byte[] {7, 8, 9});
       final var hyphenatedChart = mock(HelmChartInfo.class);
-      when(it.helmStorageService.getResource(any(), eq(REPO_NAME))).thenReturn(Optional.empty());
+      when(it.helmStorageService.findResource(any(), eq(REPO_NAME))).thenReturn(Optional.empty());
       when(hyphenatedChart.name()).thenReturn("my-chart-with-dashes");
       when(hyphenatedChart.version()).thenReturn("1.2.3");
       when(hyphenatedChart.digest()).thenReturn(DIGEST);
       when(it.chartService.findAllByRepoId(REPO_ID)).thenReturn(List.of(hyphenatedChart));
-      when(it.helmStorageService.getBlob(REPO_ID, DIGEST, REPO_NAME))
+      when(it.helmStorageService.findBlob(REPO_ID, DIGEST, REPO_NAME))
           .thenReturn(Optional.of(blobResource));
 
       final var result = it.facade.getChart(it.context, "my-chart-with-dashes-1.2.3.tgz");
@@ -894,7 +894,7 @@ class AbstractHelmProtocolTxFacadeTest {
       final var chartId = UUID.fromString("00000000-0000-0000-0000-000000000003");
       when(AbstractHelmProtocolTxFacadeTest.this.chartInfo.id()).thenReturn(chartId);
       when(AbstractHelmProtocolTxFacadeTest.this.chartInfo.digest()).thenReturn(DIGEST);
-      when(AbstractHelmProtocolTxFacadeTest.this.chartService.findByRepoIdAndNameAndVersion(
+      when(AbstractHelmProtocolTxFacadeTest.this.chartService.getByRepoIdAndNameAndVersion(
               REPO_ID, "payments", "1.0.0"))
           .thenReturn(AbstractHelmProtocolTxFacadeTest.this.chartInfo);
       when(AbstractHelmProtocolTxFacadeTest.this.ociManifestService.findAllByChartId(chartId))
@@ -921,7 +921,7 @@ class AbstractHelmProtocolTxFacadeTest {
           .lockChart(REPO_ID, "payments");
       order
           .verify(AbstractHelmProtocolTxFacadeTest.this.chartService)
-          .findByRepoIdAndNameAndVersion(REPO_ID, "payments", "1.0.0");
+          .getByRepoIdAndNameAndVersion(REPO_ID, "payments", "1.0.0");
       order
           .verify(AbstractHelmProtocolTxFacadeTest.this.ociManifestService)
           .findAllByChartId(chartId);

@@ -158,7 +158,7 @@ class PendingSignatureServiceTest {
                     ? Optional.of(this.storedFile)
                     : Optional.empty());
     lenient()
-        .when(this.keyStoreService.findPublicKeySources(this.repoId, true))
+        .when(this.keyStoreService.getPublicKeySources(this.repoId, true))
         .thenReturn(PublicKeySources.none());
   }
 

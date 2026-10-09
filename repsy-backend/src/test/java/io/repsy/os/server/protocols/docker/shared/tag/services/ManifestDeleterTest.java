@@ -101,7 +101,7 @@ class ManifestDeleterTest {
   }
 
   private void imageExists() {
-    when(this.imageService.findImageInfoByRepoIdAndName(REPO_ID, IMAGE))
+    when(this.imageService.getImageInfoByRepoIdAndName(REPO_ID, IMAGE))
         .thenReturn(ImageInfo.builder().id(IMAGE_ID).name(IMAGE).build());
   }
 
@@ -156,7 +156,7 @@ class ManifestDeleterTest {
   @Test
   @DisplayName("an unknown image is the image lookup's own not-found error")
   void unknownImageIsNotFound() {
-    when(this.imageService.findImageInfoByRepoIdAndName(REPO_ID, IMAGE))
+    when(this.imageService.getImageInfoByRepoIdAndName(REPO_ID, IMAGE))
         .thenThrow(new ItemNotFoundException("imageNotFound"));
 
     assertThatThrownBy(() -> this.component.delete(this.repoInfo, IMAGE, SHA256))

@@ -454,7 +454,7 @@ public class PendingSignatureService {
       final BaseRepoInfo<UUID> repoInfo, final PendingSignature row, final Resource file) {
 
     final var sources =
-        this.keyStoreService.findPublicKeySources(
+        this.keyStoreService.getPublicKeySources(
             repoInfo.getStorageKey(), repoInfo.isPgpKeyServerLookupEnabled());
 
     try {

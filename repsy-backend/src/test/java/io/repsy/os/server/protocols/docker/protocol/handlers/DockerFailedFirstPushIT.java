@@ -223,7 +223,7 @@ class DockerFailedFirstPushIT extends AbstractIntegrationTest {
     final var failed = this.wire.putImage(repo, IMAGE, "latest", imageManifest("layer-one"));
 
     assertThat(failed.getStatus()).as(failed.getContentAsString()).isGreaterThanOrEqualTo(500);
-    verify(this.imageTxService).findOrCreateImage(repo.getId(), IMAGE);
+    verify(this.imageTxService).getOrCreateImage(repo.getId(), IMAGE);
     assertThat(this.imageNames(repo)).as("no image without a manifest").isEmpty();
 
     final var retried = this.wire.putImage(repo, IMAGE, "latest", imageManifest("layer-one"));

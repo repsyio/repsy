@@ -55,7 +55,7 @@ class HelmOciManifestContentColumnIT extends AbstractIntegrationTest {
   void storesTheJsonInTheColumn() {
     final var repo = this.seedRepo(RepoType.HELM, uniqueRepoName("helm"));
     final var chart =
-        this.helmChartService.findOrCreate(
+        this.helmChartService.getOrCreate(
             HelmChartForm.builder()
                 .name("payments")
                 .version("1.0.0")

@@ -42,7 +42,7 @@ public class TagDeleter {
   public void deleteTag(final RepoInfo repoInfo, final String imageName, final String tagName) {
 
     final var imageInfo =
-        this.imageService.findImageInfoByRepoIdAndName(repoInfo.getStorageKey(), imageName);
+        this.imageService.getImageInfoByRepoIdAndName(repoInfo.getStorageKey(), imageName);
 
     // The image row is locked first, in the order every transaction that deletes rows of the image
     // takes (see ImageTxService.lockImage). The image itself is never deleted here: the manifest
@@ -50,7 +50,7 @@ public class TagDeleter {
     this.imageService.lockImage(imageInfo.getId());
 
     final var tag =
-        this.manifestService.findTag(repoInfo.getStorageKey(), imageInfo.getId(), tagName);
+        this.manifestService.getTag(repoInfo.getStorageKey(), imageInfo.getId(), tagName);
 
     this.manifestService.deleteTag(tag);
 

@@ -714,7 +714,7 @@ public class ProtocolAuthService {
     // tryAuthorizeWithPat), so a password that looks like one is refused here, whoever the user is.
     this.rejectPersonalAccessTokenAsPassword(password);
 
-    final var userInfo = this.userTxService.getUserByUsernameOptional(username).orElse(null);
+    final var userInfo = this.userTxService.findUserInfoByUsername(username).orElse(null);
 
     // A password the cache remembers costs no hash check, so it is let through even for a client
     // that is blocked: a CI behind a shared address keeps working while a neighbour that sends

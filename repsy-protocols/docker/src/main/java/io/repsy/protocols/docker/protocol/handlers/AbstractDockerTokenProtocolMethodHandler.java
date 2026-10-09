@@ -71,7 +71,7 @@ public abstract class AbstractDockerTokenProtocolMethodHandler<ID>
     provider.registerMethodHandler(this);
   }
 
-  protected abstract Optional<ProtocolContext> getProtocolContext(RelativePath relativePath);
+  protected abstract Optional<ProtocolContext> findProtocolContext(RelativePath relativePath);
 
   @Override
   public List<HttpMethod> getSupportedMethods() {
@@ -102,7 +102,7 @@ public abstract class AbstractDockerTokenProtocolMethodHandler<ID>
 
       final var relativePath = new RelativePath("/token");
 
-      return this.getProtocolContext(relativePath);
+      return this.findProtocolContext(relativePath);
     };
   }
 
@@ -209,7 +209,7 @@ public abstract class AbstractDockerTokenProtocolMethodHandler<ID>
   }
 
   private ResponseEntity<Object> handlePublicReadRequest(final String scope) {
-    final var repoInfoOpt = this.scopeParser.getRepoInfoByScope(scope);
+    final var repoInfoOpt = this.scopeParser.findRepoInfoByScope(scope);
 
     if (repoInfoOpt.isEmpty()) {
 

@@ -134,7 +134,7 @@ class AbstractDockerProtocolTxFacadeTest {
   }
 
   private void uploadHolds(final byte[] bytes) {
-    when(this.dockerStorageService.getResource(
+    when(this.dockerStorageService.findResource(
             argThat(path -> path != null && path.getPath().equals(UPLOAD_STORAGE_PATH)),
             eq(REPO_NAME)))
         .thenReturn(Optional.of(new ByteArrayResource(bytes)));
@@ -224,7 +224,7 @@ class AbstractDockerProtocolTxFacadeTest {
   @Test
   @DisplayName("getUploadSize() refuses an upload session that was never written")
   void getUploadSizeRefusesAMissingSession() {
-    when(this.dockerStorageService.getResource(
+    when(this.dockerStorageService.findResource(
             argThat(path -> path != null && path.getPath().equals(UPLOAD_STORAGE_PATH)),
             eq(REPO_NAME)))
         .thenReturn(Optional.empty());
@@ -246,12 +246,12 @@ class AbstractDockerProtocolTxFacadeTest {
   private BaseImageInfo<UUID> stubImage() {
     final var imageInfo =
         BaseImageInfo.<UUID>builder().id(UUID.randomUUID()).name(IMAGE_NAME).build();
-    when(this.imageService.findImageInfoByRepoIdAndName(REPO_ID, IMAGE_NAME)).thenReturn(imageInfo);
+    when(this.imageService.getImageInfoByRepoIdAndName(REPO_ID, IMAGE_NAME)).thenReturn(imageInfo);
     return imageInfo;
   }
 
   private void stubManifestStorage(final byte[] body) {
-    when(this.dockerStorageService.getResource(
+    when(this.dockerStorageService.findResource(
             argThat(path -> path != null && path.getPath().contains("manifests/")), eq(REPO_NAME)))
         .thenReturn(Optional.of(new ByteArrayResource(body)));
   }
@@ -267,7 +267,7 @@ class AbstractDockerProtocolTxFacadeTest {
     final var manifestDetail = new BaseManifestDetail<UUID>();
     manifestDetail.setMediaType("application/vnd.oci.image.manifest.v1+json");
     manifestDetail.setDigest(digest);
-    when(this.manifestService.findManifestByRepoIdAndImageNameAndDigest(REPO_ID, imageInfo, digest))
+    when(this.manifestService.getManifestByRepoIdAndImageNameAndDigest(REPO_ID, imageInfo, digest))
         .thenReturn(manifestDetail);
     this.stubManifestStorage("manifest-body".getBytes(StandardCharsets.UTF_8));
 
@@ -293,7 +293,7 @@ class AbstractDockerProtocolTxFacadeTest {
     final var manifestDetail = new BaseManifestDetail<UUID>();
     manifestDetail.setMediaType("application/vnd.oci.image.manifest.v1+json");
     manifestDetail.setDigest("sha256:" + "c".repeat(64));
-    when(this.manifestService.findManifestByRepoIdAndImageNameAndDigest(REPO_ID, imageInfo, digest))
+    when(this.manifestService.getManifestByRepoIdAndImageNameAndDigest(REPO_ID, imageInfo, digest))
         .thenReturn(manifestDetail);
     this.stubManifestStorage("manifest-body".getBytes(StandardCharsets.UTF_8));
 
@@ -317,7 +317,7 @@ class AbstractDockerProtocolTxFacadeTest {
     final var manifestDetail = new BaseManifestDetail<UUID>();
     manifestDetail.setMediaType("application/vnd.oci.image.manifest.v1+json");
     manifestDetail.setDigest("sha256:" + "c".repeat(64));
-    when(this.manifestService.findManifestByRepoIdAndImageNameAndDigest(REPO_ID, imageInfo, sha512))
+    when(this.manifestService.getManifestByRepoIdAndImageNameAndDigest(REPO_ID, imageInfo, sha512))
         .thenReturn(manifestDetail);
     this.stubManifestStorage("manifest-body".getBytes(StandardCharsets.UTF_8));
     final var requested = "sha512:" + "AB".repeat(64);
@@ -338,9 +338,9 @@ class AbstractDockerProtocolTxFacadeTest {
     final var manifestDetail = new BaseManifestDetail<UUID>();
     manifestDetail.setMediaType("application/vnd.oci.image.manifest.v1+json");
     manifestDetail.setDigest(digest);
-    when(this.manifestService.findManifestByRepoIdAndImageNameAndDigest(REPO_ID, imageInfo, digest))
+    when(this.manifestService.getManifestByRepoIdAndImageNameAndDigest(REPO_ID, imageInfo, digest))
         .thenReturn(manifestDetail);
-    when(this.dockerStorageService.getResource(
+    when(this.dockerStorageService.findResource(
             argThat(
                 path -> path != null && path.getPath().equals(REPO_ID + "/manifests/" + digest)),
             eq(REPO_NAME)))
@@ -366,14 +366,14 @@ class AbstractDockerProtocolTxFacadeTest {
     manifestDetail.setMediaType("application/vnd.oci.image.manifest.v1+json");
     manifestDetail.setDigest(digest);
     manifestDetail.setStorageName("latest");
-    when(this.manifestService.findManifestByRepoIdAndImageNameAndDigest(REPO_ID, imageInfo, digest))
+    when(this.manifestService.getManifestByRepoIdAndImageNameAndDigest(REPO_ID, imageInfo, digest))
         .thenReturn(manifestDetail);
     final var legacyPath =
         REPO_ID + "/manifests/" + ManifestNameGenerator.generate(REPO_ID, IMAGE_NAME, "latest");
     when(this.dockerStorageService.existsResource(
             argThat(path -> path != null && path.getPath().equals(legacyPath)), eq(REPO_NAME)))
         .thenReturn(true);
-    when(this.dockerStorageService.getResource(
+    when(this.dockerStorageService.findResource(
             argThat(path -> path != null && path.getPath().equals(legacyPath)), eq(REPO_NAME)))
         .thenReturn(
             Optional.of(new ByteArrayResource("legacy-body".getBytes(StandardCharsets.UTF_8))));
@@ -397,10 +397,10 @@ class AbstractDockerProtocolTxFacadeTest {
     manifestDetail.setMediaType("application/vnd.oci.image.manifest.v1+json");
     manifestDetail.setDigest(digest);
     manifestDetail.setStorageName("latest");
-    when(this.manifestService.findManifestByRepoIdAndImageNameAndDigest(REPO_ID, imageInfo, digest))
+    when(this.manifestService.getManifestByRepoIdAndImageNameAndDigest(REPO_ID, imageInfo, digest))
         .thenReturn(manifestDetail);
     when(this.dockerStorageService.existsResource(any(), eq(REPO_NAME))).thenReturn(false);
-    when(this.dockerStorageService.getResource(
+    when(this.dockerStorageService.findResource(
             argThat(
                 path -> path != null && path.getPath().equals(REPO_ID + "/manifests/" + digest)),
             eq(REPO_NAME)))
@@ -440,7 +440,7 @@ class AbstractDockerProtocolTxFacadeTest {
         .isInstanceOf(BadRequestException.class)
         .hasMessage("digestMismatch");
     verify(this.dockerStorageService, never()).writeInputStreamToPath(any(), any(), any());
-    verify(this.imageService, never()).findOrCreateImage(any(), any());
+    verify(this.imageService, never()).getOrCreateImage(any(), any());
   }
 
   @Test
@@ -461,7 +461,7 @@ class AbstractDockerProtocolTxFacadeTest {
         .isInstanceOf(AccessNotAllowedException.class)
         .hasMessage("packageOverrideDisabled");
     verify(this.dockerStorageService, never()).writeInputStreamToPath(any(), any(), any());
-    verify(this.imageService, never()).findOrCreateImage(any(), any());
+    verify(this.imageService, never()).getOrCreateImage(any(), any());
   }
 
   private static final String EMPTY_BLOB = "sha256:" + "4".repeat(64);
@@ -484,7 +484,7 @@ class AbstractDockerProtocolTxFacadeTest {
   private List<String> digestsAskedFor(final String manifestJson) throws Exception {
     final var bytes = manifestJson.getBytes(StandardCharsets.UTF_8);
     final var digest = DockerDigestCalculator.calculateDigest(bytes);
-    when(this.imageService.findOrCreateImage(REPO_ID, IMAGE_NAME))
+    when(this.imageService.getOrCreateImage(REPO_ID, IMAGE_NAME))
         .thenReturn(BaseImageInfo.<UUID>builder().id(UUID.randomUUID()).name(IMAGE_NAME).build());
     doThrow(new ItemNotFoundException("stop"))
         .when(this.layerService)
@@ -548,7 +548,7 @@ class AbstractDockerProtocolTxFacadeTest {
   @Test
   @DisplayName("listTags() refuses an image the repo does not have (RPS-1489)")
   void listTagsRefusesAnUnknownImage() {
-    when(this.imageService.findImageInfoByRepoIdAndName(REPO_ID, IMAGE_NAME))
+    when(this.imageService.getImageInfoByRepoIdAndName(REPO_ID, IMAGE_NAME))
         .thenThrow(new ItemNotFoundException("imageNotFound"));
 
     assertThatThrownBy(() -> this.facade().listTags(newContext(), IMAGE_NAME, null, null))

@@ -37,7 +37,7 @@ public interface NpmStorageService {
 
   void createRepo(UUID repoId);
 
-  long removeDistributionTag(UUID repoId, String repoName, Path packageBasePath, String tagName)
+  long deleteDistributionTag(UUID repoId, String repoName, Path packageBasePath, String tagName)
       throws IOException;
 
   BaseUsages writeMetadataToFile(
@@ -179,7 +179,7 @@ public interface NpmStorageService {
    *     was not the latest
    * @param snapshot the rows of the package with the removal already made in them
    */
-  long removeVersion(
+  long deleteVersion(
       UUID repoId,
       String repoName,
       Path packageBasePath,

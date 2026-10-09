@@ -66,7 +66,7 @@ class AbstractCargoMeProtocolMethodHandlerTest {
     handler =
         new AbstractCargoMeProtocolMethodHandler(authenticator, provider) {
           @Override
-          protected Optional<ProtocolContext> getProtocolContext(final RelativePath relativePath) {
+          protected Optional<ProtocolContext> findProtocolContext(final RelativePath relativePath) {
             requestedPath = relativePath;
             return Optional.of(meContext);
           }

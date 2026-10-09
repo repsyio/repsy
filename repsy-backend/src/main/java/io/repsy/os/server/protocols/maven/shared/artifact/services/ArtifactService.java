@@ -1079,7 +1079,7 @@ public class ArtifactService extends AbstractArtifactService<UUID> {
       final BaseRepoInfo<UUID> repoInfo, final Resource storedFile, final Resource signature) {
 
     final var sources =
-        this.keyStoreService.findPublicKeySources(
+        this.keyStoreService.getPublicKeySources(
             repoInfo.getStorageKey(), repoInfo.isPgpKeyServerLookupEnabled());
 
     this.pgpVerifierService.verify(storedFile, signature, sources);

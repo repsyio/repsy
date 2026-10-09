@@ -53,7 +53,7 @@ public class HelmArtifactStorageResolver implements ArtifactStorageResolver {
     final var storagePath = StoragePath.of(repoId, relativePath);
 
     try {
-      final var resource = this.helmStorageService.getResource(storagePath, repoName);
+      final var resource = this.helmStorageService.findResource(storagePath, repoName);
 
       if (resource.isPresent() && resource.get().exists()) {
         return Optional.of(relativePath);

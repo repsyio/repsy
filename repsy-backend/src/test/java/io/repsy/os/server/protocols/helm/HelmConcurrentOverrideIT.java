@@ -354,7 +354,7 @@ class HelmConcurrentOverrideIT extends AbstractIntegrationTest {
                   new TransactionTemplate(this.transactionManager)
                       .execute(
                           status -> {
-                            this.helmChartService.findOrCreate(firstForm, repo.getId());
+                            this.helmChartService.getOrCreate(firstForm, repo.getId());
                             // The update is sent, so its row lock is held, not just pending.
                             this.helmChartVersionRepository.flush();
                             firstUpdated.countDown();

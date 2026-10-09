@@ -23,7 +23,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public interface OciBlobService<ID> {
 
-  HelmOciBlobInfo findOrCreate(HelmOciBlobForm form, ID repoId);
+  HelmOciBlobInfo getOrCreate(HelmOciBlobForm form, ID repoId);
 
   Optional<HelmOciBlobInfo> findByDigest(ID repoId, String digest);
 

@@ -105,7 +105,7 @@ public class KeyStoreService {
         .build();
   }
 
-  public io.repsy.os.generated.model.KeyStoreItem find(
+  public io.repsy.os.generated.model.KeyStoreItem get(
       final RepoInfo repoInfo, final UUID keyStoreId) {
 
     final var keyStore =
@@ -203,7 +203,7 @@ public class KeyStoreService {
     return this.artifactConverter.toPgpPublicKeyItemDto(saved);
   }
 
-  public PgpPublicKeyItem findPublicKey(final RepoInfo repoInfo, final UUID id) {
+  public PgpPublicKeyItem getPublicKey(final RepoInfo repoInfo, final UUID id) {
 
     return this.pgpPublicKeyRepository
         .findByIdAndRepoId(id, repoInfo.getStorageKey())
@@ -238,7 +238,7 @@ public class KeyStoreService {
    * keyServerLookupEnabled} is {@code false} (RPS-1204) the hosts are not even read: no key server
    * is going to be asked.
    */
-  public PublicKeySources findPublicKeySources(
+  public PublicKeySources getPublicKeySources(
       final UUID repoId, final boolean keyServerLookupEnabled) {
 
     return new PublicKeySources(

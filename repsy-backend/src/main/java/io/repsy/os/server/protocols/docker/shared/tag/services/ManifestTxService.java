@@ -152,7 +152,7 @@ public class ManifestTxService implements ManifestService<UUID> {
   }
 
   @Override
-  public ManifestDetail findManifestByRepoIdAndImageNameAndDigest(
+  public ManifestDetail getManifestByRepoIdAndImageNameAndDigest(
       final UUID repoId, final BaseImageInfo<UUID> imageInfo, final String digest) {
 
     return this.manifestConverter.toManifestDetail(this.findManifest(imageInfo.getId(), digest));
@@ -234,7 +234,7 @@ public class ManifestTxService implements ManifestService<UUID> {
     return this.pageOf(matching, pageable);
   }
 
-  public Tag findTag(final UUID repoId, final UUID imageId, final String tagName) {
+  public Tag getTag(final UUID repoId, final UUID imageId, final String tagName) {
 
     return this.tagRepository
         .findByImageRepoIdAndImageIdAndName(repoId, imageId, tagName)
@@ -253,7 +253,7 @@ public class ManifestTxService implements ManifestService<UUID> {
   public io.repsy.os.generated.model.TagDetail getTagDetail(
       final UUID repoId, final UUID imageId, final String tagName) {
 
-    return this.manifestConverter.toTagDetail(this.findTag(repoId, imageId, tagName));
+    return this.manifestConverter.toTagDetail(this.getTag(repoId, imageId, tagName));
   }
 
   private List<String> fileNamesOf(

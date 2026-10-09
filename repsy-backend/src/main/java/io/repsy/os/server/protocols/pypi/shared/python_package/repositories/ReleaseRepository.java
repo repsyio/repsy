@@ -34,7 +34,7 @@ public interface ReleaseRepository extends JpaRepository<Release, UUID> {
 
   @Query(
       "select r.summary from Release r where r.pypiPackage.id = :packageId and r.version = :version")
-  Optional<String> getDescription(UUID packageId, String version);
+  Optional<String> findDescription(UUID packageId, String version);
 
   Optional<Release> findByPypiPackageIdAndVersion(UUID packageId, String version);
 

@@ -119,8 +119,8 @@ public class HelmProtocolTxFacade extends AbstractHelmProtocolTxFacade<UUID> {
 
   @Override
   @Transactional
-  public HelmOciBlobInfo findOrCreateBlob(final HelmOciBlobForm form, final UUID repoId) {
-    return super.findOrCreateBlob(form, repoId);
+  public HelmOciBlobInfo getOrCreateBlob(final HelmOciBlobForm form, final UUID repoId) {
+    return super.getOrCreateBlob(form, repoId);
   }
 
   @Override

@@ -110,7 +110,7 @@ public abstract class AbstractNpmDistTagsRemoveProtocolMethodHandler
 
     final var pathVars = ExtractPath.extractPathVars(packagePath);
 
-    this.npmProtocolFacade.removeDistributionTag(
+    this.npmProtocolFacade.deleteDistributionTag(
         context, pathVars.scopeName(), pathVars.packageName(), tagName);
 
     return ResponseEntity.ok()

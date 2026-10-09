@@ -159,7 +159,7 @@ class NpmMissingMetadataIT extends AbstractIntegrationTest {
   }
 
   private RepoInfo infoOf(final Repo repo) {
-    return this.repoTxService.getRepoByNameAndType(repo.getName(), RepoType.NPM).orElseThrow();
+    return this.repoTxService.findRepoByNameAndType(repo.getName(), RepoType.NPM).orElseThrow();
   }
 
   private String adminToken() {

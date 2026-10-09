@@ -120,7 +120,7 @@ class AbstractDockerUploadFinalizeProtocolMethodHandlerTest {
   @DisplayName("appends the closing chunk, verifies the digest, then records the layer")
   void verifiesTheDigestBeforeRecordingTheLayer() throws Exception {
     final var layerInfo = LayerInfo.builder().uuid(UUID.randomUUID()).digest(DIGEST).build();
-    when(this.layerService.findOrCreate(any(LayerForm.class), eq(REPO_ID))).thenReturn(layerInfo);
+    when(this.layerService.getOrCreate(any(LayerForm.class), eq(REPO_ID))).thenReturn(layerInfo);
 
     final var response =
         this.handler().handle(this.context, request(new byte[16]), new MockHttpServletResponse());
@@ -132,7 +132,7 @@ class AbstractDockerUploadFinalizeProtocolMethodHandlerTest {
         .verify(this.dockerFacade)
         .uploadLayerChunk(eq(this.context), uploadPath(), any(), eq(16L));
     order.verify(this.dockerFacade).verifyLayerDigest(eq(this.context), uploadPath(), eq(DIGEST));
-    order.verify(this.layerService).findOrCreate(any(LayerForm.class), eq(REPO_ID));
+    order.verify(this.layerService).getOrCreate(any(LayerForm.class), eq(REPO_ID));
     order
         .verify(this.dockerFacade)
         .finalizeLayerUpload(eq(this.context), uploadPath(), eq(layerInfo));
@@ -141,7 +141,7 @@ class AbstractDockerUploadFinalizeProtocolMethodHandlerTest {
   @Test
   @DisplayName("sends no closing chunk when the finalize request has no body")
   void skipsTheChunkOfAnEmptyBody() throws Exception {
-    when(this.layerService.findOrCreate(any(LayerForm.class), eq(REPO_ID)))
+    when(this.layerService.getOrCreate(any(LayerForm.class), eq(REPO_ID)))
         .thenReturn(LayerInfo.builder().uuid(UUID.randomUUID()).digest(DIGEST).build());
 
     this.handler().handle(this.context, request(new byte[0]), new MockHttpServletResponse());
@@ -163,7 +163,7 @@ class AbstractDockerUploadFinalizeProtocolMethodHandlerTest {
                     .handle(this.context, request(new byte[0]), new MockHttpServletResponse()))
         .isInstanceOf(BadRequestException.class);
 
-    verify(this.layerService, never()).findOrCreate(any(), any());
+    verify(this.layerService, never()).getOrCreate(any(), any());
     verify(this.dockerFacade, never()).finalizeLayerUpload(any(), any(), any());
   }
 }

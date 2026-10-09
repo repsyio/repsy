@@ -77,7 +77,7 @@ public class HelmApiFacade implements ProtocolApiFacade {
   @Transactional(readOnly = true)
   public HelmChartSummary getChart(final RepoInfo repoInfo, final String name) {
     return this.helmChartMapper.toSummary(
-        this.helmChartService.findLatestByName(repoInfo.getStorageKey(), name));
+        this.helmChartService.getLatestByName(repoInfo.getStorageKey(), name));
   }
 
   @Transactional(readOnly = true)
@@ -92,8 +92,7 @@ public class HelmApiFacade implements ProtocolApiFacade {
   public HelmChartDetail getDetail(
       final RepoInfo repoInfo, final String name, final String version) {
     final var info =
-        this.helmChartService.findByRepoIdAndNameAndVersion(
-            repoInfo.getStorageKey(), name, version);
+        this.helmChartService.getByRepoIdAndNameAndVersion(repoInfo.getStorageKey(), name, version);
     return this.helmChartMapper.toDetail(info);
   }
 
@@ -144,8 +143,7 @@ public class HelmApiFacade implements ProtocolApiFacade {
     this.helmChartService.lockChart(repoInfo.getStorageKey(), name);
 
     final var chartInfo =
-        this.helmChartService.findByRepoIdAndNameAndVersion(
-            repoInfo.getStorageKey(), name, version);
+        this.helmChartService.getByRepoIdAndNameAndVersion(repoInfo.getStorageKey(), name, version);
 
     final var manifests = this.helmOciManifestService.findAllByChartId(chartInfo.id());
 

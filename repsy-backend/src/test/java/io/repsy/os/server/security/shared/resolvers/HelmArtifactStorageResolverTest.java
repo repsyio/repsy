@@ -60,7 +60,7 @@ class HelmArtifactStorageResolverTest {
   @DisplayName("a classic chart resolves to its charts/ path")
   void classicOnly() throws IOException {
     when(this.storage.getChartRelativePath("payments", "1.0.0")).thenReturn(CLASSIC);
-    when(this.storage.getResource(any(), any()))
+    when(this.storage.findResource(any(), any()))
         .thenReturn(Optional.of(new ByteArrayResource(new byte[] {1})));
 
     assertThat(this.resolver().resolve(this.repoId, "repo", "payments", "1.0.0")).contains(CLASSIC);
@@ -70,7 +70,7 @@ class HelmArtifactStorageResolverTest {
   @DisplayName("an OCI-only chart resolves to its chart layer blob")
   void ociOnly() throws IOException {
     when(this.storage.getChartRelativePath("payments", "1.0.0")).thenReturn(CLASSIC);
-    when(this.storage.getResource(any(), any())).thenReturn(Optional.empty());
+    when(this.storage.findResource(any(), any())).thenReturn(Optional.empty());
     this.givenChartRow();
     when(this.storage.blobExists(this.repoId, DIGEST, "repo")).thenReturn(true);
 
@@ -82,7 +82,7 @@ class HelmArtifactStorageResolverTest {
   @DisplayName("a chart row whose blob is gone resolves to nothing")
   void rowWithoutBlob() throws IOException {
     when(this.storage.getChartRelativePath("payments", "1.0.0")).thenReturn(CLASSIC);
-    when(this.storage.getResource(any(), any())).thenReturn(Optional.empty());
+    when(this.storage.findResource(any(), any())).thenReturn(Optional.empty());
     this.givenChartRow();
     when(this.storage.blobExists(this.repoId, DIGEST, "repo")).thenReturn(false);
 
@@ -93,7 +93,7 @@ class HelmArtifactStorageResolverTest {
   @DisplayName("a chart with neither a file nor a row resolves to nothing")
   void missing() throws IOException {
     when(this.storage.getChartRelativePath("payments", "1.0.0")).thenReturn(CLASSIC);
-    when(this.storage.getResource(any(), any())).thenReturn(Optional.empty());
+    when(this.storage.findResource(any(), any())).thenReturn(Optional.empty());
     when(this.chartService.findOptionalByNameAndVersion(this.repoId, "payments", "1.0.0"))
         .thenReturn(Optional.empty());
 

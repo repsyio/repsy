@@ -271,7 +271,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
   }
 
   @Override
-  public void removeDistributionTag(
+  public void deleteDistributionTag(
       final ProtocolContext context,
       @Nullable final String scopeName,
       final String packageName,
@@ -286,7 +286,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
     final var packageBasePath = this.npmStorageService.getPackageBasePath(scopeName, packageName);
 
     final var usages =
-        this.npmPackageService.removeDistributionTag(
+        this.npmPackageService.deleteDistributionTag(
             repoInfo,
             scopeName,
             packageName,
@@ -298,7 +298,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
                     packageName,
                     packageBasePath,
                     () ->
-                        this.npmStorageService.removeDistributionTag(
+                        this.npmStorageService.deleteDistributionTag(
                             repoInfo.getStorageKey(),
                             repoInfo.getName(),
                             packageBasePath,
@@ -396,7 +396,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
             versionName,
             newLatest ->
                 BaseUsages.ofDisk(
-                    this.npmStorageService.removeVersion(
+                    this.npmStorageService.deleteVersion(
                         repoInfo.getStorageKey(),
                         repoInfo.getName(),
                         packageBasePath,

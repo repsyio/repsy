@@ -138,7 +138,7 @@ public class TrivyScanService {
         () -> this.runDockerScan(scanId, imageReference, registryAuthToken, registryInsecure));
   }
 
-  public @NonNull Optional<ScanJob> getStatus(final @NonNull String scanId) {
+  public @NonNull Optional<ScanJob> findStatus(final @NonNull String scanId) {
     return this.jobStore.get(scanId);
   }
 

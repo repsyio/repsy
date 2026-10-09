@@ -114,7 +114,7 @@ class ProtocolAuthServiceTest {
 
   @BeforeEach
   void seedUser() {
-    when(this.userTxService.getUserByUsernameOptional(USERNAME)).thenReturn(Optional.of(ALICE));
+    when(this.userTxService.findUserInfoByUsername(USERNAME)).thenReturn(Optional.of(ALICE));
   }
 
   @Test
@@ -254,7 +254,7 @@ class ProtocolAuthServiceTest {
     @Test
     @DisplayName("authenticateWithPassword upgrades an outdated hash after a correct password")
     void upgradesOutdatedHash() {
-      when(ProtocolAuthServiceTest.this.userTxService.getUserByUsernameOptional("dave"))
+      when(ProtocolAuthServiceTest.this.userTxService.findUserInfoByUsername("dave"))
           .thenReturn(Optional.of(this.weakUser));
 
       ProtocolAuthServiceTest.this.authService.authenticateWithPassword(
@@ -267,7 +267,7 @@ class ProtocolAuthServiceTest {
     @Test
     @DisplayName("authenticateWithPassword leaves a current BCrypt hash alone")
     void keepsCurrentHash() {
-      when(ProtocolAuthServiceTest.this.userTxService.getUserByUsernameOptional("carol"))
+      when(ProtocolAuthServiceTest.this.userTxService.findUserInfoByUsername("carol"))
           .thenReturn(Optional.of(this.bcryptUser));
 
       final var user =
@@ -282,7 +282,7 @@ class ProtocolAuthServiceTest {
     @Test
     @DisplayName("authenticateWithPassword does not upgrade after a wrong password")
     void doesNotUpgradeOnWrongPassword() {
-      when(ProtocolAuthServiceTest.this.userTxService.getUserByUsernameOptional("dave"))
+      when(ProtocolAuthServiceTest.this.userTxService.findUserInfoByUsername("dave"))
           .thenReturn(Optional.of(this.weakUser));
 
       assertUnauthorized(
@@ -351,7 +351,7 @@ class ProtocolAuthServiceTest {
 
     @BeforeEach
     void seedCarol() {
-      when(this.users.getUserByUsernameOptional("carol")).thenReturn(Optional.of(this.carol));
+      when(this.users.findUserInfoByUsername("carol")).thenReturn(Optional.of(this.carol));
     }
 
     @Test
@@ -384,7 +384,7 @@ class ProtocolAuthServiceTest {
               .hash(PasswordHasher.hash("new-s3cret"))
               .role(UserRole.USER)
               .build();
-      when(this.users.getUserByUsernameOptional("carol")).thenReturn(Optional.of(changed));
+      when(this.users.findUserInfoByUsername("carol")).thenReturn(Optional.of(changed));
 
       assertUnauthorized(() -> this.service.authenticateUser(basicAuth("carol", PASSWORD)));
       assertThat(this.service.authenticateUser(basicAuth("carol", "new-s3cret"))).isSameAs(changed);
@@ -395,7 +395,7 @@ class ProtocolAuthServiceTest {
     void deletedUserIsRejected() {
       this.service.authenticateUser(basicAuth("carol", PASSWORD));
 
-      when(this.users.getUserByUsernameOptional("carol")).thenReturn(Optional.empty());
+      when(this.users.findUserInfoByUsername("carol")).thenReturn(Optional.empty());
 
       assertUnauthorized(() -> this.service.authenticateUser(basicAuth("carol", PASSWORD)));
     }
@@ -412,7 +412,7 @@ class ProtocolAuthServiceTest {
               .hash(this.carol.getHash())
               .role(UserRole.ADMIN)
               .build();
-      when(this.users.getUserByUsernameOptional("carol")).thenReturn(Optional.of(promoted));
+      when(this.users.findUserInfoByUsername("carol")).thenReturn(Optional.of(promoted));
 
       assertThat(this.service.authenticateUser(basicAuth("carol", PASSWORD)).getRole())
           .isEqualTo(UserRole.ADMIN);
@@ -459,8 +459,8 @@ class ProtocolAuthServiceTest {
 
     @BeforeEach
     void seedDaveAndAClient() {
-      when(this.users.getUserByUsernameOptional("dave")).thenReturn(Optional.of(this.dave));
-      when(this.users.getUserByUsernameOptional("ghost")).thenReturn(Optional.empty());
+      when(this.users.findUserInfoByUsername("dave")).thenReturn(Optional.of(this.dave));
+      when(this.users.findUserInfoByUsername("ghost")).thenReturn(Optional.empty());
 
       final var request = new MockHttpServletRequest();
       request.setRemoteAddr("203.0.113.7");
@@ -763,7 +763,7 @@ class ProtocolAuthServiceTest {
       this.jwtAuthService.handleBearerAuth(BEARER, this.repoId, Permission.WRITE);
 
       verify(ProtocolAuthServiceTest.this.userTxService, never())
-          .getUserByUsernameOptional(anyString());
+          .findUserInfoByUsername(anyString());
       verify(ProtocolAuthServiceTest.this.userTxService, never())
           .getAuthenticatedUserByUsername(anyString());
       verify(this.deployTokenService, times(2)).updateLastUsedTime(this.tokenId);
@@ -787,7 +787,7 @@ class ProtocolAuthServiceTest {
       assertUnauthorized(
           () -> this.jwtAuthService.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.READ));
       verify(ProtocolAuthServiceTest.this.userTxService, never())
-          .getUserByUsernameOptional(anyString());
+          .findUserInfoByUsername(anyString());
     }
 
     @Test
@@ -835,7 +835,7 @@ class ProtocolAuthServiceTest {
       verify(ProtocolAuthServiceTest.this.userTxService, never())
           .getAuthenticatedUserByUsername(anyString());
       verify(ProtocolAuthServiceTest.this.userTxService, never())
-          .getUserByUsernameOptional(anyString());
+          .findUserInfoByUsername(anyString());
     }
 
     /**

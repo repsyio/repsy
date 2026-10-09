@@ -446,7 +446,7 @@ class VersionSignatureServiceTest {
     final var signature = this.stored(VERSION_PATH + "/lib-1.0.jar.asc", "sig");
     this.stored(VERSION_PATH + "/lib-1.0.pom", "pom");
     this.stored(VERSION_PATH + "/lib-1.0.pom.asc", "pom-sig");
-    when(this.keyStoreService.findPublicKeySources(this.storageKey, true)).thenReturn(SOURCES);
+    when(this.keyStoreService.getPublicKeySources(this.storageKey, true)).thenReturn(SOURCES);
 
     assertThat(this.service.recompute(this.version.getId())).isTrue();
 
@@ -470,7 +470,7 @@ class VersionSignatureServiceTest {
     this.verifiedFiles("lib-1.0.pom");
     final var jar = this.stored(VERSION_PATH + "/lib-1.0.jar", "jar");
     final var signature = this.stored(VERSION_PATH + "/lib-1.0.jar.asc", "forged");
-    when(this.keyStoreService.findPublicKeySources(this.storageKey, true)).thenReturn(SOURCES);
+    when(this.keyStoreService.getPublicKeySources(this.storageKey, true)).thenReturn(SOURCES);
     doThrow(new SignatureNotVerifiedException("artifactSignatureNotVerified"))
         .when(this.pgpVerifierService)
         .verify(jar, signature, SOURCES);
@@ -491,7 +491,7 @@ class VersionSignatureServiceTest {
     this.verifiedFiles("lib-1.0.pom");
     final var pom = this.stored(VERSION_PATH + "/lib-1.0.pom", "replaced pom");
     final var signature = this.stored(VERSION_PATH + "/lib-1.0.pom.asc", "sig of the old pom");
-    when(this.keyStoreService.findPublicKeySources(this.storageKey, true)).thenReturn(SOURCES);
+    when(this.keyStoreService.getPublicKeySources(this.storageKey, true)).thenReturn(SOURCES);
     doThrow(new SignatureNotVerifiedException("artifactSignatureNotVerified"))
         .when(this.pgpVerifierService)
         .verify(pom, signature, SOURCES);
@@ -510,7 +510,7 @@ class VersionSignatureServiceTest {
     this.verifiedFiles("lib-1.0.pom");
     this.stored(VERSION_PATH + "/lib-1.0.pom", "pom");
     this.stored(VERSION_PATH + "/lib-1.0.pom.asc", "sig");
-    when(this.keyStoreService.findPublicKeySources(this.storageKey, true)).thenReturn(SOURCES);
+    when(this.keyStoreService.getPublicKeySources(this.storageKey, true)).thenReturn(SOURCES);
 
     this.service.recompute(this.version.getId());
 
@@ -531,7 +531,7 @@ class VersionSignatureServiceTest {
     this.stored(VERSION_PATH + "/lib-1.0.pom.asc", "sig");
     this.stored(VERSION_PATH + "/lib-1.0.jar", "jar");
     this.stored(VERSION_PATH + "/lib-1.0.jar.asc", "sig");
-    when(this.keyStoreService.findPublicKeySources(this.storageKey, true)).thenReturn(SOURCES);
+    when(this.keyStoreService.getPublicKeySources(this.storageKey, true)).thenReturn(SOURCES);
     doThrow(new ItemNotFoundException("artifactSigningKeyNotFound"))
         .when(this.pgpVerifierService)
         .verify(any(), any(), eq(SOURCES));
@@ -566,7 +566,7 @@ class VersionSignatureServiceTest {
     this.stored(VERSION_PATH + "/lib-1.0.pom", "pom");
     this.stored(VERSION_PATH + "/lib-1.0.pom.asc", "sig");
     final var registeredOnly = new PublicKeySources(List.of("armored"), List.of(), false);
-    when(this.keyStoreService.findPublicKeySources(this.storageKey, false))
+    when(this.keyStoreService.getPublicKeySources(this.storageKey, false))
         .thenReturn(registeredOnly);
 
     this.service.recompute(this.version.getId());
@@ -584,7 +584,7 @@ class VersionSignatureServiceTest {
         .thenReturn(List.of(), List.of(), List.of("lib-1.0.pom"));
     final var pom = this.stored(VERSION_PATH + "/lib-1.0.pom", "pom");
     final var signature = this.stored(VERSION_PATH + "/lib-1.0.pom.asc", "sig");
-    when(this.keyStoreService.findPublicKeySources(this.storageKey, true)).thenReturn(SOURCES);
+    when(this.keyStoreService.getPublicKeySources(this.storageKey, true)).thenReturn(SOURCES);
 
     this.service.recompute(this.version.getId());
 
@@ -604,7 +604,7 @@ class VersionSignatureServiceTest {
     this.verifiedFiles();
     final var pom = this.stored(VERSION_PATH + "/lib-1.0.pom", "pom");
     final var signature = this.stored(VERSION_PATH + "/lib-1.0.pom.asc", "forged");
-    when(this.keyStoreService.findPublicKeySources(this.storageKey, true)).thenReturn(SOURCES);
+    when(this.keyStoreService.getPublicKeySources(this.storageKey, true)).thenReturn(SOURCES);
     doThrow(new SignatureNotVerifiedException("artifactSignatureNotVerified"))
         .when(this.pgpVerifierService)
         .verify(pom, signature, SOURCES);
@@ -648,7 +648,7 @@ class VersionSignatureServiceTest {
         .thenReturn(List.of(), List.of(), List.of("lib-1.0-20260921.101010-1.pom"));
     this.stored(snapshotPath + "/lib-1.0-20260921.101010-1.pom", "pom");
     this.stored(snapshotPath + "/lib-1.0-20260921.101010-1.pom.asc", "sig");
-    when(this.keyStoreService.findPublicKeySources(this.storageKey, true)).thenReturn(SOURCES);
+    when(this.keyStoreService.getPublicKeySources(this.storageKey, true)).thenReturn(SOURCES);
 
     this.service.recompute(this.version.getId());
 

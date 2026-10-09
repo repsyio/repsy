@@ -106,7 +106,7 @@ class NpmAuthenticatorImplTest {
             .hash(PASSWORD_HASH)
             .role(UserRole.USER)
             .build();
-    when(this.userTxService.getUserByUsernameOptional(USERNAME)).thenReturn(Optional.of(alice));
+    when(this.userTxService.findUserInfoByUsername(USERNAME)).thenReturn(Optional.of(alice));
   }
 
   @Test
@@ -144,7 +144,7 @@ class NpmAuthenticatorImplTest {
 
     assertThat(token).isEqualTo("the-jwt").isNotEqualTo("stored-sha-256-hash");
     verify(this.deployTokenService).updateLastUsedTime(info.getId());
-    verify(this.userTxService, never()).getUserByUsernameOptional(anyString());
+    verify(this.userTxService, never()).findUserInfoByUsername(anyString());
   }
 
   @Test
@@ -204,7 +204,7 @@ class NpmAuthenticatorImplTest {
 
     assertThat(this.authenticator.resolveUsername(this.repo, basic(USERNAME, "the-secret")))
         .isEqualTo("deploy-1a2b");
-    verify(this.userTxService, never()).getUserByUsernameOptional("typed");
+    verify(this.userTxService, never()).findUserInfoByUsername("typed");
   }
 
   @Test
@@ -316,7 +316,7 @@ class NpmAuthenticatorImplTest {
   @DisplayName("authenticateRepoUser mints the login token with the version of the user")
   void loginTokenCarriesTheTokenVersion() {
     final var userId = UUID.randomUUID();
-    when(this.userTxService.getUserByUsernameOptional(USERNAME))
+    when(this.userTxService.findUserInfoByUsername(USERNAME))
         .thenReturn(
             Optional.of(
                 UserInfo.builder()
@@ -394,7 +394,7 @@ class NpmAuthenticatorImplTest {
   @Test
   @DisplayName("revokeToken lets a Basic caller revoke a token issued to the same user")
   void revokeAnotherTokenOfTheSameUser() {
-    final var user = this.userTxService.getUserByUsernameOptional(USERNAME).orElseThrow();
+    final var user = this.userTxService.findUserInfoByUsername(USERNAME).orElseThrow();
     tokenClaims("other-login", user.getId(), AuthenticationType.USERNAME_PASSWORD);
 
     this.authenticator.revokeToken(this.repo, basic(USERNAME, PASSWORD), "other-login");

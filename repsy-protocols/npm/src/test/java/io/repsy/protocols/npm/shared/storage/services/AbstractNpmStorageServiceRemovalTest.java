@@ -52,7 +52,7 @@ import org.springframework.core.io.ByteArrayResource;
 import org.springframework.data.util.Pair;
 
 /**
- * RPS-1280: {@link AbstractNpmStorageService#removeVersion} rewrites the package metadata before it
+ * RPS-1280: {@link AbstractNpmStorageService#deleteVersion} rewrites the package metadata before it
  * removes the tarball, restores the metadata when anything before the tarball's removal fails, and
  * {@link AbstractNpmStorageService#deprecateVersions} changes the metadata as it is stored.
  */
@@ -137,7 +137,7 @@ class AbstractNpmStorageServiceRemovalTest {
         .thenReturn(BaseUsages.ofDisk(-100L));
 
     final var growth =
-        this.service.removeVersion(
+        this.service.deleteVersion(
             REPO_ID, REPO_NAME, BASE_PATH, PACKAGE, "1.2.0", "1.1.0", NO_ROWS);
 
     assertThat(growth).as("the metadata shrank by 100, the tarball freed 40").isEqualTo(-140L);
@@ -159,7 +159,7 @@ class AbstractNpmStorageServiceRemovalTest {
         .thenReturn(BaseUsages.ofDisk(-10L));
 
     final var growth =
-        this.service.removeVersion(REPO_ID, REPO_NAME, BASE_PATH, PACKAGE, "1.0.0", null, NO_ROWS);
+        this.service.deleteVersion(REPO_ID, REPO_NAME, BASE_PATH, PACKAGE, "1.0.0", null, NO_ROWS);
 
     assertThat(growth).as("a tarball that is gone frees nothing").isEqualTo(-10L);
     final var written = this.written();
@@ -176,7 +176,7 @@ class AbstractNpmStorageServiceRemovalTest {
     when(this.storageStrategy.write(eq(REPO_NAME), at(METADATA_FILE), any()))
         .thenReturn(BaseUsages.ofDisk(0L));
 
-    this.service.removeVersion(REPO_ID, REPO_NAME, BASE_PATH, PACKAGE, "1.2.0", "1.1.0", NO_ROWS);
+    this.service.deleteVersion(REPO_ID, REPO_NAME, BASE_PATH, PACKAGE, "1.2.0", "1.1.0", NO_ROWS);
 
     final var order = inOrder(this.storageStrategy);
     order.verify(this.storageStrategy).write(eq(REPO_NAME), at(METADATA_FILE), any());
@@ -195,7 +195,7 @@ class AbstractNpmStorageServiceRemovalTest {
 
     assertThatThrownBy(
             () ->
-                this.service.removeVersion(
+                this.service.deleteVersion(
                     REPO_ID, REPO_NAME, BASE_PATH, PACKAGE, "1.2.0", "1.1.0", NO_ROWS))
         .isSameAs(failure);
 
@@ -216,7 +216,7 @@ class AbstractNpmStorageServiceRemovalTest {
 
     assertThatThrownBy(
             () ->
-                this.service.removeVersion(
+                this.service.deleteVersion(
                     REPO_ID, REPO_NAME, BASE_PATH, PACKAGE, "1.2.0", "1.1.0", NO_ROWS))
         .isInstanceOf(IllegalStateException.class)
         .hasMessage("disk full");
@@ -239,7 +239,7 @@ class AbstractNpmStorageServiceRemovalTest {
 
     assertThatThrownBy(
             () ->
-                this.service.removeVersion(
+                this.service.deleteVersion(
                     REPO_ID, REPO_NAME, BASE_PATH, PACKAGE, "1.2.0", "1.1.0", NO_ROWS))
         .isSameAs(failure)
         .hasSuppressedException(restoreFailure);
@@ -252,7 +252,7 @@ class AbstractNpmStorageServiceRemovalTest {
 
     assertThatThrownBy(
             () ->
-                this.service.removeVersion(
+                this.service.deleteVersion(
                     REPO_ID, REPO_NAME, BASE_PATH, PACKAGE, "1.2.0", "1.1.0", NO_PACKAGE))
         .isInstanceOf(ItemNotFoundException.class);
 

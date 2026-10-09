@@ -476,7 +476,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
    */
   private void seedVersionNamedTags(final Repo repo, final String chartName) throws IOException {
     final var content = "tags-package".getBytes(StandardCharsets.UTF_8);
-    this.helmChartService.findOrCreate(
+    this.helmChartService.getOrCreate(
         HelmChartForm.builder()
             .name(chartName)
             .version("tags")
@@ -503,7 +503,7 @@ class HelmChartControllerIT extends AbstractIntegrationTest {
     final var content = "{}";
     final var bytes = archive(spec);
     final var chart =
-        this.helmChartService.findOrCreate(
+        this.helmChartService.getOrCreate(
             HelmChartForm.builder()
                 .name(spec.name())
                 .version(spec.version())
