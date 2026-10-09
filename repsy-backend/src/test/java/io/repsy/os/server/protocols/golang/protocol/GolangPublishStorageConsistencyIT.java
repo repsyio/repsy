@@ -24,7 +24,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.os.AbstractIntegrationTest;
-import io.repsy.os.server.protocols.golang.shared.storage.services.GolangStorageService;
+import io.repsy.os.server.protocols.golang.shared.storage.services.GoStorageService;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
@@ -84,7 +84,7 @@ class GolangPublishStorageConsistencyIT extends AbstractIntegrationTest {
   @MockitoBean private UsageUpdateService usageUpdateService;
 
   /** A spy that calls through, so only the test that stubs it changes the storage behaviour. */
-  @MockitoSpyBean private GolangStorageService golangStorageService;
+  @MockitoSpyBean private GoStorageService golangStorageService;
 
   @Autowired private RepoTxService repoTxService;
 

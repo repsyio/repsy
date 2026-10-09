@@ -43,7 +43,7 @@ import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.os.server.protocols.maven.shared.artifact.dtos.ArtifactVersionListItem;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.Artifact;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.ArtifactVersion;
-import io.repsy.os.server.protocols.maven.shared.artifact.mappers.ArtifactConverter;
+import io.repsy.os.server.protocols.maven.shared.artifact.mappers.ArtifactMapper;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactRepository;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactVersionRepository;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.PendingSignatureRepository;
@@ -158,7 +158,7 @@ class ArtifactServiceImplTest {
   @Mock ArtifactVersionRepository artifactVersionRepository;
   @Mock VersionDeveloperRepository versionDeveloperRepository;
   @Mock VersionLicenseRepository versionLicenseRepository;
-  @Mock ArtifactConverter artifactConverter;
+  @Mock ArtifactMapper artifactConverter;
   @Mock PgpVerifierService pgpVerifierService;
   @Mock KeyStoreService keyStoreService;
   @Mock ArtifactUpsertHelper artifactUpsertHelper;

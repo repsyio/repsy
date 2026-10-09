@@ -26,7 +26,7 @@ import io.repsy.os.shared.token.dtos.PersonalAccessTokenInfo;
 import io.repsy.os.shared.token.dtos.PersonalAccessTokenListItem;
 import io.repsy.os.shared.token.dtos.TokenScope;
 import io.repsy.os.shared.token.entities.PersonalAccessToken;
-import io.repsy.os.shared.token.mappers.PersonalAccessTokenConverter;
+import io.repsy.os.shared.token.mappers.PersonalAccessTokenMapper;
 import io.repsy.os.shared.token.repositories.PersonalAccessTokenRepository;
 import io.repsy.os.shared.token.utils.TokenFactory;
 import io.repsy.os.shared.token.utils.TokenHash;
@@ -71,14 +71,14 @@ public class PersonalAccessTokenService {
 
   private final @NonNull PersonalAccessTokenRepository tokenRepository;
   private final @NonNull UserRepository userRepository;
-  private final @NonNull PersonalAccessTokenConverter converter;
+  private final @NonNull PersonalAccessTokenMapper converter;
   private final @NonNull Clock clock;
 
   @Autowired
   public PersonalAccessTokenService(
       final @NonNull PersonalAccessTokenRepository tokenRepository,
       final @NonNull UserRepository userRepository,
-      final @NonNull PersonalAccessTokenConverter converter) {
+      final @NonNull PersonalAccessTokenMapper converter) {
     this(tokenRepository, userRepository, converter, Clock.systemUTC());
   }
 
@@ -89,7 +89,7 @@ public class PersonalAccessTokenService {
   PersonalAccessTokenService(
       final @NonNull PersonalAccessTokenRepository tokenRepository,
       final @NonNull UserRepository userRepository,
-      final @NonNull PersonalAccessTokenConverter converter,
+      final @NonNull PersonalAccessTokenMapper converter,
       final @NonNull Clock clock) {
     this.tokenRepository = tokenRepository;
     this.userRepository = userRepository;

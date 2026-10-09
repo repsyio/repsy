@@ -30,7 +30,7 @@ import io.repsy.os.generated.model.MavenGroupSummary;
 import io.repsy.os.server.protocols.maven.shared.artifact.dtos.ArtifactVersionListItem;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.Artifact;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.ArtifactVersion;
-import io.repsy.os.server.protocols.maven.shared.artifact.mappers.ArtifactConverter;
+import io.repsy.os.server.protocols.maven.shared.artifact.mappers.ArtifactMapper;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactRepository;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactVersionRepository;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.PendingSignatureRepository;
@@ -105,7 +105,7 @@ public class ArtifactServiceImpl implements ArtifactService<UUID> {
   private final ArtifactVersionRepository artifactVersionRepository;
   private final VersionDeveloperRepository versionDeveloperRepository;
   private final VersionLicenseRepository versionLicenseRepository;
-  private final ArtifactConverter artifactConverter;
+  private final ArtifactMapper artifactConverter;
   private final PgpVerifierService pgpVerifierService;
   private final KeyStoreService keyStoreService;
   private final ArtifactUpsertHelper artifactUpsertHelper;

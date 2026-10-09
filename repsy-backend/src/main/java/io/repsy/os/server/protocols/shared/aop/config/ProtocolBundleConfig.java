@@ -40,7 +40,7 @@ public class ProtocolBundleConfig {
       @Qualifier("npmAuthComponentImpl") final ProtocolAuthService npm,
       @Qualifier("dockerAuthComponent") final ProtocolAuthService docker,
       @Qualifier("pypiAuthComponent") final ProtocolAuthService pypi,
-      @Qualifier("golangAuthComponent") final ProtocolAuthService golang,
+      @Qualifier("goAuthComponent") final ProtocolAuthService golang,
       @Qualifier("helmAuthComponent") final ProtocolAuthService helm,
       @Qualifier("nuGetAuthComponent") final ProtocolAuthService nuget,
       @Qualifier("rubyAuthComponent") final ProtocolAuthService ruby) {
@@ -65,7 +65,7 @@ public class ProtocolBundleConfig {
       @Qualifier("npmApiFacade") final ProtocolApiFacade npm,
       @Qualifier("dockerApiFacade") final ProtocolApiFacade docker,
       @Qualifier("pypiApiFacade") final ProtocolApiFacade pypi,
-      @Qualifier("golangApiFacade") final ProtocolApiFacade golang,
+      @Qualifier("goApiFacade") final ProtocolApiFacade golang,
       @Qualifier("helmApiFacade") final ProtocolApiFacade helm,
       @Qualifier("nugetApiFacade") final ProtocolApiFacade nuget,
       @Qualifier("rubyApiFacade") final ProtocolApiFacade ruby) {

@@ -37,7 +37,7 @@ import io.repsy.os.server.protocols.cargo.shared.crate.entities.CargoCrate;
 import io.repsy.os.server.protocols.cargo.shared.crate.entities.CargoCrateIndex;
 import io.repsy.os.server.protocols.cargo.shared.crate.entities.CargoCrateMeta;
 import io.repsy.os.server.protocols.cargo.shared.crate.entities.CargoKeyword;
-import io.repsy.os.server.protocols.cargo.shared.crate.mappers.CargoCrateConverter;
+import io.repsy.os.server.protocols.cargo.shared.crate.mappers.CargoCrateMapper;
 import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoAuthorRepository;
 import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoCategoryRepository;
 import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoCrateIndexRepository;
@@ -78,7 +78,7 @@ class CargoCrateServiceTest {
   @Mock CargoAuthorRepository authorRepository;
   @Mock CargoKeywordRepository keywordRepository;
   @Mock CargoCategoryRepository categoryRepository;
-  @Mock CargoCrateConverter crateConverter;
+  @Mock CargoCrateMapper crateConverter;
   @Mock ObjectMapper objectMapper;
 
   @InjectMocks CargoCrateServiceImpl cargoCrateService;

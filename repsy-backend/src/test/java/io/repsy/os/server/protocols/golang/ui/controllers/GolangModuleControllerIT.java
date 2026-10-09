@@ -32,7 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.HeapOrder;
 import io.repsy.os.PagingAssertions;
-import io.repsy.os.server.protocols.golang.ui.facades.GolangApiFacade;
+import io.repsy.os.server.protocols.golang.ui.facades.GoApiFacade;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
@@ -59,7 +59,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.ResultActions;
 
 /** Full-stack integration tests for the Go module-management API. */
-@DisplayName("GolangModuleController /api/go/modules/*")
+@DisplayName("GoModuleController /api/go/modules/*")
 class GolangModuleControllerIT extends AbstractIntegrationTest {
 
   private static final String MODULE = "io.repsy/hello-world";
@@ -67,7 +67,7 @@ class GolangModuleControllerIT extends AbstractIntegrationTest {
   private static final String UPPERCASE_MODULE = "example.com/Upper/Module";
 
   @Autowired private RepoTxService repoTxService;
-  @Autowired private GolangApiFacade golangApiFacade;
+  @Autowired private GoApiFacade golangApiFacade;
 
   private static String unique(final String prefix) {
     return prefix + UUID.randomUUID().toString().replace("-", "").substring(0, 10);

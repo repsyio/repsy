@@ -29,7 +29,7 @@ import io.repsy.os.server.protocols.npm.shared.npm_package.entities.PackageDistT
 import io.repsy.os.server.protocols.npm.shared.npm_package.entities.PackageKeyword;
 import io.repsy.os.server.protocols.npm.shared.npm_package.entities.PackageMaintainer;
 import io.repsy.os.server.protocols.npm.shared.npm_package.entities.PackageVersion;
-import io.repsy.os.server.protocols.npm.shared.npm_package.mappers.NpmPackageConverter;
+import io.repsy.os.server.protocols.npm.shared.npm_package.mappers.NpmPackageMapper;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.NpmPackageRepository;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageDistTagRepository;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageKeywordRepository;
@@ -86,7 +86,7 @@ public class NpmPackageServiceImpl implements NpmPackageService<UUID> {
   private final PackageDistTagRepository packageDistTagRepository;
   private final PackageMaintainerRepository packageMaintainerRepository;
   private final PackageKeywordRepository packageKeywordRepository;
-  private final NpmPackageConverter npmPackageConverter;
+  private final NpmPackageMapper npmPackageConverter;
 
   @Transactional(rollbackFor = {IOException.class, URISyntaxException.class})
   @Override

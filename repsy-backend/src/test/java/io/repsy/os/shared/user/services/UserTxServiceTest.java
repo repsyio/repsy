@@ -28,7 +28,7 @@ import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.User;
-import io.repsy.os.shared.user.mappers.UserConverter;
+import io.repsy.os.shared.user.mappers.UserMapper;
 import io.repsy.os.shared.user.repositories.UserRepository;
 import java.time.Instant;
 import java.util.Optional;
@@ -42,7 +42,7 @@ import org.mockito.Mockito;
 class UserTxServiceTest {
 
   private final UserRepository userRepository = Mockito.mock(UserRepository.class);
-  private final UserConverter userConverter = Mockito.mock(UserConverter.class);
+  private final UserMapper userConverter = Mockito.mock(UserMapper.class);
   private final UserTxService service = new UserTxService(this.userRepository, this.userConverter);
 
   @Test

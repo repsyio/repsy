@@ -20,7 +20,7 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.generated.model.NpmPackageInfo;
 import io.repsy.os.generated.model.PackageVersionDetail;
 import io.repsy.os.generated.model.PackageVersionListItem;
-import io.repsy.os.server.protocols.npm.shared.npm_package.mappers.NpmPackageConverter;
+import io.repsy.os.server.protocols.npm.shared.npm_package.mappers.NpmPackageMapper;
 import io.repsy.os.server.protocols.npm.shared.npm_package.services.NpmPackageServiceImpl;
 import io.repsy.os.server.protocols.npm.shared.storage.services.NpmStorageService;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
@@ -49,7 +49,7 @@ public class NpmApiFacade implements ProtocolApiFacade {
 
   private final @NonNull NpmPackageServiceImpl npmPackageService;
   private final @NonNull NpmStorageService npmStorageService;
-  private final @NonNull NpmPackageConverter npmPackageConverter;
+  private final @NonNull NpmPackageMapper npmPackageConverter;
   private final @NonNull ApplicationEventPublisher eventPublisher;
 
   @Override

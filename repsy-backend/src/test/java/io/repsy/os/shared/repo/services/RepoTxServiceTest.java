@@ -32,7 +32,7 @@ import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.events.PgpKeySourcesChangedEvent;
 import io.repsy.os.shared.repo.events.PgpVerifyAllSignaturesToggledEvent;
-import io.repsy.os.shared.repo.mappers.RepoConverter;
+import io.repsy.os.shared.repo.mappers.RepoMapper;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.sql.SQLException;
@@ -64,7 +64,7 @@ class RepoTxServiceTest {
   private static final String CONSTRAINT = "ux_repo__name";
   private static final String OTHER_CONSTRAINT = "ux_repo_deploy_token__token";
 
-  @Mock private RepoConverter repoConverter;
+  @Mock private RepoMapper repoConverter;
   @Mock private RepoRepository repoRepository;
   @Mock private ApplicationEventPublisher eventPublisher;
 

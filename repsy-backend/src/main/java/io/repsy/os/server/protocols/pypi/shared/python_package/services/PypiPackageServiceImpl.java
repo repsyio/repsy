@@ -30,7 +30,7 @@ import io.repsy.os.server.protocols.pypi.shared.python_package.entities.PypiPack
 import io.repsy.os.server.protocols.pypi.shared.python_package.entities.Release;
 import io.repsy.os.server.protocols.pypi.shared.python_package.entities.ReleaseClassifier;
 import io.repsy.os.server.protocols.pypi.shared.python_package.entities.ReleaseProjectUrl;
-import io.repsy.os.server.protocols.pypi.shared.python_package.mappers.PypiPackageConverter;
+import io.repsy.os.server.protocols.pypi.shared.python_package.mappers.PypiPackageMapper;
 import io.repsy.os.server.protocols.pypi.shared.python_package.repositories.PypiPackageRepository;
 import io.repsy.os.server.protocols.pypi.shared.python_package.repositories.ReleaseClassifierRepository;
 import io.repsy.os.server.protocols.pypi.shared.python_package.repositories.ReleaseProjectUrlRepository;
@@ -81,7 +81,7 @@ public class PypiPackageServiceImpl implements PypiPackageService<UUID> {
   private final ReleaseRepository releaseRepository;
   private final ConversionService conversionService;
   private final Configuration freeMarkerConfiguration;
-  private final PypiPackageConverter pypiPackageConverter;
+  private final PypiPackageMapper pypiPackageConverter;
   private final PypiPackageRepository pypiPackageRepository;
   private final ReleaseClassifierRepository releaseClassifierRepository;
   private final ReleaseProjectUrlRepository releaseProjectURLRepository;

@@ -43,7 +43,7 @@ import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.UserRole;
-import io.repsy.os.shared.user.mappers.UserConverter;
+import io.repsy.os.shared.user.mappers.UserMapper;
 import io.repsy.os.shared.user.repositories.UserRepository;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
@@ -125,8 +125,7 @@ class DockerAuthComponentTest {
     // A real UserTxService over an empty repository: the lookup itself is under test.
     final var component =
         new DockerAuthComponent(
-            new UserTxService(
-                Mockito.mock(UserRepository.class), Mockito.mock(UserConverter.class)),
+            new UserTxService(Mockito.mock(UserRepository.class), Mockito.mock(UserMapper.class)),
             jwtUtils,
             Mockito.mock(DeployTokenService.class),
             new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),

@@ -25,7 +25,7 @@ import io.repsy.os.server.protocols.cargo.shared.crate.entities.CargoCrate;
 import io.repsy.os.server.protocols.cargo.shared.crate.entities.CargoCrateIndex;
 import io.repsy.os.server.protocols.cargo.shared.crate.entities.CargoCrateMeta;
 import io.repsy.os.server.protocols.cargo.shared.crate.entities.CargoKeyword;
-import io.repsy.os.server.protocols.cargo.shared.crate.mappers.CargoCrateConverter;
+import io.repsy.os.server.protocols.cargo.shared.crate.mappers.CargoCrateMapper;
 import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoAuthorRepository;
 import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoCategoryRepository;
 import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoCrateIndexRepository;
@@ -85,7 +85,7 @@ public class CargoCrateServiceImpl implements CargoCrateService<UUID> {
   private final CargoAuthorRepository authorRepository;
   private final CargoKeywordRepository keywordRepository;
   private final CargoCategoryRepository categoryRepository;
-  private final CargoCrateConverter crateConverter;
+  private final CargoCrateMapper crateConverter;
   private final ObjectMapper objectMapper;
 
   @Override

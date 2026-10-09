@@ -33,7 +33,7 @@ import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.generated.model.AccessTokenForm;
 import io.repsy.os.shared.token.dtos.TokenScope;
 import io.repsy.os.shared.token.entities.PersonalAccessToken;
-import io.repsy.os.shared.token.mappers.PersonalAccessTokenConverterImpl;
+import io.repsy.os.shared.token.mappers.PersonalAccessTokenMapperImpl;
 import io.repsy.os.shared.token.repositories.PersonalAccessTokenRepository;
 import io.repsy.os.shared.token.utils.TokenHash;
 import io.repsy.os.shared.user.entities.User;
@@ -81,7 +81,7 @@ class PersonalAccessTokenServiceTest {
     return new PersonalAccessTokenService(
         this.tokenRepository,
         this.userRepository,
-        new PersonalAccessTokenConverterImpl(),
+        new PersonalAccessTokenMapperImpl(),
         Clock.fixed(now, ZoneOffset.UTC));
   }
 

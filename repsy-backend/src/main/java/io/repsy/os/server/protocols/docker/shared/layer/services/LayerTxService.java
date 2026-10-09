@@ -18,7 +18,7 @@ package io.repsy.os.server.protocols.docker.shared.layer.services;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.os.server.protocols.docker.shared.layer.dtos.OrphanLayerInfo;
 import io.repsy.os.server.protocols.docker.shared.layer.entities.Layer;
-import io.repsy.os.server.protocols.docker.shared.layer.mappers.LayerConverter;
+import io.repsy.os.server.protocols.docker.shared.layer.mappers.LayerMapper;
 import io.repsy.os.server.protocols.docker.shared.layer.repositories.LayerRepository;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.protocols.docker.shared.layer.dtos.LayerForm;
@@ -41,7 +41,7 @@ import org.springframework.transaction.annotation.Transactional;
 @AllArgsConstructor
 public class LayerTxService implements LayerService<UUID> {
 
-  private final @NonNull LayerConverter layerConverter;
+  private final @NonNull LayerMapper layerConverter;
   private final @NonNull LayerRepository layerRepository;
 
   @Override
