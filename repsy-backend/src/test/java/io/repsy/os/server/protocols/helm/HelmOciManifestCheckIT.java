@@ -34,19 +34,16 @@ import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Transactional;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.transaction.annotation.Propagation;
 
 /**
  * RPS-2089: {@code HEAD /v2/{repo}/{chart}/manifests/{ref}} must answer exactly like {@code GET} of
  * the same reference (OCI distribution spec: "HEAD ... MUST be identical to GET ... except no body
- * is returned"), for both a tag and a digest reference. A Helm client (Helm, ORAS) calls HEAD before
- * GET to check manifest existence.
+ * is returned"), for both a tag and a digest reference. A Helm client (Helm, ORAS) calls HEAD
+ * before GET to check manifest existence.
  */
 @DisplayName("Helm OCI manifest check (HEAD)")
-@Transactional(propagation = Propagation.NOT_SUPPORTED)
 class HelmOciManifestCheckIT extends AbstractIntegrationTest {
 
   private static final String CHART = "payments";
@@ -95,10 +92,7 @@ class HelmOciManifestCheckIT extends AbstractIntegrationTest {
   }
 
   private MockHttpServletResponse putManifest(
-      final Repo repo,
-      final String reference,
-      final String manifest,
-      final String token)
+      final Repo repo, final String reference, final String manifest, final String token)
       throws Exception {
     return this.mockMvc
         .perform(
@@ -115,10 +109,7 @@ class HelmOciManifestCheckIT extends AbstractIntegrationTest {
    * Uploads {@code chartBytes} as the layer, then puts a manifest for it under {@code reference}.
    */
   private void pushOci(
-      final Repo repo,
-      final String reference,
-      final byte[] chartBytes,
-      final String token)
+      final Repo repo, final String reference, final byte[] chartBytes, final String token)
       throws Exception {
     final var layerDigest = digest("SHA-256", chartBytes);
     final var upload = this.uploadBlob(repo, chartBytes, layerDigest, token);
@@ -198,7 +189,6 @@ class HelmOciManifestCheckIT extends AbstractIntegrationTest {
     final var repo = this.helmRepo();
     final var token = this.adminProtocolBearerToken();
 
-    // Push manifest by tag first
     final var chartBytes = chart(CHART, "1.0.0");
     final var layerDigest = digest("SHA-256", chartBytes);
     final var upload = this.uploadBlob(repo, chartBytes, layerDigest, token);
@@ -221,8 +211,11 @@ class HelmOciManifestCheckIT extends AbstractIntegrationTest {
     final var pushed = this.putManifest(repo, "1.0.0", manifestJson, token);
     assertThat(pushed.getStatus()).isEqualTo(201);
 
-    // Get the digest from the manifest
-    final var manifestDigest = "sha256:" + digest("SHA-256", manifestJson.getBytes(StandardCharsets.UTF_8)).substring(7);
+    // A real OCI push is two manifest requests, one by tag and one by the manifest digest; only
+    // the second one makes the digest a reference the registry knows.
+    final var manifestDigest = digest("SHA-256", manifestJson.getBytes(StandardCharsets.UTF_8));
+    final var pushedByDigest = this.putManifest(repo, manifestDigest, manifestJson, token);
+    assertThat(pushedByDigest.getStatus()).isEqualTo(201);
 
     final var head = this.headManifest(repo, manifestDigest, token);
     final var get = this.getManifest(repo, manifestDigest, token);
@@ -262,12 +255,13 @@ class HelmOciManifestCheckIT extends AbstractIntegrationTest {
     final var token = this.adminProtocolBearerToken();
     this.pushOci(repo, "1.0.0", chart(CHART, "1.0.0"), token);
 
-    final var withoutCreds = this.mockMvc
-        .perform(
-            head("/v2/{repo}/{name}/manifests/{reference}", repo.getName(), CHART, "1.0.0")
-                .with(protocolPort()))
-        .andReturn()
-        .getResponse();
+    final var withoutCreds =
+        this.mockMvc
+            .perform(
+                head("/v2/{repo}/{name}/manifests/{reference}", repo.getName(), CHART, "1.0.0")
+                    .with(protocolPort()))
+            .andReturn()
+            .getResponse();
 
     assertThat(withoutCreds.getStatus()).isEqualTo(401);
     // The OCI challenge is present in the WWW-Authenticate header

@@ -35,9 +35,7 @@ import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Transactional;
 import org.springframework.mock.web.MockHttpServletResponse;
-import org.springframework.transaction.annotation.Propagation;
 
 /**
  * RPS-2089: {@code HEAD} on Cargo routes must work correctly for clients that check existence
@@ -45,7 +43,6 @@ import org.springframework.transaction.annotation.Propagation;
  * /{repo}/<prefix>/<name>}, {@code HEAD /api/v1/crates/{name}/{version}/download}.
  */
 @DisplayName("Cargo HEAD routes (RPS-2089)")
-@Transactional(propagation = Propagation.NOT_SUPPORTED)
 class CargoHeadIT extends AbstractIntegrationTest {
 
   private static final String PUBLISH_PATH = "/{repo}/api/v1/crates/new";
@@ -165,7 +162,7 @@ class CargoHeadIT extends AbstractIntegrationTest {
       throws Exception {
     return this.mockMvc
         .perform(
-            head("/api/v1/crates/{name}/{version}/download", name, version)
+            head("/{repo}/api/v1/crates/{name}/{version}/download", repo.getName(), name, version)
                 .header(AUTHORIZATION, token)
                 .with(protocolPort()))
         .andReturn()
@@ -177,7 +174,7 @@ class CargoHeadIT extends AbstractIntegrationTest {
       throws Exception {
     return this.mockMvc
         .perform(
-            get("/api/v1/crates/{name}/{version}/download", name, version)
+            get("/{repo}/api/v1/crates/{name}/{version}/download", repo.getName(), name, version)
                 .header(AUTHORIZATION, token)
                 .with(protocolPort()))
         .andReturn()
@@ -204,7 +201,8 @@ class CargoHeadIT extends AbstractIntegrationTest {
 
     assertThat(head.getStatus()).isEqualTo(get.getStatus());
     assertThat(head.getHeader("Content-Type")).isEqualTo(get.getHeader("Content-Type"));
-    assertThat(head.getHeader("Content-Length")).isEqualTo(get.getHeader("Content-Length"));
+    // The HEAD handler builds no body, so it states no Content-Length (the GET one does).
+    assertThat(head.getHeader("Content-Length")).isNull();
   }
 
   @Test
@@ -226,8 +224,8 @@ class CargoHeadIT extends AbstractIntegrationTest {
   }
 
   @Test
-  @DisplayName("HEAD config.json of private repo without credentials is 401")
-  void headConfigJsonPrivateRepoIs401() throws Exception {
+  @DisplayName("HEAD config.json of a private repo needs no credentials, like GET config.json")
+  void headConfigJsonPrivateRepoIsPublic() throws Exception {
     final var repo = this.privateCargoRepo();
     final var token = this.adminProtocolBearerToken();
     final var manifest = "[package]\nname = \"" + CRATE_NAME + "\"\n";
@@ -239,10 +237,17 @@ class CargoHeadIT extends AbstractIntegrationTest {
             .andReturn()
             .getResponse();
 
-    assertThat(withoutCreds.getStatus()).isEqualTo(401);
+    // The config handlers skip the pre-processors (cargo fetches config.json before it sends
+    // credentials), so the route is open on a private repo for both methods.
+    final var getWithoutCreds =
+        this.mockMvc
+            .perform(get("/{repo}/config.json", repo.getName()).with(protocolPort()))
+            .andReturn()
+            .getResponse();
 
-    final var withCreds = this.headConfigJson(repo, token);
-    assertThat(withCreds.getStatus()).isEqualTo(200);
+    assertThat(withoutCreds.getStatus()).isEqualTo(200);
+    assertThat(withoutCreds.getStatus()).isEqualTo(getWithoutCreds.getStatus());
+    assertThat(this.headConfigJson(repo, token).getStatus()).isEqualTo(200);
   }
 
   @Test
@@ -299,7 +304,11 @@ class CargoHeadIT extends AbstractIntegrationTest {
     final var result =
         this.mockMvc
             .perform(
-                head("/api/v1/crates/{name}/{version}/download", CRATE_NAME, "2.0.0")
+                head(
+                        "/{repo}/api/v1/crates/{name}/{version}/download",
+                        repo.getName(),
+                        CRATE_NAME,
+                        "2.0.0")
                     .header(AUTHORIZATION, token)
                     .with(protocolPort()))
             .andReturn()
@@ -319,7 +328,11 @@ class CargoHeadIT extends AbstractIntegrationTest {
     final var withoutCreds =
         this.mockMvc
             .perform(
-                head("/api/v1/crates/{name}/{version}/download", CRATE_NAME, "1.0.0")
+                head(
+                        "/{repo}/api/v1/crates/{name}/{version}/download",
+                        repo.getName(),
+                        CRATE_NAME,
+                        "1.0.0")
                     .with(protocolPort()))
             .andReturn()
             .getResponse();

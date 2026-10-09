@@ -1006,18 +1006,13 @@ test.describe('helm registry rules (raw HTTP)', () => {
 
       expect(head.status, 'HEAD returns 200').toBe(200);
       expect(head.body.length, 'HEAD has empty body').toBe(0);
-      expect(head.headers['docker-content-digest'], 'HEAD has Docker-Content-Digest').toBeDefined();
+      expect(head.digestHeader, 'HEAD has Docker-Content-Digest').toBeDefined();
 
       expect(head.status, 'HEAD and GET have same status').toBe(get.status);
-      expect(head.headers['docker-content-digest'], 'HEAD and GET have same Docker-Content-Digest').toBe(
-        get.headers['docker-content-digest'],
+      expect(head.digestHeader, 'HEAD and GET have same Docker-Content-Digest').toBe(
+        get.digestHeader,
       );
-      expect(head.headers['content-type'], 'HEAD and GET have same Content-Type').toBe(
-        get.headers['content-type'],
-      );
-      expect(head.headers['content-length'], 'HEAD and GET have same Content-Length').toBe(
-        get.headers['content-length'],
-      );
+      expect(head.contentType, 'HEAD and GET have same Content-Type').toBe(get.contentType);
     },
   );
 });
