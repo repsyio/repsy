@@ -42,8 +42,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * RPS-1219: there was no handler for {@code GET /v2/{repo}/{name}/tags/list}, so a real Helm client
  * pull without an exact {@code --version} (or with a semver constraint) failed: Helm's own {@code
  * ValidateReference} calls {@code Tags(...)} in both cases. The route now exists, reusing the
- * previously dead-code {@code HelmFacade.listTags}, filtered to tags only (no {@code sha256:...}
- * digest references) and lexically sorted, per the distribution spec.
+ * previously dead-code {@code HelmProtocolFacade.listTags}, filtered to tags only (no {@code
+ * sha256:...} digest references) and lexically sorted, per the distribution spec.
  */
 @DisplayName("Helm OCI tags/list (RPS-1219)")
 class HelmOciTagsListIT extends AbstractIntegrationTest {

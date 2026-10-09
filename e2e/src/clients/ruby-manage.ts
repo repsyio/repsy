@@ -57,7 +57,7 @@ import {
 } from './ruby-raw.js';
 
 const CLIENT_TIMEOUT_MS = 30_000;
-/** What a successful yank prints: the server's own 200 body (`AbstractRubyGemYankHandler`). */
+/** What a successful yank prints: the server's own 200 body (`AbstractRubyGemYankProtocolMethodHandler`). */
 const YANKED_MESSAGE = 'Successfully yanked gem';
 
 /** What a cell acts on: one gem of two versions, and the version the operation is about. */

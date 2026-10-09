@@ -46,8 +46,8 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("AbstractRubySpecsIndexHandler")
-class AbstractRubySpecsIndexHandlerTest {
+@DisplayName("AbstractRubySpecsIndexProtocolMethodHandler")
+class AbstractRubySpecsIndexProtocolMethodHandlerTest {
 
   private static final String URL_PROPERTIES = "urlProperties";
 
@@ -55,7 +55,7 @@ class AbstractRubySpecsIndexHandlerTest {
   @Mock private RubyProtocolFacade facade;
   @Mock private RubyProtocolProvider provider;
 
-  private static final class TestHandler extends AbstractRubySpecsIndexHandler {
+  private static final class TestHandler extends AbstractRubySpecsIndexProtocolMethodHandler {
 
     TestHandler(
         final PathParser basePathParser,

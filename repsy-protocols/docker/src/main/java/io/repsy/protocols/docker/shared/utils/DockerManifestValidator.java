@@ -22,11 +22,11 @@ import static io.repsy.protocols.docker.shared.utils.MediaTypes.OCI_IMAGE_INDEX;
 import static io.repsy.protocols.docker.shared.utils.MediaTypes.OCI_MANIFEST_SCHEMA1;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
-import io.repsy.protocols.docker.shared.tag.dtos.Config;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestInfo;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestLayer;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestList;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestListManifest;
+import io.repsy.protocols.docker.shared.tag.dtos.OciImageConfig;
 import java.util.List;
 import lombok.experimental.UtilityClass;
 import org.apache.commons.lang3.StringUtils;
@@ -93,7 +93,7 @@ public final class DockerManifestValidator {
     validateSchemaVersion(manifest.getSchemaVersion(), expectedSchemaVersion);
   }
 
-  private static void validateConfig(final @Nullable Config config) {
+  private static void validateConfig(final @Nullable OciImageConfig config) {
 
     if (config == null || StringUtils.isBlank(config.getDigest())) {
       throw new BadRequestException("manifestConfigMissing");

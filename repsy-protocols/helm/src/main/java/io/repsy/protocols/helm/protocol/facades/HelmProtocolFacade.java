@@ -33,7 +33,7 @@ import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 
 @NullMarked
-public interface HelmFacade<ID> {
+public interface HelmProtocolFacade<ID> {
 
   HelmIndexDto generateIndex(ProtocolContext context);
 

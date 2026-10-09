@@ -18,16 +18,17 @@ package io.repsy.os.server.protocols.ruby.protocol.handlers;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.protocols.ruby.protocol.RubyProtocolProvider;
 import io.repsy.protocols.ruby.protocol.facades.contracts.RubyProtocolFacade;
-import io.repsy.protocols.ruby.protocol.handlers.AbstractRubyCompactIndexNamesHandler;
+import io.repsy.protocols.ruby.protocol.handlers.AbstractRubySpecsIndexProtocolMethodHandler;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 @Component
 @NullMarked
-public class RubyCompactIndexNamesHandler extends AbstractRubyCompactIndexNamesHandler {
+public class RubySpecsIndexProtocolMethodHandler
+    extends AbstractRubySpecsIndexProtocolMethodHandler {
 
-  public RubyCompactIndexNamesHandler(
+  public RubySpecsIndexProtocolMethodHandler(
       @Qualifier("osRubyPathParser") final PathParser basePathParser,
       final RubyProtocolFacade facade,
       final RubyProtocolProvider provider) {

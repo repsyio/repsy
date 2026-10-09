@@ -48,8 +48,8 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("AbstractRubyHeadHandler")
-class AbstractRubyHeadHandlerTest {
+@DisplayName("AbstractRubyHeadProtocolMethodHandler")
+class AbstractRubyHeadProtocolMethodHandlerTest {
 
   private static final UUID REPO_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
   private static final String REPO_NAME = "gems";
@@ -58,7 +58,7 @@ class AbstractRubyHeadHandlerTest {
   @Mock private RubyProtocolFacade facade;
   @Mock private RubyProtocolProvider provider;
 
-  private static class TestHandler extends AbstractRubyHeadHandler {
+  private static class TestHandler extends AbstractRubyHeadProtocolMethodHandler {
 
     TestHandler(
         final PathParser basePathParser,

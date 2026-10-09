@@ -17,7 +17,7 @@ package io.repsy.os.server.protocols.helm.protocol.handlers.oci;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
-import io.repsy.protocols.helm.protocol.facades.HelmFacade;
+import io.repsy.protocols.helm.protocol.facades.HelmProtocolFacade;
 import io.repsy.protocols.helm.protocol.handlers.oci.AbstractHelmOciBlobPullProtocolMethodHandler;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
@@ -31,7 +31,7 @@ public class HelmOciBlobPullProtocolMethodHandler
 
   public HelmOciBlobPullProtocolMethodHandler(
       @Qualifier("osHelmOciPathParser") final PathParser basePathParser,
-      final HelmFacade<UUID> helmProtocolTxFacade,
+      final HelmProtocolFacade<UUID> helmProtocolTxFacade,
       final HelmProtocolProvider provider) {
     super(basePathParser, helmProtocolTxFacade, provider);
   }

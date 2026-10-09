@@ -24,32 +24,25 @@ import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
-import java.util.regex.Pattern;
-import java.util.zip.DeflaterOutputStream;
 import org.jspecify.annotations.NullMarked;
-import org.springframework.http.HttpHeaders;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 @NullMarked
-public abstract class AbstractRubyGemspecHandler implements ProtocolMethodHandler {
+public abstract class AbstractRubyGemYankProtocolMethodHandler implements ProtocolMethodHandler {
 
-  private static final Pattern GEMSPEC_PATH_PATTERN =
-      Pattern.compile("^/quick/Marshal\\.4\\.8/(.+)\\.gemspec\\.rz$");
+  private static final String YANK_PATH = "/api/v1/gems/yank";
+  private static final String DEFAULT_PLATFORM = "ruby";
 
   private final PathParser basePathParser;
   private final RubyProtocolFacade facade;
 
-  protected AbstractRubyGemspecHandler(
+  protected AbstractRubyGemYankProtocolMethodHandler(
       final PathParser basePathParser,
       final RubyProtocolFacade facade,
       final RubyProtocolProvider provider) {
@@ -60,18 +53,24 @@ public abstract class AbstractRubyGemspecHandler implements ProtocolMethodHandle
 
   @Override
   public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.GET);
+    return List.of(HttpMethod.DELETE);
   }
 
+  /**
+   * Yank is a WRITE, like Cargo's yank and NuGet's unlist: it only unpublishes a version from the
+   * index and keeps the {@code .gem} file (RPS-1238), so whoever may push may yank. A read-write
+   * deploy token, which is what the panel's Ruby snippet has {@code gem yank} use, and a USER-role
+   * account are therefore allowed; a read-only token is not (RPS-1317).
+   */
   @Override
   public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.READ, "writeOperation", false);
+    return Map.of("permission", Permission.WRITE, "writeOperation", true);
   }
 
   @Override
   public PathParser getPathParser() {
     return request -> {
-      if (!HttpMethod.GET.name().equals(request.getMethod())) {
+      if (!HttpMethod.DELETE.name().equals(request.getMethod())) {
         return Optional.empty();
       }
       final var parsedOpt = this.basePathParser.parse(request);
@@ -79,7 +78,7 @@ public abstract class AbstractRubyGemspecHandler implements ProtocolMethodHandle
         return Optional.empty();
       }
       final var relativePath = ProtocolContextUtils.getRelativePath(parsedOpt.get()).getPath();
-      return GEMSPEC_PATH_PATTERN.matcher(relativePath).matches() ? parsedOpt : Optional.empty();
+      return YANK_PATH.equals(relativePath) ? parsedOpt : Optional.empty();
     };
   }
 
@@ -88,34 +87,25 @@ public abstract class AbstractRubyGemspecHandler implements ProtocolMethodHandle
       final ProtocolContext context,
       final HttpServletRequest request,
       final HttpServletResponse response) {
-    final var relativePath = ProtocolContextUtils.getRelativePath(context).getPath();
-    final var matcher = GEMSPEC_PATH_PATTERN.matcher(relativePath);
-    if (!matcher.matches()) {
-      return ResponseEntity.notFound().build();
+    // gem yank sends form-encoded body; Spring Boot's FormContentFilter makes params available
+    final var gemName = request.getParameter("gem_name");
+    final var version = request.getParameter("version");
+    final var platform = platformOrDefault(request.getParameter("platform"));
+
+    if (gemName == null || gemName.isBlank() || version == null || version.isBlank()) {
+      return ResponseEntity.badRequest()
+          .contentType(MediaType.TEXT_PLAIN)
+          .body("gem_name and version are required");
     }
-    try {
-      final var raw = this.facade.getGemspec(context, matcher.group(1));
-      // Without a header of its own Spring names the download "f.txt" (RPS-1442).
-      return ResponseEntity.ok()
-          .contentType(MediaType.APPLICATION_OCTET_STREAM)
-          .header(
-              HttpHeaders.CONTENT_DISPOSITION,
-              Objects.requireNonNull(RubyContentDisposition.forPath(relativePath)))
-          .body(deflate(raw));
-    } catch (final Exception e) {
-      return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-    }
+
+    this.facade.yankGem(context, gemName, version, platform);
+
+    return ResponseEntity.ok()
+        .contentType(MediaType.TEXT_PLAIN)
+        .body("Successfully yanked gem: " + gemName + " (" + version + ")");
   }
 
-  private static byte[] deflate(final byte[] raw) {
-    try {
-      final var out = new ByteArrayOutputStream(raw.length);
-      try (final var deflate = new DeflaterOutputStream(out)) {
-        deflate.write(raw);
-      }
-      return out.toByteArray();
-    } catch (final IOException e) {
-      throw new UncheckedIOException(e);
-    }
+  private static String platformOrDefault(final @Nullable String platform) {
+    return (platform == null || platform.isBlank()) ? DEFAULT_PLATFORM : platform;
   }
 }

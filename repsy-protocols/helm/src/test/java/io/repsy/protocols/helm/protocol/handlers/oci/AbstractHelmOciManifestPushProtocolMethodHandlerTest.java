@@ -33,7 +33,7 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
-import io.repsy.protocols.helm.protocol.facades.HelmFacade;
+import io.repsy.protocols.helm.protocol.facades.HelmProtocolFacade;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestInfo;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestPushForm;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestPushResult;
@@ -81,7 +81,7 @@ class AbstractHelmOciManifestPushProtocolMethodHandlerTest {
   private static final UUID REPO_ID = UUID.randomUUID();
 
   @Mock private PathParser basePathParser;
-  @Mock private HelmFacade<UUID> facade;
+  @Mock private HelmProtocolFacade<UUID> facade;
   @Mock private HelmProtocolProvider provider;
   @Mock private HelmOciManifestInfo manifestInfo;
 
@@ -99,7 +99,8 @@ class AbstractHelmOciManifestPushProtocolMethodHandlerTest {
 
   static class TestHandler extends AbstractHelmOciManifestPushProtocolMethodHandler<UUID> {
 
-    TestHandler(final PathParser p, final HelmFacade<UUID> f, final HelmProtocolProvider pr) {
+    TestHandler(
+        final PathParser p, final HelmProtocolFacade<UUID> f, final HelmProtocolProvider pr) {
       super(p, f, pr);
     }
   }

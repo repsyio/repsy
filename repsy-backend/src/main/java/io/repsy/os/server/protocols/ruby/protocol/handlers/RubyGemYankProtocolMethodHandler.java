@@ -18,16 +18,16 @@ package io.repsy.os.server.protocols.ruby.protocol.handlers;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.protocols.ruby.protocol.RubyProtocolProvider;
 import io.repsy.protocols.ruby.protocol.facades.contracts.RubyProtocolFacade;
-import io.repsy.protocols.ruby.protocol.handlers.AbstractRubyCompactIndexInfoHandler;
+import io.repsy.protocols.ruby.protocol.handlers.AbstractRubyGemYankProtocolMethodHandler;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 @Component
 @NullMarked
-public class RubyCompactIndexInfoHandler extends AbstractRubyCompactIndexInfoHandler {
+public class RubyGemYankProtocolMethodHandler extends AbstractRubyGemYankProtocolMethodHandler {
 
-  public RubyCompactIndexInfoHandler(
+  public RubyGemYankProtocolMethodHandler(
       @Qualifier("osRubyPathParser") final PathParser basePathParser,
       final RubyProtocolFacade facade,
       final RubyProtocolProvider provider) {

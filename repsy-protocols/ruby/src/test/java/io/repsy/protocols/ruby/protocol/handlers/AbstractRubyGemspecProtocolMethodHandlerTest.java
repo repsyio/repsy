@@ -49,8 +49,8 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("AbstractRubyGemspecHandler")
-class AbstractRubyGemspecHandlerTest {
+@DisplayName("AbstractRubyGemspecProtocolMethodHandler")
+class AbstractRubyGemspecProtocolMethodHandlerTest {
 
   private static final String REPO_NAME = "demo-repo";
 
@@ -58,7 +58,7 @@ class AbstractRubyGemspecHandlerTest {
   @Mock private RubyProtocolFacade facade;
   @Mock private RubyProtocolProvider provider;
 
-  private static class TestHandler extends AbstractRubyGemspecHandler {
+  private static class TestHandler extends AbstractRubyGemspecProtocolMethodHandler {
 
     TestHandler(
         final PathParser basePathParser,

@@ -27,11 +27,11 @@ import org.jspecify.annotations.NonNull;
 public class ManifestInfo {
   private long schemaVersion;
   private String mediaType;
-  private Config config;
+  private OciImageConfig config;
   private List<ManifestLayer> layers;
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
-  private Config subject;
+  private OciImageConfig subject;
 
   public @NonNull List<String> getLayerDigests() {
 

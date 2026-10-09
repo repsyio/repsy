@@ -3878,7 +3878,7 @@ search`/`install`/`pull <repo>/<chart>`, or a raw `helm pull --repo`) 404s (`cha
 - **B-H3 (filed as [RPS-1219](https://repsyio.atlassian.net/browse/RPS-1219), fixed; the text below is the
   original finding)** — There was no
   `GET /v2/<repo>/<name>/tags/list` handler at all (`404` with OCI code `NAME_UNKNOWN`, msgId
-  `unknownPath`), although `HelmFacade.listTags`/`HelmOciTagListDto` exist (used only by the panel's
+  `unknownPath`), although `HelmProtocolFacade.listTags`/`HelmOciTagListDto` exist (used only by the panel's
   own `GET /api/helm/charts/{repo}/{packageName}/tags`). Helm's own `ValidateReference` calls `Tags(...)`
   whenever `--version` is empty or a semver CONSTRAINT, so a real `helm pull`/`install`/`show
 oci://.../<chart>` without an EXACT version fails outright against Repsy. Confirmed live: "HL2",
@@ -4507,7 +4507,7 @@ end`) and a real `bundle install --verbose`, plus an auth-only raw `GET /info/<n
 
 The plan's single most consequential prediction was that a real `bundle install` could not
 successfully consume from a Ruby repo on Repsy OS at all, because `quick/Marshal.4.8/*.gemspec.rz`
-has no backend route (RPS-1233, grep-confirmed: no class extends `AbstractRubyGemspecHandler`) and
+has no backend route (RPS-1233, grep-confirmed: no class extends `AbstractRubyGemspecProtocolMethodHandler`) and
 `/info` never advertises `ruby:`/`rubygems:` requirement keys (RB-2). This was probed live FIRST,
 before any adapter code was written: a hand-built gem was raw-POSTed to a local stack, then a
 throwaway `ruby:4.0.7-slim-bookworm` container (`docker run --network host`) ran `bundle install
@@ -4526,7 +4526,7 @@ toolchain with NO `knownConsumeFailure` hook at all** — every scenario's consu
 real, exactly like maven/npm/pypi, per the plan's own explicit fallback instruction for a refuted H1.
 
 RPS-1233 was real (confirmed live, `registry-rules.spec.ts`'s R10 test) and broke `gem install
---source .../gem/`; it is now fixed by a concrete `RubyGemspecHandler` that registers the route, and
+--source .../gem/`; it is now fixed by a concrete `RubyGemspecProtocolMethodHandler` that registers the route, and
 both `registry-rules.spec.ts`'s R10 test and `publish-consume.spec.ts`'s dedicated `gem install`
 real-client test assert the fixed behavior instead of pinning the failure. `gem fetch` shared the
 same route dependency plus its own separate bug (RPS-1234, the zlib/gzip mismatch below); both are
@@ -4636,13 +4636,13 @@ adapter code was written.
 ### Backend bug candidates found while reading and confirmed live (do not fix here)
 
 - **RPS-1233 (fixed)** — `quick/Marshal.4.8/<name>-<version>.gemspec.rz` had no backend route at all:
-  no class under `repsy-backend`'s Ruby package extended `AbstractRubyGemspecHandler` (grep-confirmed),
+  no class under `repsy-backend`'s Ruby package extended `AbstractRubyGemspecProtocolMethodHandler` (grep-confirmed),
   even though the abstract handler, `RubyGemspecMarshalWriter` and `RubyProtocolFacade.getGemspec`
   were all already implemented in `repsy-protocols/ruby`. The router's catch-all answered `404
 unknownPath`. Broke `gem install --source`/`gem fetch`; did NOT break `bundle install` (H1's
   refutation, the headline finding of this step). Was the highest-severity candidate of this step,
   since it silently dropped an entire, otherwise-implemented feature from being reachable. Fixed by a
-  concrete `RubyGemspecHandler` that registers the route: `gem install` now succeeds end-to-end
+  concrete `RubyGemspecProtocolMethodHandler` that registers the route: `gem install` now succeeds end-to-end
   (`publish-consume.spec.ts`) and `registry-rules.spec.ts`'s R10 test asserts `200`. `gem fetch`
   shared this route dependency plus its own separate RPS-1234 zlib/gzip bug below; both are now
   fixed and `gem fetch` succeeds end-to-end too.
@@ -4658,14 +4658,14 @@ unknownPath`. Broke `gem install --source`/`gem fetch`; did NOT break `bundle in
   filenames and a real `gem fetch`/the legacy Index fetcher both expect. Confirmed live before the
   fix: `gunzipSync` threw, `inflateSync` succeeded and yielded a valid Marshal 4.8 stream; a real
   `gem fetch` failed. Fixed by swapping in `java.util.zip.GZIPOutputStream`
-  (`AbstractRubySpecsIndexHandler`); `Content-Type` stays `application/octet-stream` and no
+  (`AbstractRubySpecsIndexProtocolMethodHandler`); `Content-Type` stays `application/octet-stream` and no
   `Content-Encoding: gzip` header is added (the gzip framing is the file's own content, not a
   transfer encoding — adding that header would make an HTTP client transparently decompress it and
   hand RubyGems a bare Marshal stream to gunzip a second time). `registry-rules.spec.ts` (R9) now
   asserts `gunzipSync` succeeds and `inflateSync` throws. The dedicated `publish-consume.spec.ts`
   real-client `gem fetch` test asserts the same gzip framing directly and, now that `gem fetch`'s
   other shared dependency (the `gemspec.rz` route, RPS-1233) is also fixed, asserts a real exit 0
-  end to end. Note: `AbstractRubyGemspecHandler.deflate` (the `.rz` gemspec route, RPS-1233) is a
+  end to end. Note: `AbstractRubyGemspecProtocolMethodHandler.deflate` (the `.rz` gemspec route, RPS-1233) is a
   different, near-identical-looking method that correctly uses raw zlib per the RubyGems spec — it
   was deliberately left untouched.
 - **RPS-1235 (fixed)** — a yanked version used to be listed in `/info/<gem>` with a `-` prefix instead
@@ -4688,13 +4688,13 @@ unknownPath`. Broke `gem install --source`/`gem fetch`; did NOT break `bundle in
   (unlike every other protocol's hyphenated one), since `REPSY_E2E_RUN_ID` can start with a digit and
   a hyphenated scenario name would otherwise risk tripping this exact case by accident on every run.
 - **RPS-1237 (fixed)** — `HEAD` on ANY path used to answer `200` empty, existence never checked at all
-  (the pypi/nuget analogue). Fixed: `AbstractRubyHeadHandler` now dispatches per path kind with
+  (the pypi/nuget analogue). Fixed: `AbstractRubyHeadProtocolMethodHandler` now dispatches per path kind with
   existence-only checks (`gemExists`/`gemFileExists`/`gemspecExists` on the facade, the `.gem` case
   reusing RPS-1236's `findByGemFilename` resolver) and mirrors the matching `GET` route's `200`/`404`.
   `registry-rules.spec.ts`'s dedicated test now asserts the mirrored status directly. **RPS-1465
   (fixed)**: the `HEAD` answers the `Content-Type` of its `GET` too (`text/plain` for `/names`,
   `/versions`, `/info/<gem>`, `application/octet-stream` for the rest), which the same test asserts.
-- **RB-7** (observation from source, not independently forced live) — `RubyGemDownloadHandler`'s
+- **RB-7** (observation from source, not independently forced live) — `RubyGemDownloadProtocolMethodHandler`'s
   `downloadGem` swallows every exception (`catch (Exception)`) into a bodyless `404`, so a genuine
   server error (a storage backend outage, say) would be indistinguishable from "this gem does not
   exist" to any client. Not independently forceable without breaking the storage backend itself, so
@@ -4755,7 +4755,7 @@ dependency, and `GET`/`HEAD` of the `.gemspec.rz` of a multi-segment platform (`
 
 `tests/ruby/transitive-resolution.spec.ts`'s last `describe` block (RPS-1724, "happy flow 1") covers
 the LEGACY `GET /api/v1/dependencies` route (`RubyMarshalWriter.dumpDependencies`,
-`AbstractRubyDependenciesHandler`) that `gem dependency --remote` and some third-party tools still
+`AbstractRubyDependenciesProtocolMethodHandler`) that `gem dependency --remote` and some third-party tools still
 call -- never Bundler 2.x, which resolves through the compact index proven above and never this
 route. Repsy Cloud implements the SAME route with its own, separate handler
 (`RubyGemDependenciesStubProtocolMethodHandler`); this OS-side test is the ground truth a later

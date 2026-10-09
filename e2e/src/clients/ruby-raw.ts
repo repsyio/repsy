@@ -77,7 +77,7 @@
  *    decode it; confirmed live post-fix: `gunzipSync` now succeeds and yields the Marshal `\x04\x08`
  *    header). Prerelease = "version contains a letter".
  *  - `GET /<repo>/quick/Marshal.4.8/<name>-<ver>[-<platform>].gemspec.rz`: `200`, a zlib-deflated
- *    Marshal 4.8 `Gem::Specification` (`RubyGemspecHandler` extends `AbstractRubyGemspecHandler`,
+ *    Marshal 4.8 `Gem::Specification` (`RubyGemspecProtocolMethodHandler` extends `AbstractRubyGemspecProtocolMethodHandler`,
  *    RPS-1233, fixed -- confirmed live in `tests/ruby/publish-consume.spec.ts`'s `gem install`/`gem
  *    fetch` tests). It now carries the gem's real runtime `dependencies` too (RPS-1554, fixed,
  *    confirmed live in `tests/ruby/transitive-resolution.spec.ts`: inflate then `Marshal.load` --
@@ -85,7 +85,7 @@
  *    runner, never a hand-rolled TS Marshal parser); before RPS-1554 it always said
  *    `dependencies = []`. Unknown coordinate -> `404`.
  *  - `GET /<repo>/api/v1/dependencies?gems=a,b,c`: the LEGACY Marshal dependency-resolution route
- *    (`AbstractRubyDependenciesHandler`, RPS-1554/RPS-1724, fixed -- before this handler existed the
+ *    (`AbstractRubyDependenciesProtocolMethodHandler`, RPS-1554/RPS-1724, fixed -- before this handler existed the
  *    request matched no route and answered `404 unknownPath`, so `RubyMarshalWriter.dumpDependencies`
  *    was dead code with nothing serving it). `permission: READ`. `200
  *    application/octet-stream`, a Marshal 4.8 Array of `{name:, number:, platform:, dependencies:}`

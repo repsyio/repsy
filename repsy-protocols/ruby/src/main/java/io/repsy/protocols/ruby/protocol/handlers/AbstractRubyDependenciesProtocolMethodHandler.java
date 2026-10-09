@@ -24,26 +24,34 @@ import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
-import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
-import org.springframework.http.HttpHeaders;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
+/**
+ * {@code GET /api/v1/dependencies?gems=name1,name2}: the legacy Marshal dependency-resolution
+ * endpoint older RubyGems clients and some tools (including some Bundler resolution paths) still
+ * call, backed by {@link io.repsy.protocols.ruby.shared.utils.RubyMarshalWriter#dumpDependencies}
+ * (RPS-1554). Before this handler existed, the request matched no route and answered {@code 404
+ * unknownPath}, so {@code dumpDependencies} was dead code with nothing serving it.
+ */
 @NullMarked
-public abstract class AbstractRubyCompactIndexInfoHandler implements ProtocolMethodHandler {
+public abstract class AbstractRubyDependenciesProtocolMethodHandler
+    implements ProtocolMethodHandler {
 
-  private static final Pattern INFO_PATTERN = Pattern.compile("^/info/(.+)$");
+  private static final String DEPENDENCIES_PATH = "/api/v1/dependencies";
+  private static final String GEMS_PARAM = "gems";
 
   private final PathParser basePathParser;
   private final RubyProtocolFacade facade;
 
-  protected AbstractRubyCompactIndexInfoHandler(
+  protected AbstractRubyDependenciesProtocolMethodHandler(
       final PathParser basePathParser,
       final RubyProtocolFacade facade,
       final RubyProtocolProvider provider) {
@@ -73,7 +81,7 @@ public abstract class AbstractRubyCompactIndexInfoHandler implements ProtocolMet
         return Optional.empty();
       }
       final var relativePath = ProtocolContextUtils.getRelativePath(parsedOpt.get()).getPath();
-      return INFO_PATTERN.matcher(relativePath).matches() ? parsedOpt : Optional.empty();
+      return DEPENDENCIES_PATH.equals(relativePath) ? parsedOpt : Optional.empty();
     };
   }
 
@@ -82,20 +90,22 @@ public abstract class AbstractRubyCompactIndexInfoHandler implements ProtocolMet
       final ProtocolContext context,
       final HttpServletRequest request,
       final HttpServletResponse response) {
-    final var relativePath = ProtocolContextUtils.getRelativePath(context).getPath();
-    final var matcher = INFO_PATTERN.matcher(relativePath);
-    if (!matcher.matches()) {
-      return ResponseEntity.notFound().build();
+    final var gemNames = parseGemNames(request.getParameter(GEMS_PARAM));
+    final var body = this.facade.getDependencies(context, gemNames);
+    return ResponseEntity.ok().contentType(MediaType.APPLICATION_OCTET_STREAM).body(body);
+  }
+
+  /**
+   * {@code gems} is a comma-separated list of names, matching the real RubyGems API; a missing or
+   * blank value is an empty request (no gems to resolve), not an error.
+   */
+  private static List<String> parseGemNames(final @Nullable String gems) {
+    if (gems == null || gems.isBlank()) {
+      return List.of();
     }
-    final var gemName = matcher.group(1);
-    final var body = this.facade.getGemInfo(context, gemName);
-    // A gem name with a dot ("foo.rb") reads as an extension to Spring, which then names the
-    // response "f.txt" (RPS-1442).
-    return ResponseEntity.ok()
-        .contentType(MediaType.TEXT_PLAIN)
-        .header(
-            HttpHeaders.CONTENT_DISPOSITION,
-            Objects.requireNonNull(RubyContentDisposition.forPath(relativePath)))
-        .body(body);
+    return Arrays.stream(gems.split(","))
+        .map(String::trim)
+        .filter(name -> !name.isEmpty())
+        .toList();
   }
 }

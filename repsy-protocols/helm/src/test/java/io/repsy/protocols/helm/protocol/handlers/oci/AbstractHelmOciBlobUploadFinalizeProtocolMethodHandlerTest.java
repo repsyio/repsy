@@ -29,7 +29,7 @@ import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
-import io.repsy.protocols.helm.protocol.facades.HelmFacade;
+import io.repsy.protocols.helm.protocol.facades.HelmProtocolFacade;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciBlobInfo;
 import io.repsy.protocols.helm.shared.utils.HelmConstants;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
@@ -65,7 +65,7 @@ class AbstractHelmOciBlobUploadFinalizeProtocolMethodHandlerTest {
   private static final String OCTET_STREAM = "application/octet-stream";
 
   @Mock private PathParser basePathParser;
-  @Mock private HelmFacade<UUID> helmFacade;
+  @Mock private HelmProtocolFacade<UUID> helmFacade;
   @Mock private HelmProtocolProvider provider;
   @Mock private HelmOciBlobInfo blobInfo;
 
@@ -74,7 +74,7 @@ class AbstractHelmOciBlobUploadFinalizeProtocolMethodHandlerTest {
 
     TestHandler(
         final PathParser basePathParser,
-        final HelmFacade<UUID> helmFacade,
+        final HelmProtocolFacade<UUID> helmFacade,
         final HelmProtocolProvider provider) {
       super(basePathParser, helmFacade, provider);
     }

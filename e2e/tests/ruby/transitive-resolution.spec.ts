@@ -732,7 +732,7 @@ test.describe('ruby > transitive resolution (RPS-1479)', () => {
 
 /**
  * RPS-1724 ("happy flow 1"): the LEGACY `GET /api/v1/dependencies` route (`RubyMarshalWriter
- * .dumpDependencies`, `AbstractRubyDependenciesHandler`), which `gem dependency --remote` and some
+ * .dumpDependencies`, `AbstractRubyDependenciesProtocolMethodHandler`), which `gem dependency --remote` and some
  * third-party tools still call -- never Bundler 2.x, which resolves through the compact index
  * (`/info`, proven above) and never this route. Repsy Cloud implements the SAME route with its own,
  * separate handler (`RubyGemDependenciesStubProtocolMethodHandler`); this file is the OS-side ground

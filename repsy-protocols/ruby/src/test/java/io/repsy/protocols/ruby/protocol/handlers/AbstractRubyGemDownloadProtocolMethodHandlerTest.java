@@ -19,37 +19,38 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.protocols.ruby.protocol.RubyProtocolProvider;
 import io.repsy.protocols.ruby.protocol.facades.contracts.RubyProtocolFacade;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
-import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
-import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.HttpMethod;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("AbstractRubyGemYankHandler")
-class AbstractRubyGemYankHandlerTest {
+@DisplayName("AbstractRubyGemDownloadProtocolMethodHandler")
+class AbstractRubyGemDownloadProtocolMethodHandlerTest {
 
-  private static final String YANK_PATH = "/api/v1/gems/yank";
+  private static final String REPO_NAME = "gems";
 
   @Mock private PathParser basePathParser;
   @Mock private RubyProtocolFacade facade;
   @Mock private RubyProtocolProvider provider;
 
-  private static class TestHandler extends AbstractRubyGemYankHandler {
+  private static class TestHandler extends AbstractRubyGemDownloadProtocolMethodHandler {
 
     TestHandler(
         final PathParser basePathParser,
@@ -65,76 +66,72 @@ class AbstractRubyGemYankHandlerTest {
 
   private static ProtocolContext contextFor(final String relativePath) {
     final var repoInfo = new BaseRepoInfo<UUID>();
-    repoInfo.setName("demo-repo");
+    repoInfo.setName(REPO_NAME);
 
     final var context = new ProtocolContext();
     context.addProperty(
         "urlProperties",
         BaseUrlParserProperties.<UUID, BaseRepoInfo<UUID>>builder()
-            .repoName("demo-repo")
+            .repoName(REPO_NAME)
             .relativePath(new RelativePath(relativePath))
             .repoInfo(repoInfo)
             .build());
     return context;
   }
 
-  @Test
-  @DisplayName("yank is a WRITE, not MANAGE, so a read-write deploy token may yank (RPS-1317)")
-  void yankIsAWriteOperation() {
-    final var properties = this.handler().getProperties();
-
-    assertThat(properties).containsEntry("permission", Permission.WRITE);
-    assertThat(properties).containsEntry("writeOperation", true);
+  private ProtocolContext download(final String filename) {
+    final var context = contextFor("/gems/" + filename);
+    when(this.facade.downloadGem(context, filename))
+        .thenReturn(new ByteArrayResource(new byte[] {1, 2, 3}));
+    return context;
   }
 
   @Test
-  @DisplayName("registers itself with the provider and serves DELETE only")
-  void registersForDelete() {
+  @DisplayName("registers itself with the provider")
+  void registers() {
     final var handler = this.handler();
 
     verify(this.provider).registerMethodHandler(handler);
-    assertThat(handler.getSupportedMethods()).containsExactly(HttpMethod.DELETE);
   }
 
   @Test
-  @DisplayName("matches DELETE /api/v1/gems/yank and nothing else")
-  void matchesYankPathOnly() {
-    final var yank = new MockHttpServletRequest("DELETE", YANK_PATH);
-    when(this.basePathParser.parse(yank)).thenReturn(Optional.of(contextFor(YANK_PATH)));
-    final var other = new MockHttpServletRequest("DELETE", "/api/v1/gems");
-    when(this.basePathParser.parse(other)).thenReturn(Optional.of(contextFor("/api/v1/gems")));
-    final var get = new MockHttpServletRequest("GET", YANK_PATH);
+  @DisplayName("serves the gem as an attachment named after the gem file, not f.txt (RPS-1389)")
+  void namesTheGemFile() {
+    final var context = this.download("demo-1.2.3.gem");
 
-    final var parser = this.handler().getPathParser();
+    final var response =
+        this.handler().handle(context, new MockHttpServletRequest(), new MockHttpServletResponse());
 
-    assertThat(parser.parse(yank)).isPresent();
-    assertThat(parser.parse(other)).isEmpty();
-    assertThat(parser.parse(get)).isEmpty();
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(response.getHeaders().getFirst(HttpHeaders.CONTENT_TYPE))
+        .isEqualTo(MediaType.APPLICATION_OCTET_STREAM_VALUE);
+    assertThat(response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION))
+        .isEqualTo("attachment; filename=\"demo-1.2.3.gem\"");
   }
 
   @Test
-  @DisplayName("yanks the named version, defaulting the platform to ruby")
-  void yanksWithDefaultPlatform() {
-    final var request = new MockHttpServletRequest("DELETE", YANK_PATH);
-    request.setParameter("gem_name", "demo");
-    request.setParameter("version", "1.0.0");
-    final var context = contextFor(YANK_PATH);
+  @DisplayName("names a platform gem after its whole file name")
+  void namesAPlatformGemFile() {
+    final var context = this.download("demo-1.2.3-java.gem");
 
-    final var result = this.handler().handle(context, request, new MockHttpServletResponse());
+    final var response =
+        this.handler().handle(context, new MockHttpServletRequest(), new MockHttpServletResponse());
 
-    assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
-    verify(this.facade).yankGem(context, "demo", "1.0.0", "ruby");
+    assertThat(response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION))
+        .isEqualTo("attachment; filename=\"demo-1.2.3-java.gem\"");
   }
 
   @Test
-  @DisplayName("refuses a yank without gem_name or version with 400")
-  void refusesMissingParameters() {
-    final var request = new MockHttpServletRequest("DELETE", YANK_PATH);
-    request.setParameter("gem_name", "demo");
+  @DisplayName("answers 404 without a header when the gem is not found")
+  void notFound() {
+    final var context = contextFor("/gems/missing-1.0.0.gem");
+    when(this.facade.downloadGem(context, "missing-1.0.0.gem"))
+        .thenThrow(new ItemNotFoundException("gemNotFound"));
 
-    final var result =
-        this.handler().handle(contextFor(YANK_PATH), request, new MockHttpServletResponse());
+    final var response =
+        this.handler().handle(context, new MockHttpServletRequest(), new MockHttpServletResponse());
 
-    assertThat(result.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    assertThat(response.getHeaders().containsHeader(HttpHeaders.CONTENT_DISPOSITION)).isFalse();
   }
 }

@@ -37,12 +37,12 @@ import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
-@DisplayName("AbstractRubyCompactIndexInfoHandler")
-class AbstractRubyCompactIndexInfoHandlerTest {
+@DisplayName("AbstractRubyCompactIndexInfoProtocolMethodHandler")
+class AbstractRubyCompactIndexInfoProtocolMethodHandlerTest {
 
   private final RubyProtocolFacade facade = mock();
 
-  private static class TestHandler extends AbstractRubyCompactIndexInfoHandler {
+  private static class TestHandler extends AbstractRubyCompactIndexInfoProtocolMethodHandler {
 
     TestHandler(final RubyProtocolFacade facade) {
       super(mock(PathParser.class), facade, mock(RubyProtocolProvider.class));

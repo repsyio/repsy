@@ -25,7 +25,7 @@ import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
-import io.repsy.protocols.helm.protocol.facades.HelmFacade;
+import io.repsy.protocols.helm.protocol.facades.HelmProtocolFacade;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -52,11 +52,11 @@ public abstract class AbstractHelmOciBlobUploadChunkProtocolMethodHandler<ID>
       Pattern.compile("^/([^/]+)/blobs/uploads/([0-9a-fA-F-]{36})/?$");
 
   private final PathParser basePathParser;
-  private final HelmFacade<ID> helmFacade;
+  private final HelmProtocolFacade<ID> helmFacade;
 
   public AbstractHelmOciBlobUploadChunkProtocolMethodHandler(
       final PathParser basePathParser,
-      final HelmFacade<ID> helmFacade,
+      final HelmProtocolFacade<ID> helmFacade,
       final HelmProtocolProvider provider) {
     this.basePathParser = basePathParser;
     this.helmFacade = helmFacade;

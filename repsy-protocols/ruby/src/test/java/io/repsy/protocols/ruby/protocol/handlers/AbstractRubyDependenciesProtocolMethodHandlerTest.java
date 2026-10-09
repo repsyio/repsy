@@ -45,8 +45,8 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("AbstractRubyDependenciesHandler")
-class AbstractRubyDependenciesHandlerTest {
+@DisplayName("AbstractRubyDependenciesProtocolMethodHandler")
+class AbstractRubyDependenciesProtocolMethodHandlerTest {
 
   private static final String REPO_NAME = "demo-repo";
   private static final String PATH = "/api/v1/dependencies";
@@ -55,7 +55,7 @@ class AbstractRubyDependenciesHandlerTest {
   @Mock private RubyProtocolFacade facade;
   @Mock private RubyProtocolProvider provider;
 
-  private static class TestHandler extends AbstractRubyDependenciesHandler {
+  private static class TestHandler extends AbstractRubyDependenciesProtocolMethodHandler {
 
     TestHandler(
         final PathParser basePathParser,

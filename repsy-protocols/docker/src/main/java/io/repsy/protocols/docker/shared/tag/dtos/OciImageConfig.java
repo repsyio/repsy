@@ -20,7 +20,7 @@ import lombok.NoArgsConstructor;
 
 @Data
 @NoArgsConstructor
-public class Config {
+public class OciImageConfig {
   private Long size;
   private String mediaType;
   private String digest;
