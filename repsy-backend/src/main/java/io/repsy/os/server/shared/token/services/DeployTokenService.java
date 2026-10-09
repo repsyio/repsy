@@ -112,8 +112,19 @@ public class DeployTokenService {
 
     if (repoDeployToken.getExpirationDate() == null) {
       repoDeployToken.setExpirationDate(now.plus(DEFAULT_EXPIRATION_DURATION));
-    } else if (isBeyondMaximumExpiration(repoDeployToken.getExpirationDate(), now)) {
-      throw new BadRequestException("deployTokenExpirationTooLate");
+    } else {
+      // Truncated before it is checked, so that what is checked is what is stored.
+      final var date = repoDeployToken.getExpirationDate().truncatedTo(ChronoUnit.MICROS);
+
+      if (!date.isAfter(now)) {
+        throw new BadRequestException("deployTokenExpirationInPast");
+      }
+
+      if (isBeyondMaximumExpiration(date, now)) {
+        throw new BadRequestException("deployTokenExpirationTooLate");
+      }
+
+      repoDeployToken.setExpirationDate(date);
     }
 
     final var dayDuration =

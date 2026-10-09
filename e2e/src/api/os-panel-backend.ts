@@ -62,8 +62,6 @@ import {
 
 type Generated = typeof import('./generated/index.js');
 
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
-
 /** The panel's own query shapes, whose `RepoType` is the generated enum (see `RepoType` in panel-backend). */
 type GeneratedRepoTypeFilter = { repoType?: GeneratedRepoType; repoName?: string };
 type GeneratedRepoListParams = Omit<RepoListParams, 'type'> & { type?: GeneratedRepoType };
@@ -150,15 +148,12 @@ export class OsPanelBackend implements PanelBackend {
     };
   }
 
-  /** A token created with an expiration date in the past: the server accepts it (`past-date`). */
+  /** A token that lived a few seconds and has expired: the server refuses a past date (`short-ttl-wait`). */
   async seedExpiredTokenCredential({
     seeder,
     repoName,
   }: CredentialSeedContext): Promise<MaterializedCredential> {
-    const token = await seeder.createToken(repoName, {
-      readOnly: false,
-      expirationDate: new Date(Date.now() - ONE_DAY_MS),
-    });
+    const token = await seeder.createExpiredToken(repoName, { readOnly: false });
     return { transport: 'basic', username: token.username, password: token.token, kind: 'token' };
   }
 

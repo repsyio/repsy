@@ -307,8 +307,8 @@ test.describe('docker registry rules (raw HTTP)', () => {
         200,
       );
 
-      // The target's own way to an expired token (`PanelBackend.seedExpiredTokenCredential`): OS
-      // creates it with a past date, Repsy Cloud refuses that and waits out a short lifetime.
+      // The target's own way to an expired token (`PanelBackend.seedExpiredTokenCredential`): neither
+      // product accepts a past date, so it is a short lifetime that is waited out.
       const expiredCred = await materializeCredentialKind(
         seeder,
         'token-expired',

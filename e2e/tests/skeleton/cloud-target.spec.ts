@@ -71,7 +71,7 @@ test.describe('target capabilities', () => {
       expect(os.supportsUserRole, name).toBe(true);
       expect(os.supportsRepoUsers, name).toBe(false);
       expect(os.supportsExpiredTokenSeed, name).toBe(true);
-      expect(os.expiredTokenStrategy, name).toBe('past-date');
+      expect(os.expiredTokenStrategy, name).toBe('short-ttl-wait');
       expect(os.maxDeployTokensPerRepo, name).toBe(Number.POSITIVE_INFINITY);
       expect(os.supportsDirectoryListing, name).toBe(true);
     }

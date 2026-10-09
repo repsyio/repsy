@@ -131,8 +131,8 @@ test.describe('Deploy tokens: create', { tag: SETTINGS }, () => {
     },
   );
 
-  // @cloud-skip: seeds two tokens, one past-dated; the Cloud FREE plan holds one token per repo and takes no past
-  // expiration date (`maxDeployTokensPerRepo`, `supportsExpiredTokenSeed`).
+  // @cloud-skip: seeds two tokens, one already expired; the Cloud FREE plan holds one token per repo
+  // (`maxDeployTokensPerRepo`, `supportsExpiredTokenSeed`).
   test(
     'TOK-02 a Read Only token with a custom username and a near expiry, and the expiry colours',
     { tag: ['@cloud-skip'] },
@@ -142,10 +142,7 @@ test.describe('Deploy tokens: create', { tag: SETTINGS }, () => {
       const { tokens } = settings;
 
       // Two tokens the UI cannot make: one already expired, one far from expiring.
-      const expired = await seeder.createToken(repo.name, {
-        name: 'tok-expired',
-        expirationDate: new Date(Date.now() - ONE_DAY_MS),
-      });
+      const expired = await seeder.createExpiredToken(repo.name, { name: 'tok-expired' });
       const distant = await seeder.createToken(repo.name, {
         name: 'tok-distant',
         expirationDate: new Date(Date.now() + 30 * ONE_DAY_MS),
