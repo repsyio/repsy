@@ -23,7 +23,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.repsy.os.AbstractIntegrationTest;
-import io.repsy.os.server.protocols.nuget.shared.packages.services.NuGetPackageServiceImpl;
+import io.repsy.os.server.protocols.nuget.shared.packages.services.NuGetPackageService;
 import io.repsy.os.server.protocols.nuget.shared.storage.NuGetStorageService;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -58,7 +58,7 @@ class NuGetReadProtocolIT extends AbstractIntegrationTest {
   private static final String NUSPEC_PATH = "/{repo}/v3/package/{id}/1.0.0/{id}.1.0.0.nuspec";
 
   @MockitoSpyBean private NuGetStorageService nugetStorageService;
-  @MockitoSpyBean private NuGetPackageServiceImpl nugetPackageService;
+  @MockitoSpyBean private NuGetPackageService nugetPackageService;
 
   private Repo repo;
 

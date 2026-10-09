@@ -48,7 +48,7 @@ import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredPlugin;
 import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredVersion;
 import io.repsy.protocols.maven.shared.artifact.dtos.SignatureOutcome;
 import io.repsy.protocols.maven.shared.artifact.services.VersionComparator;
-import io.repsy.protocols.maven.shared.artifact.services.contracts.ArtifactService;
+import io.repsy.protocols.maven.shared.artifact.services.contracts.AbstractArtifactService;
 import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
 import io.repsy.protocols.maven.shared.utils.MavenPublishLimits;
 import io.repsy.protocols.maven.shared.utils.PluginDescriptorReader;
@@ -86,7 +86,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
 @NullMarked
-public class ArtifactServiceImpl implements ArtifactService<UUID> {
+public class ArtifactService extends AbstractArtifactService<UUID> {
 
   private static final String SOURCES_CLASSIFIER = "sources";
   private static final String JAVADOC_CLASSIFIER = "javadoc";

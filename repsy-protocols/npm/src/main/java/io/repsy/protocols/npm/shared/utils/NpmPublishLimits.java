@@ -27,7 +27,7 @@ import org.jspecify.annotations.Nullable;
 /**
  * Guards the length of every value the npm publish path stores in a length-limited column, before
  * anything is written (RPS-1136). {@code AbstractNpmProtocolFacade.publish} used to write the
- * tarball to storage (RPS-1124's ordering) and only then let {@code NpmPackageServiceImpl} copy
+ * tarball to storage (RPS-1124's ordering) and only then let {@code NpmPackageService} copy
  * unguarded values into 17 columns; an over-long one failed the row insert with SQLSTATE 22001,
  * {@code ErrorHandler} (RPS-1012) turned that into a generic 400 that named no field, and the
  * tarball was already left behind in storage.
@@ -168,8 +168,8 @@ public final class NpmPublishLimits {
 
   /**
    * Drops every over-long descriptive value from a single published version, in place, so what
-   * reaches {@code NpmPackageServiceImpl} and the stored {@code package.json} already fits its
-   * column. Keywords and maintainers whose own field cannot be nulled lose only that one entry.
+   * reaches {@code NpmPackageService} and the stored {@code package.json} already fits its column.
+   * Keywords and maintainers whose own field cannot be nulled lose only that one entry.
    */
   public static void dropOverLongFields(final Map<String, Object> version) {
 

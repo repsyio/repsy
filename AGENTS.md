@@ -298,12 +298,18 @@ them in both repositories together.
   `Request` and `Response` are for calls to and from external HTTP services. No `Dto`, `DTO` or `Model`
   suffix. New DTOs are records.
 - MapStruct mappers are `*Mapper`, in a `mappers` package (not `*Converter`).
-- No `Impl` suffix unless there are two implementations. A single implementation is a concrete class without
-  an interface. A second implementation gets a role name (`NoOp<Name>`, `Trivy<Name>`), not `Impl`.
+- No `Impl` suffix at all. A single implementation is a concrete class without an interface. A class that
+  implements a library contract (an interface in `repsy-protocols` or the libs, implemented once per
+  product) takes the contract's plain name and extends the library `Abstract<Contract>` base (the same-name
+  pair rule below). A second implementation of the same thing gets a role name (`NoOp<Name>`,
+  `Trivy<Name>`), not `Impl`. The only exception, until the owner decides, is a class that must extend a
+  backend base class and so cannot extend a library `Abstract` class: `NpmAuthenticatorImpl` (it extends
+  `ProtocolAuthService` and implements three library interfaces).
 - **`*TxService`** (and `<Format>ProtocolTxFacade`) is the transactional persistence layer below a service or
   facade. It is the only place for the `Tx` infix; do not add it elsewhere.
 - **Library interface and backend class share a name.** Each format splits into a library
-  (`io.repsy.protocols.<format>`: `<Format>ProtocolFacade` and `<Format>StorageService` interfaces, `Abstract*`
+  (`io.repsy.protocols.<format>`: `<Format>ProtocolFacade` and `<Format>StorageService` interfaces and the
+  service contracts such as `ArtifactService`, `NpmPackageService` or `PypiPackageService`, with `Abstract*`
   bases) and the backend (`io.repsy.os.server.protocols.<format>`: the concrete class of the same simple name).
   The backend class extends the library `Abstract<...>` class, never implements the interface directly, has
   only a constructor, and callers inject the interface. This pattern is deliberate; do not prefix the backend

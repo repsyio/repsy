@@ -31,7 +31,7 @@ import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.PagingAssertions;
 import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoCrateIndexRepository;
 import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoCrateMetaRepository;
-import io.repsy.os.server.protocols.cargo.shared.crate.services.CargoCrateServiceImpl;
+import io.repsy.os.server.protocols.cargo.shared.crate.services.CargoCrateService;
 import io.repsy.os.server.shared.http.BareBodyAssertions;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.entities.Repo;
@@ -60,7 +60,7 @@ import org.springframework.test.web.servlet.ResultActions;
 @DisplayName("CargoCrateController /api/cargo/crates/*")
 class CargoCrateControllerIT extends AbstractIntegrationTest {
 
-  @Autowired private CargoCrateServiceImpl crateService;
+  @Autowired private CargoCrateService crateService;
   @Autowired private CargoCrateIndexRepository crateIndexRepository;
   @Autowired private CargoCrateMetaRepository crateMetaRepository;
   @Autowired private CargoStorageService cargoStorageService;

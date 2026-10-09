@@ -15,7 +15,7 @@
  */
 package io.repsy.os.server.protocols.golang.protocol.facades;
 
-import io.repsy.os.server.protocols.golang.shared.go_module.services.GoModuleServiceImpl;
+import io.repsy.os.server.protocols.golang.shared.go_module.services.GoModuleService;
 import io.repsy.os.server.protocols.golang.shared.storage.services.GoStorageService;
 import io.repsy.protocols.golang.protocol.facades.AbstractGoProtocolFacade;
 import java.util.UUID;
@@ -30,7 +30,7 @@ public class GoProtocolFacade extends AbstractGoProtocolFacade<UUID> {
 
   public GoProtocolFacade(
       final GoStorageService golangStorageService,
-      final GoModuleServiceImpl goModuleService,
+      final GoModuleService goModuleService,
       @Value("${repsy.golang.max-module-zip-size:500MB}") final DataSize maxModuleZipSize) {
 
     super(golangStorageService, goModuleService, maxModuleZipSize.toBytes());

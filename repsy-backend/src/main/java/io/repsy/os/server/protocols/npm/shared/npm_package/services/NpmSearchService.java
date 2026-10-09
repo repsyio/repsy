@@ -19,12 +19,12 @@ import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.NpmSearchCandida
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.NpmSearchCandidateRepository;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageKeywordRepository;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageMaintainerRepository;
+import io.repsy.protocols.npm.shared.search.AbstractNpmSearchService;
 import io.repsy.protocols.npm.shared.search.NpmSearchDocument;
 import io.repsy.protocols.npm.shared.search.NpmSearchPerson;
 import io.repsy.protocols.npm.shared.search.NpmSearchQuery;
 import io.repsy.protocols.npm.shared.search.NpmSearchResult;
 import io.repsy.protocols.npm.shared.search.NpmSearchScorer;
-import io.repsy.protocols.npm.shared.search.NpmSearchService;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -50,7 +50,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @Transactional(readOnly = true)
 @NullMarked
-public class NpmSearchServiceImpl implements NpmSearchService<UUID> {
+public class NpmSearchService extends AbstractNpmSearchService<UUID> {
 
   /**
    * The most packages one search loads by default, so that an empty search of a huge repo stays
@@ -66,7 +66,7 @@ public class NpmSearchServiceImpl implements NpmSearchService<UUID> {
   private final PackageMaintainerRepository maintainerRepository;
   private final int maxCandidates;
 
-  public NpmSearchServiceImpl(
+  public NpmSearchService(
       final NpmSearchCandidateRepository candidateRepository,
       final PackageKeywordRepository keywordRepository,
       final PackageMaintainerRepository maintainerRepository,

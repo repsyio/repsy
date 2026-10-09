@@ -28,8 +28,8 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Guards the length of every value the Maven upload path copies from the request path and from the
- * POM into a length-limited column, before it is written (RPS-1138). {@code ArtifactServiceImpl}
- * used to copy them unguarded into about twenty columns of {@code maven_artifact}, {@code
+ * POM into a length-limited column, before it is written (RPS-1138). {@code ArtifactService} used
+ * to copy them unguarded into about twenty columns of {@code maven_artifact}, {@code
  * maven_artifact_version}, {@code maven_version_license} and {@code maven_version_developer}; an
  * over-long one failed the row insert with SQLSTATE 22001, {@code ErrorHandler} (RPS-1012) turned
  * that into a generic 400 that named no field, and the file was already in storage.
@@ -160,8 +160,8 @@ public final class MavenPublishLimits {
 
   /**
    * Drops every over-long descriptive value from a parsed POM, in place, so what {@code
-   * ArtifactServiceImpl} copies into its rows already fits their columns. It must run after the
-   * checks that read the parent (the groupId of a POM without its own is its parent's).
+   * ArtifactService} copies into its rows already fits their columns. It must run after the checks
+   * that read the parent (the groupId of a POM without its own is its parent's).
    */
   public static void dropOverLongFields(final Model model) {
 

@@ -47,8 +47,8 @@ import org.springframework.data.domain.Sort;
  * {@code "9.0"}). A mocked repository returns the releases in an order neither a plain string sort
  * nor insertion order would produce, and the page must still come back correct.
  */
-@DisplayName("PypiPackageServiceImpl.getReleaseList version sort (RPS-1688)")
-class PypiPackageServiceImplVersionSortTest {
+@DisplayName("PypiPackageService.getReleaseList version sort (RPS-1688)")
+class PypiPackageServiceVersionSortTest {
 
   private final RepoRepository repoRepository = mock(RepoRepository.class);
   private final PypiStorageService pypiStorageService = mock(PypiStorageService.class);
@@ -62,8 +62,8 @@ class PypiPackageServiceImplVersionSortTest {
   private final ReleaseProjectUrlRepository releaseProjectURLRepository =
       mock(ReleaseProjectUrlRepository.class);
 
-  private final PypiPackageServiceImpl service =
-      new PypiPackageServiceImpl(
+  private final PypiPackageService service =
+      new PypiPackageService(
           this.repoRepository,
           this.pypiStorageService,
           this.releaseRepository,

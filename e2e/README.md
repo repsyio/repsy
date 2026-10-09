@@ -1848,7 +1848,7 @@ through `test.fail()`.
 Re-publishing (redeploying, `allowOverride: true`) an **existing** npm version whose manifest has no
 `keywords` field used to crash with `400 badRequest`, swallowing a `ClassCastException`:
 `NpmPackageUtils.liftFieldsToTopLevel` defaulted an absent version `keywords` onto the **top-level**
-packument as a native `new String[] {}`; `NpmPackageServiceImpl.updateVersionFromMetadata` (reached
+packument as a native `new String[] {}`; `NpmPackageService.updateVersionFromMetadata` (reached
 only on a re-publish of an _existing_ version, via `AbstractNpmProtocolFacade.publish`'s "already
 exists" branch) then called `addKeywords`/`addMaintainers` with that **top-level** payload instead of
 the version's own sub-object, and `addKeywords` cast what it found at `"keywords"` to
@@ -1859,7 +1859,7 @@ passes the version's own sub-object, which legitimately has no `"keywords"` key,
 the same bug as RPS-1205 (a different bug, a different code path, no relation to tarball URLs).
 
 **Fixed**: `NpmPackageUtils.liftFieldsToTopLevel` now defaults `keywords` to an empty `ArrayList`
-instead of a `String[]` (same `[]` on the wire), and `NpmPackageServiceImpl.addKeywords`/
+instead of a `String[]` (same `[]` on the wire), and `NpmPackageService.addKeywords`/
 `addMaintainers` read their input through an `instanceof Collection<?>` guard instead of an unchecked
 cast, so no shape can throw there again. `clients/npm-raw.ts`'s `buildPublishDocument` and
 `src/packages/npm/package.template.json` still always include `"keywords": []` by default (a real npm
@@ -2644,7 +2644,7 @@ same throw-on-any-auth-failure shape), EXCEPT the override pair, which cargo has
 
 | scenario (shared catalog)                                                                             | real status observed        | note                                                                                                                                                                                                      |
 | ----------------------------------------------------------------------------------------------------- | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `no-override` (2nd publish, `allowOverride:false`)                                                    | `400 rejected`              | `CargoCrateServiceImpl.checkExistsVersion` throws unconditionally — `allowOverride` is never read by the protocol at all (`expectByProtocol: { cargo: { publish: 'rejected' } }`, `catalog.ts`)           |
+| `no-override` (2nd publish, `allowOverride:false`)                                                    | `400 rejected`              | `CargoCrateService.checkExistsVersion` throws unconditionally — `allowOverride` is never read by the protocol at all (`expectByProtocol: { cargo: { publish: 'rejected' } }`, `catalog.ts`)               |
 | `override` (2nd publish, `allowOverride:true`)                                                        | `400 rejected`              | deliberately still `rejected`: this is exactly what the scenario pins — `allowOverride: true` does NOT make cargo accept a version override                                                               |
 | `token-ro` publish                                                                                    | `401 unauthorized`          | same as maven/npm: `ProtocolAuthService.authorizeDeployToken` throws the plain `UnAuthorizedException`, not a distinct "forbidden"; the client fails at its own index-query preflight before ever PUTting |
 | `token-expired`/`token-revoked`/`token-rotated-old`/`token-other-repo`/`wrong-password`/`anonymous-*` | `401`, all                  | fails at the client's OWN preflight index GET (`config.json` is unauthenticated even on a private repo, but the index GET that follows needs the token) before any publish PUT is ever sent               |
@@ -2660,7 +2660,7 @@ own `dl`/`api`/`auth-required` shape.
 
 `AbstractCargoProtocolFacade.publish` used to write the `.crate` bytes to storage
 (`FileSystemStorageStrategy.write`, `TRUNCATE_EXISTING` — overwrites whatever was already there) and
-append an index line to a storage-only index FILE **BEFORE** calling `CargoCrateServiceImpl.publish`,
+append an index line to a storage-only index FILE **BEFORE** calling `CargoCrateService.publish`,
 where the duplicate-version check (`checkExistsVersion`) lives. When that check threw, the DB
 transaction rolled back but the storage write had already happened. Live evidence at the time
 (`tests/cargo/registry-rules.spec.ts`):
@@ -2683,7 +2683,7 @@ file only afterwards). The download after a refused duplicate is now bytesA agai
 ### H2, confirmed live: the sparse index serves a crate under its normalised name (RPS-1212)
 
 `CrateUtils.normalizeCrateName` (lower-case, `-` -> `_`) is applied both when a crate is stored
-(`CargoCrateServiceImpl.publish` stores the crate row and its index row under the normalised name)
+(`CargoCrateService.publish` stores the crate row and its index row under the normalised name)
 and whenever it is looked up by name (`getIndexEntries`/`findCrate` normalise their own `name`
 argument before querying) — so a raw HTTP GET of a hyphenated crate's sparse index, by EITHER its
 hyphenated or its normalised spelling, answers `200` with the SAME entry, whose own `"name"` field
@@ -4094,7 +4094,7 @@ download` in the catalog loop succeeds against pages carrying it.
   found only by probing live (not predicted by the plan): the response's own `Content-Type` was
   `application/json`, not `text/html`, despite the body being this same HTML. Low impact — `pip
 install`/`download` never fetch the root page, only `/simple/<project>/` — but a real PEP 503 spec
-  violation. Fixed: `PypiPackageServiceImpl.getPackageList` now passes a `repoUri` built the same way
+  violation. Fixed: `PypiPackageService.getPackageList` now passes a `repoUri` built the same way
   `PypiStorageService.buildRepoUri` does (`RequestBaseUrlUtils.resolveBaseUrl()` + the repo name),
   `packages.ftl` renders `${repoUri}/simple/${package.getNormalizedName()}/`, and
   `PypiSimpleHandlerPreProcessor` now sets `Content-Type: text/html` explicitly. Confirmed live:
@@ -4122,7 +4122,7 @@ install`/`download` never fetch the root page, only `/simple/<project>/` — but
   Since RPS-1662 a declared version that differs from the file name's is refused outright, `400
 archiveVersionMismatch`, so the same test now pins that answer.
 - **P4** (fixed, RPS-1124/#508): `AbstractPypiStorageService.writePackageArchive` (the archive file
-  AND its `.sha256` sidecar) used to run BEFORE `PypiPackageServiceImpl.addOrUpdateRelease`, where
+  AND its `.sha256` sidecar) used to run BEFORE `PypiPackageService.addOrUpdateRelease`, where
   `ReleaseVersion.of(form.version)` can still throw `badVersionString`, so a validation failure
   after the storage write left an orphaned, directly-downloadable archive+sidecar with no DB row.
   The release rows are now written first, in one transaction, and the archive only afterwards:
@@ -4140,7 +4140,7 @@ archiveVersionMismatch`, so the same test now pins that answer.
   exists), `/simple/<project>/` `200`/`404` on the package's existence (mirroring `GET`'s `307`
   redirect first for a non-normalized name), and `/<project>/-/<file>` `200`/`404` on the archive
   file's existence. Confirmed live: `registry-rules.spec.ts`'s HEAD test.
-- **P7** (observation, no test) — `PypiPackageServiceImpl.updateRelease` (read while investigating
+- **P7** (observation, no test) — `PypiPackageService.updateRelease` (read while investigating
   `addOrUpdateRelease`) throws a bare `IllegalStateException` in what reads as an unreachable branch;
   noted only, not independently confirmed live (no code path in this harness's own scenarios reaches
   it).
@@ -7041,7 +7041,7 @@ opt-in, and `docker-compose.runners.yml` gives every runner the stub's control U
 | `tests/docker/scanner.spec.ts`                          | `crane push`               | the scanner gets no file but the image reference `<registry>/<repo>/<image>:<tag>` and a registry token; the panel API holds the scan and its findings                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 
 The audit needs the stub to name the published package: Repsy matches an advisory on the finding's package
-name and version (`NpmAdvisorySourceImpl`), and the stub's own findings are made-up `stub-lib-*` packages. So
+name and version (`NpmAdvisorySource`), and the stub's own findings are made-up `stub-lib-*` packages. So
 a script's `findings` may hold `{severity, packageName, packageVersion, cveId, description}` (only the
 severity is required; the rest keep the defaults above), and the spec registers one for the exact name it
 is about to publish (`scanner.script(name, {findings: [{severity: 'HIGH', packageName: name, packageVersion:

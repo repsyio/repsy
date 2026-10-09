@@ -21,7 +21,7 @@
  * advisory.
  *
  * What makes it possible: Repsy answers an audit from the findings of the repository's scans by the
- * finding's package NAME and VERSION (`NpmAdvisorySourceImpl`), and the stub's own findings are made-up
+ * finding's package NAME and VERSION (`NpmAdvisorySource`), and the stub's own findings are made-up
  * `stub-lib-*` packages, so it is scripted (`PUT /control/scripts`, `src/stubs/scanner/`) to report a
  * finding on the very package the test publishes.
  *

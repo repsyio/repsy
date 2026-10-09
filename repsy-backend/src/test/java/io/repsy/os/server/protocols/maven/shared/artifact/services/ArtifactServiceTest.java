@@ -117,9 +117,9 @@ import org.springframework.data.domain.Sort;
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName(
-    "Maven ArtifactServiceImpl version-type rules (RPS-1174, RPS-1176, RPS-1182, RPS-1183,"
+    "Maven ArtifactService version-type rules (RPS-1174, RPS-1176, RPS-1182, RPS-1183,"
         + " RPS-1185)")
-class ArtifactServiceImplTest {
+class ArtifactServiceTest {
 
   private static final UUID RECORDED_ID = UUID.fromString("00000000-0000-0000-0000-000000000007");
   private static final String SNAPSHOT_JAR =
@@ -168,7 +168,7 @@ class ArtifactServiceImplTest {
   @Mock PendingSignatureRepository pendingSignatureRepository;
   @Mock StorageStrategy storageStrategy;
 
-  @InjectMocks ArtifactServiceImpl artifactService;
+  @InjectMocks ArtifactService artifactService;
 
   /**
    * The setting as it is committed once the version is locked (RPS-1323): on unless a test says
@@ -2454,11 +2454,11 @@ class ArtifactServiceImplTest {
               .map(row -> (ArtifactVersionListItem) row)
               .toList();
 
-      when(ArtifactServiceImplTest.this.artifactVersionRepository
+      when(ArtifactServiceTest.this.artifactVersionRepository
               .findAllByRepoIdAndGroupNameAndArtifactName(this.repoId, "com.acme", "lib"))
           .thenReturn(rows);
 
-      when(ArtifactServiceImplTest.this.artifactConverter.toArtifactVersionListItemDto(any()))
+      when(ArtifactServiceTest.this.artifactConverter.toArtifactVersionListItemDto(any()))
           .thenAnswer(
               invocation -> {
                 final ArtifactVersionListItem source = invocation.getArgument(0);
@@ -2475,7 +2475,7 @@ class ArtifactServiceImplTest {
       this.stubUnpagedVersions("1.9.0", "1.10.0", "1.10.0-SNAPSHOT", "1.11.0");
 
       final var descending =
-          ArtifactServiceImplTest.this.artifactService.getArtifactVersions(
+          ArtifactServiceTest.this.artifactService.getArtifactVersions(
               this.repoId,
               "com.acme",
               "lib",
@@ -2487,7 +2487,7 @@ class ArtifactServiceImplTest {
       assertThat(descending.getTotalElements()).isEqualTo(4);
 
       final var ascending =
-          ArtifactServiceImplTest.this.artifactService.getArtifactVersions(
+          ArtifactServiceTest.this.artifactService.getArtifactVersions(
               this.repoId,
               "com.acme",
               "lib",
@@ -2504,7 +2504,7 @@ class ArtifactServiceImplTest {
       this.stubUnpagedVersions("1.9.0", "1.10.0", "1.10.0-SNAPSHOT", "1.11.0");
 
       final var secondPage =
-          ArtifactServiceImplTest.this.artifactService.getArtifactVersions(
+          ArtifactServiceTest.this.artifactService.getArtifactVersions(
               this.repoId,
               "com.acme",
               "lib",
@@ -2520,17 +2520,17 @@ class ArtifactServiceImplTest {
     @Test
     @DisplayName("a plain id/lastUpdatedAt sort stays a database page, no unpaged fetch")
     void otherSortsStayOnTheDatabase() {
-      when(ArtifactServiceImplTest.this.artifactVersionRepository
+      when(ArtifactServiceTest.this.artifactVersionRepository
               .findAllByRepoIdAndGroupNameAndArtifactName(any(), any(), any(), any()))
           .thenReturn(Page.empty());
 
-      ArtifactServiceImplTest.this.artifactService.getArtifactVersions(
+      ArtifactServiceTest.this.artifactService.getArtifactVersions(
           this.repoId,
           "com.acme",
           "lib",
           PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "id")));
 
-      verify(ArtifactServiceImplTest.this.artifactVersionRepository, never())
+      verify(ArtifactServiceTest.this.artifactVersionRepository, never())
           .findAllByRepoIdAndGroupNameAndArtifactName(any(), any(), any());
     }
   }

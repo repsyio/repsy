@@ -17,7 +17,7 @@
 /**
  * The cargo server's registry rules, pinned at the protocol level with raw HTTP PUTs/GETs (no
  * `cargo` client), the cargo analogue of `tests/npm/registry-rules.spec.ts`. Every status/detail here
- * was read from `AbstractCargoPublishProtocolMethodHandler`/`CargoCrateServiceImpl`/`CrateUtils`
+ * was read from `AbstractCargoPublishProtocolMethodHandler`/`CargoCrateService`/`CrateUtils`
  * first and then confirmed against a running instance (see `README.md`'s "Scenario outcomes pinned
  * against a running instance" for the raw evidence):
  *

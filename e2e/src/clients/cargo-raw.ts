@@ -32,17 +32,17 @@
  *    403/409 on this route (`AbstractCargoPublishProtocolMethodHandler.handle`).
  *  - `AbstractCargoProtocolFacade.publish` writes the `.crate` bytes and appends the index line to
  *    storage (`AbstractCargoStorageService.writeCrateAndIndex`, `StorageStrategy.write` /
- *    `.append`) BEFORE calling `CargoCrateServiceImpl.publish`, where the duplicate-version check
+ *    `.append`) BEFORE calling `CargoCrateService.publish`, where the duplicate-version check
  *    (`checkExistsVersion`) lives -- so a refused duplicate has already touched storage; see this
  *    file's own `README.md` section on H1 for what was observed live.
- *  - Duplicate-version rule: `CargoCrateServiceImpl.publish`/`checkExistsVersion` refuses
+ *  - Duplicate-version rule: `CargoCrateService.publish`/`checkExistsVersion` refuses
  *    unconditionally (`ItemAlreadyExistException("crate \`%s@%s\` already exists in this
  *    registry")`) whenever a `CargoCrateIndex` row for that exact `(crate, vers)` already exists.
  *    `allowOverride` is never read by the protocol at all (only `grep`-visible in
  *    `CargoApiFacade.java`, which just reports the panel setting) -- both `no-override` and
  *    `override` therefore share the same pinned `rejected` expectation in `catalog.ts`.
  *  - Name normalisation: `CrateUtils.normalizeCrateName` = `toLowerCase(ROOT).replace('-', '_')`.
- *    `CargoCrateServiceImpl.publish` stores the crate row under that normalised name
+ *    `CargoCrateService.publish` stores the crate row under that normalised name
  *    (`crate.name`), and `createCrateIndex` sets `index.name = crate.getName()` (also normalised);
  *    `CargoCrateConverter.toCrateIndexEntry` maps the served `name` straight off `index.name`. So the
  *    sparse index serves a hyphenated crate's normalised (underscored) name, never the name it was

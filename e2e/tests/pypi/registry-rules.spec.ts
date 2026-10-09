@@ -26,7 +26,7 @@
  * Six backend bug candidates were found and confirmed live while building this suite, each filed as
  * its own Jira story per this repo's e2e process. RPS-1221/RPS-1223/RPS-1224/RPS-1225/RPS-1226 are
  * now FIXED (see `AbstractPypiProtocolFacade.uploadPackage`/`AbstractPypiStorageService`,
- * `PypiPackageServiceImpl.getPackageList`/`packages.ftl`/`PypiSimpleHandlerPreProcessor`,
+ * `PypiPackageService.getPackageList`/`packages.ftl`/`PypiSimpleHandlerPreProcessor`,
  * `AbstractPypiHeadProtocolMethodHandler`) and their tests below pin the corrected behaviour; the
  * rest are still open:
  *  - **RPS-1222** (fixed): the panel's own PyPI config screen used to tell users

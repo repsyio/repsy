@@ -19,7 +19,7 @@ import io.repsy.core.events.ArtifactVersionDeletedEvent;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.server.protocols.maven.shared.artifact.dtos.DeletedItem;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.Artifact;
-import io.repsy.os.server.protocols.maven.shared.artifact.services.ArtifactServiceImpl;
+import io.repsy.os.server.protocols.maven.shared.artifact.services.ArtifactService;
 import io.repsy.os.server.protocols.maven.shared.storage.services.MavenStorageService;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import java.io.IOException;
@@ -39,7 +39,7 @@ import org.springframework.stereotype.Component;
 public class ArtifactDeleter {
 
   private final MavenStorageService mavenStorageService;
-  private final ArtifactServiceImpl artifactService;
+  private final ArtifactService artifactService;
   private final ApplicationEventPublisher eventPublisher;
 
   public Pair<DeletedItem, BaseUsages> deleteArtifactVersion(

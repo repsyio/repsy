@@ -46,8 +46,8 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("NpmSearchServiceImpl")
-class NpmSearchServiceImplTest {
+@DisplayName("NpmSearchService")
+class NpmSearchServiceTest {
 
   @Mock private NpmSearchCandidateRepository candidates;
   @Mock private PackageKeywordRepository keywords;
@@ -56,13 +56,12 @@ class NpmSearchServiceImplTest {
   private final BaseRepoInfo<UUID> repo =
       BaseRepoInfo.<UUID>builder().name("npm").storageKey(UUID.randomUUID()).build();
 
-  private NpmSearchServiceImpl service() {
-    return this.service(NpmSearchServiceImpl.DEFAULT_MAX_CANDIDATES);
+  private NpmSearchService service() {
+    return this.service(NpmSearchService.DEFAULT_MAX_CANDIDATES);
   }
 
-  private NpmSearchServiceImpl service(final int maxCandidates) {
-    return new NpmSearchServiceImpl(
-        this.candidates, this.keywords, this.maintainers, maxCandidates);
+  private NpmSearchService service(final int maxCandidates) {
+    return new NpmSearchService(this.candidates, this.keywords, this.maintainers, maxCandidates);
   }
 
   private static NpmSearchCandidate candidate(
@@ -235,7 +234,7 @@ class NpmSearchServiceImplTest {
   @DisplayName("loads the keywords of many candidates in chunks of 1000")
   void chunksTheKeywordLookup() {
     final var loaded = new ArrayList<NpmSearchCandidate>();
-    for (var i = 0; i < NpmSearchServiceImpl.ID_CHUNK_SIZE * 2 + 1; i++) {
+    for (var i = 0; i < NpmSearchService.ID_CHUNK_SIZE * 2 + 1; i++) {
       loaded.add(candidate(UUID.randomUUID(), null, "p" + i, null));
     }
     when(this.candidates.find(any(), any(), anyInt())).thenReturn(loaded);

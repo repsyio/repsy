@@ -29,8 +29,8 @@ import io.repsy.os.server.protocols.golang.shared.go_module.repositories.GoModul
 import io.repsy.os.shared.error_handling.utils.ConstraintViolations;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.protocols.golang.shared.module.services.AbstractGoModuleService;
 import io.repsy.protocols.golang.shared.module.services.GoModuleFilesWriter;
-import io.repsy.protocols.golang.shared.module.services.GoModuleService;
 import io.repsy.protocols.golang.shared.utils.GoVersionUtils;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.IOException;
@@ -52,7 +52,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
 @NullMarked
-public class GoModuleServiceImpl implements GoModuleService<UUID> {
+public class GoModuleService extends AbstractGoModuleService<UUID> {
 
   /** The unique index on (module, version), created in {@code V0002__Golang_Protocol.sql}. */
   private static final String VERSION_UNIQUE_CONSTRAINT = "ux_go_module_version__module_id_version";

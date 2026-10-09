@@ -45,8 +45,8 @@ import org.springframework.data.domain.Sort;
  * "10.0.0"} above {@code "9.0.0"}). A mocked repository returns the versions in an order neither a
  * plain string sort nor insertion order would produce, and the page must still come back correct.
  */
-@DisplayName("NpmPackageServiceImpl.getVersionsContainsVersion version sort (RPS-1688)")
-class NpmPackageServiceImplVersionSortTest {
+@DisplayName("NpmPackageService.getVersionsContainsVersion version sort (RPS-1688)")
+class NpmPackageServiceVersionSortTest {
 
   private final RepoRepository repoRepository = mock(RepoRepository.class);
   private final NpmPackageRepository npmPackageRepository = mock(NpmPackageRepository.class);
@@ -60,8 +60,8 @@ class NpmPackageServiceImplVersionSortTest {
       mock(PackageKeywordRepository.class);
   private final NpmPackageMapper npmPackageConverter = mock(NpmPackageMapper.class);
 
-  private final NpmPackageServiceImpl service =
-      new NpmPackageServiceImpl(
+  private final NpmPackageService service =
+      new NpmPackageService(
           this.repoRepository,
           this.npmPackageRepository,
           this.packageVersionRepository,

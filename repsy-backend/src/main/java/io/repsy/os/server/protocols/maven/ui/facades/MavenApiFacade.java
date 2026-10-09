@@ -22,7 +22,7 @@ import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.os.generated.model.ArtifactVersionInfo;
 import io.repsy.os.generated.model.RepoSettingsForm;
 import io.repsy.os.generated.model.RepoSettingsInfo;
-import io.repsy.os.server.protocols.maven.shared.artifact.services.ArtifactServiceImpl;
+import io.repsy.os.server.protocols.maven.shared.artifact.services.ArtifactService;
 import io.repsy.os.server.protocols.maven.shared.storage.services.MavenStorageService;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacadeMavenAdapter;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
@@ -48,7 +48,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class MavenApiFacade implements ProtocolApiFacadeMavenAdapter {
 
   private final @NonNull RepoTxService repoTxService;
-  private final @NonNull ArtifactServiceImpl artifactService;
+  private final @NonNull ArtifactService artifactService;
   private final @NonNull MavenStorageService mavenStorageService;
 
   @Transactional

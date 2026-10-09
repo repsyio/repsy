@@ -22,7 +22,7 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.os.H2IntegrationTest;
 import io.repsy.os.server.protocols.golang.shared.go_module.repositories.GoModuleRepository;
-import io.repsy.os.server.protocols.golang.shared.go_module.services.GoModuleServiceImpl;
+import io.repsy.os.server.protocols.golang.shared.go_module.services.GoModuleService;
 import io.repsy.os.server.protocols.golang.shared.storage.services.GoStorageService;
 import io.repsy.os.server.protocols.golang.ui.facades.GoApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
@@ -72,7 +72,7 @@ class H2GolangLastVersionRemovalIT extends H2IntegrationTest {
   private static final int TIMEOUT_SECONDS = 20;
 
   @Autowired private RepoTxService repoTxService;
-  @Autowired private GoModuleServiceImpl goModuleService;
+  @Autowired private GoModuleService goModuleService;
   @Autowired private GoModuleRepository goModuleRepository;
   @Autowired private GoApiFacade golangApiFacade;
   @Autowired private GoStorageService golangStorageService;

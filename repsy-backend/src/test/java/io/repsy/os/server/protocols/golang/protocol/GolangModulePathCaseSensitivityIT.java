@@ -44,7 +44,7 @@ import org.junit.jupiter.api.Test;
  *
  * <p>A module that was already published (and hence lower-cased) before this fix keeps its data:
  * nothing is migrated, but a lookup that finds no row under the exact requested case falls back
- * once to the all-lower-case spelling (see {@code GoModuleServiceImpl.findModule} and {@code
+ * once to the all-lower-case spelling (see {@code GoModuleService.findModule} and {@code
  * AbstractGoProtocolFacade.getResourceWithLegacyFallback}/{@code lowerCaseModuleSegment}).
  *
  * <p>None of these reaches the database with a leaked row across test methods: each uses its own
@@ -175,7 +175,7 @@ class GolangModulePathCaseSensitivityIT extends AbstractIntegrationTest {
     assertThat(this.latestVersion(repo, legacyPath)).isEqualTo("v1.0.0");
 
     // Reachable by its real, mixed case too: no row/storage exists under that exact case, so both
-    // GoModuleServiceImpl.findModule and AbstractGoProtocolFacade.getResourceWithLegacyFallback
+    // GoModuleService.findModule and AbstractGoProtocolFacade.getResourceWithLegacyFallback
     // fall back once to the all-lower-case spelling.
     final var mixedCaseRequestPath = legacyPath.replaceFirst("legacy", "Legacy");
     assertThat(this.versionList(repo, mixedCaseRequestPath).lines().toList())

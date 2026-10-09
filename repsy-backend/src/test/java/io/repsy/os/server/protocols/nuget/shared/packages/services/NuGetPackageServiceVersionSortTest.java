@@ -46,16 +46,16 @@ import org.springframework.data.domain.Sort;
  * NuGetPackageUtilsTest}): a mocked repository returns the versions in an order neither a plain
  * string sort nor insertion order would produce, and the page must still come back correct.
  */
-@DisplayName("NuGetPackageServiceImpl.getVersionInfosPage version sort (RPS-1688)")
-class NuGetPackageServiceImplVersionSortTest {
+@DisplayName("NuGetPackageService.getVersionInfosPage version sort (RPS-1688)")
+class NuGetPackageServiceVersionSortTest {
 
   private final NuGetPackageRepository packageRepository = mock(NuGetPackageRepository.class);
   private final NuGetPackageVersionRepository packageVersionRepository =
       mock(NuGetPackageVersionRepository.class);
   private final NuGetPackageMapper converter = mock(NuGetPackageMapper.class);
 
-  private final NuGetPackageServiceImpl service =
-      new NuGetPackageServiceImpl(
+  private final NuGetPackageService service =
+      new NuGetPackageService(
           this.packageRepository, this.packageVersionRepository, this.converter);
 
   @Test

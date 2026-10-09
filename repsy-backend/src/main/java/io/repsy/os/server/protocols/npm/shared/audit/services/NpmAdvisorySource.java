@@ -22,8 +22,8 @@ import io.repsy.os.server.security.scan.services.VulnerabilityScanTxService;
 import io.repsy.os.server.security.scanner.VulnerabilityAdvisoryLookup;
 import io.repsy.os.server.security.scanner.dtos.AdvisoryLookupResult;
 import io.repsy.os.server.security.scanner.dtos.ScannerFinding;
+import io.repsy.protocols.npm.shared.audit.AbstractNpmAdvisorySource;
 import io.repsy.protocols.npm.shared.audit.NpmAdvisory;
-import io.repsy.protocols.npm.shared.audit.NpmAdvisorySource;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -53,7 +53,7 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 @NullMarked
-public class NpmAdvisorySourceImpl implements NpmAdvisorySource<UUID> {
+public class NpmAdvisorySource extends AbstractNpmAdvisorySource<UUID> {
 
   private static final String LOOKUP_SCANNER_NAME = "trivy";
 
@@ -81,7 +81,7 @@ public class NpmAdvisorySourceImpl implements NpmAdvisorySource<UUID> {
     try {
       return this.advisoryLookup
           .lookupNpm(versionsByName)
-          .map(NpmAdvisorySourceImpl::rows)
+          .map(NpmAdvisorySource::rows)
           .orElse(List.of());
     } catch (final RuntimeException exception) {
       // The lookup does not throw, but an audit must not fail on one that does.

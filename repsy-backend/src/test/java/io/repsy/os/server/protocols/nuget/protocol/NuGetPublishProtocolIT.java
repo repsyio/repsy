@@ -332,7 +332,7 @@ class NuGetPublishProtocolIT extends AbstractIntegrationTest {
    * Creates a NuGet repo in a transaction of its own, so it is committed before the test runs.
    *
    * <p>A push cannot run against a repo that only exists in the test's transaction: {@code
-   * NuGetPackageServiceImpl} inserts the {@code nuget_package} row in a {@code REQUIRES_NEW}
+   * NuGetPackageService} inserts the {@code nuget_package} row in a {@code REQUIRES_NEW}
    * transaction (so two concurrent first pushes of a package cannot fail each other), and that
    * transaction cannot see the uncommitted repo the row references.
    */

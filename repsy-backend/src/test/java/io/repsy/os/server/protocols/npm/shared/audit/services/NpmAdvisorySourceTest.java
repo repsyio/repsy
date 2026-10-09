@@ -39,12 +39,12 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-@DisplayName("NpmAdvisorySourceImpl")
-class NpmAdvisorySourceImplTest {
+@DisplayName("NpmAdvisorySource")
+class NpmAdvisorySourceTest {
 
   private final VulnerabilityScanTxService scans = mock(VulnerabilityScanTxService.class);
   private final VulnerabilityAdvisoryLookup lookup = mock(VulnerabilityAdvisoryLookup.class);
-  private final NpmAdvisorySourceImpl source = new NpmAdvisorySourceImpl(this.scans, this.lookup);
+  private final NpmAdvisorySource source = new NpmAdvisorySource(this.scans, this.lookup);
 
   {
     when(this.lookup.lookupNpm(any())).thenReturn(Optional.empty());

@@ -21,7 +21,7 @@ import io.repsy.os.generated.model.NpmPackageInfo;
 import io.repsy.os.generated.model.NpmPackageListItem;
 import io.repsy.os.generated.model.PackageVersionDetail;
 import io.repsy.os.generated.model.PackageVersionListItem;
-import io.repsy.os.server.protocols.npm.shared.npm_package.services.NpmPackageServiceImpl;
+import io.repsy.os.server.protocols.npm.shared.npm_package.services.NpmPackageService;
 import io.repsy.os.server.protocols.npm.ui.facades.NpmApiFacade;
 import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
 import io.repsy.os.shared.http.ResponseEntities;
@@ -71,7 +71,7 @@ public class NpmPackageApiController {
           "updatedAt", "updatedAt");
 
   private final UsageUpdateService usageUpdateService;
-  private final NpmPackageServiceImpl npmPackageService;
+  private final NpmPackageService npmPackageService;
   private final NpmApiFacade npmFacade;
 
   @DeleteMapping("/{repoName}/{packageName}")

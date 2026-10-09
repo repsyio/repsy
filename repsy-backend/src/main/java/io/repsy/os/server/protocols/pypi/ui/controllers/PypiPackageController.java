@@ -21,7 +21,7 @@ import io.repsy.os.generated.model.PypiPackageInfo;
 import io.repsy.os.generated.model.PypiPackageListItem;
 import io.repsy.os.generated.model.ReleaseDetail;
 import io.repsy.os.generated.model.ReleaseListItem;
-import io.repsy.os.server.protocols.pypi.shared.python_package.services.PypiPackageServiceImpl;
+import io.repsy.os.server.protocols.pypi.shared.python_package.services.PypiPackageService;
 import io.repsy.os.server.protocols.pypi.ui.facades.PypiApiFacade;
 import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
 import io.repsy.os.shared.http.ResponseEntities;
@@ -61,7 +61,7 @@ public class PypiPackageController {
 
   private final UsageUpdateService usageUpdateService;
   private final PypiApiFacade pypiApiFacade;
-  private final PypiPackageServiceImpl pypiPackageService;
+  private final PypiPackageService pypiPackageService;
 
   @DeleteMapping("/{repoName}/{packageName}")
   @RepoOperation(permission = Permission.MANAGE)

@@ -26,7 +26,7 @@ import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.NpmSearchCandidateRepository;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageKeywordRepository;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageMaintainerRepository;
-import io.repsy.os.server.protocols.npm.shared.npm_package.services.NpmSearchServiceImpl;
+import io.repsy.os.server.protocols.npm.shared.npm_package.services.NpmSearchService;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.user.entities.UserRole;
@@ -340,8 +340,8 @@ class NpmSearchProtocolIT extends AbstractIntegrationTest {
   }
 
   /** The service with a cap far below the number of packages of the repo. */
-  private NpmSearchServiceImpl cappedService(final int cap) {
-    return new NpmSearchServiceImpl(
+  private NpmSearchService cappedService(final int cap) {
+    return new NpmSearchService(
         this.candidateRepository, this.keywordRepository, this.maintainerRepository, cap);
   }
 

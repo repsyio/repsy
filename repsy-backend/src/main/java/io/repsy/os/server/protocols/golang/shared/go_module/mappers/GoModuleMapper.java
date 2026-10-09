@@ -33,7 +33,7 @@ public interface GoModuleMapper {
       final List<io.repsy.os.server.protocols.golang.shared.go_module.dtos.GoModuleVersionListItem>
           versions) {
 
-    // The same "latest" rule as the wire protocol's @latest (GoModuleServiceImpl.
+    // The same "latest" rule as the wire protocol's @latest (GoModuleService.
     // computeLatestVersion), not a plain max, so the panel and the wire agree (RPS-1720
     // C8/RPS-1733).
     final String latestVersion =

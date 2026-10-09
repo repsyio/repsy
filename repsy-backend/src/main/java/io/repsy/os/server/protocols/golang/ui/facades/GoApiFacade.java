@@ -25,7 +25,7 @@ import io.repsy.os.generated.model.GoModuleVersionListItem;
 import io.repsy.os.server.protocols.golang.shared.go_module.entities.GoModule;
 import io.repsy.os.server.protocols.golang.shared.go_module.repositories.GoModuleRepository;
 import io.repsy.os.server.protocols.golang.shared.go_module.repositories.GoModuleVersionRepository;
-import io.repsy.os.server.protocols.golang.shared.go_module.services.GoModuleServiceImpl;
+import io.repsy.os.server.protocols.golang.shared.go_module.services.GoModuleService;
 import io.repsy.os.server.protocols.golang.shared.storage.services.GoStorageService;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
@@ -46,7 +46,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class GoApiFacade implements ProtocolApiFacade {
 
   private final @NonNull GoStorageService golangStorageService;
-  private final @NonNull GoModuleServiceImpl goModuleService;
+  private final @NonNull GoModuleService goModuleService;
   private final @NonNull GoModuleRepository goModuleRepository;
   private final @NonNull GoModuleVersionRepository goModuleVersionRepository;
   private final @NonNull ApplicationEventPublisher eventPublisher;

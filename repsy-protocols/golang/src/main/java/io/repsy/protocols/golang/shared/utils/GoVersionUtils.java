@@ -121,8 +121,8 @@ public class GoVersionUtils {
    * TAGGED pre-release (e.g. {@code v1.3.0-beta.1}) win; only when there is no tagged version at
    * all -- release or pre-release -- does the highest pseudo-version win, so this still answers
    * rather than being empty for a module whose only versions are pseudo-versions. Shared by the
-   * wire protocol's {@code @latest} ({@code GoModuleServiceImpl.computeLatestVersion}) and the
-   * panel's module info ({@code GoModuleMapper.toGoModuleInfo}), so the two agree.
+   * wire protocol's {@code @latest} ({@code GoModuleService.computeLatestVersion}) and the panel's
+   * module info ({@code GoModuleMapper.toGoModuleInfo}), so the two agree.
    */
   public static Optional<String> latestOf(final Collection<String> versions) {
     final var release =

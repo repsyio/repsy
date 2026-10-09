@@ -58,8 +58,8 @@ class ArtifactUpsertHelper {
    * in this same transaction (rather than left to the caller's outer transaction) so that a failure
    * in any of them rolls back the version row too, instead of leaving it committed but orphaned (no
    * developers/licenses, stale latest/release on the artifact). The dependent-write logic itself
-   * lives in {@link ArtifactVersionWriteService}, shared with {@link ArtifactServiceImpl}'s
-   * "already exists" update path, so there is a single implementation.
+   * lives in {@link ArtifactVersionWriteService}, shared with {@link ArtifactService}'s "already
+   * exists" update path, so there is a single implementation.
    */
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   ArtifactVersion insertArtifactVersion(
