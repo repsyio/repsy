@@ -22,7 +22,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
@@ -31,7 +30,9 @@ class ProtocolProviderTest {
   /**
    * RPS-2050: Two equal-priority processors both run when registered, and the order is stable
    * (ordered by priority, then class name, then identity hash code). Before this fix, the second
-   * one was silently dropped because ProtocolProcessor.equals compared by priority only.
+   * one was silently dropped because ProtocolProcessor.equals compared by priority only. This test
+   * uses two instances of the same class, so ordering is determined by identityHashCode tie-break,
+   * which is fine for verifying both processors run.
    */
   @Test
   void twoEqualPriorityProcessorsBothRun() {
@@ -54,9 +55,7 @@ class ProtocolProviderTest {
     assertThat(invocationOrder).hasSize(2).contains("processor1", "processor2");
   }
 
-  /**
-   * Verify that two equal-priority processors are ordered stably by class name.
-   */
+  /** Verify that two equal-priority processors are ordered stably by class name. */
   @Test
   void equalPriorityProcessorsAreOrderedStably() {
     final var provider = new TestProtocolProvider();
