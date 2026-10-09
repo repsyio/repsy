@@ -385,6 +385,7 @@ capability, so a spec or the engine asks the capability and never the target's n
 | `supportsDirectoryListing`               | yes                                   | no (Maven repos list, no other protocol does: one flag, kept off)     |
 | `supportsVersionAllowanceSettings(type)` | Maven, NuGet                          | the same                                                              |
 | `ui.repoRoute(repo, ...segments)`        | `/<repo>/...`                         | `/<owner>/<repo>/...` (`REPSY_REPO_OWNER`, read when called)          |
+| `ui.loginPath`                           | `/`                                   | `/login` (`/` is the landing page, RPS-1997)                          |
 | `ui.profilePath`                         | `/profile`                            | `/account`                                                            |
 | `ui.settingsPath`                        | `/profile/settings`                   | `/settings`                                                           |
 | `ui.accessTokensPath`                    | `/profile/settings`                   | `/settings` (RPS-2003 moves the section there from `/account`)        |

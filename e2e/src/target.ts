@@ -86,6 +86,12 @@ export interface UiCapabilities {
    * Cloud when `REPSY_REPO_OWNER` is unset.
    */
   formatApiPath(prefix: string, repo: string, ...segments: string[]): string;
+  /**
+   * The route where an anonymous visitor lands on the login form: `/` (OS renders the form in place) or `/login`
+   * (Cloud serves its marketing landing page at `/` and shows the form there only after an `AuthGuard` redirect,
+   * RPS-1997).
+   */
+  loginPath: string;
   /** The route of the signed-in account's own page: `/profile` (OS) or `/account` (Cloud). */
   profilePath: string;
   /**
@@ -161,6 +167,7 @@ const OS_UI: UiCapabilities = {
   repoRoute: (repo, ...segments) => ['', repo, ...segments].join('/'),
   repoApiPath: (repo, ...segments) => ['', 'api', 'repos', repo, ...segments].join('/'),
   formatApiPath: (prefix, repo, ...segments) => [prefix, repo, ...segments].join('/'),
+  loginPath: '/',
   profilePath: '/profile',
   settingsPath: '/profile/settings',
   accessTokensPath: '/profile/settings',
@@ -203,6 +210,7 @@ const CLOUD_UI: UiCapabilities = {
     }
     return [prefix, env.repoOwner, repo, ...segments].join('/');
   },
+  loginPath: '/login',
   profilePath: '/account',
   settingsPath: '/settings',
   accessTokensPath: '/settings',

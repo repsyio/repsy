@@ -24,6 +24,7 @@
 import { expect, test } from '../../../src/ui/fixtures.js';
 import { DashboardPage } from '../../../src/ui/pages/dashboard.js';
 import { LoginPage } from '../../../src/ui/pages/login.js';
+import { loginRoute } from '../../../src/ui/routes.js';
 import { RepositoriesPage } from '../../../src/ui/pages/repositories.js';
 import { JWT_SHAPE, NO_SESSION, storedSession } from './stored-session.js';
 
@@ -48,7 +49,7 @@ test.describe('AUTH-15 a #access_token fragment', () => {
   });
 
   test('does not sign a visitor in or store anything', async ({ page }) => {
-    await page.goto(`/${FRAGMENT}`);
+    await page.goto(`${loginRoute()}${FRAGMENT}`);
 
     await expect(new LoginPage(page).submit).toBeVisible();
     expect(await storedSession(page)).toEqual(NO_SESSION);
