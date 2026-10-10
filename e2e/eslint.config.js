@@ -17,6 +17,7 @@
 import pluginJs from '@eslint/js';
 import playwright from 'eslint-plugin-playwright';
 import prettier from 'eslint-config-prettier';
+import checkFile from 'eslint-plugin-check-file';
 import tseslint from 'typescript-eslint';
 
 const IGNORES = [
@@ -73,6 +74,13 @@ const HARDCODED_REPO_API = [
   'Literal[value=/\\/api\\/repos\\/(\\*|\\{)/]',
 ].map((selector) => ({ selector, message: HARDCODED_REPO_API_MESSAGE }));
 
+// RPS-2123: JS/TS naming baseline (AGENTS.md "JavaScript and TypeScript naming"). Every rule below is `warn`;
+// the story that migrates a family of names flips its rule to `error`. An `I` interface prefix, the
+// abbreviations URL / ID / UI written in capitals, and Uuid, Golang, Nuget and Oauth are not allowed in an
+// identifier; all-caps constants and the wire names in the filter (uploadUuid, baseURL, toHaveURL) are skipped.
+const FORBIDDEN_IDENTIFIER_PARTS = '^I[A-Z][a-z]|Uuid|Golang|Nuget|Oauth|(URL|ID|UI)(?![a-z])';
+const SKIPPED_IDENTIFIERS = '^([A-Z0-9_]+|uploadUuid|baseURL|toHaveURL)$';
+
 export default tseslint.config(
   { ignores: IGNORES },
   pluginJs.configs.recommended,
@@ -82,6 +90,41 @@ export default tseslint.config(
       '@typescript-eslint/no-unused-vars': [
         'error',
         { varsIgnorePattern: '^_', argsIgnorePattern: '^_' },
+      ],
+    },
+  },
+  {
+    files: ['src/**/*.ts', 'tests/**/*.ts', '*.ts'],
+    plugins: { 'check-file': checkFile },
+    rules: {
+      '@typescript-eslint/naming-convention': [
+        'warn',
+        // Quoted keys (HTTP headers, JSON wire names) are a contract, not a naming choice.
+        { selector: 'default', modifiers: ['requiresQuotes'], format: null },
+        {
+          selector: 'default',
+          format: null,
+          filter: { regex: SKIPPED_IDENTIFIERS, match: false },
+          custom: { regex: FORBIDDEN_IDENTIFIER_PARTS, match: false },
+        },
+      ],
+      'check-file/filename-naming-convention': [
+        'warn',
+        { '**/*.ts': 'KEBAB_CASE' },
+        { ignoreMiddleExtensions: true },
+      ],
+      '@typescript-eslint/explicit-member-accessibility': ['warn', { accessibility: 'no-public' }],
+      'no-restricted-imports': [
+        'warn',
+        {
+          patterns: [
+            {
+              regex: 'api/generated/(?!index(\\.js)?$).+',
+              message:
+                'Import the generated client from src/api/generated/index.js, not a deep path.',
+            },
+          ],
+        },
       ],
     },
   },
@@ -150,6 +193,8 @@ export default tseslint.config(
       // `` `@${string}` ``-shaped strings there; that is this project's real enforcement of the
       // format this rule would otherwise check.
       'playwright/valid-test-tags': 'off',
+      // RPS-2123: a title states the behaviour; no `should`, no `Success -` / `Fail -` prefixes.
+      'playwright/valid-title': ['warn', { disallowedWords: ['should', 'Success', 'Fail'] }],
     },
   },
   prettier,

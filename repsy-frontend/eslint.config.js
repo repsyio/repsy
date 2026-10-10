@@ -4,6 +4,16 @@ import tseslint from 'typescript-eslint';
 import angular from 'angular-eslint';
 import simpleImportSort from 'eslint-plugin-simple-import-sort';
 import prettierConfig from 'eslint-config-prettier';
+import checkFile from 'eslint-plugin-check-file';
+import rxjsX from 'eslint-plugin-rxjs-x';
+
+// RPS-2123: JS/TS naming baseline (AGENTS.md "JavaScript and TypeScript naming"). Every rule below is
+// `warn`; the story that migrates a family of names flips its rule to `error`.
+//   - `I` interface prefix, and the abbreviations URL / ID / UI written in capitals, plus Uuid, Golang,
+//     Nuget and Oauth, are not allowed in an identifier. All-caps constants and the wire names listed in the
+//     filter (uploadUuid, baseURL, toHaveURL) are skipped.
+const FORBIDDEN_IDENTIFIER_PARTS = '^I[A-Z][a-z]|Uuid|Golang|Nuget|Oauth|(URL|ID|UI)(?![a-z])';
+const SKIPPED_IDENTIFIERS = '^([A-Z0-9_]+|uploadUuid|baseURL|toHaveURL)$';
 
 export default tseslint.config(
   {
@@ -18,8 +28,44 @@ export default tseslint.config(
     processor: angular.processInlineTemplates,
     plugins: {
       "simple-import-sort": simpleImportSort,
+      "check-file": checkFile,
+      "rxjs-x": rxjsX,
+    },
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+      },
     },
     rules: {
+      "@typescript-eslint/naming-convention": [
+        "warn",
+        // Quoted keys (HTTP headers, JSON wire names) are a contract, not a naming choice.
+        { selector: "default", modifiers: ["requiresQuotes"], format: null },
+        {
+          selector: "default",
+          format: null,
+          filter: { regex: SKIPPED_IDENTIFIERS, match: false },
+          custom: { regex: FORBIDDEN_IDENTIFIER_PARTS, match: false },
+        },
+      ],
+      "check-file/filename-naming-convention": [
+        "warn",
+        { "**/*.ts": "KEBAB_CASE" },
+        { ignoreMiddleExtensions: true },
+      ],
+      "@typescript-eslint/explicit-member-accessibility": ["warn", { accessibility: "no-public" }],
+      "rxjs-x/finnish": "warn",
+      "no-restricted-imports": [
+        "warn",
+        {
+          patterns: [
+            {
+              regex: "generated/api/.+",
+              message: "Import from the generated API index (src/generated/api), not a deep path.",
+            },
+          ],
+        },
+      ],
       '@typescript-eslint/no-empty-function': 'off',
       "@angular-eslint/prefer-inject": "off",
       "no-useless-escape": "off",
