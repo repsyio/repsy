@@ -61,7 +61,7 @@ class PypiPackageServiceVersionSortTest {
   private final PypiPackageRepository pypiPackageRepository = mock(PypiPackageRepository.class);
   private final ReleaseClassifierRepository releaseClassifierRepository =
       mock(ReleaseClassifierRepository.class);
-  private final ReleaseProjectUrlRepository releaseProjectURLRepository =
+  private final ReleaseProjectUrlRepository releaseProjectUrlRepository =
       mock(ReleaseProjectUrlRepository.class);
 
   private final PypiPackageService service =
@@ -74,7 +74,7 @@ class PypiPackageServiceVersionSortTest {
           this.pypiPackageConverter,
           this.pypiPackageRepository,
           this.releaseClassifierRepository,
-          this.releaseProjectURLRepository);
+          this.releaseProjectUrlRepository);
 
   @Test
   @DisplayName("sorts a version-descending request by precedence, not by string or insertion order")

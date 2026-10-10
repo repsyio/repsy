@@ -84,7 +84,7 @@ public class PypiPackageService extends AbstractPypiPackageService<UUID> {
   private final PypiPackageMapper pypiPackageConverter;
   private final PypiPackageRepository pypiPackageRepository;
   private final ReleaseClassifierRepository releaseClassifierRepository;
-  private final ReleaseProjectUrlRepository releaseProjectURLRepository;
+  private final ReleaseProjectUrlRepository releaseProjectUrlRepository;
 
   @Override
   public PypiPackageInfo getPackage(final UUID repoId, final String packageNormalizedName) {
@@ -271,9 +271,9 @@ public class PypiPackageService extends AbstractPypiPackageService<UUID> {
 
     final var classifiers = this.releaseClassifierRepository.findAllByReleaseId(release.getId());
 
-    final var projectURLs = this.releaseProjectURLRepository.findAllByReleaseId(release.getId());
+    final var projectUrls = this.releaseProjectUrlRepository.findAllByReleaseId(release.getId());
 
-    return this.pypiPackageConverter.toReleaseDetail(release, classifiers, projectURLs);
+    return this.pypiPackageConverter.toReleaseDetail(release, classifiers, projectUrls);
   }
 
   public Page<io.repsy.os.generated.model.ReleaseListItem> getReleaseList(
@@ -432,7 +432,7 @@ public class PypiPackageService extends AbstractPypiPackageService<UUID> {
     this.releaseRepository.save(release);
 
     this.releaseClassifierRepository.deleteAllByReleaseId(release.getId());
-    this.releaseProjectURLRepository.deleteAllByReleaseId(release.getId());
+    this.releaseProjectUrlRepository.deleteAllByReleaseId(release.getId());
 
     this.addReleaseClassifiers(uploadForm, release);
     this.addReleaseProjectURLs(uploadForm, release);
@@ -525,6 +525,6 @@ public class PypiPackageService extends AbstractPypiPackageService<UUID> {
       releaseProjectURLs.add(releaseProjectURL);
     }
 
-    this.releaseProjectURLRepository.saveAll(releaseProjectURLs);
+    this.releaseProjectUrlRepository.saveAll(releaseProjectURLs);
   }
 }
