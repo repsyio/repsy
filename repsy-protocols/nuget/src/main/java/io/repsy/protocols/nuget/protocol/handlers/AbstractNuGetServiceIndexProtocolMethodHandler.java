@@ -26,13 +26,11 @@ import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.Locale;
-import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
-@Slf4j
 @NullMarked
 public abstract class AbstractNuGetServiceIndexProtocolMethodHandler
     extends AbstractFacadeProtocolMethodHandler<NuGetProtocolFacade> {
@@ -70,16 +68,11 @@ public abstract class AbstractNuGetServiceIndexProtocolMethodHandler
       final HttpServletRequest request,
       final HttpServletResponse response) {
 
-    try {
-      final var repoName = ProtocolContextUtils.<Object>getRepoInfo(context).getName();
-      final var baseUrl = this.baseUrlResolver.baseUrl(request, repoName);
-      final var serviceIndex = this.facade.getServiceIndex(context, baseUrl);
+    final var repoName = ProtocolContextUtils.<Object>getRepoInfo(context).getName();
+    final var baseUrl = this.baseUrlResolver.baseUrl(request, repoName);
+    final var serviceIndex = this.facade.getServiceIndex(context, baseUrl);
 
-      return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(serviceIndex);
-    } catch (final Exception e) {
-      log.error("NuGet service index failed", e);
-      return ResponseEntity.internalServerError().build();
-    }
+    return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(serviceIndex);
   }
 
   /** The headers of the service index; it is a fixed document, so nothing is built. */

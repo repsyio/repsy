@@ -30,6 +30,7 @@ import io.repsy.protocols.npm.shared.utils.NpmPackageUtils;
 import io.repsy.protocols.npm.shared.utils.NpmPayloadUtils;
 import io.repsy.protocols.npm.shared.utils.NpmTarballUrlUtils;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
+import io.repsy.protocols.shared.storage.AbstractArtifactStorageService;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.file.NoSuchFileException;
@@ -58,30 +59,19 @@ import tools.jackson.core.JacksonException;
 @Slf4j
 @SuppressWarnings("unchecked")
 @NullMarked
-public abstract class AbstractNpmStorageService implements NpmStorageService {
+public abstract class AbstractNpmStorageService extends AbstractArtifactStorageService
+    implements NpmStorageService {
 
-  private final StorageStrategy storageStrategy;
   private final NpmPackumentStore packumentStore;
   private final NpmTarballStore tarballStore;
   private final NpmPackumentRebuilder packumentRebuilder;
 
   protected AbstractNpmStorageService(final StorageStrategy storageStrategy) {
 
-    this.storageStrategy = storageStrategy;
+    super(storageStrategy);
     this.packumentStore = new NpmPackumentStore(storageStrategy);
     this.tarballStore = new NpmTarballStore(storageStrategy);
     this.packumentRebuilder = new NpmPackumentRebuilder(this.tarballStore);
-  }
-
-  @Override
-  public void deleteRepo(final UUID repoId) {
-    final var storagePath = StoragePath.of(repoId);
-    this.storageStrategy.delete(storagePath);
-  }
-
-  @Override
-  public void createRepo(final UUID repoId) {
-    this.storageStrategy.createDirectory(repoId.toString());
   }
 
   @Override
@@ -402,11 +392,7 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
 
     final var storagePath = StoragePath.of(repoId, packageBasePath.toString());
 
-    final var usage = this.storageStrategy.calculatePathUsage(storagePath);
-
-    this.storageStrategy.delete(storagePath);
-
-    return usage;
+    return this.deleteTreeWithUsage(storagePath);
   }
 
   @Override

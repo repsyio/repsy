@@ -15,6 +15,7 @@
  */
 package io.repsy.protocols.ruby.protocol.handlers;
 
+import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.ruby.protocol.RubyProtocolProvider;
@@ -72,7 +73,9 @@ public abstract class AbstractRubyGemDownloadProtocolMethodHandler
               HttpHeaders.CONTENT_DISPOSITION,
               Objects.requireNonNull(RubyContentDisposition.forPath(relativePath)))
           .body(resource);
-    } catch (final Exception e) {
+    } catch (final ItemNotFoundException _) {
+      // Only a gem or gemspec that is not there is a 404; any other failure is left to
+      // ProtocolErrorAdvice (RPS-2060).
       return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
     }
   }

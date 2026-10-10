@@ -20,6 +20,7 @@ import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
 import io.repsy.protocols.cargo.protocol.facades.contracts.CargoProtocolFacade;
+import io.repsy.protocols.cargo.shared.constants.CargoConstants;
 import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
 import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.http.ResourceResponses;
@@ -63,6 +64,11 @@ public abstract class AbstractCargoDownloadProtocolMethodHandler
       final HttpServletRequest request,
       final HttpServletResponse response) {
 
+    // Only a missing crate is answered here. Any other failure is left to ProtocolErrorAdvice (500,
+    // or 503 with Retry-After when storage is down) and, with this mark, to Cargo's error body
+    // (RPS-2060); it used to be answered 404, which hid an outage as a missing crate.
+    request.setAttribute(CargoConstants.ERROR_BODY_ATTRIBUTE, true);
+
     try {
       final var resource = this.facade.download(context);
 
@@ -78,8 +84,8 @@ public abstract class AbstractCargoDownloadProtocolMethodHandler
 
       return ok.header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_OCTET_STREAM_VALUE)
           .body(resource);
-    } catch (final Exception e) {
-      log.debug("Cargo download failed: {}", e.getMessage());
+    } catch (final ItemNotFoundException e) {
+      log.debug("Cargo download not found: {}", e.getMessage());
       return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
     }
   }

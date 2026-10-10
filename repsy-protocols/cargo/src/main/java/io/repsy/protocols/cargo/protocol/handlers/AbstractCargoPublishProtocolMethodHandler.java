@@ -19,9 +19,9 @@ import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
-import io.repsy.protocols.cargo.protocol.dtos.CargoErrorResponse;
 import io.repsy.protocols.cargo.protocol.facades.contracts.CargoProtocolFacade;
 import io.repsy.protocols.cargo.shared.constants.CargoConstants;
+import io.repsy.protocols.shared.dtos.ProtocolErrorBody;
 import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
 import io.repsy.protocols.shared.handlers.HandlerRoute;
 import jakarta.servlet.http.HttpServletRequest;
@@ -99,6 +99,6 @@ public abstract class AbstractCargoPublishProtocolMethodHandler
 
     return ResponseEntity.status(status)
         .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-        .body(CargoErrorResponse.of(detail));
+        .body(ProtocolErrorBody.withDetail(detail));
   }
 }

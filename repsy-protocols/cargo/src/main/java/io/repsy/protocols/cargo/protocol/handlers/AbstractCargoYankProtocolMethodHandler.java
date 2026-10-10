@@ -15,11 +15,13 @@
  */
 package io.repsy.protocols.cargo.protocol.handlers;
 
+import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
-import io.repsy.protocols.cargo.protocol.dtos.CargoErrorResponse;
 import io.repsy.protocols.cargo.protocol.facades.contracts.CargoProtocolFacade;
+import io.repsy.protocols.cargo.shared.constants.CargoConstants;
+import io.repsy.protocols.shared.dtos.ProtocolErrorBody;
 import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
 import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
@@ -74,6 +76,11 @@ public abstract class AbstractCargoYankProtocolMethodHandler
       final HttpServletRequest request,
       final HttpServletResponse response) {
 
+    // A version that is not there (or a malformed request) is the client's 400; any other failure
+    // is
+    // left to ProtocolErrorAdvice and, with this mark, to Cargo's error body (RPS-2060).
+    request.setAttribute(CargoConstants.ERROR_BODY_ATTRIBUTE, true);
+
     try {
       final var relativePath = ProtocolContextUtils.getRelativePath(context).getPath();
       final var isYank = relativePath.endsWith("/yank");
@@ -88,10 +95,10 @@ public abstract class AbstractCargoYankProtocolMethodHandler
           .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
           .body(Map.of("ok", true));
 
-    } catch (final Exception e) {
+    } catch (final ItemNotFoundException | IllegalArgumentException e) {
       return ResponseEntity.status(HttpStatus.BAD_REQUEST)
           .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-          .body(CargoErrorResponse.of(e.getMessage()));
+          .body(ProtocolErrorBody.withDetail(e.getMessage()));
     }
   }
 }

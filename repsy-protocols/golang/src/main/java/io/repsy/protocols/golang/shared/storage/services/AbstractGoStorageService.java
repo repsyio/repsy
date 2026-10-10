@@ -21,24 +21,26 @@ import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
+import io.repsy.protocols.shared.storage.AbstractArtifactStorageService;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 
 @Slf4j
-@RequiredArgsConstructor
 @NullMarked
-public abstract class AbstractGoStorageService<ID> implements GoStorageService<ID> {
+public abstract class AbstractGoStorageService<ID> extends AbstractArtifactStorageService
+    implements GoStorageService<ID> {
 
   private static final String ZIP_EXTENSION = ".zip";
 
-  private final StorageStrategy storageStrategy;
+  protected AbstractGoStorageService(final StorageStrategy storageStrategy) {
+    super(storageStrategy);
+  }
 
   /**
    * {@code modulePath} must already be the module's on-disk storage form: the !-escaped,
@@ -52,11 +54,6 @@ public abstract class AbstractGoStorageService<ID> implements GoStorageService<I
   }
 
   @Override
-  public void createRepo(final UUID repoId) {
-    this.storageStrategy.createDirectory(repoId.toString());
-  }
-
-  @Override
   public BaseUsages getUsages(
       final StoragePath storagePath, final String repoName, final long contentLength)
       throws IOException {
@@ -65,9 +62,7 @@ public abstract class AbstractGoStorageService<ID> implements GoStorageService<I
 
   @Override
   public Resource getResource(final String repoName, final StoragePath storagePath) {
-    return this.storageStrategy
-        .get(storagePath, repoName)
-        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.ITEM_NOT_FOUND));
+    return this.requireResource(storagePath, repoName, ProtocolErrorCodes.ITEM_NOT_FOUND);
   }
 
   @Override
@@ -87,10 +82,7 @@ public abstract class AbstractGoStorageService<ID> implements GoStorageService<I
 
   @Override
   public long deleteDirectory(final StoragePath storagePath) {
-    final var freedBytes = this.storageStrategy.calculatePathUsage(storagePath);
-    this.storageStrategy.delete(storagePath);
-
-    return freedBytes;
+    return this.deleteTreeWithUsage(storagePath);
   }
 
   @Override
@@ -145,11 +137,5 @@ public abstract class AbstractGoStorageService<ID> implements GoStorageService<I
     }
 
     return item.getSize() == null ? 0L : item.getSize();
-  }
-
-  @Override
-  public void deleteRepo(final UUID repoId) {
-    final var storagePath = StoragePath.of(repoId);
-    this.storageStrategy.delete(storagePath);
   }
 }

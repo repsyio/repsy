@@ -17,6 +17,7 @@ package io.repsy.protocols.nuget.protocol.handlers;
 
 import static io.repsy.protocols.nuget.NuGetTestContexts.context;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -237,16 +238,14 @@ class AbstractNuGetSearchProtocolMethodHandlerTest {
   }
 
   @Test
-  @DisplayName("still answers 500 for an unexpected failure, and still logs it")
-  void unexpectedFailureStillLogsAndAnswers500() {
+  @DisplayName("lets an unexpected failure propagate to the error advice, which logs it")
+  void unexpectedFailurePropagates() {
     final var ctx = context(SEARCH_PATH);
     when(this.facade.search(
             eq(ctx), anyString(), anyInt(), anyInt(), anyBoolean(), anyBoolean(), anyString()))
         .thenThrow(new IllegalStateException("storage down"));
 
-    final var response = this.handler.handle(ctx, request(null), new MockHttpServletResponse());
-
-    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
-    assertThat(this.logs.list).anyMatch(event -> event.getLevel() == Level.ERROR);
+    assertThatThrownBy(() -> this.handler.handle(ctx, request(null), new MockHttpServletResponse()))
+        .isInstanceOf(IllegalStateException.class);
   }
 }

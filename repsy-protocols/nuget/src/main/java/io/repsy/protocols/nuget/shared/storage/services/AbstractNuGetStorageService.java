@@ -22,25 +22,27 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
+import io.repsy.protocols.shared.storage.AbstractArtifactStorageService;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
-import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 
 @NullMarked
-@RequiredArgsConstructor
-public abstract class AbstractNuGetStorageService implements NuGetStorageService {
+public abstract class AbstractNuGetStorageService extends AbstractArtifactStorageService
+    implements NuGetStorageService {
 
   private static final String PACKAGES_PATH = "packages";
   private static final String NUPKG_EXTENSION = ".nupkg";
   private static final String NUSPEC_EXTENSION = ".nuspec";
 
-  private final StorageStrategy storageStrategy;
+  protected AbstractNuGetStorageService(final StorageStrategy storageStrategy) {
+    super(storageStrategy);
+  }
 
   @Override
   public BaseUsages writePackage(
@@ -83,11 +85,6 @@ public abstract class AbstractNuGetStorageService implements NuGetStorageService
 
     return this.getPackageFile(repoId, packageId, version, NUSPEC_EXTENSION)
         .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.NUSPEC_NOT_FOUND));
-  }
-
-  @Override
-  public void createRepo(final UUID repoId) {
-    this.storageStrategy.createDirectory(repoId.toString());
   }
 
   @Override
@@ -167,10 +164,7 @@ public abstract class AbstractNuGetStorageService implements NuGetStorageService
     final var versionPath = PACKAGES_PATH + "/" + normalizedId + "/" + versionDirectory;
     final var versionStoragePath = StoragePath.of(repoId, versionPath);
 
-    final var usage = this.storageStrategy.calculatePathUsage(versionStoragePath);
-    this.storageStrategy.delete(versionStoragePath);
-
-    return usage;
+    return this.deleteTreeWithUsage(versionStoragePath);
   }
 
   @Override
@@ -180,16 +174,7 @@ public abstract class AbstractNuGetStorageService implements NuGetStorageService
     final var packagePath = PACKAGES_PATH + "/" + normalizedId;
     final var packageStoragePath = StoragePath.of(repoId, packagePath);
 
-    final var usage = this.storageStrategy.calculatePathUsage(packageStoragePath);
-    this.storageStrategy.delete(packageStoragePath);
-
-    return usage;
-  }
-
-  @Override
-  public void deleteRepo(final UUID repoId) {
-    final var storagePath = StoragePath.of(repoId);
-    this.storageStrategy.delete(storagePath);
+    return this.deleteTreeWithUsage(packageStoragePath);
   }
 
   private Optional<Resource> getPackageFile(

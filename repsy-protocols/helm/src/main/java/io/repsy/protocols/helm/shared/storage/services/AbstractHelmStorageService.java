@@ -20,6 +20,7 @@ import io.repsy.libs.storage.core.dtos.StaleFile;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.protocols.helm.shared.constants.HelmConstants;
+import io.repsy.protocols.shared.storage.AbstractArtifactStorageService;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -27,29 +28,19 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 
 @Slf4j
-@RequiredArgsConstructor
 @NullMarked
-public abstract class AbstractHelmStorageService<ID> implements HelmStorageService<ID> {
+public abstract class AbstractHelmStorageService<ID> extends AbstractArtifactStorageService
+    implements HelmStorageService<ID> {
 
   private static final String OCI_BLOBS_PATH = "oci/blobs";
 
-  private final StorageStrategy storageStrategy;
-
-  @Override
-  public void createRepo(final UUID repoId) {
-    this.storageStrategy.createDirectory(repoId.toString());
-  }
-
-  @Override
-  public void deleteRepo(final UUID repoId) {
-    final var storagePath = StoragePath.of(repoId);
-    this.storageStrategy.delete(storagePath);
+  protected AbstractHelmStorageService(final StorageStrategy storageStrategy) {
+    super(storageStrategy);
   }
 
   @Override
@@ -145,9 +136,7 @@ public abstract class AbstractHelmStorageService<ID> implements HelmStorageServi
   public long deleteBlobFile(final UUID repoId, final String repoName, final String fileName)
       throws IOException {
     final var storagePath = StoragePath.of(repoId, OCI_BLOBS_PATH + "/" + fileName);
-    final var usage = this.storageStrategy.getFileUsage(storagePath, repoName);
-    this.storageStrategy.delete(storagePath);
-    return usage;
+    return this.deleteFileWithUsage(storagePath, repoName);
   }
 
   @Override

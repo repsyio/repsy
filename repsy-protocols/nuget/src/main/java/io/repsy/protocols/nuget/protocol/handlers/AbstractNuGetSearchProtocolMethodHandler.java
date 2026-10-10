@@ -84,9 +84,6 @@ public abstract class AbstractNuGetSearchProtocolMethodHandler
     } catch (final IllegalArgumentException e) {
       log.debug("NuGet search: invalid paging parameter: {}", e.getMessage());
       return ResponseEntity.badRequest().build();
-    } catch (final Exception e) {
-      log.error("NuGet search failed", e);
-      return ResponseEntity.internalServerError().build();
     }
   }
 }

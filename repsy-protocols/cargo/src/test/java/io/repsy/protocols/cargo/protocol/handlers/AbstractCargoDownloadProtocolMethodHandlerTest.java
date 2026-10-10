@@ -17,6 +17,7 @@ package io.repsy.protocols.cargo.protocol.handlers;
 
 import static io.repsy.protocols.cargo.protocol.handlers.CargoHandlerTestSupport.context;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -25,6 +26,7 @@ import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
 import io.repsy.protocols.cargo.protocol.facades.contracts.CargoProtocolFacade;
+import io.repsy.protocols.cargo.shared.constants.CargoConstants;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -171,6 +173,18 @@ class AbstractCargoDownloadProtocolMethodHandlerTest {
 
       assertThat(result.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
       assertThat(result.getBody()).isNull();
+    }
+
+    @Test
+    @DisplayName("lets an unexpected failure propagate to the error advice (it was a 404)")
+    void unexpectedFailurePropagates() {
+      final var ctx = context(DOWNLOAD_PATH);
+      final var request = new MockHttpServletRequest();
+      when(facade.download(ctx)).thenThrow(new IllegalStateException("storage down"));
+
+      assertThatThrownBy(() -> handler.handle(ctx, request, new MockHttpServletResponse()))
+          .isInstanceOf(IllegalStateException.class);
+      assertThat(request.getAttribute(CargoConstants.ERROR_BODY_ATTRIBUTE)).isEqualTo(true);
     }
   }
 }

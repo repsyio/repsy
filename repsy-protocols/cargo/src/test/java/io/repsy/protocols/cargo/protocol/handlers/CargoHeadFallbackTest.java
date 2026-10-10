@@ -17,6 +17,7 @@ package io.repsy.protocols.cargo.protocol.handlers;
 
 import static io.repsy.protocols.cargo.protocol.handlers.CargoHandlerTestSupport.context;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -214,10 +215,21 @@ class CargoHeadFallbackTest {
   }
 
   @Test
-  @DisplayName("a failing sparse index lookup answers 404 like its GET")
+  @DisplayName("an unexpected sparse index failure propagates like on its GET")
   void indexLookupFails() {
     final var ctx = context("/se/rd/serde");
     when(facade.getIndexEntries(ctx)).thenThrow(new IllegalStateException("boom"));
+    final var request = new MockHttpServletRequest("HEAD", "/se/rd/serde");
+
+    assertThatThrownBy(() -> sparse.handleHead(ctx, request, new MockHttpServletResponse()))
+        .isInstanceOf(IllegalStateException.class);
+  }
+
+  @Test
+  @DisplayName("a sparse index lookup that finds no crate answers 404 like its GET")
+  void indexLookupNotFound() {
+    final var ctx = context("/se/rd/serde");
+    when(facade.getIndexEntries(ctx)).thenThrow(new ItemNotFoundException("crateNotFound"));
 
     final var response =
         sparse.handleHead(

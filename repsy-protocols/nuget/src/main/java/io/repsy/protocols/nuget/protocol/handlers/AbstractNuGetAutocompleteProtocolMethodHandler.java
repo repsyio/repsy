@@ -76,9 +76,6 @@ public abstract class AbstractNuGetAutocompleteProtocolMethodHandler
     } catch (final IllegalArgumentException | ArithmeticException e) {
       log.debug("NuGet autocomplete: invalid paging parameter: {}", e.getMessage());
       return ResponseEntity.badRequest().build();
-    } catch (final Exception e) {
-      log.error("NuGet autocomplete failed", e);
-      return ResponseEntity.internalServerError().build();
     }
   }
 }

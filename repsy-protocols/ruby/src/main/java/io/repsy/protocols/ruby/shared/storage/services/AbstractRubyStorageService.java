@@ -20,22 +20,24 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
+import io.repsy.protocols.shared.storage.AbstractArtifactStorageService;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Paths;
 import java.util.UUID;
-import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 
-@RequiredArgsConstructor
 @NullMarked
-public abstract class AbstractRubyStorageService implements RubyStorageService {
+public abstract class AbstractRubyStorageService extends AbstractArtifactStorageService
+    implements RubyStorageService {
 
   private static final String GEMS_PATH = "gems";
   private static final String DEFAULT_PLATFORM = "ruby";
 
-  private final StorageStrategy storageStrategy;
+  protected AbstractRubyStorageService(final StorageStrategy storageStrategy) {
+    super(storageStrategy);
+  }
 
   @Override
   public BaseUsages writeGem(
@@ -64,9 +66,7 @@ public abstract class AbstractRubyStorageService implements RubyStorageService {
     final var gemPath = Paths.get(GEMS_PATH, gemName, filename);
     final var storagePath = StoragePath.of(repoId, gemPath.toString());
 
-    return this.storageStrategy
-        .get(storagePath, repoName)
-        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.GEM_NOT_FOUND));
+    return this.requireResource(storagePath, repoName, ProtocolErrorCodes.GEM_NOT_FOUND);
   }
 
   @Override
@@ -82,9 +82,7 @@ public abstract class AbstractRubyStorageService implements RubyStorageService {
     final var storagePath = StoragePath.of(repoId, gemPath.toString());
 
     try {
-      final var usage = this.storageStrategy.getFileUsage(storagePath, repoName);
-      this.storageStrategy.delete(storagePath);
-      return usage;
+      return this.deleteFileWithUsage(storagePath, repoName);
     } catch (final IOException e) {
       throw new ItemNotFoundException(ProtocolErrorCodes.GEM_NOT_FOUND);
     }
@@ -95,14 +93,7 @@ public abstract class AbstractRubyStorageService implements RubyStorageService {
     final var gemPath = Paths.get(GEMS_PATH, gemName);
     final var storagePath = StoragePath.of(repoId, gemPath.toString());
 
-    final var usage = this.storageStrategy.calculatePathUsage(storagePath);
-    this.storageStrategy.delete(storagePath);
-    return usage;
-  }
-
-  @Override
-  public void createRepo(final UUID repoId) {
-    this.storageStrategy.createDirectory(repoId.toString());
+    return this.deleteTreeWithUsage(storagePath);
   }
 
   @Override
@@ -111,12 +102,6 @@ public abstract class AbstractRubyStorageService implements RubyStorageService {
 
     final var filename = buildFilename(gemName, version, platform);
     return Paths.get(GEMS_PATH, gemName, filename).toString();
-  }
-
-  @Override
-  public void deleteRepo(final UUID repoId) {
-    final var storagePath = StoragePath.of(repoId);
-    this.storageStrategy.delete(storagePath);
   }
 
   public static String buildFilename(

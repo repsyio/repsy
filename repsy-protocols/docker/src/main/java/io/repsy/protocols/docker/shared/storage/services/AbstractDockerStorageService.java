@@ -22,6 +22,7 @@ import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import io.repsy.protocols.shared.storage.AbstractArtifactStorageService;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -31,29 +32,18 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 
-@RequiredArgsConstructor
 @NullMarked
-public abstract class AbstractDockerStorageService<ID> implements DockerStorageService<ID> {
+public abstract class AbstractDockerStorageService<ID> extends AbstractArtifactStorageService
+    implements DockerStorageService<ID> {
 
   private static final String MANIFESTS_PATH = "manifests";
   private static final String BLOBS_PATH = "blobs";
 
-  private final StorageStrategy storageStrategy;
-
-  @Override
-  public void createRepo(final UUID repoId) {
-
-    this.storageStrategy.createDirectory(repoId.toString());
-  }
-
-  @Override
-  public void deleteRepo(final UUID repoId) {
-    final var storagePath = StoragePath.of(repoId);
-    this.storageStrategy.delete(storagePath);
+  protected AbstractDockerStorageService(final StorageStrategy storageStrategy) {
+    super(storageStrategy);
   }
 
   @Override
@@ -157,11 +147,7 @@ public abstract class AbstractDockerStorageService<ID> implements DockerStorageS
 
     final var storagePath = StoragePath.of(repoId, Paths.get(BLOBS_PATH, fileName).toString());
 
-    final var usage = this.storageStrategy.getFileUsage(storagePath, repoName);
-
-    this.storageStrategy.delete(storagePath);
-
-    return usage;
+    return this.deleteFileWithUsage(storagePath, repoName);
   }
 
   @Override

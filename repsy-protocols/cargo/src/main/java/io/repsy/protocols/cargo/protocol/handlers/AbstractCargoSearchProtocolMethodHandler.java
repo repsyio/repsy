@@ -18,8 +18,9 @@ package io.repsy.protocols.cargo.protocol.handlers;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
-import io.repsy.protocols.cargo.protocol.dtos.CargoErrorResponse;
 import io.repsy.protocols.cargo.protocol.facades.contracts.CargoProtocolFacade;
+import io.repsy.protocols.cargo.shared.constants.CargoConstants;
+import io.repsy.protocols.shared.dtos.ProtocolErrorBody;
 import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
 import io.repsy.protocols.shared.handlers.HandlerRoute;
 import jakarta.servlet.http.HttpServletRequest;
@@ -47,7 +48,6 @@ public abstract class AbstractCargoSearchProtocolMethodHandler
 
   static final String PER_PAGE_NOT_A_NUMBER = "per_page must be a whole number";
   static final String PAGE_NOT_A_NUMBER = "page must be a whole number";
-  static final String SEARCH_FAILED = "Search failed";
 
   /**
    * Crates are unique per (repo, name), so the name alone is a total order and the pages of one
@@ -76,44 +76,44 @@ public abstract class AbstractCargoSearchProtocolMethodHandler
       final HttpServletRequest request,
       final HttpServletResponse response) {
 
-    try {
-      final var query = Optional.ofNullable(request.getParameter("q")).orElse("");
-      final var perPage = parseWholeNumber(request.getParameter("per_page"), DEFAULT_PER_PAGE);
-      final var page = parseWholeNumber(request.getParameter("page"), 1);
+    // Only a malformed paging parameter is the client's fault. A database failure is left to
+    // ProtocolErrorAdvice (500) and, with this mark, to Cargo's error body (RPS-2060); it used to
+    // be answered 400 "Search failed".
+    request.setAttribute(CargoConstants.ERROR_BODY_ATTRIBUTE, true);
 
-      if (perPage.isEmpty()) {
-        return badRequest(PER_PAGE_NOT_A_NUMBER);
-      }
+    final var query = Optional.ofNullable(request.getParameter("q")).orElse("");
+    final var perPage = parseWholeNumber(request.getParameter("per_page"), DEFAULT_PER_PAGE);
+    final var page = parseWholeNumber(request.getParameter("page"), 1);
 
-      if (page.isEmpty()) {
-        return badRequest(PAGE_NOT_A_NUMBER);
-      }
-
-      // cargo sends per_page=0 for `cargo search --limit 0`: no crates, but the true total, which
-      // cargo prints as "... and N crates more". A page size of 0 is not a valid Pageable, so ask
-      // for one row to learn the total and drop it.
-      final var wanted = perPage.getAsInt();
-      final var pageable =
-          wanted == 0
-              ? PageRequest.of(0, 1, SEARCH_ORDER)
-              : PageRequest.of(
-                  Math.max(page.getAsInt() - 1, 0),
-                  Math.clamp(wanted, 1, MAX_PER_PAGE),
-                  SEARCH_ORDER);
-      final var result = this.facade.search(context, query, pageable);
-
-      return ResponseEntity.ok()
-          .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-          .body(
-              Map.of(
-                  "crates",
-                  wanted == 0 ? List.of() : result.getContent(),
-                  "meta",
-                  Map.of("total", result.getTotalElements())));
-    } catch (final Exception e) {
-      // The message of a database or Spring exception is an internal detail, not an answer.
-      return badRequest(SEARCH_FAILED);
+    if (perPage.isEmpty()) {
+      return badRequest(PER_PAGE_NOT_A_NUMBER);
     }
+
+    if (page.isEmpty()) {
+      return badRequest(PAGE_NOT_A_NUMBER);
+    }
+
+    // cargo sends per_page=0 for `cargo search --limit 0`: no crates, but the true total, which
+    // cargo prints as "... and N crates more". A page size of 0 is not a valid Pageable, so ask
+    // for one row to learn the total and drop it.
+    final var wanted = perPage.getAsInt();
+    final var pageable =
+        wanted == 0
+            ? PageRequest.of(0, 1, SEARCH_ORDER)
+            : PageRequest.of(
+                Math.max(page.getAsInt() - 1, 0),
+                Math.clamp(wanted, 1, MAX_PER_PAGE),
+                SEARCH_ORDER);
+    final var result = this.facade.search(context, query, pageable);
+
+    return ResponseEntity.ok()
+        .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+        .body(
+            Map.of(
+                "crates",
+                wanted == 0 ? List.of() : result.getContent(),
+                "meta",
+                Map.of("total", result.getTotalElements())));
   }
 
   /**
@@ -138,6 +138,6 @@ public abstract class AbstractCargoSearchProtocolMethodHandler
   private static ResponseEntity<Object> badRequest(final String detail) {
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
         .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-        .body(CargoErrorResponse.of(detail));
+        .body(ProtocolErrorBody.withDetail(detail));
   }
 }

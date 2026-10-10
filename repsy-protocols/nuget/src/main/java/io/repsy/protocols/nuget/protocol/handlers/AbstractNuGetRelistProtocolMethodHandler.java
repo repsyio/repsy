@@ -15,26 +15,24 @@
  */
 package io.repsy.protocols.nuget.protocol.handlers;
 
-import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.nuget.protocol.NuGetProtocolProvider;
-import io.repsy.protocols.nuget.protocol.dtos.NuGetErrorResponse;
 import io.repsy.protocols.nuget.protocol.facades.contracts.NuGetProtocolFacade;
+import io.repsy.protocols.shared.dtos.ProtocolErrorBody;
 import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
 import io.repsy.protocols.shared.handlers.HandlerRoute;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.util.regex.Pattern;
-import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 
-@Slf4j
 @NullMarked
 public abstract class AbstractNuGetRelistProtocolMethodHandler
     extends AbstractFacadeProtocolMethodHandler<NuGetProtocolFacade> {
@@ -59,17 +57,14 @@ public abstract class AbstractNuGetRelistProtocolMethodHandler
   public ResponseEntity<Object> handle(
       final ProtocolContext context,
       final HttpServletRequest request,
-      final HttpServletResponse response) {
+      final HttpServletResponse response)
+      throws IOException {
 
     try {
       this.facade.relistVersion(context);
       return ResponseEntity.ok().build();
     } catch (final ItemNotFoundException e) {
-      return ResponseEntity.status(NOT_FOUND).body(NuGetErrorResponse.of(e.getMessage()));
-    } catch (final Exception e) {
-      log.error("NuGet relist failed", e);
-      return ResponseEntity.status(INTERNAL_SERVER_ERROR)
-          .body(NuGetErrorResponse.of("Relist failed"));
+      return ResponseEntity.status(NOT_FOUND).body(ProtocolErrorBody.withMessage(e.getMessage()));
     }
   }
 }
