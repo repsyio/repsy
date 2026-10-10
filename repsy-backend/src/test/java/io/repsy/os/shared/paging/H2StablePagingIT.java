@@ -132,7 +132,8 @@ class H2StablePagingIT extends H2IntegrationTest {
     assertEveryRowOnceAndStable(
         Sort.by(Sort.Direction.DESC, "lastUpdatedAt"),
         pageable ->
-            this.artifactRepository.findAllByRepoIdAndContainsGroupName(repo.getId(), "", pageable),
+            this.artifactRepository.findAllByRepoIdAndContainsGroupName(
+                repo.getId(), "%", pageable),
         artifact -> artifact.getArtifactName(),
         names);
   }

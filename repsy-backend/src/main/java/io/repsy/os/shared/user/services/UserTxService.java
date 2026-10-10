@@ -18,6 +18,7 @@ package io.repsy.os.shared.user.services;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
+import io.repsy.core.web.utils.LikePatterns;
 import io.repsy.os.generated.model.UserCreateForm;
 import io.repsy.os.generated.model.UserResponse;
 import io.repsy.os.generated.model.UserUpdateForm;
@@ -144,7 +145,8 @@ public class UserTxService {
       final @NonNull String search, final @NonNull Pageable pageable) {
 
     return this.userRepository
-        .findAllWithSearch(search, pageable)
+        .findAllWithSearch(
+            search.isBlank() ? null : LikePatterns.of("%", search.strip(), "%"), pageable)
         .map(this.userConverter::toUserResponseDto);
   }
 

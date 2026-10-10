@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -44,11 +45,10 @@ public interface UserRepository extends JpaRepository<User, UUID> {
   @Query(
       """
   select u from User u
-  where (:search is null or :search = ''
-    or LOWER(u.username) like LOWER(CONCAT('%', :search, '%')))
+  where (:pattern is null or lower(u.username) like :pattern escape '\\')
   """)
   @NonNull Page<User> findAllWithSearch(
-      @NonNull @Param("search") String search, @NonNull Pageable pageable);
+      @Nullable @Param("pattern") String pattern, @NonNull Pageable pageable);
 
   Long countByRole(UserRole userRole);
 
