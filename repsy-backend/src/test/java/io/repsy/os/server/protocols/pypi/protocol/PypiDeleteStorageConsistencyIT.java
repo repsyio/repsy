@@ -25,7 +25,7 @@ import static org.mockito.Mockito.verify;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.core.UrlParserProperties;
 import io.repsy.os.server.protocols.pypi.protocol.facades.PypiProtocolFacade;
 import io.repsy.os.server.protocols.pypi.shared.storage.services.PypiStorageService;
@@ -75,7 +75,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("PyPI deletes keep storage and the database in agreement with a publish (RPS-1277)")
-class PypiDeleteStorageConsistencyIT extends AbstractIntegrationTest {
+class PypiDeleteStorageConsistencyIT extends AbstractIT {
 
   private static final String REFUSE_DELETE_SUMMARY = "undeletable";
   private static final String REFUSE_DELETE_TRIGGER = "tr_pypi_release__it_refuse_delete";

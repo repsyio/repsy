@@ -17,7 +17,7 @@ package io.repsy.os.panel.auth.services;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.UserRole;
@@ -62,7 +62,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("login/refresh vs. a user deletion racing the token write (RPS-1152)")
-class AuthUserServiceRaceIT extends AbstractIntegrationTest {
+class AuthUserServiceRaceIT extends AbstractIT {
 
   @MockitoSpyBean private UserTxService userTxServiceSpy;
 

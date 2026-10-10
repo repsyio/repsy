@@ -21,7 +21,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.ArrayList;
@@ -60,7 +60,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("RepoTxService: concurrent create/rename to the same name (RPS-1134)")
-class RepoNameRaceIT extends AbstractIntegrationTest {
+class RepoNameRaceIT extends AbstractIT {
 
   @Autowired private RepoTxService repoTxService;
 
@@ -74,9 +74,9 @@ class RepoNameRaceIT extends AbstractIntegrationTest {
   }
 
   /**
-   * Creates and commits an ADMIN, without the flush {@link AbstractIntegrationTest#createUser}
-   * does: that flush needs an active transaction, and this class runs with none bound to the
-   * calling thread ({@link Propagation#NOT_SUPPORTED}).
+   * Creates and commits an ADMIN, without the flush {@link AbstractIT#createUser} does: that flush
+   * needs an active transaction, and this class runs with none bound to the calling thread ({@link
+   * Propagation#NOT_SUPPORTED}).
    */
   private String committedAdminToken() {
     final var username = uniqueUsername("race");

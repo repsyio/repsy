@@ -26,7 +26,7 @@ import static org.mockito.Mockito.verify;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
 import io.repsy.os.server.security.scan.dtos.ScanStatus;
 import io.repsy.os.server.security.scan.entities.VulnerabilityScan;
@@ -73,7 +73,7 @@ import org.springframework.web.context.WebApplicationContext;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("Docker delete when the manifest file cannot be deleted (RPS-1448)")
-class DockerDeleteStorageFailureIT extends AbstractIntegrationTest {
+class DockerDeleteStorageFailureIT extends AbstractIT {
 
   private static final String IMAGE = "app";
   private static final String TAG = "latest";

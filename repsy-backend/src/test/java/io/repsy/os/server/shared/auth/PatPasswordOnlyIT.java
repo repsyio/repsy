@@ -48,7 +48,7 @@ import org.junit.jupiter.params.provider.MethodSource;
  * {@code /v2}, so it is covered where its token exchange is ({@code DockerPatTokenExchangeIT}).
  */
 @DisplayName("A personal access token authenticates by its secret, whatever username is sent")
-class PatPasswordOnlyIT extends AbstractPatIntegrationTest {
+class PatPasswordOnlyIT extends AbstractPatIT {
 
   private static final String MODULE = "example.com/mod";
   private static final String WRONG_USERNAME = "not-the-owner";

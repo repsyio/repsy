@@ -20,7 +20,7 @@ import static io.repsy.os.server.protocols.docker.protocol.handlers.DockerWire.i
 import static io.repsy.os.server.protocols.docker.protocol.handlers.DockerWire.sha256;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.TagRepository;
 import io.repsy.os.shared.repo.entities.Repo;
@@ -70,7 +70,7 @@ import org.springframework.web.context.WebApplicationContext;
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("Concurrent moves of one Docker tag (RPS-1322)")
 @Import(DockerConcurrentTagMoveIT.TagReadHook.class)
-class DockerConcurrentTagMoveIT extends AbstractIntegrationTest {
+class DockerConcurrentTagMoveIT extends AbstractIT {
 
   private static final String IMAGE = "app";
   private static final String TAG = "latest";

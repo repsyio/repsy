@@ -21,7 +21,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.shared.token.entities.RepoDeployToken;
 import io.repsy.os.server.shared.token.repositories.RepoDeployTokenRepository;
 import io.repsy.os.server.shared.token.utils.DeployTokenHash;
@@ -56,7 +56,7 @@ import org.springframework.test.web.servlet.request.AbstractMockHttpServletReque
  * fixture stops being a valid credential, not only if the query parameter starts working again.
  */
 @DisplayName("A credential in the ?token= query parameter is refused by every protocol")
-class QueryTokenRefusedIT extends AbstractIntegrationTest {
+class QueryTokenRefusedIT extends AbstractIT {
 
   private static final String MODULE = "example.com/mod";
 

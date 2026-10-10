@@ -18,7 +18,7 @@ package io.repsy.os.shared.configs;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.context.TestPropertySource;
@@ -30,7 +30,7 @@ import org.springframework.test.context.TestPropertySource;
  */
 @TestPropertySource(properties = "APP_HSTS_MAX_AGE=31536000")
 @DisplayName("Strict-Transport-Security, app.hsts-max-age set (RPS-1514)")
-class HstsHeaderIT extends AbstractIntegrationTest {
+class HstsHeaderIT extends AbstractIT {
 
   private static final String HSTS = "Strict-Transport-Security";
 

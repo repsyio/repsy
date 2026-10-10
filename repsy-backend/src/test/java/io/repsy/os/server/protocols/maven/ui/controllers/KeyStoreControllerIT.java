@@ -25,7 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.PagingAssertions;
 import io.repsy.os.server.protocols.maven.shared.keystore.PgpTestKeys;
 import io.repsy.os.server.protocols.maven.shared.keystore.entities.AllowedKeyserver;
@@ -58,7 +58,7 @@ import tools.jackson.databind.ObjectMapper;
 
 /** Full-stack integration tests for the Maven key-store API. */
 @DisplayName("KeyStoreController /api/mvn/key-stores/*")
-class KeyStoreControllerIT extends AbstractIntegrationTest {
+class KeyStoreControllerIT extends AbstractIT {
 
   private static final String[] KEY_STORE_KEYS = {
     "id", "allowedKeyserverId", "host", "displayName"

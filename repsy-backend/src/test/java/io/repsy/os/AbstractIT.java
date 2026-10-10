@@ -117,7 +117,7 @@ import org.testcontainers.containers.PostgreSQLContainer;
 @SpringBootTest(
     classes = RepsyApplication.class,
     webEnvironment = SpringBootTest.WebEnvironment.MOCK)
-public abstract class AbstractIntegrationTest {
+public abstract class AbstractIT {
 
   protected static final int API_PORT = 8080;
 

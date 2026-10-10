@@ -21,7 +21,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageKeywordListItem;
 import io.repsy.os.server.protocols.npm.shared.npm_package.dtos.PackageMaintainerListItem;
 import io.repsy.os.server.protocols.npm.shared.npm_package.entities.PackageVersion;
@@ -70,12 +70,12 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <p>{@link UsageUpdateService} is mocked: it is {@code @Async} and cannot see this test's
  * uncommitted data. Every test runs in the default rolled-back transaction (see {@link
- * AbstractIntegrationTest}); npm's package/version writes use ordinary {@code REQUIRED}
- * propagation, so a repo seeded through {@link #seedRepo} in the same test is visible to the
- * publish request without needing a committed fixture.
+ * AbstractIT}); npm's package/version writes use ordinary {@code REQUIRED} propagation, so a repo
+ * seeded through {@link #seedRepo} in the same test is visible to the publish request without
+ * needing a committed fixture.
  */
 @DisplayName("npm wire protocol PUT /{repo}/{package}")
-class NpmPublishProtocolIT extends AbstractIntegrationTest {
+class NpmPublishProtocolIT extends AbstractIT {
 
   private static final String HOST = "http://localhost:9090";
   private static final String PUBLISH_PATH = "/{repo}/{packagePath}";

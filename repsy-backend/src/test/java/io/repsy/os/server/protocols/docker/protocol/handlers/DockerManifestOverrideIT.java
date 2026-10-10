@@ -28,7 +28,7 @@ import static org.mockito.Mockito.verify;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.docker.shared.image.repositories.ImageRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestChildRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestRepository;
@@ -61,7 +61,7 @@ import org.springframework.web.context.WebApplicationContext;
  * usage the pushes and deletes ask for.
  */
 @DisplayName("Docker manifests are content-addressed (RPS-1216)")
-class DockerManifestOverrideIT extends AbstractIntegrationTest {
+class DockerManifestOverrideIT extends AbstractIT {
 
   private static final String IMAGE = "app";
 

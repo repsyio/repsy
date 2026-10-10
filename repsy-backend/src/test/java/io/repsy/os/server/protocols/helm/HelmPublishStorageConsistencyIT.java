@@ -26,7 +26,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.helm.shared.storage.services.HelmStorageService;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
@@ -75,7 +75,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("Helm chart upload keeps storage and the database in agreement (RPS-1124)")
-class HelmPublishStorageConsistencyIT extends AbstractIntegrationTest {
+class HelmPublishStorageConsistencyIT extends AbstractIT {
 
   /** An {@code appVersion} the database refuses through {@link #rejectAppVersionAtTheDatabase}. */
   private static final String REJECTED_APP_VERSION = "reject-me";

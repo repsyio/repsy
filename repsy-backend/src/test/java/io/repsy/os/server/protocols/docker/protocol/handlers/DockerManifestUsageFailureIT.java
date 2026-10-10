@@ -27,7 +27,7 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 
 import io.repsy.libs.storage.core.services.StorageStrategy;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
@@ -68,7 +68,7 @@ import org.springframework.web.context.WebApplicationContext;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("Docker delete when the manifest usage lookup fails (RPS-1463)")
-class DockerManifestUsageFailureIT extends AbstractIntegrationTest {
+class DockerManifestUsageFailureIT extends AbstractIT {
 
   private static final String IMAGE = "app";
 

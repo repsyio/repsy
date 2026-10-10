@@ -28,7 +28,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import io.repsy.core.events.ArtifactPushedEvent;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.security.shared.resolvers.HelmArtifactStorageResolver;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
@@ -51,7 +51,7 @@ import org.springframework.test.context.event.RecordApplicationEvents;
  */
 @RecordApplicationEvents
 @DisplayName("Helm scan storage resolution for an OCI-only chart (RPS-1736)")
-class HelmOciScanResolverIT extends AbstractIntegrationTest {
+class HelmOciScanResolverIT extends AbstractIT {
 
   private static final String CHART = "payments";
   private static final String OCTET_STREAM = "application/octet-stream";

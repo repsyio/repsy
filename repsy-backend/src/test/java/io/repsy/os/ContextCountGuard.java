@@ -30,9 +30,9 @@ import org.springframework.test.context.BootstrapUtils;
  * {@value #MAX_CONTEXTS} (RPS-1353).
  *
  * <p>Every context of a run keeps its own connection pool to the one PostgreSQL container that all
- * {@link AbstractIntegrationTest} classes share (see the Hikari settings there), and Spring's own
- * context cache holds 32 contexts at most, so a run with more distinct configurations than that
- * also boots contexts again after the cache evicted them. A class that adds one more context with a
+ * {@link AbstractIT} classes share (see the Hikari settings there), and Spring's own context cache
+ * holds 32 contexts at most, so a run with more distinct configurations than that also boots
+ * contexts again after the cache evicted them. A class that adds one more context with a
  * {@code @MockitoBean}, a {@code @DynamicPropertySource} of its own or an {@code @Import} pays for
  * it in every full run, and nothing else would tell. The count is of distinct context
  * configurations (what the Spring cache keys on), not of context instances, so it does not depend

@@ -20,7 +20,7 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.shared.controllers.RepoOperationRoutes.Route;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -45,7 +45,7 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
  * the callers of the MANAGE routes apart; this class is about who may not get in at all.
  */
 @DisplayName("@RepoOperation routes: an anonymous caller is answered 401 (RPS-1558)")
-class RepoOperationRoutesStatusIT extends AbstractIntegrationTest {
+class RepoOperationRoutesStatusIT extends AbstractIT {
 
   /** A floor, so an enumeration that silently finds nothing cannot pass. */
   private static final int EXPECTED_AT_LEAST = 100;

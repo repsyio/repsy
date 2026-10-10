@@ -26,7 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.nuget.shared.storage.NuGetStorageService;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
@@ -75,7 +75,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * single version per package, so there is nothing to order.
  */
 @DisplayName("NuGet wire protocol read-back of a pushed package")
-class NuGetReadBackProtocolIT extends AbstractIntegrationTest {
+class NuGetReadBackProtocolIT extends AbstractIT {
 
   private static final String PUSH_PATH = "/{repo}/v3/package";
   private static final String PACKAGE_PART = "package";

@@ -32,7 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.shared.token.entities.RepoDeployToken;
 import io.repsy.os.server.shared.token.repositories.RepoDeployTokenRepository;
 import io.repsy.os.server.shared.token.utils.DeployTokenHash;
@@ -85,7 +85,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
  * permission field, and token names are not unique per repo.
  */
 @DisplayName("ProtocolDeployTokenController /api/repos/{repoName}/deploy-tokens/*")
-class ProtocolDeployTokenControllerIT extends AbstractIntegrationTest {
+class ProtocolDeployTokenControllerIT extends AbstractIT {
 
   private static final String DEPLOY_TOKEN_PATTERN = "rdt-[A-Za-z0-9_-]{43}";
   private static final String DEPLOY_USERNAME_PATTERN = "repsy-deploy-token-[a-z0-9]{7}";

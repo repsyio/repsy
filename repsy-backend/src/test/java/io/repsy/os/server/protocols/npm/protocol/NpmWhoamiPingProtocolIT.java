@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.shared.token.entities.RepoDeployToken;
 import io.repsy.os.server.shared.token.repositories.RepoDeployTokenRepository;
 import io.repsy.os.server.shared.token.utils.DeployTokenHash;
@@ -51,7 +51,7 @@ import tools.jackson.databind.ObjectMapper;
  * and handler, and uses the credentials an npm client would hold.
  */
 @DisplayName("npm wire protocol GET /-/whoami and /-/ping")
-class NpmWhoamiPingProtocolIT extends AbstractIntegrationTest {
+class NpmWhoamiPingProtocolIT extends AbstractIT {
 
   private static final String WHOAMI = "/{repo}/-/whoami";
   private static final String PING = "/{repo}/-/ping";

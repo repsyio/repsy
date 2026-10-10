@@ -35,15 +35,15 @@ import org.junit.jupiter.api.Test;
  *
  * <p>A BCrypt hash at the production work factor costs about 100 ms of CPU. Before RPS-1453 every
  * integration test that made a user paid for one, about 60% of the CPU time of a full run. {@link
- * AbstractIntegrationTest#VALID_PASSWORD_HASH} is the hash of the known test password, made once
- * per JVM, and {@code createUser} and the {@code *BearerToken()} helpers use it. Nothing stopped a
- * new test from calling {@code PasswordHasher.hash(...)} again, so this test scans the sources
- * instead: it needs no Docker and runs in {@code mvn test}.
+ * AbstractIT#VALID_PASSWORD_HASH} is the hash of the known test password, made once per JVM, and
+ * {@code createUser} and the {@code *BearerToken()} helpers use it. Nothing stopped a new test from
+ * calling {@code PasswordHasher.hash(...)} again, so this test scans the sources instead: it needs
+ * no Docker and runs in {@code mvn test}.
  *
  * <p>Scope: every Java file under {@code src/test/java} that is not a unit test ({@code *Test}) and
- * not {@code AbstractIntegrationTest}, which makes the shared hash. That is the integration tests
- * and the helpers they share. A unit test hashes once per class in a {@code static final} field and
- * stays out of scope.
+ * not {@code AbstractIT}, which makes the shared hash. That is the integration tests and the
+ * helpers they share. A unit test hashes once per class in a {@code static final} field and stays
+ * out of scope.
  *
  * <p>Two rules, on {@code PasswordHasher.hash(} and {@code PasswordHasher::hash}:
  *
@@ -65,7 +65,7 @@ class IntegrationTestHashingGuardTest {
   /** Surefire runs with the module directory ({@code repsy-backend}) as the working directory. */
   private static final Path TEST_SOURCES = Path.of("src", "test", "java");
 
-  private static final String SHARED_HASH_OWNER = "AbstractIntegrationTest.java";
+  private static final String SHARED_HASH_OWNER = "AbstractIT.java";
 
   /**
    * Files that legitimately call {@code PasswordHasher.hash} outside a {@code static final} field,
@@ -120,7 +120,7 @@ class IntegrationTestHashingGuardTest {
   void reportsTheSharedPassword() {
     final var source =
         """
-        class SomeIT extends AbstractIntegrationTest {
+        class SomeIT extends AbstractIT {
           void t() {
             final var hash = PasswordHasher.hash(VALID_PASSWORD);
           }
@@ -267,12 +267,12 @@ class IntegrationTestHashingGuardTest {
         violations.add(
             where
                 + " hashes the shared test password again, which costs about 100 ms of CPU per"
-                + " call (RPS-1453). Use AbstractIntegrationTest.VALID_PASSWORD_HASH.");
+                + " call (RPS-1453). Use AbstractIT.VALID_PASSWORD_HASH.");
       } else if (!inStaticFinalField(code, matcher.start()) && !ALLOWED.containsKey(fileName)) {
         violations.add(
             where
                 + " calls PasswordHasher.hash per test, and a BCrypt hash costs about 100 ms of CPU"
-                + " (RPS-1453). Use AbstractIntegrationTest.VALID_PASSWORD_HASH for the shared"
+                + " (RPS-1453). Use AbstractIT.VALID_PASSWORD_HASH for the shared"
                 + " test password; for a password of its own, hash it once in a private static"
                 + " final field. Only if the test needs a fresh hash per call, add"
                 + " \"%s\" to IntegrationTestHashingGuardTest.ALLOWED with the reason."

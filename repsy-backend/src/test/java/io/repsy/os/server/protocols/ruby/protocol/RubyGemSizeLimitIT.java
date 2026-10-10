@@ -24,7 +24,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -39,7 +39,7 @@ import org.springframework.test.web.servlet.ResultActions;
  */
 @TestPropertySource(properties = "repsy.ruby.max-gem-size=4KB")
 @DisplayName("Ruby gem push size limit (RPS-1055)")
-class RubyGemSizeLimitIT extends AbstractIntegrationTest {
+class RubyGemSizeLimitIT extends AbstractIT {
 
   private ResultActions push(final String repoName, final byte[] body) throws Exception {
     return this.mockMvc.perform(

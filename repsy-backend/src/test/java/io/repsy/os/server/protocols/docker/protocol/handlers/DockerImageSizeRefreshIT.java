@@ -24,7 +24,7 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
 import io.repsy.os.server.shared.http.BareBodyAssertions;
 import io.repsy.os.shared.repo.entities.Repo;
@@ -47,7 +47,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 @DisplayName("The size and digest an image is listed with follow its tags (RPS-1318)")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-class DockerImageSizeRefreshIT extends AbstractIntegrationTest {
+class DockerImageSizeRefreshIT extends AbstractIT {
 
   private static final String IMAGE = "app";
 

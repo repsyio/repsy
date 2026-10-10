@@ -27,7 +27,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.nuget.shared.storage.NuGetStorageService;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -74,7 +74,7 @@ import org.springframework.test.web.servlet.request.AbstractMockHttpServletReque
  * default rolled-back transaction and read back on the protocol port.
  */
 @DisplayName("Downloads name the file they serve (RPS-1389, RPS-1442)")
-class ProtocolDownloadContentDispositionIT extends AbstractIntegrationTest {
+class ProtocolDownloadContentDispositionIT extends AbstractIT {
 
   private static final String RUBY_GEM = "dispo-gem";
   private static final String RUBY_DOTTED_GEM = "dispo.rb";

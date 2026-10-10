@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
@@ -43,7 +43,7 @@ import tools.jackson.databind.ObjectMapper;
  */
 @TestPropertySource(properties = "repsy.npm.max-publish-size=4KB")
 @DisplayName("npm publish size limit (RPS-1561)")
-class NpmPublishSizeLimitIT extends AbstractIntegrationTest {
+class NpmPublishSizeLimitIT extends AbstractIT {
 
   private static final String PACKAGE_PATH = "/{repo}/{name}";
 

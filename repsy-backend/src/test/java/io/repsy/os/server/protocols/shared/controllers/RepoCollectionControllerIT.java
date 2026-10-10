@@ -28,7 +28,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -69,7 +69,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
  * the query is {@code H2RepoCollectionIT}.
  */
 @DisplayName("RepoCollectionController /api/repos")
-class RepoCollectionControllerIT extends AbstractIntegrationTest {
+class RepoCollectionControllerIT extends AbstractIT {
 
   private static final String REPOS = "/api/repos";
   private static final String COUNTS = "/api/repos/counts";

@@ -23,7 +23,7 @@ import static org.mockito.Mockito.verify;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.maven.shared.storage.services.MavenStorageService;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
@@ -78,7 +78,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("A Maven artifactId containing \".pom\" is judged by file name, not path (RPS-1196)")
-class MavenDottedArtifactIdIT extends AbstractIntegrationTest {
+class MavenDottedArtifactIdIT extends AbstractIT {
 
   private static final String GROUP_ID = "com.acme";
 

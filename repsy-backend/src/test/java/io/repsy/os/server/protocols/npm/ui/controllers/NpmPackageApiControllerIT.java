@@ -30,7 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.repsy.libs.storage.core.dtos.StoragePath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.PagingAssertions;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.NpmPackageRepository;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageDistTagRepository;
@@ -70,7 +70,7 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
 
 /** End-to-end coverage for every npm package-management API mapping. */
 @DisplayName("NpmPackageApiController /api/npm/packages/*")
-class NpmPackageApiControllerIT extends AbstractIntegrationTest {
+class NpmPackageApiControllerIT extends AbstractIT {
 
   @Autowired private RequestMappingHandlerMapping handlerMapping;
   @Autowired private RepoTxService repoTxService;

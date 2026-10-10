@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 import com.auth0.jwt.JWT;
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.shared.token.entities.RepoDeployToken;
 import io.repsy.os.server.shared.token.repositories.RepoDeployTokenRepository;
 import io.repsy.os.server.shared.token.utils.DeployTokenHash;
@@ -62,7 +62,7 @@ import org.springframework.test.web.servlet.request.AbstractMockHttpServletReque
  * and a deploy-token secret, so a regression shows up whichever side (issuer or verifier) moves.
  */
 @DisplayName("Cargo deploy-token JWT is a deploy token, not the user its username names")
-class CargoDeployTokenAuthIT extends AbstractIntegrationTest {
+class CargoDeployTokenAuthIT extends AbstractIT {
 
   private static final String CRATE = "deploy-crate";
   private static final String INDEX = "/de/pl/" + CRATE;

@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.ByteArrayOutputStream;
@@ -52,7 +52,7 @@ import org.junit.jupiter.api.Test;
  * transaction (the storage writes are cleaned up along with the repo by the normal repo lifecycle).
  */
 @DisplayName("Go module paths are case-sensitive for storage and lookup (RPS-1232)")
-class GolangModulePathCaseSensitivityIT extends AbstractIntegrationTest {
+class GolangModulePathCaseSensitivityIT extends AbstractIT {
 
   private static final String DOMAIN = "example.com";
 

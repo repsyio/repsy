@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.npm.shared.npm_package.entities.PackageVersion;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.NpmPackageRepository;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageVersionRepository;
@@ -68,7 +68,7 @@ import tools.jackson.databind.ObjectMapper;
  * transaction, like {@link NpmPublishProtocolIT}.
  */
 @DisplayName("npm unpublish over the wire (RPS-1289)")
-class NpmUnpublishProtocolIT extends AbstractIntegrationTest {
+class NpmUnpublishProtocolIT extends AbstractIT {
 
   private static final String HOST = "http://localhost:9090";
   private static final String REV = "undefined";

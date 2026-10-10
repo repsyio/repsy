@@ -19,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.generated.model.AccessTokenForm;
 import io.repsy.os.shared.token.dtos.TokenScope;
 import io.repsy.os.shared.user.entities.UserRole;
@@ -58,7 +58,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("personal access token creates under concurrent requests (RPS-1901)")
-class PersonalAccessTokenCapRaceIT extends AbstractIntegrationTest {
+class PersonalAccessTokenCapRaceIT extends AbstractIT {
 
   private static final int ROUNDS = 20;
   private static final int TIMEOUT_SECONDS = 30;

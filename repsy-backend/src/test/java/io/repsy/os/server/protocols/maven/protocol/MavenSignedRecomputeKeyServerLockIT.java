@@ -23,7 +23,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.config.async.SignedRecomputeExecutorConfig;
 import io.repsy.os.server.protocols.maven.shared.keystore.PgpTestKeys;
 import io.repsy.os.server.protocols.maven.shared.keystore.support.StubKeyServers;
@@ -78,7 +78,7 @@ import org.springframework.web.client.RestClient;
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName(
     "Maven signed recompute does not hold the version lock across a key-server lookup (RPS-1469)")
-class MavenSignedRecomputeKeyServerLockIT extends AbstractIntegrationTest {
+class MavenSignedRecomputeKeyServerLockIT extends AbstractIT {
 
   private static final PgpTestKeys OUTSIDER = PgpTestKeys.generate();
   private static final Duration RECOMPUTE_TIMEOUT = Duration.ofSeconds(30);

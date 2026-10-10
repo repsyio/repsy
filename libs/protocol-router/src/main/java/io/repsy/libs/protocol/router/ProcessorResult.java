@@ -23,16 +23,16 @@ import org.springframework.http.ResponseEntity;
 @Data
 public class ProcessorResult {
 
-  private boolean isEmpty;
+  private boolean empty;
   private ResponseEntity<Object> result;
 
   public static ProcessorResult next() {
 
-    return ProcessorResult.builder().isEmpty(true).result(ResponseEntity.ofNullable(null)).build();
+    return ProcessorResult.builder().empty(true).result(ResponseEntity.ofNullable(null)).build();
   }
 
   public static ProcessorResult of(final ResponseEntity<Object> result) {
 
-    return ProcessorResult.builder().isEmpty(false).result(result).build();
+    return ProcessorResult.builder().empty(false).result(result).build();
   }
 }

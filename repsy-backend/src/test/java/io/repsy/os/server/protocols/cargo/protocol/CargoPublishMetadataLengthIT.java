@@ -20,7 +20,7 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.protocols.cargo.protocol.utils.CrateUtils;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -57,7 +57,7 @@ import tools.jackson.databind.ObjectMapper;
  * transaction.
  */
 @DisplayName("Cargo publish holds metadata to its columns (RPS-1072)")
-class CargoPublishMetadataLengthIT extends AbstractIntegrationTest {
+class CargoPublishMetadataLengthIT extends AbstractIT {
 
   private static final String CRATE = "meta-crate";
   private static final String NORMALIZED = "meta_crate";

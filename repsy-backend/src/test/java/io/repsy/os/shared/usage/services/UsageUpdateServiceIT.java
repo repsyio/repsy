@@ -23,7 +23,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -59,7 +59,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("UsageUpdateService negative disk usage")
-class UsageUpdateServiceIT extends AbstractIntegrationTest {
+class UsageUpdateServiceIT extends AbstractIT {
 
   private static final Duration ASYNC_TIMEOUT = Duration.ofSeconds(10);
 

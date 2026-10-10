@@ -19,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetDependencyInfo;
@@ -53,7 +53,7 @@ import org.springframework.web.server.ResponseStatusException;
  * RPS-901 and RPS-904 regression tests (RPS-967).
  */
 @DisplayName("NuGetPackageService publish/read on PostgreSQL")
-class NuGetPackageServiceIT extends AbstractIntegrationTest {
+class NuGetPackageServiceIT extends AbstractIT {
 
   private static final String PACKAGE_ID = "fixture.package";
   private static final String VERSION = "1.0.0";

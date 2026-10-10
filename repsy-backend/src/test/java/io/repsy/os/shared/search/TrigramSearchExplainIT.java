@@ -17,7 +17,7 @@ package io.repsy.os.shared.search;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.docker.shared.image.repositories.ImageRepository;
 import io.repsy.os.server.protocols.golang.shared.go_module.repositories.GoModuleRepository;
 import io.repsy.os.server.protocols.helm.shared.chart.repositories.HelmChartVersionRepository;
@@ -55,7 +55,7 @@ import org.springframework.jdbc.core.ConnectionCallback;
  * planner makes on a table with rows.
  */
 @DisplayName("Contains searches use their trigram index (RPS-2117)")
-class TrigramSearchExplainIT extends AbstractIntegrationTest {
+class TrigramSearchExplainIT extends AbstractIT {
 
   @Autowired private EntityManagerFactory entityManagerFactory;
 

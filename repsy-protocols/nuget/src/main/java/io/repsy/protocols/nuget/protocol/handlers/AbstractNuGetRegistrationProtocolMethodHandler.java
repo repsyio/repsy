@@ -53,19 +53,19 @@ public abstract class AbstractNuGetRegistrationProtocolMethodHandler
   private final PathParser basePathParser;
   private final NuGetProtocolFacade facade;
   private final NuGetBaseUrlResolver baseUrlResolver;
-  private final boolean isIndex;
+  private final boolean index;
 
   protected AbstractNuGetRegistrationProtocolMethodHandler(
       final PathParser basePathParser,
       final NuGetProtocolFacade facade,
       final NuGetProtocolProvider provider,
       final NuGetBaseUrlResolver baseUrlResolver,
-      final boolean isIndex) {
+      final boolean index) {
 
     this.basePathParser = basePathParser;
     this.facade = facade;
     this.baseUrlResolver = baseUrlResolver;
-    this.isIndex = isIndex;
+    this.index = index;
 
     provider.registerMethodHandler(this);
   }
@@ -88,7 +88,7 @@ public abstract class AbstractNuGetRegistrationProtocolMethodHandler
       }
 
       final var path = request.getServletPath();
-      final var pattern = this.isIndex ? INDEX_PATTERN : LEAF_PATTERN;
+      final var pattern = this.index ? INDEX_PATTERN : LEAF_PATTERN;
 
       if (!pattern.matcher(path).matches()) {
         return Optional.empty();
@@ -108,7 +108,7 @@ public abstract class AbstractNuGetRegistrationProtocolMethodHandler
       final var repoName = ProtocolContextUtils.<Object>getRepoInfo(context).getName();
       final var baseUrl = this.baseUrlResolver.baseUrl(request, repoName);
 
-      if (this.isIndex) {
+      if (this.index) {
         final var result = this.facade.getRegistrationIndex(context, baseUrl);
         return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(result);
       }

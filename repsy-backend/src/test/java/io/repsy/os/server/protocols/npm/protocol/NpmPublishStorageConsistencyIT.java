@@ -22,7 +22,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.npm.shared.storage.services.NpmStorageService;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
@@ -78,7 +78,7 @@ import tools.jackson.databind.ObjectMapper;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("npm publish keeps storage and the database in agreement (RPS-1124)")
-class NpmPublishStorageConsistencyIT extends AbstractIntegrationTest {
+class NpmPublishStorageConsistencyIT extends AbstractIT {
 
   /** A description the database refuses through {@link #rejectDescriptionAtTheDatabase()}. */
   private static final String REJECTED_DESCRIPTION = "reject-me";

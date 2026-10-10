@@ -33,7 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackageVersion;
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageRepository;
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageVersionRepository;
@@ -107,7 +107,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * is what "repo usage updated" means here.
  */
 @DisplayName("NuGet wire protocol PUT /{repo}/v3/package")
-class NuGetPublishProtocolIT extends AbstractIntegrationTest {
+class NuGetPublishProtocolIT extends AbstractIT {
 
   private static final String PUSH_PATH = "/{repo}/v3/package";
   private static final String PACKAGE_PART = "package";

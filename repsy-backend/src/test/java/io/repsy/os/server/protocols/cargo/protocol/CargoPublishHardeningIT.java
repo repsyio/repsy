@@ -21,7 +21,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoCrateMetaRepository;
 import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoCrateRepository;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -50,7 +50,7 @@ import org.springframework.test.web.servlet.ResultActions;
  */
 @TestPropertySource(properties = "repsy.cargo.max-crate-size=4KB")
 @DisplayName("Cargo publish hardening (RPS-1119, RPS-1141)")
-class CargoPublishHardeningIT extends AbstractIntegrationTest {
+class CargoPublishHardeningIT extends AbstractIT {
 
   private static final String PUBLISH_PATH = "/{repo}/api/v1/crates/new";
 

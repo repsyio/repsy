@@ -22,7 +22,7 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.config.async.SignedRecomputeExecutorConfig;
 import io.repsy.os.server.protocols.maven.shared.keystore.PgpTestKeys;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.MavenPgpCaps;
@@ -65,7 +65,7 @@ import tools.jackson.databind.ObjectMapper;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("Maven PGP abuse caps (RPS-1796)")
-class MavenPgpCapsIT extends AbstractIntegrationTest {
+class MavenPgpCapsIT extends AbstractIT {
 
   private static final PgpTestKeys SIGNER = PgpTestKeys.generate();
   private static final String DIR = "com/acme/caps/1.0/";

@@ -21,7 +21,7 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.maven.shared.keystore.PgpTestKeys;
 import io.repsy.os.server.protocols.maven.shared.keystore.support.StubKeyServers;
 import io.repsy.os.server.protocols.maven.shared.storage.services.MavenStorageService;
@@ -69,7 +69,7 @@ import tools.jackson.databind.ObjectMapper;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("Maven verifies every artifact signature when the repo asks for it (RPS-1188)")
-class MavenArtifactSignatureIT extends AbstractIntegrationTest {
+class MavenArtifactSignatureIT extends AbstractIT {
 
   private static final PgpTestKeys KEYS = PgpTestKeys.generate();
   private static final Pattern SEARCH = Pattern.compile("search=0x([0-9A-Fa-f]{16})");

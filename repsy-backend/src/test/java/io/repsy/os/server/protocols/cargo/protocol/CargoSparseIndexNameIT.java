@@ -21,7 +21,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -45,7 +45,7 @@ import org.springframework.test.web.servlet.MvcResult;
  * unusable even though the raw HTTP GET answered 200.
  */
 @DisplayName("Cargo sparse index serves a crate under its originally-published name")
-class CargoSparseIndexNameIT extends AbstractIntegrationTest {
+class CargoSparseIndexNameIT extends AbstractIT {
 
   private static final String CRATE = "my-crate";
   private static final String PUBLISH = "/{repo}/api/v1/crates/new";

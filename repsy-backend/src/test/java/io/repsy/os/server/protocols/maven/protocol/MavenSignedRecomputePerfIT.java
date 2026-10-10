@@ -27,7 +27,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.maven.shared.artifact.services.SignedRecomputeService;
 import io.repsy.os.server.protocols.maven.shared.keystore.PgpTestKeys;
 import io.repsy.os.server.protocols.maven.shared.storage.services.MavenStorageService;
@@ -111,7 +111,7 @@ import tools.jackson.databind.ObjectMapper;
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @EnabledIfSystemProperty(named = "rps1449.perf", matches = "true")
 @DisplayName("Maven signed recompute on a large repo (RPS-1449, measurement)")
-class MavenSignedRecomputePerfIT extends AbstractIntegrationTest {
+class MavenSignedRecomputePerfIT extends AbstractIT {
 
   private static final PgpTestKeys KEYS = PgpTestKeys.generate();
 

@@ -21,7 +21,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
@@ -52,7 +52,7 @@ import org.springframework.http.MediaType;
  */
 @ExtendWith(OutputCaptureExtension.class)
 @DisplayName("PasswordResetMarkerScanner")
-class PasswordResetMarkerScannerIT extends AbstractIntegrationTest {
+class PasswordResetMarkerScannerIT extends AbstractIT {
 
   @TempDir private Path markerDir;
 

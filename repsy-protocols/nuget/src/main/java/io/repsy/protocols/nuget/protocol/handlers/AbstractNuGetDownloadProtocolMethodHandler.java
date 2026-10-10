@@ -52,17 +52,17 @@ public abstract class AbstractNuGetDownloadProtocolMethodHandler implements Prot
 
   private final PathParser basePathParser;
   private final NuGetProtocolFacade facade;
-  private final boolean isNupkg;
+  private final boolean nupkg;
 
   protected AbstractNuGetDownloadProtocolMethodHandler(
       final PathParser basePathParser,
       final NuGetProtocolFacade facade,
       final NuGetProtocolProvider provider,
-      final boolean isNupkg) {
+      final boolean nupkg) {
 
     this.basePathParser = basePathParser;
     this.facade = facade;
-    this.isNupkg = isNupkg;
+    this.nupkg = nupkg;
 
     provider.registerMethodHandler(this);
   }
@@ -85,7 +85,7 @@ public abstract class AbstractNuGetDownloadProtocolMethodHandler implements Prot
       }
 
       final var path = request.getServletPath();
-      final var pattern = this.isNupkg ? NUPKG_PATTERN : NUSPEC_PATTERN;
+      final var pattern = this.nupkg ? NUPKG_PATTERN : NUSPEC_PATTERN;
 
       if (!pattern.matcher(path).matches()) {
         return Optional.empty();
@@ -115,7 +115,7 @@ public abstract class AbstractNuGetDownloadProtocolMethodHandler implements Prot
       final HttpServletResponse response) {
 
     try {
-      if (this.isNupkg) {
+      if (this.nupkg) {
         final var resource = this.facade.downloadNuPackage(context);
         return ResponseEntity.ok()
             .header(CONTENT_TYPE, APPLICATION_OCTET_STREAM.toString())

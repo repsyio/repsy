@@ -27,7 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.PagingAssertions;
 import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.repo.entities.Repo;
@@ -48,7 +48,7 @@ import org.springframework.test.web.servlet.ResultActions;
 
 /** Full-stack integration coverage for the Ruby gem-management API. */
 @DisplayName("RubyGemApiController /api/ruby/gems/*")
-class RubyGemApiControllerIT extends AbstractIntegrationTest {
+class RubyGemApiControllerIT extends AbstractIT {
 
   private String publisherToken;
 

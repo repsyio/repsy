@@ -20,7 +20,7 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.shared.controllers.RepoOperationRoutes.Route;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -50,7 +50,7 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
  * variables other than the repository are placeholders and no request changes anything.
  */
 @DisplayName("MANAGE routes: 403 for a user who is not allowed, 401 for a bad credential")
-class ManageRoutesStatusIT extends AbstractIntegrationTest {
+class ManageRoutesStatusIT extends AbstractIT {
 
   /** A floor, so an enumeration that silently finds nothing cannot pass. */
   private static final int EXPECTED_AT_LEAST = 30;

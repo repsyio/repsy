@@ -27,7 +27,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.docker.shared.layer.repositories.LayerRepository;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
@@ -67,7 +67,7 @@ import org.springframework.web.context.WebApplicationContext;
  * uncommitted data. The mock records the disk-usage deltas the upload post-processor requests.
  */
 @DisplayName("Docker layer upload usage")
-class DockerLayerUploadUsageIT extends AbstractIntegrationTest {
+class DockerLayerUploadUsageIT extends AbstractIT {
 
   private static final String IMAGE = "app";
   private static final String OCI_MANIFEST = "application/vnd.oci.image.manifest.v1+json";

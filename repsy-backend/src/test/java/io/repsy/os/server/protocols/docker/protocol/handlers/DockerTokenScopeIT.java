@@ -25,7 +25,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
@@ -49,7 +49,7 @@ import org.springframework.web.context.WebApplicationContext;
  * uncommitted data.
  */
 @DisplayName("Docker token scope on DELETE (RPS-1434)")
-class DockerTokenScopeIT extends AbstractIntegrationTest {
+class DockerTokenScopeIT extends AbstractIT {
 
   private static final String IMAGE = "app";
   private static final String LAYER = "layer-one";

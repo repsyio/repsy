@@ -32,7 +32,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 import com.jayway.jsonpath.JsonPath;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.HeapOrder;
 import io.repsy.os.server.protocols.helm.shared.chart.repositories.HelmChartRepository;
 import io.repsy.os.server.protocols.helm.shared.chart.repositories.HelmChartVersionRepository;
@@ -105,7 +105,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
  * post-processor request, which is what "repo usage updated" means here.
  */
 @DisplayName("HelmChartController /api/helm/charts/*")
-class HelmChartControllerIT extends AbstractIntegrationTest {
+class HelmChartControllerIT extends AbstractIT {
 
   private static final String OCI_MANIFEST_TYPE = "application/vnd.oci.image.manifest.v1+json";
   private static final String OCI_CONFIG_TYPE = "application/vnd.cncf.helm.config.v1+json";

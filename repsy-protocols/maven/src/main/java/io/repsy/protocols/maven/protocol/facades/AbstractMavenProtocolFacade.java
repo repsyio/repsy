@@ -260,11 +260,11 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
       }
     }
 
-    final var isNewRegisteredFile = this.isNewRegisteredFile(repoInfo, storagePath);
+    final var newRegisteredFile = this.isNewRegisteredFile(repoInfo, storagePath);
 
     final var stored = this.store(repoInfo.getName(), storagePath, inputStream, content);
 
-    this.register(context, repoInfo, storagePath, stored, isNewRegisteredFile);
+    this.register(context, repoInfo, storagePath, stored, newRegisteredFile);
 
     final var gav = ArtifactUtils.getGavByFile(storagePath);
 
@@ -315,7 +315,7 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
       final BaseRepoInfo<ID> repoInfo,
       final StoragePath storagePath,
       final Stored stored,
-      final boolean isNewRegisteredFile) {
+      final boolean newRegisteredFile) {
 
     final var usage = stored.usage();
 
@@ -324,7 +324,7 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
 
       this.artifactService.createOrUpdateArtifact(repoInfo, storagePath, resource);
     } catch (final RuntimeException e) {
-      if (!isNewRegisteredFile || !this.takeBack(repoInfo.getName(), storagePath, e)) {
+      if (!newRegisteredFile || !this.takeBack(repoInfo.getName(), storagePath, e)) {
         context.addProperty(USAGES, usage);
       }
 

@@ -28,7 +28,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.security.scan.dtos.FixStatus;
 import io.repsy.os.server.security.scan.dtos.Severity;
 import io.repsy.os.server.security.scan.repositories.VulnerabilityScanRepository;
@@ -118,7 +118,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Import(SecurityScanControllerIT.StubScannerConfig.class)
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("SecurityScanController /api/security/*")
-class SecurityScanControllerIT extends AbstractIntegrationTest {
+class SecurityScanControllerIT extends AbstractIT {
 
   private static final String SCANS_PATH = "/api/security/scans";
   private static final String SUMMARY_PATH = "/api/security/scans/summary";

@@ -52,11 +52,11 @@ public interface NuGetPackageRepository extends JpaRepository<NuGetPackage, UUID
         and lower(p.packageId) like :pattern escape '\\'
         and (not exists (
             select 1 from NuGetPackageVersion a
-            where a.nugetPackage = p and a.isListed = true)
+            where a.nugetPackage = p and a.listed = true)
           or exists (
             select 1 from NuGetPackageVersion v
-            where v.nugetPackage = p and v.isListed = true
-              and (:includePrerelease = true or v.isPrerelease = false)
+            where v.nugetPackage = p and v.listed = true
+              and (:includePrerelease = true or v.prerelease = false)
               and (:includeSemVer2 = true
                 or (v.version not like '%+%' and v.version not like '%-%.%'))))
       """)

@@ -32,7 +32,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
@@ -62,13 +62,13 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
  *
  * <p>The container, the fake {@code multiport.ports.api} local port ({@link #apiPort()}, needed
  * because {@code UserController} is only registered on the "api" connector), the user and JWT
- * fixtures and the per-test rollback all come from {@link AbstractIntegrationTest}. The only data
- * that survives between tests is what the application seeds at startup (the {@code admin} user and
- * the default repos), so tests that list users scope their query with a unique {@code search} tag
- * instead of relying on the table being empty.
+ * fixtures and the per-test rollback all come from {@link AbstractIT}. The only data that survives
+ * between tests is what the application seeds at startup (the {@code admin} user and the default
+ * repos), so tests that list users scope their query with a unique {@code search} tag instead of
+ * relying on the table being empty.
  */
 @DisplayName("UserController /api/users/*")
-class UserControllerIT extends AbstractIntegrationTest {
+class UserControllerIT extends AbstractIT {
 
   private static final String VALIDATION_TEXT = "Incoming data couldn't be validated.";
   private static final String UNSUPPORTED_MEDIA_TYPE_TEXT = "Unsupported media type.";

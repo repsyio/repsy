@@ -29,7 +29,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.HeapOrder;
 import io.repsy.os.PagingAssertions;
 import io.repsy.os.server.protocols.golang.ui.facades.GoApiFacade;
@@ -60,7 +60,7 @@ import org.springframework.test.web.servlet.ResultActions;
 
 /** Full-stack integration tests for the Go module-management API. */
 @DisplayName("GoModuleController /api/go/modules/*")
-class GolangModuleControllerIT extends AbstractIntegrationTest {
+class GolangModuleControllerIT extends AbstractIT {
 
   private static final String MODULE = "io.repsy/hello-world";
   private static final String V2_MODULE = "example.com/mod/v2";

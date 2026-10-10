@@ -20,7 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.maven.shared.storage.services.MavenStorageService;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
@@ -57,7 +57,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("Maven allowOverride:false lets a literal SNAPSHOT be redeployed (RPS-1328)")
-class MavenLiteralSnapshotRedeployIT extends AbstractIntegrationTest {
+class MavenLiteralSnapshotRedeployIT extends AbstractIT {
 
   private static final String DIR = "com/acme/lib/1.0-SNAPSHOT/";
   private static final String LITERAL_POM = DIR + "lib-1.0-SNAPSHOT.pom";

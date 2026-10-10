@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -44,7 +44,7 @@ import org.springframework.test.context.TestPropertySource;
  */
 @TestPropertySource(properties = "repsy.golang.max-module-zip-size=4KB")
 @DisplayName("Go module zip publish size limit (RPS-1119)")
-class GolangModuleZipSizeLimitIT extends AbstractIntegrationTest {
+class GolangModuleZipSizeLimitIT extends AbstractIT {
 
   private static final String MODULE = "example.com/zipsize";
   private static final String VERSION = "v1.0.0";

@@ -25,7 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.List;
 import java.util.Map;
@@ -41,7 +41,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
  * document, while the protocol routes keep the error format of their own client.
  */
 @DisplayName("Panel API problem+json errors")
-class PanelProblemJsonIT extends AbstractIntegrationTest {
+class PanelProblemJsonIT extends AbstractIT {
 
   private static final String NOT_VALID_TEXT = "Incoming data couldn't be validated.";
 

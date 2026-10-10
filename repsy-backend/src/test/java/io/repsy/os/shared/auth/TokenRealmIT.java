@@ -26,7 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
@@ -50,7 +50,7 @@ import org.springframework.test.web.servlet.request.AbstractMockHttpServletReque
  * test fails if an issuer stops stamping its tokens, not only if the verifier changes.
  */
 @DisplayName("Token realms: panel vs protocol bearer tokens")
-class TokenRealmIT extends AbstractIntegrationTest {
+class TokenRealmIT extends AbstractIT {
 
   private MvcResult protocol(final AbstractMockHttpServletRequestBuilder<?> request)
       throws Exception {

@@ -21,7 +21,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.repsy.os.spa.controllers.AbstractStaticFrontendIntegrationTest;
+import io.repsy.os.spa.controllers.AbstractStaticFrontendIT;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -33,12 +33,12 @@ import org.springframework.http.HttpHeaders;
  *
  * <p>{@code spring.web.resources.static-locations} normally points at the built frontend, which
  * this backend-only build does not produce, so this class points it at a temporary directory with a
- * minimal {@code index.html} instead (see {@link AbstractStaticFrontendIntegrationTest}, which it
- * shares with {@code SpaControllerIT}). That is a different context configuration than every other
- * IT class shares, so it boots a Spring context of its own.
+ * minimal {@code index.html} instead (see {@link AbstractStaticFrontendIT}, which it shares with
+ * {@code SpaControllerIT}). That is a different context configuration than every other IT class
+ * shares, so it boots a Spring context of its own.
  */
 @DisplayName("Content-Security-Policy header (RPS-1131)")
-class SecurityHeadersIT extends AbstractStaticFrontendIntegrationTest {
+class SecurityHeadersIT extends AbstractStaticFrontendIT {
 
   @Test
   @DisplayName("is present on GET /")

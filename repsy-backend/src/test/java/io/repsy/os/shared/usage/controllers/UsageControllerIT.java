@@ -27,7 +27,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 import com.jayway.jsonpath.JsonPath;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
@@ -83,7 +83,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("UsageController GET /api/usage")
-class UsageControllerIT extends AbstractIntegrationTest {
+class UsageControllerIT extends AbstractIT {
 
   private static final String USAGES_PATH = "/api/usage";
   private static final String UNAUTHORIZED_TEXT =
@@ -350,7 +350,7 @@ class UsageControllerIT extends AbstractIntegrationTest {
     @Test
     @DisplayName("on a fresh installation reports the default repositories with zero usage")
     void freshInstallation() throws Exception {
-      // The startup seeding has finished (AbstractIntegrationTest waits for it): one default
+      // The startup seeding has finished (AbstractIT waits for it): one default
       // repository per type, none of which has any usage. The listeners' own behaviour is asserted
       // against an empty database in DefaultRepoSeedingIT.
       final var seededTypes = new HashSet<RepoType>();

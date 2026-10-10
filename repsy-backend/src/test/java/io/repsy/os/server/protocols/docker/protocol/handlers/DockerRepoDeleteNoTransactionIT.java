@@ -22,7 +22,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
@@ -60,7 +60,7 @@ import org.springframework.web.context.WebApplicationContext;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("Docker repo delete holds no transaction during the storage call (RPS-2114)")
-class DockerRepoDeleteNoTransactionIT extends AbstractIntegrationTest {
+class DockerRepoDeleteNoTransactionIT extends AbstractIT {
 
   private static final String IMAGE = "app";
 

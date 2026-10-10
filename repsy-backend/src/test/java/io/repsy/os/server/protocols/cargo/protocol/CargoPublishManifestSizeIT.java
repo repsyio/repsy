@@ -20,7 +20,7 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.protocols.cargo.protocol.utils.CrateUtils;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.ByteArrayOutputStream;
@@ -42,7 +42,7 @@ import org.junit.jupiter.api.Test;
  * is answered with a Cargo error and stores nothing.
  */
 @DisplayName("Cargo publish caps the size of the crate's Cargo.toml")
-class CargoPublishManifestSizeIT extends AbstractIntegrationTest {
+class CargoPublishManifestSizeIT extends AbstractIT {
 
   private static final String CRATE = "manifest-crate";
   private static final String PUBLISH = "/{repo}/api/v1/crates/new";

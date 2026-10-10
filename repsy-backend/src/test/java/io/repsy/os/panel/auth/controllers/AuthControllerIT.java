@@ -34,7 +34,7 @@ import com.auth0.jwt.algorithms.Algorithm;
 import com.auth0.jwt.interfaces.DecodedJWT;
 import com.jayway.jsonpath.JsonPath;
 import io.repsy.core.events.UserLoginEvent;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.auth.utils.TokenRealm;
@@ -83,17 +83,17 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Every test method runs in one transaction that is rolled back afterwards, so the only data
  * that survives between tests is what the application seeds at startup: the {@code admin} user,
  * whose password {@link #SEEDED_ADMIN_PASSWORD} is pinned through {@code admin.initial-password} in
- * {@link AbstractIntegrationTest}. The exceptions are {@code updatesLastLoginAt} and the {@code
- * UserDeletion} tests. {@code UserLoginListener} is {@code @Async} and runs on another thread,
- * which cannot see rows that are still uncommitted inside a test transaction, so {@code
- * updatesLastLoginAt} runs without one; {@code UserDeletion} checks the {@code ON DELETE CASCADE}
- * of {@code refresh_tokens}, which only a committed delete exercises. Both clean up after
- * themselves. In every other test the listener still fires but finds no such user and logs the
- * failure on its own thread; that is expected noise, not a test failure.
+ * {@link AbstractIT}. The exceptions are {@code updatesLastLoginAt} and the {@code UserDeletion}
+ * tests. {@code UserLoginListener} is {@code @Async} and runs on another thread, which cannot see
+ * rows that are still uncommitted inside a test transaction, so {@code updatesLastLoginAt} runs
+ * without one; {@code UserDeletion} checks the {@code ON DELETE CASCADE} of {@code refresh_tokens},
+ * which only a committed delete exercises. Both clean up after themselves. In every other test the
+ * listener still fires but finds no such user and logs the failure on its own thread; that is
+ * expected noise, not a test failure.
  */
 @RecordApplicationEvents
 @DisplayName("AuthController /api/auth/*")
-class AuthControllerIT extends AbstractIntegrationTest {
+class AuthControllerIT extends AbstractIT {
 
   private static final String OTHER_VALID_PASSWORD = "NewPassword2@";
   private static final String VALIDATION_TEXT = "Incoming data couldn't be validated.";

@@ -19,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -31,7 +31,7 @@ import org.springframework.beans.factory.annotation.Autowired;
  * case-insensitivity is exercised end to end, independent of the request validation.
  */
 @DisplayName("ReservedUsernameService")
-class ReservedUsernameServiceIT extends AbstractIntegrationTest {
+class ReservedUsernameServiceIT extends AbstractIT {
 
   @Autowired private ReservedUsernameService reservedUsernameService;
 

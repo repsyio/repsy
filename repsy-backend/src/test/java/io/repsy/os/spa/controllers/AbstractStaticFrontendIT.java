@@ -15,7 +15,7 @@
  */
 package io.repsy.os.spa.controllers;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
@@ -38,7 +38,7 @@ import org.springframework.test.context.DynamicPropertySource;
  * capped ({@code ContextCountGuard}), so the classes that need it extend this one and share a
  * single context instead of each declaring a {@code @DynamicPropertySource} of its own.
  */
-public abstract class AbstractStaticFrontendIntegrationTest extends AbstractIntegrationTest {
+public abstract class AbstractStaticFrontendIT extends AbstractIT {
 
   /**
    * What {@code assets/} and the root hold; a test reads them back through the resource handler.

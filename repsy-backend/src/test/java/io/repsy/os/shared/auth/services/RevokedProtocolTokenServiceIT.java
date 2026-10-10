@@ -17,7 +17,7 @@ package io.repsy.os.shared.auth.services;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.auth.repositories.RevokedProtocolTokenRepository;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -28,7 +28,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 /** RPS-1361: the registry of the protocol tokens that a logout revoked. */
 @DisplayName("RevokedProtocolTokenService")
-class RevokedProtocolTokenServiceIT extends AbstractIntegrationTest {
+class RevokedProtocolTokenServiceIT extends AbstractIT {
 
   @Autowired private RevokedProtocolTokenService service;
   @Autowired private RevokedProtocolTokenRepository repository;

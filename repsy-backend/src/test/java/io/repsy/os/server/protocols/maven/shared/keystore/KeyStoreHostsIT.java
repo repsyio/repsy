@@ -20,7 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.maven.shared.keystore.dtos.KeyStoreItem;
 import io.repsy.os.server.protocols.maven.shared.keystore.entities.AllowedKeyserver;
 import io.repsy.os.server.protocols.maven.shared.keystore.entities.KeyStore;
@@ -43,7 +43,7 @@ import org.springframework.core.io.ByteArrayResource;
  * only, in a fixed order. A keyserver an admin deactivated must not be contacted, and the host that
  * is tried first must not depend on the query plan.
  */
-class KeyStoreHostsIT extends AbstractIntegrationTest {
+class KeyStoreHostsIT extends AbstractIT {
 
   private static final PgpTestKeys SIGNER = PgpTestKeys.generate();
 

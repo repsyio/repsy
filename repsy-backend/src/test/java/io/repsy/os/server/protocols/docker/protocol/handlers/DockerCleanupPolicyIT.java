@@ -26,7 +26,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.docker.shared.cleanup.services.CleanupPolicyFacade;
 import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
 import io.repsy.os.server.shared.http.BareBodyAssertions;
@@ -55,7 +55,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 @DisplayName("The Docker cleanup policy (RPS-1882)")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-class DockerCleanupPolicyIT extends AbstractIntegrationTest {
+class DockerCleanupPolicyIT extends AbstractIT {
 
   private static final String IMAGE = "app";
   private static final String BASE = "/api/repos/%s/docker/cleanup-policy";

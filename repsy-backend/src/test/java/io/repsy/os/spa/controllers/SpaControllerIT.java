@@ -47,7 +47,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
  * index.html} with a 200 and {@code text/html}, and every icon rendered as a box.
  */
 @DisplayName("SPA fallback and static files (RPS-1467)")
-class SpaControllerIT extends AbstractStaticFrontendIntegrationTest {
+class SpaControllerIT extends AbstractStaticFrontendIT {
 
   /** What a browser sends for a font, script, style or image subresource, or curl by default. */
   private static final List<String> SUBRESOURCE_ACCEPTS =

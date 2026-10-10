@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.shared.token.entities.RepoDeployToken;
 import io.repsy.os.server.shared.token.repositories.RepoDeployTokenRepository;
 import io.repsy.os.server.shared.token.utils.DeployTokenHash;
@@ -67,7 +67,7 @@ import tools.jackson.databind.ObjectMapper;
  * pulling with the token it issues.
  */
 @DisplayName("A deploy token authenticates by its secret, whatever username is sent")
-class DeployTokenPasswordOnlyIT extends AbstractIntegrationTest {
+class DeployTokenPasswordOnlyIT extends AbstractIT {
 
   private static final String MODULE = "example.com/mod";
   private static final String WRONG_USERNAME = "not-the-token-username";

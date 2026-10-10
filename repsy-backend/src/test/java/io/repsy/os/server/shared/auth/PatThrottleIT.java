@@ -45,11 +45,11 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
  * but not allowed to do the thing) is not counted, and a valid one is never refused for the
  * failures of the client behind the same address.
  *
- * <p>Every test starts with an empty throttle ({@link io.repsy.os.AbstractIntegrationTest}). The
- * failures cost no hash check, so the limit is reached quickly.
+ * <p>Every test starts with an empty throttle ({@link io.repsy.os.AbstractIT}). The failures cost
+ * no hash check, so the limit is reached quickly.
  */
 @DisplayName("Failed personal access token checks are throttled per client")
-class PatThrottleIT extends AbstractPatIntegrationTest {
+class PatThrottleIT extends AbstractPatIT {
 
   private static final String READ = "/{repo}/com/example/lib/1.0/lib-1.0.pom";
   private static final String WRITE = "/{repo}/com/example/lib/1.0/lib-1.0.pom.sha1";

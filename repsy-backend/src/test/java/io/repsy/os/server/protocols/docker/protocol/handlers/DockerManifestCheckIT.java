@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.nio.charset.StandardCharsets;
@@ -45,7 +45,7 @@ import org.springframework.web.context.WebApplicationContext;
  * the raw reference, so a digest GET served fine still 404'd on HEAD.
  */
 @DisplayName("Docker manifest check (HEAD)")
-class DockerManifestCheckIT extends AbstractIntegrationTest {
+class DockerManifestCheckIT extends AbstractIT {
 
   private static final String IMAGE = "app";
   private static final String OCI_MANIFEST = "application/vnd.oci.image.manifest.v1+json";

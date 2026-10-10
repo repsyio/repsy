@@ -27,7 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.jayway.jsonpath.JsonPath;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.core.UrlParserProperties;
 import io.repsy.os.server.protocols.docker.shared.image.repositories.ImageRepository;
 import io.repsy.os.server.protocols.docker.shared.image.services.ImageTxService;
@@ -94,7 +94,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("A USER who may not manage a public repo can read it and nothing more (RPS-1602)")
-class PublicRepoAuthorizationIT extends AbstractIntegrationTest {
+class PublicRepoAuthorizationIT extends AbstractIT {
 
   private static final byte[] JAR = "not really a jar".getBytes(StandardCharsets.UTF_8);
   private static final String GROUP = "com.example";

@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.shared.token.entities.RepoDeployToken;
 import io.repsy.os.server.shared.token.repositories.RepoDeployTokenRepository;
 import io.repsy.os.server.shared.token.utils.DeployTokenHash;
@@ -47,7 +47,7 @@ import org.springframework.beans.factory.annotation.Autowired;
  * WRONG password still received a 200 anonymous token.
  */
 @DisplayName("Docker OAuth2 password-grant token exchange")
-class DockerOauthTokenIT extends AbstractIntegrationTest {
+class DockerOauthTokenIT extends AbstractIT {
 
   private static final String IMAGE = "app";
 

@@ -25,7 +25,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import com.auth0.jwt.JWT;
 import com.jayway.jsonpath.JsonPath;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
-import io.repsy.os.server.shared.auth.AbstractPatIntegrationTest;
+import io.repsy.os.server.shared.auth.AbstractPatIT;
 import io.repsy.os.server.shared.auth.AuthThrottleProperties;
 import io.repsy.os.shared.auth.PanelAuthHelper;
 import io.repsy.os.shared.auth.utils.TokenRealm;
@@ -59,7 +59,7 @@ import org.springframework.mock.web.MockHttpServletResponse;
  * {@code 202} for the start of an upload): it is {@code 401} where the token is refused.
  */
 @DisplayName("Docker token exchange with a personal access token")
-class DockerPatTokenExchangeIT extends AbstractPatIntegrationTest {
+class DockerPatTokenExchangeIT extends AbstractPatIT {
 
   private static final String IMAGE = "some-image";
   private static final String DIGEST =

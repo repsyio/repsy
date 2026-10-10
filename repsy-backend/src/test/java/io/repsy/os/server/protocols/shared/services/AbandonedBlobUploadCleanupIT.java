@@ -26,7 +26,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.docker.shared.layer.entities.Layer;
 import io.repsy.os.server.protocols.docker.shared.layer.repositories.LayerRepository;
 import io.repsy.os.server.protocols.helm.HelmChartFixtures;
@@ -68,7 +68,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * uncommitted data. The mock records the disk-usage deltas the uploads and the cleanup request.
  */
 @DisplayName("Abandoned blob upload cleanup")
-class AbandonedBlobUploadCleanupIT extends AbstractIntegrationTest {
+class AbandonedBlobUploadCleanupIT extends AbstractIT {
 
   private static final String IMAGE = "app";
   private static final Duration IDLE_FOR_TWO_DAYS = Duration.ofDays(2);

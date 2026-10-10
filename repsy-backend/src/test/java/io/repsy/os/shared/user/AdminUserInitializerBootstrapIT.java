@@ -21,7 +21,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.user.entities.UserRole;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
@@ -46,7 +46,7 @@ import org.springframework.test.util.ReflectionTestUtils;
  * one, and the rollback brings the seeded admin back.
  */
 @DisplayName("AdminUserInitializer bootstrap password")
-class AdminUserInitializerBootstrapIT extends AbstractIntegrationTest {
+class AdminUserInitializerBootstrapIT extends AbstractIT {
 
   @Autowired private AdminUserInitializer adminUserInitializer;
 

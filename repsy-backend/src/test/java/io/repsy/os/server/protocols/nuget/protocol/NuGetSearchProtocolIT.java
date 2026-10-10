@@ -26,7 +26,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackage;
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackageVersion;
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageRepository;
@@ -72,7 +72,7 @@ import org.springframework.test.web.servlet.request.AbstractMockHttpServletReque
  * /v3/autocomplete}.
  */
 @DisplayName("NuGet wire protocol search")
-class NuGetSearchProtocolIT extends AbstractIntegrationTest {
+class NuGetSearchProtocolIT extends AbstractIT {
 
   private static final String SEARCH_PATH = "/{repo}/v3/search";
   private static final String AUTOCOMPLETE_PATH = "/{repo}/v3/autocomplete";

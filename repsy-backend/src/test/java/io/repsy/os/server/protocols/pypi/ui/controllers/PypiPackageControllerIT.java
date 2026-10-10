@@ -29,7 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.jayway.jsonpath.JsonPath;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.PagingAssertions;
 import io.repsy.os.server.core.UrlParserProperties;
 import io.repsy.os.server.protocols.pypi.protocol.facades.PypiProtocolFacade;
@@ -72,7 +72,7 @@ import org.springframework.test.web.servlet.ResultActions;
 
 /** Full-stack integration tests for {@code /api/pypi/packages/*}. */
 @DisplayName("PypiPackageController /api/pypi/packages/*")
-class PypiPackageControllerIT extends AbstractIntegrationTest {
+class PypiPackageControllerIT extends AbstractIT {
 
   @Autowired private RepoTxService repoTxService;
   @Autowired private PypiApiFacade pypiApiFacade;

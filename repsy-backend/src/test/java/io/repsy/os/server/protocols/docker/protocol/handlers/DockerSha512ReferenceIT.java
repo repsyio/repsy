@@ -23,7 +23,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.docker.shared.image.repositories.ImageRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.TagRepository;
@@ -60,7 +60,7 @@ import org.springframework.web.context.WebApplicationContext;
  * {@code sha256} one. A {@code sha512:} reference never becomes a tag row.
  */
 @DisplayName("Docker sha512 digest references")
-class DockerSha512ReferenceIT extends AbstractIntegrationTest {
+class DockerSha512ReferenceIT extends AbstractIT {
 
   private static final String IMAGE = "app";
   private static final String OCI_MANIFEST = "application/vnd.oci.image.manifest.v1+json";

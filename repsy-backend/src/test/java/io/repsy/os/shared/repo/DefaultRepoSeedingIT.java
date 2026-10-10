@@ -65,14 +65,13 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * usage and with its storage directory created, and a repeated event changing none of that, failing
  * no listener, and repairing a repository whose storage directory is missing (RPS-1070).
  *
- * <p>Since every {@code AbstractIntegrationTest} class shares one PostgreSQL database (RPS-941),
- * the default repositories already exist there and repo names are unique ({@code ux_repo__name}),
- * so those classes can neither wipe the {@code repo} table nor re-publish the event. This class is
- * therefore the documented exception to "one container, owned by {@code AbstractIntegrationTest}":
- * it boots a context of its own on a dedicated, initially empty {@code postgres:18} and a storage
- * root of its own, so nothing another class leaves behind can change the outcome, and it may empty
- * the {@code repo} table freely. {@link DirtiesContext} closes that context together with its
- * container.
+ * <p>Since every {@code AbstractIT} class shares one PostgreSQL database (RPS-941), the default
+ * repositories already exist there and repo names are unique ({@code ux_repo__name}), so those
+ * classes can neither wipe the {@code repo} table nor re-publish the event. This class is therefore
+ * the documented exception to "one container, owned by {@code AbstractIT}": it boots a context of
+ * its own on a dedicated, initially empty {@code postgres:18} and a storage root of its own, so
+ * nothing another class leaves behind can change the outcome, and it may empty the {@code repo}
+ * table freely. {@link DirtiesContext} closes that context together with its container.
  *
  * <p>Startup already published the event once for the {@code admin} user, so every test first waits
  * for that seeding to finish, empties the table and publishes the event itself. The listeners are

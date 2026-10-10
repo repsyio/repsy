@@ -31,7 +31,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.helm.shared.chart.repositories.HelmChartVersionRepository;
 import io.repsy.os.server.protocols.helm.shared.chart.services.HelmChartService;
 import io.repsy.os.server.protocols.helm.shared.storage.services.HelmStorageService;
@@ -79,7 +79,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("Concurrent overriding pushes of one Helm chart version take turns (RPS-1273)")
-class HelmConcurrentOverrideIT extends AbstractIntegrationTest {
+class HelmConcurrentOverrideIT extends AbstractIT {
 
   private static final long TIMEOUT_SECONDS = 30;
   private static final String OCTET_STREAM = "application/octet-stream";

@@ -20,7 +20,7 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.user.entities.UserRole;
@@ -43,7 +43,7 @@ import tools.jackson.databind.ObjectMapper;
  * column, so both are bounded before anything is written.
  */
 @DisplayName("npm deprecation message and dist-tag name limits")
-class NpmDeprecationLimitsIT extends AbstractIntegrationTest {
+class NpmDeprecationLimitsIT extends AbstractIT {
 
   private static final String NAME = "left-pad";
 

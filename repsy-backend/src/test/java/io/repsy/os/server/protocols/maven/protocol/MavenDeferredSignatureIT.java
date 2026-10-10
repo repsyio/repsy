@@ -27,7 +27,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.config.async.SignedRecomputeExecutorConfig;
 import io.repsy.os.server.protocols.maven.shared.artifact.services.PendingSignatureService;
 import io.repsy.os.server.protocols.maven.shared.keystore.PgpTestKeys;
@@ -89,7 +89,7 @@ import tools.jackson.databind.ObjectMapper;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("Maven signatures may arrive before their file (RPS-1188)")
-class MavenDeferredSignatureIT extends AbstractIntegrationTest {
+class MavenDeferredSignatureIT extends AbstractIT {
 
   private static final PgpTestKeys KEYS = PgpTestKeys.generate();
   private static final AtomicInteger KEY_SERVER_REQUESTS = new AtomicInteger();
