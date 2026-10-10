@@ -214,7 +214,7 @@ class RubyPublishStorageConsistencyIT extends AbstractIT {
               throw new IllegalStateException("storage went away after the write");
             })
         .when(this.rubyStorageService)
-        .writeGem(any(), any(), any(), any(), any(), any());
+        .writeGem(any(), any(), any(), any(), any());
   }
 
   @Test
@@ -293,7 +293,7 @@ class RubyPublishStorageConsistencyIT extends AbstractIT {
               return invocation.callRealMethod();
             })
         .when(this.rubyStorageService)
-        .writeGem(any(), any(), any(), any(), any(), any());
+        .writeGem(any(), any(), any(), any(), any());
 
     final var executor = Executors.newFixedThreadPool(2);
     try {
@@ -315,7 +315,7 @@ class RubyPublishStorageConsistencyIT extends AbstractIT {
     }
 
     // Once for the winner, and once for the push that seeded the gem.
-    verify(this.rubyStorageService, times(2)).writeGem(any(), any(), any(), any(), any(), any());
+    verify(this.rubyStorageService, times(2)).writeGem(any(), any(), any(), any(), any());
     assertThat(gemFile(repo, name, "1.0.1")).hasBinaryContent(winnerGem);
     assertThat(this.storedVersionCount(repo, name)).isEqualTo(2);
     assertThat(this.storedChecksum(repo, name, "1.0.1"))
@@ -344,7 +344,7 @@ class RubyPublishStorageConsistencyIT extends AbstractIT {
             })
         .doAnswer(InvocationOnMock::callRealMethod)
         .when(this.rubyStorageService)
-        .writeGem(any(), any(), any(), any(), any(), any());
+        .writeGem(any(), any(), any(), any(), any());
 
     final var executor = Executors.newFixedThreadPool(2);
     try {
@@ -389,7 +389,7 @@ class RubyPublishStorageConsistencyIT extends AbstractIT {
             })
         .doAnswer(InvocationOnMock::callRealMethod)
         .when(this.rubyStorageService)
-        .writeGem(any(), any(), any(), any(), any(), any());
+        .writeGem(any(), any(), any(), any(), any());
 
     final var executor = Executors.newFixedThreadPool(2);
     try {
@@ -426,7 +426,7 @@ class RubyPublishStorageConsistencyIT extends AbstractIT {
               throw new IOException("disk full");
             })
         .when(this.rubyStorageService)
-        .writeGem(any(), any(), any(), any(), any(), any());
+        .writeGem(any(), any(), any(), any(), any());
 
     final var response = this.push(repo, gem(name, "1.0.0"), this.adminToken());
 

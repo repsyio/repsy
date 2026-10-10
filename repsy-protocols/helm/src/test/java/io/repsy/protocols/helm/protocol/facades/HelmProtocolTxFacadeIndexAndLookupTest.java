@@ -35,6 +35,7 @@ import io.repsy.protocols.helm.shared.oci.services.OciBlobService;
 import io.repsy.protocols.helm.shared.oci.services.OciManifestService;
 import io.repsy.protocols.helm.shared.storage.services.HelmStorageService;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import io.repsy.protocols.shared.storage.RepoRef;
 import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
 import java.time.Instant;
 import java.util.List;
@@ -192,8 +193,10 @@ class HelmProtocolTxFacadeIndexAndLookupTest {
     when(this.ociBlobService.findByDigest(REPO_ID, "sha256:has")).thenReturn(Optional.of(blob));
     when(this.ociBlobService.findByDigest(REPO_ID, "sha256:nofile")).thenReturn(Optional.of(blob));
     when(this.ociBlobService.findByDigest(REPO_ID, "sha256:norow")).thenReturn(Optional.empty());
-    when(this.helmStorageService.blobExists(REPO_ID, "sha256:has", REPO_NAME)).thenReturn(true);
-    when(this.helmStorageService.blobExists(REPO_ID, "sha256:nofile", REPO_NAME)).thenReturn(false);
+    when(this.helmStorageService.blobExists(new RepoRef(REPO_ID, REPO_NAME), "sha256:has"))
+        .thenReturn(true);
+    when(this.helmStorageService.blobExists(new RepoRef(REPO_ID, REPO_NAME), "sha256:nofile"))
+        .thenReturn(false);
 
     assertThat(this.facade.checkBlob(this.context, "sha256:has")).containsSame(blob);
     assertThat(this.facade.checkBlob(this.context, "sha256:nofile")).isEmpty();
@@ -204,9 +207,9 @@ class HelmProtocolTxFacadeIndexAndLookupTest {
   @DisplayName("getBlob() answers the file, or blobNotFound")
   void getBlobAnswersTheFileOrNotFound() throws Exception {
     final var resource = new ByteArrayResource(new byte[3]);
-    when(this.helmStorageService.findBlob(REPO_ID, "sha256:has", REPO_NAME))
+    when(this.helmStorageService.findBlob(new RepoRef(REPO_ID, REPO_NAME), "sha256:has"))
         .thenReturn(Optional.of(resource));
-    when(this.helmStorageService.findBlob(REPO_ID, "sha256:no", REPO_NAME))
+    when(this.helmStorageService.findBlob(new RepoRef(REPO_ID, REPO_NAME), "sha256:no"))
         .thenReturn(Optional.empty());
 
     assertThat(this.facade.getBlob(this.context, "sha256:has")).isSameAs(resource);

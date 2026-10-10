@@ -418,7 +418,7 @@ class CargoPublishStorageConsistencyIT extends AbstractIT {
               return invocation.callRealMethod();
             })
         .when(this.cargoStorageService)
-        .writeCrateAndIndex(any(), any(), any(), any(), any(), any());
+        .writeCrateAndIndex(any(), any(), any(), any(), any());
 
     final var executor = Executors.newFixedThreadPool(2);
     try {
@@ -441,7 +441,7 @@ class CargoPublishStorageConsistencyIT extends AbstractIT {
 
     // Once for the winner, and once for the push that seeded the crate.
     verify(this.cargoStorageService, times(2))
-        .writeCrateAndIndex(any(), any(), any(), any(), any(), any());
+        .writeCrateAndIndex(any(), any(), any(), any(), any());
     assertThat(crateFile(repo, name, "1.0.1")).hasBinaryContent(winnerCrate);
     assertThat(indexLines(repo, name)).as("one index line per version").hasSize(2);
     assertThat(this.storedVersionCount(repo, name)).isEqualTo(2);
@@ -470,7 +470,7 @@ class CargoPublishStorageConsistencyIT extends AbstractIT {
             })
         .doAnswer(InvocationOnMock::callRealMethod)
         .when(this.cargoStorageService)
-        .writeCrateAndIndex(any(), any(), any(), any(), any(), any());
+        .writeCrateAndIndex(any(), any(), any(), any(), any());
 
     final var executor = Executors.newFixedThreadPool(2);
     try {
@@ -517,7 +517,7 @@ class CargoPublishStorageConsistencyIT extends AbstractIT {
             })
         .doAnswer(InvocationOnMock::callRealMethod)
         .when(this.cargoStorageService)
-        .writeCrateAndIndex(any(), any(), any(), any(), any(), any());
+        .writeCrateAndIndex(any(), any(), any(), any(), any());
 
     final var executor = Executors.newFixedThreadPool(2);
     try {

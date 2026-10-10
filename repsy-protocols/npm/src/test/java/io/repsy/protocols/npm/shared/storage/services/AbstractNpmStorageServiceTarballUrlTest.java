@@ -23,6 +23,7 @@ import static org.mockito.Mockito.when;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.protocols.npm.shared.npm_package.dtos.NpmPackageSnapshot;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -117,7 +118,7 @@ class AbstractNpmStorageServiceTarballUrlTest {
     this.service.registryBaseUrl = "https://repo.example.test";
 
     final var packument =
-        this.service.getMetadata(REPO_ID, REPO_NAME, null, "demo", false, NO_ROWS);
+        this.service.getMetadata(new RepoRef(REPO_ID, REPO_NAME), null, "demo", false, NO_ROWS);
 
     assertThat(tarballOf(packument))
         .isEqualTo("https://repo.example.test/npm-repo/demo/-/demo-1.0.0.tgz");
@@ -129,7 +130,8 @@ class AbstractNpmStorageServiceTarballUrlTest {
     this.metadataIsStored();
     this.service.registryBaseUrl = "https://repo.example.test/prefix/";
 
-    final var packument = this.service.getMetadata(REPO_ID, REPO_NAME, null, "demo", true, NO_ROWS);
+    final var packument =
+        this.service.getMetadata(new RepoRef(REPO_ID, REPO_NAME), null, "demo", true, NO_ROWS);
 
     assertThat(tarballOf(packument))
         .isEqualTo("https://repo.example.test/prefix/npm-repo/demo/-/demo-1.0.0.tgz");
@@ -141,7 +143,8 @@ class AbstractNpmStorageServiceTarballUrlTest {
     this.metadataIsStored();
     this.service.registryBaseUrl = "https://repo.example.test";
 
-    final var packument = this.service.getMetadata(REPO_ID, REPO_NAME, null, "demo", false);
+    final var packument =
+        this.service.getMetadata(new RepoRef(REPO_ID, REPO_NAME), null, "demo", false);
 
     assertThat(tarballOf(packument))
         .isEqualTo("https://repo.example.test/npm-repo/demo/-/demo-1.0.0.tgz");
@@ -153,7 +156,7 @@ class AbstractNpmStorageServiceTarballUrlTest {
     this.metadataIsStored();
 
     final var packument =
-        this.service.getMetadata(REPO_ID, REPO_NAME, null, "demo", false, NO_ROWS);
+        this.service.getMetadata(new RepoRef(REPO_ID, REPO_NAME), null, "demo", false, NO_ROWS);
 
     assertThat(tarballOf(packument)).isEqualTo(PUBLISHER_URL);
   }

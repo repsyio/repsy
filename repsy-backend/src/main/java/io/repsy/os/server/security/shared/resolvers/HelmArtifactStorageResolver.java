@@ -20,6 +20,7 @@ import io.repsy.os.server.protocols.helm.shared.chart.services.HelmChartService;
 import io.repsy.os.server.security.shared.ArtifactStorageResolver;
 import io.repsy.protocols.helm.shared.constants.HelmConstants;
 import io.repsy.protocols.helm.shared.storage.services.HelmStorageService;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.IOException;
 import java.util.Optional;
 import java.util.Set;
@@ -67,7 +68,9 @@ public class HelmArtifactStorageResolver implements ArtifactStorageResolver {
     // use.
     return this.helmChartService
         .findOptionalByNameAndVersion(repoId, artifactName, artifactVersion)
-        .filter(chart -> this.helmStorageService.blobExists(repoId, chart.digest(), repoName))
+        .filter(
+            chart ->
+                this.helmStorageService.blobExists(new RepoRef(repoId, repoName), chart.digest()))
         .map(chart -> HelmConstants.OCI_BLOBS_PATH + "/" + chart.digest());
   }
 

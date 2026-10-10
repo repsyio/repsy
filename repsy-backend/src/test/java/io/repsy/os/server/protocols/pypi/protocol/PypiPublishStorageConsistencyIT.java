@@ -239,7 +239,7 @@ class PypiPublishStorageConsistencyIT extends AbstractIT {
               throw new IllegalStateException("storage went away after the write");
             })
         .when(this.pypiStorageService)
-        .writePackageArchive(any(), any(), any(), any());
+        .writePackageArchive(any(), any(), any());
   }
 
   /** Holds the first archive write, which is inside its transaction, until the returned latch. */
@@ -253,7 +253,7 @@ class PypiPublishStorageConsistencyIT extends AbstractIT {
             })
         .doAnswer(InvocationOnMock::callRealMethod)
         .when(this.pypiStorageService)
-        .writePackageArchive(any(), any(), any(), any());
+        .writePackageArchive(any(), any(), any());
 
     return releaseFirst;
   }
@@ -306,7 +306,7 @@ class PypiPublishStorageConsistencyIT extends AbstractIT {
     assertThat(this.releaseCount(repo, name)).isZero();
     assertThat(this.archive(repo, name, wheel(name, "1.0.0"))).doesNotExist();
     assertThat(digestOf(this.archive(repo, name, wheel(name, "1.0.0")))).doesNotExist();
-    verify(this.pypiStorageService, never()).writePackageArchive(any(), any(), any(), any());
+    verify(this.pypiStorageService, never()).writePackageArchive(any(), any(), any());
   }
 
   @Test
@@ -465,7 +465,7 @@ class PypiPublishStorageConsistencyIT extends AbstractIT {
     assertThat(this.packageCount(repo, name)).isOne();
     assertThat(this.releaseCount(repo, name)).isOne();
     // Once, for the winner: the loser never reached the storage.
-    verify(this.pypiStorageService, times(1)).writePackageArchive(any(), any(), any(), any());
+    verify(this.pypiStorageService, times(1)).writePackageArchive(any(), any(), any());
   }
 
   @Test

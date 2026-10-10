@@ -148,7 +148,7 @@ class HelmDeleteStorageFailureIT extends AbstractIT {
   private void failToDeleteTheArchive() throws IOException {
     doThrow(new IOException("storage went away while deleting the archive"))
         .when(this.helmStorageService)
-        .deleteChartFile(any(), any(), any(), any());
+        .deleteChartFile(any(), any(), any());
   }
 
   private MockHttpServletResponse panelDeleteVersion(final Repo repo) throws Exception {

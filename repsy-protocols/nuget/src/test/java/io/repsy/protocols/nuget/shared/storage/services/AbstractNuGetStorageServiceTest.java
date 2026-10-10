@@ -30,6 +30,7 @@ import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.Optional;
@@ -49,6 +50,7 @@ import org.springframework.core.io.Resource;
 class AbstractNuGetStorageServiceTest {
 
   private static final UUID REPO_ID = UUID.randomUUID();
+  private static final RepoRef REPO = new RepoRef(REPO_ID, REPO_ID.toString());
   private static final String CANONICAL_NUPKG =
       "packages/some.package/1.0.0/some.package.1.0.0.nupkg";
   private static final String CANONICAL_NUSPEC =
@@ -87,7 +89,7 @@ class AbstractNuGetStorageServiceTest {
 
     final var usages =
         this.service.writePackage(
-            REPO_ID,
+            REPO,
             "Some.Package",
             "1.0.0+Build",
             new ByteArrayInputStream(new byte[] {1}),
@@ -107,7 +109,7 @@ class AbstractNuGetStorageServiceTest {
     final Resource resource = new ByteArrayResource(new byte[] {1});
     this.stubOnlyExisting(CANONICAL_NUPKG, resource);
 
-    assertThat(this.service.getNuPkg(REPO_ID, "Some.Package", "1.0")).isSameAs(resource);
+    assertThat(this.service.getNuPkg(REPO, "Some.Package", "1.0")).isSameAs(resource);
   }
 
   @Test
@@ -115,9 +117,9 @@ class AbstractNuGetStorageServiceTest {
   void ignoresLegacyDirectory() {
     this.stubOnlyExisting(LEGACY_NUPKG, new ByteArrayResource(new byte[] {1}));
 
-    assertThatThrownBy(() -> this.service.getNuPkg(REPO_ID, "Some.Package", "1.0.0+Build"))
+    assertThatThrownBy(() -> this.service.getNuPkg(REPO, "Some.Package", "1.0.0+Build"))
         .isInstanceOf(ItemNotFoundException.class);
-    assertThatThrownBy(() -> this.service.getNuspec(REPO_ID, "Some.Package", "1.0.0+Build"))
+    assertThatThrownBy(() -> this.service.getNuspec(REPO, "Some.Package", "1.0.0+Build"))
         .isInstanceOf(ItemNotFoundException.class);
   }
 
@@ -127,7 +129,7 @@ class AbstractNuGetStorageServiceTest {
     final Resource canonical = new ByteArrayResource(new byte[] {1});
     this.stubOnlyExisting(CANONICAL_NUPKG, canonical);
 
-    assertThat(this.service.getNuPkg(REPO_ID, "Some.Package", "1.0.0+Build")).isSameAs(canonical);
+    assertThat(this.service.getNuPkg(REPO, "Some.Package", "1.0.0+Build")).isSameAs(canonical);
   }
 
   @Test
@@ -136,7 +138,7 @@ class AbstractNuGetStorageServiceTest {
     final Resource canonical = new ByteArrayResource(new byte[] {1});
     this.stubOnlyExisting(CANONICAL_NUSPEC, canonical);
 
-    assertThat(this.service.getNuspec(REPO_ID, "Some.Package", "1.0.0+Build")).isSameAs(canonical);
+    assertThat(this.service.getNuspec(REPO, "Some.Package", "1.0.0+Build")).isSameAs(canonical);
   }
 
   @Test
@@ -145,9 +147,9 @@ class AbstractNuGetStorageServiceTest {
     when(this.storageStrategy.get(any(StoragePath.class), anyString()))
         .thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> this.service.getNuPkg(REPO_ID, "Some.Package", "1.0.0+Build"))
+    assertThatThrownBy(() -> this.service.getNuPkg(REPO, "Some.Package", "1.0.0+Build"))
         .isInstanceOf(ItemNotFoundException.class);
-    assertThatThrownBy(() -> this.service.getNuspec(REPO_ID, "Some.Package", "1.0.0"))
+    assertThatThrownBy(() -> this.service.getNuspec(REPO, "Some.Package", "1.0.0"))
         .isInstanceOf(ItemNotFoundException.class);
   }
 
@@ -157,7 +159,7 @@ class AbstractNuGetStorageServiceTest {
     when(this.storageStrategy.get(any(StoragePath.class), anyString()))
         .thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> this.service.getNuPkg(REPO_ID, "Some.Package", "1.0.0+Build"))
+    assertThatThrownBy(() -> this.service.getNuPkg(REPO, "Some.Package", "1.0.0+Build"))
         .isInstanceOf(ItemNotFoundException.class);
 
     verify(this.storageStrategy).get(any(StoragePath.class), anyString());
@@ -176,7 +178,7 @@ class AbstractNuGetStorageServiceTest {
   void deletesCanonicalDirectoryOfBuildMetadataVersion() throws IOException {
     when(this.storageStrategy.calculatePathUsage(any(StoragePath.class))).thenReturn(7L);
 
-    assertThat(this.service.deletePackageVersion(REPO_ID, "Some.Package", "1.0.0+Build"))
+    assertThat(this.service.deletePackageVersion(REPO, "Some.Package", "1.0.0+Build"))
         .isEqualTo(7L);
 
     final var deleted = ArgumentCaptor.forClass(StoragePath.class);
@@ -189,7 +191,7 @@ class AbstractNuGetStorageServiceTest {
   void deletesBuildMetadataDirectory() throws IOException {
     when(this.storageStrategy.calculatePathUsage(any(StoragePath.class))).thenReturn(7L);
 
-    assertThat(this.service.deleteBuildMetadataVersion(REPO_ID, "Some.Package", "1.0.0+Build"))
+    assertThat(this.service.deleteBuildMetadataVersion(REPO, "Some.Package", "1.0.0+Build"))
         .isEqualTo(7L);
 
     final var deleted = ArgumentCaptor.forClass(StoragePath.class);
@@ -200,7 +202,7 @@ class AbstractNuGetStorageServiceTest {
   @Test
   @DisplayName("never deletes the canonical directory as a directory with build metadata")
   void keepsCanonicalDirectoryWhenThereIsNoBuildMetadata() throws IOException {
-    assertThat(this.service.deleteBuildMetadataVersion(REPO_ID, "Some.Package", "1.0")).isZero();
+    assertThat(this.service.deleteBuildMetadataVersion(REPO, "Some.Package", "1.0")).isZero();
 
     verifyNoInteractions(this.storageStrategy);
   }
@@ -210,7 +212,7 @@ class AbstractNuGetStorageServiceTest {
   void deletesCanonicalDirectory() throws IOException {
     when(this.storageStrategy.calculatePathUsage(any(StoragePath.class))).thenReturn(3L);
 
-    this.service.deletePackageVersion(REPO_ID, "Some.Package", "1.0");
+    this.service.deletePackageVersion(REPO, "Some.Package", "1.0");
 
     final var deleted = ArgumentCaptor.forClass(StoragePath.class);
     verify(this.storageStrategy).delete(deleted.capture());
@@ -226,8 +228,7 @@ class AbstractNuGetStorageServiceTest {
                 Optional.of(
                     new ByteArrayResource(relativePath(invocation.getArgument(0)).getBytes())));
 
-    assertThat(this.service.copyToCanonicalVersion(REPO_ID, "Some.Package", "1.0.0+Build"))
-        .isTrue();
+    assertThat(this.service.copyToCanonicalVersion(REPO, "Some.Package", "1.0.0+Build")).isTrue();
 
     final var read = ArgumentCaptor.forClass(StoragePath.class);
     verify(this.storageStrategy, times(2)).get(read.capture(), eq(REPO_ID.toString()));
@@ -249,7 +250,7 @@ class AbstractNuGetStorageServiceTest {
     when(this.storageStrategy.get(any(StoragePath.class), anyString()))
         .thenReturn(Optional.of(new ByteArrayResource(new byte[] {4, 2})));
 
-    this.service.copyToCanonicalVersion(REPO_ID, "Some.Package", "1.0.0+Build");
+    this.service.copyToCanonicalVersion(REPO, "Some.Package", "1.0.0+Build");
 
     final var content = ArgumentCaptor.forClass(java.io.InputStream.class);
     verify(this.storageStrategy, times(2))
@@ -265,8 +266,7 @@ class AbstractNuGetStorageServiceTest {
     when(this.storageStrategy.get(any(StoragePath.class), anyString()))
         .thenReturn(Optional.empty());
 
-    assertThat(this.service.copyToCanonicalVersion(REPO_ID, "Some.Package", "1.0.0+Build"))
-        .isFalse();
+    assertThat(this.service.copyToCanonicalVersion(REPO, "Some.Package", "1.0.0+Build")).isFalse();
 
     verify(this.storageStrategy, never()).write(anyString(), any(StoragePath.class), any());
   }
@@ -274,7 +274,7 @@ class AbstractNuGetStorageServiceTest {
   @Test
   @DisplayName("has nothing to copy for a version without build metadata")
   void copiesNothingForCanonicalVersion() throws IOException {
-    assertThat(this.service.copyToCanonicalVersion(REPO_ID, "Some.Package", "1.0")).isFalse();
+    assertThat(this.service.copyToCanonicalVersion(REPO, "Some.Package", "1.0")).isFalse();
 
     verifyNoInteractions(this.storageStrategy);
   }
@@ -282,7 +282,7 @@ class AbstractNuGetStorageServiceTest {
   @Test
   @DisplayName("deletes a whole package and a whole repo")
   void deletesPackageAndRepo() throws IOException {
-    this.service.deletePackage(REPO_ID, "Some.Package");
+    this.service.deletePackage(REPO, "Some.Package");
     this.service.deleteRepo(REPO_ID);
 
     final var deleted = ArgumentCaptor.forClass(StoragePath.class);

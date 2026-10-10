@@ -32,6 +32,7 @@ import io.repsy.protocols.pypi.shared.utils.PackageStorageUtils;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.storage.AbstractArtifactStorageService;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.Paths;
@@ -124,11 +125,11 @@ public abstract class AbstractPypiStorageService<ID> extends AbstractArtifactSto
 
   @Override
   public Resource getArchiveFile(
-      final UUID repoId, final String repoName, final String packageName, final String fileName) {
+      final RepoRef repo, final String packageName, final String fileName) {
 
-    final var storagePath = StoragePath.of(repoId, Paths.get(packageName, fileName).toString());
+    final var storagePath = StoragePath.of(repo.id(), Paths.get(packageName, fileName).toString());
 
-    return this.requireResource(storagePath, repoName, ProtocolErrorCodes.ITEM_NOT_FOUND);
+    return this.requireResource(storagePath, repo.name(), ProtocolErrorCodes.ITEM_NOT_FOUND);
   }
 
   private void addDirectoryUpLink(
@@ -245,15 +246,12 @@ public abstract class AbstractPypiStorageService<ID> extends AbstractArtifactSto
 
   @Override
   public void discardArchive(
-      final UUID repoId,
-      final String repoName,
-      final String normalizedName,
-      final String filename) {
+      final RepoRef repo, final String normalizedName, final String filename) {
 
     for (final var name : List.of(filename, filename + "." + HASH_ALGORITHM)) {
-      final var path = StoragePath.of(repoId, Paths.get(normalizedName, name).toString());
+      final var path = StoragePath.of(repo.id(), Paths.get(normalizedName, name).toString());
 
-      if (this.storageStrategy.get(path, repoName).isPresent()) {
+      if (this.storageStrategy.get(path, repo.name()).isPresent()) {
         this.storageStrategy.delete(path);
       }
     }
@@ -262,34 +260,31 @@ public abstract class AbstractPypiStorageService<ID> extends AbstractArtifactSto
   /** Write archive file to fs, if it does not exists already */
   @Override
   public BaseUsages writePackageArchive(
-      final UUID repoId,
-      final String repoName,
-      final PackageUploadForm uploadForm,
-      final MultipartFile file)
+      final RepoRef repo, final PackageUploadForm uploadForm, final MultipartFile file)
       throws IOException {
 
-    final var path = Paths.get(repoId.toString(), uploadForm.getNormalizedName()).toString();
+    final var path = Paths.get(repo.id().toString(), uploadForm.getNormalizedName()).toString();
     this.storageStrategy.createDirectory(path);
 
     final var storagePath =
         StoragePath.of(
-            repoId,
+            repo.id(),
             Paths.get(uploadForm.getNormalizedName(), file.getOriginalFilename()).toString());
 
     final var packageUsage =
-        this.storageStrategy.write(repoName, storagePath, file.getInputStream());
+        this.storageStrategy.write(repo.name(), storagePath, file.getInputStream());
 
     final var digestPath =
         Paths.get(uploadForm.getNormalizedName(), file.getOriginalFilename() + "." + HASH_ALGORITHM)
             .toString();
 
-    final var digestStoragePath = StoragePath.of(repoId, digestPath);
+    final var digestStoragePath = StoragePath.of(repo.id(), digestPath);
 
     final var uploadFormSha256DigestBytes =
         Objects.requireNonNull(uploadForm.getSha256_digest(), "sha256_digest").getBytes(UTF_8);
 
     try (final var bais = new ByteArrayInputStream(uploadFormSha256DigestBytes)) {
-      final var metadataUsage = this.storageStrategy.write(repoName, digestStoragePath, bais);
+      final var metadataUsage = this.storageStrategy.write(repo.name(), digestStoragePath, bais);
 
       packageUsage.setDiskUsage(packageUsage.getDiskUsage() + metadataUsage.getDiskUsage());
     }

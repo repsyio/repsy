@@ -18,6 +18,7 @@ package io.repsy.protocols.npm.shared.storage.services;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.protocols.npm.shared.npm_package.dtos.NpmPackageSnapshot;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.file.Path;
@@ -37,23 +38,20 @@ public interface NpmStorageService {
 
   void createRepo(UUID repoId);
 
-  long deleteDistributionTag(UUID repoId, String repoName, Path packageBasePath, String tagName)
-      throws IOException;
+  long deleteDistributionTag(RepoRef repo, Path packageBasePath, String tagName) throws IOException;
 
   BaseUsages writeMetadataToFile(
       String repoName, Map<String, Object> metadata, StoragePath metadataStoragePath)
       throws IOException;
 
   Pair<Map<String, Object>, Long> addDistributionTag(
-      UUID repoId, String repoName, Path packageBasePath, String tagName, String versionName)
-      throws IOException;
+      RepoRef repo, Path packageBasePath, String tagName, String versionName) throws IOException;
 
   Pair<Long, Long> processPackagePayload(Map<String, Object> payload, String repoName)
       throws URISyntaxException, JacksonException;
 
   BaseUsages writeTarballAndMetadata(
-      UUID repoId,
-      String repoName,
+      RepoRef repo,
       Map<String, Object> metadata,
       Path packageBasePath,
       String packageName,
@@ -71,8 +69,7 @@ public interface NpmStorageService {
   Pair<Pair<Long, Long>, Map<String, Object>> processVersionPayload(
       Map<String, Object> payload,
       Path packageBasePath,
-      UUID repoId,
-      String repoName,
+      RepoRef repo,
       Supplier<NpmPackageSnapshot> snapshot)
       throws IOException, URISyntaxException;
 
@@ -82,16 +79,14 @@ public interface NpmStorageService {
    * @return the bytes of the file, whatever they hold, or {@code null} when the package has no
    *     metadata file
    */
-  byte @Nullable [] readMetadataBytes(UUID repoId, String repoName, Path packageBasePath)
-      throws IOException;
+  byte @Nullable [] readMetadataBytes(RepoRef repo, Path packageBasePath) throws IOException;
 
   /**
    * Puts the package metadata back to {@code metadata}, as {@link #readMetadataBytes} returned it,
    * after a change that wrote it has to be undone. {@code null} means there was none: a file that
    * is there now is removed.
    */
-  void restoreMetadataBytes(
-      UUID repoId, String repoName, Path packageBasePath, byte @Nullable [] metadata)
+  void restoreMetadataBytes(RepoRef repo, Path packageBasePath, byte @Nullable [] metadata)
       throws IOException;
 
   /** A change to the package metadata file that reports how many bytes the file grew by. */
@@ -118,8 +113,7 @@ public interface NpmStorageService {
    * @return the growth of the file: what {@code change} reports, plus the size of a rebuilt file
    */
   long changeMetadata(
-      UUID repoId,
-      String repoName,
+      RepoRef repo,
       Path packageBasePath,
       Supplier<NpmPackageSnapshot> snapshot,
       MetadataChange change)
@@ -134,15 +128,13 @@ public interface NpmStorageService {
    *     used and {@code snapshot} finds no package either
    */
   Map<String, Object> readMetadataOrRebuild(
-      UUID repoId, String repoName, Path packageBasePath, Supplier<NpmPackageSnapshot> snapshot)
-      throws IOException;
+      RepoRef repo, Path packageBasePath, Supplier<NpmPackageSnapshot> snapshot) throws IOException;
 
   /**
    * Tells whether the tarball of the version is in storage, whether or not the database knows the
    * version.
    */
-  boolean tarballExists(
-      UUID repoId, String repoName, Path packageBasePath, String packageName, String versionName);
+  boolean tarballExists(RepoRef repo, Path packageBasePath, String packageName, String versionName);
 
   /**
    * Removes what a publish that failed part-way left of a version it was adding: its tarball, and
@@ -153,8 +145,7 @@ public interface NpmStorageService {
    *     publish, or {@code null} when the package did not exist
    */
   void discardPublishedVersion(
-      UUID repoId,
-      String repoName,
+      RepoRef repo,
       Path packageBasePath,
       String packageName,
       String versionName,
@@ -180,8 +171,7 @@ public interface NpmStorageService {
    * @param snapshot the rows of the package with the removal already made in them
    */
   long deleteVersion(
-      UUID repoId,
-      String repoName,
+      RepoRef repo,
       Path packageBasePath,
       String packageName,
       String versionName,
@@ -196,15 +186,11 @@ public interface NpmStorageService {
    * @param deprecations pairs of version and message; an empty message removes the deprecation
    */
   long deprecateVersions(
-      UUID repoId, String repoName, Path packageBasePath, List<Pair<String, String>> deprecations)
+      RepoRef repo, Path packageBasePath, List<Pair<String, String>> deprecations)
       throws IOException;
 
   Map<String, Object> getMetadata(
-      UUID repoId,
-      String repoName,
-      @Nullable String scopeName,
-      String packageName,
-      boolean isAbbreviated)
+      RepoRef repo, @Nullable String scopeName, String packageName, boolean isAbbreviated)
       throws IOException;
 
   /**
@@ -216,8 +202,7 @@ public interface NpmStorageService {
    *     {@code snapshot} finds no package either
    */
   Map<String, Object> getMetadata(
-      UUID repoId,
-      String repoName,
+      RepoRef repo,
       @Nullable String scopeName,
       String packageName,
       boolean isAbbreviated,
@@ -233,15 +218,11 @@ public interface NpmStorageService {
    * file has no entry or readme for the version (RPS-1143), or is gone or corrupt (RPS-1310). The
    * caller has found the version in the database. Nothing is rebuilt: the rows keep no readme.
    */
-  @Nullable String getReadmeContent(
-      UUID repoId, String repoName, Path packageBasePath, String versionName) throws IOException;
+  @Nullable String getReadmeContent(RepoRef repo, Path packageBasePath, String versionName)
+      throws IOException;
 
   Resource getTarball(
-      UUID repoId,
-      String repoName,
-      @Nullable String scopeName,
-      String packageName,
-      String filename);
+      RepoRef repo, @Nullable String scopeName, String packageName, String filename);
 
   Map<String, Object> getMetadata(StoragePath metadataStoragePath, String repoName)
       throws IOException;

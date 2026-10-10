@@ -19,6 +19,7 @@ import io.repsy.os.server.protocols.helm.shared.chart.services.HelmChartService;
 import io.repsy.os.server.protocols.helm.shared.oci.repositories.HelmOciManifestMismatch;
 import io.repsy.os.server.protocols.helm.shared.oci.repositories.HelmOciManifestRepository;
 import io.repsy.os.server.protocols.helm.shared.storage.services.HelmStorageService;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
@@ -141,14 +142,15 @@ public class HelmOciManifestNameRepairService {
     try {
       if (move.content() != null) {
         this.helmStorageService.saveManifest(
-            mismatch.repoId(),
+            new RepoRef(mismatch.repoId(), mismatch.repoName()),
             mismatch.chartName(),
             mismatch.reference(),
-            move.content().getBytes(StandardCharsets.UTF_8),
-            mismatch.repoName());
+            move.content().getBytes(StandardCharsets.UTF_8));
       }
       this.helmStorageService.deleteManifestFile(
-          mismatch.repoId(), mismatch.name(), mismatch.reference(), mismatch.repoName());
+          new RepoRef(mismatch.repoId(), mismatch.repoName()),
+          mismatch.name(),
+          mismatch.reference());
     } catch (final RuntimeException e) {
       log.warn(
           "Could not move the file of OCI manifest {} of repo {} from {} to {}",

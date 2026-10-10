@@ -35,6 +35,7 @@ import io.repsy.protocols.pypi.shared.python_package.services.PypiPackageService
 import io.repsy.protocols.pypi.shared.storage.services.PypiStorageService;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import io.repsy.protocols.shared.storage.RepoRef;
 import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
 import java.io.IOException;
 import java.security.MessageDigest;
@@ -184,13 +185,13 @@ class AbstractPypiProtocolFacadeTest {
       final var params = form("pkg", "1.0.0", upperCaseDigest);
 
       publishRunsFileWriter();
-      when(storageService.writePackageArchive(any(), any(), any(), any())).thenReturn(usages);
+      when(storageService.writePackageArchive(any(), any(), any())).thenReturn(usages);
 
       facade.uploadPackage(context(), params, file);
 
       final var captor = ArgumentCaptor.forClass(PackageUploadForm.class);
       verify(storageService)
-          .writePackageArchive(eq(REPO_ID), eq(REPO_NAME), captor.capture(), eq(file));
+          .writePackageArchive(eq(new RepoRef(REPO_ID, REPO_NAME)), captor.capture(), eq(file));
       assertThat(captor.getValue().getSha256_digest()).isEqualTo(sha256Hex(bytes));
     }
 
@@ -204,12 +205,12 @@ class AbstractPypiProtocolFacadeTest {
       final var params = form("pkg", "1.0.0", digest);
 
       publishRunsFileWriter();
-      when(storageService.writePackageArchive(any(), any(), any(), any())).thenReturn(usages);
+      when(storageService.writePackageArchive(any(), any(), any())).thenReturn(usages);
 
       facade.uploadPackage(context(), params, file);
 
       final var captor = ArgumentCaptor.forClass(PackageUploadForm.class);
-      verify(storageService).writePackageArchive(any(), any(), captor.capture(), any());
+      verify(storageService).writePackageArchive(any(), captor.capture(), any());
       assertThat(captor.getValue().getSha256_digest()).isEqualTo(digest);
     }
   }
@@ -236,7 +237,7 @@ class AbstractPypiProtocolFacadeTest {
           .isInstanceOf(BadRequestException.class)
           .hasMessage("archiveVersionMismatch");
 
-      verify(storageService, never()).writePackageArchive(any(), any(), any(), any());
+      verify(storageService, never()).writePackageArchive(any(), any(), any());
     }
 
     @Test
@@ -254,7 +255,7 @@ class AbstractPypiProtocolFacadeTest {
           .isInstanceOf(BadRequestException.class)
           .hasMessage("archiveVersionMismatch");
 
-      verify(storageService, never()).writePackageArchive(any(), any(), any(), any());
+      verify(storageService, never()).writePackageArchive(any(), any(), any());
     }
 
     @Test
@@ -267,11 +268,11 @@ class AbstractPypiProtocolFacadeTest {
 
       when(storageService.isPackageFileExist(any(), any(), any())).thenReturn(false);
       publishRunsFileWriter();
-      when(storageService.writePackageArchive(any(), any(), any(), any())).thenReturn(usages);
+      when(storageService.writePackageArchive(any(), any(), any())).thenReturn(usages);
 
       facade.uploadPackage(context(), form("pkg", "1.0.0+CU118", digest), file);
 
-      verify(storageService).writePackageArchive(any(), any(), any(), any());
+      verify(storageService).writePackageArchive(any(), any(), any());
       verify(storageService, atLeastOnce())
           .isPackageFileExist(REPO_ID, "pkg", "pkg-1.0.0+cu118-py3-none-any.whl");
     }
@@ -287,11 +288,11 @@ class AbstractPypiProtocolFacadeTest {
 
       when(storageService.isPackageFileExist(any(), any(), any())).thenReturn(false);
       publishRunsFileWriter();
-      when(storageService.writePackageArchive(any(), any(), any(), any())).thenReturn(usages);
+      when(storageService.writePackageArchive(any(), any(), any())).thenReturn(usages);
 
       facade.uploadPackage(context(), params, file);
 
-      verify(storageService).writePackageArchive(any(), any(), any(), any());
+      verify(storageService).writePackageArchive(any(), any(), any());
     }
 
     @Test
@@ -305,11 +306,11 @@ class AbstractPypiProtocolFacadeTest {
 
       publishRunsFileWriter();
       when(storageService.isPackageFileExist(REPO_ID, "pkg", "pkg-1.0.0.tar.gz")).thenReturn(true);
-      when(storageService.writePackageArchive(any(), any(), any(), any())).thenReturn(usages);
+      when(storageService.writePackageArchive(any(), any(), any())).thenReturn(usages);
 
       facade.uploadPackage(context(), params, file);
 
-      verify(storageService).writePackageArchive(any(), any(), any(), any());
+      verify(storageService).writePackageArchive(any(), any(), any());
     }
 
     @Test
@@ -331,8 +332,8 @@ class AbstractPypiProtocolFacadeTest {
           .isInstanceOf(AccessNotAllowedException.class)
           .hasMessage("fileAlreadyExists");
 
-      verify(storageService, never()).writePackageArchive(any(), any(), any(), any());
-      verify(storageService, never()).discardArchive(any(), any(), any(), any());
+      verify(storageService, never()).writePackageArchive(any(), any(), any());
+      verify(storageService, never()).discardArchive(any(), any(), any());
     }
   }
 
@@ -398,7 +399,7 @@ class AbstractPypiProtocolFacadeTest {
       final var params = form("My.Package", "1.0.0", digest);
 
       publishRunsFileWriter();
-      when(storageService.writePackageArchive(any(), any(), any(), any())).thenReturn(usages);
+      when(storageService.writePackageArchive(any(), any(), any())).thenReturn(usages);
       when(usages.getDiskUsage()).thenReturn(300L);
 
       final var ctx = context();
@@ -418,7 +419,7 @@ class AbstractPypiProtocolFacadeTest {
       final var params = form("My.Package", "1.0.0", sha256Hex(bytes));
 
       publishRunsFileWriter();
-      when(storageService.writePackageArchive(any(), any(), any(), any())).thenReturn(usages);
+      when(storageService.writePackageArchive(any(), any(), any())).thenReturn(usages);
       when(usages.getDiskUsage()).thenReturn(300L);
 
       final var ctx = context();
@@ -452,8 +453,8 @@ class AbstractPypiProtocolFacadeTest {
       final var ctx = context();
       assertThatThrownBy(() -> facade.uploadPackage(ctx, params(), upload())).isSameAs(rejected);
 
-      verify(storageService, never()).writePackageArchive(any(), any(), any(), any());
-      verify(storageService, never()).discardArchive(any(), any(), any(), any());
+      verify(storageService, never()).writePackageArchive(any(), any(), any());
+      verify(storageService, never()).discardArchive(any(), any(), any());
       assertThat(ctx.<BaseUsages>getProperty("usages")).isNull();
       assertThat(ctx.<String>getProperty("artifactName")).isNull();
     }
@@ -463,12 +464,13 @@ class AbstractPypiProtocolFacadeTest {
     void removesThePartialFilesOfANewFile() throws Exception {
       publishRunsFileWriter();
       final var failure = new IOException("disk full");
-      when(storageService.writePackageArchive(any(), any(), any(), any())).thenThrow(failure);
+      when(storageService.writePackageArchive(any(), any(), any())).thenThrow(failure);
 
       final var ctx = context();
       assertThatThrownBy(() -> facade.uploadPackage(ctx, params(), upload())).isSameAs(failure);
 
-      verify(storageService).discardArchive(REPO_ID, REPO_NAME, "pkg", "pkg-1.0.0.tar.gz");
+      verify(storageService)
+          .discardArchive(new RepoRef(REPO_ID, REPO_NAME), "pkg", "pkg-1.0.0.tar.gz");
       assertThat(ctx.<BaseUsages>getProperty("usages")).isNull();
     }
 
@@ -478,12 +480,12 @@ class AbstractPypiProtocolFacadeTest {
       publishRunsFileWriter();
       when(storageService.isPackageFileExist(REPO_ID, "pkg", "pkg-1.0.0.tar.gz")).thenReturn(true);
       final var failure = new IllegalStateException("disk full");
-      when(storageService.writePackageArchive(any(), any(), any(), any())).thenThrow(failure);
+      when(storageService.writePackageArchive(any(), any(), any())).thenThrow(failure);
 
       assertThatThrownBy(() -> facade.uploadPackage(context(), params(), upload()))
           .isSameAs(failure);
 
-      verify(storageService, never()).discardArchive(any(), any(), any(), any());
+      verify(storageService, never()).discardArchive(any(), any(), any());
     }
 
     @Test
@@ -492,10 +494,10 @@ class AbstractPypiProtocolFacadeTest {
       publishRunsFileWriter();
       final var failure = new IllegalStateException("disk full");
       final var cleanupFailure = new IllegalStateException("cannot delete");
-      when(storageService.writePackageArchive(any(), any(), any(), any())).thenThrow(failure);
+      when(storageService.writePackageArchive(any(), any(), any())).thenThrow(failure);
       org.mockito.Mockito.doThrow(cleanupFailure)
           .when(storageService)
-          .discardArchive(any(), any(), any(), any());
+          .discardArchive(any(), any(), any());
 
       assertThatThrownBy(() -> facade.uploadPackage(context(), params(), upload()))
           .isSameAs(failure)

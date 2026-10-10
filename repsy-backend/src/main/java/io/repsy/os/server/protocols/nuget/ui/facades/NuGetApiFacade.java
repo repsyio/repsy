@@ -28,6 +28,7 @@ import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetVersionInfo;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.IOException;
 import java.util.Locale;
 import java.util.UUID;
@@ -131,7 +132,7 @@ public class NuGetApiFacade implements ProtocolApiFacade {
     try {
       freed =
           this.nugetStorageService.deletePackage(
-              repoInfo.getId(), packageId.toLowerCase(Locale.ROOT));
+              RepoRef.of(repoInfo), packageId.toLowerCase(Locale.ROOT));
     } catch (final Exception e) {
       log.warn("Storage delete failed for NuGet package {}: {}", packageId, e.getMessage());
     }
@@ -165,7 +166,7 @@ public class NuGetApiFacade implements ProtocolApiFacade {
         try {
 
           this.nugetStorageService.deletePackage(
-              repoInfo.getId(), packageId.toLowerCase(Locale.ROOT));
+              RepoRef.of(repoInfo), packageId.toLowerCase(Locale.ROOT));
         } catch (final Exception cleanupException) {
           log.debug(
               "NuGet package directory cleanup skipped for {}: {}",
@@ -198,9 +199,9 @@ public class NuGetApiFacade implements ProtocolApiFacade {
 
     return storedVersion.contains("+")
         ? this.nugetStorageService.deleteBuildMetadataVersion(
-            repoInfo.getId(), normalizedId, storedVersion)
+            RepoRef.of(repoInfo), normalizedId, storedVersion)
         : this.nugetStorageService.deletePackageVersion(
-            repoInfo.getId(), normalizedId, storedVersion);
+            RepoRef.of(repoInfo), normalizedId, storedVersion);
   }
 
   private NuGetPackageListItem toPackageListItem(

@@ -486,7 +486,7 @@ class NpmDistTagStorageConsistencyIT extends AbstractIT {
               throw new IllegalStateException("storage went away after the write");
             })
         .when(this.npmStorageService)
-        .deleteDistributionTag(any(), any(), any(), any());
+        .deleteDistributionTag(any(), any(), any());
 
     final var response = this.removeTag(repo, name, "beta", token);
 
@@ -513,7 +513,7 @@ class NpmDistTagStorageConsistencyIT extends AbstractIT {
             })
         .doAnswer(InvocationOnMock::callRealMethod)
         .when(this.npmStorageService)
-        .writeTarballAndMetadata(any(), any(), any(), any(), any(), any());
+        .writeTarballAndMetadata(any(), any(), any(), any(), any());
 
     return release;
   }
@@ -658,7 +658,7 @@ class NpmDistTagStorageConsistencyIT extends AbstractIT {
               throw new IllegalStateException("storage went away after the write");
             })
         .when(this.npmStorageService)
-        .writeTarballAndMetadata(any(), any(), any(), any(), any(), any());
+        .writeTarballAndMetadata(any(), any(), any(), any(), any());
 
     final var response = this.publish(repo, name, "1.1.0", tarballOf("fresh"), token);
 

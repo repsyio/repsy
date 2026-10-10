@@ -28,6 +28,7 @@ import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -71,7 +72,12 @@ class AbstractRubyStorageServiceTest {
 
     final var usages =
         new TestService(this.storageStrategy)
-            .writeGem(repoId, "gems", "rack", "2.2.8", "ruby", new ByteArrayInputStream(gem));
+            .writeGem(
+                new RepoRef(repoId, "gems"),
+                "rack",
+                "2.2.8",
+                "ruby",
+                new ByteArrayInputStream(gem));
 
     assertThat(usages.getDiskUsage()).isEqualTo(3);
     assertThat(written.get()).isEqualTo(gem);
@@ -95,7 +101,8 @@ class AbstractRubyStorageServiceTest {
     // A gem name that itself contains a hyphen-digit sequence (RPS-1236): the naive
     // first-boundary split would misread this as name "x" / version "2fa-1.0.0".
     final var found =
-        new TestService(this.storageStrategy).getGem(repoId, "gems", "x-2fa", "1.0.0", "ruby");
+        new TestService(this.storageStrategy)
+            .getGem(new RepoRef(repoId, "gems"), "x-2fa", "1.0.0", "ruby");
 
     assertThat(found).isSameAs(resource);
     assertThat(path.get().getRelativePath().getPath()).endsWith("x-2fa/x-2fa-1.0.0.gem");
@@ -114,7 +121,8 @@ class AbstractRubyStorageServiceTest {
               return Optional.of(resource);
             });
 
-    new TestService(this.storageStrategy).getGem(repoId, "gems", "nokogiri", "1.16.0", "java");
+    new TestService(this.storageStrategy)
+        .getGem(new RepoRef(repoId, "gems"), "nokogiri", "1.16.0", "java");
 
     assertThat(path.get().getRelativePath().getPath())
         .endsWith("nokogiri/nokogiri-1.16.0-java.gem");
@@ -129,7 +137,7 @@ class AbstractRubyStorageServiceTest {
     assertThatThrownBy(
             () ->
                 new TestService(this.storageStrategy)
-                    .getGem(repoId, "gems", "demo", "1.0.0", "ruby"))
+                    .getGem(new RepoRef(repoId, "gems"), "demo", "1.0.0", "ruby"))
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessageContaining("gemNotFound");
   }
@@ -141,7 +149,8 @@ class AbstractRubyStorageServiceTest {
     when(this.storageStrategy.getFileUsage(any(), eq("gems"))).thenReturn(42L);
 
     final var freed =
-        new TestService(this.storageStrategy).deleteGem(repoId, "gems", "rack", "2.2.8", "ruby");
+        new TestService(this.storageStrategy)
+            .deleteGem(new RepoRef(repoId, "gems"), "rack", "2.2.8", "ruby");
 
     assertThat(freed).isEqualTo(42L);
     verify(this.storageStrategy).delete(any());
@@ -158,7 +167,7 @@ class AbstractRubyStorageServiceTest {
     assertThatThrownBy(
             () ->
                 new TestService(this.storageStrategy)
-                    .deleteGem(repoId, "gems", "rack", "2.2.8", "ruby"))
+                    .deleteGem(new RepoRef(repoId, "gems"), "rack", "2.2.8", "ruby"))
         .isInstanceOf(ErrorOccurredException.class)
         .hasCauseInstanceOf(IOException.class);
     verify(this.storageStrategy, never()).delete(any());

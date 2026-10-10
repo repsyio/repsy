@@ -34,6 +34,7 @@ import io.repsy.protocols.npm.shared.npm_package.services.NpmPackageService;
 import io.repsy.protocols.npm.shared.npm_package.services.NpmPackageService.PublishKind;
 import io.repsy.protocols.npm.shared.storage.services.AbstractNpmStorageService;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import io.repsy.protocols.shared.storage.RepoRef;
 import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -141,15 +142,14 @@ class AbstractNpmProtocolFacadePublishTest {
     final var usages = BaseUsages.ofDisk(42L);
     this.publishRuns(PublishKind.NEW_PACKAGE);
     when(this.storageService.writeTarballAndMetadata(
-            REPO_ID, REPO_NAME, payload, BASE_PATH, PACKAGE, VERSION))
+            new RepoRef(REPO_ID, REPO_NAME), payload, BASE_PATH, PACKAGE, VERSION))
         .thenReturn(usages);
 
     this.publish(payload);
 
     verify(this.storageService).processPackagePayload(payload, REPO_NAME);
-    verify(this.storageService, never()).readMetadataBytes(any(), any(), any());
-    verify(this.storageService, never())
-        .discardPublishedVersion(any(), any(), any(), any(), any(), any());
+    verify(this.storageService, never()).readMetadataBytes(any(), any());
+    verify(this.storageService, never()).discardPublishedVersion(any(), any(), any(), any(), any());
     assertThat(this.context.<BaseUsages>getProperty("usages")).isSameAs(usages);
     assertThat(this.context.<String>getProperty("artifactName")).isEqualTo(PACKAGE);
     assertThat(this.context.<String>getProperty("artifactVersion")).isEqualTo(VERSION);
@@ -164,20 +164,19 @@ class AbstractNpmProtocolFacadePublishTest {
     final var merged = new LinkedHashMap<String, Object>();
     final var usages = BaseUsages.ofDisk(7L);
     this.publishRuns(PublishKind.NEW_VERSION);
-    when(this.storageService.readMetadataBytes(REPO_ID, REPO_NAME, BASE_PATH))
+    when(this.storageService.readMetadataBytes(new RepoRef(REPO_ID, REPO_NAME), BASE_PATH))
         .thenReturn(PREVIOUS_METADATA);
     when(this.storageService.processVersionPayload(
-            eq(payload), eq(BASE_PATH), eq(REPO_ID), eq(REPO_NAME), any()))
+            eq(payload), eq(BASE_PATH), eq(new RepoRef(REPO_ID, REPO_NAME)), any()))
         .thenReturn(Pair.of(Pair.of(1L, 2L), merged));
     when(this.storageService.writeTarballAndMetadata(
-            REPO_ID, REPO_NAME, merged, BASE_PATH, PACKAGE, VERSION))
+            new RepoRef(REPO_ID, REPO_NAME), merged, BASE_PATH, PACKAGE, VERSION))
         .thenReturn(usages);
 
     this.publish(payload);
 
     verify(this.storageService, never()).processPackagePayload(any(), any());
-    verify(this.storageService, never())
-        .discardPublishedVersion(any(), any(), any(), any(), any(), any());
+    verify(this.storageService, never()).discardPublishedVersion(any(), any(), any(), any(), any());
     assertThat(this.context.<BaseUsages>getProperty("usages")).isSameAs(usages);
   }
 
@@ -189,16 +188,16 @@ class AbstractNpmProtocolFacadePublishTest {
         new NpmPackageSnapshot(null, PACKAGE, VERSION, Instant.EPOCH, List.of(), Map.of());
     this.publishRuns(PublishKind.NEW_VERSION);
     when(this.packageService.getSnapshot(REPO_ID, null, PACKAGE)).thenReturn(rows);
-    when(this.storageService.processVersionPayload(any(), any(), any(), any(), any()))
+    when(this.storageService.processVersionPayload(any(), any(), any(), any()))
         .thenAnswer(
             invocation -> {
               // Asked for by the storage only when the file cannot be used: nothing is read before.
               verify(this.packageService, never()).getSnapshot(any(), any(), any());
-              assertThat(invocation.<Supplier<NpmPackageSnapshot>>getArgument(4).get())
+              assertThat(invocation.<Supplier<NpmPackageSnapshot>>getArgument(3).get())
                   .isSameAs(rows);
               return Pair.of(Pair.of(1L, 2L), payload);
             });
-    when(this.storageService.writeTarballAndMetadata(any(), any(), any(), any(), any(), any()))
+    when(this.storageService.writeTarballAndMetadata(any(), any(), any(), any(), any()))
         .thenReturn(BaseUsages.ofDisk(1L));
 
     this.publish(payload);
@@ -212,17 +211,19 @@ class AbstractNpmProtocolFacadePublishTest {
   void undoesANewVersionOfAPackageWithoutAMetadataFile() throws Exception {
     final var failure = new IOException("disk full");
     this.publishRuns(PublishKind.NEW_VERSION);
-    when(this.storageService.readMetadataBytes(REPO_ID, REPO_NAME, BASE_PATH)).thenReturn(null);
-    when(this.storageService.processVersionPayload(any(), any(), any(), any(), any()))
+    when(this.storageService.readMetadataBytes(new RepoRef(REPO_ID, REPO_NAME), BASE_PATH))
+        .thenReturn(null);
+    when(this.storageService.processVersionPayload(any(), any(), any(), any()))
         .thenReturn(Pair.of(Pair.of(1L, 2L), new LinkedHashMap<>()));
-    when(this.storageService.writeTarballAndMetadata(any(), any(), any(), any(), any(), any()))
+    when(this.storageService.writeTarballAndMetadata(any(), any(), any(), any(), any()))
         .thenThrow(failure);
 
     assertThatThrownBy(() -> this.publish(payload())).isSameAs(failure);
 
     // No previous file: the discard removes the one the publish wrote.
     verify(this.storageService)
-        .discardPublishedVersion(REPO_ID, REPO_NAME, BASE_PATH, PACKAGE, VERSION, null);
+        .discardPublishedVersion(
+            new RepoRef(REPO_ID, REPO_NAME), BASE_PATH, PACKAGE, VERSION, null);
   }
 
   @Test
@@ -231,18 +232,20 @@ class AbstractNpmProtocolFacadePublishTest {
     final var payload = payload();
     final var usages = BaseUsages.ofDisk(42L);
     this.publishRuns(PublishKind.NEW_VERSION);
-    when(this.storageService.tarballExists(REPO_ID, REPO_NAME, BASE_PATH, PACKAGE, VERSION))
+    when(this.storageService.tarballExists(
+            new RepoRef(REPO_ID, REPO_NAME), BASE_PATH, PACKAGE, VERSION))
         .thenReturn(true);
-    when(this.storageService.processVersionPayload(any(), any(), any(), any(), any()))
+    when(this.storageService.processVersionPayload(any(), any(), any(), any()))
         .thenReturn(Pair.of(Pair.of(1L, 2L), payload));
     when(this.storageService.writeTarballAndMetadata(
-            REPO_ID, REPO_NAME, payload, BASE_PATH, PACKAGE, VERSION))
+            new RepoRef(REPO_ID, REPO_NAME), payload, BASE_PATH, PACKAGE, VERSION))
         .thenReturn(usages);
 
     this.publish(payload);
 
     verify(this.storageService)
-        .writeTarballAndMetadata(REPO_ID, REPO_NAME, payload, BASE_PATH, PACKAGE, VERSION);
+        .writeTarballAndMetadata(
+            new RepoRef(REPO_ID, REPO_NAME), payload, BASE_PATH, PACKAGE, VERSION);
     assertThat(this.context.<BaseUsages>getProperty("usages")).isSameAs(usages);
   }
 
@@ -251,14 +254,14 @@ class AbstractNpmProtocolFacadePublishTest {
   void doesNotLookForAnOrphanWhenReplacing() throws Exception {
     final var payload = payload();
     this.publishRuns(PublishKind.REPLACES_VERSION);
-    when(this.storageService.processVersionPayload(any(), any(), any(), any(), any()))
+    when(this.storageService.processVersionPayload(any(), any(), any(), any()))
         .thenReturn(Pair.of(Pair.of(1L, 2L), payload));
-    when(this.storageService.writeTarballAndMetadata(any(), any(), any(), any(), any(), any()))
+    when(this.storageService.writeTarballAndMetadata(any(), any(), any(), any(), any()))
         .thenReturn(BaseUsages.ofDisk(1L));
 
     this.publish(payload);
 
-    verify(this.storageService, never()).tarballExists(any(), any(), any(), any(), any());
+    verify(this.storageService, never()).tarballExists(any(), any(), any(), any());
   }
 
   @Test
@@ -269,10 +272,8 @@ class AbstractNpmProtocolFacadePublishTest {
 
     assertThatThrownBy(() -> this.publish(payload())).isInstanceOf(AccessNotAllowedException.class);
 
-    verify(this.storageService, never())
-        .writeTarballAndMetadata(any(), any(), any(), any(), any(), any());
-    verify(this.storageService, never())
-        .discardPublishedVersion(any(), any(), any(), any(), any(), any());
+    verify(this.storageService, never()).writeTarballAndMetadata(any(), any(), any(), any(), any());
+    verify(this.storageService, never()).discardPublishedVersion(any(), any(), any(), any(), any());
     assertThat(this.context.<BaseUsages>getProperty("usages")).isNull();
     assertThat(this.context.<String>getProperty("artifactName")).isNull();
   }
@@ -282,13 +283,14 @@ class AbstractNpmProtocolFacadePublishTest {
   void removesTheFilesOfANewPackage() throws Exception {
     final var failure = new IllegalStateException("disk full");
     this.publishRuns(PublishKind.NEW_PACKAGE);
-    when(this.storageService.writeTarballAndMetadata(any(), any(), any(), any(), any(), any()))
+    when(this.storageService.writeTarballAndMetadata(any(), any(), any(), any(), any()))
         .thenThrow(failure);
 
     assertThatThrownBy(() -> this.publish(payload())).isSameAs(failure);
 
     verify(this.storageService)
-        .discardPublishedVersion(REPO_ID, REPO_NAME, BASE_PATH, PACKAGE, VERSION, null);
+        .discardPublishedVersion(
+            new RepoRef(REPO_ID, REPO_NAME), BASE_PATH, PACKAGE, VERSION, null);
     assertThat(this.context.<BaseUsages>getProperty("usages")).isNull();
   }
 
@@ -298,18 +300,18 @@ class AbstractNpmProtocolFacadePublishTest {
   void restoresTheMetadataOfANewVersion() throws Exception {
     final var failure = new IOException("disk full");
     this.publishRuns(PublishKind.NEW_VERSION);
-    when(this.storageService.readMetadataBytes(REPO_ID, REPO_NAME, BASE_PATH))
+    when(this.storageService.readMetadataBytes(new RepoRef(REPO_ID, REPO_NAME), BASE_PATH))
         .thenReturn(PREVIOUS_METADATA);
-    when(this.storageService.processVersionPayload(any(), any(), any(), any(), any()))
+    when(this.storageService.processVersionPayload(any(), any(), any(), any()))
         .thenReturn(Pair.of(Pair.of(1L, 2L), new LinkedHashMap<>()));
-    when(this.storageService.writeTarballAndMetadata(any(), any(), any(), any(), any(), any()))
+    when(this.storageService.writeTarballAndMetadata(any(), any(), any(), any(), any()))
         .thenThrow(failure);
 
     assertThatThrownBy(() -> this.publish(payload())).isSameAs(failure);
 
     verify(this.storageService)
         .discardPublishedVersion(
-            REPO_ID, REPO_NAME, BASE_PATH, PACKAGE, VERSION, PREVIOUS_METADATA);
+            new RepoRef(REPO_ID, REPO_NAME), BASE_PATH, PACKAGE, VERSION, PREVIOUS_METADATA);
   }
 
   @Test
@@ -322,9 +324,9 @@ class AbstractNpmProtocolFacadePublishTest {
     assertThatThrownBy(() -> this.publish(payload())).isInstanceOf(BadRequestException.class);
 
     verify(this.storageService)
-        .discardPublishedVersion(REPO_ID, REPO_NAME, BASE_PATH, PACKAGE, VERSION, null);
-    verify(this.storageService, never())
-        .writeTarballAndMetadata(any(), any(), any(), any(), any(), any());
+        .discardPublishedVersion(
+            new RepoRef(REPO_ID, REPO_NAME), BASE_PATH, PACKAGE, VERSION, null);
+    verify(this.storageService, never()).writeTarballAndMetadata(any(), any(), any(), any(), any());
   }
 
   @Test
@@ -332,16 +334,15 @@ class AbstractNpmProtocolFacadePublishTest {
   void keepsTheFilesOfAReplacedVersion() throws Exception {
     final var failure = new IllegalStateException("disk full");
     this.publishRuns(PublishKind.REPLACES_VERSION);
-    when(this.storageService.processVersionPayload(any(), any(), any(), any(), any()))
+    when(this.storageService.processVersionPayload(any(), any(), any(), any()))
         .thenReturn(Pair.of(Pair.of(1L, 2L), new LinkedHashMap<>()));
-    when(this.storageService.writeTarballAndMetadata(any(), any(), any(), any(), any(), any()))
+    when(this.storageService.writeTarballAndMetadata(any(), any(), any(), any(), any()))
         .thenThrow(failure);
 
     assertThatThrownBy(() -> this.publish(payload())).isSameAs(failure);
 
-    verify(this.storageService, never()).readMetadataBytes(any(), any(), any());
-    verify(this.storageService, never())
-        .discardPublishedVersion(any(), any(), any(), any(), any(), any());
+    verify(this.storageService, never()).readMetadataBytes(any(), any());
+    verify(this.storageService, never()).discardPublishedVersion(any(), any(), any(), any(), any());
   }
 
   @Test
@@ -350,11 +351,11 @@ class AbstractNpmProtocolFacadePublishTest {
     final var failure = new IllegalStateException("disk full");
     final var cleanupFailure = new IOException("trash unavailable");
     this.publishRuns(PublishKind.NEW_PACKAGE);
-    when(this.storageService.writeTarballAndMetadata(any(), any(), any(), any(), any(), any()))
+    when(this.storageService.writeTarballAndMetadata(any(), any(), any(), any(), any()))
         .thenThrow(failure);
     doThrow(cleanupFailure)
         .when(this.storageService)
-        .discardPublishedVersion(any(), any(), any(), any(), any(), any());
+        .discardPublishedVersion(any(), any(), any(), any(), any());
 
     assertThatThrownBy(() -> this.publish(payload()))
         .isSameAs(failure)

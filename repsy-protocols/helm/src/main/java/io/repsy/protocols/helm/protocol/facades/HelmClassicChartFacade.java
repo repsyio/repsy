@@ -31,6 +31,7 @@ import io.repsy.protocols.helm.shared.oci.services.OciManifestService;
 import io.repsy.protocols.helm.shared.storage.services.HelmStorageService;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import io.repsy.protocols.shared.storage.RepoRef;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import io.repsy.protocols.shared.utils.StoredUpload;
 import java.io.IOException;
@@ -83,10 +84,7 @@ final class HelmClassicChartFacade<ID> {
     // (AbstractHelmStorageService#deleteChartFile). Without it, an OCI-only chart is listed in
     // index.yaml but 404s on the classic download route (RPS-1217).
     return this.findChartByArchiveFileName(repoInfo, filename)
-        .flatMap(
-            chart ->
-                this.helmStorageService.findBlob(
-                    repoInfo.getStorageKey(), chart.digest(), repoInfo.getName()))
+        .flatMap(chart -> this.helmStorageService.findBlob(RepoRef.of(repoInfo), chart.digest()))
         .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.CHART_NOT_FOUND));
   }
 

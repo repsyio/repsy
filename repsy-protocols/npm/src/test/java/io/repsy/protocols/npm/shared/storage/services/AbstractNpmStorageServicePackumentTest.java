@@ -24,6 +24,7 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.protocols.npm.shared.npm_package.dtos.NpmPackageSnapshot;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -263,7 +264,7 @@ class AbstractNpmStorageServicePackumentTest {
     this.stored(LEGACY);
 
     final var packument =
-        this.service.getMetadata(REPO_ID, REPO_NAME, null, "demo", false, NO_ROWS);
+        this.service.getMetadata(new RepoRef(REPO_ID, REPO_NAME), null, "demo", false, NO_ROWS);
 
     assertThat(packument).doesNotContainKeys("_attachments", "_from", "_resolved");
     assertThat(versionOf(packument, "1.0.0"))
@@ -276,7 +277,8 @@ class AbstractNpmStorageServicePackumentTest {
   void servedWithoutThemWhenReadWithoutRows() throws Exception {
     this.stored(LEGACY);
 
-    final var packument = this.service.getMetadata(REPO_ID, REPO_NAME, null, "demo", false);
+    final var packument =
+        this.service.getMetadata(new RepoRef(REPO_ID, REPO_NAME), null, "demo", false);
 
     assertThat(packument).doesNotContainKeys("_attachments", "_from", "_resolved");
     assertThat(versionOf(packument, "1.0.0")).doesNotContainKeys("_from", "_resolved");
@@ -302,7 +304,7 @@ class AbstractNpmStorageServicePackumentTest {
 
     final var usages =
         this.service.writeTarballAndMetadata(
-            REPO_ID, REPO_NAME, payload, BASE_PATH, "demo", "1.0.0");
+            new RepoRef(REPO_ID, REPO_NAME), payload, BASE_PATH, "demo", "1.0.0");
 
     final var packument = this.writtenPackument();
     assertThat(packument).doesNotContainKeys("_attachments", "_from", "_resolved");
@@ -339,8 +341,7 @@ class AbstractNpmStorageServicePackumentTest {
     this.recordWrites();
 
     this.service.deprecateVersions(
-        REPO_ID,
-        REPO_NAME,
+        new RepoRef(REPO_ID, REPO_NAME),
         BASE_PATH,
         new ArrayList<>(List.of(Pair.of("1.0.0", ""), Pair.of("1.2.0", "use 1.3"))));
 
@@ -355,9 +356,10 @@ class AbstractNpmStorageServicePackumentTest {
   void emptyDeprecationIsNotServed() throws Exception {
     this.stored(DEPRECATED.replace("\"deprecated\":\"old\"", "\"deprecated\":\"\""));
 
-    final var full = this.service.getMetadata(REPO_ID, REPO_NAME, null, "demo", false, NO_ROWS);
+    final var full =
+        this.service.getMetadata(new RepoRef(REPO_ID, REPO_NAME), null, "demo", false, NO_ROWS);
     final var abbreviated =
-        this.service.getMetadata(REPO_ID, REPO_NAME, null, "demo", true, NO_ROWS);
+        this.service.getMetadata(new RepoRef(REPO_ID, REPO_NAME), null, "demo", true, NO_ROWS);
 
     assertThat(versionOf(full, "1.0.0")).doesNotContainKey("deprecated");
     assertThat(versionOf(abbreviated, "1.0.0")).doesNotContainKey("deprecated");
@@ -398,7 +400,7 @@ class AbstractNpmStorageServicePackumentTest {
     this.stored(WITH_ATTACHMENTS);
     this.recordWrites();
 
-    this.service.deleteDistributionTag(REPO_ID, REPO_NAME, BASE_PATH, "old");
+    this.service.deleteDistributionTag(new RepoRef(REPO_ID, REPO_NAME), BASE_PATH, "old");
 
     this.assertRewrittenWithoutAttachmentsAndUntouched();
     assertThat(this.writtenPackument().get("dist-tags")).isEqualTo(Map.of("latest", "1.1.0"));
@@ -412,7 +414,8 @@ class AbstractNpmStorageServicePackumentTest {
     final var storagePath = StoragePath.of(REPO_ID, "demo/package.json");
 
     final var metadataAndUsage =
-        this.service.addDistributionTag(REPO_ID, REPO_NAME, BASE_PATH, "next", "1.0.0");
+        this.service.addDistributionTag(
+            new RepoRef(REPO_ID, REPO_NAME), BASE_PATH, "next", "1.0.0");
     this.service.writeMetadataToFile(REPO_NAME, metadataAndUsage.getFirst(), storagePath);
 
     this.assertRewrittenWithoutAttachmentsAndUntouched();
@@ -427,7 +430,9 @@ class AbstractNpmStorageServicePackumentTest {
     this.recordWrites();
 
     this.service.deprecateVersions(
-        REPO_ID, REPO_NAME, BASE_PATH, new ArrayList<>(List.of(Pair.of("1.0.0", "old"))));
+        new RepoRef(REPO_ID, REPO_NAME),
+        BASE_PATH,
+        new ArrayList<>(List.of(Pair.of("1.0.0", "old"))));
 
     final var packument = this.writtenPackument();
     assertThat(packument).doesNotContainKey("_attachments");
@@ -444,7 +449,8 @@ class AbstractNpmStorageServicePackumentTest {
     this.stored(WITH_ATTACHMENTS);
     this.recordWrites();
 
-    this.service.deleteVersion(REPO_ID, REPO_NAME, BASE_PATH, "demo", "1.0.0", null, NO_ROWS);
+    this.service.deleteVersion(
+        new RepoRef(REPO_ID, REPO_NAME), BASE_PATH, "demo", "1.0.0", null, NO_ROWS);
 
     final var packument = this.writtenPackument();
     assertThat(packument).doesNotContainKey("_attachments");

@@ -19,6 +19,7 @@ import freemarker.template.TemplateException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.protocols.pypi.shared.python_package.dtos.PackageUploadForm;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.IOException;
 import java.util.Map;
 import java.util.UUID;
@@ -33,7 +34,7 @@ public interface PypiStorageService<ID> {
 
   long deleteRelease(UUID repoId, String packageNormalizedName, String releaseVersion);
 
-  Resource getArchiveFile(UUID repoId, String repoName, String packageName, String fileName);
+  Resource getArchiveFile(RepoRef repo, String packageName, String fileName);
 
   ByteArrayResource getPackageArchiveFileList(
       BaseRepoInfo<ID> repoInfo,
@@ -53,9 +54,8 @@ public interface PypiStorageService<ID> {
    * Removes one archive file and its digest, whichever of the two exists. Used to take back the
    * partly written files of an upload that failed.
    */
-  void discardArchive(UUID repoId, String repoName, String normalizedName, String filename);
+  void discardArchive(RepoRef repo, String normalizedName, String filename);
 
-  BaseUsages writePackageArchive(
-      UUID repoId, String repoName, PackageUploadForm uploadForm, MultipartFile file)
+  BaseUsages writePackageArchive(RepoRef repo, PackageUploadForm uploadForm, MultipartFile file)
       throws IOException;
 }

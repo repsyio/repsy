@@ -28,6 +28,7 @@ import io.repsy.protocols.helm.shared.oci.services.OciManifestService;
 import io.repsy.protocols.helm.shared.storage.services.HelmStorageService;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import io.repsy.protocols.shared.storage.RepoRef;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import io.repsy.protocols.shared.utils.StoredUpload;
 import java.io.IOException;
@@ -109,17 +110,13 @@ final class HelmOciManifestFacade<ID> {
         () -> {
           final var usages =
               this.helmStorageService.saveManifest(
-                  repoInfo.getStorageKey(),
-                  form.getName(),
-                  form.getReference(),
-                  contentBytes,
-                  repoInfo.getName());
+                  RepoRef.of(repoInfo), form.getName(), form.getReference(), contentBytes);
           this.undoManifestFileUnlessCommitted(repoInfo, form, contentBytes, previous, replaced);
           return new HelmOciManifestPushResult(manifest, usages);
         },
         () ->
             this.helmStorageService.deleteManifestFile(
-                repoInfo.getStorageKey(), form.getName(), form.getReference(), repoInfo.getName()),
+                RepoRef.of(repoInfo), form.getName(), form.getReference()),
         replaced,
         log,
         Level.DEBUG,
@@ -189,14 +186,10 @@ final class HelmOciManifestFacade<ID> {
 
       if (previous != null) {
         this.helmStorageService.saveManifest(
-            repoInfo.getStorageKey(),
-            form.getName(),
-            form.getReference(),
-            previous,
-            repoInfo.getName());
+            RepoRef.of(repoInfo), form.getName(), form.getReference(), previous);
       } else if (!replaced) {
         this.helmStorageService.deleteManifestFile(
-            repoInfo.getStorageKey(), form.getName(), form.getReference(), repoInfo.getName());
+            RepoRef.of(repoInfo), form.getName(), form.getReference());
       }
     } catch (final RuntimeException e) {
       log.warn(
@@ -213,7 +206,7 @@ final class HelmOciManifestFacade<ID> {
     try {
       final var resource =
           this.helmStorageService.findManifest(
-              repoInfo.getStorageKey(), form.getName(), form.getReference(), repoInfo.getName());
+              RepoRef.of(repoInfo), form.getName(), form.getReference());
       if (resource.isEmpty() || !resource.get().exists()) {
         return null;
       }

@@ -28,6 +28,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import io.repsy.core.error_handling.exceptions.ErrorOccurredException;
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
@@ -38,6 +39,7 @@ import io.repsy.protocols.cargo.shared.crate.dtos.CratePublishRequest;
 import io.repsy.protocols.cargo.shared.crate.services.CargoCrateService;
 import io.repsy.protocols.cargo.shared.storage.services.CargoStorageService;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import io.repsy.protocols.shared.storage.RepoRef;
 import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -206,7 +208,7 @@ class AbstractCargoProtocolFacadeTest {
     void stubWriteSide() throws Exception {
       lenient().when(objectMapper.writeValueAsString(any())).thenReturn("{}");
       lenient()
-          .when(storageService.writeCrateAndIndex(any(), any(), any(), any(), any(), any()))
+          .when(storageService.writeCrateAndIndex(any(), any(), any(), any(), any()))
           .thenReturn(usages);
       // Like the real service: the rows first, then the files through the writer it is handed.
       lenient()
@@ -223,11 +225,11 @@ class AbstractCargoProtocolFacadeTest {
           .thenReturn(minimalRequest("my_crate", "1.0.0"));
 
       final var stored = new AtomicReference<byte[]>();
-      when(storageService.writeCrateAndIndex(any(), any(), any(), any(), any(), any()))
+      when(storageService.writeCrateAndIndex(any(), any(), any(), any(), any()))
           .thenAnswer(
               invocation -> {
                 // The stream is closed once the write returns, so it is read while it is open.
-                stored.set(invocation.<InputStream>getArgument(4).readAllBytes());
+                stored.set(invocation.<InputStream>getArgument(3).readAllBytes());
                 return usages;
               });
 
@@ -236,7 +238,7 @@ class AbstractCargoProtocolFacadeTest {
       verify(crateService).publish(eq(repoInfo), any(CratePublishRequest.class), any(), any());
       verify(storageService)
           .writeCrateAndIndex(
-              eq(REPO_ID), eq(REPO_NAME), eq("my_crate"), eq("1.0.0"), any(), any());
+              eq(new RepoRef(REPO_ID, REPO_NAME)), eq("my_crate"), eq("1.0.0"), any(), any());
       assertThat(stored.get()).isEqualTo(crateBytes);
     }
 
@@ -341,7 +343,7 @@ class AbstractCargoProtocolFacadeTest {
       facade.publish(
           context("/api/v1/crates/new"), stream(publishPayload("{}", minimalCrateBytes())));
 
-      verify(storageService).writeCrateAndIndex(any(), any(), eq("my_crate"), any(), any(), any());
+      verify(storageService).writeCrateAndIndex(any(), eq("my_crate"), any(), any(), any());
     }
 
     @Test
@@ -674,8 +676,8 @@ class AbstractCargoProtocolFacadeTest {
           .isInstanceOf(ItemAlreadyExistException.class)
           .hasMessage("crateVersionAlreadyExists");
 
-      verify(storageService, never()).deleteCrate(any(), any(), any(), any());
-      verify(storageService, never()).writeCrateAndIndex(any(), any(), any(), any(), any(), any());
+      verify(storageService, never()).deleteCrate(any(), any(), any());
+      verify(storageService, never()).writeCrateAndIndex(any(), any(), any(), any(), any());
     }
 
     @Test
@@ -683,7 +685,7 @@ class AbstractCargoProtocolFacadeTest {
     void removesThePartialCrateWhenTheWriteFails() throws Exception {
       when(objectMapper.readValue(any(byte[].class), eq(CratePublishRequest.class)))
           .thenReturn(minimalRequest("my_crate", "1.0.0"));
-      when(storageService.writeCrateAndIndex(any(), any(), any(), any(), any(), any()))
+      when(storageService.writeCrateAndIndex(any(), any(), any(), any(), any()))
           .thenThrow(new IOException("disk full"));
       final var ctx = context("/api/v1/crates/new");
       final var body = stream(publishPayload("{}", minimalCrateBytes()));
@@ -692,7 +694,7 @@ class AbstractCargoProtocolFacadeTest {
           .isInstanceOf(IOException.class)
           .hasMessage("disk full");
 
-      verify(storageService).deleteCrate(REPO_ID, REPO_NAME, "my_crate", "1.0.0");
+      verify(storageService).deleteCrate(new RepoRef(REPO_ID, REPO_NAME), "my_crate", "1.0.0");
       assertThat(ctx.<Object>getProperty("usages")).isNull();
     }
 
@@ -701,7 +703,7 @@ class AbstractCargoProtocolFacadeTest {
     void removesThePartialCrateWhenTheWriteFailsUnchecked() throws Exception {
       when(objectMapper.readValue(any(byte[].class), eq(CratePublishRequest.class)))
           .thenReturn(minimalRequest("my_crate", "1.0.0"));
-      when(storageService.writeCrateAndIndex(any(), any(), any(), any(), any(), any()))
+      when(storageService.writeCrateAndIndex(any(), any(), any(), any(), any()))
           .thenThrow(new IllegalStateException("storage went away"));
 
       assertThatThrownBy(
@@ -711,7 +713,7 @@ class AbstractCargoProtocolFacadeTest {
                       stream(publishPayload("{}", minimalCrateBytes()))))
           .isInstanceOf(IllegalStateException.class);
 
-      verify(storageService).deleteCrate(REPO_ID, REPO_NAME, "my_crate", "1.0.0");
+      verify(storageService).deleteCrate(new RepoRef(REPO_ID, REPO_NAME), "my_crate", "1.0.0");
     }
 
     @Test
@@ -720,10 +722,11 @@ class AbstractCargoProtocolFacadeTest {
       when(objectMapper.readValue(any(byte[].class), eq(CratePublishRequest.class)))
           .thenReturn(minimalRequest("my_crate", "1.0.0"));
       final var writeFailure = new IOException("disk full");
-      final var cleanupFailure = new NoSuchFileException("my_crate-1.0.0.crate");
-      when(storageService.writeCrateAndIndex(any(), any(), any(), any(), any(), any()))
+      final var cleanupFailure =
+          new ErrorOccurredException(new NoSuchFileException("my_crate-1.0.0.crate"));
+      when(storageService.writeCrateAndIndex(any(), any(), any(), any(), any()))
           .thenThrow(writeFailure);
-      when(storageService.deleteCrate(any(), any(), any(), any())).thenThrow(cleanupFailure);
+      when(storageService.deleteCrate(any(), any(), any())).thenThrow(cleanupFailure);
 
       assertThatThrownBy(
               () ->
@@ -743,7 +746,7 @@ class AbstractCargoProtocolFacadeTest {
 
       facade.publish(ctx, stream(publishPayload("{}", minimalCrateBytes())));
 
-      verify(storageService, never()).deleteCrate(any(), any(), any(), any());
+      verify(storageService, never()).deleteCrate(any(), any(), any());
       assertThat(ctx.<Object>getProperty("usages")).isSameAs(usages);
     }
 
@@ -953,7 +956,7 @@ class AbstractCargoProtocolFacadeTest {
             .thenReturn(request);
         lenient().when(objectMapper.writeValueAsString(any())).thenReturn("{}");
         lenient()
-            .when(storageService.writeCrateAndIndex(any(), any(), any(), any(), any(), any()))
+            .when(storageService.writeCrateAndIndex(any(), any(), any(), any(), any()))
             .thenReturn(usages);
         final var payload = publishPayload("{}", minimalCrateBytes());
         assertThatCode(() -> facade.publish(context("/api/v1/crates/new"), stream(payload)))
@@ -1064,7 +1067,8 @@ class AbstractCargoProtocolFacadeTest {
     @Test
     @DisplayName("returns the resource from storage and increments the download count")
     void downloadsAndIncrementsCount() {
-      when(storageService.getCrate(REPO_ID, REPO_NAME, "my_crate", "1.0.0")).thenReturn(resource);
+      when(storageService.getCrate(new RepoRef(REPO_ID, REPO_NAME), "my_crate", "1.0.0"))
+          .thenReturn(resource);
 
       final var result = facade.download(context("/api/v1/crates/my_crate/1.0.0/download"));
 
@@ -1075,17 +1079,18 @@ class AbstractCargoProtocolFacadeTest {
     @Test
     @DisplayName("normalises hyphenated crate name before passing to storage")
     void normalisesNameInDownloadPath() {
-      when(storageService.getCrate(REPO_ID, REPO_NAME, "my_crate", "2.0.0")).thenReturn(resource);
+      when(storageService.getCrate(new RepoRef(REPO_ID, REPO_NAME), "my_crate", "2.0.0"))
+          .thenReturn(resource);
 
       facade.download(context("/api/v1/crates/My-Crate/2.0.0/download"));
 
-      verify(storageService).getCrate(REPO_ID, REPO_NAME, "my_crate", "2.0.0");
+      verify(storageService).getCrate(new RepoRef(REPO_ID, REPO_NAME), "my_crate", "2.0.0");
     }
 
     @Test
     @DisplayName("passes correct version to incrementDownloadCount")
     void incrementsCountWithCorrectVersion() {
-      when(storageService.getCrate(any(), any(), any(), eq("0.5.1"))).thenReturn(resource);
+      when(storageService.getCrate(any(), any(), eq("0.5.1"))).thenReturn(resource);
 
       facade.download(context("/api/v1/crates/some_crate/0.5.1/download"));
 
@@ -1102,7 +1107,8 @@ class AbstractCargoProtocolFacadeTest {
     @Test
     @DisplayName("returns the resource from storage and counts no download")
     void resolvesWithoutCounting() {
-      when(storageService.getCrate(REPO_ID, REPO_NAME, "my_crate", "1.0.0")).thenReturn(resource);
+      when(storageService.getCrate(new RepoRef(REPO_ID, REPO_NAME), "my_crate", "1.0.0"))
+          .thenReturn(resource);
 
       final var result = facade.getCrate(context("/api/v1/crates/my_crate/1.0.0/download"));
 

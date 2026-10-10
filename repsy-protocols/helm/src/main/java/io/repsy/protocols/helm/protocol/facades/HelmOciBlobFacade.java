@@ -24,6 +24,7 @@ import io.repsy.protocols.helm.shared.oci.services.OciBlobService;
 import io.repsy.protocols.helm.shared.storage.services.HelmStorageService;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import io.repsy.protocols.shared.storage.RepoRef;
 import io.repsy.protocols.shared.utils.BlobDigests;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import java.io.IOException;
@@ -55,17 +56,15 @@ final class HelmOciBlobFacade<ID> {
       throws IOException {
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     final var usages =
-        this.helmStorageService.saveBlobChunk(
-            repoInfo.getStorageKey(), uploadId, stream, repoInfo.getName());
+        this.helmStorageService.saveBlobChunk(RepoRef.of(repoInfo), uploadId, stream);
     ProtocolContextUtils.addUsages(context, usages);
-    return this.helmStorageService.getBlobSize(
-        repoInfo.getStorageKey(), uploadId, repoInfo.getName());
+    return this.helmStorageService.getBlobSize(RepoRef.of(repoInfo), uploadId);
   }
 
   long getUploadSize(final ProtocolContext context, final UUID uploadId) throws IOException {
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     return this.helmStorageService
-        .findBlob(repoInfo.getStorageKey(), uploadId.toString(), repoInfo.getName())
+        .findBlob(RepoRef.of(repoInfo), uploadId.toString())
         .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.BLOB_NOT_FOUND))
         .contentLength();
   }
@@ -82,8 +81,7 @@ final class HelmOciBlobFacade<ID> {
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     if (contentLength > 0) {
       final var chunkUsages =
-          this.helmStorageService.saveBlobChunk(
-              repoInfo.getStorageKey(), uploadId, stream, repoInfo.getName());
+          this.helmStorageService.saveBlobChunk(RepoRef.of(repoInfo), uploadId, stream);
       ProtocolContextUtils.addUsages(context, chunkUsages);
     }
     this.verifyUploadDigest(repoInfo, uploadId, digest);
@@ -94,7 +92,7 @@ final class HelmOciBlobFacade<ID> {
     ProtocolContextUtils.addUsages(context, finalizeUsages);
     final var resource =
         this.helmStorageService
-            .findBlob(repoInfo.getStorageKey(), digest, repoInfo.getName())
+            .findBlob(RepoRef.of(repoInfo), digest)
             .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.BLOB_NOT_FOUND));
     final var form =
         HelmOciBlobForm.builder()
@@ -111,7 +109,7 @@ final class HelmOciBlobFacade<ID> {
       throws IOException {
     final var upload =
         this.helmStorageService
-            .findBlob(repoInfo.getStorageKey(), uploadId.toString(), repoInfo.getName())
+            .findBlob(RepoRef.of(repoInfo), uploadId.toString())
             .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.BLOB_NOT_FOUND));
 
     if (!BlobDigests.matches(digest, upload.getInputStream())) {
@@ -125,7 +123,7 @@ final class HelmOciBlobFacade<ID> {
     if (blobOpt.isEmpty()) {
       return Optional.empty();
     }
-    if (!this.helmStorageService.blobExists(repoInfo.getStorageKey(), digest, repoInfo.getName())) {
+    if (!this.helmStorageService.blobExists(RepoRef.of(repoInfo), digest)) {
       return Optional.empty();
     }
     return blobOpt;
@@ -134,7 +132,7 @@ final class HelmOciBlobFacade<ID> {
   Resource getBlob(final ProtocolContext context, final String digest) throws IOException {
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     return this.helmStorageService
-        .findBlob(repoInfo.getStorageKey(), digest, repoInfo.getName())
+        .findBlob(RepoRef.of(repoInfo), digest)
         .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.BLOB_NOT_FOUND));
   }
 

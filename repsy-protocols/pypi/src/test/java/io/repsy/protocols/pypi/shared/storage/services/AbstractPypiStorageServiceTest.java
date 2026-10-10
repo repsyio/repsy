@@ -31,6 +31,7 @@ import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.protocols.pypi.shared.python_package.dtos.PackageUploadForm;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -125,7 +126,7 @@ class AbstractPypiStorageServiceTest {
       when(storageStrategy.get(any(StoragePath.class), eq(REPO_NAME)))
           .thenReturn(Optional.of(new ByteArrayResource(new byte[] {1})));
 
-      service.discardArchive(REPO_ID, REPO_NAME, NORMALIZED_NAME, FILENAME);
+      service.discardArchive(new RepoRef(REPO_ID, REPO_NAME), NORMALIZED_NAME, FILENAME);
 
       verify(storageStrategy).delete(path(ARCHIVE_PATH));
       verify(storageStrategy).delete(path(DIGEST_PATH));
@@ -138,7 +139,7 @@ class AbstractPypiStorageServiceTest {
           .thenReturn(Optional.of(new ByteArrayResource(new byte[] {1})));
       when(storageStrategy.get(path(DIGEST_PATH), eq(REPO_NAME))).thenReturn(Optional.empty());
 
-      service.discardArchive(REPO_ID, REPO_NAME, NORMALIZED_NAME, FILENAME);
+      service.discardArchive(new RepoRef(REPO_ID, REPO_NAME), NORMALIZED_NAME, FILENAME);
 
       verify(storageStrategy).delete(path(ARCHIVE_PATH));
       verify(storageStrategy, never()).delete(path(DIGEST_PATH));
@@ -149,7 +150,7 @@ class AbstractPypiStorageServiceTest {
     void doesNothingWhenNothingWasWritten() {
       when(storageStrategy.get(any(StoragePath.class), eq(REPO_NAME))).thenReturn(Optional.empty());
 
-      service.discardArchive(REPO_ID, REPO_NAME, NORMALIZED_NAME, FILENAME);
+      service.discardArchive(new RepoRef(REPO_ID, REPO_NAME), NORMALIZED_NAME, FILENAME);
 
       verify(storageStrategy, never()).delete(any(StoragePath.class));
     }
@@ -304,7 +305,8 @@ class AbstractPypiStorageServiceTest {
                 return BaseUsages.ofDisk(8);
               });
 
-      final var usages = service.writePackageArchive(REPO_ID, REPO_NAME, uploadForm, file);
+      final var usages =
+          service.writePackageArchive(new RepoRef(REPO_ID, REPO_NAME), uploadForm, file);
 
       assertThat(usages.getDiskUsage()).isEqualTo(108);
       assertThat(new String(sidecarBytes[0], StandardCharsets.UTF_8)).isEqualTo("cafef00d");
@@ -321,7 +323,8 @@ class AbstractPypiStorageServiceTest {
       when(storageStrategy.write(eq(REPO_NAME), any(StoragePath.class), any(InputStream.class)))
           .thenReturn(BaseUsages.ofDisk(100));
 
-      assertThatThrownBy(() -> service.writePackageArchive(REPO_ID, REPO_NAME, uploadForm, file))
+      assertThatThrownBy(
+              () -> service.writePackageArchive(new RepoRef(REPO_ID, REPO_NAME), uploadForm, file))
           .isInstanceOf(NullPointerException.class);
     }
   }

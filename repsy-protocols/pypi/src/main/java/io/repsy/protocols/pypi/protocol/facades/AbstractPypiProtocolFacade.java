@@ -32,6 +32,7 @@ import io.repsy.protocols.pypi.shared.utils.PypiPublishLimits;
 import io.repsy.protocols.pypi.shared.utils.ReleaseVersion;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import io.repsy.protocols.shared.storage.RepoRef;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import io.repsy.protocols.shared.utils.StoredUpload;
 import java.io.IOException;
@@ -116,8 +117,7 @@ public abstract class AbstractPypiProtocolFacade<ID> implements PypiProtocolFaca
 
     final var repoInfo = ProtocolContextUtils.getRepoInfo(context);
 
-    return this.pypiStorageService.getArchiveFile(
-        repoInfo.getStorageKey(), repoInfo.getName(), packageName, fileName);
+    return this.pypiStorageService.getArchiveFile(RepoRef.of(repoInfo), packageName, fileName);
   }
 
   @Override
@@ -218,13 +218,10 @@ public abstract class AbstractPypiProtocolFacade<ID> implements PypiProtocolFaca
     }
 
     return StoredUpload.storeOrDiscard(
-        () ->
-            this.pypiStorageService.writePackageArchive(
-                repoInfo.getStorageKey(), repoInfo.getName(), uploadForm, file),
+        () -> this.pypiStorageService.writePackageArchive(RepoRef.of(repoInfo), uploadForm, file),
         () ->
             this.pypiStorageService.discardArchive(
-                repoInfo.getStorageKey(),
-                repoInfo.getName(),
+                RepoRef.of(repoInfo),
                 uploadForm.getNormalizedName(),
                 Objects.requireNonNull(file.getOriginalFilename())),
         replacesExisting,

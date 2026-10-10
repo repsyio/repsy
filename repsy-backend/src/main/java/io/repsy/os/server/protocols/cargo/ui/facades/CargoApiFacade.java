@@ -30,6 +30,7 @@ import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.cargo.protocol.utils.CrateUtils;
 import io.repsy.protocols.cargo.shared.storage.services.CargoStorageService;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
@@ -112,9 +113,7 @@ public class CargoApiFacade implements ProtocolApiFacade {
 
     this.cargoCrateService.deleteCrate(repoInfo, normalizedName);
 
-    final var usage =
-        this.cargoStorageService.deletePackage(
-            repoInfo.getStorageKey(), repoInfo.getName(), normalizedName);
+    final var usage = this.cargoStorageService.deletePackage(RepoRef.of(repoInfo), normalizedName);
 
     return BaseUsages.builder().diskUsage(-1L * usage).build();
   }
@@ -139,8 +138,7 @@ public class CargoApiFacade implements ProtocolApiFacade {
 
     if (remainingEntries.isEmpty()) {
       final var usage =
-          this.cargoStorageService.deletePackage(
-              repoInfo.getStorageKey(), repoInfo.getName(), normalizedName);
+          this.cargoStorageService.deletePackage(RepoRef.of(repoInfo), normalizedName);
       return BaseUsages.builder().diskUsage(-1L * usage).build();
     }
 
@@ -157,12 +155,10 @@ public class CargoApiFacade implements ProtocolApiFacade {
             .toList();
 
     final var indexDelta =
-        this.cargoStorageService.rewriteIndex(
-            repoInfo.getStorageKey(), repoInfo.getName(), normalizedName, jsonLines);
+        this.cargoStorageService.rewriteIndex(RepoRef.of(repoInfo), normalizedName, jsonLines);
 
     final var crateFreed =
-        this.cargoStorageService.deleteCrate(
-            repoInfo.getStorageKey(), repoInfo.getName(), normalizedName, vers);
+        this.cargoStorageService.deleteCrate(RepoRef.of(repoInfo), normalizedName, vers);
 
     return BaseUsages.builder().diskUsage(-1L * crateFreed + indexDelta).build();
   }

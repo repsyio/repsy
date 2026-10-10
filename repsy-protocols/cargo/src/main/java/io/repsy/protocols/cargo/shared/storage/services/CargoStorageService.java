@@ -16,6 +16,7 @@
 package io.repsy.protocols.cargo.shared.storage.services;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
@@ -31,24 +32,22 @@ public interface CargoStorageService {
    * crateStream} is read to the end and closed by this call.
    */
   BaseUsages writeCrateAndIndex(
-      UUID repoId,
-      String repoName,
+      RepoRef repo,
       String crateName,
       String versionName,
       InputStream crateStream,
       String indexJsonLine)
       throws IOException;
 
-  Resource getCrate(UUID repoId, String repoName, String crateName, String versionName);
+  Resource getCrate(RepoRef repo, String crateName, String versionName);
 
-  long deleteCrate(UUID repoId, String repoName, String crateName, String versionName);
+  long deleteCrate(RepoRef repo, String crateName, String versionName);
 
-  long deletePackage(UUID repoId, String repoName, String crateName);
+  long deletePackage(RepoRef repo, String crateName);
 
   void deleteRepo(UUID repoId);
 
-  long rewriteIndex(UUID repoId, String repoName, String crateName, List<String> jsonLines)
-      throws IOException;
+  long rewriteIndex(RepoRef repo, String crateName, List<String> jsonLines) throws IOException;
 
   void createRepo(UUID repoId);
 

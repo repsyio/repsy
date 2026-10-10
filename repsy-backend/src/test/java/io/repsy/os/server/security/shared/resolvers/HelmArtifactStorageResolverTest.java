@@ -23,6 +23,7 @@ import static org.mockito.Mockito.when;
 import io.repsy.os.server.protocols.helm.shared.chart.services.HelmChartService;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartInfo;
 import io.repsy.protocols.helm.shared.storage.services.HelmStorageService;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.IOException;
 import java.util.Optional;
 import java.util.UUID;
@@ -72,7 +73,7 @@ class HelmArtifactStorageResolverTest {
     when(this.storage.getChartRelativePath("payments", "1.0.0")).thenReturn(CLASSIC);
     when(this.storage.findResource(any(), any())).thenReturn(Optional.empty());
     this.givenChartRow();
-    when(this.storage.blobExists(this.repoId, DIGEST, "repo")).thenReturn(true);
+    when(this.storage.blobExists(new RepoRef(this.repoId, "repo"), DIGEST)).thenReturn(true);
 
     assertThat(this.resolver().resolve(this.repoId, "repo", "payments", "1.0.0"))
         .contains("oci/blobs/" + DIGEST);
@@ -84,7 +85,7 @@ class HelmArtifactStorageResolverTest {
     when(this.storage.getChartRelativePath("payments", "1.0.0")).thenReturn(CLASSIC);
     when(this.storage.findResource(any(), any())).thenReturn(Optional.empty());
     this.givenChartRow();
-    when(this.storage.blobExists(this.repoId, DIGEST, "repo")).thenReturn(false);
+    when(this.storage.blobExists(new RepoRef(this.repoId, "repo"), DIGEST)).thenReturn(false);
 
     assertThat(this.resolver().resolve(this.repoId, "repo", "payments", "1.0.0")).isEmpty();
   }

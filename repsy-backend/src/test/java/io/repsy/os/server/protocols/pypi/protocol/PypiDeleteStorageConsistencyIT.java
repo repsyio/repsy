@@ -261,7 +261,7 @@ class PypiDeleteStorageConsistencyIT extends AbstractIT {
     doAnswer(invocation -> this.passGate(reached, gate, invocation))
         .doAnswer(InvocationOnMock::callRealMethod)
         .when(this.pypiStorageService)
-        .writePackageArchive(any(), any(), any(), any());
+        .writePackageArchive(any(), any(), any());
 
     return gate;
   }

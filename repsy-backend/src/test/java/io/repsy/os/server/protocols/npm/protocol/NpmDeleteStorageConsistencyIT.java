@@ -490,7 +490,7 @@ class NpmDeleteStorageConsistencyIT extends AbstractIT {
     doAnswer(invocation -> this.passGate(reached, gate, invocation))
         .doAnswer(InvocationOnMock::callRealMethod)
         .when(this.npmStorageService)
-        .writeTarballAndMetadata(any(), any(), any(), any(), any(), any());
+        .writeTarballAndMetadata(any(), any(), any(), any(), any());
 
     return gate;
   }

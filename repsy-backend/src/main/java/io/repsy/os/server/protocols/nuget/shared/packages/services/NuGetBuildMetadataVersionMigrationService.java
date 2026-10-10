@@ -21,6 +21,7 @@ import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetBuil
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageVersionRepository;
 import io.repsy.os.server.security.scan.repositories.VulnerabilityScanRepository;
 import io.repsy.protocols.nuget.shared.storage.services.NuGetStorageService;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -136,7 +137,7 @@ public class NuGetBuildMetadataVersionMigrationService {
 
     final var filesFound =
         this.nuGetStorageService.copyToCanonicalVersion(
-            legacy.repoId(), packageId, legacy.version());
+            new RepoRef(legacy.repoId(), legacy.repoName()), packageId, legacy.version());
     if (!filesFound) {
       log.warn(
           "NuGet package {} {} of repo {} has no file to move. Only its version is migrated.",
@@ -166,7 +167,7 @@ public class NuGetBuildMetadataVersionMigrationService {
   private void deleteLegacyFiles(final NuGetBuildMetadataVersion legacy, final String packageId) {
     try {
       this.nuGetStorageService.deleteBuildMetadataVersion(
-          legacy.repoId(), packageId, legacy.version());
+          new RepoRef(legacy.repoId(), legacy.repoName()), packageId, legacy.version());
     } catch (final IOException | RuntimeException e) {
       log.warn(
           "Could not remove the files NuGet package {} {} of repo {} was moved out of",

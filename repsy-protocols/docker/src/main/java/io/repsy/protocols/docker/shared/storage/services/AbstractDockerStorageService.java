@@ -23,6 +23,7 @@ import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.storage.AbstractArtifactStorageService;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Paths;
@@ -132,11 +133,11 @@ public abstract class AbstractDockerStorageService<ID> extends AbstractArtifactS
   }
 
   @Override
-  public long deleteBlobFile(final UUID repoId, final String repoName, final String fileName) {
+  public long deleteBlobFile(final RepoRef repo, final String fileName) {
 
-    final var storagePath = StoragePath.of(repoId, Paths.get(BLOBS_PATH, fileName).toString());
+    final var storagePath = StoragePath.of(repo.id(), Paths.get(BLOBS_PATH, fileName).toString());
 
-    return this.deleteFileWithUsage(storagePath, repoName);
+    return this.deleteFileWithUsage(storagePath, repo.name());
   }
 
   @Override

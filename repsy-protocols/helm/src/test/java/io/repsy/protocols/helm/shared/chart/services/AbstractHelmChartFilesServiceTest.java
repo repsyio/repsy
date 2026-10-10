@@ -29,6 +29,7 @@ import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestInfo;
 import io.repsy.protocols.helm.shared.oci.services.OciBlobService;
 import io.repsy.protocols.helm.shared.oci.services.OciManifestService;
 import io.repsy.protocols.helm.shared.storage.services.HelmStorageService;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Stream;
@@ -118,15 +119,18 @@ class AbstractHelmChartFilesServiceTest {
     void deletesTheChartsOwnFilesAndItsUnsharedBlobs() throws Exception {
       final var content = manifestJson(CONFIG, ARCHIVE);
       final var tags = List.of(manifest("1.0.0", content), manifest("stable", content));
-      when(helmStorageService.deleteChartFile(REPO_ID, "payments-1.0.0.tgz", ARCHIVE, REPO_NAME))
+      when(helmStorageService.deleteChartFile(
+              new RepoRef(REPO_ID, REPO_NAME), "payments-1.0.0.tgz", ARCHIVE))
           .thenReturn(1000L);
-      when(helmStorageService.deleteManifestFile(REPO_ID, "payments", "1.0.0", REPO_NAME))
+      when(helmStorageService.deleteManifestFile(
+              new RepoRef(REPO_ID, REPO_NAME), "payments", "1.0.0"))
           .thenReturn(300L);
-      when(helmStorageService.deleteManifestFile(REPO_ID, "payments", "stable", REPO_NAME))
+      when(helmStorageService.deleteManifestFile(
+              new RepoRef(REPO_ID, REPO_NAME), "payments", "stable"))
           .thenReturn(300L);
       when(chartService.existsByRepoIdAndDigest(REPO_ID, ARCHIVE)).thenReturn(false);
       remainingManifests();
-      when(helmStorageService.deleteBlob(REPO_ID, CONFIG, REPO_NAME)).thenReturn(2L);
+      when(helmStorageService.deleteBlob(new RepoRef(REPO_ID, REPO_NAME), CONFIG)).thenReturn(2L);
 
       final var freed =
           service.deleteFiles(
@@ -139,7 +143,7 @@ class AbstractHelmChartFilesServiceTest {
       verify(ociBlobService).deleteByRepoIdAndDigest(REPO_ID, ARCHIVE);
       verify(ociBlobService).deleteByRepoIdAndDigest(REPO_ID, CONFIG);
       // The archive is deleted with the chart, never as a shared blob.
-      verify(helmStorageService, never()).deleteBlob(REPO_ID, ARCHIVE, REPO_NAME);
+      verify(helmStorageService, never()).deleteBlob(new RepoRef(REPO_ID, REPO_NAME), ARCHIVE);
     }
 
     @Test
@@ -147,7 +151,8 @@ class AbstractHelmChartFilesServiceTest {
     void keepsABlobAnotherManifestReferences() throws Exception {
       final var tags = List.of(manifest("1.0.0", manifestJson(CONFIG, ARCHIVE, PROVENANCE)));
       remainingManifests("{\"config\":{\"digest\":\"" + CONFIG + "\"}}");
-      when(helmStorageService.deleteBlob(REPO_ID, PROVENANCE, REPO_NAME)).thenReturn(40L);
+      when(helmStorageService.deleteBlob(new RepoRef(REPO_ID, REPO_NAME), PROVENANCE))
+          .thenReturn(40L);
 
       final var freed =
           service.deleteFiles(
@@ -157,7 +162,7 @@ class AbstractHelmChartFilesServiceTest {
               List.of(new DeletedChart("payments", "1.0.0", ARCHIVE, tags)));
 
       assertThat(freed).isEqualTo(40L);
-      verify(helmStorageService, never()).deleteBlob(REPO_ID, CONFIG, REPO_NAME);
+      verify(helmStorageService, never()).deleteBlob(new RepoRef(REPO_ID, REPO_NAME), CONFIG);
       verify(ociBlobService, never()).deleteByRepoIdAndDigest(REPO_ID, CONFIG);
       verify(ociBlobService).deleteByRepoIdAndDigest(REPO_ID, PROVENANCE);
     }
@@ -172,7 +177,7 @@ class AbstractHelmChartFilesServiceTest {
       when(chartService.existsByRepoIdAndDigest(eq(REPO_ID), anyString()))
           .thenAnswer(invocation -> retagged.equals(invocation.getArgument(1)));
       remainingManifests();
-      when(helmStorageService.deleteBlob(REPO_ID, CONFIG, REPO_NAME)).thenReturn(2L);
+      when(helmStorageService.deleteBlob(new RepoRef(REPO_ID, REPO_NAME), CONFIG)).thenReturn(2L);
 
       final var freed =
           service.deleteFiles(
@@ -182,7 +187,7 @@ class AbstractHelmChartFilesServiceTest {
               List.of(new DeletedChart("payments", "1.0.0", ARCHIVE, tags)));
 
       assertThat(freed).isEqualTo(2L);
-      verify(helmStorageService, never()).deleteBlob(REPO_ID, retagged, REPO_NAME);
+      verify(helmStorageService, never()).deleteBlob(new RepoRef(REPO_ID, REPO_NAME), retagged);
       verify(ociBlobService, never()).deleteByRepoIdAndDigest(REPO_ID, retagged);
     }
 
@@ -193,7 +198,7 @@ class AbstractHelmChartFilesServiceTest {
       final var first = List.of(manifest("1.0.0", manifestJson(CONFIG, ARCHIVE)));
       final var second = List.of(manifest("1.1.0", manifestJson(CONFIG, other)));
       remainingManifests();
-      when(helmStorageService.deleteBlob(REPO_ID, CONFIG, REPO_NAME)).thenReturn(2L);
+      when(helmStorageService.deleteBlob(new RepoRef(REPO_ID, REPO_NAME), CONFIG)).thenReturn(2L);
 
       final var freed =
           service.deleteFiles(
@@ -205,7 +210,7 @@ class AbstractHelmChartFilesServiceTest {
                   new DeletedChart("payments", "1.1.0", other, second)));
 
       assertThat(freed).isEqualTo(2L);
-      verify(helmStorageService).deleteBlob(REPO_ID, CONFIG, REPO_NAME);
+      verify(helmStorageService).deleteBlob(new RepoRef(REPO_ID, REPO_NAME), CONFIG);
     }
 
     @Test
@@ -227,7 +232,8 @@ class AbstractHelmChartFilesServiceTest {
     @Test
     @DisplayName("a chart uploaded the classic way has no manifests, so only its archive goes")
     void classicChartHasNoBlobsToRelease() throws Exception {
-      when(helmStorageService.deleteChartFile(REPO_ID, "payments-1.0.0.tgz", ARCHIVE, REPO_NAME))
+      when(helmStorageService.deleteChartFile(
+              new RepoRef(REPO_ID, REPO_NAME), "payments-1.0.0.tgz", ARCHIVE))
           .thenReturn(900L);
 
       final var freed =

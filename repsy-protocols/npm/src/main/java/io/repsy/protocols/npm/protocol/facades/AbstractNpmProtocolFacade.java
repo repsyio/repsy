@@ -34,6 +34,7 @@ import io.repsy.protocols.npm.shared.utils.NpmPublishLimits;
 import io.repsy.protocols.npm.shared.utils.NpmRevPath;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import io.repsy.protocols.shared.storage.RepoRef;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import io.repsy.protocols.shared.utils.StoredUpload;
 import java.io.IOException;
@@ -95,8 +96,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
 
     final var metadata =
         this.npmStorageService.readMetadataOrRebuild(
-            repoInfo.getStorageKey(),
-            repoInfo.getName(),
+            RepoRef.of(repoInfo),
             packageBasePath,
             this.snapshotOf(repoInfo, scopeName, packageName));
     final var unpublishedVersion = NpmPayloadUtils.findUnpublishedVersion(metadata, payload);
@@ -153,7 +153,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
     final var repoInfo = ProtocolContextUtils.getRepoInfo(context);
 
     return this.npmStorageService.getTarball(
-        repoInfo.getStorageKey(), repoInfo.getName(), scopeName, packageName, filename);
+        RepoRef.of(repoInfo), scopeName, packageName, filename);
   }
 
   @Override
@@ -201,8 +201,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
     // A package the database has and storage lost is served from the rows (RPS-1300): it is what a
     // client reads before it unpublishes, deprecates or tags the package.
     return this.npmStorageService.getMetadata(
-        repoInfo.getStorageKey(),
-        repoInfo.getName(),
+        RepoRef.of(repoInfo),
         scopeName,
         packageName,
         isAbbreviated,
@@ -260,11 +259,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
                     () -> {
                       final var metadataAndUsage =
                           this.npmStorageService.addDistributionTag(
-                              repoInfo.getStorageKey(),
-                              repoInfo.getName(),
-                              packageBasePath,
-                              tagName,
-                              version);
+                              RepoRef.of(repoInfo), packageBasePath, tagName, version);
 
                       this.npmStorageService.writeMetadataToFile(
                           repoInfo.getName(), metadataAndUsage.getFirst(), storagePath);
@@ -304,10 +299,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
                     packageBasePath,
                     () ->
                         this.npmStorageService.deleteDistributionTag(
-                            repoInfo.getStorageKey(),
-                            repoInfo.getName(),
-                            packageBasePath,
-                            tagName)));
+                            RepoRef.of(repoInfo), packageBasePath, tagName)));
 
     context.addProperty(USAGES, usages);
   }
@@ -328,8 +320,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
 
     return BaseUsages.ofDisk(
         this.npmStorageService.changeMetadata(
-            repoInfo.getStorageKey(),
-            repoInfo.getName(),
+            RepoRef.of(repoInfo),
             packageBasePath,
             this.snapshotOf(repoInfo, scopeName, packageName),
             change));
@@ -402,8 +393,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
             newLatest ->
                 BaseUsages.ofDisk(
                     this.npmStorageService.deleteVersion(
-                        repoInfo.getStorageKey(),
-                        repoInfo.getName(),
+                        RepoRef.of(repoInfo),
                         packageBasePath,
                         packageName,
                         versionName,
@@ -426,8 +416,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
 
     final var metadata =
         this.npmStorageService.readMetadataOrRebuild(
-            repoInfo.getStorageKey(),
-            repoInfo.getName(),
+            RepoRef.of(repoInfo),
             packageBasePath,
             this.snapshotOf(repoInfo, scopeName, packageName));
     final var deprecations = NpmPayloadUtils.findDeprecatedVersions(metadata, payload);
@@ -449,10 +438,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
                     packageBasePath,
                     () ->
                         this.npmStorageService.deprecateVersions(
-                            repoInfo.getStorageKey(),
-                            repoInfo.getName(),
-                            packageBasePath,
-                            deprecations)));
+                            RepoRef.of(repoInfo), packageBasePath, deprecations)));
 
     context.addProperty(USAGES, usages);
   }
@@ -534,8 +520,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
     // written its own.
     final var previousMetadata =
         kind == PublishKind.NEW_VERSION
-            ? this.npmStorageService.readMetadataBytes(
-                repoInfo.getStorageKey(), repoInfo.getName(), packageBasePath)
+            ? this.npmStorageService.readMetadataBytes(RepoRef.of(repoInfo), packageBasePath)
             : null;
 
     // The rows are rolled back with a failure. A version being replaced keeps its row, so its
@@ -547,8 +532,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
                   repoInfo, scopeName, packageBasePath, packageName, versionName, payload, kind),
           () ->
               this.npmStorageService.discardPublishedVersion(
-                  repoInfo.getStorageKey(),
-                  repoInfo.getName(),
+                  RepoRef.of(repoInfo),
                   packageBasePath,
                   packageName,
                   versionName,
@@ -581,7 +565,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
       final String versionName) {
 
     if (this.npmStorageService.tarballExists(
-        repoInfo.getStorageKey(), repoInfo.getName(), packageBasePath, packageName, versionName)) {
+        RepoRef.of(repoInfo), packageBasePath, packageName, versionName)) {
       log.warn(
           "Replacing an orphaned tarball of npm package {} {} in repo {}: storage has it, the"
               + " database has no such version",
@@ -608,18 +592,12 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
                 .processVersionPayload(
                     payload,
                     packageBasePath,
-                    repoInfo.getStorageKey(),
-                    repoInfo.getName(),
+                    RepoRef.of(repoInfo),
                     this.snapshotOf(repoInfo, scopeName, packageName))
                 .getSecond();
 
     return this.npmStorageService.writeTarballAndMetadata(
-        repoInfo.getStorageKey(),
-        repoInfo.getName(),
-        metadata,
-        packageBasePath,
-        packageName,
-        versionName);
+        RepoRef.of(repoInfo), metadata, packageBasePath, packageName, versionName);
   }
 
   private Map<String, Object> processNewPackage(

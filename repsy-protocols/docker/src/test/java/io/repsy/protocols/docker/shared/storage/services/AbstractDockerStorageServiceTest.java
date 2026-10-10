@@ -32,6 +32,7 @@ import io.repsy.libs.storage.core.dtos.StaleFile;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.time.Instant;
@@ -117,7 +118,8 @@ class AbstractDockerStorageServiceTest {
         .thenReturn(4096L);
 
     final var freed =
-        new TestStorageService(this.storageStrategy).deleteBlobFile(REPO_UUID, "repo", "upload-id");
+        new TestStorageService(this.storageStrategy)
+            .deleteBlobFile(new RepoRef(REPO_UUID, "repo"), "upload-id");
 
     assertThat(freed).isEqualTo(4096L);
     final var order = inOrder(this.storageStrategy);
@@ -133,7 +135,7 @@ class AbstractDockerStorageServiceTest {
     when(this.storageStrategy.getFileUsage(any(), eq("repo"))).thenThrow(new IOException("disk"));
     final var service = new TestStorageService(this.storageStrategy);
 
-    assertThatThrownBy(() -> service.deleteBlobFile(REPO_UUID, "repo", "upload-id"))
+    assertThatThrownBy(() -> service.deleteBlobFile(new RepoRef(REPO_UUID, "repo"), "upload-id"))
         .isInstanceOf(ErrorOccurredException.class)
         .hasCauseInstanceOf(IOException.class);
     verify(this.storageStrategy, never()).delete(any());

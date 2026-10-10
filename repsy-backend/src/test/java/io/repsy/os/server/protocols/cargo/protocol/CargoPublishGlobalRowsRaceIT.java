@@ -266,7 +266,7 @@ class CargoPublishGlobalRowsRaceIT extends AbstractIT {
             })
         .doAnswer(InvocationOnMock::callRealMethod)
         .when(this.cargoStorageService)
-        .writeCrateAndIndex(any(), any(), any(), any(), any(), any());
+        .writeCrateAndIndex(any(), any(), any(), any(), any());
 
     final var executor = Executors.newFixedThreadPool(2);
     try {

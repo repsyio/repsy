@@ -33,6 +33,7 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.protocols.npm.shared.npm_package.dtos.NpmPackageSnapshot;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -138,7 +139,7 @@ class AbstractNpmStorageServiceRemovalTest {
 
     final var growth =
         this.service.deleteVersion(
-            REPO_ID, REPO_NAME, BASE_PATH, PACKAGE, "1.2.0", "1.1.0", NO_ROWS);
+            new RepoRef(REPO_ID, REPO_NAME), BASE_PATH, PACKAGE, "1.2.0", "1.1.0", NO_ROWS);
 
     assertThat(growth).as("the metadata shrank by 100, the tarball freed 40").isEqualTo(-140L);
     final var written = this.written();
@@ -159,7 +160,8 @@ class AbstractNpmStorageServiceRemovalTest {
         .thenReturn(BaseUsages.ofDisk(-10L));
 
     final var growth =
-        this.service.deleteVersion(REPO_ID, REPO_NAME, BASE_PATH, PACKAGE, "1.0.0", null, NO_ROWS);
+        this.service.deleteVersion(
+            new RepoRef(REPO_ID, REPO_NAME), BASE_PATH, PACKAGE, "1.0.0", null, NO_ROWS);
 
     assertThat(growth).as("a tarball that is gone frees nothing").isEqualTo(-10L);
     final var written = this.written();
@@ -176,7 +178,8 @@ class AbstractNpmStorageServiceRemovalTest {
     when(this.storageStrategy.write(eq(REPO_NAME), at(METADATA_FILE), any()))
         .thenReturn(BaseUsages.ofDisk(0L));
 
-    this.service.deleteVersion(REPO_ID, REPO_NAME, BASE_PATH, PACKAGE, "1.2.0", "1.1.0", NO_ROWS);
+    this.service.deleteVersion(
+        new RepoRef(REPO_ID, REPO_NAME), BASE_PATH, PACKAGE, "1.2.0", "1.1.0", NO_ROWS);
 
     final var order = inOrder(this.storageStrategy);
     order.verify(this.storageStrategy).write(eq(REPO_NAME), at(METADATA_FILE), any());
@@ -196,7 +199,7 @@ class AbstractNpmStorageServiceRemovalTest {
     assertThatThrownBy(
             () ->
                 this.service.deleteVersion(
-                    REPO_ID, REPO_NAME, BASE_PATH, PACKAGE, "1.2.0", "1.1.0", NO_ROWS))
+                    new RepoRef(REPO_ID, REPO_NAME), BASE_PATH, PACKAGE, "1.2.0", "1.1.0", NO_ROWS))
         .isSameAs(failure);
 
     final var restored = ArgumentCaptor.forClass(InputStream.class);
@@ -217,7 +220,7 @@ class AbstractNpmStorageServiceRemovalTest {
     assertThatThrownBy(
             () ->
                 this.service.deleteVersion(
-                    REPO_ID, REPO_NAME, BASE_PATH, PACKAGE, "1.2.0", "1.1.0", NO_ROWS))
+                    new RepoRef(REPO_ID, REPO_NAME), BASE_PATH, PACKAGE, "1.2.0", "1.1.0", NO_ROWS))
         .isInstanceOf(IllegalStateException.class)
         .hasMessage("disk full");
 
@@ -240,7 +243,7 @@ class AbstractNpmStorageServiceRemovalTest {
     assertThatThrownBy(
             () ->
                 this.service.deleteVersion(
-                    REPO_ID, REPO_NAME, BASE_PATH, PACKAGE, "1.2.0", "1.1.0", NO_ROWS))
+                    new RepoRef(REPO_ID, REPO_NAME), BASE_PATH, PACKAGE, "1.2.0", "1.1.0", NO_ROWS))
         .isSameAs(failure)
         .hasSuppressedException(restoreFailure);
   }
@@ -253,7 +256,12 @@ class AbstractNpmStorageServiceRemovalTest {
     assertThatThrownBy(
             () ->
                 this.service.deleteVersion(
-                    REPO_ID, REPO_NAME, BASE_PATH, PACKAGE, "1.2.0", "1.1.0", NO_PACKAGE))
+                    new RepoRef(REPO_ID, REPO_NAME),
+                    BASE_PATH,
+                    PACKAGE,
+                    "1.2.0",
+                    "1.1.0",
+                    NO_PACKAGE))
         .isInstanceOf(ItemNotFoundException.class);
 
     verify(this.storageStrategy, never()).delete(any());
@@ -269,8 +277,7 @@ class AbstractNpmStorageServiceRemovalTest {
 
     final var growth =
         this.service.deprecateVersions(
-            REPO_ID,
-            REPO_NAME,
+            new RepoRef(REPO_ID, REPO_NAME),
             BASE_PATH,
             List.of(Pair.of("1.0.0", "old"), Pair.of("1.1.0", ""), Pair.of("9.9.9", "gone")));
 
@@ -285,7 +292,7 @@ class AbstractNpmStorageServiceRemovalTest {
   @DisplayName("the restore writes the bytes that were read")
   void restoreUsesTheGivenBytes() throws Exception {
     this.service.restoreMetadataBytes(
-        REPO_ID, REPO_NAME, BASE_PATH, "x".getBytes(StandardCharsets.UTF_8));
+        new RepoRef(REPO_ID, REPO_NAME), BASE_PATH, "x".getBytes(StandardCharsets.UTF_8));
 
     final var stream = ArgumentCaptor.forClass(InputStream.class);
     verify(this.storageStrategy).write(eq(REPO_NAME), at(METADATA_FILE), stream.capture());

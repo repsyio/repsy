@@ -20,9 +20,9 @@ import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.storage.AbstractArtifactStorageService;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.InputStream;
 import java.nio.file.Paths;
-import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 
@@ -39,8 +39,7 @@ public abstract class AbstractRubyStorageService extends AbstractArtifactStorage
 
   @Override
   public BaseUsages writeGem(
-      final UUID repoId,
-      final String repoName,
+      final RepoRef repo,
       final String gemName,
       final String version,
       final String platform,
@@ -48,44 +47,36 @@ public abstract class AbstractRubyStorageService extends AbstractArtifactStorage
 
     final var filename = buildFilename(gemName, version, platform);
     final var gemPath = Paths.get(GEMS_PATH, gemName, filename);
-    final var storagePath = StoragePath.of(repoId, gemPath.toString());
+    final var storagePath = StoragePath.of(repo.id(), gemPath.toString());
 
-    return this.storageStrategy.write(repoName, storagePath, gem);
+    return this.storageStrategy.write(repo.name(), storagePath, gem);
   }
 
   @Override
   public Resource getGem(
-      final UUID repoId,
-      final String repoName,
-      final String gemName,
-      final String version,
-      final String platform) {
+      final RepoRef repo, final String gemName, final String version, final String platform) {
     final var filename = buildFilename(gemName, version, platform);
     final var gemPath = Paths.get(GEMS_PATH, gemName, filename);
-    final var storagePath = StoragePath.of(repoId, gemPath.toString());
+    final var storagePath = StoragePath.of(repo.id(), gemPath.toString());
 
-    return this.requireResource(storagePath, repoName, ProtocolErrorCodes.GEM_NOT_FOUND);
+    return this.requireResource(storagePath, repo.name(), ProtocolErrorCodes.GEM_NOT_FOUND);
   }
 
   @Override
   public long deleteGem(
-      final UUID repoId,
-      final String repoName,
-      final String gemName,
-      final String version,
-      final String platform) {
+      final RepoRef repo, final String gemName, final String version, final String platform) {
 
     final var filename = buildFilename(gemName, version, platform);
     final var gemPath = Paths.get(GEMS_PATH, gemName, filename);
-    final var storagePath = StoragePath.of(repoId, gemPath.toString());
+    final var storagePath = StoragePath.of(repo.id(), gemPath.toString());
 
-    return this.deleteFileWithUsage(storagePath, repoName);
+    return this.deleteFileWithUsage(storagePath, repo.name());
   }
 
   @Override
-  public long deleteAllGems(final UUID repoId, final String repoName, final String gemName) {
+  public long deleteAllGems(final RepoRef repo, final String gemName) {
     final var gemPath = Paths.get(GEMS_PATH, gemName);
-    final var storagePath = StoragePath.of(repoId, gemPath.toString());
+    final var storagePath = StoragePath.of(repo.id(), gemPath.toString());
 
     return this.deleteTreeWithUsage(storagePath);
   }

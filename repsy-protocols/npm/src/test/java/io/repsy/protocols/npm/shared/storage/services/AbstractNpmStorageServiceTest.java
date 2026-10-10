@@ -27,6 +27,7 @@ import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.UUID;
@@ -96,7 +97,8 @@ class AbstractNpmStorageServiceTest {
       stubMetadata("{\"name\":\"my-package\"}");
 
       final var readme =
-          service.getReadmeContent(REPO_ID, REPO_NAME, PACKAGE_BASE_PATH, VERSION_NAME);
+          service.getReadmeContent(
+              new RepoRef(REPO_ID, REPO_NAME), PACKAGE_BASE_PATH, VERSION_NAME);
 
       assertThat(readme).isNull();
     }
@@ -108,7 +110,8 @@ class AbstractNpmStorageServiceTest {
           "{\"name\":\"my-package\",\"versions\":{\"2.0.0\":{\"readme\":\"other version\"}}}");
 
       final var readme =
-          service.getReadmeContent(REPO_ID, REPO_NAME, PACKAGE_BASE_PATH, VERSION_NAME);
+          service.getReadmeContent(
+              new RepoRef(REPO_ID, REPO_NAME), PACKAGE_BASE_PATH, VERSION_NAME);
 
       assertThat(readme).isNull();
     }
@@ -122,7 +125,8 @@ class AbstractNpmStorageServiceTest {
               + "\":{\"version\":\"1.0.0\"}}}");
 
       final var readme =
-          service.getReadmeContent(REPO_ID, REPO_NAME, PACKAGE_BASE_PATH, VERSION_NAME);
+          service.getReadmeContent(
+              new RepoRef(REPO_ID, REPO_NAME), PACKAGE_BASE_PATH, VERSION_NAME);
 
       assertThat(readme).isNull();
     }
@@ -136,7 +140,8 @@ class AbstractNpmStorageServiceTest {
               + "\":{\"readme\":{\"nested\":\"object\"}}}}");
 
       final var readme =
-          service.getReadmeContent(REPO_ID, REPO_NAME, PACKAGE_BASE_PATH, VERSION_NAME);
+          service.getReadmeContent(
+              new RepoRef(REPO_ID, REPO_NAME), PACKAGE_BASE_PATH, VERSION_NAME);
 
       assertThat(readme).isNull();
     }
@@ -155,7 +160,8 @@ class AbstractNpmStorageServiceTest {
               + "\":{\"readme\":\"# Hello\"}}}");
 
       final var readme =
-          service.getReadmeContent(REPO_ID, REPO_NAME, PACKAGE_BASE_PATH, VERSION_NAME);
+          service.getReadmeContent(
+              new RepoRef(REPO_ID, REPO_NAME), PACKAGE_BASE_PATH, VERSION_NAME);
 
       assertThat(readme).isEqualTo("# Hello");
     }
@@ -170,7 +176,9 @@ class AbstractNpmStorageServiceTest {
     void returnsNullWhenTheFileIsGone() throws Exception {
       when(storageStrategy.get(any(StoragePath.class), anyString())).thenReturn(Optional.empty());
 
-      assertThat(service.getReadmeContent(REPO_ID, REPO_NAME, PACKAGE_BASE_PATH, VERSION_NAME))
+      assertThat(
+              service.getReadmeContent(
+                  new RepoRef(REPO_ID, REPO_NAME), PACKAGE_BASE_PATH, VERSION_NAME))
           .isNull();
     }
 
@@ -180,7 +188,9 @@ class AbstractNpmStorageServiceTest {
     void returnsNullWhenTheFileIsCorrupt(final String corrupt) throws Exception {
       stubMetadata(corrupt);
 
-      assertThat(service.getReadmeContent(REPO_ID, REPO_NAME, PACKAGE_BASE_PATH, VERSION_NAME))
+      assertThat(
+              service.getReadmeContent(
+                  new RepoRef(REPO_ID, REPO_NAME), PACKAGE_BASE_PATH, VERSION_NAME))
           .isNull();
     }
   }
@@ -210,7 +220,7 @@ class AbstractNpmStorageServiceTest {
     void readsTheMetadataBytes() throws Exception {
       stubMetadata("{\"name\":\"my-package\"}");
 
-      assertThat(service.readMetadataBytes(REPO_ID, REPO_NAME, PACKAGE_BASE_PATH))
+      assertThat(service.readMetadataBytes(new RepoRef(REPO_ID, REPO_NAME), PACKAGE_BASE_PATH))
           .isEqualTo("{\"name\":\"my-package\"}".getBytes());
     }
 
@@ -219,7 +229,8 @@ class AbstractNpmStorageServiceTest {
     void missingMetadataHasNoBytes() throws Exception {
       when(storageStrategy.get(any(StoragePath.class), anyString())).thenReturn(Optional.empty());
 
-      assertThat(service.readMetadataBytes(REPO_ID, REPO_NAME, PACKAGE_BASE_PATH)).isNull();
+      assertThat(service.readMetadataBytes(new RepoRef(REPO_ID, REPO_NAME), PACKAGE_BASE_PATH))
+          .isNull();
     }
 
     @Test
@@ -227,7 +238,7 @@ class AbstractNpmStorageServiceTest {
     void corruptMetadataIsReadAsItIs() throws Exception {
       stubMetadata("{corrupt");
 
-      assertThat(service.readMetadataBytes(REPO_ID, REPO_NAME, PACKAGE_BASE_PATH))
+      assertThat(service.readMetadataBytes(new RepoRef(REPO_ID, REPO_NAME), PACKAGE_BASE_PATH))
           .isEqualTo("{corrupt".getBytes());
     }
 
@@ -238,7 +249,7 @@ class AbstractNpmStorageServiceTest {
       stubPresent(METADATA, true);
 
       service.discardPublishedVersion(
-          REPO_ID, REPO_NAME, PACKAGE_BASE_PATH, "my-package", VERSION_NAME, null);
+          new RepoRef(REPO_ID, REPO_NAME), PACKAGE_BASE_PATH, "my-package", VERSION_NAME, null);
 
       verify(storageStrategy).delete(pathEnding(TARBALL));
       verify(storageStrategy).delete(pathEnding(METADATA));
@@ -252,7 +263,7 @@ class AbstractNpmStorageServiceTest {
       stubPresent(METADATA, false);
 
       service.discardPublishedVersion(
-          REPO_ID, REPO_NAME, PACKAGE_BASE_PATH, "my-package", VERSION_NAME, null);
+          new RepoRef(REPO_ID, REPO_NAME), PACKAGE_BASE_PATH, "my-package", VERSION_NAME, null);
 
       verify(storageStrategy, never()).delete(any(StoragePath.class));
     }
@@ -271,7 +282,7 @@ class AbstractNpmStorageServiceTest {
               });
 
       service.discardPublishedVersion(
-          REPO_ID, REPO_NAME, PACKAGE_BASE_PATH, "my-package", VERSION_NAME, previous);
+          new RepoRef(REPO_ID, REPO_NAME), PACKAGE_BASE_PATH, "my-package", VERSION_NAME, previous);
 
       verify(storageStrategy).delete(pathEnding(TARBALL));
       verify(storageStrategy, never()).delete(pathEnding(METADATA));
@@ -291,7 +302,7 @@ class AbstractNpmStorageServiceTest {
                 return BaseUsages.ofDisk(0L);
               });
 
-      service.restoreMetadataBytes(REPO_ID, REPO_NAME, PACKAGE_BASE_PATH, previous);
+      service.restoreMetadataBytes(new RepoRef(REPO_ID, REPO_NAME), PACKAGE_BASE_PATH, previous);
 
       verify(storageStrategy).write(eq(REPO_NAME), pathEnding(METADATA), any());
       verify(storageStrategy, never()).delete(any(StoragePath.class));
@@ -304,13 +315,13 @@ class AbstractNpmStorageServiceTest {
       stubPresent(TARBALL, true);
       assertThat(
               service.tarballExists(
-                  REPO_ID, REPO_NAME, PACKAGE_BASE_PATH, "my-package", VERSION_NAME))
+                  new RepoRef(REPO_ID, REPO_NAME), PACKAGE_BASE_PATH, "my-package", VERSION_NAME))
           .isTrue();
 
       stubPresent(TARBALL, false);
       assertThat(
               service.tarballExists(
-                  REPO_ID, REPO_NAME, PACKAGE_BASE_PATH, "my-package", VERSION_NAME))
+                  new RepoRef(REPO_ID, REPO_NAME), PACKAGE_BASE_PATH, "my-package", VERSION_NAME))
           .isFalse();
     }
   }

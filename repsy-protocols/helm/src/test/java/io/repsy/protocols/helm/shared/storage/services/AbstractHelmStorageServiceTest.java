@@ -31,6 +31,7 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StaleFile;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -77,7 +78,9 @@ class AbstractHelmStorageServiceTest {
     final var usages =
         new TestStorageService(this.storageStrategy)
             .saveBlobChunk(
-                REPO_UUID, UPLOAD_ID, new ByteArrayInputStream(new byte[2048]), REPO_NAME);
+                new RepoRef(REPO_UUID, REPO_NAME),
+                UPLOAD_ID,
+                new ByteArrayInputStream(new byte[2048]));
 
     assertThat(usages).isSameAs(expected);
   }
@@ -122,7 +125,7 @@ class AbstractHelmStorageServiceTest {
 
     final var freed =
         new TestStorageService(this.storageStrategy)
-            .deleteBlobFile(REPO_UUID, REPO_NAME, UPLOAD_ID.toString());
+            .deleteBlobFile(new RepoRef(REPO_UUID, REPO_NAME), UPLOAD_ID.toString());
 
     assertThat(freed).isEqualTo(4096L);
     final var order = inOrder(this.storageStrategy);
@@ -148,7 +151,10 @@ class AbstractHelmStorageServiceTest {
     final var usages =
         new TestStorageService(this.storageStrategy)
             .saveManifest(
-                REPO_UUID, "payments", "1.0.0", "{}".getBytes(StandardCharsets.UTF_8), REPO_NAME);
+                new RepoRef(REPO_UUID, REPO_NAME),
+                "payments",
+                "1.0.0",
+                "{}".getBytes(StandardCharsets.UTF_8));
 
     assertThat(usages).isSameAs(expected);
   }
@@ -163,7 +169,7 @@ class AbstractHelmStorageServiceTest {
 
     final var freed =
         new TestStorageService(this.storageStrategy)
-            .deleteManifestFile(REPO_UUID, "payments", "1.0.0", REPO_NAME);
+            .deleteManifestFile(new RepoRef(REPO_UUID, REPO_NAME), "payments", "1.0.0");
 
     assertThat(freed).isEqualTo(700L);
     verify(this.storageStrategy).delete(argThat(sp -> sp.getPath().equals(path)));
@@ -176,7 +182,7 @@ class AbstractHelmStorageServiceTest {
 
     final var freed =
         new TestStorageService(this.storageStrategy)
-            .deleteManifestFile(REPO_UUID, "payments", "1.0.0", REPO_NAME);
+            .deleteManifestFile(new RepoRef(REPO_UUID, REPO_NAME), "payments", "1.0.0");
 
     assertThat(freed).isZero();
     verify(this.storageStrategy, never()).delete(any());
@@ -191,7 +197,8 @@ class AbstractHelmStorageServiceTest {
         .thenReturn(Optional.of(new ByteArrayResource(new byte[64])));
 
     final var freed =
-        new TestStorageService(this.storageStrategy).deleteBlob(REPO_UUID, "sha256:abc", REPO_NAME);
+        new TestStorageService(this.storageStrategy)
+            .deleteBlob(new RepoRef(REPO_UUID, REPO_NAME), "sha256:abc");
 
     assertThat(freed).isEqualTo(64L);
     verify(this.storageStrategy).delete(argThat(sp -> sp.getPath().equals(path)));
@@ -203,7 +210,8 @@ class AbstractHelmStorageServiceTest {
     when(this.storageStrategy.get(any(), eq(REPO_NAME))).thenReturn(Optional.empty());
 
     final var freed =
-        new TestStorageService(this.storageStrategy).deleteBlob(REPO_UUID, "sha256:abc", REPO_NAME);
+        new TestStorageService(this.storageStrategy)
+            .deleteBlob(new RepoRef(REPO_UUID, REPO_NAME), "sha256:abc");
 
     assertThat(freed).isZero();
     verify(this.storageStrategy, never()).delete(any());
@@ -217,7 +225,7 @@ class AbstractHelmStorageServiceTest {
         .thenThrow(new IOException("disk"));
     final var service = new TestStorageService(this.storageStrategy);
 
-    assertThatThrownBy(() -> service.deleteBlobFile(REPO_UUID, REPO_NAME, "upload"))
+    assertThatThrownBy(() -> service.deleteBlobFile(new RepoRef(REPO_UUID, REPO_NAME), "upload"))
         .isInstanceOf(ErrorOccurredException.class)
         .hasCauseInstanceOf(IOException.class);
     verify(this.storageStrategy, never()).delete(any());
@@ -246,7 +254,9 @@ class AbstractHelmStorageServiceTest {
     final var service = new TestStorageService(this.storageStrategy);
 
     assertThatThrownBy(
-            () -> service.deleteChartFile(REPO_UUID, "a-1.0.0.tgz", "sha256:abc", REPO_NAME))
+            () ->
+                service.deleteChartFile(
+                    new RepoRef(REPO_UUID, REPO_NAME), "a-1.0.0.tgz", "sha256:abc"))
         .isInstanceOf(ErrorOccurredException.class)
         .hasCauseInstanceOf(IOException.class);
     verify(this.storageStrategy, never()).delete(any());
@@ -260,7 +270,9 @@ class AbstractHelmStorageServiceTest {
         .thenThrow(new IOException("disk"));
     final var service = new TestStorageService(this.storageStrategy);
 
-    assertThatThrownBy(() -> service.deleteManifestFile(REPO_UUID, "payments", "1.0.0", REPO_NAME))
+    assertThatThrownBy(
+            () ->
+                service.deleteManifestFile(new RepoRef(REPO_UUID, REPO_NAME), "payments", "1.0.0"))
         .isInstanceOf(ErrorOccurredException.class)
         .hasCauseInstanceOf(IOException.class);
     verify(this.storageStrategy, never()).delete(any());
@@ -275,7 +287,7 @@ class AbstractHelmStorageServiceTest {
     when(this.storageStrategy.get(any(), eq(REPO_NAME))).thenReturn(Optional.of(blob));
     final var service = new TestStorageService(this.storageStrategy);
 
-    assertThatThrownBy(() -> service.deleteBlob(REPO_UUID, "sha256:abc", REPO_NAME))
+    assertThatThrownBy(() -> service.deleteBlob(new RepoRef(REPO_UUID, REPO_NAME), "sha256:abc"))
         .isInstanceOf(ErrorOccurredException.class)
         .hasCauseInstanceOf(IOException.class);
     verify(this.storageStrategy, never()).delete(any());

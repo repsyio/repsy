@@ -209,7 +209,7 @@ class PublishStorageFailureIT extends AbstractIT {
       void failStorage(final PublishStorageFailureIT it) throws Exception {
         doThrow(outage())
             .when(it.npmStorageService)
-            .writeTarballAndMetadata(any(), any(), any(), any(), any(), any());
+            .writeTarballAndMetadata(any(), any(), any(), any(), any());
       }
     },
     NUGET(RepoType.NUGET, 503, "nuget_package", "\"msgId\":\"errorOccurred\"") {
@@ -252,9 +252,7 @@ class PublishStorageFailureIT extends AbstractIT {
 
       @Override
       void failStorage(final PublishStorageFailureIT it) throws Exception {
-        doThrow(outage())
-            .when(it.pypiStorageService)
-            .writePackageArchive(any(), any(), any(), any());
+        doThrow(outage()).when(it.pypiStorageService).writePackageArchive(any(), any(), any());
       }
     },
     RUBY(RepoType.RUBY, 503, "ruby_gem", "\"msgId\":\"errorOccurred\"") {
@@ -269,9 +267,7 @@ class PublishStorageFailureIT extends AbstractIT {
 
       @Override
       void failStorage(final PublishStorageFailureIT it) {
-        doThrow(outage())
-            .when(it.rubyStorageService)
-            .writeGem(any(), any(), any(), any(), any(), any());
+        doThrow(outage()).when(it.rubyStorageService).writeGem(any(), any(), any(), any(), any());
       }
     },
     CARGO(RepoType.CARGO, 503, "cargo_crate", "{\"errors\":[{\"detail\":\"errorOccurred\"}]}") {
@@ -286,7 +282,7 @@ class PublishStorageFailureIT extends AbstractIT {
       void failStorage(final PublishStorageFailureIT it) throws Exception {
         doThrow(outage())
             .when(it.cargoStorageService)
-            .writeCrateAndIndex(any(), any(), any(), any(), any(), any());
+            .writeCrateAndIndex(any(), any(), any(), any(), any());
       }
     },
     GO(RepoType.GOLANG, 503, "go_module", "\"msgId\":\"errorOccurred\"") {

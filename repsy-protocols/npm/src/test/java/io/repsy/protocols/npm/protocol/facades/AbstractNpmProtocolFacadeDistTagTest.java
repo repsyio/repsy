@@ -35,6 +35,7 @@ import io.repsy.protocols.npm.shared.npm_package.services.NpmPackageService;
 import io.repsy.protocols.npm.shared.storage.services.AbstractNpmStorageService;
 import io.repsy.protocols.npm.shared.storage.services.NpmStorageService;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import io.repsy.protocols.shared.storage.RepoRef;
 import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -64,6 +65,7 @@ class AbstractNpmProtocolFacadeDistTagTest {
 
   private static final UUID REPO_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
   private static final String REPO_NAME = "npm-repo";
+  private static final RepoRef REPO = new RepoRef(REPO_ID, REPO_NAME);
   private static final String PACKAGE = "demo";
   private static final String TAG = "next";
   private static final String VERSION = "1.2.3";
@@ -127,14 +129,13 @@ class AbstractNpmProtocolFacadeDistTagTest {
    * not it had to rebuild the file first, and hand out the rows it is given.
    */
   private void metadataChangesRun() throws IOException {
-    when(this.storageService.changeMetadata(
-            eq(REPO_ID), eq(REPO_NAME), eq(BASE_PATH), any(), any()))
+    when(this.storageService.changeMetadata(eq(REPO), eq(BASE_PATH), any(), any()))
         .thenAnswer(
             invocation -> {
-              assertThat(invocation.<Supplier<NpmPackageSnapshot>>getArgument(3).get())
+              assertThat(invocation.<Supplier<NpmPackageSnapshot>>getArgument(2).get())
                   .as("the rows the storage service rebuilds a lost file from")
                   .isSameAs(SNAPSHOT);
-              return invocation.<NpmStorageService.MetadataChange>getArgument(4).apply();
+              return invocation.<NpmStorageService.MetadataChange>getArgument(3).apply();
             });
     when(this.packageService.getSnapshot(REPO_ID, null, PACKAGE)).thenReturn(SNAPSHOT);
   }
@@ -151,7 +152,7 @@ class AbstractNpmProtocolFacadeDistTagTest {
     this.addRuns();
     final var metadata = new LinkedHashMap<String, Object>();
     this.metadataChangesRun();
-    when(this.storageService.addDistributionTag(REPO_ID, REPO_NAME, BASE_PATH, TAG, VERSION))
+    when(this.storageService.addDistributionTag(REPO, BASE_PATH, TAG, VERSION))
         .thenReturn(Pair.of(metadata, 7L));
 
     this.add();
@@ -167,7 +168,7 @@ class AbstractNpmProtocolFacadeDistTagTest {
     this.basePath();
     this.addRuns();
     this.metadataChangesRun();
-    when(this.storageService.addDistributionTag(any(), any(), any(), any(), any()))
+    when(this.storageService.addDistributionTag(any(), any(), any(), any()))
         .thenReturn(Pair.of(new LinkedHashMap<>(), 7L));
     doThrow(failure).when(this.storageService).writeMetadataToFile(any(), any(), any());
 
@@ -185,7 +186,7 @@ class AbstractNpmProtocolFacadeDistTagTest {
 
     assertThatThrownBy(this::add).isInstanceOf(BadRequestException.class);
 
-    verify(this.storageService, never()).changeMetadata(any(), any(), any(), any(), any());
+    verify(this.storageService, never()).changeMetadata(any(), any(), any(), any());
     assertThat(this.context.<BaseUsages>getProperty("usages")).isNull();
   }
 
@@ -195,8 +196,7 @@ class AbstractNpmProtocolFacadeDistTagTest {
     this.basePath();
     this.removeRuns();
     this.metadataChangesRun();
-    when(this.storageService.deleteDistributionTag(REPO_ID, REPO_NAME, BASE_PATH, TAG))
-        .thenReturn(-9L);
+    when(this.storageService.deleteDistributionTag(REPO, BASE_PATH, TAG)).thenReturn(-9L);
 
     this.facade.deleteDistributionTag(this.context, null, PACKAGE, TAG);
 
@@ -210,7 +210,7 @@ class AbstractNpmProtocolFacadeDistTagTest {
     this.basePath();
     this.removeRuns();
     this.metadataChangesRun();
-    when(this.storageService.deleteDistributionTag(any(), any(), any(), any())).thenThrow(failure);
+    when(this.storageService.deleteDistributionTag(any(), any(), any())).thenThrow(failure);
 
     assertThatThrownBy(() -> this.facade.deleteDistributionTag(this.context, null, PACKAGE, TAG))
         .isSameAs(failure);
