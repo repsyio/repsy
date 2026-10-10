@@ -14,7 +14,7 @@
 
 # bun, current stable on the 1.3 line (confirmed live as `oven/bun:1.3.14-debian`). Copied in from the
 # official image the same "copy the toolchain, not the whole image" approach as cargo.Dockerfile's
-# Rust toolchain / golang.Dockerfile's Go toolchain / ruby.Dockerfile's interpreter: bun ships as one
+# Rust toolchain / go.Dockerfile's Go toolchain / ruby.Dockerfile's interpreter: bun ships as one
 # glibc binary, which runs on bookworm-slim unchanged. The final image must stay
 # `node:24-bookworm-slim` (the harness itself needs Node). A named build stage (not the final
 # image), only used below as a `COPY --from` source -- a normal build-time reference, not a Docker

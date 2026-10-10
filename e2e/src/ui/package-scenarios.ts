@@ -231,7 +231,7 @@ export function allowNotFoundToast(pageErrors: PageErrors): void {
 
 /** A version no seeder publishes: Go's carry the leading `v`. */
 function unknownVersionOf(descriptor: ProtocolDescriptor): string {
-  return descriptor.protocol === 'golang' ? 'v9.9.9' : '9.9.9';
+  return descriptor.protocol === 'go' ? 'v9.9.9' : '9.9.9';
 }
 
 /** Registers PKG-<proto>-01..06 and 09 for one protocol. See the file comment. */

@@ -33,7 +33,7 @@
  * live, see the real-client tests in `tests/ruby/publish-consume.spec.ts`, never the catalog loop's
  * own consumer.)
  *
- * Like nuget/helm/golang (a REAL, toggleable override rule that answers a genuine `409`, confirmed
+ * Like nuget/helm/go (a REAL, toggleable override rule that answers a genuine `409`, confirmed
  * live): `publish`'s raw-HTTP companion probe (`rawPublish`, the exact same gem bytes `gem push` was
  * just given, via the same `built.sha256Hex`) is a byte-identical re-POST of the coordinate just
  * attempted -- every `ok`-expected scenario runs under `allowOverride: true` (the fixture default),
@@ -208,7 +208,7 @@ export async function publish(world: World): Promise<AdapterResult> {
 
 /** The pre-publish for a scenario whose own credential cannot publish, or that redeploys a
  *  coordinate (`reuseCoordinates`). Only the real client runs, mirroring `clients/pypi.ts`'s/
- *  `clients/golang.ts`'s `seedPublish`. */
+ *  `clients/go.ts`'s `seedPublish`. */
 export async function seedPublish(world: World): Promise<SeedResult> {
   const published = await publishWithClient(world, `ruby-seed-${world.scenario.id}`);
   if (published.exitCode !== 0) {
@@ -272,7 +272,7 @@ export async function resolve(world: World): Promise<AdapterResult> {
   const filename = gemFilename(packageName, version);
   const resolved = await findCachedGem(bundleProcessEnv.BUNDLE_PATH as string, filename);
 
-  // The auth-only companion probe (mirrors pypi's/golang's own resolve()): a plain /info GET never
+  // The auth-only companion probe (mirrors pypi's/go's own resolve()): a plain /info GET never
   // touches the gem bytes `bundle install` itself just fetched.
   const rawRes = await rawGet(world.repoName, world.credential, infoRelPath(packageName));
 
@@ -288,7 +288,7 @@ export async function resolve(world: World): Promise<AdapterResult> {
 
 /** `/info/<gem>`'s own body hash plus every listed version's (yanked included) downloaded `.gem`
  *  content hash, for `ProtocolAdapter.fingerprint`/`expectNothingStored`. Scoped to the one gem a
- *  scenario's publish targets, exactly like `PypiFingerprint`/`GolangFingerprint`. Deliberately never
+ *  scenario's publish targets, exactly like `PypiFingerprint`/`GoFingerprint`. Deliberately never
  *  includes `/versions` (its `created_at` preamble changes on every request, confirmed live). */
 export interface RubyFingerprint {
   infoSha256?: string;
@@ -386,7 +386,7 @@ export const rubyAdapter: ProtocolAdapter<RubyFingerprint> = {
 
   packageName: (runId, scenario) => rawPackageName(runId, scenario),
   // Ruby has no release/prerelease repo-setting distinction (`releases`/`snapshots` are never read
-  // by any Ruby code, grep-confirmed), so `versionType` is ignored, same as pypi/docker/helm/golang.
+  // by any Ruby code, grep-confirmed), so `versionType` is ignored, same as pypi/docker/helm/go.
   version: () => gemVersion(),
 
   publish,

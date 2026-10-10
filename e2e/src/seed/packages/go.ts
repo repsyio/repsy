@@ -19,13 +19,13 @@
  * key. Go versions start with `v`, so a version given without one (the shared scenarios pass
  * `1.0.0`) gets it added, and the returned `version` is the one the panel shows (`v1.0.0`).
  */
-import { buildModuleZip, rawUpload } from '../../clients/golang-raw.js';
+import { buildModuleZip, rawUpload } from '../../clients/go-raw.js';
 import { adminCredential } from '../../clients/raw-http.js';
 import type { PackageSeeder } from '../packages.js';
 import { defaultPackageName, DEFAULT_VERSION, expectPublished } from './shared.js';
 
-export const seedGolang: PackageSeeder = async (repoName, ctx, opts) => {
-  const name = opts.name ?? defaultPackageName('golang', ctx.runId, opts.index);
+export const seedGo: PackageSeeder = async (repoName, ctx, opts) => {
+  const name = opts.name ?? defaultPackageName('go', ctx.runId, opts.index);
   const requested = opts.version ?? DEFAULT_VERSION;
   const version = requested.startsWith('v') ? requested : `v${requested}`;
 
@@ -35,5 +35,5 @@ export const seedGolang: PackageSeeder = async (repoName, ctx, opts) => {
     `PUT ${name}@${version}.zip`,
   );
 
-  return { protocol: 'golang', repoName, name, version, extra: {} };
+  return { protocol: 'go', repoName, name, version, extra: {} };
 };

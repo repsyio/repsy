@@ -14,7 +14,7 @@
 /// limitations under the License.
 
 /** Small helpers every per-protocol seeder shares. */
-import { MODULE_DOMAIN } from '../../clients/golang-raw.js';
+import { MODULE_DOMAIN } from '../../clients/go-raw.js';
 import type { RawResponse } from '../../clients/raw-http.js';
 import type { PackageProtocol } from '../packages.js';
 
@@ -57,7 +57,7 @@ export function defaultPackageName(
     case 'cargo':
     case 'ruby':
       return `e2e_${runId.replace(/[^a-z0-9]/gi, '').toLowerCase()}_pkg_${index}`;
-    case 'golang':
+    case 'go':
       return `${MODULE_DOMAIN}/${base}`;
     case 'docker':
     case 'pypi':

@@ -20,7 +20,7 @@
  * `require`s module B and the REAL `go` toolchain has to work out the graph from what Repsy serves
  * (`@v/list`, `@v/<v>.info`, `@v/<v>.mod`, `@v/<v>.zip`, `@latest`), the way an ordinary `go mod
  * tidy` does. Adapted from `publish-consume.spec.ts` (the hand-built module zips, `goEnv`, the TLS
- * shim for a credentialed consume); `buildModuleZip({ requires })` in `golang-raw.ts` writes the
+ * shim for a credentialed consume); `buildModuleZip({ requires })` in `go-raw.ts` writes the
  * `require` lines and a `hello.go` that imports the dependency.
  *
  *  - T1 A private repo, a read-only deploy token (through the TLS shim, the only way a real `go`
@@ -49,7 +49,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 import { RepoType } from '../../src/api/panel-api.js';
-import { goEnv } from '../../src/clients/golang.js';
+import { goEnv } from '../../src/clients/go.js';
 import {
   adminCredential,
   type BuiltGoModule,
@@ -64,8 +64,8 @@ import {
   parseVersionList,
   rawGet,
   rawUpload,
-} from '../../src/clients/golang-raw.js';
-import { shimTraceSoFar } from '../../src/clients/golang-tls-shim.js';
+} from '../../src/clients/go-raw.js';
+import { shimTraceSoFar } from '../../src/clients/go-tls-shim.js';
 import { isolatedWorkDir, run } from '../../src/clients/exec.js';
 import { env } from '../../src/env.js';
 import { repoPath } from '../../src/repo-url.js';
@@ -76,7 +76,7 @@ const TIMEOUT_MS = 180_000;
 
 type Env = NodeJS.ProcessEnv;
 
-/** Uploads one module with the real wire format (the raw PUT `golang.ts` mirrors with `curl -T`). */
+/** Uploads one module with the real wire format (the raw PUT `go.ts` mirrors with `curl -T`). */
 async function publishModule(
   repoName: string,
   modulePath: string,
@@ -188,7 +188,7 @@ async function expectShimRequests(
 }
 
 test(
-  'golang > go mod tidy resolves the dependency of a dependency to the version its go.mod names, ' +
+  'go > go mod tidy resolves the dependency of a dependency to the version its go.mod names, ' +
     'through a private repo and a read-only deploy token (RPS-1479 T1)',
   { tag: ['@smoke', '@auth'] },
   async ({ seeder }) => {
@@ -211,13 +211,13 @@ test(
       { modulePath: b, version: 'v1.1.0' },
     ]);
 
-    const { home, work } = await isolatedWorkDir(`golang-transitive-${seeder.runId}`);
+    const { home, work } = await isolatedWorkDir(`go-transitive-${seeder.runId}`);
     await writeConsumer(work, a);
     const goEnvVars = await goEnv(home, credential, repo.name);
     const redact = [token.token];
     const traceBefore = (await shimTraceSoFar())?.length ?? 0;
 
-    const tidy = await go(['mod', 'tidy'], work, goEnvVars, 'golang-transitive-tidy', redact);
+    const tidy = await go(['mod', 'tidy'], work, goEnvVars, 'go-transitive-tidy', redact);
     expect(tidy.exitCode, `go mod tidy: ${tidy.command}\n${tidy.stderr}`).toBe(0);
 
     // go.mod: A at its @latest, B pulled in as an indirect requirement at the version A NAMES
@@ -239,7 +239,7 @@ test(
     expect(sums.has(`${b} v1.0.0`), 'the older B zip was never needed').toBe(false);
     expect(sums.has(`${b} v1.2.0`), 'the newer B zip was never needed').toBe(false);
 
-    const all = await go(['list', '-m', 'all'], work, goEnvVars, 'golang-transitive-all', redact);
+    const all = await go(['list', '-m', 'all'], work, goEnvVars, 'go-transitive-all', redact);
     expect(all.exitCode, `go list -m all: ${all.stderr}`).toBe(0);
     const modules = parseModuleList(all.stdout);
     expect(modules.get('e2e.consumer'), 'the main module has no version').toBeUndefined();
@@ -250,7 +250,7 @@ test(
       ['list', '-m', '-versions', b],
       work,
       goEnvVars,
-      'golang-transitive-versions',
+      'go-transitive-versions',
       redact,
     );
     expect(versions.exitCode, `go list -m -versions: ${versions.stderr}`).toBe(0);
@@ -259,7 +259,7 @@ test(
     );
 
     // The program built from the resolved graph runs B v1.1.0's own code.
-    const output = await go(['run', '.'], work, goEnvVars, 'golang-transitive-run', redact);
+    const output = await go(['run', '.'], work, goEnvVars, 'go-transitive-run', redact);
     expect(output.exitCode, `go run: ${output.stderr}`).toBe(0);
     expect(output.stdout.trim().split('\n')).toEqual([aV110.marker, bV110.marker]);
     expect(output.stdout).not.toContain(bV100.marker);
@@ -272,7 +272,7 @@ test(
 );
 
 test(
-  'golang > minimal version selection: the highest version anyone requires wins, never a newer ' +
+  'go > minimal version selection: the highest version anyone requires wins, never a newer ' +
     'one nobody asked for (RPS-1479 T2)',
   { tag: ['@smoke'] },
   async ({ seeder }) => {
@@ -313,13 +313,13 @@ test(
     ];
 
     for (const c of cases) {
-      const { home, work } = await isolatedWorkDir(`golang-mvs-${c.id}-${seeder.runId}`);
+      const { home, work } = await isolatedWorkDir(`go-mvs-${c.id}-${seeder.runId}`);
       await writeConsumer(work, a, c.requires);
       const goEnvVars = await goEnv(home, {}, repo.name);
 
-      const tidy = await go(['mod', 'tidy'], work, goEnvVars, `golang-mvs-${c.id}-tidy`);
+      const tidy = await go(['mod', 'tidy'], work, goEnvVars, `go-mvs-${c.id}-tidy`);
       expect(tidy.exitCode, `[${c.id}] go mod tidy: ${tidy.command}\n${tidy.stderr}`).toBe(0);
-      const all = await go(['list', '-m', 'all'], work, goEnvVars, `golang-mvs-${c.id}-all`);
+      const all = await go(['list', '-m', 'all'], work, goEnvVars, `go-mvs-${c.id}-all`);
       expect(all.exitCode, `[${c.id}] go list -m all: ${all.stderr}`).toBe(0);
       const modules = parseModuleList(all.stdout);
       expect(modules.get(a), `[${c.id}] A`).toBe(c.expected.a);
@@ -331,7 +331,7 @@ test(
 );
 
 test(
-  'golang > a /v2 major-path dependency is a module of its own next to /v1 in one repo (RPS-1479 T3)',
+  'go > a /v2 major-path dependency is a module of its own next to /v1 in one repo (RPS-1479 T3)',
   { tag: ['@smoke'] },
   async ({ seeder }) => {
     const repo = await seeder.createRepo(RepoType.GOLANG, { privateRepo: false });
@@ -368,10 +368,10 @@ test(
     const latest2 = await rawGet(repo.name, admin, latestRelPath(b2));
     expect(parseInfo(latest2.body).Version, '@latest of the /v2 path').toBe('v2.1.0');
 
-    const { home, work } = await isolatedWorkDir(`golang-v2-${seeder.runId}`);
+    const { home, work } = await isolatedWorkDir(`go-v2-${seeder.runId}`);
     await writeConsumer(work, a);
     const goEnvVars = await goEnv(home, {}, repo.name);
-    const tidy = await go(['mod', 'tidy'], work, goEnvVars, 'golang-v2-tidy');
+    const tidy = await go(['mod', 'tidy'], work, goEnvVars, 'go-v2-tidy');
     expect(tidy.exitCode, `go mod tidy: ${tidy.command}\n${tidy.stderr}`).toBe(0);
 
     const sums = await readGoSum(work);
@@ -381,27 +381,27 @@ test(
     expect(goMod, 'the /v2 dependency is required under its /v2 path').toContain(
       `${b2} v2.1.0 // indirect`,
     );
-    const run1 = await go(['run', '.'], work, goEnvVars, 'golang-v2-run');
+    const run1 = await go(['run', '.'], work, goEnvVars, 'go-v2-run');
     expect(run1.exitCode, `go run: ${run1.stderr}`).toBe(0);
     expect(run1.stdout.trim().split('\n')).toEqual([aBuilt.marker, b2V210.marker]);
 
-    const versions = await go(['list', '-m', '-versions', b2], work, goEnvVars, 'golang-v2-vers');
+    const versions = await go(['list', '-m', '-versions', b2], work, goEnvVars, 'go-v2-vers');
     expect(versions.exitCode, `go list -m -versions: ${versions.stderr}`).toBe(0);
     expect(versions.stdout.trim()).toBe(`${b2} v2.0.0 v2.1.0`);
 
     // A consumer of C gets BOTH majors of B, side by side, at the versions C's go.mod names.
-    const second = await isolatedWorkDir(`golang-v2-both-${seeder.runId}`);
+    const second = await isolatedWorkDir(`go-v2-both-${seeder.runId}`);
     await writeConsumer(second.work, c);
     const secondEnv = await goEnv(second.home, {}, repo.name);
-    const tidy2 = await go(['mod', 'tidy'], second.work, secondEnv, 'golang-v2-both-tidy');
+    const tidy2 = await go(['mod', 'tidy'], second.work, secondEnv, 'go-v2-both-tidy');
     expect(tidy2.exitCode, `go mod tidy (both majors): ${tidy2.command}\n${tidy2.stderr}`).toBe(0);
-    const all = await go(['list', '-m', 'all'], second.work, secondEnv, 'golang-v2-both-all');
+    const all = await go(['list', '-m', 'all'], second.work, secondEnv, 'go-v2-both-all');
     expect(all.exitCode, `go list -m all: ${all.stderr}`).toBe(0);
     const modules = parseModuleList(all.stdout);
     expect(modules.get(c)).toBe('v1.0.0');
     expect(modules.get(b1)).toBe('v1.1.0');
     expect(modules.get(b2)).toBe('v2.0.0');
-    const run2 = await go(['run', '.'], second.work, secondEnv, 'golang-v2-both-run');
+    const run2 = await go(['run', '.'], second.work, secondEnv, 'go-v2-both-run');
     expect(run2.exitCode, `go run (both majors): ${run2.stderr}`).toBe(0);
     expect(run2.stdout.trim().split('\n')).toEqual([
       cBuilt.marker,
@@ -411,7 +411,7 @@ test(
 );
 
 test(
-  'golang > the go.mod of a dependency is served verbatim at @v/<v>.mod, next to .info, @latest ' +
+  'go > the go.mod of a dependency is served verbatim at @v/<v>.mod, next to .info, @latest ' +
     'and @v/list (RPS-1479 T4)',
   { tag: ['@smoke'] },
   async ({ seeder }) => {
@@ -447,7 +447,7 @@ test(
 );
 
 test(
-  'golang > go mod tidy fails in the consumer when a dependency was never published (RPS-1479 T5)',
+  'go > go mod tidy fails in the consumer when a dependency was never published (RPS-1479 T5)',
   { tag: ['@negative'] },
   async ({ seeder }) => {
     const repo = await seeder.createRepo(RepoType.GOLANG, { privateRepo: false });
@@ -455,10 +455,10 @@ test(
     const a = `${MODULE_DOMAIN}/e2e-${seeder.runId}-t5-a`;
     await publishModule(repo.name, a, 'v1.0.0', [{ modulePath: b, version: 'v1.0.0' }]);
 
-    const { home, work } = await isolatedWorkDir(`golang-missingdep-${seeder.runId}`);
+    const { home, work } = await isolatedWorkDir(`go-missingdep-${seeder.runId}`);
     await writeConsumer(work, a);
     const goEnvVars = await goEnv(home, {}, repo.name);
-    const tidy = await go(['mod', 'tidy'], work, goEnvVars, 'golang-missingdep-tidy');
+    const tidy = await go(['mod', 'tidy'], work, goEnvVars, 'go-missingdep-tidy');
     expect(tidy.exitCode, `go mod tidy: ${tidy.command}`).toBe(1);
     expect(tidy.stderr, 'the message names the missing dependency').toContain(b);
     // The proxy's 404 for B's go.mod makes `go` fall through to the next GOPROXY entry, `off`.

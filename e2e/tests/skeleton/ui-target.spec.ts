@@ -179,7 +179,7 @@ const SAMPLES: Record<PackageProtocol, PackageRef> = {
   cargo: { name: 'lib', version: '1.0.0' },
   nuget: { name: 'lib', version: '1.0.0' },
   helm: { name: 'lib', version: '1.0.0' },
-  golang: { name: 'example.com/acme/lib', version: 'v1.0.0' },
+  go: { name: 'example.com/acme/lib', version: 'v1.0.0' },
   ruby: { name: 'lib', version: '1.0.0' },
 };
 

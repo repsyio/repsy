@@ -23,7 +23,7 @@
  * client asks with, which credential scheme it sends where, and that a credential never leaves the
  * repository it belongs to -- without trusting anyone's memory of a client's source.
  *
- * Structure follows `clients/golang-tls-shim.ts` (a per-test server the client is pointed at, `trace`
+ * Structure follows `clients/go-tls-shim.ts` (a per-test server the client is pointed at, `trace`
  * entries), minus TLS. A client is pointed at it through `RegistryBinding.baseUrl`. Two things to
  * know:
  *  - `dist.tarball` is the REGISTRY's address (RPS-1333: `REPO_BASE_URL`, never the address a

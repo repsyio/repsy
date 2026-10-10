@@ -19,7 +19,7 @@
  * wire delete (NO_ROUTE): a DELETE of a module zip gets the router's 404 with every credential and the
  * module stays served.
  */
-import { GOLANG_MANAGE_OPERATIONS } from '../../src/clients/no-route-manage.js';
+import { GO_MANAGE_OPERATIONS } from '../../src/clients/no-route-manage.js';
 import { registerManageMatrix } from '../../src/scenarios/manage-matrix.js';
 
-registerManageMatrix(GOLANG_MANAGE_OPERATIONS);
+registerManageMatrix(GO_MANAGE_OPERATIONS);

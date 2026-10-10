@@ -55,7 +55,7 @@ import { buildImage } from '../../src/clients/docker-image.js';
 import { dockerAdapter } from '../../src/clients/docker.js';
 import { imageRef, sha256Hex } from '../../src/clients/docker-raw.js';
 import { isolatedWorkDir, run } from '../../src/clients/exec.js';
-import { golangAdapter } from '../../src/clients/golang.js';
+import { goAdapter } from '../../src/clients/go.js';
 import { helmAdapter } from '../../src/clients/helm.js';
 import { mavenAdapter } from '../../src/clients/maven-adapter.js';
 import { npmAdapter } from '../../src/clients/npm.js';
@@ -299,7 +299,7 @@ test.describe.serial(
         [npmAdapter, RepoType.NPM],
         [dockerAdapter, RepoType.DOCKER],
         [helmAdapter, RepoType.HELM],
-        [golangAdapter, RepoType.GOLANG],
+        [goAdapter, RepoType.GOLANG],
       ] as const) {
         const name = seeder.reserveRepoName(repoType);
         await legacy.createRepo(repoType, name);

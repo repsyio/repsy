@@ -28,20 +28,20 @@ import { test } from '@playwright/test';
 import { clientEnv } from '../../src/clients/client-env.js';
 import { isolatedWorkDir } from '../../src/clients/exec.js';
 import { expectSealed, probeEnv } from '../../src/clients/env-probe.js';
-import { goEnv } from '../../src/clients/golang.js';
+import { goEnv } from '../../src/clients/go.js';
 
 test(
-  'golang > no runner variable reaches go, its module settings do',
+  'go > no runner variable reaches go, its module settings do',
   { tag: ['@sealed-env'] },
   async () => {
-    const { home, work } = await isolatedWorkDir('golang-sealed-env-go');
-    const seen = await probeEnv(await goEnv(home, {}, 'sealed-env'), work, 'golang-sealed-env-go');
+    const { home, work } = await isolatedWorkDir('go-sealed-env-go');
+    const seen = await probeEnv(await goEnv(home, {}, 'sealed-env'), work, 'go-sealed-env-go');
     expectSealed(seen, home, ['GOPATH', 'GOPROXY', 'GOTOOLCHAIN']);
   },
 );
 
-test('golang > no runner variable reaches curl', { tag: ['@sealed-env'] }, async () => {
-  const { home, work } = await isolatedWorkDir('golang-sealed-env-curl');
-  const seen = await probeEnv(clientEnv(home), work, 'golang-sealed-env-curl');
+test('go > no runner variable reaches curl', { tag: ['@sealed-env'] }, async () => {
+  const { home, work } = await isolatedWorkDir('go-sealed-env-curl');
+  const seen = await probeEnv(clientEnv(home), work, 'go-sealed-env-curl');
   expectSealed(seen, home, []);
 });

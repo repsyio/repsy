@@ -30,12 +30,12 @@ independent wire protocols on the same port for the same package format — OCI 
 project (see "Helm runner" below). This is **step 4c ("pypi")**: a seventh worked example, the PyPI
 (Python Package Index) client adapter and runner — real `twine upload`/`pip download` against a
 hand-built wheel, a single-hop Basic auth model like maven/npm/cargo/nuget/helm, and a real,
-per-FILENAME override rule (see "PyPI runner" below). This is **step 4d ("golang")**: an eighth
+per-FILENAME override rule (see "PyPI runner" below). This is **step 4d ("go")**: an eighth
 worked example, the Go module proxy (GOPROXY protocol) client adapter and runner — the first
 protocol in this harness with NO official publisher at all (Repsy is push-only; the only documented
 way in is a single `curl -T`), so `publish`/`seedPublish` drive real `curl` while `resolve` drives
 the real `go` toolchain, and the first protocol whose consume side needs its own in-process HTTPS
-terminator (`clients/golang-tls-shim.ts`) because the `go` command refuses outright to pass
+terminator (`clients/go-tls-shim.ts`) because the `go` command refuses outright to pass
 credentials to a plain-http `GOPROXY` URL (see "Go runner" below). This is **step 4e ("ruby")** —
 **the LAST protocol adapter of step 4**: a ninth worked example, the Ruby gem (RubyGems/Bundler)
 client adapter and runner, real `gem push`/`bundle install` against a hand-built `.gem`, and the
@@ -78,7 +78,7 @@ install`/`lint`/`tsc`/`gen:api`/`format` are dev tooling, not test execution, an
 ```
 e2e/
   package.json  pnpm-lock.yaml  tsconfig.json  eslint.config.js  .prettierrc  .env.example   # package.json is also the package `repsy-e2e` a workspace consumer depends on, see "Consuming the harness from another repository"
-  playwright.config.ts        # one project per protocol: "skeleton", "maven", "npm", "npm-clients", "cargo", "nuget", "docker", "helm", "pypi", "golang", "ruby"; plus "ui" (the panel in headless Chromium, see "UI suite"), "ui-firefox" and "ui-webkit" (its @smoke subset in the other two engines, see "UI suite: Firefox and WebKit"), "ui-visual" (screenshot comparison, see "UI suite: visual regression") and "api" (raw HTTP at the edge, see "API suite")
+  playwright.config.ts        # one project per protocol: "skeleton", "maven", "npm", "npm-clients", "cargo", "nuget", "docker", "helm", "pypi", "go", "ruby"; plus "ui" (the panel in headless Chromium, see "UI suite"), "ui-firefox" and "ui-webkit" (its @smoke subset in the other two engines, see "UI suite: Firefox and WebKit"), "ui-visual" (screenshot comparison, see "UI suite: visual regression") and "api" (raw HTTP at the edge, see "API suite")
   run.sh                       # single entry point: local | test | sweep
   docker-compose.stack.yml     # postgres profile: postgres:18 + Repsy, `run.sh local up|down`
   docker-compose.stack-h2.yml  # H2 profile: Repsy alone (embedded H2, no postgres service), `run.sh local up|down --h2`
@@ -89,7 +89,7 @@ e2e/
   docker-compose.stack-cors.yml    # OPT-IN overlay on either stack: APP_ALLOWED_ORIGINS set to two origins, `run.sh local up|down --cors`, see "CORS leg"
   docker-compose.stack-proxy.yml   # OPT-IN overlay on either stack: an nginx in front of Repsy terminating TLS (RPS-1651), `run.sh local up|down --proxy`, see "Reverse proxy stack"
   proxy/default.conf.template  # the nginx configuration of that overlay (three listeners, the README's X-Forwarded-* example)
-  docker-compose.runners.yml   # one runner service per protocol: "skeleton", "maven", "npm", "npm-clients", "cargo", "nuget", "docker", "helm", "pypi", "golang", "ruby"; plus "ui", "ui-firefox", "ui-webkit", "ui-visual" and "api"
+  docker-compose.runners.yml   # one runner service per protocol: "skeleton", "maven", "npm", "npm-clients", "cargo", "nuget", "docker", "helm", "pypi", "go", "ruby"; plus "ui", "ui-firefox", "ui-webkit", "ui-visual" and "api"
   runners/base.Dockerfile      # node:24 + pinned pnpm + the harness; the "skeleton" runner
   runners/maven.Dockerfile     # + pinned Temurin/Maven/Gradle/sbt/Ant + Ivy and gpg; see "Adding a protocol adapter" below
   runners/sbt-warmup/          # the throwaway sbt project maven.Dockerfile builds once to prime the sbt caches (RPS-134)
@@ -100,7 +100,7 @@ e2e/
   runners/docker.Dockerfile    # + the static `crane` binary copied out of its own distroless image, `skopeo` (built statically from its pinned tag and commit), `regctl` and `oras` (release binaries, sha256 per arch); no daemon, no socket
   runners/helm.Dockerfile      # + the static `helm` binary + the cm-push plugin installed at build time; no daemon, no socket
   runners/pypi.Dockerfile      # + a pinned CPython copied out of the official python image; pip/twine installed at build time; the static uv binary copied out of Astral's image
-  runners/golang.Dockerfile    # + a pinned Go toolchain copied out of the official golang image, `curl`, and a build-time TLS cert/key for the shim
+  runners/go.Dockerfile    # + a pinned Go toolchain copied out of the official go image, `curl`, and a build-time TLS cert/key for the shim
   runners/ruby.Dockerfile      # + a pinned Ruby toolchain (ruby/gem/bundle/bundler + stdlib) copied out of the official ruby image
   runners/stack.Dockerfile     # + the static `docker` CLI and its compose plugin copied out of docker-cli, a JDK + Maven, crane and npm; the "stack" runner, the only one with the host's Docker socket, see "Stack runner"
   runners/ui.Dockerfile        # + Playwright's own headless Chromium, Firefox and WebKit (build-time install, /ms-playwright); the "ui", "ui-firefox", "ui-webkit" and "ui-visual" runners, see "UI suite"
@@ -183,9 +183,9 @@ e2e/
       pypi-raw.ts                     # pypi-specific raw POST/GET (upload/simple page/root index/download), buildWheel (fflate)
       pypi.ts                          # the pypi client + pypiAdapter: publish()/resolve()/seedPublish(), python3 -m twine/pip
       uv.ts                            # the second pypi client: uvAdapter (uv publish / uv lock + uv sync), uvEnv, runUv, a uv.lock reader
-      golang-raw.ts                     # golang-specific raw PUT/GET (@v/list, @latest, .info/.mod/.zip), buildModuleZip (fflate), dirhashHash1
-      golang-tls-shim.ts                 # in-process HTTPS reverse proxy for a credentialed consume (a real `go` refuses plain-http creds; not used on a TLS stack)
-      golang.ts                          # the golang client + golangAdapter: publish()/resolve()/seedPublish(), real curl -T / go mod download
+      go-raw.ts                     # go-specific raw PUT/GET (@v/list, @latest, .info/.mod/.zip), buildModuleZip (fflate), dirhashHash1
+      go-tls-shim.ts                 # in-process HTTPS reverse proxy for a credentialed consume (a real `go` refuses plain-http creds; not used on a TLS stack)
+      go.ts                          # the go client + goAdapter: publish()/resolve()/seedPublish(), real curl -T / go mod download
       ruby-raw.ts                          # ruby-specific raw POST/GET/DELETE (gems/yank/versions/info/names/specs.4.8.gz), buildGem (buildTar + node:zlib)
       ruby.ts                              # the ruby client + rubyAdapter: publish()/resolve()/seedPublish(), real gem push / bundle install
     packages/
@@ -199,7 +199,7 @@ e2e/
       docker/                    # config.template.json (DOCKER_CONFIG auths entry; the image itself is built in code, see docker-image.ts)
       helm/                      # Chart.template.yaml + registry-config.template.json (HELM_REGISTRY_CONFIG auths entry)
       # no packages/pypi/: the wheel is built entirely in code (line-based text), see pypi-raw.ts's buildWheel
-      golang/                    # go.template.mod + hello.template.go (rendered into the zip in code) + consumer-go.template.mod/consumer-main.template.go
+      go/                    # go.template.mod + hello.template.go (rendered into the zip in code) + consumer-go.template.mod/consumer-main.template.go
       ruby/                      # metadata.template.yaml (the hand-built .gem's gzipped gemspec YAML) + lib.template.rb + Gemfile.template
   tests/
     ui/                         # the panel UI suite (Playwright + headless Chromium): smoke.spec.ts (@smoke) and harness.spec.ts, one folder per area from here on -- see "UI suite"
@@ -281,8 +281,8 @@ e2e/
       registry-rules.spec.ts    # raw-HTTP pins of the override/version/digest rules, root-index shape, HEAD, 307 redirect, no releases/snapshots rule
       uv-catalog.spec.ts        # RPS-1486 registerPublishConsumeLoop(uvAdapter): the shared catalog with `uv publish` + `uv lock`/`uv sync`
       uv-client.spec.ts         # RPS-1486 U1-U9: uv's upload form, uv.lock hashes, netrc, uv pip --require-hashes, tampered lock, PEP 691 Accept, --check-url, deleted release
-    golang/
-      publish-consume.spec.ts   # registerPublishConsumeLoop(golangAdapter) + go-get-build-run, plain-http-creds-refused, dirhash cross-check, mixed-case, wire-trace, .netrc authentication, escape-encoded paths, retract probe, GOSUMDB variations real-client tests (RPS-1720)
+    go/
+      publish-consume.spec.ts   # registerPublishConsumeLoop(goAdapter) + go-get-build-run, plain-http-creds-refused, dirhash cross-check, mixed-case, wire-trace, .netrc authentication, escape-encoded paths, retract probe, GOSUMDB variations real-client tests (RPS-1720)
       registry-rules.spec.ts    # raw-HTTP pins R1-R16 (auth, upload URL spellings, sha256, immutability, zip validation, @v/list/@latest, sumdb, HEAD, delete+reupload)
     ruby/
       publish-consume.spec.ts   # registerPublishConsumeLoop(rubyAdapter) + gem-install (RPS-1233, fixed)/gem-fetch (RPS-1234, fixed), anonymous-push, yank (RPS-1235, fixed), USER-role-push, bundle-install-e2e real-client tests
@@ -1368,8 +1368,8 @@ checks the status), so `ruby-manage.ts` reads the outcome from the server's "Suc
 message instead of the exit code.
 
 Helm, Docker and the protocols with no wire delete (`clients/{helm,docker,no-route}-manage.ts`,
-`tests/{helm,docker,pypi,golang,maven}/manage-matrix.spec.ts`; `./run.sh test --protocol
-helm,docker,pypi,golang,maven --grep " manage "`, 35 cells). MANAGE: the classic Helm chart
+`tests/{helm,docker,pypi,go,maven}/manage-matrix.spec.ts`; `./run.sh test --protocol
+helm,docker,pypi,go,maven --grep " manage "`, 35 cells). MANAGE: the classic Helm chart
 `DELETE /<repo>/api/charts/<chart>/<version>` (raw, no Helm command sends it) and Docker
 `delete-manifest`/`delete-tag` (the real `crane delete` by digest and by tag, replayed as the token
 dance plus `DELETE` for a refused cell). A USER account gets a Docker token (issuance is not scope- or
@@ -1933,14 +1933,14 @@ the pnpm under test), and there is **no corepack** (it would download at run tim
 Versions are compose build args, exported as `ENV NPM_CLIENTS_*_VERSION`, printed in the build log and
 checked against each client's own `--version` at build time and by `tests/npm-clients/versions.spec.ts`.
 
-| Client       | How it is installed                                                                                                                                                      | Pinned version (build arg)                                                                           | Resolved with                                     |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| npm          | the `node:24-bookworm-slim` base's own                                                                                                                                   | 11.19.0 (not pinned: printed in the build log, the spec asserts major 11)                            | `npm --version`                                   |
-| pnpm         | `npm install -g --ignore-scripts --prefix /opt/clients/pnpm pnpm@…`                                                                                                      | `PNPM_CLIENT_VERSION` = **12.6.0** (one major only, on purpose; the harness's own pnpm stays 12.5.1) | `npm view pnpm dist-tags` (`latest`)              |
-| yarn classic | `… --prefix /opt/clients/yarn1 yarn@…`                                                                                                                                   | `YARN_CLASSIC_VERSION` = **1.22.22** (the frozen last release of the line)                           | `npm view yarn dist-tags` (`latest`)              |
-| yarn berry   | `… --prefix /opt/clients/yarn4 @yarnpkg/cli-dist@…`                                                                                                                      | `YARN_BERRY_VERSION` = **4.18.1**                                                                    | `npm view @yarnpkg/cli-dist dist-tags` (`latest`) |
-| bun          | `COPY --from=oven/bun:<v>-debian /usr/local/bin/bun /opt/clients/bun/bin/bun` (the cargo/golang/ruby "copy the toolchain" pattern; a glibc binary runs on bookworm-slim) | `BUN_VERSION` = **1.3.14**                                                                           | the newest `1.3.x-debian` tag of `oven/bun`       |
-| deno         | `COPY --from=denoland/deno:bin-<v> /deno /opt/clients/deno/bin/deno` (the `bin-<version>` image holds just that glibc binary; consume-only, see "Deno")                  | `DENO_VERSION` = **2.9.7**                                                                           | the newest `bin-2.x.y` tag of `denoland/deno`     |
+| Client       | How it is installed                                                                                                                                                  | Pinned version (build arg)                                                                           | Resolved with                                     |
+| ------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| npm          | the `node:24-bookworm-slim` base's own                                                                                                                               | 11.19.0 (not pinned: printed in the build log, the spec asserts major 11)                            | `npm --version`                                   |
+| pnpm         | `npm install -g --ignore-scripts --prefix /opt/clients/pnpm pnpm@…`                                                                                                  | `PNPM_CLIENT_VERSION` = **12.6.0** (one major only, on purpose; the harness's own pnpm stays 12.5.1) | `npm view pnpm dist-tags` (`latest`)              |
+| yarn classic | `… --prefix /opt/clients/yarn1 yarn@…`                                                                                                                               | `YARN_CLASSIC_VERSION` = **1.22.22** (the frozen last release of the line)                           | `npm view yarn dist-tags` (`latest`)              |
+| yarn berry   | `… --prefix /opt/clients/yarn4 @yarnpkg/cli-dist@…`                                                                                                                  | `YARN_BERRY_VERSION` = **4.18.1**                                                                    | `npm view @yarnpkg/cli-dist dist-tags` (`latest`) |
+| bun          | `COPY --from=oven/bun:<v>-debian /usr/local/bin/bun /opt/clients/bun/bin/bun` (the cargo/go/ruby "copy the toolchain" pattern; a glibc binary runs on bookworm-slim) | `BUN_VERSION` = **1.3.14**                                                                           | the newest `1.3.x-debian` tag of `oven/bun`       |
+| deno         | `COPY --from=denoland/deno:bin-<v> /deno /opt/clients/deno/bin/deno` (the `bin-<version>` image holds just that glibc binary; consume-only, see "Deno")              | `DENO_VERSION` = **2.9.7**                                                                           | the newest `bin-2.x.y` tag of `denoland/deno`     |
 
 To bump one: change its build arg in `docker-compose.runners.yml` (for bun or deno also run
 `runners/bump-pins.sh --write`, which refreshes their `*_IMAGE_DIGEST`, "Runner images and pins"), `./run.sh test
@@ -4251,15 +4251,15 @@ run `uv publish --trusted-publishing never --publish-url <repo>/`, `resolve` run
 Go is the first protocol in this harness with **no official publisher at all**:
 `repsy-protocols/golang/README.md`'s "Uploading a Module" section is explicit that Repsy is a push
 registry ("Repsy does not run `go mod` commands. You build the zip locally and upload it with a
-single `curl`"), and the panel's own `golang-config.component.ts` teaches the identical incantation.
-So `clients/golang.ts`'s `publish`/`seedPublish` drive the REAL `curl` binary directly, and there is
+single `curl`"), and the panel's own `go-config.component.ts` teaches the identical incantation.
+So `clients/go.ts`'s `publish`/`seedPublish` drive the REAL `curl` binary directly, and there is
 no companion raw-HTTP probe the way pypi's/nuget's/cargo's `publish()` needs one: `curl -w
 '%{http_code}'` already reports the raw HTTP status (confirmed live: `--fail-with-body` still writes
 the response body to `-o` and prints the status code on a 4xx/5xx, curl exit `22`). `resolve` drives
 the REAL `go` toolchain (`go mod download -json`), the consume side every protocol in this harness
 gets.
 
-Every module zip is hand-built (`golang-raw.ts`'s `buildModuleZip`, `fflate` — never `go build`/
+Every module zip is hand-built (`go-raw.ts`'s `buildModuleZip`, `fflate` — never `go build`/
 `go mod`), rendered from `go.template.mod`/`hello.template.go` with a fresh random marker packed into
 `hello.go`/`e2e-marker.txt`. There is deliberately **no redeploy/prerelease-sibling trick** the way
 cargo's adapter needs one: version immutability is unconditional (`allowOverride` is never read
@@ -4271,26 +4271,26 @@ adapter code was written (H3): a real `go` command refuses outright to pass Basi
 explicit `http://` `GOPROXY` URL (`refusing to pass credentials to insecure URL: ...`, client-side,
 before any request), while the exact same credentials work over `https://` (H4). Since this harness's
 own stack is plain HTTP, a credentialed consume needs an in-process HTTPS terminator in front of it —
-`clients/golang-tls-shim.ts`'s `ensureTlsShim()`, a lazily started, per-worker-process Node
+`clients/go-tls-shim.ts`'s `ensureTlsShim()`, a lazily started, per-worker-process Node
 `https.createServer` reverse proxy bound to `127.0.0.1:0`, trusted via `SSL_CERT_FILE` alone (no
-`--ca`, confirmed live/H4) pointed at a throwaway certificate/key `runners/golang.Dockerfile` generates
+`--ca`, confirmed live/H4) pointed at a throwaway certificate/key `runners/go.Dockerfile` generates
 ONCE at build time with Go's own `crypto/tls/generate_cert.go`. An anonymous consume, or one already
 against `https://` (a remote target), never needs the shim at all (H2).
 
 ```bash
-./run.sh test --protocol golang -b   # -b the first time: builds the golang runner image
+./run.sh test --protocol go -b   # -b the first time: builds the go runner image
 ```
 
 ### Scenario mapping onto the shared catalog
 
-Every catalog scenario that is not maven/nuget-restricted applies to golang unchanged, with the SAME
+Every catalog scenario that is not maven/nuget-restricted applies to go unchanged, with the SAME
 `unauthorized`/`ok` buckets maven already pins — `GoAuthenticator` is a bare `ProtocolAuthService`
 subclass with no overrides, so every auth outcome (a read-only token's flat 401 on WRITE, an expired/
 revoked/rotated/wrong-repo token, a wrong password, anonymous-on-private) matches byte-for-byte,
 confirmed live. The ONE data change needed: `no-override`/`override` both get `expectByProtocol: {
-golang: { publish: 'conflict' } }` — a REAL, UNCONDITIONAL `409` (`goModuleVersionAlreadyExists`),
+go: { publish: 'conflict' } }` — a REAL, UNCONDITIONAL `409` (`goModuleVersionAlreadyExists`),
 confirmed live, since `allowOverride` is never read at all (so, like cargo's own deliberate note,
-`override: true` does NOT make a redeploy succeed for golang either). golang is never added to
+`override: true` does NOT make a redeploy succeed for go either). go is never added to
 `maven-releases-off`/`maven-snapshots-off`/`redeploy-*-off`/`snapshot-*`: it has no releases/snapshots
 rule at all (grep-confirmed: no Go code reads either repo setting) and no SNAPSHOT-file concept.
 
@@ -4323,7 +4323,7 @@ BEFORE any adapter code was written — H1-H4 and H12 gated the whole design.
   no `--ca`; both `user:password` and `token:<deploy-token>` work): confirmed live.
 - **H5** (`/usr/local/go` copied into `node:24-bookworm-slim` runs `go version`/`go mod download`/
   `go build` with no extra apt packages beyond `curl ca-certificates`; `go run generate_cert.go`
-  works at build time): confirmed live — `runners/golang.Dockerfile` built clean on the first
+  works at build time): confirmed live — `runners/go.Dockerfile` built clean on the first
   attempt.
 - **H6** (`go get`, then `go build`, then running the binary, prints the marker): confirmed live —
   `publish-consume.spec.ts`'s dedicated test.
@@ -4352,7 +4352,7 @@ BEFORE any adapter code was written — H1-H4 and H12 gated the whole design.
   R2/R3 — every raw upload in this suite that omits `Content-Type` still succeeds; the adapter itself
   sends one explicitly regardless (this file's header, the maven-adapter lesson).
 - **H15** (parallel workers each start their own shim on an ephemeral port; two consecutive full
-  `--protocol golang` runs are green without a stack reset): confirmed — both runs passed 35/35 with
+  `--protocol go` runs are green without a stack reset): confirmed — both runs passed 35/35 with
   no port conflict and no stack reset in between.
 - **H16** (`v0.<secs>.<seq>` is accepted by both Repsy and Go; `@latest` returns it when it is the
   only version): confirmed live.
@@ -4414,7 +4414,7 @@ RPS-1227 and RPS-1228 are fixed (#447): `registry-rules.spec.ts` now pins `400 i
 .extractVersionFromPath`'s own javadoc), not a defect the catalog loop needs to work around.
 - **RPS-1229** (same family as RPS-1214/RPS-1222, docs bugs on other protocols) — the panel's
   own documented `go env -w GOPROXY="<scheme>://user:pass@..."` incantation
-  (`golang-config.component.ts`) cannot work AT ALL on a plain-http deployment: the `go` command
+  (`go-config.component.ts`) cannot work AT ALL on a plain-http deployment: the `go` command
   itself refuses to send it (H3). Confirmed live: `publish-consume.spec.ts`'s dedicated test.
 - **RPS-1230** (resolved) — the `410 Gone`/`GoVersionGoneException` path was DEAD: grep-confirmed
   nothing in either Go package ever threw it, and the `deleted` column `V0002__Golang_Protocol.sql`
@@ -4426,7 +4426,7 @@ RPS-1227 and RPS-1228 are fixed (#447): `registry-rules.spec.ts` now pins `400 i
   fresh `200`, never a `410`. Confirmed live: `registry-rules.spec.ts`'s R14 test, unchanged by the
   cleanup since the observable behavior was identical before and after.
 - **G9** (not a defect — the observed status is correct on both ports, just by two unrelated code
-  paths, no ticket filed) — `sumdb/supported` 404s on BOTH the API port (`GolangModuleController
+  paths, no ticket filed) — `sumdb/supported` 404s on BOTH the API port (`GoModuleController
 .checkSumdbSupported`, deliberate — the doc comment says so) and the protocol port (the `go` command's
   own probe lands on the download handler and 404s by a plain storage-miss, purely by accident — a
   different code path producing the same status). Confirmed live: `registry-rules.spec.ts`'s R12
@@ -4438,18 +4438,18 @@ RPS-1227 and RPS-1228 are fixed (#447): `registry-rules.spec.ts` now pins `400 i
   trip (`publish-consume.spec.ts`, lines 193–224, H18/RPS-1232) showing that a real `go mod download`
   of a mixed-case module path succeeds and the server reports back the original mixed-case path.
 
-### Real-client authentication and edge cases (RPS-1720, `tests/golang/publish-consume.spec.ts`)
+### Real-client authentication and edge cases (RPS-1720, `tests/go/publish-consume.spec.ts`)
 
 `publish-consume.spec.ts` includes four new real-client tests for authentication and Go's module handling:
 
-- **`.netrc` authentication**: A real `go mod download` authenticates purely from a `~/.netrc` file, no credentials embedded in `GOPROXY` at all. Like URL-embedded userinfo (H3/RPS-1229 above), `cmd/go`'s `web` package refuses to send netrc-sourced Basic Auth over a plain (non-`https`) `GOPROXY` URL either -- the SAME "refusing to pass credentials to insecure URL" policy covers both credential sources, confirmed live. So this test goes through the same TLS shim (`golang-tls-shim.ts`) H4/H8 use for embedded credentials over plain http, but with no userinfo in the shim's URL, forcing `go` to fall through to its netrc lookup; the netrc `machine` line names the shim's own `127.0.0.1:<port>`, not the plain-http backend.
+- **`.netrc` authentication**: A real `go mod download` authenticates purely from a `~/.netrc` file, no credentials embedded in `GOPROXY` at all. Like URL-embedded userinfo (H3/RPS-1229 above), `cmd/go`'s `web` package refuses to send netrc-sourced Basic Auth over a plain (non-`https`) `GOPROXY` URL either -- the SAME "refusing to pass credentials to insecure URL" policy covers both credential sources, confirmed live. So this test goes through the same TLS shim (`go-tls-shim.ts`) H4/H8 use for embedded credentials over plain http, but with no userinfo in the shim's URL, forcing `go` to fall through to its netrc lookup; the netrc `machine` line names the shim's own `127.0.0.1:<port>`, not the plain-http backend.
 - **Escape-encoded module paths with uppercase letters**: Tests that a real `go get` of a module path with uppercase letters (escaped via Go's `!`-encoding mechanism, e.g., `Hello` → `!hello`) correctly resolves and downloads. Verifies that Repsy and Go handle the escape encoding transparently for real module paths.
 - **Retract directive behavior**: Probes Go's module retraction mechanism (client-side metadata in `go.mod` files). Confirms that Repsy, having no knowledge of retractions, continues to serve retracted versions normally. Go's `go mod download` succeeds even for versions marked as retracted in a consumer's own `go.mod`, since Repsy is the upstream provider.
 - **`GOSUMDB` variations**: Tests the interaction between `GONOSUMDB` and `GOSUMDB` environment variables. Confirms that `GONOSUMDB=<domain>` (set by `goEnv` to skip checksum verification for Repsy's modules) and `GOSUMDB=off` (explicit disable) both allow module download to succeed from a sumdb-less proxy like Repsy.
 
-### Transitive resolution (RPS-1479, `tests/golang/transitive-resolution.spec.ts`)
+### Transitive resolution (RPS-1479, `tests/go/transitive-resolution.spec.ts`)
 
-`buildModuleZip({ requires })` (`golang-raw.ts`) writes `require` lines into a module's `go.mod` and
+`buildModuleZip({ requires })` (`go-raw.ts`) writes `require` lines into a module's `go.mod` and
 a `hello.go` (`hello-deps.template.go`) that imports the dependencies, so a real `go mod tidy` in a
 consumer that imports only module A has to walk A's `go.mod` to B through what Repsy serves. Pinned,
 against the real `go` (through the TLS shim for the private-repo case): the consumer's `go.mod`
@@ -4469,13 +4469,13 @@ database). A dependency's go.mod is plain `@v/<v>.mod` (`text/plain`); an unpubl
 
 This is **step 4e ("ruby") — the LAST protocol adapter of step 4**: the Ruby gem (RubyGems/Bundler)
 client adapter and runner. It closes out step 4 with a real-toolchain publisher/consumer pair, like
-pypi/golang, and it is the protocol whose plan carried the single most consequential gating
+pypi/go, and it is the protocol whose plan carried the single most consequential gating
 hypothesis of the whole harness — refuted live before any adapter code was written (see below).
 
 `runners/ruby.Dockerfile` copies a pinned Ruby toolchain (`ruby:4.0.7-slim-bookworm`, confirmed live
 to ship RubyGems 4.0.20 / Bundler 4.0.20 — unified versioning since Ruby 4.0) in from that official
 image's `/usr/local/{bin,lib/ruby,lib/libruby.so*}`, the same "copy the toolchain, not the whole
-image" approach as pypi's CPython / golang's Go toolchain. `clients/ruby.ts` renders
+image" approach as pypi's CPython / go's Go toolchain. `clients/ruby.ts` renders
 `src/packages/ruby/{Gemfile,lib}.template.*` (plus `metadata.template.yaml` for the hand-built `.gem`
 itself, `ruby-raw.ts`'s `buildGem`) into a per-invocation isolated work directory (`clients/exec.ts`)
 and runs the REAL `gem`/`bundle` binaries:
@@ -4487,7 +4487,7 @@ and runs the REAL `gem`/`bundle` binaries:
   default `allowOverride: true`, and the same `409` under `false`).
 - **`resolve`**: a rendered `Gemfile` (`source "<repoBaseUrl>/<repo>" do gem "<name>", "= <version>"
 end`) and a real `bundle install --verbose`, plus an auth-only raw `GET /info/<name>` companion
-  probe (never the `.gem` bytes themselves, mirroring pypi's/golang's own `resolve()` reasoning).
+  probe (never the `.gem` bytes themselves, mirroring pypi's/go's own `resolve()` reasoning).
 - **Every publish/seed-publish packs a fresh random marker** into both `lib/<name>.rb` and
   `e2e-marker.txt`; `AdapterResult.contentSha256` is the sha256 of the WHOLE `.gem` file (Bundler's
   cache renames the downloaded gem into place byte-for-byte, confirmed live).
@@ -4538,7 +4538,7 @@ now fixed and `publish-consume.spec.ts`'s dedicated `gem fetch` test asserts a r
 
 Every catalog scenario that is not maven/nuget-restricted applies to ruby unchanged, with the SAME
 `unauthorized`/`ok` buckets maven already pins — `RubyAuthenticator` is a bare `ProtocolAuthService`
-subclass with no overrides (`normalizeAuthHeader` Bearer-prefixes a bare value, the cargo/golang
+subclass with no overrides (`normalizeAuthHeader` Bearer-prefixes a bare value, the cargo/go
 trick), so every auth outcome (a read-only token's flat 401 on WRITE, an expired/revoked/rotated/
 wrong-repo token, a wrong password, anonymous-on-private) matches byte-for-byte, confirmed live. The
 ONE data change needed: `no-override` gets `expectByProtocol: { ruby: { publish: 'conflict' } }` — a
@@ -4812,7 +4812,7 @@ and is never part of the default stack.
 | ------------ | ----------------------- | ------------------------ | ------------------------------------- | ------------ | ---------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | `scanner`    | `--scanner`             | `REPSY_E2E_SCANNER=1`    | `docker-compose.stack-scanner.yml`    | `scanner`    | stub scanner, `SECURITY_SCANNER=enabled`                   | `@scanner` (ui, npm-clients, docker, maven, pypi), "Scanner stack"             |
 | `throttle`   | `--throttle`            | `REPSY_E2E_THROTTLE=1`   | `docker-compose.stack-throttle.yml`   | `throttle`   | 3 failed password checks per 10 s per client               | `@throttle` (stack, ui), "Auth-throttle leg"                                   |
-| `tls`        | `--tls`                 | `REPSY_E2E_TLS=1`        | `docker-compose.stack-tls.yml`        | `tls`        | Repsy's own https listeners 8443/9443                      | `@tls` (skeleton, golang, ui), "TLS stack"; nightly `@smoke` of all clients    |
+| `tls`        | `--tls`                 | `REPSY_E2E_TLS=1`        | `docker-compose.stack-tls.yml`        | `tls`        | Repsy's own https listeners 8443/9443                      | `@tls` (skeleton, go, ui), "TLS stack"; nightly `@smoke` of all clients        |
 | `limits`     | `--limits`              | `REPSY_E2E_LIMITS=1`     | `docker-compose.stack-limits.yml`     | `limits`     | every configurable upload limit at 64 KiB                  | `@limits` (7 runners), "Size-limit leg"                                        |
 | `cors`       | `--cors`                | `REPSY_E2E_CORS=1`       | `docker-compose.stack-cors.yml`       | `cors`       | `APP_ALLOWED_ORIGINS` set to two origins (default: unset)  | `@cors` (api), "CORS leg"                                                      |
 | `proxy`      | `--proxy`               | `REPSY_E2E_PROXY=1`      | `docker-compose.stack-proxy.yml`      | `proxy`      | an nginx in front of Repsy, TLS terminated there           | `@proxy` (ui, api), "Reverse proxy stack"                                      |
@@ -4936,10 +4936,10 @@ Every panel session the harness holds dies with a restart of a stack without a f
 a Basic-auth client authenticates per request and never notices. The runner runs with
 `REPSY_E2E_WORKERS=1` (`playwright.config.ts`), never against a shared stack. The stack runner image is
 about 1.75 GB (JDK, Maven, crane, compose plugin, the helm binary and the Go toolchain; versions pinned in
-`docker-compose.runners.yml` next to the maven, docker, helm and golang runners' and to be kept equal to
+`docker-compose.runners.yml` next to the maven, docker, helm and go runners' and to be kept equal to
 them). Helm and Go grow it by roughly 250 MB (mostly the Go toolchain, RPS-1719/RPS-1720): the packages
 and persistence specs publish a chart and a module with the same real `helm`/`go` clients as the helm and
-golang runners, including golang's build-time TLS shim certificate (`golang.Dockerfile`'s header) that a
+go runners, including go's build-time TLS shim certificate (`go.Dockerfile`'s header) that a
 credentialed `go` invocation needs.
 
 Flip checks (each made the named test fail, then reverted): `--renew-anon-volumes` on the recreate (the
@@ -5108,7 +5108,7 @@ has to trust its certificate in its own way.
 
 ```bash
 ./run.sh local up --tls                                   # (or REPSY_E2E_TLS=1) add --h2 for H2
-REPSY_E2E_TLS=1 ./run.sh test --protocol skeleton,api,golang,docker,npm --grep @smoke
+REPSY_E2E_TLS=1 ./run.sh test --protocol skeleton,api,go,docker,npm --grep @smoke
 ./run.sh local down --tls
 ```
 
@@ -5163,14 +5163,14 @@ when `REPSY_E2E_TLS_CA_FILE` is set ("The panel over https" under "UI suite: Fir
 
 **Go without the shim.** On a TLS stack the target is https, so `goEnv` embeds the credentials in an https `GOPROXY`
 and Go trusts the CA through `SSL_CERT_FILE`; the in-process shim is never started. In
-`tests/golang/publish-consume.spec.ts` the plain-http refusal case (H3) runs against the plain port
+`tests/go/publish-consume.spec.ts` the plain-http refusal case (H3) runs against the plain port
 (`plainRepoBaseUrl`, still there), and the shim wire-sequence case (H8/H19) has an https twin: a credentialed
 `go mod download -json` straight at Repsy's TLS listener, whose `Info`, `GoMod` and `Zip` files exist and
 whose zip is the published one, with the shim's trace unchanged.
 
 **Runs of this part** (own stack, offset 200, image of main): skeleton `@tls` 12/12, `api` `@smoke` 18/18,
-golang full 43 passed and 1 skipped (the shim case), docker full 56/56, npm full (its RPS-1559 cases were expected failures until the fix, below).
-Flip checks: with `SSL_CERT_FILE` withheld from the runner the golang `@smoke` cases fail with `tls: failed to verify
+go full 43 passed and 1 skipped (the shim case), docker full 56/56, npm full (its RPS-1559 cases were expected failures until the fix, below).
+Flip checks: with `SSL_CERT_FILE` withheld from the runner the go `@smoke` cases fail with `tls: failed to verify
 certificate`; with `NODE_EXTRA_CA_CERTS` and `SSL_CERT_FILE` withheld every npm and docker case fails with `self-signed
 certificate in certificate chain`; the untrusted-child case above pins the same thing permanently.
 
@@ -5209,7 +5209,7 @@ uses it) and trusts the CA the way it always does, with no `--insecure` and no s
 | `helm`: classic (`helm repo`, `cm-push`) and OCI (`helm push`/`pull`, `--plain-http` left off on https) | `SSL_CERT_FILE` (Go)                                                                                                                                                                                                                                             |
 | `ruby`: gem, bundler                                                                                    | `SSL_CERT_FILE` (OpenSSL)                                                                                                                                                                                                                                        |
 | `npm-clients`: npm, pnpm, yarn 1, yarn 4, bun                                                           | `NODE_EXTRA_CA_CERTS`, copied into their sealed environment by `sealedEnv`                                                                                                                                                                                       |
-| `docker`: crane; `golang`: go; `npm`: npm                                                               | `SSL_CERT_FILE` (Go), `NODE_EXTRA_CA_CERTS` (part a); `crane` runs without `--insecure` on https                                                                                                                                                                 |
+| `docker`: crane; `go`: go; `npm`: npm                                                                   | `SSL_CERT_FILE` (Go), `NODE_EXTRA_CA_CERTS` (part a); `crane` runs without `--insecure` on https                                                                                                                                                                 |
 
 The JVM truststore is **not** the CA alone: a truststore replaces the JDK's for the whole process, and Maven and Gradle
 also resolve plugins from Maven Central (a CA-only store fails them with `PKIX path building failed`, observed). So
@@ -5254,16 +5254,16 @@ Whichever adapter comes next needs its own TLS setting decided in that file (or 
 `@smoke` (and full catalog) on a TLS stack recorded under "Runs of this part".
 
 **Runs of this part** (own stack, offset 200, image of main, `REPSY_E2E_TLS=1`): `@smoke` skeleton 21, maven 23, npm 5
-(the RPS-1559 expected failure, since fixed, included), npm-clients 11, cargo 12, nuget 12, docker 8, helm 7, pypi 7, golang 10 + 1 skipped (the shim case),
+(the RPS-1559 expected failure, since fixed, included), npm-clients 11, cargo 12, nuget 12, docker 8, helm 7, pypi 7, go 10 + 1 skipped (the shim case),
 ruby 7, api 277: all green, none retried (run as the nightly leg runs them, then its opt-in check). The full catalogs on the same stack (not part of the nightly leg, run once for this part):
-maven 238 passed and 1 skipped, cargo 49, nuget 51, helm 63, ruby 51, golang 48 and 1 skipped, npm-clients 208 (the 13 RPS-1559
+maven 238 passed and 1 skipped, cargo 49, nuget 51, helm 63, ruby 51, go 48 and 1 skipped, npm-clients 208 (the 13 RPS-1559
 expected failures, since fixed, among them) and 6 skipped, and, after merging the skopeo, regctl, oras, uv and deno adapters, docker 106 passed
 and 1 skipped (the 4 RPS-1490 expected failures among them) and pypi 66 passed and 3 skipped; no failure anywhere.
 Flip checks: with the client-side trust withheld and the harness's own kept (`NODE_EXTRA_CA_CERTS` only), maven's `@smoke`
 fails 18 of 20 with `PKIX path building failed`, cargo 11/11 with `SSL peer certificate ... was not OK`, nuget 12/12
 with `Unable to load the service index`, pypi 5 of 6 (`CERTIFICATE_VERIFY_FAILED` by hand), helm 7/7 and docker 6/6
 with `x509: certificate signed by unknown authority`, ruby 3 of 7 (bundler's "your system doesn't have the CA
-certificates"), golang 8 of 10; with `NODE_EXTRA_CA_CERTS` withheld from the npm-clients' sealed environment only,
+certificates"), go 8 of 10; with `NODE_EXTRA_CA_CERTS` withheld from the npm-clients' sealed environment only,
 all 11 npm-clients cases (deno included) fail with `self-signed certificate in certificate chain`; with every client-side
 variable withheld the docker runner's crane, skopeo, regctl and oras cases fail (35 of 54) and pypi's pip, twine and uv cases fail 6 of 7. (The
 passing rest of each are cases that talk only to the harness.)
@@ -5279,7 +5279,7 @@ KiB is refused.
 
 ```bash
 ./run.sh local up --limits                                        # (or REPSY_E2E_LIMITS=1) add --h2 for H2
-REPSY_E2E_LIMITS=1 ./run.sh test --protocol pypi --grep @limits   # and helm, nuget, ruby, cargo, golang, npm, npm-clients, api
+REPSY_E2E_LIMITS=1 ./run.sh test --protocol pypi --grep @limits   # and helm, nuget, ruby, cargo, go, npm, npm-clients, api
 ./run.sh local down --limits
 ```
 
@@ -5458,7 +5458,7 @@ Two more specs of the `api` runner (`./run.sh test --protocol api`, see "API sui
      spec, called as admin before and after (plus the run's users and repos), answers the same (`errorCode`, a
      fresh correlation id per error, is dropped from the comparison);
   3. an anonymous caller gets 401 on every operation that is not `security: []`, on placeholders and on real
-     private repos; the public ones (`login`, `refreshToken`, `checkGolangSumdbSupported`,
+     private repos; the public ones (`login`, `refreshToken`, `checkGoSumdbSupported`,
      `getSupportedRepoTypes`) are not 401;
   4. the reverse: every OTHER operation, called as a USER, is not 403, so a MANAGE route that forgot to document its
      403 fails the build. `REVERSE_SKIP` holds `deleteProfile`, `updateUsername`, `updatePassword`, `login` and
@@ -5558,11 +5558,11 @@ same `expectCovers`). What is specific to them:
 
 ## Panel API contract specs: NuGet, Cargo, Ruby and Go (RPS-1483 part B5)
 
-`tests/{nuget,cargo,ruby,golang}/panel-api.spec.ts`, each in its own runner (`--protocol nuget|cargo|ruby|golang`), built
+`tests/{nuget,cargo,ruby,go}/panel-api.spec.ts`, each in its own runner (`--protocol nuget|cargo|ruby|go`), built
 like the Maven, npm and PyPI ones (same helpers, same five kinds of check: coverage, facts, failures, paging, deletes):
 
 ```bash
-./run.sh test --protocol nuget,cargo,ruby,golang --grep "panel API"
+./run.sh test --protocol nuget,cargo,ruby,go --grep "panel API"
 ```
 
 | Protocol | Published with                                                                                                                     | Facts matched to the client                                                                                                                                                                                                                           | After the panel DELETE                                                                                                                                                     |
@@ -5570,7 +5570,7 @@ like the Maven, npm and PyPI ones (same helpers, same five kinds of check: cover
 | NuGet    | `dotnet nuget push` of a nupkg with a nuspec of our own (`buildNupkg({ metadata, dependencies })`)                                 | flat-container versions, registration `listed` (flipped by a real `dotnet nuget delete`), title, tags, URLs, README, dependencies per target framework, downloads after a `dotnet restore`, `3.0.0.0` read as `3.0.0`                                 | `v3/package/<id>/index.json`, the registration and the `.nupkg` drop it (404 for the last version), `dotnet restore` fails, the sibling restores to its bytes              |
 | Cargo    | `cargo publish` (the adapter's crate, and a manifest of our own with a normal and a dev dependency)                                | sparse-index versions and `yanked` (flipped by `cargo yank` and `--undo`), `cksum`, description, authors, keywords, categories, URLs, license, edition, `rust-version`, README, `deps` of each kind, downloads after a `cargo fetch`, `-` read as `_` | the sparse index and the `.crate` drop it, `cargo fetch` fails, the sibling fetches its bytes; the last version takes the crate                                            |
 | Ruby     | `gem push` (the adapter's gem; gems of our own with platforms `java` and `x86_64-linux`, dependencies and `required_ruby_version`) | `/info` lines and checksums (the panel's `checksum`, the `/info` one and the digest of the `.gem` served are the same), platforms, gemspec metadata, runtime and development dependencies, `gem yank`                                                 | `/info` drops the version, `platform=java` removes that variant only, the `.gem` answers 404, `bundle install` fails, the sibling installs its bytes                       |
-| Go       | `curl -T` (the adapter's `seedPublish`; a `/v2` module beside the module)                                                          | `@v/list`, `@latest`, the `go` directive of the zipped `go.mod`, the module path (query parameter `modulePath`), `checkGolangSumdbSupported` (a bare 404, no credentials)                                                                             | `@v/list` and the `.zip` drop it, `go mod download` fails, the sibling downloads its bytes, deleting the module leaves the `/v2` module; the last version takes the module |
+| Go       | `curl -T` (the adapter's `seedPublish`; a `/v2` module beside the module)                                                          | `@v/list`, `@latest`, the `go` directive of the zipped `go.mod`, the module path (query parameter `modulePath`), `checkGoSumdbSupported` (a bare 404, no credentials)                                                                                 | `@v/list` and the `.zip` drop it, `go mod download` fails, the sibling downloads its bytes, deleting the module leaves the `/v2` module; the last version takes the module |
 
 Helpers extended for this (signatures stable): `expectPagingSweep` takes an optional `baseQuery` (Go names its module in
 the query string), `buildNupkg` an optional `metadata`, and `buildGem`'s `requiredRubyVersion` (declared, never applied
@@ -5602,9 +5602,9 @@ Untested by this step (no remote instance to test against): a preflight check th
 login and refuses to run if the run prefix already exists, and never touching anything global on a
 real shared remote. Both are called out in the plan as later, "remote hardening" work.
 
-**golang-specific**: a remote target whose `REPSY_REPO_BASE_URL` is already `https://` needs no TLS
-shim at all (`golang-tls-shim.ts`'s `needsTlsShim` — credentials embed directly into that URL). A
-remote target that is plain `http://` with an UNTRUSTED certificate is unsupported for golang: Go has
+**go-specific**: a remote target whose `REPSY_REPO_BASE_URL` is already `https://` needs no TLS
+shim at all (`go-tls-shim.ts`'s `needsTlsShim` — credentials embed directly into that URL). A
+remote target that is plain `http://` with an UNTRUSTED certificate is unsupported for go: Go has
 no per-request "skip TLS verification" knob for a `GOPROXY` URL the way `curl -k`/`--insecure` does,
 so there is no equivalent of `REPSY_E2E_INSECURE_REGISTRY` this protocol could honour.
 
@@ -6428,7 +6428,7 @@ test('lists a seeded package', async ({ adminPage, seeder, seedPackage }) => {
   (`src/seed/packages/<proto>.ts`; the last five arrived with RPS-1257).
 - **Identity.** `PackageRef.name` is the raw row key: maven `group:artifact` (default: one group per
   `index`, so deleting a group never takes a sibling), npm `@scope/name` or `name`, docker the image
-  (`version` = the tag), golang the module path.
+  (`version` = the tag), go the module path.
 - **Descriptors are data.** `ProtocolDescriptor.levels` has `list`, `versions`, `detail` and, where the
   protocol has them, `sublist` (maven group, npm scope) and `manifests` (docker). A list level says its
   route (`path`, with any query string), `rowKey`, `search` (`placeholder` and the `term` that finds a
@@ -6449,7 +6449,7 @@ test('lists a seeded package', async ({ adminPage, seeder, seedPackage }) => {
   segment has no `@`. Docker's manifest row is keyed by the tag,
   and its last-tag delete leaves the image listed.
 - **Not covered here.** The scenario templates live in RPS-1256 (maven, npm, docker, pypi) and RPS-1257
-  (cargo, nuget, helm, golang, ruby).
+  (cargo, nuget, helm, go, ruby).
 
 ### Package tests: Maven, npm, Docker, PyPI (RPS-1256)
 
@@ -6548,33 +6548,33 @@ load of the list page of a repository with one seeded package sends exactly one 
 
 ### Package tests: Cargo, NuGet, Helm, Go, Ruby (RPS-1257)
 
-`tests/ui/packages/{cargo,nuget,helm,golang,ruby}.spec.ts`: each is one `registerPackageScenarios(...)`
+`tests/ui/packages/{cargo,nuget,helm,go,ruby}.spec.ts`: each is one `registerPackageScenarios(...)`
 call (PKG-<proto>-01..06, `01` is `@smoke`) plus the protocol's own PKG-<proto>-07 tests. All nine
 protocols now have seeders, so `SEEDERS` has no `notImplemented` entry left. Every package is published
 over raw HTTP to the protocol port as the admin, with a real artifact built in code (the `ui` image has
 no toolchain):
 
-| Seeder               | Wire request and artifact                                                                                                                                          |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `packages/cargo.ts`  | `PUT api/v1/crates/new` (length-prefixed JSON + `.crate`); `.crate` = gzip+ustar with `Cargo.toml` and `src/lib.rs`/`src/main.rs`; `publishCrate` adds README/deps |
-| `packages/nuget.ts`  | `PUT v3/package/` multipart `package`; `.nupkg` = fflate zip with the nuspec                                                                                       |
-| `packages/helm.ts`   | `variant: 'oci'` (default): config blob, chart blob, manifest under the tag; `variant: 'classic'`: multipart `chart` to `/<repo>/api/charts` (ChartMuseum)         |
-| `packages/golang.ts` | `PUT <repo>/<module>/@v/<v>.zip` + `Content-Sha256`; a version without `v` gets one (`1.0.0` seeds `v1.0.0`)                                                       |
-| `packages/ruby.ts`   | `POST api/v1/gems`; `.gem` = tar of `metadata.gz`, `data.tar.gz`, `checksums.yaml.gz`                                                                              |
+| Seeder              | Wire request and artifact                                                                                                                                          |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `packages/cargo.ts` | `PUT api/v1/crates/new` (length-prefixed JSON + `.crate`); `.crate` = gzip+ustar with `Cargo.toml` and `src/lib.rs`/`src/main.rs`; `publishCrate` adds README/deps |
+| `packages/nuget.ts` | `PUT v3/package/` multipart `package`; `.nupkg` = fflate zip with the nuspec                                                                                       |
+| `packages/helm.ts`  | `variant: 'oci'` (default): config blob, chart blob, manifest under the tag; `variant: 'classic'`: multipart `chart` to `/<repo>/api/charts` (ChartMuseum)         |
+| `packages/go.ts`    | `PUT <repo>/<module>/@v/<v>.zip` + `Content-Sha256`; a version without `v` gets one (`1.0.0` seeds `v1.0.0`)                                                       |
+| `packages/ruby.ts`  | `POST api/v1/gems`; `.gem` = tar of `metadata.gz`, `data.tar.gz`, `checksums.yaml.gz`                                                                              |
 
 Default names (`defaultPackageName`): Cargo and Ruby `e2e_<runid>_pkg_<n>` (underscores only: the panel
 keys a crate by its normalised name, `-` becoming `_`), NuGet and Helm `e2e-<runid>-pkg-<n>`, Go
 `e2e.repsy.test/e2e-<runid>-pkg-<n>`. The builders are the ones the protocol suites already use
-(`clients/{cargo,nuget,helm,helm-chart,golang,ruby}-raw.ts`); the only edits there are
+(`clients/{cargo,nuget,helm,helm-chart,go,ruby}-raw.ts`); the only edits there are
 `buildPublishBody`'s optional `readme`/`deps` and `export` on Helm's two OCI body builders.
 
-| ID        | What it does                                                                                                                                                                                                                                                                                                                                                                                          |
-| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| cargo-07  | README renders (and is absent when none was published); deps in the Cargo.toml block; Add Dependency vs Install Binary; the four sorts (crates published out of version and name order); Newest puts the crate published last on top; latest version and every version; delete a crate with two versions; a yanked version stays listed and is marked yanked on the list and on its detail (RPS-1301) |
-| nuget-07  | stable and pre-release side by side; a stable-only repo (`releases`/`snapshots`) refuses a pre-release and keeps the list; unlist/relist flips `Listed` on the detail (the version stays listed); the four install snippets, no dependencies, nuspec metadata                                                                                                                                         |
-| helm-07   | a chart published to each module (OCI and classic) in one list, both open with digest and Chart.yaml; one chart with versions from both modules; deleting a classic chart; the Latest link; deleting the last version toasts once and lands on the chart list (RPS-1302)                                                                                                                              |
-| golang-07 | list -> `/modules?modulePath=` -> `/modules/version?modulePath=&version=` with the breadcrumb; deep link; GOPROXY endpoints; "Version 'x' not found"; the detail without its query goes to the list; a module path with slashes is searchable; deleting the only version left on page 2 stays on the versions page (RPS-1340)                                                                         |
-| ruby-07   | yanked badge on the versions list and on the detail after a yank through the API; install commands, platform and checksum; the Latest link                                                                                                                                                                                                                                                            |
+| ID       | What it does                                                                                                                                                                                                                                                                                                                                                                                          |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| cargo-07 | README renders (and is absent when none was published); deps in the Cargo.toml block; Add Dependency vs Install Binary; the four sorts (crates published out of version and name order); Newest puts the crate published last on top; latest version and every version; delete a crate with two versions; a yanked version stays listed and is marked yanked on the list and on its detail (RPS-1301) |
+| nuget-07 | stable and pre-release side by side; a stable-only repo (`releases`/`snapshots`) refuses a pre-release and keeps the list; unlist/relist flips `Listed` on the detail (the version stays listed); the four install snippets, no dependencies, nuspec metadata                                                                                                                                         |
+| helm-07  | a chart published to each module (OCI and classic) in one list, both open with digest and Chart.yaml; one chart with versions from both modules; deleting a classic chart; the Latest link; deleting the last version toasts once and lands on the chart list (RPS-1302)                                                                                                                              |
+| go-07    | list -> `/modules?modulePath=` -> `/modules/version?modulePath=&version=` with the breadcrumb; deep link; GOPROXY endpoints; "Version 'x' not found"; the detail without its query goes to the list; a module path with slashes is searchable; deleting the only version left on page 2 stays on the versions page (RPS-1340)                                                                         |
+| ruby-07  | yanked badge on the versions list and on the detail after a yank through the API; install commands, platform and checksum; the Latest link                                                                                                                                                                                                                                                            |
 
 What the descriptors record (found by running each protocol): a version row's link appends `#security`
 (the template accepts a fragment); a detail Delete follows the RPS-1288 (7) convention for every protocol (the versions page, or the list after the package's LAST version); only Docker records
@@ -7183,11 +7183,11 @@ about 3 minutes) and the databases downloaded (about 2).
 ./run.sh test --protocol docker
 ./run.sh test --protocol helm   # runs BOTH Helm modes (OCI + classic/ChartMuseum) from one runner
 ./run.sh test --protocol pypi
-./run.sh test --protocol golang
+./run.sh test --protocol go
 ./run.sh test --protocol ruby
 ./run.sh test --protocol stack  # docker-exec cases against the local stack's Repsy container (see "Stack runner")
 ./run.sh test --protocol ui     # the panel UI suite in headless Chromium (see "UI suite")
-./run.sh test --protocol skeleton,maven,npm,cargo,nuget,docker,helm,pypi,golang,ruby
+./run.sh test --protocol skeleton,maven,npm,cargo,nuget,docker,helm,pypi,go,ruby
 ./run.sh test --grep '@smoke'
 ./run.sh test -b             # rebuild the runner image(s) first (Dockerfile/lockfile changed)
 ./run.sh local down
@@ -7197,14 +7197,14 @@ about 3 minutes) and the databases downloaded (about 2).
                               # (same ports, so stop the postgres profile first if it is up)
 REPSY_E2E_PROJECT=mine REPSY_E2E_PORT_OFFSET=100 ./run.sh local up   # a private stack next to the
                               # default one: see "Parallel stacks" (give the same to test/sweep/down)
-./run.sh test --protocol skeleton,maven,npm,cargo,nuget,docker,helm,pypi,golang,ruby --grep '@smoke'
+./run.sh test --protocol skeleton,maven,npm,cargo,nuget,docker,helm,pypi,go,ruby --grep '@smoke'
 ./run.sh test --protocol maven   # one full catalog against H2 -- see "Stack profiles" above
 ./run.sh local ps --h2       # the stack's containers ("local logs --h2" prints their logs)
 ./run.sh local down --h2
 ```
 
 `run.sh test` accepts `--target local|remote|ci` and `--protocol a,b` (a comma-separated list of
-runner services: `skeleton`, `maven`, `npm`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`,
+runner services: `skeleton`, `maven`, `npm`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `go`,
 `ruby`, `stack`, `ui`) — identically whichever stack profile is up (see "Stack profiles (postgres and H2)" above).
 Reports land under `e2e/test-results/` (JUnit
 XML) and
@@ -7282,7 +7282,7 @@ is what tells you**, on the `wire` leg of the runner concerned. Locally a cached
    It talks to public registries only (anonymous Docker Hub pulls are rate limited: `429` is reported as an
    error, never as an ok), needs `docker buildx`, `curl` and `git`, and fails when a Dockerfile uses a digest arg
    that compose does not set, when two services disagree on a repeated value (`TEMURIN_*`, `MAVEN_*`,
-   `GO_*`, `CRANE_*`: the `stack` and `maven` runners, the `docker` and `golang` runners), or when a pin has no
+   `GO_*`, `CRANE_*`: the `stack` and `maven` runners, the `docker` and `go` runners), or when a pin has no
    resolver, so a new pin cannot be added without a way to keep it fresh.
 
 Dependabot cannot do this: its Docker ecosystem does not read a `FROM` line that is built from `ARG`s, and the
@@ -7323,22 +7323,22 @@ says; without it the leg takes tonight's runner of the rotation and `protocol` f
 | `image`             |                                             | builds the Repsy image from the checkout (layer cache) and hands it to the legs as an artifact                                                                                                                                                                                                                                         | 40 min                                                                     |
 | `typecheck`         |                                             | `tsc --noEmit` and `eslint .` of this harness against the client generated from `openapi-spec.yaml`, no stack ("UI suite: route stubs typed from the OpenAPI models")                                                                                                                                                                  | 10 min                                                                     |
 | `ui`                | PostgreSQL                                  | `--protocol ui`, the whole panel UI suite                                                                                                                                                                                                                                                                                              | 60 min                                                                     |
-| `wire`              | PostgreSQL                                  | `--protocol` `skeleton`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby`, `api`, one `run.sh test` each (RPS-1857: `maven` and `stack` have legs of their own below)                                                                                                                                | 60 min                                                                     |
+| `wire`              | PostgreSQL                                  | `--protocol` `skeleton`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `go`, `ruby`, `api`, one `run.sh test` each (RPS-1857: `maven` and `stack` have legs of their own below)                                                                                                                                    | 60 min                                                                     |
 | `wire-maven-kotlin` | PostgreSQL                                  | `--protocol maven --grep <MAVEN_KOTLIN>` (the pattern is in the plan job): the Gradle Kotlin DSL family (publish/consume, locking, plugin) and the Groovy locking spec, 46 tests, about 13 minutes on a runner (RPS-1857)                                                                                                              | 60 min                                                                     |
 | `wire-maven-rest`   | PostgreSQL                                  | `--protocol maven --grep-invert <MAVEN_KOTLIN>`: the rest of the maven catalog (229 tests: Gradle Groovy, sbt, plain `mvn`, Ivy, signing), about 16 minutes. The two legs cover the 275 tests exactly once. With the `grep` input set the pair runs as one `wire-maven` leg (one `--grep` cannot carry both the split and the pattern) | 60 min                                                                     |
 | `wire-stack`        | PostgreSQL                                  | `--protocol stack`: the cases that restart, crash and recreate the Repsy container                                                                                                                                                                                                                                                     | 30 min                                                                     |
 | `browsers`          | PostgreSQL                                  | `ui-firefox`, then `ui-webkit`: `@smoke`, `@tls` (skips here) and A11Y-13 of the UI suite in each engine ("UI suite: Firefox and WebKit"), one runner per browser so a failure names it                                                                                                                                                | 30 min                                                                     |
 | `h2`                | embedded H2 (`docker-compose.stack-h2.yml`) | `@smoke` of every wire runner above; `stack` has no `@smoke` test, so it runs whole (the "Scope decision" above)                                                                                                                                                                                                                       | 90 min                                                                     |
 | `h2-ui`             | embedded H2                                 | `--protocol ui`, the WHOLE panel UI suite on H2 ("UI suite: the complete suite on H2")                                                                                                                                                                                                                                                 | 45 min                                                                     |
-| `h2-full`           | embedded H2                                 | the WHOLE catalog of one runner per night, rotating over `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby` by date (`ordinal % 10`, UTC); `h2_full` picks another                                                                                                                            | 90 min                                                                     |
+| `h2-full`           | embedded H2                                 | the WHOLE catalog of one runner per night, rotating over `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `go`, `ruby` by date (`ordinal % 10`, UTC); `h2_full` picks another                                                                                                                                | 90 min                                                                     |
 | `scanner`           | PostgreSQL + the stub scanner overlay       | `REPSY_E2E_OPT_IN=scanner`, `--grep @scanner` only, on the `ui` (20 tests, "Scanner stack" above), `npm-clients`, `docker`, `maven` and `pypi` ("Wire clients on the scanner stack") runners, never the whole `ui` suite                                                                                                               | 60 min                                                                     |
 | `throttle`          | PostgreSQL + the auth-throttle overlay      | `REPSY_E2E_OPT_IN=throttle`, `--grep @throttle` on `stack` then `ui` (last), 9 tests, "Auth-throttle leg"                                                                                                                                                                                                                              | 30 min                                                                     |
-| `limits`            | PostgreSQL + the tiny-upload-limit overlay  | `REPSY_E2E_OPT_IN=limits`, `--grep @limits` on `pypi`, `helm`, `nuget`, `ruby`, `cargo`, `golang` and `api`, 16 tests, "Size-limit leg"                                                                                                                                                                                                | 60 min                                                                     |
+| `limits`            | PostgreSQL + the tiny-upload-limit overlay  | `REPSY_E2E_OPT_IN=limits`, `--grep @limits` on `pypi`, `helm`, `nuget`, `ruby`, `cargo`, `go` and `api`, 16 tests, "Size-limit leg"                                                                                                                                                                                                    | 60 min                                                                     |
 | `cors`              | PostgreSQL + the CORS overlay               | `REPSY_E2E_OPT_IN=cors`, `--grep @cors` on `api`, "CORS leg": the configured origins are reflected, any other refused                                                                                                                                                                                                                  | 30 min                                                                     |
 | `upgrade`           | PostgreSQL + the upgrade overlay            | `REPSY_E2E_OPT_IN=upgrade`, `--grep @upgrade` on `stack`: the previous release, populated, recreated on this image (5 tests, "Upgrade path")                                                                                                                                                                                           | 30 min                                                                     |
 | `upgrade-h2`        | embedded H2 + the upgrade overlay           | the same on the H2 stack                                                                                                                                                                                                                                                                                                               | 30 min                                                                     |
 | `trivy`             | PostgreSQL + the real scanner overlay       | `REPSY_E2E_OPT_IN=trivy`, `--grep @trivy` on `api`, 20 tests, "Real scanner stack": the contract the stub mimics, the status and advisory lookup, one real `npm audit` and one real scan of an npm package and of a Docker image                                                                                                       | 45 min                                                                     |
-| `tls`               | PostgreSQL + the TLS overlay                | `REPSY_E2E_OPT_IN=tls` and `REPSY_E2E_TLS=1`, `@smoke` of `skeleton`, `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `golang`, `ruby` and `api` over Repsy's https listeners ("TLS stack"), and `@smoke                                                                                                    | @tls`of`ui`, `ui-firefox`and`ui-webkit`("The panel over https"); no`stack` | 75 min |
+| `tls`               | PostgreSQL + the TLS overlay                | `REPSY_E2E_OPT_IN=tls` and `REPSY_E2E_TLS=1`, `@smoke` of `skeleton`, `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `go`, `ruby` and `api` over Repsy's https listeners ("TLS stack"), and `@smoke                                                                                                        | @tls`of`ui`, `ui-firefox`and`ui-webkit`("The panel over https"); no`stack` | 75 min |
 | `proxy`             | PostgreSQL + the reverse proxy overlay      | `REPSY_E2E_OPT_IN=proxy` and `REPSY_E2E_PROXY=1`: `@smoke\|@proxy` of `ui` and `@proxy` of `api` through an nginx that terminates TLS ("Reverse proxy stack"); every case must run                                                                                                                                                     | 45 min                                                                     |
 
 The legs run in parallel on separate runners, each with its own stack; a red leg does not stop the
@@ -7383,7 +7383,7 @@ input may replace it, as on `h2`; the three ui runners take `@smoke|@tls` throug
 `@tls` only). `test` cannot see the stack, so the leg also exports `REPSY_E2E_TLS=1` for the step
 that runs the tests (the plan job's `SWITCHES`, the matrix field `switches`): that is what points the runners at the
 https URLs and gives every client its CA (`tls_run_args` in `run.sh`). Its check "Check the opt-in specs ran" cannot
-demand zero skips (the golang TLS-shim case skips by design on https), so the plan job's `OPT_IN_PROBE` names
+demand zero skips (the go TLS-shim case skips by design on https), so the plan job's `OPT_IN_PROBE` names
 `tls-listeners.spec.ts` instead: the leg fails when a case of that file skipped (the opt-in never arrived) or a runner
 ran no test, and lists the other skips as notices.
 
@@ -7510,7 +7510,7 @@ The workflow only calls `run.sh`; nothing in it is CI-specific. From `e2e/`, wit
 ```bash
 ./run.sh local up                                          # postgres profile; add --h2 for the H2 one
 ./run.sh test --target ci --protocol ui                    # the `ui` leg
-for p in skeleton maven npm npm-clients cargo nuget docker helm pypi golang ruby stack; do ./run.sh test --target ci --protocol "$p"; done
+for p in skeleton maven npm npm-clients cargo nuget docker helm pypi go ruby stack; do ./run.sh test --target ci --protocol "$p"; done
 ./run.sh sweep --all --dry-run                             # the leak check: it must print no "would delete" line
 ./run.sh local down
 CI=true ./run.sh test --protocol ui --grep @smoke          # with the CI behaviour: forbidOnly, and the ui project's retry and trace
@@ -7622,11 +7622,11 @@ pnpm exec prettier --check .
 ./run.sh test --protocol helm    # again — proves run isolation for helm too (both modes)
 ./run.sh test --protocol pypi
 ./run.sh test --protocol pypi    # again — proves run isolation for pypi too
-./run.sh test --protocol golang -b  # -b the first time: builds the golang runner image
-./run.sh test --protocol golang  # again — proves run isolation for golang too (H15)
+./run.sh test --protocol go -b  # -b the first time: builds the go runner image
+./run.sh test --protocol go  # again — proves run isolation for go too (H15)
 ./run.sh test --protocol ruby -b    # -b the first time: builds the ruby runner image
 ./run.sh test --protocol ruby    # again — proves run isolation for ruby too (H15)
-./run.sh test --protocol maven,npm,cargo,nuget,docker,helm,pypi,golang -b  # regression: every protocol before ruby stays green
+./run.sh test --protocol maven,npm,cargo,nuget,docker,helm,pypi,go -b  # regression: every protocol before ruby stays green
 ./run.sh test                    # the skeleton project
 ./run.sh sweep --dry-run         # before tearing down: confirms nothing was left behind
 ./run.sh local down
@@ -7641,9 +7641,9 @@ the docker protocol specifically, flipping `token-expired`'s `publish` to `'ok'`
 `401` reported against the flipped `'ok'` expectation; and once for helm, adding a temporary
 `expectByProtocol: { helm: { publish: 'ok' } }` to `token-expired` — `./run.sh test --protocol helm
 --grep "helm > token-expired"` failed as expected, `helm push`'s own raw-probe status `401` against
-the flipped `'ok'` expectation, then reverted; and once for golang, adding a temporary
-`expectByProtocol: { golang: { publish: 'ok' } }` to `token-expired` — `./run.sh test --protocol
-golang --grep token-expired` failed as expected (`Error: expected "ok", got "unauthorized" (http 401;
+the flipped `'ok'` expectation, then reverted; and once for go, adding a temporary
+`expectByProtocol: { go: { publish: 'ok' } }` to `token-expired` — `./run.sh test --protocol
+go --grep token-expired` failed as expected (`Error: expected "ok", got "unauthorized" (http 401;
 curl/go exit 22; curl ... -u <token>:*** -T module.zip ...)`), then reverted, `git diff` confirmed
 clean). `./run.sh sweep --dry-run` lists any `e2e-*` leftovers without deleting them.
 
@@ -7651,7 +7651,7 @@ The protocol suites carry exactly one `test.fail` pin left (checked on a stack b
 RPS-1287): docker's R7/B2 (RPS-1216, overriding a tag makes the previous manifest unpullable by
 digest, still open), so a docker run prints one `✘` line next to an overall "passed"/exit `0` —
 treat those two as authoritative over the per-line glyph. Every other suite (maven, npm, cargo,
-nuget, helm, pypi, golang, ruby) has none: the pins for RPS-1205/1212/1215/1220/1221-1225 and the
+nuget, helm, pypi, go, ruby) has none: the pins for RPS-1205/1212/1215/1220/1221-1225 and the
 RPS-1124 storage-order family (cargo, pypi, ...) were flipped into plain assertions as their fixes
 landed, and a `test.fail` whose bug is fixed makes the runner exit `1` with "Expected to fail, but
 passed", so it has to be flipped as part of the fix.
@@ -7663,7 +7663,7 @@ passed", so it has to be flipped as part of the fix.
 ./run.sh test --protocol maven   # 45 passed -- regression check, byte-for-byte same as before this step
 ./run.sh local down
 ./run.sh local up --h2
-./run.sh test --protocol skeleton,maven,npm,cargo,nuget,docker,helm,pypi,golang,ruby --grep '@smoke' -b
+./run.sh test --protocol skeleton,maven,npm,cargo,nuget,docker,helm,pypi,go,ruby --grep '@smoke' -b
 ./run.sh test --protocol maven   # one full catalog on H2: 45 passed
 ./run.sh test --protocol maven   # again, no stack reset: 45 passed -- proves run isolation on H2 too
 ./run.sh sweep --dry-run         # "sweep: deleted 0 repo(s) and 0 user(s)" -- nothing left behind
@@ -7673,7 +7673,7 @@ passed", so it has to be flipped as part of the fix.
 
 All of the above ran clean (exit `0`) against the locally built `repsy-os-e2e:local` image. The
 `--grep '@smoke'` run across all 10 runners reported 38 passed total (skeleton 2, maven 4, npm 2,
-cargo 2, nuget 3, docker 4, helm 5, pypi 4, golang 6, ruby 6), including the same `test.fail`-routed
+cargo 2, nuget 3, docker 4, helm 5, pypi 4, go 6, ruby 6), including the same `test.fail`-routed
 tests reporting a per-line `✘` with an overall "passed"/`0` (npm's RPS-1205 real-client test, cargo's
 hyphenated-crate-name test, helm's HL1/HL2) documented above for the postgres profile — parity
 confirmed between the two database profiles for every runner, not just maven.

@@ -144,7 +144,7 @@ export async function expectListedInPanel(
     ).toContain(version);
     return;
   }
-  if (pkg.adapter.protocol === 'golang') {
+  if (pkg.adapter.protocol === 'go') {
     // No `{ name, latestVersion }` listing (RPS-1720): a module lists only its path, so this is the
     // same two-step lookup as maven's, against `/api/go/modules` instead of dedicated helpers.
     const modulesPath = `/api/go/modules/${encodeURIComponent(repoName)}?size=100`;

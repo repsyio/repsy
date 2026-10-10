@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # 1.27.1 (current stable, confirmed available live as `golang:1.27.1-bookworm`). Only the CONSUME
-# side runs a real toolchain -- Go has no official publisher at all (`clients/golang.ts`'s file
+# side runs a real toolchain -- Go has no official publisher at all (`clients/go.ts`'s file
 # header: the only documented publisher is a single `curl -T`), so this Dockerfile copies `go` in
 # from the official image the same "copy the toolchain, not the whole image" approach as
 # cargo.Dockerfile's Rust toolchain / nuget.Dockerfile's .NET SDK / pypi.Dockerfile's CPython. The
@@ -27,9 +27,9 @@ ARG GO_VERSION=1.27.1
 ARG GO_IMAGE_DIGEST
 FROM golang:${GO_VERSION}-bookworm@${GO_IMAGE_DIGEST} AS go-toolchain
 
-# The golang runner: the harness itself (see base.Dockerfile) plus the Go toolchain copied in from
-# the stage above, `curl` (the real publisher, `clients/golang.ts`'s file header) and a build-time-
-# generated throwaway TLS certificate/key (`clients/golang-tls-shim.ts`'s file header: a real `go`
+# The go runner: the harness itself (see base.Dockerfile) plus the Go toolchain copied in from
+# the stage above, `curl` (the real publisher, `clients/go.ts`'s file header) and a build-time-
+# generated throwaway TLS certificate/key (`clients/go-tls-shim.ts`'s file header: a real `go`
 # command refuses to pass credentials to a plain-http GOPROXY URL, confirmed live, so a credentialed
 # consume needs an in-process HTTPS terminator in front of this stack's own plain-http port). Its
 # first layers intentionally repeat base.Dockerfile's rather than `FROM` a separately built tag, for
@@ -57,10 +57,10 @@ COPY ${HARNESS_DIR}/tests ./tests
 COPY ${HARNESS_DIR}/runners/entrypoint.sh ./entrypoint.sh
 RUN chmod +x ./entrypoint.sh
 
-# --- golang-specific layers ---
+# --- go-specific layers ---
 
 # `curl` is absent from `node:24-bookworm-slim` (confirmed live: `which curl` prints nothing on a
-# bare image) -- 7.88.1 on bookworm carries `--fail-with-body` (7.76+), which `clients/golang.ts`
+# bare image) -- 7.88.1 on bookworm carries `--fail-with-body` (7.76+), which `clients/go.ts`
 # relies on to get BOTH the response body and the raw HTTP status out of one invocation.
 # `ca-certificates` is not needed for this harness's own http:// calls, but is cheap and keeps a
 # stray https:// (a remote target) from failing on an unrelated missing trust store.
@@ -89,4 +89,4 @@ ENV REPSY_E2E_TLS_CERT=/opt/e2e-tls/cert.pem REPSY_E2E_TLS_KEY=/opt/e2e-tls/key.
 
 RUN go version && curl --version | head -1 && test -s /opt/e2e-tls/cert.pem && test -s /opt/e2e-tls/key.pem
 
-CMD ["./entrypoint.sh", "golang"]
+CMD ["./entrypoint.sh", "go"]

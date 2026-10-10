@@ -37,8 +37,8 @@ import {
   SIZE_LIMIT_BYTES,
   UNDER_LIMIT_PADDING_BYTES,
 } from '../../src/clients/padding.js';
-import { golangAdapter } from '../../src/clients/golang.js';
-import { buildModuleZip, uploadUrl as goUploadUrl } from '../../src/clients/golang-raw.js';
+import { goAdapter } from '../../src/clients/go.js';
+import { buildModuleZip, uploadUrl as goUploadUrl } from '../../src/clients/go-raw.js';
 import { authHeader } from '../../src/clients/raw-http.js';
 import { rubyAdapter } from '../../src/clients/ruby.js';
 import {
@@ -173,9 +173,9 @@ const CHUNKED_CASES: ChunkedCase[] = [
     },
   },
   {
-    protocol: 'golang',
+    protocol: 'go',
     repoType: RepoType.GOLANG,
-    adapter: golangAdapter,
+    adapter: goAdapter,
     upload: async (world, padBytes) => {
       const built = await buildModuleZip({
         modulePath: world.publishTarget.packageName,

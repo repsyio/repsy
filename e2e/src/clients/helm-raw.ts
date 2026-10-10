@@ -33,7 +33,7 @@
  *    handlers -- `docker`'s two-hop `dockerRequest` pattern does not apply here.
  *  - `GET|HEAD /v2/` (the ping `helm registry login`/`crane`'s own probe open with) is answered by
  *    the DOCKER provider, not Helm's own (dead-code) version-check handler: `ProtocolRouterController
- *    .route` tries every registered handler in provider-list order (maven, pypi, npm, docker, golang,
+ *    .route` tries every registered handler in provider-list order (maven, pypi, npm, docker, go,
  *    cargo, helm, nuget, ruby -- `repsy-backend/pom.xml`), and Docker's `DockerPathParser` matches
  *    `/v2/` first. Confirmed live (H1, this file's `rawPing` re-export from `docker-raw.ts`): a real
  *    `helm registry login <host> --plain-http` is steered to DOCKER's `/v2/token` token endpoint, not

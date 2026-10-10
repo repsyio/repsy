@@ -43,7 +43,7 @@ import { UiPage } from './base.js';
 import { DangerModal, DesktopList, EmptyList, Pagination, Spinner, Toasts } from './components.js';
 import { cargoDescriptor } from './protocols/cargo.js';
 import { dockerDescriptor } from './protocols/docker.js';
-import { golangDescriptor } from './protocols/golang.js';
+import { goDescriptor } from './protocols/go.js';
 import { helmDescriptor } from './protocols/helm.js';
 import { mavenDescriptor } from './protocols/maven.js';
 import { npmDescriptor } from './protocols/npm.js';
@@ -76,7 +76,7 @@ export const DESCRIPTORS: Record<PackageProtocol, ProtocolDescriptor> = {
   cargo: cargoDescriptor,
   nuget: nugetDescriptor,
   helm: helmDescriptor,
-  golang: golangDescriptor,
+  go: goDescriptor,
   ruby: rubyDescriptor,
 };
 

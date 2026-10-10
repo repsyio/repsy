@@ -108,21 +108,21 @@
  *    is never added to `maven-releases-off`/`maven-snapshots-off`/`redeploy-*-off`/`snapshot-*`: the
  *    `releases`/`snapshots` repo settings are never read by any PyPI code at all (grep-confirmed,
  *    and confirmed live: a `.dev0`/`a1`/`.post1` upload succeeds regardless of either switch).
- *  - golang (step 4d) needs one data change: `no-override`/`override` both pin `expectByProtocol: {
- *    golang: { publish: 'conflict' } }` -- confirmed live, a real, UNCONDITIONAL `409`
+ *  - go (step 4d) needs one data change: `no-override`/`override` both pin `expectByProtocol: {
+ *    go: { publish: 'conflict' } }` -- confirmed live, a real, UNCONDITIONAL `409`
  *    ("goModuleVersionAlreadyExists", `GoModuleService.publishModule`) for a duplicate version
  *    regardless of `allowOverride`, which is never read anywhere in either Go package
  *    (grep-confirmed) -- like cargo's own "no override rule at all" bullet above, except Go's
  *    refusal is a real `409`, not cargo's unconditional `400`. Every auth scenario's shared `expect`
- *    already matches for golang too (single-hop Basic, a read-only deploy token on a WRITE is the
- *    same flat 401 every other protocol pins, confirmed live -- see `golang-raw.ts`'s file header).
- *    golang is never added to `maven-releases-off`/`maven-snapshots-off`/`redeploy-*-off`/
+ *    already matches for go too (single-hop Basic, a read-only deploy token on a WRITE is the
+ *    same flat 401 every other protocol pins, confirmed live -- see `go-raw.ts`'s file header).
+ *    go is never added to `maven-releases-off`/`maven-snapshots-off`/`redeploy-*-off`/
  *    `snapshot-*`: it has no releases/snapshots rule at all (grep-confirmed: no Go code reads
  *    either repo setting) and no SNAPSHOT-file concept.
  *  - ruby (step 4e, the LAST protocol of step 4) needs one data change: `no-override` pins
  *    `expectByProtocol: { ruby: { publish: 'conflict' } }` -- confirmed live, a real `409`
  *    ("gemVersionAlreadyExists", `RubyGemService.upsertVersion`: an existing version that is
- *    EITHER yanked OR published under `allowOverride:false` is refused) -- like nuget/helm/golang,
+ *    EITHER yanked OR published under `allowOverride:false` is refused) -- like nuget/helm/go,
  *    this is a genuine conflict, not maven's 403. `override` needs no data change: an existing,
  *    non-yanked version under `allowOverride:true` is overwritten in place, so the shared `expect`
  *    of `ok` already matches. Every auth scenario's shared `expect` already matches for ruby too
@@ -260,8 +260,8 @@ export const SCENARIOS: readonly Scenario[] = [
     // ("packageOverrideDisabled") as the shared pin, no override needed -- see the file-level
     // comment's docker bullet. helm/helm-classic: a REAL 409 ("conflict") in both modes -- see the
     // file-level comment's helm bullet. pypi: the SAME 403 ("fileAlreadyExists") as the shared pin,
-    // no override needed -- see the file-level comment's pypi bullet. golang: a REAL, UNCONDITIONAL
-    // 409 ("goModuleVersionAlreadyExists") -- see the file-level comment's golang bullet. ruby: a
+    // no override needed -- see the file-level comment's pypi bullet. go: a REAL, UNCONDITIONAL
+    // 409 ("goModuleVersionAlreadyExists") -- see the file-level comment's go bullet. ruby: a
     // REAL 409 ("gemVersionAlreadyExists") -- see the file-level comment's ruby bullet.
     expect: { publish: 'forbidden', consume: 'ok' },
     expectByProtocol: {
@@ -269,7 +269,7 @@ export const SCENARIOS: readonly Scenario[] = [
       nuget: { publish: 'conflict' },
       helm: { publish: 'conflict' },
       'helm-classic': { publish: 'conflict' },
-      golang: { publish: 'conflict' },
+      go: { publish: 'conflict' },
       ruby: { publish: 'conflict' },
     },
   },
@@ -282,10 +282,10 @@ export const SCENARIOS: readonly Scenario[] = [
     expect: { publish: 'ok', consume: 'ok' },
     // cargo has no override rule at all -- see the file-level comment's cargo bullet. Deliberately
     // still `rejected` here even though `allowOverride: true`: that is exactly the point being
-    // pinned. golang: still a real 409 too -- `allowOverride` is never read at all, so `override`
+    // pinned. go: still a real 409 too -- `allowOverride` is never read at all, so `override`
     // does NOT make a redeploy succeed, exactly like cargo's own deliberate "still rejected" note
-    // (see the file-level comment's golang bullet).
-    expectByProtocol: { cargo: { publish: 'rejected' }, golang: { publish: 'conflict' } },
+    // (see the file-level comment's go bullet).
+    expectByProtocol: { cargo: { publish: 'rejected' }, go: { publish: 'conflict' } },
   },
   {
     id: 'maven-releases-off',

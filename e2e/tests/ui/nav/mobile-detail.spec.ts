@@ -63,7 +63,7 @@ const LONG: Record<PackageProtocol, SeedPackageOptions> = {
   cargo: { name: `e2e_long_${'a'.repeat(50)}` },
   nuget: { name: `e2e.long.${'a'.repeat(80)}` },
   helm: { name: `e2e-long-${'a'.repeat(50)}` },
-  golang: { name: `example.com/e2e/${'a'.repeat(100)}` },
+  go: { name: `example.com/e2e/${'a'.repeat(100)}` },
   ruby: { name: `e2e_long_${'a'.repeat(100)}` },
 };
 

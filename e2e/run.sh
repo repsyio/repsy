@@ -73,7 +73,7 @@ REPSY_E2E_PORT_OFFSET), anywhere on the line.
 
 --protocol takes runner service names: skeleton, maven, npm, npm-clients (the npm registry under pnpm,
 yarn classic, yarn berry and bun as well as npm; see README.md "npm-family clients"), cargo, nuget,
-docker, helm, pypi, golang, ruby, stack (cases that docker-exec into the Repsy container, tests/stack;
+docker, helm, pypi, go, ruby, stack (cases that docker-exec into the Repsy container, tests/stack;
 local stack only, see README.md "Stack runner") ui (the panel UI suite in headless Chromium,
 tests/ui; see README.md "UI suite"), ui-firefox and ui-webkit (the same runner image, the @smoke subset of the
 UI suite in Firefox and in WebKit; see README.md "UI suite: Firefox and WebKit") and api (raw HTTP at Repsy's edge, no package client: port separation,
@@ -135,7 +135,7 @@ certificate. It cannot be combined with --tls. For the @proxy specs of the ui an
 
 --limits (or REPSY_E2E_LIMITS=1) is the fourth overlay: Repsy starts with tiny upload size limits, 64 KiB for a
 PyPI/Helm/NuGet upload, a gem, a crate and a Go module zip (docker-compose.stack-limits.yml), for the @limits
-specs of the pypi, helm, nuget, ruby, cargo, golang and api runners: an over-limit push gets a 413. No other
+specs of the pypi, helm, nuget, ruby, cargo, go and api runners: an over-limit push gets a 413. No other
 suite may run there. See README.md "Size-limit leg".
 
 --cors (or REPSY_E2E_CORS=1) is the CORS overlay: Repsy starts with APP_ALLOWED_ORIGINS set to two origins
@@ -619,7 +619,7 @@ cmd_local_up() {
     echo "Give the same to test, sweep and down: REPSY_E2E_PROJECT=$PROJECT REPSY_E2E_PORT_OFFSET=$PORT_OFFSET ./run.sh ..."
   fi
   if overlay_active tls; then
-    echo "TLS overlay on: https on $REPSY_API_BASE_URL and $REPSY_REPO_BASE_URL (plain http stays open); CA in $TLS_DIR/ca.pem; run REPSY_E2E_TLS=1 ./run.sh test --protocol skeleton,api,golang,docker,npm --grep @smoke (the ui, ui-firefox and ui-webkit runners take it too)"
+    echo "TLS overlay on: https on $REPSY_API_BASE_URL and $REPSY_REPO_BASE_URL (plain http stays open); CA in $TLS_DIR/ca.pem; run REPSY_E2E_TLS=1 ./run.sh test --protocol skeleton,api,go,docker,npm --grep @smoke (the ui, ui-firefox and ui-webkit runners take it too)"
   fi
   if overlay_active proxy; then
     echo "Proxy overlay on: nginx in front of Repsy, the panel on $REPSY_API_BASE_URL and the repo protocols on $REPSY_REPO_BASE_URL (Repsy's own plain ports stay open); CA in $PROXY_DIR/ca.pem; run REPSY_E2E_PROXY=1 ./run.sh test --protocol ui --grep '@smoke|@proxy' and --protocol api --grep @proxy"
@@ -628,7 +628,7 @@ cmd_local_up() {
     echo "Throttle overlay on: 3 failed password checks per 10 s per client; run REPSY_E2E_THROTTLE=1 ./run.sh test --protocol stack,ui --grep @throttle (the ui runner last: AUTH-11 locks the docker gateway's bucket)"
   fi
   if overlay_active limits; then
-    echo "Limits overlay on: uploads over 64 KiB are refused (413); run REPSY_E2E_LIMITS=1 ./run.sh test --protocol pypi,helm,nuget,ruby,cargo,golang,api --grep @limits, one runner per call"
+    echo "Limits overlay on: uploads over 64 KiB are refused (413); run REPSY_E2E_LIMITS=1 ./run.sh test --protocol pypi,helm,nuget,ruby,cargo,go,api --grep @limits, one runner per call"
   fi
   if overlay_active cors; then
     echo "CORS overlay on: APP_ALLOWED_ORIGINS is set; run REPSY_E2E_CORS=1 ./run.sh test --protocol api --grep @cors"
@@ -781,9 +781,9 @@ cmd_test() {
     IFS=',' read -ra services <<< "$protocols"
   else
     # No --protocol given: run the skeleton harness proof only. A protocol runner (maven, npm,
-    # npm-clients, cargo, nuget, docker, helm, pypi, golang, ruby, api) is opt-in via --protocol so a plain
+    # npm-clients, cargo, nuget, docker, helm, pypi, go, ruby, api) is opt-in via --protocol so a plain
     # "run.sh test" stays fast; pass e.g. --protocol maven or
-    # --protocol skeleton,maven,npm,npm-clients,cargo,nuget,docker,helm,pypi,golang,ruby,stack,ui to run more. "stack" is
+    # --protocol skeleton,maven,npm,npm-clients,cargo,nuget,docker,helm,pypi,go,ruby,stack,ui to run more. "stack" is
     # the docker-exec cases against the container of a local stack (tests/stack); "ui" is the
     # panel UI suite (Playwright + headless Chromium, tests/ui), not a package format. "helm" runs
     # BOTH Helm protocols (OCI and classic/ChartMuseum, `tests/helm/*.spec.ts`) from one

@@ -65,7 +65,7 @@ import {
   h2ClosedCleanly,
 } from '../../src/clients/stack.js';
 import { dockerAdapter } from '../../src/clients/docker.js';
-import { golangAdapter } from '../../src/clients/golang.js';
+import { goAdapter } from '../../src/clients/go.js';
 import { helmAdapter } from '../../src/clients/helm.js';
 import {
   ADMIN,
@@ -210,7 +210,7 @@ test.describe.serial(
         await publish(npmAdapter, RepoType.NPM),
         await publish(dockerAdapter, RepoType.DOCKER),
         await publish(helmAdapter, RepoType.HELM),
-        await publish(golangAdapter, RepoType.GOLANG),
+        await publish(goAdapter, RepoType.GOLANG),
       ];
     });
 

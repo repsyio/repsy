@@ -203,8 +203,8 @@ export default defineConfig({
       retries: retriesFor(false),
     },
     {
-      name: 'golang',
-      testMatch: 'golang/**/*.spec.ts',
+      name: 'go',
+      testMatch: 'go/**/*.spec.ts',
       retries: retriesFor(false),
     },
     {

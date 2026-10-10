@@ -21,7 +21,7 @@
  * not work"; the message says why; the raw replay says which status and which JSON the server sent).
  *
  * Every function copies the client invocation of the protocol's adapter (`pypi.ts`, `nuget.ts`,
- * `helm-classic.ts`, `ruby.ts`, `cargo.ts`, `golang.ts`: the same environment, arguments and
+ * `helm-classic.ts`, `ruby.ts`, `cargo.ts`, `go.ts`: the same environment, arguments and
  * timeouts), builds the package with `padBytes` of random padding (`padding.ts`), and replays the
  * package to the route the client uses with `fetch`. Whether anything was stored is asked of the
  * adapter afterwards (`adapter.fingerprint`, `adapter.expectNothingStored`), never of these.
@@ -40,11 +40,7 @@ import { repoUrl } from '../repo-url.js';
 import { isolatedWorkDir, run } from './exec.js';
 import { gemEnv } from './ruby.js';
 import { buildGem, rawPublish as rawRubyPublish } from './ruby-raw.js';
-import {
-  buildModuleZip,
-  rawUpload as rawGoUpload,
-  uploadUrl as goUploadUrl,
-} from './golang-raw.js';
+import { buildModuleZip, rawUpload as rawGoUpload, uploadUrl as goUploadUrl } from './go-raw.js';
 import { buildChart, writeChartFile } from './helm-chart.js';
 import { helmEnv } from './helm.js';
 import { chartFileName, classicRepoUrl, rawUploadChart } from './helm-raw.js';
@@ -328,13 +324,9 @@ export async function pushCargo(
   };
 }
 
-/** `curl -T` of a Go module zip padded with `padBytes` to the `.zip` URL (`golang.ts`
+/** `curl -T` of a Go module zip padded with `padBytes` to the `.zip` URL (`go.ts`
  *  `publishWithClient`, the panel's documented incantation, `--fail-with-body` included). */
-export async function pushGolang(
-  world: World,
-  padBytes: number,
-  label: string,
-): Promise<OversizePush> {
+export async function pushGo(world: World, padBytes: number, label: string): Promise<OversizePush> {
   const { home, work } = await isolatedWorkDir(label);
   const { packageName: modulePath, version } = world.publishTarget;
   const built = await buildModuleZip({ modulePath, version, padBytes });
