@@ -5316,19 +5316,14 @@ components:
           format: int64
         privateRepo:
           type: boolean
-          nullable: false
         snapshots:
           type: boolean
-          nullable: false
         releases:
           type: boolean
-          nullable: false
         allowOverride:
           type: boolean
-          nullable: false
         securityScanEnabled:
           type: boolean
-          nullable: false
           description: >-
             Whether newly pushed versions are scanned automatically. Manually triggered scans ignore
             this setting.
@@ -5943,10 +5938,8 @@ components:
       properties:
         privateRepo:
           type: boolean
-          nullable: false
         allowOverride:
           type: boolean
-          nullable: false
           description: >-
             When false, uploading a version that already exists is refused. Maven: a release, and a
             timestamped snapshot build, cannot be replaced, but a non-unique snapshot (the literal
@@ -5957,27 +5950,23 @@ components:
             version.
         releases:
           type: boolean
-          nullable: false
           description: >-
             Maven and NuGet only; rejected with 400 releasesSnapshotsUnsupported for any other repo
             type. When false, uploads of release versions are refused, including redeploys of
             release versions that already exist.
         snapshots:
           type: boolean
-          nullable: false
           description: >-
             Maven and NuGet only; rejected with 400 releasesSnapshotsUnsupported for any other repo
             type. When false, uploads of snapshot versions are refused, including redeploys of
             snapshot versions that already exist.
         securityScanEnabled:
           type: boolean
-          nullable: false
           description: >-
             Whether newly pushed versions are scanned automatically. Manually triggered scans ignore
             this setting.
         pgpVerifyAllSignaturesEnabled:
           type: boolean
-          nullable: false
           description: >-
             Maven only; rejected with 400 pgpSettingsUnsupported for any other repo type. When true,
             every artifact signature (.jar.asc, -sources.jar.asc, .module.asc, ...) is verified
@@ -5986,7 +5975,6 @@ components:
             only the .pom.asc is verified.
         pgpKeyServerLookupEnabled:
           type: boolean
-          nullable: false
           description: >-
             Maven only; rejected with 400 pgpSettingsUnsupported for any other repo type. When
             false, a signature made with a key that is not registered on the repository is refused
@@ -6017,7 +6005,6 @@ components:
           "$ref": "#/components/schemas/RepoType"
         privateRepo:
           type: boolean
-          nullable: false
         diskUsage:
           type: integer
           format: int64
@@ -6042,7 +6029,6 @@ components:
           maxLength: 500
         privateRepo:
           type: boolean
-          nullable: false
           default: true
         type:
           "$ref": "#/components/schemas/RepoType"
@@ -6071,7 +6057,6 @@ components:
       properties:
         privateRepo:
           type: boolean
-          nullable: false
         releases:
           type: boolean
           description: >-
@@ -6093,7 +6078,6 @@ components:
             accepted. Omitted for Cargo and Go, which never replace a published version.
         securityScanEnabled:
           type: boolean
-          nullable: false
           description: >-
             Whether newly pushed versions are scanned automatically. Manually triggered scans ignore
             this setting.
@@ -6143,7 +6127,6 @@ components:
           minLength: 0
         readOnly:
           type: boolean
-          nullable: false
         expirationDate:
           type: string
           format: date-time
@@ -6170,16 +6153,12 @@ components:
           type: string
         canRead:
           type: boolean
-          nullable: false
         canWrite:
           type: boolean
-          nullable: false
         canManage:
           type: boolean
-          nullable: false
         private:
           type: boolean
-          nullable: false
       required:
         - canRead
         - canWrite
@@ -6288,25 +6267,35 @@ components:
         highestSeverity:
           "$ref": "#/components/schemas/Severity"
         scannerName:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
+          x-jackson-json-include-policy: NON_NULL
         scannerVersion:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
+          x-jackson-json-include-policy: NON_NULL
         errorMessage:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
+          x-jackson-json-include-policy: NON_NULL
         createdAt:
           type: string
           format: date-time
         startedAt:
-          type: string
+          type:
+          - string
+          - 'null'
           format: date-time
-          nullable: true
+          x-jackson-json-include-policy: NON_NULL
         completedAt:
-          type: string
+          type:
+          - string
+          - 'null'
           format: date-time
-          nullable: true
+          x-jackson-json-include-policy: NON_NULL
     VulnerabilityFindingInfo:
       type: object
       properties:
@@ -6322,23 +6311,33 @@ components:
         packageVersion:
           type: string
         fixedVersion:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
+          x-jackson-json-include-policy: NON_NULL
         description:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
+          x-jackson-json-include-policy: NON_NULL
         referenceUrl:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
+          x-jackson-json-include-policy: NON_NULL
         fixStatus:
           "$ref": "#/components/schemas/FixStatus"
         cvssScore:
-          type: number
+          type:
+          - number
+          - 'null'
           format: double
-          nullable: true
+          x-jackson-json-include-policy: NON_NULL
         cvssVector:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
+          x-jackson-json-include-policy: NON_NULL
     VulnerabilityScanDetail:
       type: object
       properties:
@@ -6354,25 +6353,35 @@ components:
         status:
           "$ref": "#/components/schemas/ScanStatus"
         scannerName:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
+          x-jackson-json-include-policy: NON_NULL
         scannerVersion:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
+          x-jackson-json-include-policy: NON_NULL
         errorMessage:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
+          x-jackson-json-include-policy: NON_NULL
         createdAt:
           type: string
           format: date-time
         startedAt:
-          type: string
+          type:
+          - string
+          - 'null'
           format: date-time
-          nullable: true
+          x-jackson-json-include-policy: NON_NULL
         completedAt:
-          type: string
+          type:
+          - string
+          - 'null'
           format: date-time
-          nullable: true
+          x-jackson-json-include-policy: NON_NULL
     ScanOverview:
       type: object
       properties:
@@ -6386,22 +6395,28 @@ components:
         scannedAt:
           description: >-
             When the version's newest scan finished; null while it is pending, queued or running.
-          type: string
+          type:
+          - string
+          - 'null'
           format: date-time
-          nullable: true
+          x-jackson-json-include-policy: NON_NULL
         lastCompletedAt:
           description: >-
             When the version's newest COMPLETED scan finished, the scan the counters are built
             from; null when no scan of the version has completed yet.
-          type: string
+          type:
+          - string
+          - 'null'
           format: date-time
-          nullable: true
+          x-jackson-json-include-policy: NON_NULL
         errorMessage:
           description: >-
             Why the version's newest scan failed, as one short line with URLs, addresses and file
             paths removed; null unless that scan has status FAILED (or no reason was recorded).
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
+          x-jackson-json-include-policy: NON_NULL
         criticalCount:
           type: integer
           format: int32
@@ -6421,11 +6436,14 @@ components:
           type: integer
           format: int32
     RepoSecuritySummary:
+      # the generator ignores a property-level policy on a oneOf property, so the whole model omits nulls
+      x-class-extra-annotation: '@com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)'
       type: object
       properties:
         severity:
-          "$ref": "#/components/schemas/Severity"
-          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/Severity'
+          - type: 'null'
         scanned:
           type: boolean
         rescanInProgressCount:
@@ -6461,11 +6479,14 @@ components:
       additionalProperties:
         "$ref": "#/components/schemas/RepoSecuritySummary"
     VersionSecuritySummary:
+      # the generator ignores a property-level policy on a oneOf property, so the whole model omits nulls
+      x-class-extra-annotation: '@com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)'
       type: object
       properties:
         severity:
-          "$ref": "#/components/schemas/Severity"
-          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/Severity'
+          - type: 'null'
         findingCount:
           type: integer
           format: int32
@@ -6479,8 +6500,9 @@ components:
             set on the per-version summary; absent on the per-artifact summary, which spans
             several versions. A version without a completed scan is listed as well, with scanned
             false, no severity, a findingCount of 0 and the status of its newest scan.
-          "$ref": "#/components/schemas/ScanStatus"
-          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/ScanStatus'
+          - type: 'null'
         rescanInProgressCount:
           description: >-
             Number of versions of the artifact whose newest scan is pending, queued or running
@@ -6538,6 +6560,8 @@ components:
         page:
           "$ref": "#/components/schemas/PageMetadata"
     RecentScannedVersion:
+      # the generator ignores a property-level policy on a oneOf property, so the whole model omits nulls
+      x-class-extra-annotation: '@com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)'
       type: object
       properties:
         artifactName:
@@ -6552,8 +6576,9 @@ components:
             Highest severity of the version's newest COMPLETED scan, so it stays the last known
             value while a rescan is pending, queued, running or failed. Null when that scan found
             nothing, or when the version has no completed scan (see lastCompletedAt).
-          "$ref": "#/components/schemas/Severity"
-          nullable: true
+          oneOf:
+          - $ref: '#/components/schemas/Severity'
+          - type: 'null'
         scannedAt:
           description: When the version's newest scan, of any status, was created.
           type: string
@@ -6562,9 +6587,11 @@ components:
           description: >-
             When the version's newest COMPLETED scan finished; null when no scan of the version
             has completed yet.
-          type: string
+          type:
+          - string
+          - 'null'
           format: date-time
-          nullable: true
+          x-jackson-json-include-policy: NON_NULL
     RepoSecurityDetail:
       type: object
       properties:
@@ -7020,11 +7047,15 @@ components:
         latestVersion:
           type: string
         description:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
+          x-jackson-json-include-policy: NON_NULL
         type:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
+          x-jackson-json-include-policy: NON_NULL
         updatedAt:
           type: string
           format: date-time
@@ -7034,14 +7065,20 @@ components:
         version:
           type: string
         appVersion:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
+          x-jackson-json-include-policy: NON_NULL
         description:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
+          x-jackson-json-include-policy: NON_NULL
         type:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
+          x-jackson-json-include-policy: NON_NULL
         digest:
           type: string
         size:
@@ -7060,14 +7097,20 @@ components:
         latestVersion:
           type: string
         description:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
+          x-jackson-json-include-policy: NON_NULL
         appVersion:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
+          x-jackson-json-include-policy: NON_NULL
         type:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
+          x-jackson-json-include-policy: NON_NULL
         updatedAt:
           type: string
           format: date-time
@@ -7079,14 +7122,20 @@ components:
         version:
           type: string
         description:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
+          x-jackson-json-include-policy: NON_NULL
         appVersion:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
+          x-jackson-json-include-policy: NON_NULL
         type:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
+          x-jackson-json-include-policy: NON_NULL
         digest:
           type: string
         size:
@@ -7096,9 +7145,11 @@ components:
           type: string
           format: date-time
         lastUpdatedAt:
-          type: string
+          type:
+          - string
+          - 'null'
           format: date-time
-          nullable: true
+          x-jackson-json-include-policy: NON_NULL
     PagedModelHelmChartVersionItem:
       type: object
       properties:
@@ -7322,8 +7373,10 @@ components:
         fingerprint:
           type: string
         userId:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
+          x-jackson-json-include-policy: NON_NULL
         createdAt:
           type: string
           format: date-time
@@ -7367,8 +7420,10 @@ components:
       type: object
       properties:
         scopeName:
-          type: string
-          nullable: true
+          type:
+          - string
+          - 'null'
+          x-jackson-json-include-policy: NON_NULL
           description: The scope without the `@`; absent for an unscoped package.
         packageName:
           type: string
@@ -7527,10 +7582,8 @@ components:
           format: int64
         prerelease:
           type: boolean
-          nullable: false
         listed:
           type: boolean
-          nullable: false
       required:
         - version
         - publishedAt
@@ -7591,7 +7644,6 @@ components:
           type: string
         listed:
           type: boolean
-          nullable: false
         downloadCount:
           type: integer
           format: int64
