@@ -25,6 +25,7 @@ import io.repsy.os.server.protocols.ruby.shared.ruby_gem.services.RubyGemService
 import io.repsy.os.server.protocols.ruby.shared.storage.services.RubyStorageService;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
@@ -75,8 +76,7 @@ public class RubyApiFacade implements ProtocolApiFacade {
   @Transactional
   public BaseUsages deleteGem(final RepoInfo repoInfo, final String gemName) {
     final var gemId = this.gemService.getGemId(repoInfo.getStorageKey(), gemName);
-    final var freed =
-        this.storageService.deleteAllGems(repoInfo.getStorageKey(), repoInfo.getName(), gemName);
+    final var freed = this.storageService.deleteAllGems(RepoRef.of(repoInfo), gemName);
     this.gemService.deleteGem(gemId);
     return BaseUsages.ofDisk(-1L * freed);
   }
@@ -96,7 +96,7 @@ public class RubyApiFacade implements ProtocolApiFacade {
             : BaseUsages.ofDisk(
                 -1L
                     * this.storageService.deleteGem(
-                        repoInfo.getStorageKey(), repoInfo.getName(), gemName, version, platform));
+                        RepoRef.of(repoInfo), gemName, version, platform));
 
     this.eventPublisher.publishEvent(
         new ArtifactVersionDeletedEvent(

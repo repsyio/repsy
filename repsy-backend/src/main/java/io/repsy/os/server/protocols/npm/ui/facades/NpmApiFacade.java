@@ -26,6 +26,7 @@ import io.repsy.os.server.protocols.npm.shared.npm_package.services.NpmPackageSe
 import io.repsy.os.server.protocols.npm.shared.storage.services.NpmStorageService;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
@@ -103,8 +104,7 @@ public class NpmApiFacade implements ProtocolApiFacade {
     final var packageBasePath = this.npmStorageService.getPackageBasePath(scopeName, packageName);
 
     final var readmeFileContent =
-        this.npmStorageService.getReadmeContent(
-            repoInfo.getStorageKey(), repoInfo.getName(), packageBasePath, versionName);
+        this.npmStorageService.getReadmeContent(RepoRef.of(repoInfo), packageBasePath, versionName);
 
     return this.npmPackageConverter.toPackageVersionDetail(
         packageInfo,
@@ -163,8 +163,7 @@ public class NpmApiFacade implements ProtocolApiFacade {
             newLatest ->
                 BaseUsages.ofDisk(
                     this.npmStorageService.deleteVersion(
-                        repoInfo.getStorageKey(),
-                        repoInfo.getName(),
+                        RepoRef.of(repoInfo),
                         packageBasePath,
                         packageName,
                         versionName,

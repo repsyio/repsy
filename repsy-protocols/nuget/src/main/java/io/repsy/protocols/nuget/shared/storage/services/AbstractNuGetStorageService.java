@@ -23,12 +23,12 @@ import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.storage.AbstractArtifactStorageService;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Locale;
 import java.util.Optional;
-import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 
@@ -46,7 +46,7 @@ public abstract class AbstractNuGetStorageService extends AbstractArtifactStorag
 
   @Override
   public BaseUsages writePackage(
-      final UUID repoId,
+      final RepoRef repo,
       final String packageId,
       final String version,
       final InputStream nuPkgStream,
@@ -57,16 +57,15 @@ public abstract class AbstractNuGetStorageService extends AbstractArtifactStorag
     final var normalizedVersion = normalizeNuGetVersion(version);
 
     final var nupkgStoragePath =
-        StoragePath.of(repoId, filePath(normalizedId, normalizedVersion, NUPKG_EXTENSION));
+        StoragePath.of(repo.id(), filePath(normalizedId, normalizedVersion, NUPKG_EXTENSION));
     final var nuspecStoragePath =
-        StoragePath.of(repoId, filePath(normalizedId, normalizedVersion, NUSPEC_EXTENSION));
+        StoragePath.of(repo.id(), filePath(normalizedId, normalizedVersion, NUSPEC_EXTENSION));
 
-    final var nupkgUsages =
-        this.storageStrategy.write(repoId.toString(), nupkgStoragePath, nuPkgStream);
+    final var nupkgUsages = this.storageStrategy.write(repo.name(), nupkgStoragePath, nuPkgStream);
 
     final BaseUsages nuspecUsages;
     try (final var bis = new ByteArrayInputStream(nuspecBytes)) {
-      nuspecUsages = this.storageStrategy.write(repoId.toString(), nuspecStoragePath, bis);
+      nuspecUsages = this.storageStrategy.write(repo.name(), nuspecStoragePath, bis);
     }
 
     nupkgUsages.setDiskUsage(nupkgUsages.getDiskUsage() + nuspecUsages.getDiskUsage());
@@ -74,16 +73,16 @@ public abstract class AbstractNuGetStorageService extends AbstractArtifactStorag
   }
 
   @Override
-  public Resource getNuPkg(final UUID repoId, final String packageId, final String version) {
+  public Resource getNuPkg(final RepoRef repo, final String packageId, final String version) {
 
-    return this.getPackageFile(repoId, packageId, version, NUPKG_EXTENSION)
+    return this.getPackageFile(repo, packageId, version, NUPKG_EXTENSION)
         .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.NUPKG_NOT_FOUND));
   }
 
   @Override
-  public Resource getNuspec(final UUID repoId, final String packageId, final String version) {
+  public Resource getNuspec(final RepoRef repo, final String packageId, final String version) {
 
-    return this.getPackageFile(repoId, packageId, version, NUSPEC_EXTENSION)
+    return this.getPackageFile(repo, packageId, version, NUSPEC_EXTENSION)
         .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.NUSPEC_NOT_FOUND));
   }
 
@@ -96,7 +95,7 @@ public abstract class AbstractNuGetStorageService extends AbstractArtifactStorag
 
   @Override
   public boolean copyToCanonicalVersion(
-      final UUID repoId, final String packageId, final String version) throws IOException {
+      final RepoRef repo, final String packageId, final String version) throws IOException {
 
     final var normalizedId = packageId.toLowerCase(Locale.ROOT);
     if (!hasBuildMetadata(version)) {
@@ -106,23 +105,23 @@ public abstract class AbstractNuGetStorageService extends AbstractArtifactStorag
     final var source = buildMetadataDirectory(version);
     final var target = normalizeNuGetVersion(version);
 
-    final var nupkgCopied = this.copyFile(repoId, normalizedId, source, target, NUPKG_EXTENSION);
-    this.copyFile(repoId, normalizedId, source, target, NUSPEC_EXTENSION);
+    final var nupkgCopied = this.copyFile(repo, normalizedId, source, target, NUPKG_EXTENSION);
+    this.copyFile(repo, normalizedId, source, target, NUSPEC_EXTENSION);
     return nupkgCopied;
   }
 
   private boolean copyFile(
-      final UUID repoId,
+      final RepoRef repo,
       final String normalizedId,
       final String sourceVersion,
       final String targetVersion,
       final String extension)
       throws IOException {
 
-    final var repoName = repoId.toString();
     final var resource =
         this.storageStrategy.get(
-            StoragePath.of(repoId, filePath(normalizedId, sourceVersion, extension)), repoName);
+            StoragePath.of(repo.id(), filePath(normalizedId, sourceVersion, extension)),
+            repo.name());
 
     if (resource.isEmpty()) {
       return false;
@@ -130,23 +129,25 @@ public abstract class AbstractNuGetStorageService extends AbstractArtifactStorag
 
     try (final var in = resource.get().getInputStream()) {
       this.storageStrategy.write(
-          repoName, StoragePath.of(repoId, filePath(normalizedId, targetVersion, extension)), in);
+          repo.name(),
+          StoragePath.of(repo.id(), filePath(normalizedId, targetVersion, extension)),
+          in);
     }
     return true;
   }
 
   @Override
-  public long deletePackageVersion(final UUID repoId, final String packageId, final String version)
+  public long deletePackageVersion(final RepoRef repo, final String packageId, final String version)
       throws IOException {
 
     final var normalizedId = packageId.toLowerCase(Locale.ROOT);
 
-    return this.deleteVersionDirectory(repoId, normalizedId, normalizeNuGetVersion(version));
+    return this.deleteVersionDirectory(repo, normalizedId, normalizeNuGetVersion(version));
   }
 
   @Override
   public long deleteBuildMetadataVersion(
-      final UUID repoId, final String packageId, final String version) throws IOException {
+      final RepoRef repo, final String packageId, final String version) throws IOException {
 
     // A version without build metadata has no directory of its own apart from the canonical one,
     // which must not be removed here.
@@ -155,36 +156,37 @@ public abstract class AbstractNuGetStorageService extends AbstractArtifactStorag
     }
 
     return this.deleteVersionDirectory(
-        repoId, packageId.toLowerCase(Locale.ROOT), buildMetadataDirectory(version));
+        repo, packageId.toLowerCase(Locale.ROOT), buildMetadataDirectory(version));
   }
 
   private long deleteVersionDirectory(
-      final UUID repoId, final String normalizedId, final String versionDirectory) {
+      final RepoRef repo, final String normalizedId, final String versionDirectory) {
 
     final var versionPath = PACKAGES_PATH + "/" + normalizedId + "/" + versionDirectory;
-    final var versionStoragePath = StoragePath.of(repoId, versionPath);
+    final var versionStoragePath = StoragePath.of(repo.id(), versionPath);
 
     return this.deleteTreeWithUsage(versionStoragePath);
   }
 
   @Override
-  public long deletePackage(final UUID repoId, final String packageId) {
+  public long deletePackage(final RepoRef repo, final String packageId) {
 
     final var normalizedId = packageId.toLowerCase(Locale.ROOT);
     final var packagePath = PACKAGES_PATH + "/" + normalizedId;
-    final var packageStoragePath = StoragePath.of(repoId, packagePath);
+    final var packageStoragePath = StoragePath.of(repo.id(), packagePath);
 
     return this.deleteTreeWithUsage(packageStoragePath);
   }
 
   private Optional<Resource> getPackageFile(
-      final UUID repoId, final String packageId, final String version, final String extension) {
+      final RepoRef repo, final String packageId, final String version, final String extension) {
 
     final var normalizedId = packageId.toLowerCase(Locale.ROOT);
 
     return this.storageStrategy.get(
-        StoragePath.of(repoId, filePath(normalizedId, normalizeNuGetVersion(version), extension)),
-        repoId.toString());
+        StoragePath.of(
+            repo.id(), filePath(normalizedId, normalizeNuGetVersion(version), extension)),
+        repo.name());
   }
 
   /**

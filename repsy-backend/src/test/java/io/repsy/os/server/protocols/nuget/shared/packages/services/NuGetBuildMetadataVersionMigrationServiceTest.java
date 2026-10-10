@@ -30,6 +30,7 @@ import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetBuil
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageVersionRepository;
 import io.repsy.os.server.security.scan.repositories.VulnerabilityScanRepository;
 import io.repsy.protocols.nuget.shared.storage.services.NuGetStorageService;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
@@ -104,7 +105,8 @@ class NuGetBuildMetadataVersionMigrationServiceTest {
     when(this.versions.findById(this.legacy.id())).thenReturn(Optional.of(this.row()));
     doThrow(new IOException("read-only"))
         .when(this.storage)
-        .deleteBuildMetadataVersion(eq(this.repoId), eq("some.package"), eq("1.0.0+build"));
+        .deleteBuildMetadataVersion(
+            eq(new RepoRef(this.repoId, "repo")), eq("some.package"), eq("1.0.0+build"));
 
     final var report = this.service.migrate();
 

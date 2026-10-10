@@ -23,6 +23,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import io.repsy.core.error_handling.exceptions.ErrorOccurredException;
 import io.repsy.libs.storage.core.dtos.StaleFile;
 import io.repsy.os.server.protocols.docker.shared.abandoned_upload.sources.DockerAbandonedBlobUploadSource;
 import io.repsy.os.server.protocols.docker.shared.layer.repositories.LayerRepository;
@@ -38,6 +39,7 @@ import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
@@ -139,7 +141,8 @@ class AbandonedBlobUploadCleanupServiceTest {
         .thenReturn(List.of(new StaleFile(UPLOAD_A, 100L)));
     when(this.layerRepository.existsByIdAndRepoId(UUID.fromString(UPLOAD_A), docker.getId()))
         .thenReturn(false);
-    when(this.dockerStorageService.deleteBlobFile(docker.getId(), docker.getName(), UPLOAD_A))
+    when(this.dockerStorageService.deleteBlobFile(
+            new RepoRef(docker.getId(), docker.getName()), UPLOAD_A))
         .thenReturn(100L);
 
     final var released = this.service.cleanupAbandonedUploads(THRESHOLD);
@@ -156,9 +159,11 @@ class AbandonedBlobUploadCleanupServiceTest {
     this.givenNoHelmReferences(helm);
     when(this.helmStorageService.listStaleBlobFiles(helm.getId(), THRESHOLD))
         .thenReturn(List.of(new StaleFile(UPLOAD_A, 40L), new StaleFile(UPLOAD_B, 2L)));
-    when(this.helmStorageService.deleteBlobFile(helm.getId(), helm.getName(), UPLOAD_A))
+    when(this.helmStorageService.deleteBlobFile(
+            new RepoRef(helm.getId(), helm.getName()), UPLOAD_A))
         .thenReturn(40L);
-    when(this.helmStorageService.deleteBlobFile(helm.getId(), helm.getName(), UPLOAD_B))
+    when(this.helmStorageService.deleteBlobFile(
+            new RepoRef(helm.getId(), helm.getName()), UPLOAD_B))
         .thenReturn(2L);
 
     final var released = this.service.cleanupAbandonedUploads(THRESHOLD);
@@ -181,7 +186,7 @@ class AbandonedBlobUploadCleanupServiceTest {
     final var released = this.service.cleanupAbandonedUploads(THRESHOLD);
 
     assertThat(released).isZero();
-    verify(this.dockerStorageService, never()).deleteBlobFile(any(), anyString(), anyString());
+    verify(this.dockerStorageService, never()).deleteBlobFile(any(), anyString());
     verifyNoInteractions(this.usageUpdateService);
   }
 
@@ -193,7 +198,8 @@ class AbandonedBlobUploadCleanupServiceTest {
     when(this.dockerStorageService.listStaleBlobFiles(docker.getId(), THRESHOLD))
         .thenReturn(List.of(new StaleFile(DIGEST, 500L)));
     when(this.layerRepository.existsByRepoIdAndDigest(docker.getId(), DIGEST)).thenReturn(false);
-    when(this.dockerStorageService.deleteBlobFile(docker.getId(), docker.getName(), DIGEST))
+    when(this.dockerStorageService.deleteBlobFile(
+            new RepoRef(docker.getId(), docker.getName()), DIGEST))
         .thenReturn(500L);
 
     final var released = this.service.cleanupAbandonedUploads(THRESHOLD);
@@ -216,7 +222,7 @@ class AbandonedBlobUploadCleanupServiceTest {
     final var released = this.service.cleanupAbandonedUploads(THRESHOLD);
 
     assertThat(released).isZero();
-    verify(this.helmStorageService, never()).deleteBlobFile(any(), anyString(), anyString());
+    verify(this.helmStorageService, never()).deleteBlobFile(any(), anyString());
     verify(this.helmOciBlobRepository, never()).deleteByRepoIdAndDigest(any(), anyString());
     verifyNoInteractions(this.usageUpdateService);
   }
@@ -236,7 +242,7 @@ class AbandonedBlobUploadCleanupServiceTest {
     final var released = this.service.cleanupAbandonedUploads(THRESHOLD);
 
     assertThat(released).isZero();
-    verify(this.helmStorageService, never()).deleteBlobFile(any(), anyString(), anyString());
+    verify(this.helmStorageService, never()).deleteBlobFile(any(), anyString());
   }
 
   @Test
@@ -250,7 +256,7 @@ class AbandonedBlobUploadCleanupServiceTest {
         .thenReturn(Stream.of("{\"config\":{\"digest\":\"%s\"}}".formatted(OTHER_DIGEST)));
     when(this.helmChartVersionRepository.findAllByChartRepoId(helm.getId()))
         .thenReturn(List.of(chartVersionWithDigest(OTHER_DIGEST)));
-    when(this.helmStorageService.deleteBlobFile(helm.getId(), helm.getName(), DIGEST))
+    when(this.helmStorageService.deleteBlobFile(new RepoRef(helm.getId(), helm.getName()), DIGEST))
         .thenReturn(500L);
 
     final var released = this.service.cleanupAbandonedUploads(THRESHOLD);
@@ -273,7 +279,7 @@ class AbandonedBlobUploadCleanupServiceTest {
     final var released = this.service.cleanupAbandonedUploads(THRESHOLD);
 
     assertThat(released).isZero();
-    verify(this.dockerStorageService, never()).deleteBlobFile(any(), anyString(), anyString());
+    verify(this.dockerStorageService, never()).deleteBlobFile(any(), anyString());
     verifyNoInteractions(this.usageUpdateService);
   }
 
@@ -297,9 +303,11 @@ class AbandonedBlobUploadCleanupServiceTest {
     this.givenRepos(docker, null);
     when(this.dockerStorageService.listStaleBlobFiles(docker.getId(), THRESHOLD))
         .thenReturn(List.of(new StaleFile(UPLOAD_A, 100L), new StaleFile(UPLOAD_B, 7L)));
-    when(this.dockerStorageService.deleteBlobFile(docker.getId(), docker.getName(), UPLOAD_A))
-        .thenThrow(new IOException("disk error"));
-    when(this.dockerStorageService.deleteBlobFile(docker.getId(), docker.getName(), UPLOAD_B))
+    when(this.dockerStorageService.deleteBlobFile(
+            new RepoRef(docker.getId(), docker.getName()), UPLOAD_A))
+        .thenThrow(new ErrorOccurredException(new IOException("disk error")));
+    when(this.dockerStorageService.deleteBlobFile(
+            new RepoRef(docker.getId(), docker.getName()), UPLOAD_B))
         .thenReturn(7L);
 
     final var released = this.service.cleanupAbandonedUploads(THRESHOLD);
@@ -319,7 +327,8 @@ class AbandonedBlobUploadCleanupServiceTest {
         .thenThrow(new IllegalStateException("storage unavailable"));
     when(this.helmStorageService.listStaleBlobFiles(helm.getId(), THRESHOLD))
         .thenReturn(List.of(new StaleFile(UPLOAD_A, 9L)));
-    when(this.helmStorageService.deleteBlobFile(helm.getId(), helm.getName(), UPLOAD_A))
+    when(this.helmStorageService.deleteBlobFile(
+            new RepoRef(helm.getId(), helm.getName()), UPLOAD_A))
         .thenReturn(9L);
 
     final var released = this.service.cleanupAbandonedUploads(THRESHOLD);

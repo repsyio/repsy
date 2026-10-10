@@ -20,6 +20,7 @@ import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestInfo;
 import io.repsy.protocols.helm.shared.oci.services.OciBlobService;
 import io.repsy.protocols.helm.shared.oci.services.OciManifestService;
 import io.repsy.protocols.helm.shared.storage.services.HelmStorageService;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.IOException;
 import java.util.Collection;
 import java.util.HashSet;
@@ -101,7 +102,7 @@ public abstract class AbstractHelmChartFilesService<ID> {
         log.debug("Keeping OCI blob {}, another manifest still references it", digest);
         continue;
       }
-      freed += this.helmStorageService.deleteBlob(storageKey, digest, repoName);
+      freed += this.helmStorageService.deleteBlob(new RepoRef(storageKey, repoName), digest);
       this.ociBlobService.deleteByRepoIdAndDigest(repoId, digest);
     }
 
@@ -121,12 +122,13 @@ public abstract class AbstractHelmChartFilesService<ID> {
       throws IOException {
     final var filename = chart.name() + "-" + chart.version() + HelmConstants.TGZ_EXTENSION;
     long freed =
-        this.helmStorageService.deleteChartFile(storageKey, filename, chart.digest(), repoName);
+        this.helmStorageService.deleteChartFile(
+            new RepoRef(storageKey, repoName), filename, chart.digest());
 
     for (final var manifest : chart.manifests()) {
       freed +=
           this.helmStorageService.deleteManifestFile(
-              storageKey, manifest.name(), manifest.reference(), repoName);
+              new RepoRef(storageKey, repoName), manifest.name(), manifest.reference());
       referencedBlobs.addAll(referencedDigests(manifest.content()));
     }
 

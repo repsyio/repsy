@@ -42,6 +42,7 @@ import io.repsy.protocols.nuget.shared.packages.services.NuGetPackageService;
 import io.repsy.protocols.nuget.shared.storage.services.NuGetStorageService;
 import io.repsy.protocols.nuget.shared.utils.NuGetUrlBuilder;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import io.repsy.protocols.shared.storage.RepoRef;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import io.repsy.protocols.shared.utils.StoredUpload;
 import java.io.IOException;
@@ -187,7 +188,7 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
     final var packageIdVersion = extractPackageIdAndVersion(context);
 
     return this.storageService.getNuPkg(
-        repoInfo.getStorageKey(), packageIdVersion.id(), packageIdVersion.version());
+        RepoRef.of(repoInfo), packageIdVersion.id(), packageIdVersion.version());
   }
 
   @Override
@@ -215,7 +216,7 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
     final var packageIdVersion = extractPackageIdAndVersion(context);
 
     return this.storageService.getNuspec(
-        repoInfo.getStorageKey(), packageIdVersion.id(), packageIdVersion.version());
+        RepoRef.of(repoInfo), packageIdVersion.id(), packageIdVersion.version());
   }
 
   @Override
@@ -343,7 +344,7 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
         () -> {
           try (final var nuPkgStream = Files.newInputStream(tempFile)) {
             return this.storageService.writePackage(
-                repoInfo.getStorageKey(),
+                RepoRef.of(repoInfo),
                 metadata.packageId(),
                 metadata.version(),
                 nuPkgStream,
@@ -352,7 +353,7 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
         },
         () ->
             this.storageService.deletePackageVersion(
-                repoInfo.getStorageKey(), metadata.packageId(), metadata.version()),
+                RepoRef.of(repoInfo), metadata.packageId(), metadata.version()),
         replacesExisting,
         log,
         "NuGet package " + metadata.packageId() + " " + metadata.version());

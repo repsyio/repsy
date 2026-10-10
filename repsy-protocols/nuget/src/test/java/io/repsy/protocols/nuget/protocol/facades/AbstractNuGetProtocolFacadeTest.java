@@ -29,6 +29,7 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.protocols.nuget.shared.packages.services.NuGetPackageService;
 import io.repsy.protocols.nuget.shared.storage.services.NuGetStorageService;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -89,7 +90,7 @@ class AbstractNuGetProtocolFacadeTest {
     when(packageService.versionExists(repoInfo, "Some.Package", "1.0.0")).thenReturn(false);
     publishRunsFilesWriter(false);
     when(storageService.writePackage(
-            eq(repoInfo.getStorageKey()),
+            eq(RepoRef.of(repoInfo)),
             eq("Some.Package"),
             eq("1.0.0"),
             any(InputStream.class),
@@ -135,7 +136,7 @@ class AbstractNuGetProtocolFacadeTest {
             () -> facade.publish(context("/v3/package", repoInfo), nupkg("Some.Package", "1.0.0")))
         .isSameAs(failure);
 
-    verify(storageService).deletePackageVersion(repoInfo.getStorageKey(), "Some.Package", "1.0.0");
+    verify(storageService).deletePackageVersion(RepoRef.of(repoInfo), "Some.Package", "1.0.0");
   }
 
   @Test

@@ -20,13 +20,13 @@ import io.repsy.protocols.npm.shared.utils.NpmPackageUtils;
 import io.repsy.protocols.npm.shared.utils.NpmPackumentBuilder;
 import io.repsy.protocols.npm.shared.utils.NpmTarballFacts;
 import io.repsy.protocols.npm.shared.utils.NpmTarballInspector;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -49,8 +49,7 @@ public final class NpmPackumentRebuilder {
    *     out of a rebuilt version.
    */
   public Map<String, Object> rebuild(
-      final UUID repoId,
-      final String repoName,
+      final RepoRef repo,
       final Path packageBasePath,
       final NpmPackageSnapshot snapshot,
       final @Nullable String registryBaseUrl)
@@ -59,24 +58,22 @@ public final class NpmPackumentRebuilder {
     final var tarballs = new HashMap<String, NpmTarballFacts>();
 
     for (final var version : snapshot.versions()) {
-      this.inspectTarball(repoId, repoName, packageBasePath, snapshot.name(), version.version())
+      this.inspectTarball(repo, packageBasePath, snapshot.name(), version.version())
           .ifPresent(facts -> tarballs.put(version.version(), facts));
     }
 
     return NpmPackumentBuilder.build(
-        snapshot, tarballs, packageUrl(registryBaseUrl, repoName, snapshot), Instant.now());
+        snapshot, tarballs, packageUrl(registryBaseUrl, repo.name(), snapshot), Instant.now());
   }
 
   private Optional<NpmTarballFacts> inspectTarball(
-      final UUID repoId,
-      final String repoName,
+      final RepoRef repo,
       final Path packageBasePath,
       final String packageName,
       final String versionName)
       throws IOException {
 
-    final var resource =
-        this.tarballStore.find(repoId, repoName, packageBasePath, packageName, versionName);
+    final var resource = this.tarballStore.find(repo, packageBasePath, packageName, versionName);
 
     if (resource.isEmpty()) {
       return Optional.empty();

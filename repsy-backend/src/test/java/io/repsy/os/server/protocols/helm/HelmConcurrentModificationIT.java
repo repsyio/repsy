@@ -47,6 +47,7 @@ import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Proxy;
 import java.nio.charset.StandardCharsets;
@@ -542,7 +543,7 @@ class HelmConcurrentModificationIT extends AbstractIT {
     final var override = chart(name, "1.0.0", "override", null);
     doThrow(new IllegalStateException("disk full"))
         .when(this.helmStorageService)
-        .saveManifest(any(UUID.class), anyString(), anyString(), any(byte[].class), anyString());
+        .saveManifest(any(), anyString(), anyString(), any(byte[].class));
 
     assertThat(this.pushOci(repo, name, "1.0.0", override, token).getStatus())
         .as("the push fails")
@@ -565,7 +566,7 @@ class HelmConcurrentModificationIT extends AbstractIT {
     final var content = chart(name, "1.0.0", "first", null);
     doThrow(new IllegalStateException("disk full"))
         .when(this.helmStorageService)
-        .saveManifest(any(UUID.class), anyString(), anyString(), any(byte[].class), anyString());
+        .saveManifest(any(), anyString(), anyString(), any(byte[].class));
 
     assertThat(this.pushOci(repo, name, "1.0.0", content, token).getStatus())
         .as("the push fails")
@@ -951,7 +952,7 @@ class HelmConcurrentModificationIT extends AbstractIT {
   private byte @Nullable [] manifestFile(final Repo repo, final String name, final String tag)
       throws Exception {
     final var resource =
-        this.helmStorageService.findManifest(repo.getId(), name, tag, repo.getName());
+        this.helmStorageService.findManifest(new RepoRef(repo.getId(), repo.getName()), name, tag);
     if (resource.isEmpty() || !resource.get().exists()) {
       return null;
     }
@@ -977,7 +978,7 @@ class HelmConcurrentModificationIT extends AbstractIT {
               return written;
             })
         .when(this.helmStorageService)
-        .saveManifest(any(UUID.class), anyString(), anyString(), any(byte[].class), anyString());
+        .saveManifest(any(), anyString(), anyString(), any(byte[].class));
   }
 
   @Test

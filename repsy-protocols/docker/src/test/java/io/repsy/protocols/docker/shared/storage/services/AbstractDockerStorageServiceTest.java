@@ -16,6 +16,7 @@
 package io.repsy.protocols.docker.shared.storage.services;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -24,11 +25,14 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.repsy.core.error_handling.exceptions.ErrorOccurredException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.libs.storage.core.dtos.StaleFile;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
+import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.time.Instant;
@@ -114,7 +118,8 @@ class AbstractDockerStorageServiceTest {
         .thenReturn(4096L);
 
     final var freed =
-        new TestStorageService(this.storageStrategy).deleteBlobFile(REPO_UUID, "repo", "upload-id");
+        new TestStorageService(this.storageStrategy)
+            .deleteBlobFile(new RepoRef(REPO_UUID, "repo"), "upload-id");
 
     assertThat(freed).isEqualTo(4096L);
     final var order = inOrder(this.storageStrategy);
@@ -122,5 +127,30 @@ class AbstractDockerStorageServiceTest {
         .verify(this.storageStrategy)
         .getFileUsage(argThat(sp -> sp.getPath().equals(path)), eq("repo"));
     order.verify(this.storageStrategy).delete(argThat(sp -> sp.getPath().equals(path)));
+  }
+
+  @Test
+  @DisplayName("deleteBlobFile() answers the IOException of the size lookup as errorOccurred (500)")
+  void deleteBlobFileAnswersTheIoExceptionAsErrorOccurred() throws IOException {
+    when(this.storageStrategy.getFileUsage(any(), eq("repo"))).thenThrow(new IOException("disk"));
+    final var service = new TestStorageService(this.storageStrategy);
+
+    assertThatThrownBy(() -> service.deleteBlobFile(new RepoRef(REPO_UUID, "repo"), "upload-id"))
+        .isInstanceOf(ErrorOccurredException.class)
+        .hasCauseInstanceOf(IOException.class);
+    verify(this.storageStrategy, never()).delete(any());
+  }
+
+  @Test
+  @DisplayName("deleteManifest() answers a failing usage lookup as errorOccurred (500)")
+  void deleteManifestFailureIsErrorOccurred() throws IOException {
+    when(this.storageStrategy.getFileUsage(any(), eq("repo"))).thenThrow(new IOException("disk"));
+    final var repoInfo = BaseRepoInfo.<UUID>builder().storageKey(REPO_UUID).name("repo").build();
+    final var service = new TestStorageService(this.storageStrategy);
+
+    assertThatThrownBy(() -> service.deleteManifest(repoInfo, "sha256:abc"))
+        .isInstanceOf(ErrorOccurredException.class)
+        .hasCauseInstanceOf(IOException.class);
+    verify(this.storageStrategy, never()).delete(any());
   }
 }

@@ -40,6 +40,7 @@ import io.repsy.protocols.npm.shared.npm_package.services.NpmPackageService.Vers
 import io.repsy.protocols.npm.shared.storage.services.AbstractNpmStorageService;
 import io.repsy.protocols.npm.shared.storage.services.NpmStorageService;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import io.repsy.protocols.shared.storage.RepoRef;
 import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -129,11 +130,10 @@ class AbstractNpmProtocolFacadeDeleteTest {
   void unpublishRemovesTheVersionFilesInsideTheService() throws Exception {
     this.basePath();
     when(this.storageService.readMetadataOrRebuild(
-            eq(REPO_ID), eq(REPO_NAME), eq(BASE_PATH), any()))
+            eq(new RepoRef(REPO_ID, REPO_NAME)), eq(BASE_PATH), any()))
         .thenReturn(metadataWithVersions("1.0.0", "1.1.0"));
     when(this.storageService.deleteVersion(
-            eq(REPO_ID),
-            eq(REPO_NAME),
+            eq(new RepoRef(REPO_ID, REPO_NAME)),
             eq(BASE_PATH),
             eq(PACKAGE),
             eq("1.1.0"),
@@ -161,7 +161,7 @@ class AbstractNpmProtocolFacadeDeleteTest {
   void unpublishOfTheLastVersionRemovesThePackage() throws Exception {
     this.basePath();
     when(this.storageService.readMetadataOrRebuild(
-            eq(REPO_ID), eq(REPO_NAME), eq(BASE_PATH), any()))
+            eq(new RepoRef(REPO_ID, REPO_NAME)), eq(BASE_PATH), any()))
         .thenReturn(metadataWithVersions("1.0.0"));
     when(this.storageService.deletePackage(REPO_ID, BASE_PATH)).thenReturn(300L);
     when(this.packageService.deletePackageVersion(
@@ -173,8 +173,7 @@ class AbstractNpmProtocolFacadeDeleteTest {
 
     this.facade.unPublishPackageVersion(this.context, null, PACKAGE, metadataWithVersions());
 
-    verify(this.storageService, never())
-        .deleteVersion(any(), any(), any(), any(), any(), any(), any());
+    verify(this.storageService, never()).deleteVersion(any(), any(), any(), any(), any(), any());
     assertThat(this.context.<BaseUsages>getProperty("usages").getDiskUsage()).isEqualTo(-300L);
   }
 
@@ -183,7 +182,7 @@ class AbstractNpmProtocolFacadeDeleteTest {
   void unpublishOfNothingIsAConflict() throws Exception {
     this.basePath();
     when(this.storageService.readMetadataOrRebuild(
-            eq(REPO_ID), eq(REPO_NAME), eq(BASE_PATH), any()))
+            eq(new RepoRef(REPO_ID, REPO_NAME)), eq(BASE_PATH), any()))
         .thenReturn(metadataWithVersions("1.0.0"));
 
     assertThatThrownBy(
@@ -202,7 +201,7 @@ class AbstractNpmProtocolFacadeDeleteTest {
   void unpublishOfAStalePayloadIsAConflict() throws Exception {
     this.basePath();
     when(this.storageService.readMetadataOrRebuild(
-            eq(REPO_ID), eq(REPO_NAME), eq(BASE_PATH), any()))
+            eq(new RepoRef(REPO_ID, REPO_NAME)), eq(BASE_PATH), any()))
         .thenReturn(metadataWithVersions("1.0.0", "2.0.0"));
 
     assertThatThrownBy(
@@ -313,9 +312,9 @@ class AbstractNpmProtocolFacadeDeleteTest {
   /** The storage service runs the change it is given, like the real one when the file is there. */
   private void metadataChangesRun() throws IOException {
     when(this.storageService.changeMetadata(
-            eq(REPO_ID), eq(REPO_NAME), eq(BASE_PATH), any(), any()))
+            eq(new RepoRef(REPO_ID, REPO_NAME)), eq(BASE_PATH), any(), any()))
         .thenAnswer(
-            invocation -> invocation.<NpmStorageService.MetadataChange>getArgument(4).apply());
+            invocation -> invocation.<NpmStorageService.MetadataChange>getArgument(3).apply());
   }
 
   private void deprecationRuns() throws IOException {
@@ -331,16 +330,18 @@ class AbstractNpmProtocolFacadeDeleteTest {
     this.deprecationRuns();
     this.metadataChangesRun();
     when(this.storageService.readMetadataOrRebuild(
-            eq(REPO_ID), eq(REPO_NAME), eq(BASE_PATH), any()))
+            eq(new RepoRef(REPO_ID, REPO_NAME)), eq(BASE_PATH), any()))
         .thenReturn(metadataWithVersions("1.0.0"));
-    when(this.storageService.deprecateVersions(eq(REPO_ID), eq(REPO_NAME), eq(BASE_PATH), any()))
+    when(this.storageService.deprecateVersions(
+            eq(new RepoRef(REPO_ID, REPO_NAME)), eq(BASE_PATH), any()))
         .thenReturn(17L);
 
     this.facade.deprecate(this.context, null, PACKAGE, this.deprecatedPayload());
 
     verify(this.storageService)
-        .deprecateVersions(REPO_ID, REPO_NAME, BASE_PATH, List.of(Pair.of("1.0.0", "use 1.1")));
-    verify(this.storageService, never()).restoreMetadataBytes(any(), any(), any(), any());
+        .deprecateVersions(
+            new RepoRef(REPO_ID, REPO_NAME), BASE_PATH, List.of(Pair.of("1.0.0", "use 1.1")));
+    verify(this.storageService, never()).restoreMetadataBytes(any(), any(), any());
     assertThat(this.context.<BaseUsages>getProperty("usages").getDiskUsage()).isEqualTo(17L);
   }
 
@@ -352,9 +353,9 @@ class AbstractNpmProtocolFacadeDeleteTest {
     this.deprecationRuns();
     this.metadataChangesRun();
     when(this.storageService.readMetadataOrRebuild(
-            eq(REPO_ID), eq(REPO_NAME), eq(BASE_PATH), any()))
+            eq(new RepoRef(REPO_ID, REPO_NAME)), eq(BASE_PATH), any()))
         .thenReturn(metadataWithVersions("1.0.0"));
-    doThrow(failure).when(this.storageService).deprecateVersions(any(), any(), any(), any());
+    doThrow(failure).when(this.storageService).deprecateVersions(any(), any(), any());
 
     assertThatThrownBy(
             () -> this.facade.deprecate(this.context, null, PACKAGE, this.deprecatedPayload()))
@@ -369,13 +370,13 @@ class AbstractNpmProtocolFacadeDeleteTest {
     this.basePath();
     this.deprecationRuns();
     when(this.storageService.readMetadataOrRebuild(
-            eq(REPO_ID), eq(REPO_NAME), eq(BASE_PATH), any()))
+            eq(new RepoRef(REPO_ID, REPO_NAME)), eq(BASE_PATH), any()))
         .thenReturn(metadataWithVersions("1.0.0"));
     when(this.storageService.changeMetadata(
-            eq(REPO_ID), eq(REPO_NAME), eq(BASE_PATH), any(), any()))
+            eq(new RepoRef(REPO_ID, REPO_NAME)), eq(BASE_PATH), any(), any()))
         .thenAnswer(
             invocation -> {
-              final var rows = invocation.<Supplier<NpmPackageSnapshot>>getArgument(3).get();
+              final var rows = invocation.<Supplier<NpmPackageSnapshot>>getArgument(2).get();
               assertThat(rows).isSameAs(SNAPSHOT);
               return 0L;
             });

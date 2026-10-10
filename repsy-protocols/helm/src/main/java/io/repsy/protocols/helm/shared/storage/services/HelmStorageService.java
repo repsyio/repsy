@@ -18,6 +18,7 @@ package io.repsy.protocols.helm.shared.storage.services;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StaleFile;
 import io.repsy.libs.storage.core.dtos.StoragePath;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.Instant;
@@ -38,17 +39,15 @@ public interface HelmStorageService<ID> {
 
   Optional<Resource> findResource(StoragePath storagePath, String repoName) throws IOException;
 
-  long deleteChart(StoragePath storagePath, String repoName) throws IOException;
+  long deleteChart(StoragePath storagePath, String repoName);
 
-  long deleteChartFile(UUID repoId, String filename, String digest, String repoName)
-      throws IOException;
+  long deleteChartFile(RepoRef repo, String filename, String digest);
 
   /**
    * Deletes the stored manifest file and answers the bytes it held (zero when there was none), so
    * the caller can release them from the repo's disk usage.
    */
-  long deleteManifestFile(UUID repoId, String name, String reference, String repoName)
-      throws IOException;
+  long deleteManifestFile(RepoRef repo, String name, String reference);
 
   void clearTrash();
 
@@ -58,9 +57,9 @@ public interface HelmStorageService<ID> {
    * Appends a chunk to the upload's temp file, so a blob sent in several {@code PATCH} requests is
    * stored whole. Answers the appended bytes as the disk usage change.
    */
-  BaseUsages saveBlobChunk(UUID repoId, UUID uploadId, InputStream chunk, String repoName);
+  BaseUsages saveBlobChunk(RepoRef repo, UUID uploadId, InputStream chunk);
 
-  long getBlobSize(UUID repoId, UUID uploadId, String repoName) throws IOException;
+  long getBlobSize(RepoRef repo, UUID uploadId) throws IOException;
 
   BaseUsages finalizeBlob(UUID repoId, UUID uploadId, String digest);
 
@@ -75,26 +74,25 @@ public interface HelmStorageService<ID> {
    * Deletes one file of the repo's {@code oci/blobs} directory and answers the bytes it held, so
    * the caller can release them from the repo's disk usage.
    */
-  long deleteBlobFile(UUID repoId, String repoName, String fileName) throws IOException;
+  long deleteBlobFile(RepoRef repo, String fileName);
 
   /**
    * Deletes the finalized blob stored under {@code digest} and answers the bytes it held, or zero
    * when there is no such blob.
    */
-  long deleteBlob(UUID repoId, String digest, String repoName) throws IOException;
+  long deleteBlob(RepoRef repo, String digest);
 
-  Optional<Resource> findBlob(UUID repoId, String digest, String repoName);
+  Optional<Resource> findBlob(RepoRef repo, String digest);
 
-  boolean blobExists(UUID repoId, String digest, String repoName);
+  boolean blobExists(RepoRef repo, String digest);
 
   /**
    * Writes the manifest file and answers the disk usage it changed: its size for a new file, the
    * difference when a manifest of the same reference is replaced.
    */
-  BaseUsages saveManifest(
-      UUID repoId, String name, String reference, byte[] content, String repoName);
+  BaseUsages saveManifest(RepoRef repo, String name, String reference, byte[] content);
 
-  Optional<Resource> findManifest(UUID repoId, String name, String reference, String repoName);
+  Optional<Resource> findManifest(RepoRef repo, String name, String reference);
 
-  boolean manifestExists(UUID repoId, String name, String reference, String repoName);
+  boolean manifestExists(RepoRef repo, String name, String reference);
 }

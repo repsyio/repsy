@@ -16,17 +16,22 @@
 package io.repsy.protocols.helm.shared.storage.services;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.repsy.core.error_handling.exceptions.ErrorOccurredException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StaleFile;
+import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -40,6 +45,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AbstractHelmStorageService")
@@ -72,7 +78,9 @@ class AbstractHelmStorageServiceTest {
     final var usages =
         new TestStorageService(this.storageStrategy)
             .saveBlobChunk(
-                REPO_UUID, UPLOAD_ID, new ByteArrayInputStream(new byte[2048]), REPO_NAME);
+                new RepoRef(REPO_UUID, REPO_NAME),
+                UPLOAD_ID,
+                new ByteArrayInputStream(new byte[2048]));
 
     assertThat(usages).isSameAs(expected);
   }
@@ -117,7 +125,7 @@ class AbstractHelmStorageServiceTest {
 
     final var freed =
         new TestStorageService(this.storageStrategy)
-            .deleteBlobFile(REPO_UUID, REPO_NAME, UPLOAD_ID.toString());
+            .deleteBlobFile(new RepoRef(REPO_UUID, REPO_NAME), UPLOAD_ID.toString());
 
     assertThat(freed).isEqualTo(4096L);
     final var order = inOrder(this.storageStrategy);
@@ -143,7 +151,10 @@ class AbstractHelmStorageServiceTest {
     final var usages =
         new TestStorageService(this.storageStrategy)
             .saveManifest(
-                REPO_UUID, "payments", "1.0.0", "{}".getBytes(StandardCharsets.UTF_8), REPO_NAME);
+                new RepoRef(REPO_UUID, REPO_NAME),
+                "payments",
+                "1.0.0",
+                "{}".getBytes(StandardCharsets.UTF_8));
 
     assertThat(usages).isSameAs(expected);
   }
@@ -158,7 +169,7 @@ class AbstractHelmStorageServiceTest {
 
     final var freed =
         new TestStorageService(this.storageStrategy)
-            .deleteManifestFile(REPO_UUID, "payments", "1.0.0", REPO_NAME);
+            .deleteManifestFile(new RepoRef(REPO_UUID, REPO_NAME), "payments", "1.0.0");
 
     assertThat(freed).isEqualTo(700L);
     verify(this.storageStrategy).delete(argThat(sp -> sp.getPath().equals(path)));
@@ -171,7 +182,7 @@ class AbstractHelmStorageServiceTest {
 
     final var freed =
         new TestStorageService(this.storageStrategy)
-            .deleteManifestFile(REPO_UUID, "payments", "1.0.0", REPO_NAME);
+            .deleteManifestFile(new RepoRef(REPO_UUID, REPO_NAME), "payments", "1.0.0");
 
     assertThat(freed).isZero();
     verify(this.storageStrategy, never()).delete(any());
@@ -186,7 +197,8 @@ class AbstractHelmStorageServiceTest {
         .thenReturn(Optional.of(new ByteArrayResource(new byte[64])));
 
     final var freed =
-        new TestStorageService(this.storageStrategy).deleteBlob(REPO_UUID, "sha256:abc", REPO_NAME);
+        new TestStorageService(this.storageStrategy)
+            .deleteBlob(new RepoRef(REPO_UUID, REPO_NAME), "sha256:abc");
 
     assertThat(freed).isEqualTo(64L);
     verify(this.storageStrategy).delete(argThat(sp -> sp.getPath().equals(path)));
@@ -198,9 +210,86 @@ class AbstractHelmStorageServiceTest {
     when(this.storageStrategy.get(any(), eq(REPO_NAME))).thenReturn(Optional.empty());
 
     final var freed =
-        new TestStorageService(this.storageStrategy).deleteBlob(REPO_UUID, "sha256:abc", REPO_NAME);
+        new TestStorageService(this.storageStrategy)
+            .deleteBlob(new RepoRef(REPO_UUID, REPO_NAME), "sha256:abc");
 
     assertThat(freed).isZero();
+    verify(this.storageStrategy, never()).delete(any());
+  }
+
+  @Test
+  @DisplayName(
+      "deleteBlobFile() answers the IOException of the size lookup as errorOccurred (500), deleting nothing")
+  void deleteBlobFileAnswersTheIoExceptionAsErrorOccurred() throws IOException {
+    when(this.storageStrategy.getFileUsage(any(), eq(REPO_NAME)))
+        .thenThrow(new IOException("disk"));
+    final var service = new TestStorageService(this.storageStrategy);
+
+    assertThatThrownBy(() -> service.deleteBlobFile(new RepoRef(REPO_UUID, REPO_NAME), "upload"))
+        .isInstanceOf(ErrorOccurredException.class)
+        .hasCauseInstanceOf(IOException.class);
+    verify(this.storageStrategy, never()).delete(any());
+  }
+
+  @Test
+  @DisplayName(
+      "deleteChart() answers the IOException of the size lookup as errorOccurred (500), deleting nothing")
+  void deleteChartAnswersTheIoExceptionAsErrorOccurred() throws IOException {
+    final var path = StoragePath.of(REPO_UUID, "charts/a-1.0.0.tgz");
+    when(this.storageStrategy.getFileUsage(path, REPO_NAME)).thenThrow(new IOException("disk"));
+    final var service = new TestStorageService(this.storageStrategy);
+
+    assertThatThrownBy(() -> service.deleteChart(path, REPO_NAME))
+        .isInstanceOf(ErrorOccurredException.class)
+        .hasCauseInstanceOf(IOException.class);
+    verify(this.storageStrategy, never()).delete(any());
+  }
+
+  @Test
+  @DisplayName(
+      "deleteChartFile() answers the IOException of the size lookup as errorOccurred (500)")
+  void deleteChartFileAnswersTheIoExceptionAsErrorOccurred() throws IOException {
+    when(this.storageStrategy.getFileUsage(any(), eq(REPO_NAME)))
+        .thenThrow(new IOException("disk"));
+    final var service = new TestStorageService(this.storageStrategy);
+
+    assertThatThrownBy(
+            () ->
+                service.deleteChartFile(
+                    new RepoRef(REPO_UUID, REPO_NAME), "a-1.0.0.tgz", "sha256:abc"))
+        .isInstanceOf(ErrorOccurredException.class)
+        .hasCauseInstanceOf(IOException.class);
+    verify(this.storageStrategy, never()).delete(any());
+  }
+
+  @Test
+  @DisplayName(
+      "deleteManifestFile() answers the IOException of the size lookup as errorOccurred (500)")
+  void deleteManifestFileAnswersTheIoExceptionAsErrorOccurred() throws IOException {
+    when(this.storageStrategy.getFileUsage(any(), eq(REPO_NAME)))
+        .thenThrow(new IOException("disk"));
+    final var service = new TestStorageService(this.storageStrategy);
+
+    assertThatThrownBy(
+            () ->
+                service.deleteManifestFile(new RepoRef(REPO_UUID, REPO_NAME), "payments", "1.0.0"))
+        .isInstanceOf(ErrorOccurredException.class)
+        .hasCauseInstanceOf(IOException.class);
+    verify(this.storageStrategy, never()).delete(any());
+  }
+
+  @Test
+  @DisplayName(
+      "deleteBlob() answers the IOException of the size lookup as errorOccurred (500), deleting nothing")
+  void deleteBlobAnswersTheIoExceptionAsErrorOccurred() throws IOException {
+    final var blob = mock(Resource.class);
+    when(blob.contentLength()).thenThrow(new IOException("disk"));
+    when(this.storageStrategy.get(any(), eq(REPO_NAME))).thenReturn(Optional.of(blob));
+    final var service = new TestStorageService(this.storageStrategy);
+
+    assertThatThrownBy(() -> service.deleteBlob(new RepoRef(REPO_UUID, REPO_NAME), "sha256:abc"))
+        .isInstanceOf(ErrorOccurredException.class)
+        .hasCauseInstanceOf(IOException.class);
     verify(this.storageStrategy, never()).delete(any());
   }
 }

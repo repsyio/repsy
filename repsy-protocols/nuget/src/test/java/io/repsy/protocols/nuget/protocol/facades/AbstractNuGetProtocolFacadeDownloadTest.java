@@ -24,6 +24,7 @@ import static org.mockito.Mockito.when;
 
 import io.repsy.protocols.nuget.shared.packages.services.NuGetPackageService;
 import io.repsy.protocols.nuget.shared.storage.services.NuGetStorageService;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -54,7 +55,7 @@ class AbstractNuGetProtocolFacadeDownloadTest {
     final var resource = new ByteArrayResource(new byte[] {1});
     final var repoInfo = repoInfo();
     final var ctx = context(PATH, repoInfo);
-    when(this.storageService.getNuPkg(repoInfo.getStorageKey(), "Some.Package", "1.0.0"))
+    when(this.storageService.getNuPkg(RepoRef.of(repoInfo), "Some.Package", "1.0.0"))
         .thenReturn(resource);
 
     final var result = new TestFacade(this.storageService, this.packageService).getNuPackage(ctx);
@@ -69,7 +70,7 @@ class AbstractNuGetProtocolFacadeDownloadTest {
     final var resource = new ByteArrayResource(new byte[] {1});
     final var repoInfo = repoInfo();
     final var ctx = context(PATH, repoInfo);
-    when(this.storageService.getNuPkg(repoInfo.getStorageKey(), "Some.Package", "1.0.0"))
+    when(this.storageService.getNuPkg(RepoRef.of(repoInfo), "Some.Package", "1.0.0"))
         .thenReturn(resource);
 
     final var result =

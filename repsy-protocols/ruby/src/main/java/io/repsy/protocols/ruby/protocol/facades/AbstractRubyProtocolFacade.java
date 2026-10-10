@@ -30,6 +30,7 @@ import io.repsy.protocols.ruby.shared.utils.RubyMarshalWriter;
 import io.repsy.protocols.ruby.shared.utils.RubySpecsIndexWriter;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import io.repsy.protocols.shared.storage.RepoRef;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import io.repsy.protocols.shared.utils.SpooledUpload;
 import io.repsy.protocols.shared.utils.StoredUpload;
@@ -103,11 +104,7 @@ public abstract class AbstractRubyProtocolFacade<ID> implements RubyProtocolFaca
             .findByGemFilename(repoInfo, filename)
             .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.GEM_NOT_FOUND));
     return this.storageService.getGem(
-        repoInfo.getStorageKey(),
-        repoInfo.getName(),
-        entry.getGemName(),
-        entry.getVersion(),
-        entry.getPlatform());
+        RepoRef.of(repoInfo), entry.getGemName(), entry.getVersion(), entry.getPlatform());
   }
 
   @Override
@@ -184,8 +181,7 @@ public abstract class AbstractRubyProtocolFacade<ID> implements RubyProtocolFaca
         () -> {
           try (final var in = gem.openStream()) {
             return this.storageService.writeGem(
-                repoInfo.getStorageKey(),
-                repoInfo.getName(),
+                RepoRef.of(repoInfo),
                 metadata.getName(),
                 metadata.getVersion(),
                 metadata.getPlatform(),
@@ -194,8 +190,7 @@ public abstract class AbstractRubyProtocolFacade<ID> implements RubyProtocolFaca
         },
         () ->
             this.storageService.deleteGem(
-                repoInfo.getStorageKey(),
-                repoInfo.getName(),
+                RepoRef.of(repoInfo),
                 metadata.getName(),
                 metadata.getVersion(),
                 metadata.getPlatform()),

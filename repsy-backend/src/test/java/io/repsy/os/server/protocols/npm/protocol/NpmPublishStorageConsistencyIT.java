@@ -280,7 +280,7 @@ class NpmPublishStorageConsistencyIT extends AbstractIT {
               throw new IllegalStateException("storage went away after the write");
             })
         .when(this.npmStorageService)
-        .writeTarballAndMetadata(any(), any(), any(), any(), any(), any());
+        .writeTarballAndMetadata(any(), any(), any(), any(), any());
   }
 
   @Test
@@ -430,7 +430,7 @@ class NpmPublishStorageConsistencyIT extends AbstractIT {
               throw new IOException("disk full");
             })
         .when(this.npmStorageService)
-        .writeTarballAndMetadata(any(), any(), any(), any(), any(), any());
+        .writeTarballAndMetadata(any(), any(), any(), any(), any());
 
     final var response =
         this.publish(repo, name, "1.0.0", "first", tarballOf("first"), this.adminToken());
@@ -458,7 +458,7 @@ class NpmPublishStorageConsistencyIT extends AbstractIT {
             })
         .doAnswer(InvocationOnMock::callRealMethod)
         .when(this.npmStorageService)
-        .writeTarballAndMetadata(any(), any(), any(), any(), any(), any());
+        .writeTarballAndMetadata(any(), any(), any(), any(), any());
 
     return release;
   }

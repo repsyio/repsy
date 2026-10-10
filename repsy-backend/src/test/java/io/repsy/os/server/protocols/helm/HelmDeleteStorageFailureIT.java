@@ -24,6 +24,7 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 
+import io.repsy.core.error_handling.exceptions.ErrorOccurredException;
 import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.helm.shared.storage.services.HelmStorageService;
 import io.repsy.os.shared.repo.entities.Repo;
@@ -51,10 +52,11 @@ import org.springframework.transaction.annotation.Transactional;
  * RPS-1086: deleting a chart version removes its rows first and its files second, inside one
  * transaction, and a failure of the storage while the files go must not commit the rows.
  *
- * <p>The storage failure is an {@link IOException}, a checked exception, which Spring does not roll
- * back for on its own. Without {@code rollbackFor = IOException.class} on the facades, the chart
- * disappeared from the listings while its archive stayed in storage, and the bytes never left the
- * repo's disk usage.
+ * <p>The storage failure used to surface as an {@link IOException}, a checked exception, which
+ * Spring does not roll back for on its own, so the chart disappeared from the listings while its
+ * archive stayed in storage (RPS-1086 added {@code rollbackFor = IOException.class}). The storage
+ * service now answers the failure as the unchecked {@code ErrorOccurredException} (RPS-2168), which
+ * rolls back by default; the rows must be kept either way.
  *
  * <p>Runs without a test transaction: inside one, the facade would join it and the rollback could
  * not be told apart from the test's own. It deletes the repos and users it commits.
@@ -146,9 +148,11 @@ class HelmDeleteStorageFailureIT extends AbstractIT {
 
   /** Makes the storage fail as it goes to remove the archive of a chart version. */
   private void failToDeleteTheArchive() throws IOException {
-    doThrow(new IOException("storage went away while deleting the archive"))
+    doThrow(
+            new ErrorOccurredException(
+                new IOException("storage went away while deleting the archive")))
         .when(this.helmStorageService)
-        .deleteChartFile(any(), any(), any(), any());
+        .deleteChartFile(any(), any(), any());
   }
 
   private MockHttpServletResponse panelDeleteVersion(final Repo repo) throws Exception {

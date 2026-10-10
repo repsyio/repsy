@@ -27,6 +27,7 @@ import static org.mockito.Mockito.when;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -77,7 +78,7 @@ class AbstractNpmStorageServiceTarballAccessTest {
     when(this.storageStrategy.get(any(StoragePath.class), anyString()))
         .thenReturn(Optional.of(resource));
 
-    assertThat(this.service.getTarball(REPO_ID, "r", "foo", "demo", "demo-1.0.0.tgz"))
+    assertThat(this.service.getTarball(new RepoRef(REPO_ID, "r"), "foo", "demo", "demo-1.0.0.tgz"))
         .isSameAs(resource);
     verify(this.storageStrategy)
         .get(
@@ -92,7 +93,9 @@ class AbstractNpmStorageServiceTarballAccessTest {
     when(this.storageStrategy.get(any(StoragePath.class), anyString()))
         .thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> this.service.getTarball(REPO_ID, "r", null, "demo", "demo-1.0.0.tgz"))
+    assertThatThrownBy(
+            () ->
+                this.service.getTarball(new RepoRef(REPO_ID, "r"), null, "demo", "demo-1.0.0.tgz"))
         .isInstanceOf(ItemNotFoundException.class);
   }
 }

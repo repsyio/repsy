@@ -35,6 +35,7 @@ import io.repsy.protocols.ruby.shared.gem.services.RubyGemProtocolService;
 import io.repsy.protocols.ruby.shared.storage.services.RubyStorageService;
 import io.repsy.protocols.ruby.shared.utils.RubyGemspecMarshalWriter;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import io.repsy.protocols.shared.storage.RepoRef;
 import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
 import io.repsy.protocols.shared.utils.SpooledUpload;
 import java.io.ByteArrayInputStream;
@@ -142,10 +143,10 @@ class AbstractRubyProtocolFacadeTest {
     final var stored = new AtomicReference<byte[]>();
     this.publishRunsFileWriter(false);
     when(this.storageService.writeGem(
-            eq(REPO_ID), eq(REPO_NAME), eq("demo"), eq("1.2.3"), eq("ruby"), any()))
+            eq(new RepoRef(REPO_ID, REPO_NAME)), eq("demo"), eq("1.2.3"), eq("ruby"), any()))
         .thenAnswer(
             invocation -> {
-              stored.set(invocation.<java.io.InputStream>getArgument(5).readAllBytes());
+              stored.set(invocation.<java.io.InputStream>getArgument(4).readAllBytes());
               return BaseUsages.ofDisk(gemBytes.length);
             });
 
@@ -164,7 +165,7 @@ class AbstractRubyProtocolFacadeTest {
         .isEqualTo(gemBytes.length);
     verify(this.gemService).getCompactEntriesByGemName(any(), eq("demo"));
     verify(this.gemService).saveVersionsChecksum(any(), eq("demo"), any());
-    verify(this.storageService, never()).deleteGem(any(), any(), any(), any(), any());
+    verify(this.storageService, never()).deleteGem(any(), any(), any(), any());
   }
 
   @Test
@@ -176,7 +177,7 @@ class AbstractRubyProtocolFacadeTest {
           .hasMessageContaining("invalidGemFile");
     }
 
-    verify(this.storageService, never()).writeGem(any(), any(), any(), any(), any(), any());
+    verify(this.storageService, never()).writeGem(any(), any(), any(), any(), any());
     verify(this.gemService, never()).publishGem(any(), any(), any(), any());
   }
 
@@ -191,7 +192,7 @@ class AbstractRubyProtocolFacadeTest {
           .isInstanceOf(ItemAlreadyExistException.class);
     }
 
-    verify(this.storageService, never()).writeGem(any(), any(), any(), any(), any(), any());
+    verify(this.storageService, never()).writeGem(any(), any(), any(), any(), any());
     assertThat(this.context.<BaseUsages>getProperty("usages")).isNull();
     assertThat(this.context.<String>getProperty("gemName")).isNull();
   }
@@ -208,8 +209,8 @@ class AbstractRubyProtocolFacadeTest {
           .isInstanceOf(IllegalStateException.class);
     }
 
-    verify(this.storageService, never()).writeGem(any(), any(), any(), any(), any(), any());
-    verify(this.storageService, never()).deleteGem(any(), any(), any(), any(), any());
+    verify(this.storageService, never()).writeGem(any(), any(), any(), any(), any());
+    verify(this.storageService, never()).deleteGem(any(), any(), any(), any());
   }
 
   @Test
@@ -217,14 +218,14 @@ class AbstractRubyProtocolFacadeTest {
   void removesThePartialFileOfANewVersion() throws Exception {
     this.publishRunsFileWriter(false);
     final var failure = new IllegalStateException("disk full");
-    when(this.storageService.writeGem(any(), any(), any(), any(), any(), any())).thenThrow(failure);
+    when(this.storageService.writeGem(any(), any(), any(), any(), any())).thenThrow(failure);
 
     try (final var upload = SpooledUpload.spool(new ByteArrayInputStream(gem(GEMSPEC)))) {
       assertThatThrownBy(() -> this.facade.publishGem(this.context, upload)).isSameAs(failure);
     }
 
     verify(this.storageService)
-        .deleteGem(eq(REPO_ID), eq(REPO_NAME), eq("demo"), eq("1.2.3"), eq("ruby"));
+        .deleteGem(eq(new RepoRef(REPO_ID, REPO_NAME)), eq("demo"), eq("1.2.3"), eq("ruby"));
     assertThat(this.context.<BaseUsages>getProperty("usages")).isNull();
   }
 
@@ -233,13 +234,13 @@ class AbstractRubyProtocolFacadeTest {
   void keepsTheFileOfAReplacedVersion() throws Exception {
     this.publishRunsFileWriter(true);
     final var failure = new IllegalStateException("disk full");
-    when(this.storageService.writeGem(any(), any(), any(), any(), any(), any())).thenThrow(failure);
+    when(this.storageService.writeGem(any(), any(), any(), any(), any())).thenThrow(failure);
 
     try (final var upload = SpooledUpload.spool(new ByteArrayInputStream(gem(GEMSPEC)))) {
       assertThatThrownBy(() -> this.facade.publishGem(this.context, upload)).isSameAs(failure);
     }
 
-    verify(this.storageService, never()).deleteGem(any(), any(), any(), any(), any());
+    verify(this.storageService, never()).deleteGem(any(), any(), any(), any());
   }
 
   @Test
@@ -248,9 +249,8 @@ class AbstractRubyProtocolFacadeTest {
     this.publishRunsFileWriter(false);
     final var failure = new IllegalStateException("disk full");
     final var cleanupFailure = new ItemNotFoundException("gemNotFound");
-    when(this.storageService.writeGem(any(), any(), any(), any(), any(), any())).thenThrow(failure);
-    when(this.storageService.deleteGem(any(), any(), any(), any(), any()))
-        .thenThrow(cleanupFailure);
+    when(this.storageService.writeGem(any(), any(), any(), any(), any())).thenThrow(failure);
+    when(this.storageService.deleteGem(any(), any(), any(), any())).thenThrow(cleanupFailure);
 
     try (final var upload = SpooledUpload.spool(new ByteArrayInputStream(gem(GEMSPEC)))) {
       assertThatThrownBy(() -> this.facade.publishGem(this.context, upload))
@@ -280,13 +280,13 @@ class AbstractRubyProtocolFacadeTest {
     final var resource = new ByteArrayResource(new byte[] {1, 2, 3});
     when(this.gemService.findByGemFilename(any(), eq("x-2fa-1.0.0.gem")))
         .thenReturn(Optional.of(entry("x-2fa", "1.0.0", "ruby", false)));
-    when(this.storageService.getGem(REPO_ID, REPO_NAME, "x-2fa", "1.0.0", "ruby"))
+    when(this.storageService.getGem(new RepoRef(REPO_ID, REPO_NAME), "x-2fa", "1.0.0", "ruby"))
         .thenReturn(resource);
 
     final Resource downloaded = this.facade.downloadGem(this.context, "x-2fa-1.0.0.gem");
 
     assertThat(downloaded).isSameAs(resource);
-    verify(this.storageService).getGem(REPO_ID, REPO_NAME, "x-2fa", "1.0.0", "ruby");
+    verify(this.storageService).getGem(new RepoRef(REPO_ID, REPO_NAME), "x-2fa", "1.0.0", "ruby");
   }
 
   @Test
@@ -299,7 +299,7 @@ class AbstractRubyProtocolFacadeTest {
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessageContaining("gemNotFound");
 
-    verify(this.storageService, never()).getGem(any(), any(), any(), any(), any());
+    verify(this.storageService, never()).getGem(any(), any(), any(), any());
   }
 
   @Test
@@ -310,7 +310,7 @@ class AbstractRubyProtocolFacadeTest {
     final var resource = new ByteArrayResource(new byte[] {1, 2, 3});
     when(this.gemService.findByGemFilename(any(), eq("demo-1.2.3.gem")))
         .thenReturn(Optional.of(entry("demo", "1.2.3", "ruby", true)));
-    when(this.storageService.getGem(REPO_ID, REPO_NAME, "demo", "1.2.3", "ruby"))
+    when(this.storageService.getGem(new RepoRef(REPO_ID, REPO_NAME), "demo", "1.2.3", "ruby"))
         .thenReturn(resource);
 
     final Resource downloaded = this.facade.downloadGem(this.context, "demo-1.2.3.gem");

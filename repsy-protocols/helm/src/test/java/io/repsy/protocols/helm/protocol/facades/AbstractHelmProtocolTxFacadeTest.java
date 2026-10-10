@@ -30,6 +30,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
+import io.repsy.core.error_handling.exceptions.ErrorOccurredException;
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.ProtocolContext;
@@ -50,6 +51,7 @@ import io.repsy.protocols.helm.shared.oci.services.OciBlobService;
 import io.repsy.protocols.helm.shared.oci.services.OciManifestService;
 import io.repsy.protocols.helm.shared.storage.services.HelmStorageService;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import io.repsy.protocols.shared.storage.RepoRef;
 import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import java.io.ByteArrayInputStream;
@@ -152,13 +154,13 @@ class AbstractHelmProtocolTxFacadeTest {
   }
 
   private void uploadHolds(final byte[] bytes) {
-    when(this.helmStorageService.findBlob(REPO_ID, UPLOAD_ID.toString(), REPO_NAME))
+    when(this.helmStorageService.findBlob(new RepoRef(REPO_ID, REPO_NAME), UPLOAD_ID.toString()))
         .thenReturn(Optional.of(new ByteArrayResource(bytes)));
   }
 
   private void blobIsStoredUnderDigest() {
     this.uploadHolds(new byte[BLOB_SIZE]);
-    when(this.helmStorageService.findBlob(REPO_ID, DIGEST, REPO_NAME))
+    when(this.helmStorageService.findBlob(new RepoRef(REPO_ID, REPO_NAME), DIGEST))
         .thenReturn(Optional.of(new ByteArrayResource(new byte[BLOB_SIZE])));
     when(this.ociBlobService.getOrCreate(any(), eq(REPO_ID))).thenReturn(this.blobInfo);
   }
@@ -175,10 +177,10 @@ class AbstractHelmProtocolTxFacadeTest {
     @DisplayName("reports the bytes the chunk added to the upload")
     void reportsWrittenBytes() throws Exception {
       when(AbstractHelmProtocolTxFacadeTest.this.helmStorageService.saveBlobChunk(
-              eq(REPO_ID), eq(UPLOAD_ID), any(), eq(REPO_NAME)))
+              eq(new RepoRef(REPO_ID, REPO_NAME)), eq(UPLOAD_ID), any()))
           .thenReturn(BaseUsages.ofDisk(BLOB_SIZE));
       when(AbstractHelmProtocolTxFacadeTest.this.helmStorageService.getBlobSize(
-              REPO_ID, UPLOAD_ID, REPO_NAME))
+              new RepoRef(REPO_ID, REPO_NAME), UPLOAD_ID))
           .thenReturn((long) BLOB_SIZE);
 
       final var size =
@@ -210,7 +212,7 @@ class AbstractHelmProtocolTxFacadeTest {
     @DisplayName("refuses an upload session that was never written")
     void refusesAMissingSession() {
       when(AbstractHelmProtocolTxFacadeTest.this.helmStorageService.findBlob(
-              REPO_ID, UPLOAD_ID.toString(), REPO_NAME))
+              new RepoRef(REPO_ID, REPO_NAME), UPLOAD_ID.toString()))
           .thenReturn(Optional.empty());
 
       assertThatThrownBy(
@@ -231,7 +233,7 @@ class AbstractHelmProtocolTxFacadeTest {
     void netsDuplicateAgainstItsOwnChunk() throws Exception {
       AbstractHelmProtocolTxFacadeTest.this.blobIsStoredUnderDigest();
       when(AbstractHelmProtocolTxFacadeTest.this.helmStorageService.saveBlobChunk(
-              eq(REPO_ID), eq(UPLOAD_ID), any(), eq(REPO_NAME)))
+              eq(new RepoRef(REPO_ID, REPO_NAME)), eq(UPLOAD_ID), any()))
           .thenReturn(BaseUsages.ofDisk(BLOB_SIZE));
       when(AbstractHelmProtocolTxFacadeTest.this.helmStorageService.finalizeBlob(
               REPO_ID, UPLOAD_ID, DIGEST))
@@ -267,7 +269,7 @@ class AbstractHelmProtocolTxFacadeTest {
           0);
 
       verify(AbstractHelmProtocolTxFacadeTest.this.helmStorageService, never())
-          .saveBlobChunk(any(), any(), any(), any());
+          .saveBlobChunk(any(), any(), any());
       assertThat(AbstractHelmProtocolTxFacadeTest.this.reportedUsage()).isEqualTo(-BLOB_SIZE);
     }
 
@@ -276,7 +278,7 @@ class AbstractHelmProtocolTxFacadeTest {
     void chargesNewBlobSentWithTheFinalize() throws Exception {
       AbstractHelmProtocolTxFacadeTest.this.blobIsStoredUnderDigest();
       when(AbstractHelmProtocolTxFacadeTest.this.helmStorageService.saveBlobChunk(
-              eq(REPO_ID), eq(UPLOAD_ID), any(), eq(REPO_NAME)))
+              eq(new RepoRef(REPO_ID, REPO_NAME)), eq(UPLOAD_ID), any()))
           .thenReturn(BaseUsages.ofDisk(BLOB_SIZE));
       when(AbstractHelmProtocolTxFacadeTest.this.helmStorageService.finalizeBlob(
               REPO_ID, UPLOAD_ID, DIGEST))
@@ -298,7 +300,7 @@ class AbstractHelmProtocolTxFacadeTest {
     void refusesDigestMismatch() {
       AbstractHelmProtocolTxFacadeTest.this.uploadHolds(new byte[BLOB_SIZE - 1]);
       when(AbstractHelmProtocolTxFacadeTest.this.helmStorageService.saveBlobChunk(
-              eq(REPO_ID), eq(UPLOAD_ID), any(), eq(REPO_NAME)))
+              eq(new RepoRef(REPO_ID, REPO_NAME)), eq(UPLOAD_ID), any()))
           .thenReturn(BaseUsages.ofDisk(BLOB_SIZE - 1));
 
       assertThatThrownBy(
@@ -343,7 +345,7 @@ class AbstractHelmProtocolTxFacadeTest {
     @DisplayName("answers not found for an upload that holds no data")
     void refusesUnknownUpload() {
       when(AbstractHelmProtocolTxFacadeTest.this.helmStorageService.findBlob(
-              REPO_ID, UPLOAD_ID.toString(), REPO_NAME))
+              new RepoRef(REPO_ID, REPO_NAME), UPLOAD_ID.toString()))
           .thenReturn(Optional.empty());
 
       assertThatThrownBy(
@@ -517,7 +519,7 @@ class AbstractHelmProtocolTxFacadeTest {
           .saveChart(any(), any(), any());
       when(AbstractHelmProtocolTxFacadeTest.this.helmStorageService.deleteChart(
               any(), eq(REPO_NAME)))
-          .thenThrow(new IOException("no such file"));
+          .thenThrow(new ErrorOccurredException(new IOException("no such file")));
 
       assertThatThrownBy(this::push)
           .isSameAs(failure)
@@ -558,7 +560,7 @@ class AbstractHelmProtocolTxFacadeTest {
     private void fileWriteFails(final RuntimeException failure) {
       doThrow(failure)
           .when(AbstractHelmProtocolTxFacadeTest.this.helmStorageService)
-          .saveManifest(REPO_ID, "payments", "1.0.0", this.content, REPO_NAME);
+          .saveManifest(new RepoRef(REPO_ID, REPO_NAME), "payments", "1.0.0", this.content);
     }
 
     @Test
@@ -567,7 +569,7 @@ class AbstractHelmProtocolTxFacadeTest {
       final var it = AbstractHelmProtocolTxFacadeTest.this;
       this.rowsAreWritten(false);
       when(it.helmStorageService.saveManifest(
-              REPO_ID, "payments", "1.0.0", this.content, REPO_NAME))
+              new RepoRef(REPO_ID, REPO_NAME), "payments", "1.0.0", this.content))
           .thenReturn(BaseUsages.ofDisk(this.content.length));
 
       final var result = it.facade.pushManifest(it.context, this.form(), this.content);
@@ -580,7 +582,7 @@ class AbstractHelmProtocolTxFacadeTest {
       assertThat(manifestForm.getValue().getChartId()).isEqualTo(this.chartId);
       order
           .verify(it.helmStorageService)
-          .saveManifest(REPO_ID, "payments", "1.0.0", this.content, REPO_NAME);
+          .saveManifest(new RepoRef(REPO_ID, REPO_NAME), "payments", "1.0.0", this.content);
     }
 
     @Test
@@ -589,7 +591,7 @@ class AbstractHelmProtocolTxFacadeTest {
       final var it = AbstractHelmProtocolTxFacadeTest.this;
       this.rowsAreWritten(true);
       when(it.helmStorageService.saveManifest(
-              REPO_ID, "payments", "1.0.0", this.content, REPO_NAME))
+              new RepoRef(REPO_ID, REPO_NAME), "payments", "1.0.0", this.content))
           .thenReturn(BaseUsages.ofDisk(3));
 
       final var result = it.facade.pushManifest(it.context, this.form(), this.content);
@@ -611,7 +613,8 @@ class AbstractHelmProtocolTxFacadeTest {
       assertThatThrownBy(() -> it.facade.pushManifest(it.context, this.form(), this.content))
           .isSameAs(failure);
 
-      verify(it.helmStorageService).deleteManifestFile(REPO_ID, "payments", "1.0.0", REPO_NAME);
+      verify(it.helmStorageService)
+          .deleteManifestFile(new RepoRef(REPO_ID, REPO_NAME), "payments", "1.0.0");
     }
 
     @Test
@@ -625,7 +628,7 @@ class AbstractHelmProtocolTxFacadeTest {
       assertThatThrownBy(() -> it.facade.pushManifest(it.context, this.form(), this.content))
           .isSameAs(failure);
 
-      verify(it.helmStorageService, never()).deleteManifestFile(any(), any(), any(), any());
+      verify(it.helmStorageService, never()).deleteManifestFile(any(), any(), any());
     }
 
     @Test
@@ -635,8 +638,9 @@ class AbstractHelmProtocolTxFacadeTest {
       this.rowsAreWritten(false);
       final var failure = new IllegalStateException("disk full");
       this.fileWriteFails(failure);
-      when(it.helmStorageService.deleteManifestFile(REPO_ID, "payments", "1.0.0", REPO_NAME))
-          .thenThrow(new IOException("no such file"));
+      when(it.helmStorageService.deleteManifestFile(
+              new RepoRef(REPO_ID, REPO_NAME), "payments", "1.0.0"))
+          .thenThrow(new ErrorOccurredException(new IOException("no such file")));
 
       assertThatThrownBy(() -> it.facade.pushManifest(it.context, this.form(), this.content))
           .isSameAs(failure)
@@ -667,7 +671,7 @@ class AbstractHelmProtocolTxFacadeTest {
         reads.add(Optional.of(new ByteArrayResource(bytes)));
       }
       final var first = reads.remove(0);
-      when(it.helmStorageService.findManifest(REPO_ID, "payments", "1.0.0", REPO_NAME))
+      when(it.helmStorageService.findManifest(new RepoRef(REPO_ID, REPO_NAME), "payments", "1.0.0"))
           .thenReturn(first, reads.toArray(new Optional[0]));
     }
 
@@ -680,7 +684,8 @@ class AbstractHelmProtocolTxFacadeTest {
 
       this.pushThenComplete(TransactionSynchronization.STATUS_ROLLED_BACK);
 
-      verify(it.helmStorageService).deleteManifestFile(REPO_ID, "payments", "1.0.0", REPO_NAME);
+      verify(it.helmStorageService)
+          .deleteManifestFile(new RepoRef(REPO_ID, REPO_NAME), "payments", "1.0.0");
     }
 
     @Test
@@ -691,8 +696,8 @@ class AbstractHelmProtocolTxFacadeTest {
 
       this.pushThenComplete(TransactionSynchronization.STATUS_COMMITTED);
 
-      verify(it.helmStorageService, never()).deleteManifestFile(any(), any(), any(), any());
-      verify(it.helmStorageService, never()).findManifest(any(), any(), any(), any());
+      verify(it.helmStorageService, never()).deleteManifestFile(any(), any(), any());
+      verify(it.helmStorageService, never()).findManifest(any(), any(), any());
     }
 
     @Test
@@ -703,7 +708,7 @@ class AbstractHelmProtocolTxFacadeTest {
 
       this.pushThenComplete(TransactionSynchronization.STATUS_UNKNOWN);
 
-      verify(it.helmStorageService, never()).deleteManifestFile(any(), any(), any(), any());
+      verify(it.helmStorageService, never()).deleteManifestFile(any(), any(), any());
     }
 
     @Test
@@ -717,8 +722,9 @@ class AbstractHelmProtocolTxFacadeTest {
 
       this.pushThenComplete(TransactionSynchronization.STATUS_ROLLED_BACK);
 
-      verify(it.helmStorageService).saveManifest(REPO_ID, "payments", "1.0.0", previous, REPO_NAME);
-      verify(it.helmStorageService, never()).deleteManifestFile(any(), any(), any(), any());
+      verify(it.helmStorageService)
+          .saveManifest(new RepoRef(REPO_ID, REPO_NAME), "payments", "1.0.0", previous);
+      verify(it.helmStorageService, never()).deleteManifestFile(any(), any(), any());
     }
 
     @Test
@@ -730,7 +736,7 @@ class AbstractHelmProtocolTxFacadeTest {
 
       this.pushThenComplete(TransactionSynchronization.STATUS_ROLLED_BACK);
 
-      verify(it.helmStorageService, never()).deleteManifestFile(any(), any(), any(), any());
+      verify(it.helmStorageService, never()).deleteManifestFile(any(), any(), any());
     }
 
     @Test
@@ -738,13 +744,13 @@ class AbstractHelmProtocolTxFacadeTest {
     void leavesAReplacedFileWithNoPreviousBytes() throws Exception {
       final var it = AbstractHelmProtocolTxFacadeTest.this;
       this.rowsAreWritten(true);
-      when(it.helmStorageService.findManifest(REPO_ID, "payments", "1.0.0", REPO_NAME))
+      when(it.helmStorageService.findManifest(new RepoRef(REPO_ID, REPO_NAME), "payments", "1.0.0"))
           .thenReturn(Optional.empty(), Optional.of(new ByteArrayResource(this.content)));
 
       this.pushThenComplete(TransactionSynchronization.STATUS_ROLLED_BACK);
 
-      verify(it.helmStorageService, never()).deleteManifestFile(any(), any(), any(), any());
-      verify(it.helmStorageService, times(1)).saveManifest(any(), any(), any(), any(), any());
+      verify(it.helmStorageService, never()).deleteManifestFile(any(), any(), any());
+      verify(it.helmStorageService, times(1)).saveManifest(any(), any(), any(), any());
     }
 
     @Test
@@ -753,12 +759,14 @@ class AbstractHelmProtocolTxFacadeTest {
       final var it = AbstractHelmProtocolTxFacadeTest.this;
       this.rowsAreWritten(false);
       this.fileHolds(this.content);
-      when(it.helmStorageService.deleteManifestFile(REPO_ID, "payments", "1.0.0", REPO_NAME))
-          .thenThrow(new IOException("no such file"));
+      when(it.helmStorageService.deleteManifestFile(
+              new RepoRef(REPO_ID, REPO_NAME), "payments", "1.0.0"))
+          .thenThrow(new ErrorOccurredException(new IOException("no such file")));
 
       this.pushThenComplete(TransactionSynchronization.STATUS_ROLLED_BACK);
 
-      verify(it.helmStorageService).deleteManifestFile(REPO_ID, "payments", "1.0.0", REPO_NAME);
+      verify(it.helmStorageService)
+          .deleteManifestFile(new RepoRef(REPO_ID, REPO_NAME), "payments", "1.0.0");
     }
 
     @Test
@@ -810,7 +818,7 @@ class AbstractHelmProtocolTxFacadeTest {
       final var result = it.facade.getChart(it.context, FILENAME);
 
       assertThat(result).isSameAs(classicResource);
-      verify(it.helmStorageService, never()).findBlob(any(), any(), any());
+      verify(it.helmStorageService, never()).findBlob(any(), any());
       verify(it.chartService, never()).findAllByRepoId(any());
     }
 
@@ -825,13 +833,13 @@ class AbstractHelmProtocolTxFacadeTest {
       when(it.chartInfo.version()).thenReturn("1.0.0");
       when(it.chartInfo.digest()).thenReturn(DIGEST);
       when(it.chartService.findAllByRepoId(REPO_ID)).thenReturn(List.of(it.chartInfo));
-      when(it.helmStorageService.findBlob(REPO_ID, DIGEST, REPO_NAME))
+      when(it.helmStorageService.findBlob(new RepoRef(REPO_ID, REPO_NAME), DIGEST))
           .thenReturn(Optional.of(blobResource));
 
       final var result = it.facade.getChart(it.context, FILENAME);
 
       assertThat(result).isSameAs(blobResource);
-      verify(it.helmStorageService).findBlob(REPO_ID, DIGEST, REPO_NAME);
+      verify(it.helmStorageService).findBlob(new RepoRef(REPO_ID, REPO_NAME), DIGEST);
     }
 
     @Test
@@ -855,7 +863,8 @@ class AbstractHelmProtocolTxFacadeTest {
       when(it.chartInfo.version()).thenReturn("1.0.0");
       when(it.chartInfo.digest()).thenReturn(DIGEST);
       when(it.chartService.findAllByRepoId(REPO_ID)).thenReturn(List.of(it.chartInfo));
-      when(it.helmStorageService.findBlob(REPO_ID, DIGEST, REPO_NAME)).thenReturn(Optional.empty());
+      when(it.helmStorageService.findBlob(new RepoRef(REPO_ID, REPO_NAME), DIGEST))
+          .thenReturn(Optional.empty());
 
       assertThatThrownBy(() -> it.facade.getChart(it.context, FILENAME))
           .isInstanceOf(ItemNotFoundException.class)
@@ -874,7 +883,7 @@ class AbstractHelmProtocolTxFacadeTest {
       when(hyphenatedChart.version()).thenReturn("1.2.3");
       when(hyphenatedChart.digest()).thenReturn(DIGEST);
       when(it.chartService.findAllByRepoId(REPO_ID)).thenReturn(List.of(hyphenatedChart));
-      when(it.helmStorageService.findBlob(REPO_ID, DIGEST, REPO_NAME))
+      when(it.helmStorageService.findBlob(new RepoRef(REPO_ID, REPO_NAME), DIGEST))
           .thenReturn(Optional.of(blobResource));
 
       final var result = it.facade.getChart(it.context, "my-chart-with-dashes-1.2.3.tgz");

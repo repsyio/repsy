@@ -29,6 +29,7 @@ import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -106,8 +107,7 @@ class AbstractCargoStorageServiceTest {
 
       final var usages =
           service.writeCrateAndIndex(
-              REPO_ID,
-              REPO_NAME,
+              new RepoRef(REPO_ID, REPO_NAME),
               "serde",
               "1.0.0",
               new ByteArrayInputStream(crateBytes),
@@ -138,7 +138,11 @@ class AbstractCargoStorageServiceTest {
           .thenReturn(BaseUsages.ofDisk(1));
 
       service.writeCrateAndIndex(
-          REPO_ID, REPO_NAME, crateName, "0.1.0", new ByteArrayInputStream(new byte[0]), "{}");
+          new RepoRef(REPO_ID, REPO_NAME),
+          crateName,
+          "0.1.0",
+          new ByteArrayInputStream(new byte[0]),
+          "{}");
 
       verify(storageStrategy).append(eq(REPO_NAME), path(REPO_ID + "/" + indexPath), any());
     }
@@ -154,7 +158,8 @@ class AbstractCargoStorageServiceTest {
       final var resource = new ByteArrayResource(new byte[] {1});
       when(storageStrategy.get(path(CRATE_PATH), eq(REPO_NAME))).thenReturn(Optional.of(resource));
 
-      assertThat(service.getCrate(REPO_ID, REPO_NAME, "serde", "1.0.0")).isSameAs(resource);
+      assertThat(service.getCrate(new RepoRef(REPO_ID, REPO_NAME), "serde", "1.0.0"))
+          .isSameAs(resource);
     }
 
     @Test
@@ -162,7 +167,7 @@ class AbstractCargoStorageServiceTest {
     void throwsWhenMissing() {
       when(storageStrategy.get(path(CRATE_PATH), eq(REPO_NAME))).thenReturn(Optional.empty());
 
-      assertThatThrownBy(() -> service.getCrate(REPO_ID, REPO_NAME, "serde", "1.0.0"))
+      assertThatThrownBy(() -> service.getCrate(new RepoRef(REPO_ID, REPO_NAME), "serde", "1.0.0"))
           .isInstanceOf(ItemNotFoundException.class)
           .hasMessage("crateNotFound");
     }
@@ -173,18 +178,20 @@ class AbstractCargoStorageServiceTest {
   void deleteCrate() throws IOException {
     when(storageStrategy.getFileUsage(path(CRATE_PATH), eq(REPO_NAME))).thenReturn(55L);
 
-    assertThat(service.deleteCrate(REPO_ID, REPO_NAME, "serde", "1.0.0")).isEqualTo(55L);
+    assertThat(service.deleteCrate(new RepoRef(REPO_ID, REPO_NAME), "serde", "1.0.0"))
+        .isEqualTo(55L);
     verify(storageStrategy).delete(path(CRATE_PATH));
   }
 
   @Test
-  @DisplayName("deleteCrate() lets a storage IOException through and deletes nothing")
-  void deleteCrateKeepsIoException() throws IOException {
+  @DisplayName("deleteCrate() answers a storage IOException as ErrorOccurredException (500)")
+  void deleteCrateAnswersIoExceptionAsErrorOccurred() throws IOException {
     when(storageStrategy.getFileUsage(path(CRATE_PATH), eq(REPO_NAME)))
         .thenThrow(new IOException("disk"));
 
-    assertThatThrownBy(() -> service.deleteCrate(REPO_ID, REPO_NAME, "serde", "1.0.0"))
-        .isInstanceOf(IOException.class);
+    assertThatThrownBy(() -> service.deleteCrate(new RepoRef(REPO_ID, REPO_NAME), "serde", "1.0.0"))
+        .isInstanceOf(ErrorOccurredException.class)
+        .hasCauseInstanceOf(IOException.class);
     verify(storageStrategy, never()).delete(any());
   }
 
@@ -199,7 +206,7 @@ class AbstractCargoStorageServiceTest {
       when(storageStrategy.calculatePathUsage(path(crateDir))).thenReturn(300L);
       when(storageStrategy.getFileUsage(path(INDEX_PATH), eq(REPO_NAME))).thenReturn(40L);
 
-      assertThat(service.deletePackage(REPO_ID, REPO_NAME, "serde")).isEqualTo(340L);
+      assertThat(service.deletePackage(new RepoRef(REPO_ID, REPO_NAME), "serde")).isEqualTo(340L);
       verify(storageStrategy).delete(path(crateDir));
       verify(storageStrategy).delete(path(INDEX_PATH));
     }
@@ -210,7 +217,7 @@ class AbstractCargoStorageServiceTest {
       when(storageStrategy.getFileUsage(path(INDEX_PATH), eq(REPO_NAME)))
           .thenThrow(new IOException("disk"));
 
-      assertThatThrownBy(() -> service.deletePackage(REPO_ID, REPO_NAME, "serde"))
+      assertThatThrownBy(() -> service.deletePackage(new RepoRef(REPO_ID, REPO_NAME), "serde"))
           .isInstanceOf(ErrorOccurredException.class)
           .hasMessage("errorOccurred")
           .hasCauseInstanceOf(IOException.class);
@@ -234,7 +241,8 @@ class AbstractCargoStorageServiceTest {
               });
 
       final var usage =
-          service.rewriteIndex(REPO_ID, REPO_NAME, "serde", List.of("{\"a\":1}", "{\"b\":2}"));
+          service.rewriteIndex(
+              new RepoRef(REPO_ID, REPO_NAME), "serde", List.of("{\"a\":1}", "{\"b\":2}"));
 
       assertThat(usage).isEqualTo(77L);
       assertThat(content[0]).isEqualTo("{\"a\":1}\n{\"b\":2}\n");
@@ -245,7 +253,8 @@ class AbstractCargoStorageServiceTest {
     void deletesIndexWhenEmpty() throws IOException {
       when(storageStrategy.getFileUsage(path(INDEX_PATH), eq(REPO_NAME))).thenReturn(40L);
 
-      assertThat(service.rewriteIndex(REPO_ID, REPO_NAME, "serde", List.of())).isEqualTo(-40L);
+      assertThat(service.rewriteIndex(new RepoRef(REPO_ID, REPO_NAME), "serde", List.of()))
+          .isEqualTo(-40L);
       verify(storageStrategy).delete(path(INDEX_PATH));
       verify(storageStrategy, never()).write(any(), any(), any());
     }

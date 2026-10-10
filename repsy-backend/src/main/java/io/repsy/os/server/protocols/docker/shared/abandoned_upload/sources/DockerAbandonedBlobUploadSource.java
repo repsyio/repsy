@@ -20,6 +20,7 @@ import io.repsy.os.server.protocols.docker.shared.layer.repositories.LayerReposi
 import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
 import io.repsy.os.server.protocols.shared.sources.AbandonedBlobUploadSource;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
@@ -64,6 +65,6 @@ public class DockerAbandonedBlobUploadSource implements AbandonedBlobUploadSourc
   public long deleteBlobFile(
       final @NonNull UUID repoId, final @NonNull String repoName, final @NonNull String fileName)
       throws IOException {
-    return this.dockerStorageService.deleteBlobFile(repoId, repoName, fileName);
+    return this.dockerStorageService.deleteBlobFile(new RepoRef(repoId, repoName), fileName);
   }
 }

@@ -41,6 +41,7 @@ import io.repsy.protocols.cargo.shared.crate.dtos.CratePublishDep;
 import io.repsy.protocols.cargo.shared.crate.dtos.CratePublishRequest;
 import io.repsy.protocols.cargo.shared.storage.services.CargoStorageService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -109,8 +110,7 @@ class CargoCrateControllerIT extends AbstractIT {
         "{\"name\":\"%s\",\"vers\":\"%s\",\"deps\":[],\"cksum\":\"checksum-%s\",\"features\":{},\"yanked\":false,\"v\":2}"
             .formatted(normalized, version, version);
     this.cargoStorageService.writeCrateAndIndex(
-        repo.getId(),
-        repo.getName(),
+        new RepoRef(repo.getId(), repo.getName()),
         normalized,
         version,
         new java.io.ByteArrayInputStream(
@@ -161,8 +161,7 @@ class CargoCrateControllerIT extends AbstractIT {
         "{\"name\":\"%s\",\"vers\":\"%s\",\"deps\":[{\"name\":\"serde1\",\"req\":\"^1.0\",\"features\":[\"derive\"],\"optional\":true,\"default_features\":false,\"target\":\"cfg(unix)\",\"kind\":\"dev\",\"registry\":\"https://example.test/registry\",\"package\":\"serde\"}],\"cksum\":\"checksum-%s\",\"features\":{\"default\":[\"serde1\"],\"full\":[\"serde1\"]},\"features2\":{\"full\":[\"serde1\"]},\"yanked\":false,\"links\":\"native\",\"v\":2,\"rust_version\":\"1.85\"}"
             .formatted(normalized, version, version);
     this.cargoStorageService.writeCrateAndIndex(
-        repo.getId(),
-        repo.getName(),
+        new RepoRef(repo.getId(), repo.getName()),
         normalized,
         version,
         new java.io.ByteArrayInputStream(
@@ -608,7 +607,7 @@ class CargoCrateControllerIT extends AbstractIT {
       assertThatThrownBy(
               () ->
                   CargoCrateControllerIT.this.cargoStorageService.getCrate(
-                      repo.getId(), repo.getName(), "delete-me", "1.0.0"))
+                      new RepoRef(repo.getId(), repo.getName()), "delete-me", "1.0.0"))
           .hasMessageContaining("crateNotFound");
       CargoCrateControllerIT.this
           .request("GET", "/api/cargo/crates/" + repo.getName() + "/delete-me/versions/1.0.0", null)
@@ -628,7 +627,7 @@ class CargoCrateControllerIT extends AbstractIT {
       assertThatThrownBy(
               () ->
                   CargoCrateControllerIT.this.cargoStorageService.getCrate(
-                      repo.getId(), repo.getName(), "delete-me", "2.0.0"))
+                      new RepoRef(repo.getId(), repo.getName()), "delete-me", "2.0.0"))
           .hasMessageContaining("crateNotFound");
       expectError(
           CargoCrateControllerIT.this.request(

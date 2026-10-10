@@ -28,6 +28,7 @@ import io.repsy.protocols.helm.shared.chart.dtos.HelmChartForm;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartInfo;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestForm;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -91,7 +92,10 @@ class HelmOciManifestNameRepairServiceIT extends AbstractIT {
             .build(),
         repo.getId());
     this.helmStorageService.saveManifest(
-        repo.getId(), name, reference, content.getBytes(StandardCharsets.UTF_8), repo.getName());
+        new RepoRef(repo.getId(), repo.getName()),
+        name,
+        reference,
+        content.getBytes(StandardCharsets.UTF_8));
     this.entityManager.flush();
     this.entityManager.clear();
   }

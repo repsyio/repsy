@@ -31,6 +31,7 @@ import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.nuget.shared.storage.NuGetStorageService;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -243,7 +244,7 @@ class ProtocolDownloadContentDispositionIT extends AbstractIT {
   void nugetPackage() throws Exception {
     final var repo = this.seedRepo(RepoType.NUGET, uniqueRepoName("nuget-cd"));
     this.nugetStorageService.writePackage(
-        repo.getId(),
+        new RepoRef(repo.getId(), repo.getName()),
         NUGET_ID,
         NUGET_VERSION,
         new ByteArrayInputStream(new byte[] {1, 2, 3}),
@@ -379,7 +380,7 @@ class ProtocolDownloadContentDispositionIT extends AbstractIT {
   void nugetHeadMirrorsGet() throws Exception {
     final var repo = this.seedRepo(RepoType.NUGET, uniqueRepoName("nuget-cd"));
     this.nugetStorageService.writePackage(
-        repo.getId(),
+        new RepoRef(repo.getId(), repo.getName()),
         NUGET_ID,
         NUGET_VERSION,
         new ByteArrayInputStream(new byte[] {1, 2, 3}),

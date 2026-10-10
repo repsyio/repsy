@@ -24,6 +24,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.repsy.core.error_handling.exceptions.ErrorOccurredException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
@@ -53,7 +54,7 @@ class AbstractArtifactStorageServiceTest {
       return this.requireResource(path, repoName, code);
     }
 
-    long deleteFile(final StoragePath path, final String repoName) throws IOException {
+    long deleteFile(final StoragePath path, final String repoName) {
       return this.deleteFileWithUsage(path, repoName);
     }
 
@@ -113,12 +114,15 @@ class AbstractArtifactStorageServiceTest {
 
   @Test
   @DisplayName(
-      "deleteFileWithUsage() lets the IOException of the size lookup through, deleting nothing")
-  void deleteFileKeepsTheIoException() throws IOException {
+      "deleteFileWithUsage() answers the IOException of the size lookup as ErrorOccurredException,"
+          + " deleting nothing")
+  void deleteFileAnswersTheIoExceptionAsErrorOccurred() throws IOException {
     final var path = StoragePath.of(REPO_ID, "a/b.bin");
     when(this.strategy.getFileUsage(path, "repo")).thenThrow(new IOException("disk"));
 
-    assertThatThrownBy(() -> this.service.deleteFile(path, "repo")).isInstanceOf(IOException.class);
+    assertThatThrownBy(() -> this.service.deleteFile(path, "repo"))
+        .isInstanceOf(ErrorOccurredException.class)
+        .hasCauseInstanceOf(IOException.class);
     verify(this.strategy, never()).delete(any());
   }
 
@@ -130,5 +134,15 @@ class AbstractArtifactStorageServiceTest {
 
     assertThat(this.service.deleteTree(path)).isEqualTo(300L);
     verify(this.strategy).delete(path);
+  }
+
+  @Test
+  @DisplayName(
+      "deleteFileWithUsage() answers zero for a missing file: a missing item is no failure")
+  void deletingAMissingFileAnswersZero() throws IOException {
+    final var path = StoragePath.of(REPO_ID, "a/missing.bin");
+    when(this.strategy.getFileUsage(path, "repo")).thenReturn(0L);
+
+    assertThat(this.service.deleteFile(path, "repo")).isZero();
   }
 }

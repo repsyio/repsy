@@ -22,6 +22,7 @@ import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.protocols.npm.shared.constants.NpmConstants;
 import io.repsy.protocols.npm.shared.utils.NpmMetadataUtils;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -60,10 +61,11 @@ public final class NpmPackumentStore {
   }
 
   /** The stored package metadata as it is, or {@code null} when the file is gone. */
-  public byte @Nullable [] readBytes(
-      final UUID repoId, final String repoName, final Path packageBasePath) throws IOException {
+  public byte @Nullable [] readBytes(final RepoRef repo, final Path packageBasePath)
+      throws IOException {
 
-    final var resource = this.storageStrategy.get(storagePath(repoId, packageBasePath), repoName);
+    final var resource =
+        this.storageStrategy.get(storagePath(repo.id(), packageBasePath), repo.name());
 
     if (resource.isEmpty()) {
       return null;
@@ -76,23 +78,20 @@ public final class NpmPackumentStore {
 
   /** Puts the bytes back as the packument, or removes it when there were none. */
   public void restoreBytes(
-      final UUID repoId,
-      final String repoName,
-      final Path packageBasePath,
-      final byte @Nullable [] metadata)
+      final RepoRef repo, final Path packageBasePath, final byte @Nullable [] metadata)
       throws IOException {
 
-    final var storagePath = storagePath(repoId, packageBasePath);
+    final var storagePath = storagePath(repo.id(), packageBasePath);
 
     if (metadata == null) {
-      if (this.storageStrategy.get(storagePath, repoName).isPresent()) {
+      if (this.storageStrategy.get(storagePath, repo.name()).isPresent()) {
         this.storageStrategy.delete(storagePath);
       }
       return;
     }
 
     try (final var inputStream = new ByteArrayInputStream(metadata)) {
-      this.storageStrategy.write(repoName, storagePath, inputStream);
+      this.storageStrategy.write(repo.name(), storagePath, inputStream);
     }
   }
 

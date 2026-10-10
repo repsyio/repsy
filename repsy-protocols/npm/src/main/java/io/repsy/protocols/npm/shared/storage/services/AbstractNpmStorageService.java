@@ -31,6 +31,7 @@ import io.repsy.protocols.npm.shared.utils.NpmPayloadUtils;
 import io.repsy.protocols.npm.shared.utils.NpmTarballUrlUtils;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.storage.AbstractArtifactStorageService;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.file.NoSuchFileException;
@@ -76,12 +77,11 @@ public abstract class AbstractNpmStorageService extends AbstractArtifactStorageS
 
   @Override
   public long deleteDistributionTag(
-      final UUID repoId, final String repoName, final Path packageBasePath, final String tagName)
-      throws IOException {
+      final RepoRef repo, final Path packageBasePath, final String tagName) throws IOException {
 
-    final var metadataStoragePath = NpmPackumentStore.storagePath(repoId, packageBasePath);
+    final var metadataStoragePath = NpmPackumentStore.storagePath(repo.id(), packageBasePath);
 
-    final var metadata = this.getMetadata(metadataStoragePath, repoName);
+    final var metadata = this.getMetadata(metadataStoragePath, repo.name());
 
     final var oldMetadataLength = NpmPayloadUtils.getMetadataLength(metadata);
 
@@ -89,7 +89,7 @@ public abstract class AbstractNpmStorageService extends AbstractArtifactStorageS
 
     distTags.remove(tagName);
 
-    this.writeMetadataToFile(repoName, metadata, metadataStoragePath);
+    this.writeMetadataToFile(repo.name(), metadata, metadataStoragePath);
 
     return NpmPayloadUtils.getMetadataLength(metadata) - oldMetadataLength;
   }
@@ -106,16 +106,15 @@ public abstract class AbstractNpmStorageService extends AbstractArtifactStorageS
 
   @Override
   public Pair<Map<String, Object>, Long> addDistributionTag(
-      final UUID repoId,
-      final String repoName,
+      final RepoRef repo,
       final Path packageBasePath,
       final String tagName,
       final String versionName)
       throws IOException {
 
-    final var metadataStoragePath = NpmPackumentStore.storagePath(repoId, packageBasePath);
+    final var metadataStoragePath = NpmPackumentStore.storagePath(repo.id(), packageBasePath);
 
-    final var metadata = this.getMetadata(metadataStoragePath, repoName);
+    final var metadata = this.getMetadata(metadataStoragePath, repo.name());
     final var oldMetadataLength = NpmPayloadUtils.getMetadataLength(metadata);
 
     final var versions = (Map<String, Object>) metadata.get(NpmConstants.VERSIONS);
@@ -162,15 +161,14 @@ public abstract class AbstractNpmStorageService extends AbstractArtifactStorageS
 
   @Override
   public BaseUsages writeTarballAndMetadata(
-      final UUID repoId,
-      final String repoName,
+      final RepoRef repo,
       final Map<String, Object> metadata,
       final Path packageBasePath,
       final String packageName,
       final String versionName)
       throws IOException, URISyntaxException {
 
-    final var metadataStoragePath = NpmPackumentStore.storagePath(repoId, packageBasePath);
+    final var metadataStoragePath = NpmPackumentStore.storagePath(repo.id(), packageBasePath);
 
     final var data = NpmPayloadUtils.extractTarballDataFromPayload(metadata);
     final var tarballBytes = Base64.decodeBase64(data);
@@ -182,10 +180,9 @@ public abstract class AbstractNpmStorageService extends AbstractArtifactStorageS
     NpmMetadataUtils.removePublishOnlyFields(metadata);
 
     final var tarballUsages =
-        this.tarballStore.write(
-            repoId, repoName, packageBasePath, packageName, versionName, tarballBytes);
+        this.tarballStore.write(repo, packageBasePath, packageName, versionName, tarballBytes);
 
-    final var usage = this.writeMetadataToFile(repoName, metadata, metadataStoragePath);
+    final var usage = this.writeMetadataToFile(repo.name(), metadata, metadataStoragePath);
 
     usage.setDiskUsage(usage.getDiskUsage() + tarballUsages.getDiskUsage());
 
@@ -196,16 +193,14 @@ public abstract class AbstractNpmStorageService extends AbstractArtifactStorageS
   public Pair<Pair<Long, Long>, Map<String, Object>> processVersionPayload(
       final Map<String, Object> payload,
       final Path packageBasePath,
-      final UUID repoId,
-      final String repoName,
+      final RepoRef repo,
       final Supplier<NpmPackageSnapshot> snapshot)
       throws IOException, URISyntaxException {
 
     // A file that is gone or corrupt is rebuilt from the rows (RPS-1310), which the publish has
     // already written: the version being added is in them, without a tarball yet, and is replaced
     // by the payload's own entry below.
-    final var fullMetadata =
-        this.readMetadataOrRebuild(repoId, repoName, packageBasePath, snapshot);
+    final var fullMetadata = this.readMetadataOrRebuild(repo, packageBasePath, snapshot);
 
     final var currentMetadataLength = NpmPayloadUtils.getMetadataLength(fullMetadata);
 
@@ -219,7 +214,7 @@ public abstract class AbstractNpmStorageService extends AbstractArtifactStorageS
     timeField.put(versionPair.getFirst(), NpmPackageUtils.getFormattedCurrentTime());
     timeField.put(NpmConstants.MODIFIED, NpmPackageUtils.getFormattedCurrentTime());
 
-    this.fixTarballUrl(versionPair.getSecond(), repoName);
+    this.fixTarballUrl(versionPair.getSecond(), repo.name());
 
     if (distTag.getKey().equals(NpmConstants.LATEST)) { // npm publish
 
@@ -262,89 +257,75 @@ public abstract class AbstractNpmStorageService extends AbstractArtifactStorageS
   }
 
   @Override
-  public byte @Nullable [] readMetadataBytes(
-      final UUID repoId, final String repoName, final Path packageBasePath) throws IOException {
+  public byte @Nullable [] readMetadataBytes(final RepoRef repo, final Path packageBasePath)
+      throws IOException {
 
-    return this.packumentStore.readBytes(repoId, repoName, packageBasePath);
+    return this.packumentStore.readBytes(repo, packageBasePath);
   }
 
   @Override
   public void restoreMetadataBytes(
-      final UUID repoId,
-      final String repoName,
-      final Path packageBasePath,
-      final byte @Nullable [] metadata)
+      final RepoRef repo, final Path packageBasePath, final byte @Nullable [] metadata)
       throws IOException {
 
-    this.packumentStore.restoreBytes(repoId, repoName, packageBasePath, metadata);
+    this.packumentStore.restoreBytes(repo, packageBasePath, metadata);
   }
 
   @Override
   public long changeMetadata(
-      final UUID repoId,
-      final String repoName,
+      final RepoRef repo,
       final Path packageBasePath,
       final Supplier<NpmPackageSnapshot> snapshot,
       final MetadataChange change)
       throws IOException {
 
-    final var previousMetadata = this.packumentStore.readBytes(repoId, repoName, packageBasePath);
+    final var previousMetadata = this.packumentStore.readBytes(repo, packageBasePath);
     final var rebuiltSize =
-        this.packumentStore.usable(previousMetadata, repoName, packageBasePath) == null
-            ? this.writeRebuiltMetadata(repoId, repoName, packageBasePath, snapshot.get())
+        this.packumentStore.usable(previousMetadata, repo.name(), packageBasePath) == null
+            ? this.writeRebuiltMetadata(repo, packageBasePath, snapshot.get())
             : 0L;
 
     try {
       return rebuiltSize + change.apply();
     } catch (final IOException | RuntimeException e) {
-      this.restoreAfterFailedChange(repoId, repoName, packageBasePath, previousMetadata, e);
+      this.restoreAfterFailedChange(repo, packageBasePath, previousMetadata, e);
       throw e;
     }
   }
 
   private long writeRebuiltMetadata(
-      final UUID repoId,
-      final String repoName,
-      final Path packageBasePath,
-      final NpmPackageSnapshot snapshot)
+      final RepoRef repo, final Path packageBasePath, final NpmPackageSnapshot snapshot)
       throws IOException {
 
-    final var metadata = this.rebuildMetadata(repoId, repoName, snapshot);
+    final var metadata = this.rebuildMetadata(repo, snapshot);
 
     // The same atomic write as any other change of the file: nothing half-written is ever served.
     return this.writeMetadataToFile(
-            repoName, metadata, NpmPackumentStore.storagePath(repoId, packageBasePath))
+            repo.name(), metadata, NpmPackumentStore.storagePath(repo.id(), packageBasePath))
         .getDiskUsage();
   }
 
   @Override
   public Map<String, Object> readMetadataOrRebuild(
-      final UUID repoId,
-      final String repoName,
-      final Path packageBasePath,
-      final Supplier<NpmPackageSnapshot> snapshot)
+      final RepoRef repo, final Path packageBasePath, final Supplier<NpmPackageSnapshot> snapshot)
       throws IOException {
 
     final var stored =
         this.packumentStore.usable(
-            this.packumentStore.readBytes(repoId, repoName, packageBasePath),
-            repoName,
-            packageBasePath);
+            this.packumentStore.readBytes(repo, packageBasePath), repo.name(), packageBasePath);
 
-    return stored != null ? stored : this.rebuildMetadata(repoId, repoName, snapshot.get());
+    return stored != null ? stored : this.rebuildMetadata(repo, snapshot.get());
   }
 
   /**
    * Builds the metadata of the package from its rows, reading the tarball of each version for what
    * the rows do not keep: see {@link NpmPackumentRebuilder}. Writes nothing.
    */
-  private Map<String, Object> rebuildMetadata(
-      final UUID repoId, final String repoName, final NpmPackageSnapshot snapshot)
+  private Map<String, Object> rebuildMetadata(final RepoRef repo, final NpmPackageSnapshot snapshot)
       throws IOException {
 
     return this.packumentRebuilder.rebuild(
-        repoId,
-        repoName,
+        repo,
         this.getPackageBasePath(snapshot.scope(), snapshot.name()),
         snapshot,
         this.registryBaseUrl());
@@ -364,27 +345,25 @@ public abstract class AbstractNpmStorageService extends AbstractArtifactStorageS
 
   @Override
   public boolean tarballExists(
-      final UUID repoId,
-      final String repoName,
+      final RepoRef repo,
       final Path packageBasePath,
       final String packageName,
       final String versionName) {
 
-    return this.tarballStore.exists(repoId, repoName, packageBasePath, packageName, versionName);
+    return this.tarballStore.exists(repo, packageBasePath, packageName, versionName);
   }
 
   @Override
   public void discardPublishedVersion(
-      final UUID repoId,
-      final String repoName,
+      final RepoRef repo,
       final Path packageBasePath,
       final String packageName,
       final String versionName,
       final byte @Nullable [] previousMetadata)
       throws IOException {
 
-    this.tarballStore.deleteIfPresent(repoId, repoName, packageBasePath, packageName, versionName);
-    this.packumentStore.restoreBytes(repoId, repoName, packageBasePath, previousMetadata);
+    this.tarballStore.deleteIfPresent(repo, packageBasePath, packageName, versionName);
+    this.packumentStore.restoreBytes(repo, packageBasePath, previousMetadata);
   }
 
   @Override
@@ -397,8 +376,7 @@ public abstract class AbstractNpmStorageService extends AbstractArtifactStorageS
 
   @Override
   public long deleteVersion(
-      final UUID repoId,
-      final String repoName,
+      final RepoRef repo,
       final Path packageBasePath,
       final String packageName,
       final String versionName,
@@ -407,13 +385,12 @@ public abstract class AbstractNpmStorageService extends AbstractArtifactStorageS
       throws IOException {
 
     return this.changeMetadata(
-        repoId,
-        repoName,
+        repo,
         packageBasePath,
         snapshot,
         () ->
             this.removeVersionAndTarball(
-                repoId, repoName, packageBasePath, packageName, versionName, newLatest));
+                repo, packageBasePath, packageName, versionName, newLatest));
   }
 
   /**
@@ -422,8 +399,7 @@ public abstract class AbstractNpmStorageService extends AbstractArtifactStorageS
    * tarball, and {@link #changeMetadata} puts the metadata back.
    */
   private long removeVersionAndTarball(
-      final UUID repoId,
-      final String repoName,
+      final RepoRef repo,
       final Path packageBasePath,
       final String packageName,
       final String versionName,
@@ -431,23 +407,22 @@ public abstract class AbstractNpmStorageService extends AbstractArtifactStorageS
       throws IOException {
 
     final var metadataGrowth =
-        this.removeVersionFromMetadata(repoId, repoName, packageBasePath, versionName, newLatest);
+        this.removeVersionFromMetadata(repo, packageBasePath, versionName, newLatest);
 
     final var tarballSize =
-        this.tarballStore.remove(repoId, repoName, packageBasePath, packageName, versionName);
+        this.tarballStore.remove(repo, packageBasePath, packageName, versionName);
 
     return metadataGrowth - tarballSize;
   }
 
   private void restoreAfterFailedChange(
-      final UUID repoId,
-      final String repoName,
+      final RepoRef repo,
       final Path packageBasePath,
       final byte @Nullable [] previousMetadata,
       final Exception cause) {
 
     try {
-      this.restoreMetadataBytes(repoId, repoName, packageBasePath, previousMetadata);
+      this.restoreMetadataBytes(repo, packageBasePath, previousMetadata);
     } catch (final IOException | RuntimeException e) {
       // The change's own failure is the one to report; the leftover is noted on it.
       cause.addSuppressed(e);
@@ -455,16 +430,15 @@ public abstract class AbstractNpmStorageService extends AbstractArtifactStorageS
   }
 
   private long removeVersionFromMetadata(
-      final UUID repoId,
-      final String repoName,
+      final RepoRef repo,
       final Path packageBasePath,
       final String versionName,
       final @Nullable String newLatest)
       throws IOException {
 
-    final var storagePath = NpmPackumentStore.storagePath(repoId, packageBasePath);
+    final var storagePath = NpmPackumentStore.storagePath(repo.id(), packageBasePath);
 
-    final var metadata = this.getMetadata(storagePath, repoName);
+    final var metadata = this.getMetadata(storagePath, repo.name());
 
     final var versions = (Map<String, Object>) metadata.get(NpmConstants.VERSIONS);
     final var time = (Map<String, String>) metadata.get("time");
@@ -482,20 +456,17 @@ public abstract class AbstractNpmStorageService extends AbstractArtifactStorageS
 
     NpmMetadataUtils.removeAllTagsPointingToVersion(metadata, versionName);
 
-    return this.writeMetadataToFile(repoName, metadata, storagePath).getDiskUsage();
+    return this.writeMetadataToFile(repo.name(), metadata, storagePath).getDiskUsage();
   }
 
   @Override
   public long deprecateVersions(
-      final UUID repoId,
-      final String repoName,
-      final Path packageBasePath,
-      final List<Pair<String, String>> deprecations)
+      final RepoRef repo, final Path packageBasePath, final List<Pair<String, String>> deprecations)
       throws IOException {
 
-    final var storagePath = NpmPackumentStore.storagePath(repoId, packageBasePath);
+    final var storagePath = NpmPackumentStore.storagePath(repo.id(), packageBasePath);
 
-    final var metadata = this.getMetadata(storagePath, repoName);
+    final var metadata = this.getMetadata(storagePath, repo.name());
     final var versions = (Map<String, Object>) metadata.get(NpmConstants.VERSIONS);
 
     // Applied to the metadata as it is now, not replaced by what the client sent: the client read
@@ -518,7 +489,7 @@ public abstract class AbstractNpmStorageService extends AbstractArtifactStorageS
 
     NpmMetadataUtils.updateModifiedTime(metadata);
 
-    return this.writeMetadataToFile(repoName, metadata, storagePath).getDiskUsage();
+    return this.writeMetadataToFile(repo.name(), metadata, storagePath).getDiskUsage();
   }
 
   /**
@@ -573,8 +544,7 @@ public abstract class AbstractNpmStorageService extends AbstractArtifactStorageS
 
   @Override
   public Map<String, Object> getMetadata(
-      final UUID repoId,
-      final String repoName,
+      final RepoRef repo,
       final @Nullable String scopeName,
       final String packageName,
       final boolean isAbbreviated)
@@ -586,12 +556,12 @@ public abstract class AbstractNpmStorageService extends AbstractArtifactStorageS
               .resolve(NpmConstants.METADATA_FILENAME)
               .normalize();
 
-      final var storagePath = StoragePath.of(repoId, path.toString());
-      final var resource = this.packumentStore.require(storagePath, repoName);
+      final var storagePath = StoragePath.of(repo.id(), path.toString());
+      final var resource = this.packumentStore.require(storagePath, repo.name());
 
       final var fullMetadata = NpmMetadataUtils.readMetadataFromResource(resource);
 
-      this.prepareForServing(fullMetadata, repoName);
+      this.prepareForServing(fullMetadata, repo.name());
 
       return isAbbreviated ? this.createAbbreviatedMetadata(fullMetadata) : fullMetadata;
 
@@ -602,8 +572,7 @@ public abstract class AbstractNpmStorageService extends AbstractArtifactStorageS
 
   @Override
   public Map<String, Object> getMetadata(
-      final UUID repoId,
-      final String repoName,
+      final RepoRef repo,
       final @Nullable String scopeName,
       final String packageName,
       final boolean isAbbreviated,
@@ -613,19 +582,14 @@ public abstract class AbstractNpmStorageService extends AbstractArtifactStorageS
     final var packageBasePath = this.getPackageBasePath(scopeName, packageName);
     final var stored =
         this.packumentStore.usable(
-            this.packumentStore.readBytes(repoId, repoName, packageBasePath),
-            repoName,
-            packageBasePath);
+            this.packumentStore.readBytes(repo, packageBasePath), repo.name(), packageBasePath);
     final var metadata =
         stored != null
             ? stored
             : this.rebuildIfPackageExists(
-                repoId,
-                repoName,
-                snapshot,
-                new ItemNotFoundException(ProtocolErrorCodes.ITEM_NOT_FOUND));
+                repo, snapshot, new ItemNotFoundException(ProtocolErrorCodes.ITEM_NOT_FOUND));
 
-    this.prepareForServing(metadata, repoName);
+    this.prepareForServing(metadata, repo.name());
 
     return isAbbreviated ? this.createAbbreviatedMetadata(metadata) : metadata;
   }
@@ -645,8 +609,7 @@ public abstract class AbstractNpmStorageService extends AbstractArtifactStorageS
 
   /** Rebuilds the metadata of a package the rows know, and otherwise fails as the read did. */
   private Map<String, Object> rebuildIfPackageExists(
-      final UUID repoId,
-      final String repoName,
+      final RepoRef repo,
       final Supplier<NpmPackageSnapshot> snapshot,
       final ItemNotFoundException missing)
       throws IOException {
@@ -659,7 +622,7 @@ public abstract class AbstractNpmStorageService extends AbstractArtifactStorageS
       throw missing;
     }
 
-    return this.rebuildMetadata(repoId, repoName, rows);
+    return this.rebuildMetadata(repo, rows);
   }
 
   @Override
@@ -680,11 +643,7 @@ public abstract class AbstractNpmStorageService extends AbstractArtifactStorageS
 
   @Override
   public @Nullable String getReadmeContent(
-      final UUID repoId,
-      final String repoName,
-      final Path packageBasePath,
-      final String versionName)
-      throws IOException {
+      final RepoRef repo, final Path packageBasePath, final String versionName) throws IOException {
 
     // A metadata.json that is gone or corrupt has no readme to give, and the rows cannot bring one
     // back: a readme is not among them, so a rebuild (RPS-1300) would leave it out too, at the cost
@@ -695,9 +654,7 @@ public abstract class AbstractNpmStorageService extends AbstractArtifactStorageS
     // and no longer a broken storage worth an error (RPS-1310).
     final var metadata =
         this.packumentStore.parseStored(
-            this.packumentStore.readBytes(repoId, repoName, packageBasePath),
-            repoName,
-            packageBasePath);
+            this.packumentStore.readBytes(repo, packageBasePath), repo.name(), packageBasePath);
 
     if (metadata == null) {
       return null;
@@ -722,14 +679,12 @@ public abstract class AbstractNpmStorageService extends AbstractArtifactStorageS
 
   @Override
   public Resource getTarball(
-      final UUID repoId,
-      final String repoName,
+      final RepoRef repo,
       final @Nullable String scopeName,
       final String packageName,
       final String filename) {
 
-    return this.tarballStore.get(
-        repoId, repoName, this.getPackageBasePath(scopeName, packageName), filename);
+    return this.tarballStore.get(repo, this.getPackageBasePath(scopeName, packageName), filename);
   }
 
   @Override

@@ -21,6 +21,7 @@ import io.repsy.libs.storage.core.dtos.StaleFile;
 import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.Instant;
@@ -73,7 +74,7 @@ public interface DockerStorageService<ID> {
    * Deletes one file of the repo's {@code blobs} directory and answers the bytes it held, so the
    * caller can release them from the repo's disk usage.
    */
-  long deleteBlobFile(UUID repoId, String repoName, String fileName) throws IOException;
+  long deleteBlobFile(RepoRef repo, String fileName);
 
   BaseUsages rename(UUID repoId, RelativePath relativePath, String digest);
 

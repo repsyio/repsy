@@ -22,6 +22,7 @@ import io.repsy.os.server.protocols.helm.shared.oci.repositories.HelmOciManifest
 import io.repsy.os.server.protocols.helm.shared.storage.services.HelmStorageService;
 import io.repsy.os.server.protocols.shared.sources.AbandonedBlobUploadSource;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.HashSet;
@@ -82,7 +83,8 @@ public class HelmAbandonedBlobUploadSource implements AbandonedBlobUploadSource 
       final @NonNull UUID repoId, final @NonNull String repoName, final @NonNull String fileName)
       throws IOException {
 
-    final var freed = this.helmStorageService.deleteBlobFile(repoId, repoName, fileName);
+    final var freed =
+        this.helmStorageService.deleteBlobFile(new RepoRef(repoId, repoName), fileName);
 
     if (!UPLOAD_SESSION_NAME.matcher(fileName).matches()) {
       this.helmOciBlobRepository.deleteByRepoIdAndDigest(repoId, fileName);

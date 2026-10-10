@@ -30,6 +30,7 @@ import io.repsy.os.server.protocols.nuget.shared.storage.NuGetStorageService;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetPackageSearchResult;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
@@ -119,7 +120,8 @@ class NuGetApiFacadeTest {
     @DisplayName(
         "deletes the package from storage under its lower-cased id and reports the freed disk")
     void deletesStorageUnderLowerCasedId() throws IOException {
-      when(nugetStorageService.deletePackage(REPO_ID, "some.package")).thenReturn(100L);
+      when(nugetStorageService.deletePackage(RepoRef.of(REPO_INFO), "some.package"))
+          .thenReturn(100L);
 
       final var usages = facade.deletePackage(REPO_INFO, "Some.Package");
 
@@ -130,7 +132,7 @@ class NuGetApiFacadeTest {
     @Test
     @DisplayName("still succeeds when the storage delete fails")
     void toleratesStorageFailure() throws IOException {
-      when(nugetStorageService.deletePackage(REPO_ID, "some.package"))
+      when(nugetStorageService.deletePackage(RepoRef.of(REPO_INFO), "some.package"))
           .thenThrow(new IOException("disk error"));
 
       final var usages = facade.deletePackage(REPO_INFO, "Some.Package");
@@ -148,12 +150,13 @@ class NuGetApiFacadeTest {
     void removesPackageDirectoryWhenLastVersionIsDeleted() throws IOException {
       when(nugetPackageService.deleteVersionAndGetDeletion(REPO_INFO, "Some.Package", "1.0.0-RC1"))
           .thenReturn(new VersionDeletion(NuGetDeletedItem.PACKAGE, "1.0.0-RC1"));
-      when(nugetStorageService.deletePackageVersion(REPO_ID, "some.package", "1.0.0-rc1"))
+      when(nugetStorageService.deletePackageVersion(
+              RepoRef.of(REPO_INFO), "some.package", "1.0.0-rc1"))
           .thenReturn(50L);
 
       final var result = facade.deleteVersion(REPO_INFO, "Some.Package", "1.0.0-RC1");
 
-      verify(nugetStorageService).deletePackage(REPO_ID, "some.package");
+      verify(nugetStorageService).deletePackage(RepoRef.of(REPO_INFO), "some.package");
       verify(eventPublisher).publishEvent(any(ArtifactVersionDeletedEvent.class));
       assertThat(result.deletedItem()).isEqualTo(NuGetDeletedItem.PACKAGE);
       assertThat(result.usages().getDiskUsage()).isEqualTo(-50L);
@@ -164,11 +167,11 @@ class NuGetApiFacadeTest {
     void ignoresDirectoryCleanupFailure() throws IOException {
       when(nugetPackageService.deleteVersionAndGetDeletion(REPO_INFO, "Some.Package", "1.0.0"))
           .thenReturn(new VersionDeletion(NuGetDeletedItem.PACKAGE, "1.0.0"));
-      when(nugetStorageService.deletePackageVersion(REPO_ID, "some.package", "1.0.0"))
+      when(nugetStorageService.deletePackageVersion(RepoRef.of(REPO_INFO), "some.package", "1.0.0"))
           .thenReturn(50L);
       doThrow(new IOException("not empty"))
           .when(nugetStorageService)
-          .deletePackage(REPO_ID, "some.package");
+          .deletePackage(RepoRef.of(REPO_INFO), "some.package");
 
       final var result = facade.deleteVersion(REPO_INFO, "Some.Package", "1.0.0");
 
@@ -180,7 +183,7 @@ class NuGetApiFacadeTest {
     void keepsPackageDirectoryWhenVersionsRemain() throws IOException {
       when(nugetPackageService.deleteVersionAndGetDeletion(REPO_INFO, "Some.Package", "1.0.0"))
           .thenReturn(new VersionDeletion(NuGetDeletedItem.VERSION, "1.0.0"));
-      when(nugetStorageService.deletePackageVersion(REPO_ID, "some.package", "1.0.0"))
+      when(nugetStorageService.deletePackageVersion(RepoRef.of(REPO_INFO), "some.package", "1.0.0"))
           .thenReturn(30L);
 
       final var result = facade.deleteVersion(REPO_INFO, "Some.Package", "1.0.0");
@@ -196,7 +199,8 @@ class NuGetApiFacadeTest {
       when(nugetPackageService.deleteVersionAndGetDeletion(
               REPO_INFO, "Some.Package", "1.0.0+Legacy"))
           .thenReturn(new VersionDeletion(NuGetDeletedItem.VERSION, "1.0.0+Legacy"));
-      when(nugetStorageService.deleteBuildMetadataVersion(REPO_ID, "some.package", "1.0.0+legacy"))
+      when(nugetStorageService.deleteBuildMetadataVersion(
+              RepoRef.of(REPO_INFO), "some.package", "1.0.0+legacy"))
           .thenReturn(20L);
 
       final var result = facade.deleteVersion(REPO_INFO, "Some.Package", "1.0.0+Legacy");
@@ -211,7 +215,7 @@ class NuGetApiFacadeTest {
     void deletesCanonicalDirectoryOfBuildMetadataSpelling() throws IOException {
       when(nugetPackageService.deleteVersionAndGetDeletion(REPO_INFO, "Some.Package", "1.0.0+x"))
           .thenReturn(new VersionDeletion(NuGetDeletedItem.VERSION, "1.0.0"));
-      when(nugetStorageService.deletePackageVersion(REPO_ID, "some.package", "1.0.0"))
+      when(nugetStorageService.deletePackageVersion(RepoRef.of(REPO_INFO), "some.package", "1.0.0"))
           .thenReturn(30L);
 
       final var result = facade.deleteVersion(REPO_INFO, "Some.Package", "1.0.0+x");
@@ -225,7 +229,7 @@ class NuGetApiFacadeTest {
     void toleratesStorageFailure() throws IOException {
       when(nugetPackageService.deleteVersionAndGetDeletion(REPO_INFO, "Some.Package", "1.0.0"))
           .thenReturn(new VersionDeletion(NuGetDeletedItem.VERSION, "1.0.0"));
-      when(nugetStorageService.deletePackageVersion(REPO_ID, "some.package", "1.0.0"))
+      when(nugetStorageService.deletePackageVersion(RepoRef.of(REPO_INFO), "some.package", "1.0.0"))
           .thenThrow(new IOException("disk error"));
 
       final var result = facade.deleteVersion(REPO_INFO, "Some.Package", "1.0.0");

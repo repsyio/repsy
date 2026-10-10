@@ -39,6 +39,7 @@ import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.protocols.npm.shared.npm_package.dtos.NpmPackageSnapshot;
 import io.repsy.protocols.npm.shared.npm_package.dtos.NpmPackageSnapshot.Version;
 import io.repsy.protocols.npm.shared.storage.NpmPackumentStore;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -224,7 +225,8 @@ class AbstractNpmStorageServiceRebuildTest {
     this.metadataIsStored();
 
     final var growth =
-        this.service.changeMetadata(REPO_ID, REPO_NAME, BASE_PATH, this.rows, () -> 11L);
+        this.service.changeMetadata(
+            new RepoRef(REPO_ID, REPO_NAME), BASE_PATH, this.rows, () -> 11L);
 
     assertThat(growth).isEqualTo(11L);
     assertThat(this.snapshotReads).hasValue(0);
@@ -242,8 +244,7 @@ class AbstractNpmStorageServiceRebuildTest {
 
     final var growth =
         this.service.changeMetadata(
-            REPO_ID,
-            REPO_NAME,
+            new RepoRef(REPO_ID, REPO_NAME),
             BASE_PATH,
             this.rows,
             () -> {
@@ -276,8 +277,7 @@ class AbstractNpmStorageServiceRebuildTest {
     assertThatThrownBy(
             () ->
                 this.service.changeMetadata(
-                    REPO_ID,
-                    REPO_NAME,
+                    new RepoRef(REPO_ID, REPO_NAME),
                     BASE_PATH,
                     this.rows,
                     () -> {
@@ -299,8 +299,7 @@ class AbstractNpmStorageServiceRebuildTest {
     assertThatThrownBy(
             () ->
                 this.service.changeMetadata(
-                    REPO_ID,
-                    REPO_NAME,
+                    new RepoRef(REPO_ID, REPO_NAME),
                     BASE_PATH,
                     this.rows,
                     () -> {
@@ -329,8 +328,7 @@ class AbstractNpmStorageServiceRebuildTest {
     assertThatThrownBy(
             () ->
                 this.service.changeMetadata(
-                    REPO_ID,
-                    REPO_NAME,
+                    new RepoRef(REPO_ID, REPO_NAME),
                     BASE_PATH,
                     this.rows,
                     () -> {
@@ -351,8 +349,7 @@ class AbstractNpmStorageServiceRebuildTest {
     assertThatThrownBy(
             () ->
                 this.service.changeMetadata(
-                    REPO_ID,
-                    REPO_NAME,
+                    new RepoRef(REPO_ID, REPO_NAME),
                     BASE_PATH,
                     this.rows,
                     () -> {
@@ -373,8 +370,7 @@ class AbstractNpmStorageServiceRebuildTest {
     assertThatThrownBy(
             () ->
                 this.service.changeMetadata(
-                    REPO_ID,
-                    REPO_NAME,
+                    new RepoRef(REPO_ID, REPO_NAME),
                     BASE_PATH,
                     () -> {
                       throw new ItemNotFoundException("packageNotFound");
@@ -407,7 +403,7 @@ class AbstractNpmStorageServiceRebuildTest {
 
     final var growth =
         this.service.deleteVersion(
-            REPO_ID, REPO_NAME, BASE_PATH, PACKAGE, "1.0.0", null, this.rows);
+            new RepoRef(REPO_ID, REPO_NAME), BASE_PATH, PACKAGE, "1.0.0", null, this.rows);
 
     assertThat(growth).as("rebuilt 300, then -40 for the metadata and 60 freed").isEqualTo(200L);
     final var writes = this.writtenMetadata();
@@ -432,7 +428,7 @@ class AbstractNpmStorageServiceRebuildTest {
         .thenReturn(Optional.empty());
 
     final var rebuilt =
-        this.service.readMetadataOrRebuild(REPO_ID, REPO_NAME, BASE_PATH, this.rows);
+        this.service.readMetadataOrRebuild(new RepoRef(REPO_ID, REPO_NAME), BASE_PATH, this.rows);
 
     final var versions = (Map<String, Map<String, Object>>) rebuilt.get("versions");
     assertThat(versions.get("1.0.0"))
@@ -451,7 +447,7 @@ class AbstractNpmStorageServiceRebuildTest {
     this.service.registryBaseUrl = "https://registry.example.test:9090/";
 
     final var rebuilt =
-        this.service.readMetadataOrRebuild(REPO_ID, REPO_NAME, BASE_PATH, this.rows);
+        this.service.readMetadataOrRebuild(new RepoRef(REPO_ID, REPO_NAME), BASE_PATH, this.rows);
 
     final var versions = (Map<String, Map<String, Object>>) rebuilt.get("versions");
     assertThat((Map<String, Object>) versions.get("2.0.0").get("dist"))
@@ -474,7 +470,9 @@ class AbstractNpmStorageServiceRebuildTest {
         .thenReturn(Optional.of(broken));
 
     assertThatThrownBy(
-            () -> this.service.readMetadataOrRebuild(REPO_ID, REPO_NAME, BASE_PATH, this.rows))
+            () ->
+                this.service.readMetadataOrRebuild(
+                    new RepoRef(REPO_ID, REPO_NAME), BASE_PATH, this.rows))
         .isInstanceOf(IOException.class)
         .hasMessage("disk gone");
   }
@@ -489,7 +487,7 @@ class AbstractNpmStorageServiceRebuildTest {
     this.metadataIsStored();
 
     final var metadata =
-        this.service.readMetadataOrRebuild(REPO_ID, REPO_NAME, BASE_PATH, this.rows);
+        this.service.readMetadataOrRebuild(new RepoRef(REPO_ID, REPO_NAME), BASE_PATH, this.rows);
 
     assertThat(metadata).containsEntry("name", "demo");
     assertThat(this.snapshotReads).hasValue(0);
@@ -501,7 +499,7 @@ class AbstractNpmStorageServiceRebuildTest {
     this.metadataIsGone();
 
     final var metadata =
-        this.service.readMetadataOrRebuild(REPO_ID, REPO_NAME, BASE_PATH, this.rows);
+        this.service.readMetadataOrRebuild(new RepoRef(REPO_ID, REPO_NAME), BASE_PATH, this.rows);
 
     assertThat(((Map<String, Object>) metadata.get("versions")).keySet())
         .containsExactly("1.0.0", "2.0.0");
@@ -513,9 +511,10 @@ class AbstractNpmStorageServiceRebuildTest {
   void packumentReadServesTheRows() throws Exception {
     this.metadataIsGone();
 
-    final var full = this.service.getMetadata(REPO_ID, REPO_NAME, null, PACKAGE, false, this.rows);
+    final var full =
+        this.service.getMetadata(new RepoRef(REPO_ID, REPO_NAME), null, PACKAGE, false, this.rows);
     final var abbreviated =
-        this.service.getMetadata(REPO_ID, REPO_NAME, null, PACKAGE, true, this.rows);
+        this.service.getMetadata(new RepoRef(REPO_ID, REPO_NAME), null, PACKAGE, true, this.rows);
 
     assertThat(((Map<String, Object>) full.get("versions")).keySet())
         .containsExactly("1.0.0", "2.0.0");
@@ -535,8 +534,7 @@ class AbstractNpmStorageServiceRebuildTest {
     assertThatThrownBy(
             () ->
                 this.service.getMetadata(
-                    REPO_ID,
-                    REPO_NAME,
+                    new RepoRef(REPO_ID, REPO_NAME),
                     null,
                     PACKAGE,
                     false,
@@ -553,7 +551,7 @@ class AbstractNpmStorageServiceRebuildTest {
     this.metadataIsStored();
 
     final var metadata =
-        this.service.getMetadata(REPO_ID, REPO_NAME, null, PACKAGE, false, this.rows);
+        this.service.getMetadata(new RepoRef(REPO_ID, REPO_NAME), null, PACKAGE, false, this.rows);
 
     assertThat(metadata).containsEntry("name", "demo");
     assertThat(this.snapshotReads).hasValue(0);
@@ -609,7 +607,7 @@ class AbstractNpmStorageServiceRebuildTest {
     this.metadataIs(corrupt);
 
     final var metadata =
-        this.service.readMetadataOrRebuild(REPO_ID, REPO_NAME, BASE_PATH, this.rows);
+        this.service.readMetadataOrRebuild(new RepoRef(REPO_ID, REPO_NAME), BASE_PATH, this.rows);
 
     assertThat(((Map<String, Object>) metadata.get("versions")).keySet())
         .containsExactly("1.0.0", "2.0.0");
@@ -626,7 +624,7 @@ class AbstractNpmStorageServiceRebuildTest {
   void aMissingFileIsNotWarnedAbout() throws Exception {
     this.metadataIsGone();
 
-    this.service.readMetadataOrRebuild(REPO_ID, REPO_NAME, BASE_PATH, this.rows);
+    this.service.readMetadataOrRebuild(new RepoRef(REPO_ID, REPO_NAME), BASE_PATH, this.rows);
 
     assertThat(this.warningTexts()).isEmpty();
   }
@@ -640,7 +638,8 @@ class AbstractNpmStorageServiceRebuildTest {
         .thenReturn(BaseUsages.ofDisk(500L));
 
     final var growth =
-        this.service.changeMetadata(REPO_ID, REPO_NAME, BASE_PATH, this.rows, () -> -20L);
+        this.service.changeMetadata(
+            new RepoRef(REPO_ID, REPO_NAME), BASE_PATH, this.rows, () -> -20L);
 
     assertThat(growth).isEqualTo(480L);
     assertThat(((Map<String, Object>) this.writtenMetadata().getFirst().get("versions")).keySet())
@@ -661,8 +660,7 @@ class AbstractNpmStorageServiceRebuildTest {
     assertThatThrownBy(
             () ->
                 this.service.changeMetadata(
-                    REPO_ID,
-                    REPO_NAME,
+                    new RepoRef(REPO_ID, REPO_NAME),
                     BASE_PATH,
                     this.rows,
                     () -> {
@@ -682,9 +680,10 @@ class AbstractNpmStorageServiceRebuildTest {
   void packumentReadServesTheRowsOfACorruptFile() throws Exception {
     this.metadataIs("{oops");
 
-    final var full = this.service.getMetadata(REPO_ID, REPO_NAME, null, PACKAGE, false, this.rows);
+    final var full =
+        this.service.getMetadata(new RepoRef(REPO_ID, REPO_NAME), null, PACKAGE, false, this.rows);
     final var abbreviated =
-        this.service.getMetadata(REPO_ID, REPO_NAME, null, PACKAGE, true, this.rows);
+        this.service.getMetadata(new RepoRef(REPO_ID, REPO_NAME), null, PACKAGE, true, this.rows);
 
     assertThat(((Map<String, Object>) full.get("versions")).keySet())
         .containsExactly("1.0.0", "2.0.0");
@@ -701,8 +700,7 @@ class AbstractNpmStorageServiceRebuildTest {
     assertThatThrownBy(
             () ->
                 this.service.getMetadata(
-                    REPO_ID,
-                    REPO_NAME,
+                    new RepoRef(REPO_ID, REPO_NAME),
                     null,
                     PACKAGE,
                     false,
@@ -752,7 +750,7 @@ class AbstractNpmStorageServiceRebuildTest {
   private Map<String, Object> mergePublished(final String tag) throws Exception {
     return this.service
         .processVersionPayload(
-            payloadOf(tag), BASE_PATH, REPO_ID, REPO_NAME, () -> ROWS_OF_A_PUBLISH)
+            payloadOf(tag), BASE_PATH, new RepoRef(REPO_ID, REPO_NAME), () -> ROWS_OF_A_PUBLISH)
         .getSecond();
   }
 
@@ -828,8 +826,7 @@ class AbstractNpmStorageServiceRebuildTest {
                 this.service.processVersionPayload(
                     payloadOf("latest"),
                     BASE_PATH,
-                    REPO_ID,
-                    REPO_NAME,
+                    new RepoRef(REPO_ID, REPO_NAME),
                     () -> {
                       throw new ItemNotFoundException("packageNotFound");
                     }))
@@ -845,7 +842,7 @@ class AbstractNpmStorageServiceRebuildTest {
   void restoringToNothingRemovesTheFile() throws Exception {
     this.metadataIsStored();
 
-    this.service.restoreMetadataBytes(REPO_ID, REPO_NAME, BASE_PATH, null);
+    this.service.restoreMetadataBytes(new RepoRef(REPO_ID, REPO_NAME), BASE_PATH, null);
 
     verify(this.storageStrategy).delete(at(METADATA_FILE));
   }
@@ -855,7 +852,7 @@ class AbstractNpmStorageServiceRebuildTest {
   void restoringToNothingToleratesAMissingFile() throws Exception {
     this.metadataIsGone();
 
-    this.service.restoreMetadataBytes(REPO_ID, REPO_NAME, BASE_PATH, null);
+    this.service.restoreMetadataBytes(new RepoRef(REPO_ID, REPO_NAME), BASE_PATH, null);
 
     verify(this.storageStrategy, never()).delete(any());
   }

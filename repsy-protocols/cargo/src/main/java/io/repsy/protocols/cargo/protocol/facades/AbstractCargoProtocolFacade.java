@@ -27,6 +27,7 @@ import io.repsy.protocols.cargo.shared.crate.dtos.CrateListItem;
 import io.repsy.protocols.cargo.shared.crate.services.CargoCrateService;
 import io.repsy.protocols.cargo.shared.storage.services.CargoStorageService;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import io.repsy.protocols.shared.storage.RepoRef;
 import io.repsy.protocols.shared.utils.BoundedLengthInputStream;
 import io.repsy.protocols.shared.utils.EntryTooLargeException;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
@@ -100,8 +101,7 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
     final var crateNameAndVersionPair = CrateUtils.extractCrateNameAndVersion(context);
 
     return this.cargoStorageService.getCrate(
-        repoInfo.getStorageKey(),
-        repoInfo.getName(),
+        RepoRef.of(repoInfo),
         crateNameAndVersionPair.getFirst(),
         crateNameAndVersionPair.getSecond());
   }
@@ -203,17 +203,10 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
         () -> {
           try (final var crateStream = spool.openStream()) {
             return this.cargoStorageService.writeCrateAndIndex(
-                repoInfo.getStorageKey(),
-                repoInfo.getName(),
-                crateName,
-                version,
-                crateStream,
-                indexJsonLine);
+                RepoRef.of(repoInfo), crateName, version, crateStream, indexJsonLine);
           }
         },
-        () ->
-            this.cargoStorageService.deleteCrate(
-                repoInfo.getStorageKey(), repoInfo.getName(), crateName, version),
+        () -> this.cargoStorageService.deleteCrate(RepoRef.of(repoInfo), crateName, version),
         false,
         log,
         "crate " + crateName + " " + version);

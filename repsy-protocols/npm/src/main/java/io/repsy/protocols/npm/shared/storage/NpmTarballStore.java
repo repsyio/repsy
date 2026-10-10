@@ -21,6 +21,7 @@ import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.protocols.npm.shared.utils.NpmPackageUtils;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -57,40 +58,36 @@ public final class NpmTarballStore {
 
   /** The tarball of the version, when it is in storage. */
   public Optional<Resource> find(
-      final UUID repoId,
-      final String repoName,
+      final RepoRef repo,
       final Path packageBasePath,
       final String packageName,
       final String versionName) {
 
     return this.storageStrategy.get(
-        storagePath(repoId, packageBasePath, packageName, versionName), repoName);
+        storagePath(repo.id(), packageBasePath, packageName, versionName), repo.name());
   }
 
   public boolean exists(
-      final UUID repoId,
-      final String repoName,
+      final RepoRef repo,
       final Path packageBasePath,
       final String packageName,
       final String versionName) {
 
-    return this.find(repoId, repoName, packageBasePath, packageName, versionName).isPresent();
+    return this.find(repo, packageBasePath, packageName, versionName).isPresent();
   }
 
   /** The file {@code filename} of a package, which is not found when it is not in storage. */
-  public Resource get(
-      final UUID repoId, final String repoName, final Path packageBasePath, final String filename) {
+  public Resource get(final RepoRef repo, final Path packageBasePath, final String filename) {
 
     final var tarballPath = packageBasePath.resolve(filename).normalize();
 
     return this.storageStrategy
-        .get(StoragePath.of(repoId, tarballPath.toString()), repoName)
+        .get(StoragePath.of(repo.id(), tarballPath.toString()), repo.name())
         .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.ITEM_NOT_FOUND));
   }
 
   public BaseUsages write(
-      final UUID repoId,
-      final String repoName,
+      final RepoRef repo,
       final Path packageBasePath,
       final String packageName,
       final String versionName,
@@ -99,40 +96,40 @@ public final class NpmTarballStore {
 
     try (final var inputStream = new ByteArrayInputStream(tarballBytes)) {
       return this.storageStrategy.write(
-          repoName, storagePath(repoId, packageBasePath, packageName, versionName), inputStream);
+          repo.name(),
+          storagePath(repo.id(), packageBasePath, packageName, versionName),
+          inputStream);
     }
   }
 
   /** Removes the tarball, if there is one. */
   public void deleteIfPresent(
-      final UUID repoId,
-      final String repoName,
+      final RepoRef repo,
       final Path packageBasePath,
       final String packageName,
       final String versionName) {
 
-    final var storagePath = storagePath(repoId, packageBasePath, packageName, versionName);
+    final var storagePath = storagePath(repo.id(), packageBasePath, packageName, versionName);
 
-    if (this.storageStrategy.get(storagePath, repoName).isPresent()) {
+    if (this.storageStrategy.get(storagePath, repo.name()).isPresent()) {
       this.storageStrategy.delete(storagePath);
     }
   }
 
   /** Removes the tarball, if there is one, and tells how many bytes it took. */
   public long remove(
-      final UUID repoId,
-      final String repoName,
+      final RepoRef repo,
       final Path packageBasePath,
       final String packageName,
       final String versionName)
       throws IOException {
 
-    final var storagePath = storagePath(repoId, packageBasePath, packageName, versionName);
+    final var storagePath = storagePath(repo.id(), packageBasePath, packageName, versionName);
 
-    final var tarballSize = this.storageStrategy.getFileUsage(storagePath, repoName);
+    final var tarballSize = this.storageStrategy.getFileUsage(storagePath, repo.name());
 
     // A version whose tarball is already gone (an interrupted removal) can still be removed.
-    if (this.storageStrategy.get(storagePath, repoName).isPresent()) {
+    if (this.storageStrategy.get(storagePath, repo.name()).isPresent()) {
       this.storageStrategy.delete(storagePath);
     }
 

@@ -16,6 +16,7 @@
 package io.repsy.protocols.nuget.shared.storage.services;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
+import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.UUID;
@@ -26,12 +27,12 @@ import org.springframework.core.io.Resource;
 public interface NuGetStorageService {
 
   BaseUsages writePackage(
-      UUID repoId, String packageId, String version, InputStream nuPkgStream, byte[] nuspecBytes)
+      RepoRef repo, String packageId, String version, InputStream nuPkgStream, byte[] nuspecBytes)
       throws IOException;
 
-  Resource getNuPkg(UUID repoId, String packageId, String version);
+  Resource getNuPkg(RepoRef repo, String packageId, String version);
 
-  Resource getNuspec(UUID repoId, String packageId, String version);
+  Resource getNuspec(RepoRef repo, String packageId, String version);
 
   void createRepo(UUID repoId);
 
@@ -43,19 +44,20 @@ public interface NuGetStorageService {
    *
    * @return whether the {@code .nupkg} of the version was found and copied
    */
-  boolean copyToCanonicalVersion(UUID repoId, String packageId, String version) throws IOException;
+  boolean copyToCanonicalVersion(RepoRef repo, String packageId, String version) throws IOException;
 
   /** Deletes the files of a version, which are kept under its canonical version. */
-  long deletePackageVersion(UUID repoId, String packageId, String version) throws IOException;
+  long deletePackageVersion(RepoRef repo, String packageId, String version) throws IOException;
 
   /**
    * Deletes the directory a version stored with build metadata was written to (RPS-1059), once its
    * files are in the directory of the canonical version. It does nothing for a version without
    * build metadata, so it can never remove the canonical directory.
    */
-  long deleteBuildMetadataVersion(UUID repoId, String packageId, String version) throws IOException;
+  long deleteBuildMetadataVersion(RepoRef repo, String packageId, String version)
+      throws IOException;
 
-  long deletePackage(UUID repoId, String packageId) throws IOException;
+  long deletePackage(RepoRef repo, String packageId) throws IOException;
 
   void deleteRepo(UUID repoId);
 
