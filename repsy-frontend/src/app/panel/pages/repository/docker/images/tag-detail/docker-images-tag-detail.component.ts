@@ -28,11 +28,11 @@ import { CopyClipboardComponent } from '../../../../../shared/components/copy-cl
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { BreadcrumbSecurityLinkService } from '../../../../../shared/service/breadcrumb-security-link.service';
-import { versionLoadError } from '../../../../../shared/util/version-load-error.util';
+import { BreadcrumbSecurityLinkService } from '../../../../../shared/services/breadcrumb-security-link.service';
+import { versionLoadError } from '../../../../../shared/utils/version-load-error.utils';
 import { RepoLookupService } from '../../../repo-entry/repo-lookup.service';
 import { getRepoDomain } from '../../docker-repo-util';
-import { DockerService } from '../../service/docker.service';
+import { DockerService } from '../../services/docker.service';
 
 type Classifiers = Record<string, [string]>;
 
@@ -51,17 +51,17 @@ type Classifiers = Record<string, [string]>;
   templateUrl: './docker-images-tag-detail.component.html',
 })
 export class DockerImagesTagDetailComponent implements OnDestroy {
-  public readonly securityRepoType = RepoType.Docker;
-  public loading = true;
-  public imageName: string;
-  public tagName: string;
-  public installText: string;
-  public manifestText: string;
-  public configText: string;
-  public error: string;
-  public tagInfo: TagDetail;
-  public activeRepo: RepoPermissionInfo;
-  public classifiers: Classifiers;
+  readonly securityRepoType = RepoType.Docker;
+  loading = true;
+  imageName: string;
+  tagName: string;
+  installText: string;
+  manifestText: string;
+  configText: string;
+  error: string;
+  tagInfo: TagDetail;
+  activeRepo: RepoPermissionInfo;
+  classifiers: Classifiers;
 
   private readonly repositoryChanges$: Subscription;
 
@@ -77,7 +77,7 @@ export class DockerImagesTagDetailComponent implements OnDestroy {
     this.classifiers = {};
     this.activeRepo = {} as RepoPermissionInfo;
 
-    this.repositoryChanges$ = this.dockerService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
+    this.repositoryChanges$ = this.dockerService.repoChanges$.subscribe((repo: RepoPermissionInfo) => {
       if (repo && this.isRegistryForCurrentRoute(repo)) {
         this.activeRepo = Object.assign({}, repo);
         this.imageName = this.route.snapshot.paramMap.get('imageName');
@@ -88,7 +88,7 @@ export class DockerImagesTagDetailComponent implements OnDestroy {
     this.breadcrumbSecurityLinkService.show(RepoType.Docker);
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     this.repositoryChanges$.unsubscribe();
     this.breadcrumbSecurityLinkService.clear();
   }
@@ -104,7 +104,7 @@ export class DockerImagesTagDetailComponent implements OnDestroy {
     return matches;
   }
 
-  public loadTag(): void {
+  loadTag(): void {
     this.loading = true;
     this.error = null;
 
@@ -129,7 +129,7 @@ export class DockerImagesTagDetailComponent implements OnDestroy {
       });
   }
 
-  public loadManifestText(digest: string): void {
+  loadManifestText(digest: string): void {
     const imageName = this.route.snapshot.paramMap.get('imageName');
 
     this.dockerService.fetchManifestText(imageName, digest).subscribe({
@@ -144,11 +144,11 @@ export class DockerImagesTagDetailComponent implements OnDestroy {
    * An image index (a multi-platform tag) has no config of its own: the API leaves `configDigest` out, it does not send
    * `null`, so the absence is `undefined` as much as `null` (RPS-1627). Its platforms' configs are in their manifests.
    */
-  public get hasConfig(): boolean {
+  get hasConfig(): boolean {
     return !!this.tagInfo?.configDigest;
   }
 
-  public loadConfigText(configDigest: string | null | undefined): void {
+  loadConfigText(configDigest: string | null | undefined): void {
     if (!configDigest) {
       return;
     }
@@ -163,7 +163,7 @@ export class DockerImagesTagDetailComponent implements OnDestroy {
     });
   }
 
-  public deleteTag() {
+  deleteTag() {
     this.dangerModalService.show('Delete Version', 'Delete', () => {
       this.loading = true;
       this.dockerService

@@ -20,11 +20,11 @@ import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
 import { RepoPermissionInfo, TagDetail } from '../../../../../../../generated/api';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { BreadcrumbSecurityLinkService } from '../../../../../shared/service/breadcrumb-security-link.service';
+import { BreadcrumbSecurityLinkService } from '../../../../../shared/services/breadcrumb-security-link.service';
 import { RepoLookupService } from '../../../repo-entry/repo-lookup.service';
 import { permission } from '../../../testing/protocol-service-spec-helpers';
 import { getRepoDomain } from '../../docker-repo-util';
-import { DockerService } from '../../service/docker.service';
+import { DockerService } from '../../services/docker.service';
 import { DockerImagesTagDetailComponent } from './docker-images-tag-detail.component';
 
 const REPO = 'docker-repo';
@@ -42,18 +42,18 @@ describe('DockerImagesTagDetailComponent', () => {
   let router: jasmine.SpyObj<Router>;
   let dangerModalService: DangerModalService;
   let breadcrumbSecurityLinkService: BreadcrumbSecurityLinkService;
-  let repoChanges: BehaviorSubject<RepoPermissionInfo | null>;
+  let repoChanges$: BehaviorSubject<RepoPermissionInfo | null>;
   let currentRepo: { repoName: string; repoType: string } | null;
 
   beforeEach(() => {
     // The component logs every repository emission it ignores; keep that out of the test output.
     spyOn(console, 'debug');
-    repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
+    repoChanges$ = new BehaviorSubject<RepoPermissionInfo | null>(null);
     currentRepo = { repoName: REPO, repoType: 'docker' };
     dockerService = jasmine.createSpyObj<DockerService>(
       'DockerService',
       ['fetchTag', 'fetchManifestText', 'fetchConfigText', 'deleteTag'],
-      { repoChanges },
+      { repoChanges$ },
     );
     dockerService.fetchTag.and.returnValue(of(TAG));
     dockerService.fetchManifestText.and.returnValue(of('{"schemaVersion":2}'));
@@ -82,7 +82,7 @@ describe('DockerImagesTagDetailComponent', () => {
   afterEach(() => component.ngOnDestroy());
 
   function select(name = REPO): void {
-    repoChanges.next(permission(name, { canManage: true }));
+    repoChanges$.next(permission(name, { canManage: true }));
   }
 
   it('announces the repository type to the breadcrumb, and withdraws it when destroyed', () => {
@@ -202,7 +202,7 @@ describe('DockerImagesTagDetailComponent', () => {
     });
 
     it('ignores an empty repository value', () => {
-      repoChanges.next(null);
+      repoChanges$.next(null);
 
       expect(dockerService.fetchTag).not.toHaveBeenCalled();
     });

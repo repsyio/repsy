@@ -19,12 +19,12 @@ import { provideRouter } from '@angular/router';
 import { Subject } from 'rxjs';
 
 import { RepoListInfo, ReposApi, RepoSecuritySummary, RepoType, TotalUsageInfo } from '../../../../generated/api';
-import { AuthService } from '../../../auth/pages/service/auth.service';
+import { AuthService } from '../../../auth/pages/services/auth.service';
 import { SplashService } from '../../../shared/components/splash/splash.service';
-import { ProfileService } from '../profile/service/profile.service';
-import { SecurityService } from '../security/service/security.service';
+import { ProfileService } from '../profile/services/profile.service';
+import { SecurityService } from '../security/services/security.service';
 import { DashboardComponent } from './dashboard.component';
-import { UsageService } from './service/usage.service';
+import { UsageService } from './services/usage.service';
 
 /**
  * How "/" renders the dashboard: `AuthRedirectComponent` (OnPush) creates it in a view container, so nothing

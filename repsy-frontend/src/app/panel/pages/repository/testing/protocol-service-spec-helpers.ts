@@ -21,8 +21,8 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom, NEVER, Observable, of, throwError } from 'rxjs';
 
 import { PageMetadata, RepoPermissionInfo } from '../../../../../generated/api';
-import { PagedData } from '../../../shared/dto/paged-data';
-import { Sort } from '../../../shared/dto/sort';
+import { PagedData } from '../../../shared/dtos/paged-data';
+import { Sort } from '../../../shared/dtos/sort';
 
 export const REPO = 'acme-repo';
 export const SORT: Sort = { name: 'Name', column: 'name', type: 'DESC' };
@@ -68,7 +68,7 @@ export function httpError(status = 500): HttpErrorResponse {
 
 /** A protocol service that loads and activates a repository through `fetchRepoPermission`. */
 export interface RepoSelecting {
-  readonly repoChanges: Observable<RepoPermissionInfo>;
+  readonly repoChanges$: Observable<RepoPermissionInfo>;
   fetchRepoPermission(repoName: string): Observable<RepoPermissionInfo>;
 }
 
@@ -236,8 +236,8 @@ export function describeRepoSelection<S extends RepoSelecting>(options: RepoSele
       expect(result).toEqual(permission(REPO, { canWrite: true }));
     });
 
-    it('publishes the loaded permission on repoChanges', async () => {
-      const emissions = collect(service().repoChanges);
+    it('publishes the loaded permission on repoChanges$', async () => {
+      const emissions = collect(service().repoChanges$);
       expect(emissions).withContext('a BehaviorSubject starts without an active repository').toEqual([null]);
 
       await selectRepo(service(), getPermission(), REPO, { canManage: true });
@@ -257,7 +257,7 @@ export function describeRepoSelection<S extends RepoSelecting>(options: RepoSele
 
     it('lets a permission error through without activating the repository', async () => {
       const error = httpError(404);
-      const emissions = collect(service().repoChanges);
+      const emissions = collect(service().repoChanges$);
       getPermission().and.returnValue(throwError(() => error));
 
       await expectAsync(firstValueFrom(select(service(), REPO))).toBeRejectedWith(error);
@@ -268,7 +268,7 @@ export function describeRepoSelection<S extends RepoSelecting>(options: RepoSele
     if (options.resetsOnChange) {
       it('clears the active repository as soon as a different one is requested', async () => {
         await selectRepo(service(), getPermission(), REPO);
-        const emissions = collect(service().repoChanges);
+        const emissions = collect(service().repoChanges$);
         getPermission().and.returnValue(NEVER);
 
         select(service(), 'other-repo');
@@ -279,7 +279,7 @@ export function describeRepoSelection<S extends RepoSelecting>(options: RepoSele
 
       it('keeps the active repository when the same one is requested again', async () => {
         await selectRepo(service(), getPermission(), REPO);
-        const emissions = collect(service().repoChanges);
+        const emissions = collect(service().repoChanges$);
         getPermission().and.returnValue(NEVER);
 
         select(service(), REPO);
@@ -292,7 +292,7 @@ export function describeRepoSelection<S extends RepoSelecting>(options: RepoSele
       // repositories the first calls still carry the previous repository's name (RPS-1159).
       it('keeps the previous repository active until the new permission arrives (no reset on change)', async () => {
         await selectRepo(service(), getPermission(), REPO);
-        const emissions = collect(service().repoChanges);
+        const emissions = collect(service().repoChanges$);
         getPermission().and.returnValue(NEVER);
 
         select(service(), 'other-repo');

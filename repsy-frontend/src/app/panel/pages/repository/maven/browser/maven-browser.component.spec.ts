@@ -20,10 +20,10 @@ import { BehaviorSubject, NEVER, Observable, of, Subject, throwError } from 'rxj
 import { environment } from '../../../../../../environments/environment';
 import { RepoPermissionInfo } from '../../../../../../generated/api';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
-import { ByteFormatter } from '../../../../shared/util/byte-formatter';
+import { ByteFormatter } from '../../../../shared/utils/byte-formatter';
 import { permission } from '../../testing/protocol-service-spec-helpers';
-import { FsItemInfo } from '../dto/fs-item-info';
-import { MavenService } from '../service/maven.service';
+import { FsItemInfo } from '../dtos/fs-item-info';
+import { MavenService } from '../services/maven.service';
 import { MavenBrowserComponent } from './maven-browser.component';
 
 const REPO = 'maven-repo';
@@ -39,7 +39,7 @@ function file(name: string): FsItemInfo {
 describe('MavenBrowserComponent', () => {
   let component: MavenBrowserComponent;
   let mavenService: jasmine.SpyObj<MavenService>;
-  let repoChanges: BehaviorSubject<RepoPermissionInfo | null>;
+  let repoChanges$: BehaviorSubject<RepoPermissionInfo | null>;
   let contents: Record<string, FsItemInfo[]>;
 
   beforeEach(() => {
@@ -48,9 +48,9 @@ describe('MavenBrowserComponent', () => {
       '/org/': [dir('../'), dir('acme/'), file('Maven-Metadata.xml')],
       '/org/acme/': [dir('../'), file('lib-1.0.jar')],
     };
-    repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
+    repoChanges$ = new BehaviorSubject<RepoPermissionInfo | null>(null);
     mavenService = jasmine.createSpyObj<MavenService>('MavenService', ['fetchPathContent', 'createDownloadToken'], {
-      repoChanges,
+      repoChanges$,
     });
     mavenService.fetchPathContent.and.callFake((path: string) => of(contents[path] ?? []));
     mavenService.createDownloadToken.and.returnValue(NEVER);
@@ -60,7 +60,7 @@ describe('MavenBrowserComponent', () => {
   afterEach(() => component.ngOnDestroy());
 
   function open(): void {
-    repoChanges.next(permission(REPO, { canManage: true }));
+    repoChanges$.next(permission(REPO, { canManage: true }));
   }
 
   const paths = (): string[] => component.directoryStack.map((d) => d.path);
@@ -91,7 +91,7 @@ describe('MavenBrowserComponent', () => {
       open();
       component.go(dir('org/'));
 
-      repoChanges.next(permission('other-repo'));
+      repoChanges$.next(permission('other-repo'));
 
       expect(paths()).toEqual(['/']);
       expect(component.repoUrl).toBe(`${environment.repoBaseUrl}/other-repo/`);
@@ -103,7 +103,7 @@ describe('MavenBrowserComponent', () => {
       component.prev();
       expect(component.forwardStack.length).toBe(1);
 
-      repoChanges.next(permission('other-repo'));
+      repoChanges$.next(permission('other-repo'));
       mavenService.fetchPathContent.calls.reset();
       component.next();
 
@@ -137,7 +137,7 @@ describe('MavenBrowserComponent', () => {
       component.go(dir('org/'));
       mavenService.fetchPathContent.calls.reset();
 
-      repoChanges.next(permission(REPO, { canManage: false }));
+      repoChanges$.next(permission(REPO, { canManage: false }));
 
       expect(component.activeRepo.canManage).toBeFalse();
       expect(paths()).toEqual(['/', '/org/']);
@@ -145,7 +145,7 @@ describe('MavenBrowserComponent', () => {
     });
 
     it('ignores an empty repository value', () => {
-      repoChanges.next(null);
+      repoChanges$.next(null);
 
       expect(mavenService.fetchPathContent).not.toHaveBeenCalled();
     });
@@ -410,12 +410,12 @@ describe('MavenBrowserComponent', () => {
 
 describe('MavenBrowserComponent template', () => {
   function render(flags: { canManage: boolean }, listing: Observable<FsItemInfo[]> = of([])): HTMLElement {
-    const repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(permission(REPO, flags));
+    const repoChanges$ = new BehaviorSubject<RepoPermissionInfo | null>(permission(REPO, flags));
     const mavenService = jasmine.createSpyObj<MavenService>(
       'MavenService',
       ['fetchPathContent', 'createDownloadToken'],
       {
-        repoChanges,
+        repoChanges$,
       },
     );
     mavenService.fetchPathContent.and.returnValue(listing);

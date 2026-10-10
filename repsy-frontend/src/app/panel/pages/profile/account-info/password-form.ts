@@ -15,11 +15,11 @@
 ///
 
 export class PasswordFormInputElement {
-  public inputType = 'password';
-  public visiblePassword = false;
+  inputType = 'password';
+  visiblePassword = false;
 }
 
 export class PasswordForm {
-  public readonly passwordElement = new PasswordFormInputElement();
-  public readonly passwordConfirmationElement = new PasswordFormInputElement();
+  readonly passwordElement = new PasswordFormInputElement();
+  readonly passwordConfirmationElement = new PasswordFormInputElement();
 }

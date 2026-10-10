@@ -24,7 +24,7 @@ import { of, Subject, throwError } from 'rxjs';
 
 import { ToastService } from '../../../panel/shared/components/toast/toast.service';
 import { ERROR_CODES } from '../../../shared/constants/error-codes';
-import { AuthService } from '../service/auth.service';
+import { AuthService } from '../services/auth.service';
 import { LoginComponent } from './login.component';
 
 const INVALID_CREDENTIALS_TEXT = 'Username or password is incorrect.';

@@ -19,11 +19,11 @@ import { Router, RouterOutlet } from '@angular/router';
 import { Subscription } from 'rxjs';
 
 import { RepoPermissionInfo } from '../../../../../generated/api';
-import { AuthService } from '../../../../auth/pages/service/auth.service';
+import { AuthService } from '../../../../auth/pages/services/auth.service';
 import { RepositoryBreadcrumbComponent } from '../breadcrumb/repository-breadcrumb.component';
 import { currentRepoOfType } from '../repo-entry/current-repo-of-type';
 import { RepoLookupService } from '../repo-entry/repo-lookup.service';
-import { PypiService } from './service/pypi.service';
+import { PypiService } from './services/pypi.service';
 
 @Component({
   selector: 'app-pypi',
@@ -32,10 +32,10 @@ import { PypiService } from './service/pypi.service';
   imports: [RouterOutlet, RepositoryBreadcrumbComponent],
 })
 export class PypiComponent implements OnInit, OnDestroy {
-  public permissions: RepoPermissionInfo | null = null;
-  public loading = true;
-  public isAuthenticated = false;
-  public isPublicView = false;
+  permissions: RepoPermissionInfo | null = null;
+  loading = true;
+  isAuthenticated = false;
+  isPublicView = false;
 
   private repoSubscription: Subscription | null = null;
 
@@ -46,7 +46,7 @@ export class PypiComponent implements OnInit, OnDestroy {
     private readonly router: Router,
   ) {}
 
-  public ngOnInit(): void {
+  ngOnInit(): void {
     this.isAuthenticated = this.authService.isAuthenticated();
 
     this.repoSubscription = currentRepoOfType(this.repoLookupService, 'pypi').subscribe((repoContext) => {
@@ -54,7 +54,7 @@ export class PypiComponent implements OnInit, OnDestroy {
     });
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     if (this.repoSubscription) {
       this.repoSubscription.unsubscribe();
     }

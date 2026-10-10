@@ -16,7 +16,7 @@
 
 import { describeProtocolShell } from '../testing/protocol-shell-spec-helpers';
 import { RubyComponent } from './ruby.component';
-import { RubyService } from './service/ruby.service';
+import { RubyService } from './services/ruby.service';
 
 describeProtocolShell({
   component: RubyComponent,

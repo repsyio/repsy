@@ -36,7 +36,7 @@ import { DropdownComponent } from './dropdown.component';
   `,
 })
 class HostComponent {
-  public picked = '';
+  picked = '';
 }
 
 describe('DropdownComponent', () => {

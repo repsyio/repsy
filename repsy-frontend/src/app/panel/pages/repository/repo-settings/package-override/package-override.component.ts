@@ -21,7 +21,7 @@ import { RouterLink } from '@angular/router';
 import { ReposApi, RepoSettingsForm } from '../../../../../../generated/api';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { ToggleComponent } from '../../../../shared/components/toggle/toggle.component';
-import { RepoType } from '../../../../shared/dto/repo/repo-type';
+import { RepoType } from '../../../../shared/dtos/repo/repo-type';
 import { saveRepoSetting } from '../save-repo-setting';
 
 @Component({
@@ -32,15 +32,15 @@ import { saveRepoSetting } from '../save-repo-setting';
   imports: [ReactiveFormsModule, ToggleComponent, RouterLink],
 })
 export class PackageOverrideComponent implements OnInit {
-  @Input() public repoType: string;
-  @Input() public repoName: string;
-  @Input() public parentForm: FormGroup;
-  @Output() public fetch = new EventEmitter<void>();
+  @Input() repoType: string;
+  @Input() repoName: string;
+  @Input() parentForm: FormGroup;
+  @Output() fetch = new EventEmitter<void>();
 
-  public allowOverride: boolean;
+  allowOverride: boolean;
 
   /** A save is on its way: the toggle is locked, so a double click sends one request (RPS-1618). */
-  public saving = false;
+  saving = false;
 
   constructor(
     private readonly reposApi: ReposApi,
@@ -48,7 +48,7 @@ export class PackageOverrideComponent implements OnInit {
   ) {}
 
   /** The Maven rule has an exception the shared text does not tell: a SNAPSHOT can always be deployed again. */
-  public get isMaven(): boolean {
+  get isMaven(): boolean {
     return this.repoType === RepoType.MAVEN;
   }
 
@@ -56,7 +56,7 @@ export class PackageOverrideComponent implements OnInit {
     this.allowOverride = this.parentForm.get('allowOverride')?.value;
   }
 
-  public changeOverride() {
+  changeOverride() {
     const allowOverride = this.allowOverride;
 
     this.saving = true;

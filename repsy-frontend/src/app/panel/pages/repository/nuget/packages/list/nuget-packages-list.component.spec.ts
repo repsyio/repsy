@@ -21,13 +21,13 @@ import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
 
 import { environment } from '../../../../../../../environments/environment';
 import { NuGetPackageListItem, RepoPermissionInfo, VersionSecuritySummary } from '../../../../../../../generated/api';
-import { AuthService } from '../../../../../../auth/pages/service/auth.service';
+import { AuthService } from '../../../../../../auth/pages/services/auth.service';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { PagedData } from '../../../../../shared/dto/paged-data';
-import { Sort } from '../../../../../shared/dto/sort';
-import { SecurityService } from '../../../../security/service/security.service';
-import { NuGetService } from '../../service/nuget.service';
+import { PagedData } from '../../../../../shared/dtos/paged-data';
+import { Sort } from '../../../../../shared/dtos/sort';
+import { SecurityService } from '../../../../security/services/security.service';
+import { NuGetService } from '../../services/nuget.service';
 import { NuGetPackagesListComponent } from './nuget-packages-list.component';
 
 const REPO = 'nuget-repo';
@@ -61,12 +61,12 @@ describe('NuGetPackagesListComponent', () => {
   let securityService: jasmine.SpyObj<SecurityService>;
   let toastService: jasmine.SpyObj<ToastService>;
   let dangerModalService: DangerModalService;
-  let repoChanges: BehaviorSubject<RepoPermissionInfo | null>;
+  let repoChanges$: BehaviorSubject<RepoPermissionInfo | null>;
 
   beforeEach(() => {
-    repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
+    repoChanges$ = new BehaviorSubject<RepoPermissionInfo | null>(null);
     nugetService = jasmine.createSpyObj<NuGetService>('NuGetService', ['fetchRepositoryPackages', 'deletePackage'], {
-      repoChanges,
+      repoChanges$,
     });
     securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['watchArtifactSecuritySummary']);
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
@@ -89,7 +89,7 @@ describe('NuGetPackagesListComponent', () => {
 
   /** Selects the repository and lets the package fetch settle. */
   function selectRepo(canManage = true): void {
-    repoChanges.next(repo(canManage));
+    repoChanges$.next(repo(canManage));
     flushMicrotasks();
   }
 
@@ -144,7 +144,7 @@ describe('NuGetPackagesListComponent', () => {
     }));
 
     it('ignores an empty repository value', fakeAsync(() => {
-      repoChanges.next(null);
+      repoChanges$.next(null);
       flushMicrotasks();
 
       expect(nugetService.fetchRepositoryPackages).not.toHaveBeenCalled();

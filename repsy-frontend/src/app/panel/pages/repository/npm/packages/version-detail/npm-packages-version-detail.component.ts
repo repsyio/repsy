@@ -28,16 +28,16 @@ import { MarkdownComponent } from '../../../../../shared/components/markdown/mar
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { BreadcrumbSecurityLinkService } from '../../../../../shared/service/breadcrumb-security-link.service';
+import { BreadcrumbSecurityLinkService } from '../../../../../shared/services/breadcrumb-security-link.service';
 import {
   deleteVersionAndCheckLast$,
   landAfterVersionDelete,
   VERSION_PROBE_SIZE,
   VERSION_PROBE_SORT,
-} from '../../../../../shared/util/version-delete-landing.util';
-import { versionLoadError } from '../../../../../shared/util/version-load-error.util';
+} from '../../../../../shared/utils/version-delete-landing.utils';
+import { versionLoadError } from '../../../../../shared/utils/version-load-error.utils';
 import { RepoLookupService } from '../../../repo-entry/repo-lookup.service';
-import { NpmService } from '../../service/npm.service';
+import { NpmService } from '../../services/npm.service';
 
 @Component({
   selector: 'app-npm-packages-version-detail',
@@ -53,17 +53,17 @@ import { NpmService } from '../../service/npm.service';
   templateUrl: './npm-packages-version-detail.component.html',
 })
 export class NpmPackagesVersionDetailComponent implements OnDestroy {
-  public readonly securityRepoType = RepoType.Npm;
-  public loading = true;
-  public scopeName: string;
-  public packageName: string;
-  public versionName: string;
-  public installation: string;
-  public npmrc: string;
-  public error: string;
-  public activeRegistry: RepoPermissionInfo;
+  readonly securityRepoType = RepoType.Npm;
+  loading = true;
+  scopeName: string;
+  packageName: string;
+  versionName: string;
+  installation: string;
+  npmrc: string;
+  error: string;
+  activeRegistry: RepoPermissionInfo;
   private readonly registryChanges$: Subscription;
-  public versionInfo: PackageVersionDetail;
+  versionInfo: PackageVersionDetail;
 
   constructor(
     private readonly npmService: NpmService,
@@ -76,7 +76,7 @@ export class NpmPackagesVersionDetailComponent implements OnDestroy {
   ) {
     this.activeRegistry = {} as RepoPermissionInfo;
 
-    this.registryChanges$ = this.npmService.repoChanges.subscribe((registry: RepoPermissionInfo) => {
+    this.registryChanges$ = this.npmService.repoChanges$.subscribe((registry: RepoPermissionInfo) => {
       if (registry && this.isRegistryForCurrentRoute(registry)) {
         this.activeRegistry = Object.assign({}, registry);
         this.loadVersion();
@@ -85,7 +85,7 @@ export class NpmPackagesVersionDetailComponent implements OnDestroy {
     this.breadcrumbSecurityLinkService.show(RepoType.Npm);
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     this.registryChanges$.unsubscribe();
     this.breadcrumbSecurityLinkService.clear();
   }
@@ -101,11 +101,11 @@ export class NpmPackagesVersionDetailComponent implements OnDestroy {
     return matches;
   }
 
-  public get securityArtifactName(): string {
+  get securityArtifactName(): string {
     return this.scopeName ? `@${this.scopeName}/${this.packageName}` : this.packageName;
   }
 
-  public loadVersion(): void {
+  loadVersion(): void {
     this.loading = true;
     this.error = null;
 
@@ -144,14 +144,14 @@ export class NpmPackagesVersionDetailComponent implements OnDestroy {
       });
   }
 
-  public get keywords(): string {
+  get keywords(): string {
     return (this.versionInfo?.keywords ?? [])
       .map((item) => item.keyword)
       .filter(Boolean)
       .join(', ');
   }
 
-  public deleteVersion() {
+  deleteVersion() {
     this.dangerModalService.show('Delete Version', 'Delete', () => {
       this.loading = true;
       deleteVersionAndCheckLast$(

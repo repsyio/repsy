@@ -18,10 +18,10 @@ import { Component } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 
-import { AuthService } from '../../../../auth/pages/service/auth.service';
+import { AuthService } from '../../../../auth/pages/services/auth.service';
 import { DangerModalService } from '../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../shared/components/toast/toast.service';
-import { ProfileService } from '../service/profile.service';
+import { ProfileService } from '../services/profile.service';
 
 @Component({
   selector: 'app-delete-account',
@@ -30,7 +30,7 @@ import { ProfileService } from '../service/profile.service';
   standalone: true,
 })
 export class DeleteAccountComponent {
-  public loading = false;
+  loading = false;
 
   constructor(
     private readonly router: Router,
@@ -40,7 +40,7 @@ export class DeleteAccountComponent {
     private readonly dangerModalService: DangerModalService,
   ) {}
 
-  public confirmAccountDelete(): void {
+  confirmAccountDelete(): void {
     this.dangerModalService.show('Delete Account', 'Delete', () => this.deleteAccount());
   }
 

@@ -28,9 +28,9 @@ import {
   RepoPermissionInfo,
   VersionSecuritySummary,
 } from '../../../../../../../generated/api';
-import { AuthService } from '../../../../../../auth/pages/service/auth.service';
+import { AuthService } from '../../../../../../auth/pages/services/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
-import { problemDetail } from '../../../../../../shared/error-handler/problem.util';
+import { problemDetail } from '../../../../../../shared/error-handler/problem.utils';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
 import { EmptyListComponent } from '../../../../../shared/components/empty-list/empty-list.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
@@ -40,12 +40,12 @@ import { SortSelectorComponent } from '../../../../../shared/components/sort-sel
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { VersionSecurityBadgeComponent } from '../../../../../shared/components/version-security-badge/version-security-badge.component';
-import { PagedData } from '../../../../../shared/dto/paged-data';
-import { Sort, VERSION_PRECEDENCE_SORT } from '../../../../../shared/dto/sort';
-import { pageAfterDelete } from '../../../../../shared/util/list-page-after-delete.util';
-import { SecurityService } from '../../../../security/service/security.service';
+import { PagedData } from '../../../../../shared/dtos/paged-data';
+import { Sort, VERSION_PRECEDENCE_SORT } from '../../../../../shared/dtos/sort';
+import { pageAfterDelete } from '../../../../../shared/utils/list-page-after-delete.utils';
+import { SecurityService } from '../../../../security/services/security.service';
 import { NuGetConfigComponent } from '../../config/nuget-config.component';
-import { NuGetService } from '../../service/nuget.service';
+import { NuGetService } from '../../services/nuget.service';
 
 @Component({
   selector: 'app-nuget-packages-version-list',
@@ -67,22 +67,22 @@ import { NuGetService } from '../../service/nuget.service';
   templateUrl: './nuget-packages-version-list.component.html',
 })
 export class NuGetPackagesVersionListComponent implements OnDestroy {
-  public loading = true;
-  public showConfig = false;
-  public pageNum = 0;
-  public pageSize = 10;
-  public searchText = '';
-  public error: string;
-  public packageId: string;
-  public pkg: NuGetPackageInfo;
-  public versions: NuGetVersionListItem[] = [];
-  public pagedData = new PagedData<NuGetVersionListItem>();
-  public activeRepo: RepoPermissionInfo;
-  public readonly baseUrl: string;
-  public readonly username: string;
-  public securitySummary: Record<string, VersionSecuritySummary> = {};
-  public sortOption: Sort = { name: 'Newest', column: 'publishedAt', type: 'DESC' };
-  public sortOptions: Sort[] = [
+  loading = true;
+  showConfig = false;
+  pageNum = 0;
+  pageSize = 10;
+  searchText = '';
+  error: string;
+  packageId: string;
+  pkg: NuGetPackageInfo;
+  versions: NuGetVersionListItem[] = [];
+  pagedData = new PagedData<NuGetVersionListItem>();
+  activeRepo: RepoPermissionInfo;
+  readonly baseUrl: string;
+  readonly username: string;
+  securitySummary: Record<string, VersionSecuritySummary> = {};
+  sortOption: Sort = { name: 'Newest', column: 'publishedAt', type: 'DESC' };
+  sortOptions: Sort[] = [
     { name: 'Newest', column: 'publishedAt', type: 'DESC' },
     { name: 'Oldest', column: 'publishedAt', type: 'ASC' },
     VERSION_PRECEDENCE_SORT,
@@ -102,7 +102,7 @@ export class NuGetPackagesVersionListComponent implements OnDestroy {
     this.baseUrl = environment.repoBaseUrl;
     this.username = this.authService.username;
     this.activeRepo = {} as RepoPermissionInfo;
-    this.repositoryChanges$ = this.nugetService.repoChanges.subscribe((repo) => {
+    this.repositoryChanges$ = this.nugetService.repoChanges$.subscribe((repo) => {
       if (repo) {
         this.activeRepo = Object.assign({}, repo);
         this.packageId = this.route.snapshot.paramMap.get('packageName');
@@ -112,37 +112,37 @@ export class NuGetPackagesVersionListComponent implements OnDestroy {
     });
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     this.repositoryChanges$.unsubscribe();
     this.securitySummarySubscription?.unsubscribe();
   }
 
-  public search(text: string): void {
+  search(text: string): void {
     this.pageNum = 0;
     this.searchText = text;
     this.fetchVersions();
   }
 
-  public sort(option: Sort): void {
+  sort(option: Sort): void {
     this.pageNum = 0;
     this.sortOption = option;
     this.fetchVersions();
   }
 
-  public loadPage(pageNum: number): void {
+  loadPage(pageNum: number): void {
     this.pageNum = pageNum;
     this.fetchVersions();
   }
 
-  public refreshPage(): void {
+  refreshPage(): void {
     this.fetchVersions();
   }
 
-  public openConfig(open: boolean): void {
+  openConfig(open: boolean): void {
     this.showConfig = open;
   }
 
-  public deleteVersion(version: NuGetVersionListItem): void {
+  deleteVersion(version: NuGetVersionListItem): void {
     const isLastVersion = this.pagedData.page.totalElements === 1 && !this.searchText;
     this.dangerModalService.show('Delete Version', 'Delete', () => {
       this.loading = true;
@@ -195,11 +195,11 @@ export class NuGetPackagesVersionListComponent implements OnDestroy {
       });
   }
 
-  public get canManage(): boolean {
+  get canManage(): boolean {
     return this.activeRepo?.canManage ?? false;
   }
 
-  public timeAgo(date: Date | string): string {
+  timeAgo(date: Date | string): string {
     return moment(date).fromNow();
   }
 

@@ -27,9 +27,9 @@ import { Subscription } from 'rxjs';
 })
 export class BreadcrumbComponent implements OnInit, OnDestroy {
   @Input()
-  public crumbs: string[] = [];
-  public crumbLinks: string[] = [];
-  public username: string;
+  crumbs: string[] = [];
+  crumbLinks: string[] = [];
+  username: string;
 
   private readonly params$: Subscription;
 

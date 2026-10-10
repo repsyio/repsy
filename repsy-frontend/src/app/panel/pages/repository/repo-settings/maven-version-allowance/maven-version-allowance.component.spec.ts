@@ -18,7 +18,7 @@ import { of, Subject, throwError } from 'rxjs';
 
 import { ReposApi } from '../../../../../../generated/api';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
-import { RepoSupport, RepoType } from '../../../../shared/dto/repo/repo-type';
+import { RepoSupport, RepoType } from '../../../../shared/dtos/repo/repo-type';
 import { lastSentForm, releaseAwareParentForm } from '../testing/repo-settings-spec-helpers';
 import { MavenVersionAllowanceComponent } from './maven-version-allowance.component';
 

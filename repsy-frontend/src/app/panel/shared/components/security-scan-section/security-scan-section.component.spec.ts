@@ -29,7 +29,7 @@ import {
   VulnerabilityScanDetail,
   VulnerabilityScanInfo,
 } from '../../../../../generated/api';
-import { SecurityScanSupportService } from '../../service/security-scan-support.service';
+import { SecurityScanSupportService } from '../../services/security-scan-support.service';
 import { ToastService } from '../toast/toast.service';
 import { SecurityScanSectionComponent } from './security-scan-section.component';
 

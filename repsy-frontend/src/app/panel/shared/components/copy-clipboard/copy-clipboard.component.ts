@@ -16,7 +16,7 @@
 
 import { Component, Input } from '@angular/core';
 
-import { copyToClipboard } from '../../util/clipboard.util';
+import { copyToClipboard } from '../../utils/clipboard.utils';
 
 @Component({
   selector: 'app-copy-clipboard',
@@ -25,8 +25,8 @@ import { copyToClipboard } from '../../util/clipboard.util';
   imports: [],
 })
 export class CopyClipboardComponent {
-  @Input() public text: string;
-  public copied: boolean;
+  @Input() text: string;
+  copied: boolean;
 
   copyToClipboard(text: string) {
     // The check mark shows only when the copy worked (RPS-1623): over plain HTTP there is no

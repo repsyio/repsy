@@ -15,7 +15,7 @@
 ///
 
 export class ErrorForm {
-  public message: string;
-  public stack: string;
-  public url: string;
+  message: string;
+  stack: string;
+  url: string;
 }

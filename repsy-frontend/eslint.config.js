@@ -8,7 +8,7 @@ import checkFile from 'eslint-plugin-check-file';
 import rxjsX from 'eslint-plugin-rxjs-x';
 
 // RPS-2123: JS/TS naming baseline (AGENTS.md "JavaScript and TypeScript naming"). Every rule below is
-// `warn`; the story that migrates a family of names flips its rule to `error`.
+// `warn` until its family of names is migrated (RPS-2124..2131 flipped them all to `error`).
 //   - `I` interface prefix, and the abbreviations URL / ID / UI written in capitals, plus Uuid, Golang
 //     and Oauth, are not allowed in an identifier. All-caps constants and the wire names listed in the
 //     filter (uploadUuid, baseURL, toHaveURL) are skipped.
@@ -38,9 +38,11 @@ export default tseslint.config(
     },
     rules: {
       "@typescript-eslint/naming-convention": [
-        "warn",
+        "error",
         // Quoted keys (HTTP headers, JSON wire names) are a contract, not a naming choice.
         { selector: "default", modifiers: ["requiresQuotes"], format: null },
+        // RPS-2131: a private member is `private x`, never `_x` or `#x`.
+        { selector: ["classProperty", "classMethod", "accessor"], format: null, leadingUnderscore: "forbid" },
         {
           selector: "default",
           format: null,
@@ -93,10 +95,30 @@ export default tseslint.config(
         { "**/*.ts": "KEBAB_CASE" },
         { ignoreMiddleExtensions: true },
       ],
-      "@typescript-eslint/explicit-member-accessibility": ["warn", { accessibility: "no-public" }],
-      "rxjs-x/finnish": "warn",
+      // RPS-2131: role folders are plural and a file carries one role suffix (`.utils.ts`, never `.util.ts`).
+      "check-file/folder-naming-convention": [
+        "error",
+        { "src/app/**/": "!(service|util|dto|guard|interceptor|form|model)" },
+      ],
+      "check-file/filename-blocklist": [
+        "error",
+        {
+          "**/*.util.ts": "*.utils.ts",
+          "**/*.util.spec.ts": "*.utils.spec.ts",
+          "**/*.providers.ts": "*-providers.ts",
+          "**/*.testing.ts": "*-spec-helpers.ts",
+          "**/*.models.ts": "*-info.ts",
+        },
+      ],
+      "@typescript-eslint/explicit-member-accessibility": ["error", { accessibility: "no-public" }],
+      // RPS-2131: `$` marks an Observable/Subject stored in a field. Methods and functions that return one
+      // (`getPackages()`) stay plain verbs, as the Angular style guide and HttpClient do.
+      "rxjs-x/finnish": [
+        "error",
+        { functions: false, methods: false, parameters: false, variables: false, properties: true },
+      ],
       "no-restricted-imports": [
-        "warn",
+        "error",
         {
           patterns: [
             {

@@ -19,8 +19,8 @@ import { Injectable } from '@angular/core';
 import { BehaviorSubject, finalize, map, Observable, of, share, tap } from 'rxjs';
 
 import { ReposApi } from '../../../../../generated/api';
-import { SILENT_ERROR } from '../../../../shared/interceptor/error-handler.interceptor';
-import { RepoRouteSlug, toRouteSlug } from '../../../shared/util/repo-api-type';
+import { SILENT_ERROR } from '../../../../shared/interceptors/error-handler.interceptor';
+import { RepoRouteSlug, toRouteSlug } from '../../../shared/utils/repo-api-type';
 
 export interface RepoContext {
   repoName: string;
@@ -42,27 +42,27 @@ export class RepoLookupService {
    */
   private readonly inFlight = new Map<string, Observable<RepoRouteSlug>>();
 
-  private readonly currentRepoSubject = new BehaviorSubject<RepoContext | null>(null);
-  public readonly currentRepo$ = this.currentRepoSubject.asObservable();
+  private readonly currentRepoSubject$ = new BehaviorSubject<RepoContext | null>(null);
+  readonly currentRepo$ = this.currentRepoSubject$.asObservable();
 
   constructor(private readonly reposApi: ReposApi) {}
 
-  public get currentRepo(): RepoContext | null {
-    return this.currentRepoSubject.getValue();
+  get currentRepo(): RepoContext | null {
+    return this.currentRepoSubject$.getValue();
   }
 
-  public getRepoType(repoName: string): Observable<RepoRouteSlug> {
+  getRepoType(repoName: string): Observable<RepoRouteSlug> {
     const cachedType = this.cache.get(repoName);
 
     if (cachedType) {
-      this.currentRepoSubject.next({ repoName, repoType: cachedType });
+      this.currentRepoSubject$.next({ repoName, repoType: cachedType });
       return of(cachedType);
     }
 
-    return this.sharedFetch(repoName).pipe(tap((repoType) => this.currentRepoSubject.next({ repoName, repoType })));
+    return this.sharedFetch(repoName).pipe(tap((repoType) => this.currentRepoSubject$.next({ repoName, repoType })));
   }
 
-  public checkRepoType(repoName: string): Observable<RepoRouteSlug> {
+  checkRepoType(repoName: string): Observable<RepoRouteSlug> {
     const cachedType = this.cache.get(repoName);
 
     if (cachedType) {

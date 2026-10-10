@@ -30,12 +30,12 @@ export interface RadioOption<T = boolean | string | number> {
 })
 export class RadioGroupComponent<T = boolean | string | number> {
   /** The id of the element that names the group. */
-  @Input() public labelledBy: string | null = null;
-  @Input() public options: RadioOption<T>[] = [];
-  @Input() public selectedValue: T | null = null;
-  @Input() public name = 'radio-group';
-  @Input() public disabled = false;
-  @Output() public valueChange = new EventEmitter<T>();
+  @Input() labelledBy: string | null = null;
+  @Input() options: RadioOption<T>[] = [];
+  @Input() selectedValue: T | null = null;
+  @Input() name = 'radio-group';
+  @Input() disabled = false;
+  @Output() valueChange = new EventEmitter<T>();
 
   selectOption(value: T) {
     if (this.disabled) {

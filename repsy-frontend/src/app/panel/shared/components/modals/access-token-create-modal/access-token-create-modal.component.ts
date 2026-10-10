@@ -29,7 +29,7 @@ import { AccessTokenFormComponent } from '../../access-token-form/access-token-f
 export class AccessTokenCreateModalComponent {
   @Output() openChange = new EventEmitter<boolean>();
   @Output() created = new EventEmitter<AccessTokenCreated>();
-  @Input() public open: boolean;
+  @Input() open: boolean;
 
   closeModal(): void {
     this.openChange.emit(false);

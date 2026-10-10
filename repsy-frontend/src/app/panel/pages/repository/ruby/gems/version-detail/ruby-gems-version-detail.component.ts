@@ -28,15 +28,15 @@ import { CopyClipboardComponent } from '../../../../../shared/components/copy-cl
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { externalHttpUrl } from '../../../../../shared/util/external-url.util';
+import { externalHttpUrl } from '../../../../../shared/utils/external-url.utils';
 import {
   deleteVersionAndCheckLast$,
   landAfterVersionDelete,
   VERSION_PROBE_SIZE,
   VERSION_PROBE_SORT,
-} from '../../../../../shared/util/version-delete-landing.util';
-import { versionLoadError } from '../../../../../shared/util/version-load-error.util';
-import { RubyService } from '../../service/ruby.service';
+} from '../../../../../shared/utils/version-delete-landing.utils';
+import { versionLoadError } from '../../../../../shared/utils/version-load-error.utils';
+import { RubyService } from '../../services/ruby.service';
 
 @Component({
   selector: 'app-ruby-gems-version-detail',
@@ -53,18 +53,18 @@ import { RubyService } from '../../service/ruby.service';
   templateUrl: './ruby-gems-version-detail.component.html',
 })
 export class RubyGemsVersionDetailComponent implements OnDestroy {
-  public readonly securityRepoType = RepoType.Ruby;
-  public loading = true;
-  public error: string;
-  public gemName: string;
-  public versionName: string;
-  public installCommand: string;
-  public gemfileSnippet = '';
-  public activeRepo: RepoPermissionInfo;
-  public gemVersion: GemVersionInfo;
+  readonly securityRepoType = RepoType.Ruby;
+  loading = true;
+  error: string;
+  gemName: string;
+  versionName: string;
+  installCommand: string;
+  gemfileSnippet = '';
+  activeRepo: RepoPermissionInfo;
+  gemVersion: GemVersionInfo;
 
   /** The homepage as a link target: http(s) only (RPS-1623), `null` leaves the anchor inert. */
-  public get homepageUrl(): string | null {
+  get homepageUrl(): string | null {
     return externalHttpUrl(this.gemVersion?.homepage);
   }
   private readonly repositoryChanges$: Subscription;
@@ -77,7 +77,7 @@ export class RubyGemsVersionDetailComponent implements OnDestroy {
     private readonly router: Router,
   ) {
     this.activeRepo = {} as RepoPermissionInfo;
-    this.repositoryChanges$ = this.rubyService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
+    this.repositoryChanges$ = this.rubyService.repoChanges$.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
         this.activeRepo = Object.assign({}, repo);
         this.loadVersion();
@@ -85,11 +85,11 @@ export class RubyGemsVersionDetailComponent implements OnDestroy {
     });
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     this.repositoryChanges$.unsubscribe();
   }
 
-  public loadVersion(): void {
+  loadVersion(): void {
     const gemName = this.route.snapshot.paramMap.get('packageName');
     const version = this.route.snapshot.paramMap.get('version');
     if (!gemName || !version) {
@@ -123,7 +123,7 @@ export class RubyGemsVersionDetailComponent implements OnDestroy {
       });
   }
 
-  public deleteVersion(): void {
+  deleteVersion(): void {
     this.dangerModalService.show('Delete Version', 'Delete', () => {
       this.loading = true;
       deleteVersionAndCheckLast$(

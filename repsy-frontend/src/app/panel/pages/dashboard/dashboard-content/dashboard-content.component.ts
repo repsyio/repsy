@@ -19,11 +19,11 @@ import { RouterModule } from '@angular/router';
 
 import { RepoListInfo, ReposApi, RepoType, TotalUsageInfo } from '../../../../../generated/api';
 import { RepositoryCreateModalComponent } from '../../../shared/components/modals/repository-create-modal/repository-create-modal.component';
-import { ProfileService } from '../../profile/service/profile.service';
+import { ProfileService } from '../../profile/services/profile.service';
 import { RecentActivityComponent } from '../recent-activity/recent-activity.component';
 import { RepositoryCardComponent } from '../repository-card/repository-card.component';
 import { SecurityOverviewCardComponent } from '../security-overview-card/security-overview-card.component';
-import { UsageService } from '../service/usage.service';
+import { UsageService } from '../services/usage.service';
 import { TotalDiskComponent } from '../total-disk/total-disk.component';
 import { WelcomeCardComponent } from '../welcome-card/welcome-card.component';
 
@@ -44,20 +44,20 @@ export const RECENT_REPOSITORY_COUNT = 6;
   templateUrl: './dashboard-content.component.html',
 })
 export class DashboardContentComponent {
-  public username = '';
-  public usage: TotalUsageInfo = {} as TotalUsageInfo;
-  public mavenRepoCount = 0;
-  public npmRegistryCount = 0;
-  public pypiRepoCount = 0;
-  public dockerRepoCount = 0;
-  public cargoRepoCount = 0;
-  public goRepoCount = 0;
-  public helmRepoCount = 0;
-  public nugetRepoCount = 0;
-  public rubyRepoCount = 0;
-  public repoListInfos: RepoListInfo[] = [];
-  public createRepoModal: boolean;
-  public isAdmin = false;
+  username = '';
+  usage: TotalUsageInfo = {} as TotalUsageInfo;
+  mavenRepoCount = 0;
+  npmRegistryCount = 0;
+  pypiRepoCount = 0;
+  dockerRepoCount = 0;
+  cargoRepoCount = 0;
+  goRepoCount = 0;
+  helmRepoCount = 0;
+  nugetRepoCount = 0;
+  rubyRepoCount = 0;
+  repoListInfos: RepoListInfo[] = [];
+  createRepoModal: boolean;
+  isAdmin = false;
 
   constructor(
     private readonly reposApi: ReposApi,
@@ -90,7 +90,7 @@ export class DashboardContentComponent {
     this.fetchRecentRepos();
   }
 
-  public openCreateRepo(): void {
+  openCreateRepo(): void {
     if (this.isAdmin) {
       this.createRepoModal = true;
     }

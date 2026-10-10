@@ -22,7 +22,7 @@ import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
 import { HelmChartVersionItem, RepoPermissionInfo, VersionSecuritySummary } from '../../../../../../../generated/api';
-import { AuthService } from '../../../../../../auth/pages/service/auth.service';
+import { AuthService } from '../../../../../../auth/pages/services/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
 import { EmptyListComponent } from '../../../../../shared/components/empty-list/empty-list.component';
@@ -33,12 +33,12 @@ import { SortSelectorComponent } from '../../../../../shared/components/sort-sel
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { VersionSecurityBadgeComponent } from '../../../../../shared/components/version-security-badge/version-security-badge.component';
-import { PagedData } from '../../../../../shared/dto/paged-data';
-import { Sort } from '../../../../../shared/dto/sort';
-import { pageAfterDelete } from '../../../../../shared/util/list-page-after-delete.util';
-import { SecurityService } from '../../../../security/service/security.service';
+import { PagedData } from '../../../../../shared/dtos/paged-data';
+import { Sort } from '../../../../../shared/dtos/sort';
+import { pageAfterDelete } from '../../../../../shared/utils/list-page-after-delete.utils';
+import { SecurityService } from '../../../../security/services/security.service';
 import { HelmConfigComponent } from '../../config/helm-config.component';
-import { HelmService } from '../../service/helm.service';
+import { HelmService } from '../../services/helm.service';
 
 @Component({
   selector: 'app-helm-charts-version-list',
@@ -60,24 +60,24 @@ import { HelmService } from '../../service/helm.service';
   templateUrl: './helm-charts-version-list.component.html',
 })
 export class HelmChartsVersionListComponent implements OnDestroy {
-  public loading = true;
-  public showConfig = false;
-  public error: string;
-  public chartName: string;
-  public versions: HelmChartVersionItem[] = [];
-  public searchText = '';
-  public pageNum = 0;
-  public pageSize = 10;
-  public pagedData = new PagedData<HelmChartVersionItem>();
-  public sortOption: Sort = { name: 'Newest', column: 'createdAt', type: 'DESC' };
-  public sortOptions: Sort[] = [
+  loading = true;
+  showConfig = false;
+  error: string;
+  chartName: string;
+  versions: HelmChartVersionItem[] = [];
+  searchText = '';
+  pageNum = 0;
+  pageSize = 10;
+  pagedData = new PagedData<HelmChartVersionItem>();
+  sortOption: Sort = { name: 'Newest', column: 'createdAt', type: 'DESC' };
+  sortOptions: Sort[] = [
     { name: 'Newest', column: 'createdAt', type: 'DESC' },
     { name: 'Oldest', column: 'createdAt', type: 'ASC' },
   ];
-  public activeRepo: RepoPermissionInfo = {} as RepoPermissionInfo;
-  public readonly baseUrl: string;
-  public readonly username: string;
-  public securitySummary: Record<string, VersionSecuritySummary> = {};
+  activeRepo: RepoPermissionInfo = {} as RepoPermissionInfo;
+  readonly baseUrl: string;
+  readonly username: string;
+  securitySummary: Record<string, VersionSecuritySummary> = {};
 
   private readonly repositoryChanges$: Subscription;
   private securitySummarySubscription?: Subscription;
@@ -93,7 +93,7 @@ export class HelmChartsVersionListComponent implements OnDestroy {
   ) {
     this.baseUrl = environment.repoBaseUrl;
     this.username = this.authService.username;
-    this.repositoryChanges$ = this.helmService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
+    this.repositoryChanges$ = this.helmService.repoChanges$.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
         this.activeRepo = Object.assign({}, repo);
         this.chartName = this.route.snapshot.paramMap.get('packageName');
@@ -103,41 +103,41 @@ export class HelmChartsVersionListComponent implements OnDestroy {
     });
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     this.repositoryChanges$.unsubscribe();
     this.securitySummarySubscription?.unsubscribe();
   }
 
-  public search(text: string): void {
+  search(text: string): void {
     this.searchText = text;
     this.pageNum = 0;
     this.fetchVersions();
   }
 
-  public sort(option: Sort): void {
+  sort(option: Sort): void {
     this.sortOption = option;
     this.pageNum = 0;
     this.fetchVersions();
   }
 
-  public loadPage(pageNum: number): void {
+  loadPage(pageNum: number): void {
     this.pageNum = pageNum;
     this.fetchVersions();
   }
 
-  public openConfig(open: boolean): void {
+  openConfig(open: boolean): void {
     this.showConfig = open;
   }
 
-  public refreshPage(): void {
+  refreshPage(): void {
     this.fetchVersions();
   }
 
-  public timeAgo(date: string): string {
+  timeAgo(date: string): string {
     return moment(date).fromNow();
   }
 
-  public deleteVersion(version: HelmChartVersionItem): void {
+  deleteVersion(version: HelmChartVersionItem): void {
     const isLastVersion = this.pagedData.page.totalElements === 1 && !this.searchText;
     this.dangerModalService.show('Delete Version', 'Delete', () => {
       this.loading = true;
@@ -163,7 +163,7 @@ export class HelmChartsVersionListComponent implements OnDestroy {
     });
   }
 
-  public get canManage(): boolean {
+  get canManage(): boolean {
     return this.activeRepo?.canManage ?? false;
   }
 

@@ -24,16 +24,16 @@ import { finalize } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { LoginForm } from '../../../../generated/api';
 import { ToastService } from '../../../panel/shared/components/toast/toast.service';
-import { problemDetail } from '../../../shared/error-handler/problem.util';
-import { idFactory } from '../../../shared/util/unique-id';
+import { problemDetail } from '../../../shared/error-handler/problem.utils';
+import { idFactory } from '../../../shared/utils/unique-id';
 import {
   LOGIN_PASSWORD_MESSAGES,
   LOGIN_USERNAME_MESSAGES,
   loginPasswordValidators,
   loginUsernameValidators,
 } from '../../../shared/validators/credentials.validators';
-import { RETURN_URL_PARAM, safeReturnUrl } from '../../util/return-url';
-import { AuthService } from '../service/auth.service';
+import { RETURN_URL_PARAM, safeReturnUrl } from '../../utils/return-url';
+import { AuthService } from '../services/auth.service';
 
 @Component({
   selector: 'app-login',
@@ -45,18 +45,18 @@ import { AuthService } from '../service/auth.service';
 })
 export class LoginComponent implements OnInit {
   /** Element ids of this instance: see `idFactory`. */
-  public readonly id = idFactory('login');
+  readonly id = idFactory('login');
 
-  public form: FormGroup;
-  public readonly usernameMessages = LOGIN_USERNAME_MESSAGES;
-  public readonly passwordMessages = LOGIN_PASSWORD_MESSAGES;
-  public inputType = 'password';
-  public visible = false;
-  public loading = false;
+  form: FormGroup;
+  readonly usernameMessages = LOGIN_USERNAME_MESSAGES;
+  readonly passwordMessages = LOGIN_PASSWORD_MESSAGES;
+  inputType = 'password';
+  visible = false;
+  loading = false;
 
-  public images: string[] = ['hipopotam.png'];
-  public randomImage = '';
-  public apiBaseUrl: string;
+  images: string[] = ['hipopotam.png'];
+  randomImage = '';
+  apiBaseUrl: string;
 
   constructor(
     private readonly router: Router,
@@ -66,7 +66,7 @@ export class LoginComponent implements OnInit {
     private readonly changeDetector: ChangeDetectorRef,
   ) {}
 
-  public ngOnInit(): void {
+  ngOnInit(): void {
     this.apiBaseUrl = environment.apiBaseUrl;
 
     this.setRandomImage();
@@ -77,7 +77,7 @@ export class LoginComponent implements OnInit {
     });
   }
 
-  public login(): void {
+  login(): void {
     this.loading = true;
     this.form.disable();
 
@@ -95,7 +95,7 @@ export class LoginComponent implements OnInit {
         }),
       )
       .subscribe({
-        next: () => this.router.navigateByUrl(this._returnUrl()),
+        next: () => this.router.navigateByUrl(this.returnUrl()),
         error: (error: HttpErrorResponse) => {
           // errorHandlerInterceptor leaves 401 responses to their callers, so show invalidCredentials here.
           if (error.status === 401) {
@@ -105,7 +105,7 @@ export class LoginComponent implements OnInit {
       });
   }
 
-  public toggleVisibility(): void {
+  toggleVisibility(): void {
     if (this.visible) {
       this.inputType = 'password';
       this.visible = false;
@@ -115,13 +115,13 @@ export class LoginComponent implements OnInit {
     }
   }
 
-  public setRandomImage() {
+  setRandomImage() {
     const randomIndex = Math.floor(Math.random() * this.images.length);
     this.randomImage = `/assets/images/${this.images[randomIndex]}`;
   }
 
   // The page the visitor asked for before AuthGuard sent them to the form (RPS-1278), or "/".
-  private _returnUrl(): string {
+  private returnUrl(): string {
     return safeReturnUrl(this.router.parseUrl(this.router.url).queryParams[RETURN_URL_PARAM]) ?? '/';
   }
 }

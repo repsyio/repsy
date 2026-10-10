@@ -25,19 +25,19 @@ import { PackageVersionDetail, RepoPermissionInfo } from '../../../../../../../g
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { BreadcrumbSecurityLinkService } from '../../../../../shared/service/breadcrumb-security-link.service';
-import { VERSION_PROBE_SORT } from '../../../../../shared/util/version-delete-landing.util';
+import { BreadcrumbSecurityLinkService } from '../../../../../shared/services/breadcrumb-security-link.service';
+import { VERSION_PROBE_SORT } from '../../../../../shared/utils/version-delete-landing.utils';
 import { RepoLookupService } from '../../../repo-entry/repo-lookup.service';
-import { NpmService } from '../../service/npm.service';
+import { NpmService } from '../../services/npm.service';
 import { NpmPackagesVersionDetailComponent } from './npm-packages-version-detail.component';
 
 @Component({ selector: 'app-security-scan-section', standalone: true, template: '' })
 class SecurityScanSectionStubComponent {
-  @Input() public repoType: string;
-  @Input() public repoName: string;
-  @Input() public artifactName: string;
-  @Input() public artifactVersion: string;
-  @Input() public canTriggerScan: boolean;
+  @Input() repoType: string;
+  @Input() repoName: string;
+  @Input() artifactName: string;
+  @Input() artifactVersion: string;
+  @Input() canTriggerScan: boolean;
 }
 
 describe('NpmPackagesVersionDetailComponent README', () => {
@@ -55,14 +55,14 @@ describe('NpmPackagesVersionDetailComponent README', () => {
   }
 
   beforeEach(() => {
-    const repoChanges = new BehaviorSubject<RepoPermissionInfo>({
+    const repoChanges$ = new BehaviorSubject<RepoPermissionInfo>({
       repoName: 'npm-repo',
       canRead: true,
       canWrite: true,
       canManage: true,
       private: false,
     });
-    npmService = jasmine.createSpyObj<NpmService>('NpmService', ['fetchPackageVersion'], { repoChanges });
+    npmService = jasmine.createSpyObj<NpmService>('NpmService', ['fetchPackageVersion'], { repoChanges$ });
 
     TestBed.configureTestingModule({
       imports: [NpmPackagesVersionDetailComponent],
@@ -204,7 +204,7 @@ describe('NpmPackagesVersionDetailComponent registry snippet and delete (RPS-128
       'NpmService',
       ['fetchPackageVersion', 'searchPackageVersions', 'deletePackageVersion'],
       {
-        repoChanges: new BehaviorSubject<RepoPermissionInfo>({
+        repoChanges$: new BehaviorSubject<RepoPermissionInfo>({
           repoName: REPO,
           canRead: true,
           canWrite: true,

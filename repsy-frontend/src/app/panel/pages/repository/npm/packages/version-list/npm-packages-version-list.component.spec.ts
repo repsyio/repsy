@@ -22,7 +22,7 @@ import { BehaviorSubject, of, throwError } from 'rxjs';
 import { RepoPermissionInfo } from '../../../../../../../generated/api';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { SecurityService } from '../../../../security/service/security.service';
+import { SecurityService } from '../../../../security/services/security.service';
 import { permission } from '../../../testing/protocol-service-spec-helpers';
 import { renderComponent } from '../../../testing/render-spec-helpers';
 import {
@@ -33,7 +33,7 @@ import {
   pageOf,
   REPO_NAME,
 } from '../../../testing/repo-list-spec-helpers';
-import { NpmService } from '../../service/npm.service';
+import { NpmService } from '../../services/npm.service';
 import { NpmPackagesVersionListComponent } from './npm-packages-version-list.component';
 
 describe('NpmPackagesVersionListComponent', () => {
@@ -43,16 +43,16 @@ describe('NpmPackagesVersionListComponent', () => {
   let toastService: jasmine.SpyObj<ToastService>;
   let router: jasmine.SpyObj<Router>;
   let dangerModalService: DangerModalService;
-  let repoChanges: BehaviorSubject<RepoPermissionInfo | null>;
+  let repoChanges$: BehaviorSubject<RepoPermissionInfo | null>;
   const VERSION = { version: '1.0.0' } as Parameters<NpmPackagesVersionListComponent['deleteVersion']>[0];
 
   /** Builds the component; `queryParams` is the URL it starts from (RPS-1668: `q`, `sort`, `page`). */
   function build(scope = 'acme', queryParams: Record<string, string> = {}): ListFixture {
-    repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
+    repoChanges$ = new BehaviorSubject<RepoPermissionInfo | null>(null);
     npmService = jasmine.createSpyObj<NpmService>(
       'NpmService',
       ['searchPackageVersions', 'fetchPackageTags', 'deletePackageVersion'],
-      { repoChanges },
+      { repoChanges$ },
     );
     npmService.fetchPackageTags.and.returnValue(of([]));
     securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['watchVersionSecuritySummary']);
@@ -76,7 +76,7 @@ describe('NpmPackagesVersionListComponent', () => {
     );
     return {
       component,
-      repoChanges,
+      repoChanges$,
       load: npmService.searchPackageVersions,
       args: { search: 2, sort: 3, page: 4 },
       respond: (content, totalPages) =>
@@ -110,7 +110,7 @@ describe('NpmPackagesVersionListComponent', () => {
       build().respond([VERSION], 1);
       npmService.fetchPackageTags.and.returnValue(of(tags));
 
-      repoChanges.next(permission(REPO_NAME));
+      repoChanges$.next(permission(REPO_NAME));
       flushMicrotasks();
 
       expect(npmService.searchPackageVersions).toHaveBeenCalledOnceWith('ui', 'acme', '', component.sortOption, 0, 10);
@@ -122,7 +122,7 @@ describe('NpmPackagesVersionListComponent', () => {
     it('treats the ~ scope as no scope at all', fakeAsync(() => {
       build('~').respond([VERSION], 1);
 
-      repoChanges.next(permission(REPO_NAME));
+      repoChanges$.next(permission(REPO_NAME));
       flushMicrotasks();
 
       expect(component.scopeName).toBeNull();
@@ -135,7 +135,7 @@ describe('NpmPackagesVersionListComponent', () => {
     it('starts with the search, sort and page given in the URL', fakeAsync(() => {
       build('acme', { q: '1.0', sort: 'Oldest', page: '2' }).respond([VERSION], 3);
 
-      repoChanges.next(permission(REPO_NAME));
+      repoChanges$.next(permission(REPO_NAME));
       flushMicrotasks();
 
       expect(component.searchText).toBe('1.0');
@@ -154,7 +154,7 @@ describe('NpmPackagesVersionListComponent', () => {
     it('offers a Version sort that asks the backend for version precedence (RPS-1765)', fakeAsync(() => {
       build('acme', { sort: 'Version' }).respond([VERSION], 1);
 
-      repoChanges.next(permission(REPO_NAME));
+      repoChanges$.next(permission(REPO_NAME));
       flushMicrotasks();
 
       expect(component.sortOptions.map((o) => o.name)).toEqual(['Newest', 'Oldest', 'Version']);
@@ -165,7 +165,7 @@ describe('NpmPackagesVersionListComponent', () => {
     it('falls back to the default sort for a URL sort that names no option', fakeAsync(() => {
       build('acme', { sort: 'bogus' }).respond([VERSION], 1);
 
-      repoChanges.next(permission(REPO_NAME));
+      repoChanges$.next(permission(REPO_NAME));
       flushMicrotasks();
 
       expect(component.sortOption).toBe(component.sortOptions[0]);
@@ -174,7 +174,7 @@ describe('NpmPackagesVersionListComponent', () => {
     it('does not navigate when the URL already matches what is loaded (no reload loop)', fakeAsync(() => {
       build().respond([VERSION], 1);
 
-      repoChanges.next(permission(REPO_NAME));
+      repoChanges$.next(permission(REPO_NAME));
       flushMicrotasks();
 
       expect(router.navigate).not.toHaveBeenCalled();
@@ -182,7 +182,7 @@ describe('NpmPackagesVersionListComponent', () => {
 
     it('puts the sort and page into the URL, replacing the current entry', fakeAsync(() => {
       build().respond([VERSION], 3);
-      repoChanges.next(permission(REPO_NAME));
+      repoChanges$.next(permission(REPO_NAME));
       flushMicrotasks();
       router.navigate.calls.reset();
 
@@ -206,7 +206,7 @@ describe('NpmPackagesVersionListComponent', () => {
 
     it('puts the search into the URL and drops it again once the box is emptied', fakeAsync(() => {
       build().respond([VERSION], 1);
-      repoChanges.next(permission(REPO_NAME));
+      repoChanges$.next(permission(REPO_NAME));
       flushMicrotasks();
       router.navigate.calls.reset();
 
@@ -223,7 +223,7 @@ describe('NpmPackagesVersionListComponent', () => {
       // A fresh fixture starting from `q=1.0.0` (the fake ActivatedRoute is a frozen snapshot, so a
       // second `search` on the same component would still compare against this same starting point).
       build('acme', { q: '1.0.0' }).respond([VERSION], 1);
-      repoChanges.next(permission(REPO_NAME));
+      repoChanges$.next(permission(REPO_NAME));
       flushMicrotasks();
       router.navigate.calls.reset();
 
@@ -281,7 +281,7 @@ describe('NpmPackagesVersionListComponent', () => {
 describe('NpmPackagesVersionListComponent template', () => {
   async function render(flags: Parameters<typeof permission>[1]): Promise<HTMLElement> {
     const npmService = jasmine.createSpyObj<NpmService>('NpmService', ['searchPackageVersions', 'fetchPackageTags'], {
-      repoChanges: new BehaviorSubject<RepoPermissionInfo | null>(permission(REPO_NAME, flags)),
+      repoChanges$: new BehaviorSubject<RepoPermissionInfo | null>(permission(REPO_NAME, flags)),
     });
     npmService.fetchPackageTags.and.returnValue(of([]));
     npmService.searchPackageVersions.and.returnValue(

@@ -19,7 +19,7 @@ import { Component, Input, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Observable } from 'rxjs';
 
-import { SecurityScanSupportService } from '../../service/security-scan-support.service';
+import { SecurityScanSupportService } from '../../services/security-scan-support.service';
 
 @Component({
   selector: 'app-security-details-link',
@@ -27,13 +27,13 @@ import { SecurityScanSupportService } from '../../service/security-scan-support.
   imports: [RouterLink, AsyncPipe],
 })
 export class SecurityDetailsLinkComponent implements OnInit {
-  @Input({ required: true }) public repoType: string;
+  @Input({ required: true }) repoType: string;
 
-  public isSupported$: Observable<boolean>;
+  isSupported$: Observable<boolean>;
 
   constructor(private readonly securityScanSupportService: SecurityScanSupportService) {}
 
-  public ngOnInit(): void {
+  ngOnInit(): void {
     this.isSupported$ = this.securityScanSupportService.isSupported(this.repoType);
   }
 }

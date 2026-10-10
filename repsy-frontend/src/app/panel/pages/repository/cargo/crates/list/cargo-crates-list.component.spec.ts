@@ -19,10 +19,10 @@ import { BehaviorSubject, of, throwError } from 'rxjs';
 
 import { environment } from '../../../../../../../environments/environment';
 import { CrateListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
-import { AuthService } from '../../../../../../auth/pages/service/auth.service';
+import { AuthService } from '../../../../../../auth/pages/services/auth.service';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { SecurityService } from '../../../../security/service/security.service';
+import { SecurityService } from '../../../../security/services/security.service';
 import { permission } from '../../../testing/protocol-service-spec-helpers';
 import {
   describeRepoListBehavior,
@@ -31,7 +31,7 @@ import {
   pageOf,
   REPO_NAME,
 } from '../../../testing/repo-list-spec-helpers';
-import { CargoService } from '../../service/cargo.service';
+import { CargoService } from '../../services/cargo.service';
 import { CargoCratesListComponent } from './cargo-crates-list.component';
 
 const CRATE = { name: 'serde' } as CrateListItem;
@@ -42,12 +42,12 @@ describe('CargoCratesListComponent', () => {
   let securityService: jasmine.SpyObj<SecurityService>;
   let toastService: jasmine.SpyObj<ToastService>;
   let dangerModalService: DangerModalService;
-  let repoChanges: BehaviorSubject<RepoPermissionInfo | null>;
+  let repoChanges$: BehaviorSubject<RepoPermissionInfo | null>;
 
   function build(): ListFixture {
-    repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
+    repoChanges$ = new BehaviorSubject<RepoPermissionInfo | null>(null);
     cargoService = jasmine.createSpyObj<CargoService>('CargoService', ['searchCrates', 'deleteCrate'], {
-      repoChanges,
+      repoChanges$,
     });
     securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['watchArtifactSecuritySummary']);
     securityService.watchArtifactSecuritySummary.and.returnValue(of({}));
@@ -62,7 +62,7 @@ describe('CargoCratesListComponent', () => {
     );
     return {
       component,
-      repoChanges,
+      repoChanges$,
       load: cargoService.searchCrates,
       args: { search: 0, sort: 1, page: 2 },
       respond: (content, totalPages) =>
@@ -111,7 +111,7 @@ describe('CargoCratesListComponent', () => {
 
     it('packageRoute links to the crate inside the active repository', fakeAsync(() => {
       cargoService.searchCrates.and.returnValue(of(pageOf([], 0) as never));
-      repoChanges.next(permission(REPO_NAME));
+      repoChanges$.next(permission(REPO_NAME));
       flushMicrotasks();
 
       expect(component.packageRoute(CRATE)).toBe(`/${REPO_NAME}/serde`);

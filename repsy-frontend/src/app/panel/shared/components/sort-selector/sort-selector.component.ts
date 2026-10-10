@@ -18,7 +18,7 @@ import { CommonModule } from '@angular/common';
 import { Component, ElementRef, EventEmitter, HostListener, Input, OnInit, Output } from '@angular/core';
 
 import { OutSideClickDirective } from '../../../../shared/components/outside-click-directive';
-import { Sort } from '../../dto/sort';
+import { Sort } from '../../dtos/sort';
 
 @Component({
   selector: 'app-sort-selector',
@@ -26,11 +26,11 @@ import { Sort } from '../../dto/sort';
   imports: [CommonModule, OutSideClickDirective],
 })
 export class SortSelectorComponent implements OnInit {
-  @Input() public options: Sort[];
-  @Input() public selectedOption: Sort;
-  @Output() public selectedOptionChange = new EventEmitter<Sort>();
-  @Output() public choose = new EventEmitter<Sort>();
-  public isOpen = false;
+  @Input() options: Sort[];
+  @Input() selectedOption: Sort;
+  @Output() selectedOptionChange = new EventEmitter<Sort>();
+  @Output() choose = new EventEmitter<Sort>();
+  isOpen = false;
 
   constructor(private readonly element: ElementRef<HTMLElement>) {}
 

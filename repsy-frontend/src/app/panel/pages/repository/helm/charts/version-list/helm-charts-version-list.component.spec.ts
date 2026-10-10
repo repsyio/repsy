@@ -20,15 +20,15 @@ import moment from 'moment';
 import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
 
 import { HelmChartVersionItem, RepoPermissionInfo, VersionSecuritySummary } from '../../../../../../../generated/api';
-import { AuthService } from '../../../../../../auth/pages/service/auth.service';
+import { AuthService } from '../../../../../../auth/pages/services/auth.service';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { PagedData } from '../../../../../shared/dto/paged-data';
-import { Sort } from '../../../../../shared/dto/sort';
-import { SecurityService } from '../../../../security/service/security.service';
+import { PagedData } from '../../../../../shared/dtos/paged-data';
+import { Sort } from '../../../../../shared/dtos/sort';
+import { SecurityService } from '../../../../security/services/security.service';
 import { permission } from '../../../testing/protocol-service-spec-helpers';
 import { REPO_NAME } from '../../../testing/repo-list-spec-helpers';
-import { HelmService } from '../../service/helm.service';
+import { HelmService } from '../../services/helm.service';
 import { HelmChartsVersionListComponent } from './helm-charts-version-list.component';
 
 function version(name: string, createdAt: string): HelmChartVersionItem {
@@ -62,12 +62,12 @@ describe('HelmChartsVersionListComponent', () => {
   let toastService: jasmine.SpyObj<ToastService>;
   let router: jasmine.SpyObj<Router>;
   let dangerModalService: DangerModalService;
-  let repoChanges: BehaviorSubject<RepoPermissionInfo | null>;
+  let repoChanges$: BehaviorSubject<RepoPermissionInfo | null>;
 
   beforeEach(() => {
-    repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
+    repoChanges$ = new BehaviorSubject<RepoPermissionInfo | null>(null);
     helmService = jasmine.createSpyObj<HelmService>('HelmService', ['fetchChartVersions', 'deleteChart'], {
-      repoChanges,
+      repoChanges$,
     });
     helmService.fetchChartVersions.and.returnValue(of(page([NEW, MIDDLE, OLD])));
     helmService.deleteChart.and.returnValue(of(undefined));
@@ -92,7 +92,7 @@ describe('HelmChartsVersionListComponent', () => {
   afterEach(() => component.ngOnDestroy());
 
   function selectRepo(canManage = true): void {
-    repoChanges.next(permission(REPO_NAME, { canManage }));
+    repoChanges$.next(permission(REPO_NAME, { canManage }));
     flushMicrotasks();
   }
 
@@ -125,7 +125,7 @@ describe('HelmChartsVersionListComponent', () => {
     }));
 
     it('ignores an empty repository value', fakeAsync(() => {
-      repoChanges.next(null);
+      repoChanges$.next(null);
       flushMicrotasks();
 
       expect(helmService.fetchChartVersions).not.toHaveBeenCalled();

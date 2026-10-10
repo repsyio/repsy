@@ -23,9 +23,9 @@ import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
 import { HelmChartListItem, RepoPermissionInfo, VersionSecuritySummary } from '../../../../../../../generated/api';
-import { AuthService } from '../../../../../../auth/pages/service/auth.service';
+import { AuthService } from '../../../../../../auth/pages/services/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
-import { problemDetail } from '../../../../../../shared/error-handler/problem.util';
+import { problemDetail } from '../../../../../../shared/error-handler/problem.utils';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
 import { EllipsisPipe } from '../../../../../shared/components/ellipsis/ellipsis.pipe';
 import { EmptyListComponent } from '../../../../../shared/components/empty-list/empty-list.component';
@@ -36,11 +36,11 @@ import { SearchboxComponent } from '../../../../../shared/components/searchbox/s
 import { SortSelectorComponent } from '../../../../../shared/components/sort-selector/sort-selector.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
-import { PagedData } from '../../../../../shared/dto/paged-data';
-import { Sort } from '../../../../../shared/dto/sort';
-import { SecurityService } from '../../../../security/service/security.service';
+import { PagedData } from '../../../../../shared/dtos/paged-data';
+import { Sort } from '../../../../../shared/dtos/sort';
+import { SecurityService } from '../../../../security/services/security.service';
 import { HelmConfigComponent } from '../../config/helm-config.component';
-import { HelmService } from '../../service/helm.service';
+import { HelmService } from '../../services/helm.service';
 
 @Component({
   selector: 'app-helm-charts-list',
@@ -63,26 +63,26 @@ import { HelmService } from '../../service/helm.service';
   templateUrl: './helm-charts-list.component.html',
 })
 export class HelmChartsListComponent implements OnDestroy {
-  public loading = true;
-  public showConfig = false;
-  public pageNum = 0;
-  public pageSize = 10;
-  public searchText = '';
-  public error: string;
-  public charts: HelmChartListItem[] = [];
-  public pagedData = new PagedData<HelmChartListItem>();
-  public activeRepo: RepoPermissionInfo = {} as RepoPermissionInfo;
-  public securitySummary: Record<string, VersionSecuritySummary> = {};
+  loading = true;
+  showConfig = false;
+  pageNum = 0;
+  pageSize = 10;
+  searchText = '';
+  error: string;
+  charts: HelmChartListItem[] = [];
+  pagedData = new PagedData<HelmChartListItem>();
+  activeRepo: RepoPermissionInfo = {} as RepoPermissionInfo;
+  securitySummary: Record<string, VersionSecuritySummary> = {};
 
-  public sortOption: Sort = { name: 'Newest', column: 'createdAt', type: 'DESC' };
-  public sortOptions: Sort[] = [
+  sortOption: Sort = { name: 'Newest', column: 'createdAt', type: 'DESC' };
+  sortOptions: Sort[] = [
     { name: 'Newest', column: 'createdAt', type: 'DESC' },
     { name: 'Oldest', column: 'createdAt', type: 'ASC' },
     { name: 'Name (A-Z)', column: 'name', type: 'ASC' },
     { name: 'Name (Z-A)', column: 'name', type: 'DESC' },
   ];
-  public readonly baseUrl: string;
-  public readonly username: string;
+  readonly baseUrl: string;
+  readonly username: string;
 
   private readonly repositoryChanges$: Subscription;
   private securitySummarySubscription?: Subscription;
@@ -96,7 +96,7 @@ export class HelmChartsListComponent implements OnDestroy {
   ) {
     this.baseUrl = environment.repoBaseUrl;
     this.username = this.authService.username;
-    this.repositoryChanges$ = this.helmService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
+    this.repositoryChanges$ = this.helmService.repoChanges$.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
         this.activeRepo = Object.assign({}, repo);
         this.fetchCharts();
@@ -105,36 +105,36 @@ export class HelmChartsListComponent implements OnDestroy {
     });
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     this.repositoryChanges$.unsubscribe();
     this.securitySummarySubscription?.unsubscribe();
   }
 
-  public loadPage(pageNum: number): void {
+  loadPage(pageNum: number): void {
     this.pageNum = pageNum;
     this.fetchCharts();
   }
 
-  public search(text: string): void {
+  search(text: string): void {
     this.pageNum = 0;
     this.searchText = text;
     this.fetchCharts();
   }
 
-  public sort(option: Sort): void {
+  sort(option: Sort): void {
     this.sortOption = option;
     this.fetchCharts();
   }
 
-  public refreshPage(): void {
+  refreshPage(): void {
     this.fetchCharts();
   }
 
-  public openConfig(open: boolean): void {
+  openConfig(open: boolean): void {
     this.showConfig = open;
   }
 
-  public deleteChart(chart: HelmChartListItem): void {
+  deleteChart(chart: HelmChartListItem): void {
     this.dangerModalService.show('Delete Chart', 'Delete', () => {
       this.loading = true;
       this.helmService
@@ -155,11 +155,11 @@ export class HelmChartsListComponent implements OnDestroy {
     });
   }
 
-  public get canManage(): boolean {
+  get canManage(): boolean {
     return this.activeRepo?.canManage ?? false;
   }
 
-  public timeAgo(date: string): string {
+  timeAgo(date: string): string {
     return moment(date).fromNow();
   }
 
@@ -185,7 +185,7 @@ export class HelmChartsListComponent implements OnDestroy {
       });
   }
 
-  public packageRoute(chart: HelmChartListItem): string {
+  packageRoute(chart: HelmChartListItem): string {
     return `/${this.activeRepo.repoName}/${chart.name}`;
   }
 

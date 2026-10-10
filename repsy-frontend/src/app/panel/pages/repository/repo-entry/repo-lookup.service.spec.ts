@@ -18,7 +18,7 @@ import { HttpContext } from '@angular/common/http';
 import { firstValueFrom, of, Subject, throwError } from 'rxjs';
 
 import { ReposApi, RepoType } from '../../../../../generated/api';
-import { SILENT_ERROR } from '../../../../shared/interceptor/error-handler.interceptor';
+import { SILENT_ERROR } from '../../../../shared/interceptors/error-handler.interceptor';
 import { RepoLookupService } from './repo-lookup.service';
 
 describe('RepoLookupService', () => {

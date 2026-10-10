@@ -27,10 +27,10 @@ import { DropdownComponent } from '../../../../shared/components/dropdown/dropdo
 import { EmptyListComponent } from '../../../../shared/components/empty-list/empty-list.component';
 import { SearchboxComponent } from '../../../../shared/components/searchbox/searchbox.component';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
-import { ByteFormatter } from '../../../../shared/util/byte-formatter';
+import { ByteFormatter } from '../../../../shared/utils/byte-formatter';
 import { MavenConfigComponent } from '../config/maven-config.component';
-import { FsItemInfo } from '../dto/fs-item-info';
-import { MavenService } from '../service/maven.service';
+import { FsItemInfo } from '../dtos/fs-item-info';
+import { MavenService } from '../services/maven.service';
 
 class Directory {
   constructor(
@@ -56,18 +56,18 @@ class Directory {
   templateUrl: './maven-browser.component.html',
 })
 export class MavenBrowserComponent implements OnDestroy {
-  public loading = false;
-  public operationLock = false;
-  public showConfig = false;
-  public activeRepo: RepoPermissionInfo = {} as RepoPermissionInfo;
-  public baseUrl: string;
-  public repoUrl = '';
-  public directoryStack: Directory[] = [];
-  public forwardStack: Directory[] = [];
-  public searchText = '';
+  loading = false;
+  operationLock = false;
+  showConfig = false;
+  activeRepo: RepoPermissionInfo = {} as RepoPermissionInfo;
+  baseUrl: string;
+  repoUrl = '';
+  directoryStack: Directory[] = [];
+  forwardStack: Directory[] = [];
+  searchText = '';
 
-  public fsItems: FsItemInfo[];
-  public filteredFsItems: FsItemInfo[];
+  fsItems: FsItemInfo[];
+  filteredFsItems: FsItemInfo[];
 
   private readonly repoChanges$: Subscription;
 
@@ -75,7 +75,7 @@ export class MavenBrowserComponent implements OnDestroy {
     private readonly mavenService: MavenService,
     private readonly toastService: ToastService,
   ) {
-    this.repoChanges$ = this.mavenService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
+    this.repoChanges$ = this.mavenService.repoChanges$.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
         // A reload of the permissions of the repository that is already open must not send the user
         // back to the root, or reset the path while its first listing is still in flight.
@@ -99,15 +99,15 @@ export class MavenBrowserComponent implements OnDestroy {
     });
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     this.repoChanges$.unsubscribe();
   }
 
-  public openConfig(open: boolean) {
+  openConfig(open: boolean) {
     this.showConfig = open;
   }
 
-  public search(fileName: string) {
+  search(fileName: string) {
     this.searchText = fileName;
     // No listing (the directory could not be read): there is nothing to filter, and the not-found state stays.
     if (!this.fsItems) {
@@ -119,7 +119,7 @@ export class MavenBrowserComponent implements OnDestroy {
     );
   }
 
-  public prev(): void {
+  prev(): void {
     if (this.directoryStack.length > 1) {
       const currentDir = this.directoryStack.pop();
       this.forwardStack.push(currentDir!);
@@ -129,7 +129,7 @@ export class MavenBrowserComponent implements OnDestroy {
     }
   }
 
-  public next(): void {
+  next(): void {
     if (this.forwardStack.length > 0) {
       const nextDir = this.forwardStack.pop();
       this.directoryStack.push(nextDir!);
@@ -139,7 +139,7 @@ export class MavenBrowserComponent implements OnDestroy {
     }
   }
 
-  public go(fsItem: FsItemInfo): void {
+  go(fsItem: FsItemInfo): void {
     if (this.operationLock) {
       return;
     }
@@ -167,7 +167,7 @@ export class MavenBrowserComponent implements OnDestroy {
     }
   }
 
-  public goToDir(dir: Directory): void {
+  goToDir(dir: Directory): void {
     if (this.operationLock) {
       return;
     }
@@ -187,11 +187,11 @@ export class MavenBrowserComponent implements OnDestroy {
     this.fetchCurrentRepoContent();
   }
 
-  public goToBrowser(path: string) {
+  goToBrowser(path: string) {
     location.href = `${environment.repoBaseUrl}//${this.activeRepo.repoName}${path}`;
   }
 
-  public formatBytes(bytes: number, decimals = 2): string {
+  formatBytes(bytes: number, decimals = 2): string {
     return ByteFormatter.formatBytes(bytes, decimals);
   }
 

@@ -17,7 +17,7 @@
 import { Component } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { Sort } from '../../dto/sort';
+import { Sort } from '../../dtos/sort';
 import { SelectorComponent } from '../selector/selector.component';
 import { SortSelectorComponent } from '../sort-selector/sort-selector.component';
 import { DropdownComponent } from './dropdown.component';
@@ -35,8 +35,8 @@ const OLDEST: Sort = { name: 'Oldest', column: 'createdAt', type: 'ASC' };
   `,
 })
 class HostComponent {
-  public types = ['all', 'snapshots'];
-  public sorts = [NEWEST, OLDEST];
+  types = ['all', 'snapshots'];
+  sorts = [NEWEST, OLDEST];
 }
 
 /** Only one menu is open at a time (RPS-1565): a row menu and the selectors close each other. */

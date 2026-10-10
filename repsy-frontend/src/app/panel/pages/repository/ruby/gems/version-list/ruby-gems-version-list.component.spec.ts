@@ -19,10 +19,10 @@ import moment from 'moment';
 import { BehaviorSubject, of, throwError } from 'rxjs';
 
 import { GemVersionListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
-import { AuthService } from '../../../../../../auth/pages/service/auth.service';
+import { AuthService } from '../../../../../../auth/pages/services/auth.service';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { SecurityService } from '../../../../security/service/security.service';
+import { SecurityService } from '../../../../security/services/security.service';
 import { permission } from '../../../testing/protocol-service-spec-helpers';
 import {
   describeLastVersionDelete,
@@ -32,7 +32,7 @@ import {
   pageOf,
   REPO_NAME,
 } from '../../../testing/repo-list-spec-helpers';
-import { RubyService } from '../../service/ruby.service';
+import { RubyService } from '../../services/ruby.service';
 import { RubyGemsVersionListComponent } from './ruby-gems-version-list.component';
 
 const VERSION = { version: '7.1.0', platform: 'ruby' } as GemVersionListItem;
@@ -45,14 +45,14 @@ describe('RubyGemsVersionListComponent', () => {
   let toastService: jasmine.SpyObj<ToastService>;
   let router: jasmine.SpyObj<Router>;
   let dangerModalService: DangerModalService;
-  let repoChanges: BehaviorSubject<RepoPermissionInfo | null>;
+  let repoChanges$: BehaviorSubject<RepoPermissionInfo | null>;
 
   function build(): ListFixture {
-    repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
+    repoChanges$ = new BehaviorSubject<RepoPermissionInfo | null>(null);
     rubyService = jasmine.createSpyObj<RubyService>(
       'RubyService',
       ['fetchGemVersions', 'deleteGem', 'deleteGemVersion'],
-      { repoChanges },
+      { repoChanges$ },
     );
     securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['watchVersionSecuritySummary']);
     securityService.watchVersionSecuritySummary.and.returnValue(of({}));
@@ -71,7 +71,7 @@ describe('RubyGemsVersionListComponent', () => {
     );
     return {
       component,
-      repoChanges,
+      repoChanges$,
       load: rubyService.fetchGemVersions,
       args: { search: 1, sort: 2, page: 3 },
       respond: (content, totalPages) =>
@@ -92,7 +92,7 @@ describe('RubyGemsVersionListComponent', () => {
     it('loads the versions of the gem in the route', fakeAsync(() => {
       build().respond([VERSION], 1);
 
-      repoChanges.next(permission(REPO_NAME));
+      repoChanges$.next(permission(REPO_NAME));
       flushMicrotasks();
 
       expect(component.gemName).toBe('rails');

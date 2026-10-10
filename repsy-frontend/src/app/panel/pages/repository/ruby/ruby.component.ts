@@ -18,11 +18,11 @@ import { Router, RouterOutlet } from '@angular/router';
 import { Subscription } from 'rxjs';
 
 import { RepoPermissionInfo } from '../../../../../generated/api';
-import { AuthService } from '../../../../auth/pages/service/auth.service';
+import { AuthService } from '../../../../auth/pages/services/auth.service';
 import { RepositoryBreadcrumbComponent } from '../breadcrumb/repository-breadcrumb.component';
 import { currentRepoOfType } from '../repo-entry/current-repo-of-type';
 import { RepoLookupService } from '../repo-entry/repo-lookup.service';
-import { RubyService } from './service/ruby.service';
+import { RubyService } from './services/ruby.service';
 
 @Component({
   selector: 'app-ruby',
@@ -31,10 +31,10 @@ import { RubyService } from './service/ruby.service';
   imports: [RouterOutlet, RepositoryBreadcrumbComponent],
 })
 export class RubyComponent implements OnInit, OnDestroy {
-  public permissions: RepoPermissionInfo | null = null;
-  public loading = true;
-  public isAuthenticated = false;
-  public isPublicView = false;
+  permissions: RepoPermissionInfo | null = null;
+  loading = true;
+  isAuthenticated = false;
+  isPublicView = false;
 
   private repoSubscription: Subscription | null = null;
 
@@ -45,7 +45,7 @@ export class RubyComponent implements OnInit, OnDestroy {
     private readonly router: Router,
   ) {}
 
-  public ngOnInit(): void {
+  ngOnInit(): void {
     this.isAuthenticated = this.authService.isAuthenticated();
 
     this.repoSubscription = currentRepoOfType(this.repoLookupService, 'ruby').subscribe((repoContext) => {
@@ -53,7 +53,7 @@ export class RubyComponent implements OnInit, OnDestroy {
     });
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     if (this.repoSubscription) {
       this.repoSubscription.unsubscribe();
     }

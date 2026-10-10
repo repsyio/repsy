@@ -17,8 +17,8 @@
 import { TestBed } from '@angular/core/testing';
 
 import { LoginComponent } from '../../../auth/pages/login/login.component';
-import { AuthService } from '../../../auth/pages/service/auth.service';
-import { TokenCreateInfo } from '../../pages/repository/repo-settings/deploy-token/dto/token-create-info';
+import { AuthService } from '../../../auth/pages/services/auth.service';
+import { TokenCreateInfo } from '../../pages/repository/repo-settings/deploy-token/dtos/token-create-info';
 import { renderComponent } from '../../pages/repository/testing/render-spec-helpers';
 import { DangerModalComponent } from './modals/danger-modal/danger-modal.component';
 import { DangerModalService } from './modals/danger-modal/danger-modal.service';

@@ -18,7 +18,7 @@ import { inject } from '@angular/core';
 import { CanMatchFn, Router, Routes } from '@angular/router';
 import { catchError, map, of, take } from 'rxjs';
 
-import { RepoRouteSlug } from '../../../shared/util/repo-api-type';
+import { RepoRouteSlug } from '../../../shared/utils/repo-api-type';
 import { RepoLookupService } from './repo-lookup.service';
 
 const canMatchRepoType = (expectedType: RepoRouteSlug): CanMatchFn => {

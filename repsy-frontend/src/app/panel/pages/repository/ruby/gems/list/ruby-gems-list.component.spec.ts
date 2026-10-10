@@ -18,10 +18,10 @@ import moment from 'moment';
 import { BehaviorSubject, of, throwError } from 'rxjs';
 
 import { GemListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
-import { AuthService } from '../../../../../../auth/pages/service/auth.service';
+import { AuthService } from '../../../../../../auth/pages/services/auth.service';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { SecurityService } from '../../../../security/service/security.service';
+import { SecurityService } from '../../../../security/services/security.service';
 import { permission } from '../../../testing/protocol-service-spec-helpers';
 import {
   describeRepoListBehavior,
@@ -30,7 +30,7 @@ import {
   pageOf,
   REPO_NAME,
 } from '../../../testing/repo-list-spec-helpers';
-import { RubyService } from '../../service/ruby.service';
+import { RubyService } from '../../services/ruby.service';
 import { RubyGemsListComponent } from './ruby-gems-list.component';
 
 const ITEM_UNDER_TEST = { name: 'rails' } as GemListItem;
@@ -41,11 +41,11 @@ describe('RubyGemsListComponent', () => {
   let securityService: jasmine.SpyObj<SecurityService>;
   let toastService: jasmine.SpyObj<ToastService>;
   let dangerModalService: DangerModalService;
-  let repoChanges: BehaviorSubject<RepoPermissionInfo | null>;
+  let repoChanges$: BehaviorSubject<RepoPermissionInfo | null>;
 
   function build(): ListFixture {
-    repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
-    service = jasmine.createSpyObj<RubyService>('RubyService', ['searchGems', 'deleteGem'], { repoChanges });
+    repoChanges$ = new BehaviorSubject<RepoPermissionInfo | null>(null);
+    service = jasmine.createSpyObj<RubyService>('RubyService', ['searchGems', 'deleteGem'], { repoChanges$ });
     securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['watchArtifactSecuritySummary']);
     securityService.watchArtifactSecuritySummary.and.returnValue(of({}));
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
@@ -59,7 +59,7 @@ describe('RubyGemsListComponent', () => {
     );
     return {
       component,
-      repoChanges,
+      repoChanges$,
       load: service.searchGems,
       args: { search: 0, sort: 1, page: 2 },
       respond: (content, totalPages) => service.searchGems.and.returnValue(of(pageOf(content, totalPages) as never)),
@@ -96,7 +96,7 @@ describe('RubyGemsListComponent', () => {
 
     it('packageRoute links to the item inside the active repository', fakeAsync(() => {
       service.searchGems.and.returnValue(of(pageOf([], 0) as never));
-      repoChanges.next(permission(REPO_NAME));
+      repoChanges$.next(permission(REPO_NAME));
       flushMicrotasks();
 
       expect(component.packageRoute(ITEM_UNDER_TEST)).toBe(`/${REPO_NAME}/rails`);

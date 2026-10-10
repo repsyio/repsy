@@ -17,7 +17,7 @@
 import { Observable } from 'rxjs';
 import { filter } from 'rxjs/operators';
 
-import { RepoRouteSlug } from '../../../shared/util/repo-api-type';
+import { RepoRouteSlug } from '../../../shared/utils/repo-api-type';
 import { RepoContext, RepoLookupService } from './repo-lookup.service';
 
 /**

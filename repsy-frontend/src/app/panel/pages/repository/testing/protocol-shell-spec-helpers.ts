@@ -25,8 +25,8 @@ import { Router } from '@angular/router';
 import { BehaviorSubject, Observable, of, throwError } from 'rxjs';
 
 import { RepoPermissionInfo } from '../../../../../generated/api';
-import { AuthService } from '../../../../auth/pages/service/auth.service';
-import { RepoRouteSlug } from '../../../shared/util/repo-api-type';
+import { AuthService } from '../../../../auth/pages/services/auth.service';
+import { RepoRouteSlug } from '../../../shared/utils/repo-api-type';
 import { RepositoryBreadcrumbComponent } from '../breadcrumb/repository-breadcrumb.component';
 import { RepoContext, RepoLookupService } from '../repo-entry/repo-lookup.service';
 import { permission } from './protocol-service-spec-helpers';

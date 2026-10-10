@@ -16,7 +16,7 @@
 
 import { describeProtocolShell } from '../testing/protocol-shell-spec-helpers';
 import { NpmComponent } from './npm.component';
-import { NpmService } from './service/npm.service';
+import { NpmService } from './services/npm.service';
 
 describeProtocolShell({
   component: NpmComponent,

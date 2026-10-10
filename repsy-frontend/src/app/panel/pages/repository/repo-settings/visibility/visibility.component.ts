@@ -31,20 +31,20 @@ import { saveRepoSetting } from '../save-repo-setting';
   imports: [ReactiveFormsModule, ToggleComponent, RouterLink],
 })
 export class VisibilityComponent {
-  @Input() public repoType: string;
-  @Input() public repoName: string;
-  @Input() public parentForm: FormGroup;
-  @Output() public fetch = new EventEmitter<void>();
+  @Input() repoType: string;
+  @Input() repoName: string;
+  @Input() parentForm: FormGroup;
+  @Output() fetch = new EventEmitter<void>();
 
   /** A save is on its way: the toggle is locked, so a double click sends one request (RPS-1618). */
-  public saving = false;
+  saving = false;
 
   constructor(
     private readonly reposApi: ReposApi,
     private readonly toastService: ToastService,
   ) {}
 
-  public changePrivacy(isPublic: boolean) {
+  changePrivacy(isPublic: boolean) {
     const control = this.parentForm.get('privateRepository');
     const previous = control.value;
     const privacy = !isPublic;

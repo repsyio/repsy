@@ -16,7 +16,7 @@
 
 import { describeProtocolShell } from '../testing/protocol-shell-spec-helpers';
 import { DockerComponent } from './docker.component';
-import { DockerService } from './service/docker.service';
+import { DockerService } from './services/docker.service';
 
 describeProtocolShell({
   component: DockerComponent,

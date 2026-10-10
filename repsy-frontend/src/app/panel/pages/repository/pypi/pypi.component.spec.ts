@@ -16,7 +16,7 @@
 
 import { describeProtocolShell } from '../testing/protocol-shell-spec-helpers';
 import { PypiComponent } from './pypi.component';
-import { PypiService } from './service/pypi.service';
+import { PypiService } from './services/pypi.service';
 
 describeProtocolShell({
   component: PypiComponent,

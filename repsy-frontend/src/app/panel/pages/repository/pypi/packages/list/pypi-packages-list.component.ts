@@ -23,7 +23,7 @@ import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
 import { PypiPackageListItem, RepoPermissionInfo, VersionSecuritySummary } from '../../../../../../../generated/api';
-import { AuthService } from '../../../../../../auth/pages/service/auth.service';
+import { AuthService } from '../../../../../../auth/pages/services/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
 import { EmptyListComponent } from '../../../../../shared/components/empty-list/empty-list.component';
@@ -34,11 +34,11 @@ import { SearchboxComponent } from '../../../../../shared/components/searchbox/s
 import { SortSelectorComponent } from '../../../../../shared/components/sort-selector/sort-selector.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
-import { PagedData } from '../../../../../shared/dto/paged-data';
-import { Sort } from '../../../../../shared/dto/sort';
-import { SecurityService } from '../../../../security/service/security.service';
+import { PagedData } from '../../../../../shared/dtos/paged-data';
+import { Sort } from '../../../../../shared/dtos/sort';
+import { SecurityService } from '../../../../security/services/security.service';
 import { PypiConfigComponent } from '../../config/pypi-config.component';
-import { PypiService } from '../../service/pypi.service';
+import { PypiService } from '../../services/pypi.service';
 
 @Component({
   selector: 'app-pypi-packages-list',
@@ -60,26 +60,26 @@ import { PypiService } from '../../service/pypi.service';
   templateUrl: './pypi-packages-list.component.html',
 })
 export class PypiPackagesListComponent implements OnDestroy {
-  public loading = true;
-  public showConfig = false;
-  public pageNum = 0;
-  public pageSize = 10;
-  public searchText = '';
-  public error: string;
-  public pagedData: PagedData<PypiPackageListItem>;
-  public activeRepo: RepoPermissionInfo;
-  public securitySummary: Record<string, VersionSecuritySummary> = {};
+  loading = true;
+  showConfig = false;
+  pageNum = 0;
+  pageSize = 10;
+  searchText = '';
+  error: string;
+  pagedData: PagedData<PypiPackageListItem>;
+  activeRepo: RepoPermissionInfo;
+  securitySummary: Record<string, VersionSecuritySummary> = {};
 
-  public packages: PypiPackageListItem[];
-  public sortOption: Sort = { name: 'Newest', column: 'updatedAt', type: 'DESC' };
+  packages: PypiPackageListItem[];
+  sortOption: Sort = { name: 'Newest', column: 'updatedAt', type: 'DESC' };
 
-  public sortOptions: Sort[] = [
+  sortOptions: Sort[] = [
     { name: 'Newest', column: 'updatedAt', type: 'DESC' },
     { name: 'Oldest', column: 'updatedAt', type: 'ASC' },
   ];
 
-  public readonly baseUrl: string;
-  public readonly username: string;
+  readonly baseUrl: string;
+  readonly username: string;
   private readonly repositoryChanges$: Subscription;
   private securitySummarySubscription?: Subscription;
 
@@ -95,7 +95,7 @@ export class PypiPackagesListComponent implements OnDestroy {
     this.pagedData = new PagedData<PypiPackageListItem>();
     this.activeRepo = {} as RepoPermissionInfo;
 
-    this.repositoryChanges$ = this.pypiService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
+    this.repositoryChanges$ = this.pypiService.repoChanges$.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
         this.activeRepo = Object.assign({}, repo);
         this.fetchPackages();
@@ -104,40 +104,40 @@ export class PypiPackagesListComponent implements OnDestroy {
     });
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     this.repositoryChanges$.unsubscribe();
     this.securitySummarySubscription?.unsubscribe();
   }
 
-  public loadPage(pageNum: number): void {
+  loadPage(pageNum: number): void {
     this.pageNum = pageNum;
     this.fetchPackages();
   }
 
-  public refreshPage(): void {
+  refreshPage(): void {
     this.fetchPackages();
   }
 
-  public search(packageName: string) {
+  search(packageName: string) {
     this.pageNum = 0;
     this.searchText = packageName;
     this.fetchPackages();
   }
 
-  public sort(option: Sort) {
+  sort(option: Sort) {
     this.sortOption = option;
     this.fetchPackages();
   }
 
-  public openConfig(open: boolean) {
+  openConfig(open: boolean) {
     this.showConfig = open;
   }
 
-  public timeAgo(date: Date | string): string {
+  timeAgo(date: Date | string): string {
     return moment(date).fromNow();
   }
 
-  public deletePackage(pck: PypiPackageListItem) {
+  deletePackage(pck: PypiPackageListItem) {
     this.dangerModalService.show('Delete Package', 'Delete', () => {
       this.loading = true;
       this.pypiService
@@ -176,11 +176,11 @@ export class PypiPackagesListComponent implements OnDestroy {
       });
   }
 
-  public get canManage(): boolean {
+  get canManage(): boolean {
     return this.activeRepo?.canManage ?? false;
   }
 
-  public packageRoute(pkg: PypiPackageListItem): string {
+  packageRoute(pkg: PypiPackageListItem): string {
     return `/${this.activeRepo.repoName}/${pkg.name}`;
   }
 

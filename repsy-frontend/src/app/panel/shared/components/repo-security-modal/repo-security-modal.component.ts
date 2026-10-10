@@ -21,11 +21,11 @@ import { finalize } from 'rxjs/operators';
 
 import { RecentScannedVersion, RepoSecurityDetail } from '../../../../../generated/api';
 import { SpinnerComponent } from '../../../../shared/components/spinner/spinner.component';
-import { SecurityService } from '../../../pages/security/service/security.service';
+import { SecurityService } from '../../../pages/security/services/security.service';
 import { DialogDirective } from '../../directives/dialog.directive';
 import { PortalToBodyDirective } from '../../directives/portal-to-body.directive';
-import { toApiRepoType } from '../../util/repo-api-type';
-import { ArtifactDetailRoute, buildArtifactDetailRoute } from '../../util/security-detail-route.util';
+import { toApiRepoType } from '../../utils/repo-api-type';
+import { ArtifactDetailRoute, buildArtifactDetailRoute } from '../../utils/security-detail-route.utils';
 import { RescanNoteComponent } from '../rescan-note/rescan-note.component';
 import { SeverityBadgeComponent } from '../severity-badge/severity-badge.component';
 import { SeverityBreakdownComponent } from '../severity-breakdown/severity-breakdown.component';
@@ -46,25 +46,25 @@ import { SeverityBreakdownComponent } from '../severity-breakdown/severity-break
   templateUrl: './repo-security-modal.component.html',
 })
 export class RepoSecurityModalComponent implements OnChanges {
-  @Input() public open = false;
-  @Output() public openChange = new EventEmitter<boolean>();
-  @Input({ required: true }) public repoName: string;
-  @Input({ required: true }) public repoType: string;
+  @Input() open = false;
+  @Output() openChange = new EventEmitter<boolean>();
+  @Input({ required: true }) repoName: string;
+  @Input({ required: true }) repoType: string;
 
-  public loading = false;
-  public detail: RepoSecurityDetail | null = null;
+  loading = false;
+  detail: RepoSecurityDetail | null = null;
 
   private readonly recentScanLinks = new WeakMap<RecentScannedVersion, ArtifactDetailRoute | null>();
 
   constructor(private readonly securityService: SecurityService) {}
 
-  public ngOnChanges(changes: SimpleChanges): void {
+  ngOnChanges(changes: SimpleChanges): void {
     if (changes['open'] && this.open && this.repoName) {
       this.fetchDetail();
     }
   }
 
-  public closeModal(): void {
+  closeModal(): void {
     this.openChange.emit(false);
   }
 
@@ -72,7 +72,7 @@ export class RepoSecurityModalComponent implements OnChanges {
    * The detail page of a recent scan's version. Built once per scan: the template binds its `queryParams`
    * object, and a new object on every change detection pass would be an ExpressionChanged error.
    */
-  public recentScanLink(scan: RecentScannedVersion): ArtifactDetailRoute | null {
+  recentScanLink(scan: RecentScannedVersion): ArtifactDetailRoute | null {
     let link = this.recentScanLinks.get(scan);
     if (link === undefined) {
       link = this.buildRecentScanRoute(scan);

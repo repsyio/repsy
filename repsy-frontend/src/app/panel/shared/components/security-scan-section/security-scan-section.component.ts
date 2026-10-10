@@ -31,10 +31,10 @@ import {
   VulnerabilityScanInfo,
 } from '../../../../../generated/api';
 import { SpinnerComponent } from '../../../../shared/components/spinner/spinner.component';
-import { SecurityScanSupportService } from '../../service/security-scan-support.service';
-import { pollUntilTerminal } from '../../util/poll-until-terminal.util';
-import { scanStatusLabel } from '../../util/scan-status-label.util';
-import { splitScopedArtifactName } from '../../util/scoped-artifact.util';
+import { SecurityScanSupportService } from '../../services/security-scan-support.service';
+import { pollUntilTerminal } from '../../utils/poll-until-terminal.utils';
+import { scanStatusLabel } from '../../utils/scan-status-label.utils';
+import { splitScopedArtifactName } from '../../utils/scoped-artifact.utils';
 import { PaginationComponent } from '../pagination/pagination.component';
 import { RescanNoteComponent } from '../rescan-note/rescan-note.component';
 import { ScanFailureReasonComponent } from '../scan-failure-reason/scan-failure-reason.component';
@@ -68,32 +68,32 @@ const SCROLL_RETRY_DELAYS_MS = [0, 300, 800];
   templateUrl: './security-scan-section.component.html',
 })
 export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestroy {
-  @Input({ required: true }) public repoType: string;
-  @Input({ required: true }) public repoName: string;
-  @Input({ required: true }) public artifactName: string;
-  @Input({ required: true }) public artifactVersion: string;
-  @Input() public canTriggerScan = false;
+  @Input({ required: true }) repoType: string;
+  @Input({ required: true }) repoName: string;
+  @Input({ required: true }) artifactName: string;
+  @Input({ required: true }) artifactVersion: string;
+  @Input() canTriggerScan = false;
 
-  public isSupported$: Observable<boolean>;
-  public expanded = false;
-  public loading = true;
-  public triggering = false;
-  public neverScanned = false;
-  public overview: ScanOverview | null = null;
-  public scans: VulnerabilityScanInfo[] = [];
-  public selectedScan: VulnerabilityScanDetail | null = null;
-  public pageNum = 0;
-  public totalPages = 0;
+  isSupported$: Observable<boolean>;
+  expanded = false;
+  loading = true;
+  triggering = false;
+  neverScanned = false;
+  overview: ScanOverview | null = null;
+  scans: VulnerabilityScanInfo[] = [];
+  selectedScan: VulnerabilityScanDetail | null = null;
+  pageNum = 0;
+  totalPages = 0;
 
-  public findings: VulnerabilityFindingInfo[] = [];
-  public loadingFindings = false;
-  public findingsPageNum = 0;
-  public findingsTotalPages = 0;
-  public findingsTotalCount = 0;
-  public findingsSortDirection: 'ASC' | 'DESC' = 'ASC';
+  findings: VulnerabilityFindingInfo[] = [];
+  loadingFindings = false;
+  findingsPageNum = 0;
+  findingsTotalPages = 0;
+  findingsTotalCount = 0;
+  findingsSortDirection: 'ASC' | 'DESC' = 'ASC';
 
   protected readonly ScanStatus = ScanStatus;
-  public readonly statusLabel = scanStatusLabel;
+  readonly statusLabel = scanStatusLabel;
 
   private readonly fragmentChanges$: Subscription;
   private isSupportedSub: Subscription | null = null;
@@ -113,7 +113,7 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
     });
   }
 
-  public ngOnInit(): void {
+  ngOnInit(): void {
     this.isSupported$ = this.securityScanSupportService.isSupported(this.repoType);
 
     this.isSupportedSub = this.isSupported$.subscribe((isSupported) => {
@@ -123,7 +123,7 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
     });
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     this.fragmentChanges$.unsubscribe();
     this.isSupportedSub?.unsubscribe();
     this.stopPolling();
@@ -135,7 +135,7 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
     }
   }
 
-  public ngOnChanges(changes: SimpleChanges): void {
+  ngOnChanges(changes: SimpleChanges): void {
     const coordinatesChanged = changes['repoName'] || changes['artifactName'] || changes['artifactVersion'];
 
     if (coordinatesChanged && this.repoName && this.artifactName && this.artifactVersion) {
@@ -144,11 +144,11 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
     }
   }
 
-  public toggleExpanded(): void {
+  toggleExpanded(): void {
     this.expanded = !this.expanded;
   }
 
-  public get worstSeverity(): Severity | null {
+  get worstSeverity(): Severity | null {
     if (!this.overview) {
       return null;
     }
@@ -170,7 +170,7 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
     return null;
   }
 
-  public get selectedScanSeverityCounts(): {
+  get selectedScanSeverityCounts(): {
     criticalCount: number;
     highCount: number;
     mediumCount: number;
@@ -198,16 +198,16 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
     };
   }
 
-  public loadPage(pageNum: number): void {
+  loadPage(pageNum: number): void {
     this.pageNum = pageNum;
     this.loadScans();
   }
 
-  public selectScan(scanId: string): void {
+  selectScan(scanId: string): void {
     this.loadScanDetail(scanId);
   }
 
-  public loadFindingsPage(pageNum: number): void {
+  loadFindingsPage(pageNum: number): void {
     this.findingsPageNum = pageNum;
 
     if (this.selectedScan?.id) {
@@ -215,7 +215,7 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
     }
   }
 
-  public toggleFindingsSort(): void {
+  toggleFindingsSort(): void {
     this.findingsSortDirection = this.findingsSortDirection === 'ASC' ? 'DESC' : 'ASC';
     this.findingsPageNum = 0;
 
@@ -224,7 +224,7 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
     }
   }
 
-  public triggerScan(): void {
+  triggerScan(): void {
     this.triggering = true;
     const scoped = splitScopedArtifactName(this.artifactName);
     const trigger$ = scoped
@@ -252,7 +252,7 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
       });
   }
 
-  public get canTrigger(): boolean {
+  get canTrigger(): boolean {
     if (this.neverScanned || this.triggering) {
       return false;
     }

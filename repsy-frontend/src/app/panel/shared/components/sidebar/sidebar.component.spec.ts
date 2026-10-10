@@ -19,8 +19,8 @@ import { provideRouter } from '@angular/router';
 import { Subject, throwError } from 'rxjs';
 
 import { ProfileInfo } from '../../../../../generated/api';
-import { AuthService } from '../../../../auth/pages/service/auth.service';
-import { ProfileService } from '../../../pages/profile/service/profile.service';
+import { AuthService } from '../../../../auth/pages/services/auth.service';
+import { ProfileService } from '../../../pages/profile/services/profile.service';
 import { SidebarComponent } from './sidebar.component';
 
 /**

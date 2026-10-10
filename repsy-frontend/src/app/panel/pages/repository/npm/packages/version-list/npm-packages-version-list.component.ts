@@ -30,7 +30,7 @@ import {
   VersionSecuritySummary,
 } from '../../../../../../../generated/api';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
-import { problemDetail } from '../../../../../../shared/error-handler/problem.util';
+import { problemDetail } from '../../../../../../shared/error-handler/problem.utils';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
 import { EmptyListComponent } from '../../../../../shared/components/empty-list/empty-list.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
@@ -40,18 +40,18 @@ import { SortSelectorComponent } from '../../../../../shared/components/sort-sel
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { VersionSecurityBadgeComponent } from '../../../../../shared/components/version-security-badge/version-security-badge.component';
-import { PagedData } from '../../../../../shared/dto/paged-data';
-import { Sort, VERSION_PRECEDENCE_SORT } from '../../../../../shared/dto/sort';
-import { restoreListFocus } from '../../../../../shared/util/list-focus-restore.util';
-import { emptiesList, pageAfterDelete } from '../../../../../shared/util/list-page-after-delete.util';
+import { PagedData } from '../../../../../shared/dtos/paged-data';
+import { Sort, VERSION_PRECEDENCE_SORT } from '../../../../../shared/dtos/sort';
+import { restoreListFocus } from '../../../../../shared/utils/list-focus-restore.utils';
+import { emptiesList, pageAfterDelete } from '../../../../../shared/utils/list-page-after-delete.utils';
 import {
   readListPageParam,
   readListQueryParam,
   updateListQueryParams,
-} from '../../../../../shared/util/list-query-params.util';
-import { SecurityService } from '../../../../security/service/security.service';
+} from '../../../../../shared/utils/list-query-params.utils';
+import { SecurityService } from '../../../../security/services/security.service';
 import { NpmConfigComponent } from '../../config/npm-config.component';
-import { NpmService } from '../../service/npm.service';
+import { NpmService } from '../../services/npm.service';
 
 @Component({
   selector: 'app-npm-packages-version-list',
@@ -73,23 +73,23 @@ import { NpmService } from '../../service/npm.service';
   templateUrl: './npm-packages-version-list.component.html',
 })
 export class NpmPackagesVersionListComponent implements OnDestroy {
-  public baseUrl: string;
-  public error: string;
-  public scopeName: string;
-  public packageName: string;
-  public loading = true;
-  public showConfig = false;
-  public pageNum = 0;
-  public pageSize = 10;
-  public pagedData: PagedData<PackageVersionListItem>;
-  public versions: PackageVersionListItem[];
-  public tags: PackageDistributionTagMapListItem[];
-  public activeRegistry: RepoPermissionInfo;
-  public searchText = '';
-  public securitySummary: Record<string, VersionSecuritySummary> = {};
+  baseUrl: string;
+  error: string;
+  scopeName: string;
+  packageName: string;
+  loading = true;
+  showConfig = false;
+  pageNum = 0;
+  pageSize = 10;
+  pagedData: PagedData<PackageVersionListItem>;
+  versions: PackageVersionListItem[];
+  tags: PackageDistributionTagMapListItem[];
+  activeRegistry: RepoPermissionInfo;
+  searchText = '';
+  securitySummary: Record<string, VersionSecuritySummary> = {};
 
-  public sortOption: Sort = { name: 'Newest', column: 'createdAt', type: 'DESC' };
-  public sortOptions: Sort[] = [
+  sortOption: Sort = { name: 'Newest', column: 'createdAt', type: 'DESC' };
+  sortOptions: Sort[] = [
     { name: 'Newest', column: 'createdAt', type: 'DESC' },
     { name: 'Oldest', column: 'createdAt', type: 'ASC' },
     VERSION_PRECEDENCE_SORT,
@@ -110,7 +110,7 @@ export class NpmPackagesVersionListComponent implements OnDestroy {
     this.baseUrl = environment.repoBaseUrl;
     this.pagedData = new PagedData<PackageVersionListItem>();
     this.activeRegistry = {} as RepoPermissionInfo;
-    this.registryChanges$ = this.npmService.repoChanges.subscribe((registry: RepoPermissionInfo) => {
+    this.registryChanges$ = this.npmService.repoChanges$.subscribe((registry: RepoPermissionInfo) => {
       if (registry) {
         this.activeRegistry = Object.assign({}, registry);
         this.scopeName = this.route.snapshot.paramMap.get('scope');
@@ -133,32 +133,32 @@ export class NpmPackagesVersionListComponent implements OnDestroy {
     });
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     this.registryChanges$.unsubscribe();
     this.securitySummarySubscription?.unsubscribe();
   }
 
-  public get securityArtifactName(): string {
+  get securityArtifactName(): string {
     return this.scopeName ? `@${this.scopeName}/${this.packageName}` : this.packageName;
   }
 
-  public loadPage(pageNum: number): void {
+  loadPage(pageNum: number): void {
     this.pageNum = pageNum;
     this.fetchVersions();
   }
 
   /** See `NpmPackagesListComponent.refreshPage` (RPS-1669): the caller can name the control that had
    *  the focus before it started asking, for when this reload's own opener will not survive it. */
-  public refreshPage(previouslyFocused: Element | null = null): void {
+  refreshPage(previouslyFocused: Element | null = null): void {
     this.fetchVersions(previouslyFocused);
   }
 
-  public sort(option: Sort) {
+  sort(option: Sort) {
     this.sortOption = option;
     this.fetchVersions();
   }
 
-  public search(versionName: string) {
+  search(versionName: string) {
     if (versionName.startsWith('v')) {
       versionName = versionName.substring(1);
     }
@@ -168,15 +168,15 @@ export class NpmPackagesVersionListComponent implements OnDestroy {
     this.fetchVersions();
   }
 
-  public openConfig(open: boolean) {
+  openConfig(open: boolean) {
     this.showConfig = open;
   }
 
-  public timeAgo(date: Date | string): string {
+  timeAgo(date: Date | string): string {
     return moment(date).fromNow();
   }
 
-  public deleteVersion(version: PackageVersionListItem) {
+  deleteVersion(version: PackageVersionListItem) {
     // Captured now (RPS-1669): by the time the reload actually fires, the danger modal has already
     // closed and, since its own opener (this version's row menu) is gone, given up on the focus.
     const previouslyFocused = document.activeElement;
@@ -259,7 +259,7 @@ export class NpmPackagesVersionListComponent implements OnDestroy {
     });
   }
 
-  public get canManage(): boolean {
+  get canManage(): boolean {
     return this.activeRegistry?.canManage ?? false;
   }
 

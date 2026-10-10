@@ -22,7 +22,7 @@ import { GoModuleInfo, GoModuleVersionListItem, RepoPermissionInfo } from '../..
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { permission } from '../../../testing/protocol-service-spec-helpers';
-import { GoService } from '../../service/go.service';
+import { GoService } from '../../services/go.service';
 import { GoModuleVersionDetailComponent } from './go-module-version-detail.component';
 
 const REPO = 'go-repo';
@@ -38,7 +38,7 @@ describe('GoModuleVersionDetailComponent', () => {
   let toastService: jasmine.SpyObj<ToastService>;
   let router: jasmine.SpyObj<Router>;
   let dangerModalService: DangerModalService;
-  let repoChanges: BehaviorSubject<RepoPermissionInfo | null>;
+  let repoChanges$: BehaviorSubject<RepoPermissionInfo | null>;
 
   function build(query: Record<string, string> = { modulePath: 'github.com/acme/lib', version: 'v1.2.3' }): void {
     component?.ngOnDestroy();
@@ -52,9 +52,9 @@ describe('GoModuleVersionDetailComponent', () => {
   }
 
   beforeEach(() => {
-    repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
+    repoChanges$ = new BehaviorSubject<RepoPermissionInfo | null>(null);
     goService = jasmine.createSpyObj<GoService>('GoService', ['fetchModuleInfo', 'deleteModuleVersion'], {
-      repoChanges,
+      repoChanges$,
     });
     goService.fetchModuleInfo.and.returnValue(of(moduleInfo('github.com/acme/lib', [FOUND])));
     goService.deleteModuleVersion.and.returnValue(of(undefined));
@@ -68,7 +68,7 @@ describe('GoModuleVersionDetailComponent', () => {
   afterEach(() => component.ngOnDestroy());
 
   function select(canManage = true): void {
-    repoChanges.next(permission(REPO, { canManage }));
+    repoChanges$.next(permission(REPO, { canManage }));
   }
 
   describe('when a repository is selected', () => {
@@ -145,7 +145,7 @@ describe('GoModuleVersionDetailComponent', () => {
     });
 
     it('ignores an empty repository value', () => {
-      repoChanges.next(null);
+      repoChanges$.next(null);
 
       expect(router.navigate).not.toHaveBeenCalled();
       expect(goService.fetchModuleInfo).not.toHaveBeenCalled();

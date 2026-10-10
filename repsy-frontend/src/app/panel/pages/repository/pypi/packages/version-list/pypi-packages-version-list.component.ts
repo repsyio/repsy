@@ -23,7 +23,7 @@ import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
 import { ReleaseListItem, RepoPermissionInfo, VersionSecuritySummary } from '../../../../../../../generated/api';
-import { AuthService } from '../../../../../../auth/pages/service/auth.service';
+import { AuthService } from '../../../../../../auth/pages/services/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
 import { EmptyListComponent } from '../../../../../shared/components/empty-list/empty-list.component';
@@ -34,12 +34,12 @@ import { SortSelectorComponent } from '../../../../../shared/components/sort-sel
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { VersionSecurityBadgeComponent } from '../../../../../shared/components/version-security-badge/version-security-badge.component';
-import { PagedData } from '../../../../../shared/dto/paged-data';
-import { Sort, VERSION_PRECEDENCE_SORT } from '../../../../../shared/dto/sort';
-import { emptiesList, pageAfterDelete } from '../../../../../shared/util/list-page-after-delete.util';
-import { SecurityService } from '../../../../security/service/security.service';
+import { PagedData } from '../../../../../shared/dtos/paged-data';
+import { Sort, VERSION_PRECEDENCE_SORT } from '../../../../../shared/dtos/sort';
+import { emptiesList, pageAfterDelete } from '../../../../../shared/utils/list-page-after-delete.utils';
+import { SecurityService } from '../../../../security/services/security.service';
 import { PypiConfigComponent } from '../../config/pypi-config.component';
-import { PypiService } from '../../service/pypi.service';
+import { PypiService } from '../../services/pypi.service';
 
 @Component({
   selector: 'app-pypi-packages-version-list',
@@ -61,29 +61,29 @@ import { PypiService } from '../../service/pypi.service';
   templateUrl: './pypi-packages-version-list.component.html',
 })
 export class PypiPackagesVersionListComponent implements OnDestroy {
-  public loading = true;
-  public showConfig = false;
-  public pageNum = 0;
-  public pageSize = 10;
-  public searchText = '';
-  public error: string;
-  public repoName: string;
-  public packageName: string;
-  public finalRelease: string;
-  public versions: ReleaseListItem[];
-  public pagedData: PagedData<ReleaseListItem>;
-  public activeRepo: RepoPermissionInfo;
-  public securitySummary: Record<string, VersionSecuritySummary> = {};
+  loading = true;
+  showConfig = false;
+  pageNum = 0;
+  pageSize = 10;
+  searchText = '';
+  error: string;
+  repoName: string;
+  packageName: string;
+  finalRelease: string;
+  versions: ReleaseListItem[];
+  pagedData: PagedData<ReleaseListItem>;
+  activeRepo: RepoPermissionInfo;
+  securitySummary: Record<string, VersionSecuritySummary> = {};
 
-  public sortOption: Sort = { name: 'Newest', column: 'createdAt', type: 'DESC' };
-  public sortOptions: Sort[] = [
+  sortOption: Sort = { name: 'Newest', column: 'createdAt', type: 'DESC' };
+  sortOptions: Sort[] = [
     { name: 'Newest', column: 'createdAt', type: 'DESC' },
     { name: 'Oldest', column: 'createdAt', type: 'ASC' },
     VERSION_PRECEDENCE_SORT,
   ];
 
-  public readonly baseUrl: string;
-  public readonly username: string;
+  readonly baseUrl: string;
+  readonly username: string;
   private readonly repositoryChanges$: Subscription;
   private securitySummarySubscription?: Subscription;
 
@@ -100,7 +100,7 @@ export class PypiPackagesVersionListComponent implements OnDestroy {
     this.username = this.authService.username;
     this.pagedData = new PagedData<ReleaseListItem>();
     this.activeRepo = {} as RepoPermissionInfo;
-    this.repositoryChanges$ = this.pypiService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
+    this.repositoryChanges$ = this.pypiService.repoChanges$.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
         this.activeRepo = Object.assign({}, repo);
         this.packageName = this.route.snapshot.paramMap.get('packageName');
@@ -111,40 +111,40 @@ export class PypiPackagesVersionListComponent implements OnDestroy {
     });
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     this.repositoryChanges$.unsubscribe();
     this.securitySummarySubscription?.unsubscribe();
   }
 
-  public loadPage(pageNum: number): void {
+  loadPage(pageNum: number): void {
     this.pageNum = pageNum;
     this.fetchVersions();
   }
 
-  public refreshPage(): void {
+  refreshPage(): void {
     this.fetchVersions();
   }
 
-  public search(packageName: string) {
+  search(packageName: string) {
     this.pageNum = 0;
     this.searchText = packageName;
     this.fetchVersions();
   }
 
-  public sort(option: Sort) {
+  sort(option: Sort) {
     this.sortOption = option;
     this.fetchVersions();
   }
 
-  public openConfig(open: boolean) {
+  openConfig(open: boolean) {
     this.showConfig = open;
   }
 
-  public timeAgo(date: Date | string): string {
+  timeAgo(date: Date | string): string {
     return moment(date).fromNow();
   }
 
-  public deleteVersion(version: ReleaseListItem) {
+  deleteVersion(version: ReleaseListItem) {
     this.dangerModalService.show('Delete Release', 'Delete', () => {
       this.loading = true;
       this.pypiService
@@ -190,7 +190,7 @@ export class PypiPackagesVersionListComponent implements OnDestroy {
       });
   }
 
-  public get canManage(): boolean {
+  get canManage(): boolean {
     return this.activeRepo?.canManage ?? false;
   }
 

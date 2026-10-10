@@ -20,7 +20,7 @@ import { RouterLink } from '@angular/router';
 import moment from 'moment';
 
 import { RepoListInfo, RepoType } from '../../../../../generated/api';
-import { ByteFormatter } from '../../../shared/util/byte-formatter';
+import { ByteFormatter } from '../../../shared/utils/byte-formatter';
 
 @Component({
   selector: 'app-recent-activity',
@@ -30,15 +30,15 @@ import { ByteFormatter } from '../../../shared/util/byte-formatter';
 })
 export class RecentActivityComponent {
   @Input()
-  public repoListInfos: RepoListInfo[];
+  repoListInfos: RepoListInfo[];
 
-  public timeAgo(date: Date | string): string {
+  timeAgo(date: Date | string): string {
     return moment(date).fromNow();
   }
 
   protected readonly RepoType = RepoType;
 
-  public formatBytes(bytes: number, decimals = 2): string {
+  formatBytes(bytes: number, decimals = 2): string {
     return ByteFormatter.formatBytes(bytes, decimals);
   }
 }

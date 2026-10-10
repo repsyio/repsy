@@ -19,7 +19,7 @@ import { Injectable } from '@angular/core';
 import { Router } from '@angular/router';
 
 import { ERROR_CODES } from '../constants/error-codes';
-import { problemOf } from './problem.util';
+import { problemOf } from './problem.utils';
 
 @Injectable({
   providedIn: 'root',

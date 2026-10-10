@@ -19,10 +19,10 @@ import { provideRouter, Router } from '@angular/router';
 import { NEVER, of, Subject, throwError } from 'rxjs';
 
 import { RecentScannedVersion, RepoSecurityDetail } from '../../../../../generated/api';
-import { SecurityService } from '../../../pages/security/service/security.service';
-import { toApiRepoType } from '../../util/repo-api-type';
-import { legacyNavigationUrl } from '../../util/security-detail-route.testing';
-import { buildArtifactDetailRoute } from '../../util/security-detail-route.util';
+import { SecurityService } from '../../../pages/security/services/security.service';
+import { toApiRepoType } from '../../utils/repo-api-type';
+import { buildArtifactDetailRoute } from '../../utils/security-detail-route.utils';
+import { legacyNavigationUrl } from '../../utils/security-detail-route-spec-helpers';
 import { PackageSecurityModalComponent } from './package-security-modal.component';
 
 const DETAIL = { totalCount: 3 } as unknown as RepoSecurityDetail;

@@ -18,7 +18,7 @@ import { TestBed } from '@angular/core/testing';
 import { CanMatchFn, DefaultUrlSerializer, Route, Router, Routes, UrlTree } from '@angular/router';
 import { firstValueFrom, isObservable, Observable, of, throwError } from 'rxjs';
 
-import { RepoRouteSlug } from '../../../shared/util/repo-api-type';
+import { RepoRouteSlug } from '../../../shared/utils/repo-api-type';
 import { CargoComponent } from '../cargo/cargo.component';
 import { CARGO_ROUTES } from '../cargo/cargo.routes';
 import { DockerComponent } from '../docker/docker.component';

@@ -17,7 +17,7 @@
 import { Component, EventEmitter, forwardRef, Input, Output } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 
-import { uniqueId } from '../../../../shared/util/unique-id';
+import { uniqueId } from '../../../../shared/utils/unique-id';
 
 /**
  * A switch that works both ways: with `[checked]`/`(checkedChange)`, and as a form control
@@ -31,16 +31,16 @@ import { uniqueId } from '../../../../shared/util/unique-id';
 })
 export class ToggleComponent implements ControlValueAccessor {
   /** The id of the element that names what the switch controls; the state text is appended to it. */
-  @Input() public labelledBy: string | null = null;
-  @Input() public checked: boolean;
-  @Input() public checkedLabel: string;
-  @Input() public uncheckedLabel: string;
-  @Input() public staticLabel: string;
-  @Input() public disabled = false;
-  @Output() public checkedChange = new EventEmitter<boolean>();
-  @Output() public switch = new EventEmitter<boolean>();
+  @Input() labelledBy: string | null = null;
+  @Input() checked: boolean;
+  @Input() checkedLabel: string;
+  @Input() uncheckedLabel: string;
+  @Input() staticLabel: string;
+  @Input() disabled = false;
+  @Output() checkedChange = new EventEmitter<boolean>();
+  @Output() switch = new EventEmitter<boolean>();
 
-  public readonly labelId = uniqueId('toggle-label');
+  readonly labelId = uniqueId('toggle-label');
 
   /** Set through `setDisabledState` when the bound form control is disabled. */
   private disabledByForm = false;
@@ -48,7 +48,7 @@ export class ToggleComponent implements ControlValueAccessor {
   private onTouched: () => void = () => {};
 
   /** Locked either by the `disabled` input or by a disabled form control. */
-  public get isDisabled(): boolean {
+  get isDisabled(): boolean {
     return this.disabled || this.disabledByForm;
   }
 

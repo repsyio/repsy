@@ -21,14 +21,14 @@ import { concat, Observable, of } from 'rxjs';
 import { catchError, finalize, map, switchMap, tap, toArray } from 'rxjs/operators';
 
 import { AccessTokenCreated, AccessTokenListItem, AccessTokensApi } from '../../../../../generated/api';
-import { SILENT_ERROR } from '../../../../shared/interceptor/error-handler.interceptor';
+import { SILENT_ERROR } from '../../../../shared/interceptors/error-handler.interceptor';
 import { EmptyListComponent } from '../../../shared/components/empty-list/empty-list.component';
 import { AccessTokenCreateModalComponent } from '../../../shared/components/modals/access-token-create-modal/access-token-create-modal.component';
 import { AccessTokenInfoModalComponent } from '../../../shared/components/modals/access-token-info-modal/access-token-info-modal.component';
 import { DangerModalService } from '../../../shared/components/modals/danger-modal/danger-modal.service';
 import { PaginationComponent } from '../../../shared/components/pagination/pagination.component';
 import { ToastService } from '../../../shared/components/toast/toast.service';
-import { PagedData } from '../../../shared/dto/paged-data';
+import { PagedData } from '../../../shared/dtos/paged-data';
 import { countLive, isExpired, MAX_LIVE_ACCESS_TOKENS } from './access-token-limits';
 
 @Component({
@@ -44,19 +44,19 @@ import { countLive, isExpired, MAX_LIVE_ACCESS_TOKENS } from './access-token-lim
   templateUrl: './access-tokens.component.html',
 })
 export class AccessTokensComponent implements OnInit {
-  public pageNum = 0;
-  public readonly pageSize = 5;
-  public operationLock = false;
-  public tokens: AccessTokenListItem[] = [];
-  public pagedData = new PagedData<AccessTokenListItem>();
-  public createdToken: AccessTokenCreated;
-  public showCreateModal = false;
-  public showInfoModal = false;
+  pageNum = 0;
+  readonly pageSize = 5;
+  operationLock = false;
+  tokens: AccessTokenListItem[] = [];
+  pagedData = new PagedData<AccessTokenListItem>();
+  createdToken: AccessTokenCreated;
+  showCreateModal = false;
+  showInfoModal = false;
   /** Tokens that have not expired: the limit applies to them, and a password change warns about them. */
-  public liveCount = 0;
-  public readonly maxLive = MAX_LIVE_ACCESS_TOKENS;
+  liveCount = 0;
+  readonly maxLive = MAX_LIVE_ACCESS_TOKENS;
   /** The outcome of the last "revoke all": how many were revoked and the names that failed. */
-  public revokeAllReport: { revoked: number; failed: string[] } | null = null;
+  revokeAllReport: { revoked: number; failed: string[] } | null = null;
 
   constructor(
     private readonly accessTokensApi: AccessTokensApi,
@@ -68,11 +68,11 @@ export class AccessTokensComponent implements OnInit {
     this.fetchTokens();
   }
 
-  public get limitReached(): boolean {
+  get limitReached(): boolean {
     return this.liveCount >= this.maxLive;
   }
 
-  public fetchTokens(): void {
+  fetchTokens(): void {
     this.listPage(this.pageNum).subscribe({ next: (r) => this.showTokens(r), error: () => {} });
     this.refreshLiveCount();
   }
@@ -90,22 +90,22 @@ export class AccessTokensComponent implements OnInit {
     });
   }
 
-  public loadPage(pageNum: number): void {
+  loadPage(pageNum: number): void {
     this.pageNum = pageNum;
     this.fetchTokens();
   }
 
-  public openCreate(): void {
+  openCreate(): void {
     this.showCreateModal = true;
   }
 
-  public onCreated(token: AccessTokenCreated): void {
+  onCreated(token: AccessTokenCreated): void {
     this.createdToken = token;
     this.showInfoModal = true;
     this.fetchTokens();
   }
 
-  public closeInfo(open: boolean): void {
+  closeInfo(open: boolean): void {
     this.showInfoModal = open;
     if (!open) {
       this.createdToken = undefined as never;
@@ -114,7 +114,7 @@ export class AccessTokensComponent implements OnInit {
 
   // One chained request, like the deploy token revoke: the list is fetched once, after the revoke
   // has completed, for the page that is left.
-  public revokeToken(token: AccessTokenListItem): void {
+  revokeToken(token: AccessTokenListItem): void {
     this.dangerModalService.show('Revoke Access Token', 'Revoke', () => {
       this.operationLock = true;
       this.accessTokensApi
@@ -135,11 +135,11 @@ export class AccessTokensComponent implements OnInit {
   }
 
   /** The scopes of a token as text (the wire value is an array, the generated type a Set). */
-  public scopesText(token: AccessTokenListItem): string {
+  scopesText(token: AccessTokenListItem): string {
     return Array.from(token.scopes).join(', ');
   }
 
-  public isExpired(token: AccessTokenListItem): boolean {
+  isExpired(token: AccessTokenListItem): boolean {
     return isExpired(token);
   }
 
@@ -148,7 +148,7 @@ export class AccessTokensComponent implements OnInit {
    * token that cannot be revoked does not stop the rest; the names that failed are reported. One
    * run handles the first 100 (expired ones sort last); run it again for more.
    */
-  public revokeAll(): void {
+  revokeAll(): void {
     this.dangerModalService.show('Revoke All Access Tokens', 'Revoke all', () => {
       this.operationLock = true;
       this.revokeAllReport = null;
@@ -199,11 +199,11 @@ export class AccessTokensComponent implements OnInit {
     );
   }
 
-  public timeAgo(date: string | undefined): string {
+  timeAgo(date: string | undefined): string {
     return date ? moment(date).fromNow() : 'Never';
   }
 
-  public expiryClass(expirationDate: string): string {
+  expiryClass(expirationDate: string): string {
     const date = moment(expirationDate);
     if (date.isSameOrBefore(moment())) {
       return 'text-error-500';

@@ -18,7 +18,7 @@ import { CommonModule } from '@angular/common';
 import { Component, Input } from '@angular/core';
 
 import { ScanStatus } from '../../../../../generated/api';
-import { hasRescanFailed, recentScanNote } from '../../util/rescan-status.util';
+import { hasRescanFailed, recentScanNote } from '../../utils/rescan-status.utils';
 
 /** Flags a recent scan whose newest scan is pending, running or failed. Renders nothing otherwise. */
 @Component({
@@ -28,15 +28,15 @@ import { hasRescanFailed, recentScanNote } from '../../util/rescan-status.util';
   templateUrl: './rescan-note.component.html',
 })
 export class RescanNoteComponent {
-  @Input() public status: ScanStatus | null | undefined = null;
+  @Input() status: ScanStatus | null | undefined = null;
   /** Whether an earlier scan of the version completed, i.e. whether the severity beside it is real. */
-  @Input() public hasCompletedScan = false;
+  @Input() hasCompletedScan = false;
 
-  public get note(): string {
+  get note(): string {
     return recentScanNote(this.status, this.hasCompletedScan);
   }
 
-  public get failed(): boolean {
+  get failed(): boolean {
     return hasRescanFailed(this.status);
   }
 }

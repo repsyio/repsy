@@ -18,10 +18,10 @@ import moment from 'moment';
 import { BehaviorSubject, of, throwError } from 'rxjs';
 
 import { GoModuleListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
-import { AuthService } from '../../../../../../auth/pages/service/auth.service';
+import { AuthService } from '../../../../../../auth/pages/services/auth.service';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { SecurityService } from '../../../../security/service/security.service';
+import { SecurityService } from '../../../../security/services/security.service';
 import { permission } from '../../../testing/protocol-service-spec-helpers';
 import {
   describeRepoListBehavior,
@@ -30,7 +30,7 @@ import {
   pageOf,
   REPO_NAME,
 } from '../../../testing/repo-list-spec-helpers';
-import { GoService } from '../../service/go.service';
+import { GoService } from '../../services/go.service';
 import { GoModulesListComponent } from './go-modules-list.component';
 
 const MODULE = { modulePath: 'github.com/acme/lib' } as GoModuleListItem;
@@ -41,12 +41,12 @@ describe('GoModulesListComponent', () => {
   let securityService: jasmine.SpyObj<SecurityService>;
   let toastService: jasmine.SpyObj<ToastService>;
   let dangerModalService: DangerModalService;
-  let repoChanges: BehaviorSubject<RepoPermissionInfo | null>;
+  let repoChanges$: BehaviorSubject<RepoPermissionInfo | null>;
 
   function build(): ListFixture {
-    repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
+    repoChanges$ = new BehaviorSubject<RepoPermissionInfo | null>(null);
     goService = jasmine.createSpyObj<GoService>('GoService', ['fetchModules', 'deleteModule'], {
-      repoChanges,
+      repoChanges$,
     });
     securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['watchArtifactSecuritySummary']);
     securityService.watchArtifactSecuritySummary.and.returnValue(of({}));
@@ -61,7 +61,7 @@ describe('GoModulesListComponent', () => {
     );
     return {
       component,
-      repoChanges,
+      repoChanges$,
       load: goService.fetchModules,
       args: { search: 0, sort: 1, page: 2 },
       respond: (content, totalPages) =>
@@ -79,7 +79,7 @@ describe('GoModulesListComponent', () => {
     beforeEach(fakeAsync(() => {
       build();
       goService.fetchModules.and.returnValue(of(pageOf([], 1) as never));
-      repoChanges.next(permission(REPO_NAME));
+      repoChanges$.next(permission(REPO_NAME));
       flushMicrotasks();
       goService.fetchModules.calls.reset();
     }));

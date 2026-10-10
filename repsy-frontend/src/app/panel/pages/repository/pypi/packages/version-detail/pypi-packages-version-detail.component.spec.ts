@@ -25,19 +25,19 @@ import { ReleaseDetail, RepoPermissionInfo } from '../../../../../../../generate
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { BreadcrumbSecurityLinkService } from '../../../../../shared/service/breadcrumb-security-link.service';
-import { VERSION_PROBE_SORT } from '../../../../../shared/util/version-delete-landing.util';
+import { BreadcrumbSecurityLinkService } from '../../../../../shared/services/breadcrumb-security-link.service';
+import { VERSION_PROBE_SORT } from '../../../../../shared/utils/version-delete-landing.utils';
 import { RepoLookupService } from '../../../repo-entry/repo-lookup.service';
-import { PypiService } from '../../service/pypi.service';
+import { PypiService } from '../../services/pypi.service';
 import { PypiPackagesVersionDetailComponent } from './pypi-packages-version-detail.component';
 
 @Component({ selector: 'app-security-scan-section', standalone: true, template: '' })
 class SecurityScanSectionStubComponent {
-  @Input() public repoType: string;
-  @Input() public repoName: string;
-  @Input() public artifactName: string;
-  @Input() public artifactVersion: string;
-  @Input() public canTriggerScan: boolean;
+  @Input() repoType: string;
+  @Input() repoName: string;
+  @Input() artifactName: string;
+  @Input() artifactVersion: string;
+  @Input() canTriggerScan: boolean;
 }
 
 describe('PypiPackagesVersionDetailComponent description', () => {
@@ -66,7 +66,7 @@ describe('PypiPackagesVersionDetailComponent description', () => {
   }
 
   beforeEach(() => {
-    const repoChanges = new BehaviorSubject<RepoPermissionInfo>({
+    const repoChanges$ = new BehaviorSubject<RepoPermissionInfo>({
       repoName: 'pypi-repo',
       canRead: true,
       canWrite: true,
@@ -74,7 +74,7 @@ describe('PypiPackagesVersionDetailComponent description', () => {
       private: false,
     });
     pypiService = jasmine.createSpyObj<PypiService>('PypiService', ['fetchRelease', 'deleteRelease'], {
-      repoChanges,
+      repoChanges$,
     });
 
     TestBed.configureTestingModule({
@@ -254,7 +254,7 @@ describe('PypiPackagesVersionDetailComponent delete (RPS-1288)', () => {
       'PypiService',
       ['fetchRelease', 'fetchPackageReleasesLikeName', 'deleteRelease'],
       {
-        repoChanges: new BehaviorSubject<RepoPermissionInfo>({
+        repoChanges$: new BehaviorSubject<RepoPermissionInfo>({
           repoName: REPO,
           canRead: true,
           canWrite: true,

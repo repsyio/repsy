@@ -23,5 +23,5 @@ import { Component, Input } from '@angular/core';
   imports: [],
 })
 export class StatusPollingIndicatorComponent {
-  @Input({ required: true }) public label: string;
+  @Input({ required: true }) label: string;
 }

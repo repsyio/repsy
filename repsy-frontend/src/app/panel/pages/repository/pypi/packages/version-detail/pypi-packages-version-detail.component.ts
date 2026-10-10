@@ -28,17 +28,17 @@ import { MarkdownComponent } from '../../../../../shared/components/markdown/mar
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { BreadcrumbSecurityLinkService } from '../../../../../shared/service/breadcrumb-security-link.service';
-import { externalHttpUrl } from '../../../../../shared/util/external-url.util';
+import { BreadcrumbSecurityLinkService } from '../../../../../shared/services/breadcrumb-security-link.service';
+import { externalHttpUrl } from '../../../../../shared/utils/external-url.utils';
 import {
   deleteVersionAndCheckLast$,
   landAfterVersionDelete,
   VERSION_PROBE_SIZE,
   VERSION_PROBE_SORT,
-} from '../../../../../shared/util/version-delete-landing.util';
-import { versionLoadError } from '../../../../../shared/util/version-load-error.util';
+} from '../../../../../shared/utils/version-delete-landing.utils';
+import { versionLoadError } from '../../../../../shared/utils/version-load-error.utils';
 import { RepoLookupService } from '../../../repo-entry/repo-lookup.service';
-import { PypiService } from '../../service/pypi.service';
+import { PypiService } from '../../services/pypi.service';
 
 type Classifiers = Record<string, [string]>;
 
@@ -56,20 +56,20 @@ type Classifiers = Record<string, [string]>;
   templateUrl: './pypi-packages-version-detail.component.html',
 })
 export class PypiPackagesVersionDetailComponent implements OnDestroy {
-  public readonly securityRepoType = RepoType.Pypi;
-  public loading = true;
-  public baseUrl: string;
-  public error: string;
-  public packageName: string;
-  public versionName: string;
-  public installation: string;
-  public activeRepo: RepoPermissionInfo;
+  readonly securityRepoType = RepoType.Pypi;
+  loading = true;
+  baseUrl: string;
+  error: string;
+  packageName: string;
+  versionName: string;
+  installation: string;
+  activeRepo: RepoPermissionInfo;
   private readonly repositoryChanges$: Subscription;
-  public versionInfo: ReleaseDetail;
-  public classifiers: Classifiers;
+  versionInfo: ReleaseDetail;
+  classifiers: Classifiers;
 
   /** The home page as a link target: http(s) only (RPS-1623), `null` leaves the anchor inert. */
-  public get homePageUrl(): string | null {
+  get homePageUrl(): string | null {
     return externalHttpUrl(this.versionInfo?.homePage);
   }
 
@@ -86,7 +86,7 @@ export class PypiPackagesVersionDetailComponent implements OnDestroy {
     this.baseUrl = environment.repoBaseUrl;
     this.activeRepo = {} as RepoPermissionInfo;
 
-    this.repositoryChanges$ = this.pypiService.repoChanges.subscribe((registry: RepoPermissionInfo) => {
+    this.repositoryChanges$ = this.pypiService.repoChanges$.subscribe((registry: RepoPermissionInfo) => {
       if (registry && this.isRegistryForCurrentRoute(registry)) {
         this.activeRepo = Object.assign({}, registry);
         this.loadVersion();
@@ -95,7 +95,7 @@ export class PypiPackagesVersionDetailComponent implements OnDestroy {
     this.breadcrumbSecurityLinkService.show(RepoType.Pypi);
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     this.repositoryChanges$.unsubscribe();
     this.breadcrumbSecurityLinkService.clear();
   }
@@ -111,7 +111,7 @@ export class PypiPackagesVersionDetailComponent implements OnDestroy {
     return matches;
   }
 
-  public loadVersion(): void {
+  loadVersion(): void {
     this.loading = true;
     this.error = null;
 
@@ -147,7 +147,7 @@ export class PypiPackagesVersionDetailComponent implements OnDestroy {
       });
   }
 
-  public deleteVersion() {
+  deleteVersion() {
     this.dangerModalService.show('Delete Release', 'Delete', () => {
       this.loading = true;
       deleteVersionAndCheckLast$(

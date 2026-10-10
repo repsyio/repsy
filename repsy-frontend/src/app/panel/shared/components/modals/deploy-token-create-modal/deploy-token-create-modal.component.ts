@@ -21,14 +21,14 @@ import moment, { Moment } from 'moment';
 import { finalize } from 'rxjs/operators';
 
 import { DeployTokenForm, DeployTokensApi } from '../../../../../../generated/api';
-import { idFactory } from '../../../../../shared/util/unique-id';
+import { idFactory } from '../../../../../shared/utils/unique-id';
 import { USERNAME_MESSAGES, usernameValidators } from '../../../../../shared/validators/credentials.validators';
 import {
   DESCRIPTION_MAX_LENGTH,
   DESCRIPTION_MAX_MESSAGE,
   descriptionValidators,
 } from '../../../../../shared/validators/description.validators';
-import { TokenCreateInfo } from '../../../../pages/repository/repo-settings/deploy-token/dto/token-create-info';
+import { TokenCreateInfo } from '../../../../pages/repository/repo-settings/deploy-token/dtos/token-create-info';
 import { DialogDirective } from '../../../directives/dialog.directive';
 import { RadioGroupComponent, RadioOption } from '../../radio-group/radio-group.component';
 import { ToastService } from '../../toast/toast.service';
@@ -42,24 +42,24 @@ import { ToastService } from '../../toast/toast.service';
 })
 export class DeployTokenCreateModalComponent implements OnInit {
   /** Element ids of this instance: see `idFactory`. */
-  public readonly id = idFactory('token-create');
+  readonly id = idFactory('token-create');
 
   @Output() openChange = new EventEmitter<boolean>();
   @Output() created = new EventEmitter<TokenCreateInfo>();
-  @Input() public open: boolean;
-  @Input() public repoType: string;
-  @Input() public repoName: string;
+  @Input() open: boolean;
+  @Input() repoType: string;
+  @Input() repoName: string;
 
-  public loading = false;
-  public readonly usernameMessages = USERNAME_MESSAGES;
-  public readonly descriptionMaxLength = DESCRIPTION_MAX_LENGTH;
-  public readonly descriptionMaxMessage = DESCRIPTION_MAX_MESSAGE;
+  loading = false;
+  readonly usernameMessages = USERNAME_MESSAGES;
+  readonly descriptionMaxLength = DESCRIPTION_MAX_LENGTH;
+  readonly descriptionMaxMessage = DESCRIPTION_MAX_MESSAGE;
 
-  public form: FormGroup;
-  public minDate: string;
-  public maxDate: string;
+  form: FormGroup;
+  minDate: string;
+  maxDate: string;
 
-  public accessTypeOptions: RadioOption<boolean>[] = [
+  accessTypeOptions: RadioOption<boolean>[] = [
     { label: 'Read/Write', value: false },
     { label: 'Read Only', value: true },
   ];

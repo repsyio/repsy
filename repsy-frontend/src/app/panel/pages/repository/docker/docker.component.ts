@@ -19,11 +19,11 @@ import { Router, RouterOutlet } from '@angular/router';
 import { Subscription } from 'rxjs';
 
 import { RepoPermissionInfo } from '../../../../../generated/api';
-import { AuthService } from '../../../../auth/pages/service/auth.service';
+import { AuthService } from '../../../../auth/pages/services/auth.service';
 import { RepositoryBreadcrumbComponent } from '../breadcrumb/repository-breadcrumb.component';
 import { currentRepoOfType } from '../repo-entry/current-repo-of-type';
 import { RepoLookupService } from '../repo-entry/repo-lookup.service';
-import { DockerService } from './service/docker.service';
+import { DockerService } from './services/docker.service';
 
 @Component({
   selector: 'app-docker',
@@ -32,10 +32,10 @@ import { DockerService } from './service/docker.service';
   imports: [RouterOutlet, RepositoryBreadcrumbComponent],
 })
 export class DockerComponent implements OnInit, OnDestroy {
-  public permissions: RepoPermissionInfo | null = null;
-  public loading = true;
-  public isAuthenticated = false;
-  public isPublicView = false;
+  permissions: RepoPermissionInfo | null = null;
+  loading = true;
+  isAuthenticated = false;
+  isPublicView = false;
 
   private repoSubscription: Subscription | null = null;
 
@@ -46,7 +46,7 @@ export class DockerComponent implements OnInit, OnDestroy {
     private readonly router: Router,
   ) {}
 
-  public ngOnInit(): void {
+  ngOnInit(): void {
     this.isAuthenticated = this.authService.isAuthenticated();
 
     this.repoSubscription = currentRepoOfType(this.repoLookupService, 'docker').subscribe((repoContext) => {
@@ -54,7 +54,7 @@ export class DockerComponent implements OnInit, OnDestroy {
     });
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     if (this.repoSubscription) {
       this.repoSubscription.unsubscribe();
     }

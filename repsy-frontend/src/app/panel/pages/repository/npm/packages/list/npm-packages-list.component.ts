@@ -23,7 +23,7 @@ import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
 import { NpmPackageListItem, RepoPermissionInfo, VersionSecuritySummary } from '../../../../../../../generated/api';
-import { AuthService } from '../../../../../../auth/pages/service/auth.service';
+import { AuthService } from '../../../../../../auth/pages/services/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
 import { EmptyListComponent } from '../../../../../shared/components/empty-list/empty-list.component';
@@ -34,17 +34,17 @@ import { SearchboxComponent } from '../../../../../shared/components/searchbox/s
 import { SortSelectorComponent } from '../../../../../shared/components/sort-selector/sort-selector.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
-import { PagedData } from '../../../../../shared/dto/paged-data';
-import { Sort } from '../../../../../shared/dto/sort';
-import { restoreListFocus } from '../../../../../shared/util/list-focus-restore.util';
+import { PagedData } from '../../../../../shared/dtos/paged-data';
+import { Sort } from '../../../../../shared/dtos/sort';
+import { restoreListFocus } from '../../../../../shared/utils/list-focus-restore.utils';
 import {
   readListPageParam,
   readListQueryParam,
   updateListQueryParams,
-} from '../../../../../shared/util/list-query-params.util';
-import { SecurityService } from '../../../../security/service/security.service';
+} from '../../../../../shared/utils/list-query-params.utils';
+import { SecurityService } from '../../../../security/services/security.service';
 import { NpmConfigComponent } from '../../config/npm-config.component';
-import { NpmService } from '../../service/npm.service';
+import { NpmService } from '../../services/npm.service';
 
 @Component({
   selector: 'app-npm-packages-list',
@@ -66,25 +66,25 @@ import { NpmService } from '../../service/npm.service';
   templateUrl: './npm-packages-list.component.html',
 })
 export class NpmPackagesListComponent implements OnDestroy {
-  public loading = true;
-  public showConfig = false;
-  public baseUrl: string;
-  public searchText: string;
-  public error: string;
-  public pageNum = 0;
-  public pageSize = 10;
-  public pagedData: PagedData<NpmPackageListItem>;
-  public activeRegistry: RepoPermissionInfo;
-  public packages: NpmPackageListItem[];
-  public securitySummary: Record<string, VersionSecuritySummary> = {};
+  loading = true;
+  showConfig = false;
+  baseUrl: string;
+  searchText: string;
+  error: string;
+  pageNum = 0;
+  pageSize = 10;
+  pagedData: PagedData<NpmPackageListItem>;
+  activeRegistry: RepoPermissionInfo;
+  packages: NpmPackageListItem[];
+  securitySummary: Record<string, VersionSecuritySummary> = {};
 
-  public sortOption: Sort = { name: 'Newest', column: 'updatedAt', type: 'DESC' };
-  public sortOptions: Sort[] = [
+  sortOption: Sort = { name: 'Newest', column: 'updatedAt', type: 'DESC' };
+  sortOptions: Sort[] = [
     { name: 'Newest', column: 'updatedAt', type: 'DESC' },
     { name: 'Oldest', column: 'updatedAt', type: 'ASC' },
   ];
 
-  public readonly username: string;
+  readonly username: string;
   private readonly registryChanges$: Subscription;
   private securitySummarySubscription?: Subscription;
 
@@ -102,7 +102,7 @@ export class NpmPackagesListComponent implements OnDestroy {
     this.pagedData = new PagedData<NpmPackageListItem>();
     this.activeRegistry = {} as RepoPermissionInfo;
     this.username = this.authService.username;
-    this.registryChanges$ = this.npmService.repoChanges.subscribe((registry: RepoPermissionInfo) => {
+    this.registryChanges$ = this.npmService.repoChanges$.subscribe((registry: RepoPermissionInfo) => {
       if (registry) {
         this.activeRegistry = Object.assign({}, registry);
 
@@ -119,12 +119,12 @@ export class NpmPackagesListComponent implements OnDestroy {
     });
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     this.registryChanges$.unsubscribe();
     this.securitySummarySubscription?.unsubscribe();
   }
 
-  public loadPage(pageNum: number): void {
+  loadPage(pageNum: number): void {
     this.pageNum = pageNum;
     this.fetchPackages();
   }
@@ -132,16 +132,16 @@ export class NpmPackagesListComponent implements OnDestroy {
   /** `previouslyFocused` lets a caller (a delete, whose opener is about to vanish) name the control that
    *  had the focus before it starts asking (RPS-1669), instead of the moment this reload actually goes
    *  out; a plain refresh (the toolbar button) needs no fallback and leaves it out. */
-  public refreshPage(previouslyFocused: Element | null = null): void {
+  refreshPage(previouslyFocused: Element | null = null): void {
     this.fetchPackages(previouslyFocused);
   }
 
-  public sort(option: Sort) {
+  sort(option: Sort) {
     this.sortOption = option;
     this.fetchPackages();
   }
 
-  public search(scopeName: string) {
+  search(scopeName: string) {
     if (scopeName.startsWith('@')) {
       scopeName = scopeName.substring(1);
     }
@@ -151,11 +151,11 @@ export class NpmPackagesListComponent implements OnDestroy {
     this.fetchPackages();
   }
 
-  public openConfig(open: boolean) {
+  openConfig(open: boolean) {
     this.showConfig = open;
   }
 
-  public timeAgo(date: Date | string): string {
+  timeAgo(date: Date | string): string {
     return moment(date).fromNow();
   }
 
@@ -190,7 +190,7 @@ export class NpmPackagesListComponent implements OnDestroy {
       });
   }
 
-  public deletePackage(pck: NpmPackageListItem) {
+  deletePackage(pck: NpmPackageListItem) {
     // Captured now (RPS-1669), not when the reload actually fires: by then the danger modal has already
     // closed and, since its own opener (this row's menu item) is gone, given up on restoring the focus.
     const previouslyFocused = document.activeElement;
@@ -213,15 +213,15 @@ export class NpmPackagesListComponent implements OnDestroy {
     });
   }
 
-  public get canManage(): boolean {
+  get canManage(): boolean {
     return this.activeRegistry?.canManage ?? false;
   }
 
-  public packageSecurityKey(pkg: NpmPackageListItem): string {
+  packageSecurityKey(pkg: NpmPackageListItem): string {
     return pkg.scope ? `@${pkg.scope}/${pkg.name}` : pkg.name;
   }
 
-  public packageRoute(pkg: NpmPackageListItem): string {
+  packageRoute(pkg: NpmPackageListItem): string {
     return `/${this.activeRegistry.repoName}/${pkg.scope ? pkg.scope : '~'}/${pkg.name}`;
   }
 

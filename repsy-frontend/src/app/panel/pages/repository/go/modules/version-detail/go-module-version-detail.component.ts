@@ -27,8 +27,8 @@ import { CopyClipboardComponent } from '../../../../../shared/components/copy-cl
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { versionLoadError } from '../../../../../shared/util/version-load-error.util';
-import { GoService } from '../../service/go.service';
+import { versionLoadError } from '../../../../../shared/utils/version-load-error.utils';
+import { GoService } from '../../services/go.service';
 
 @Component({
   selector: 'app-go-module-version-detail',
@@ -65,7 +65,7 @@ export class GoModuleVersionDetailComponent implements OnDestroy {
     this.repoBaseUrl = environment.repoBaseUrl;
     this.activeRepo = {} as RepoPermissionInfo;
 
-    this.repositoryChanges$ = this.goService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
+    this.repositoryChanges$ = this.goService.repoChanges$.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
         this.activeRepo = Object.assign({}, repo);
         this.modulePath = this.route.snapshot.queryParamMap.get('modulePath');

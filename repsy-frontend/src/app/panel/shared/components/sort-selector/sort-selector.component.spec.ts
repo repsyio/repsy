@@ -15,7 +15,7 @@
 
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { Sort, VERSION_PRECEDENCE_SORT } from '../../dto/sort';
+import { Sort, VERSION_PRECEDENCE_SORT } from '../../dtos/sort';
 import { SortSelectorComponent } from './sort-selector.component';
 
 const NEWEST: Sort = { name: 'Newest', column: 'createdAt', type: 'DESC' };

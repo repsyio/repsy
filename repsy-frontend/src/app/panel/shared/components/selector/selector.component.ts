@@ -18,7 +18,7 @@ import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, HostListener, Input, OnInit, Output } from '@angular/core';
 
 import { OutSideClickDirective } from '../../../../shared/components/outside-click-directive';
-import { uniqueId } from '../../../../shared/util/unique-id';
+import { uniqueId } from '../../../../shared/utils/unique-id';
 
 @Component({
   selector: 'app-selector',
@@ -27,16 +27,16 @@ import { uniqueId } from '../../../../shared/util/unique-id';
 })
 export class SelectorComponent implements OnInit {
   /** The id of the element that labels the selector; the chosen value is appended to that name. */
-  @Input() public labelledBy: string | null = null;
-  @Input() public size: 'small' | 'big' = 'small';
-  @Input() public options: string[];
-  @Input() public selectedOption: string;
+  @Input() labelledBy: string | null = null;
+  @Input() size: 'small' | 'big' = 'small';
+  @Input() options: string[];
+  @Input() selectedOption: string;
   /** Locks the selector, e.g. while the change it made is being saved. */
-  @Input() public disabled = false;
-  @Output() public selectedOptionChange = new EventEmitter<string>();
-  @Output() public choose = new EventEmitter<string>();
-  public isOpen = false;
-  public readonly valueId = uniqueId('selector-value');
+  @Input() disabled = false;
+  @Output() selectedOptionChange = new EventEmitter<string>();
+  @Output() choose = new EventEmitter<string>();
+  isOpen = false;
+  readonly valueId = uniqueId('selector-value');
 
   ngOnInit() {
     if (!this.selectedOption) {

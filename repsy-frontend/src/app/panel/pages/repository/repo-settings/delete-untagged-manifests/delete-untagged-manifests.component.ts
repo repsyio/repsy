@@ -25,7 +25,7 @@ import {
 } from '../../../../../../generated/api';
 import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
-import { ByteFormatter } from '../../../../shared/util/byte-formatter';
+import { ByteFormatter } from '../../../../shared/utils/byte-formatter';
 
 @Component({
   selector: 'app-delete-untagged-manifests',
@@ -35,14 +35,14 @@ import { ByteFormatter } from '../../../../shared/util/byte-formatter';
   imports: [RouterLink],
 })
 export class DeleteUntaggedManifestsComponent {
-  @Input() public activeRepository: RepoPermissionInfo;
+  @Input() activeRepository: RepoPermissionInfo;
   /** When set, only the untagged manifests of this image are deleted, and only a button is shown. */
-  @Input() public imageName?: string;
+  @Input() imageName?: string;
 
   /** Emits once a cleanup has succeeded, so the page around it can reload what it shows. */
-  @Output() public readonly cleaned = new EventEmitter<void>();
+  @Output() readonly cleaned = new EventEmitter<void>();
 
-  public deleting = false;
+  deleting = false;
 
   constructor(
     private readonly dockerRepoCleanupApi: DockerRepoCleanupApi,
@@ -50,7 +50,7 @@ export class DeleteUntaggedManifestsComponent {
     private readonly toastService: ToastService,
   ) {}
 
-  public deleteUntaggedManifests(): void {
+  deleteUntaggedManifests(): void {
     this.dangerModalService.showWithMessage(
       'Delete Untagged Manifests',
       'Delete',

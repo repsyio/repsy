@@ -24,8 +24,8 @@ import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
 
 import { RepoPermissionInfo, VersionSecuritySummary } from '../../../../../generated/api';
 import { DangerModalService } from '../../../shared/components/modals/danger-modal/danger-modal.service';
-import { PagedData } from '../../../shared/dto/paged-data';
-import { Sort } from '../../../shared/dto/sort';
+import { PagedData } from '../../../shared/dtos/paged-data';
+import { Sort } from '../../../shared/dtos/sort';
 import { permission } from './protocol-service-spec-helpers';
 
 /** The members every list component exposes; the concrete components are structurally assignable to it. */
@@ -48,8 +48,8 @@ export interface ListLike {
 /** A component under test with the spies it was built on. */
 export interface ListFixture {
   component: ListLike;
-  /** The `repoChanges` subject the component subscribed to. */
-  repoChanges: BehaviorSubject<RepoPermissionInfo | null>;
+  /** The `repoChanges$` subject the component subscribed to. */
+  repoChanges$: BehaviorSubject<RepoPermissionInfo | null>;
   /** The service method that loads a page of the listing. */
   load: jasmine.Spy;
   /** Positions in the argument list of `load`; `search` is left out when the loader takes no search text. */
@@ -96,7 +96,7 @@ export function describeRepoListBehavior(setup: () => ListFixture, options: List
 
   /** Selects a repository and lets the fetch settle. */
   function selectRepo(flags: Parameters<typeof permission>[1] = { canManage: true }): void {
-    fixture.repoChanges.next(permission(REPO_NAME, flags));
+    fixture.repoChanges$.next(permission(REPO_NAME, flags));
     flushMicrotasks();
   }
 
@@ -151,7 +151,7 @@ export function describeRepoListBehavior(setup: () => ListFixture, options: List
     }));
 
     it('ignores an empty repository value', fakeAsync(() => {
-      fixture.repoChanges.next(null);
+      fixture.repoChanges$.next(null);
       flushMicrotasks();
 
       expect(fixture.load).not.toHaveBeenCalled();
@@ -339,7 +339,7 @@ export function describeSimpleDelete(setup: () => DeleteFixture): void {
     fixture = setup();
     fixture.list.respond([{ id: 1 }], 1);
     fixture.remove.and.returnValue(of(undefined));
-    fixture.list.repoChanges.next(permission(REPO_NAME, { canManage: true }));
+    fixture.list.repoChanges$.next(permission(REPO_NAME, { canManage: true }));
     flushMicrotasks();
     fixture.list.load.calls.reset();
   }));
@@ -402,7 +402,7 @@ export function describeEmptyingDelete(setup: () => EmptyingDeleteFixture): void
       Array.from({ length: itemCount }, (_, id) => ({ id })),
       1,
     );
-    fixture.list.repoChanges.next(permission(REPO_NAME, { canManage: true }));
+    fixture.list.repoChanges$.next(permission(REPO_NAME, { canManage: true }));
     flushMicrotasks();
     fixture.list.load.calls.reset();
   }
@@ -494,7 +494,7 @@ export function describePagedDelete(setup: () => PagedDeleteFixture): void {
       Array.from({ length: rows }, (_, id) => ({ id })),
       2,
     );
-    fixture.list.repoChanges.next(permission(REPO_NAME, { canManage: true }));
+    fixture.list.repoChanges$.next(permission(REPO_NAME, { canManage: true }));
     flushMicrotasks();
     const list = fixture.list.component;
     list.pageNum = pageNum;
@@ -585,7 +585,7 @@ export function describeLastVersionDelete(setup: () => LastVersionDeleteFixture)
       Array.from({ length: versionCount }, (_, id) => ({ id })),
       1,
     );
-    fixture.list.repoChanges.next(permission(REPO_NAME, { canManage: true }));
+    fixture.list.repoChanges$.next(permission(REPO_NAME, { canManage: true }));
     flushMicrotasks();
     fixture.list.load.calls.reset();
   }

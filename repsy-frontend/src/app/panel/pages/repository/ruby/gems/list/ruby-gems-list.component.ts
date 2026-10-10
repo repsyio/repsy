@@ -22,7 +22,7 @@ import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
 import { GemListItem, RepoPermissionInfo, VersionSecuritySummary } from '../../../../../../../generated/api';
-import { AuthService } from '../../../../../../auth/pages/service/auth.service';
+import { AuthService } from '../../../../../../auth/pages/services/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
 import { EmptyListComponent } from '../../../../../shared/components/empty-list/empty-list.component';
@@ -33,11 +33,11 @@ import { SearchboxComponent } from '../../../../../shared/components/searchbox/s
 import { SortSelectorComponent } from '../../../../../shared/components/sort-selector/sort-selector.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
-import { PagedData } from '../../../../../shared/dto/paged-data';
-import { Sort } from '../../../../../shared/dto/sort';
-import { SecurityService } from '../../../../security/service/security.service';
+import { PagedData } from '../../../../../shared/dtos/paged-data';
+import { Sort } from '../../../../../shared/dtos/sort';
+import { SecurityService } from '../../../../security/services/security.service';
 import { RubyConfigComponent } from '../../config/ruby-config.component';
-import { RubyService } from '../../service/ruby.service';
+import { RubyService } from '../../services/ruby.service';
 
 @Component({
   selector: 'app-ruby-gems-list',
@@ -59,26 +59,26 @@ import { RubyService } from '../../service/ruby.service';
   templateUrl: './ruby-gems-list.component.html',
 })
 export class RubyGemsListComponent implements OnDestroy {
-  public loading = true;
-  public showConfig = false;
-  public pageNum = 0;
-  public pageSize = 10;
-  public searchText = '';
-  public error: string;
-  public gems: GemListItem[] = [];
-  public pagedData = new PagedData<GemListItem>();
-  public activeRepo: RepoPermissionInfo;
-  public securitySummary: Record<string, VersionSecuritySummary> = {};
+  loading = true;
+  showConfig = false;
+  pageNum = 0;
+  pageSize = 10;
+  searchText = '';
+  error: string;
+  gems: GemListItem[] = [];
+  pagedData = new PagedData<GemListItem>();
+  activeRepo: RepoPermissionInfo;
+  securitySummary: Record<string, VersionSecuritySummary> = {};
 
-  public sortOption: Sort = { name: 'Newest', column: 'updatedAt', type: 'DESC' };
-  public sortOptions: Sort[] = [
+  sortOption: Sort = { name: 'Newest', column: 'updatedAt', type: 'DESC' };
+  sortOptions: Sort[] = [
     { name: 'Newest', column: 'updatedAt', type: 'DESC' },
     { name: 'Oldest', column: 'updatedAt', type: 'ASC' },
     { name: 'Name (A-Z)', column: 'name', type: 'ASC' },
     { name: 'Name (Z-A)', column: 'name', type: 'DESC' },
   ];
-  public readonly baseUrl: string;
-  public readonly username: string;
+  readonly baseUrl: string;
+  readonly username: string;
 
   private readonly repositoryChanges$: Subscription;
   private securitySummarySubscription?: Subscription;
@@ -93,7 +93,7 @@ export class RubyGemsListComponent implements OnDestroy {
     this.baseUrl = environment.repoBaseUrl;
     this.username = this.authService.username;
     this.activeRepo = {} as RepoPermissionInfo;
-    this.repositoryChanges$ = this.rubyService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
+    this.repositoryChanges$ = this.rubyService.repoChanges$.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
         this.activeRepo = Object.assign({}, repo);
         this.fetchGems();
@@ -102,36 +102,36 @@ export class RubyGemsListComponent implements OnDestroy {
     });
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     this.repositoryChanges$.unsubscribe();
     this.securitySummarySubscription?.unsubscribe();
   }
 
-  public loadPage(pageNum: number): void {
+  loadPage(pageNum: number): void {
     this.pageNum = pageNum;
     this.fetchGems();
   }
 
-  public search(text: string): void {
+  search(text: string): void {
     this.pageNum = 0;
     this.searchText = text;
     this.fetchGems();
   }
 
-  public sort(option: Sort): void {
+  sort(option: Sort): void {
     this.sortOption = option;
     this.fetchGems();
   }
 
-  public refreshPage(): void {
+  refreshPage(): void {
     this.fetchGems();
   }
 
-  public openConfig(open: boolean): void {
+  openConfig(open: boolean): void {
     this.showConfig = open;
   }
 
-  public deleteGem(gem: GemListItem): void {
+  deleteGem(gem: GemListItem): void {
     this.dangerModalService.show('Delete Gem', 'Delete', () => {
       this.loading = true;
       this.rubyService
@@ -170,15 +170,15 @@ export class RubyGemsListComponent implements OnDestroy {
       });
   }
 
-  public get canManage(): boolean {
+  get canManage(): boolean {
     return this.activeRepo?.canManage ?? false;
   }
 
-  public timeAgo(date: Date | string): string {
+  timeAgo(date: Date | string): string {
     return moment(date).fromNow();
   }
 
-  public packageRoute(gem: GemListItem): string {
+  packageRoute(gem: GemListItem): string {
     return `/${this.activeRepo.repoName}/${gem.name}`;
   }
 

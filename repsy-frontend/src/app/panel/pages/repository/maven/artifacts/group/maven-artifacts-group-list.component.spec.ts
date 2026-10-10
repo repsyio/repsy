@@ -18,11 +18,11 @@ import moment from 'moment';
 import { BehaviorSubject, of, throwError } from 'rxjs';
 
 import { ArtifactListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
-import { AuthService } from '../../../../../../auth/pages/service/auth.service';
+import { AuthService } from '../../../../../../auth/pages/services/auth.service';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { describeRepoListBehavior, ListFixture, pageOf } from '../../../testing/repo-list-spec-helpers';
-import { MavenService } from '../../service/maven.service';
+import { MavenService } from '../../services/maven.service';
 import { MavenArtifactsGroupListComponent } from './maven-artifacts-group-list.component';
 
 const ITEM_UNDER_TEST = { groupName: 'org.acme', artifactName: 'lib' } as ArtifactListItem;
@@ -32,12 +32,12 @@ describe('MavenArtifactsGroupListComponent', () => {
   let service: jasmine.SpyObj<MavenService>;
   let toastService: jasmine.SpyObj<ToastService>;
   let dangerModalService: DangerModalService;
-  let repoChanges: BehaviorSubject<RepoPermissionInfo | null>;
+  let repoChanges$: BehaviorSubject<RepoPermissionInfo | null>;
 
   function build(): ListFixture {
-    repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
+    repoChanges$ = new BehaviorSubject<RepoPermissionInfo | null>(null);
     service = jasmine.createSpyObj<MavenService>('MavenService', ['searchGroups', 'deleteGroup', 'fetchGroupSummary'], {
-      repoChanges,
+      repoChanges$,
     });
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
     dangerModalService = new DangerModalService();
@@ -49,7 +49,7 @@ describe('MavenArtifactsGroupListComponent', () => {
     );
     return {
       component,
-      repoChanges,
+      repoChanges$,
       load: service.searchGroups,
       args: { search: 0, sort: 1, page: 2 },
       respond: (content, totalPages) => service.searchGroups.and.returnValue(of(pageOf(content, totalPages) as never)),

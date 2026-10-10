@@ -17,7 +17,7 @@ import { ChangeDetectorRef } from '@angular/core';
 import { Subject } from 'rxjs';
 
 import { RepoSecuritySummary, Severity } from '../../../../../generated/api';
-import { SecurityService } from '../../security/service/security.service';
+import { SecurityService } from '../../security/services/security.service';
 import { SecurityOverviewCardComponent } from './security-overview-card.component';
 
 // The dashboard is rendered inside an OnPush component, so this card is only checked again when it marks

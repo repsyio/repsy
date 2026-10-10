@@ -35,9 +35,9 @@ import { SearchboxComponent } from '../../shared/components/searchbox/searchbox.
 import { SelectorComponent } from '../../shared/components/selector/selector.component';
 import { SeverityBadgeComponent } from '../../shared/components/severity-badge/severity-badge.component';
 import { ToastService } from '../../shared/components/toast/toast.service';
-import { SecurityScanSupportService } from '../../shared/service/security-scan-support.service';
-import { ArtifactDetailRoute, buildArtifactDetailRoute } from '../../shared/util/security-detail-route.util';
-import { SecurityService } from './service/security.service';
+import { SecurityScanSupportService } from '../../shared/services/security-scan-support.service';
+import { ArtifactDetailRoute, buildArtifactDetailRoute } from '../../shared/utils/security-detail-route.utils';
+import { SecurityService } from './services/security.service';
 
 Chart.register(...registerables);
 
@@ -60,23 +60,23 @@ const SEVERITY_CHART_LABELS = ['Critical', 'High', 'Medium', 'Low', 'Unknown'];
   templateUrl: './security.component.html',
 })
 export class SecurityComponent implements OnInit, OnDestroy {
-  public loading = true;
-  public scans: VulnerabilityScanInfo[] = [];
-  public pagedData: PagedModelVulnerabilityScanInfo = { page: { totalPages: 0 } };
-  public pageNum = 0;
-  public pageSize = 10;
-  public repoNameSearch = '';
+  loading = true;
+  scans: VulnerabilityScanInfo[] = [];
+  pagedData: PagedModelVulnerabilityScanInfo = { page: { totalPages: 0 } };
+  pageNum = 0;
+  pageSize = 10;
+  repoNameSearch = '';
 
-  @ViewChild('summaryChartCanvas') public summaryChartCanvasRef?: ElementRef<HTMLCanvasElement>;
-  public loadingSummary = true;
-  public scansSummary: SecurityScansSummary | null = null;
+  @ViewChild('summaryChartCanvas') summaryChartCanvasRef?: ElementRef<HTMLCanvasElement>;
+  loadingSummary = true;
+  scansSummary: SecurityScansSummary | null = null;
   private summaryChart?: Chart;
   private readonly scanLinks = new WeakMap<VulnerabilityScanInfo, ArtifactDetailRoute | null>();
 
-  public readonly severityOptions: string[] = [ALL_OPTION, 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'UNKNOWN'];
-  public repoTypeOptions: string[] = [ALL_OPTION];
-  public severityOption = ALL_OPTION;
-  public repoTypeOption = ALL_OPTION;
+  readonly severityOptions: string[] = [ALL_OPTION, 'CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'UNKNOWN'];
+  repoTypeOptions: string[] = [ALL_OPTION];
+  severityOption = ALL_OPTION;
+  repoTypeOption = ALL_OPTION;
 
   protected readonly ScanStatus = ScanStatus;
 
@@ -87,44 +87,44 @@ export class SecurityComponent implements OnInit, OnDestroy {
     private readonly securityScanSupportService: SecurityScanSupportService,
   ) {}
 
-  public ngOnInit(): void {
+  ngOnInit(): void {
     this.fetchScans();
     this.fetchScansSummary();
     this.fetchSupportedRepoTypes();
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     this.summaryChart?.destroy();
   }
 
-  public get hasSummaryFindings(): boolean {
+  get hasSummaryFindings(): boolean {
     return (this.scansSummary?.totalCount ?? 0) > 0;
   }
 
-  public loadPage(pageNum: number): void {
+  loadPage(pageNum: number): void {
     this.pageNum = pageNum;
     this.fetchScans();
   }
 
-  public search(repoName: string): void {
+  search(repoName: string): void {
     this.repoNameSearch = repoName;
     this.pageNum = 0;
     this.fetchScans();
   }
 
-  public filterBySeverity(option: string): void {
+  filterBySeverity(option: string): void {
     this.severityOption = option;
     this.pageNum = 0;
     this.fetchScans();
   }
 
-  public filterByRepoType(option: string): void {
+  filterByRepoType(option: string): void {
     this.repoTypeOption = option;
     this.pageNum = 0;
     this.fetchScans();
   }
 
-  public refreshPage(): void {
+  refreshPage(): void {
     this.pageNum = 0;
     this.repoNameSearch = '';
     this.severityOption = ALL_OPTION;
@@ -136,7 +136,7 @@ export class SecurityComponent implements OnInit, OnDestroy {
    * The detail page of the scan's version. Built once per scan: the template binds its `queryParams` object,
    * and a new object on every change detection pass would be an ExpressionChanged error.
    */
-  public scanLink(scan: VulnerabilityScanInfo): ArtifactDetailRoute | null {
+  scanLink(scan: VulnerabilityScanInfo): ArtifactDetailRoute | null {
     let link = this.scanLinks.get(scan);
     if (link === undefined) {
       link = buildArtifactDetailRoute(scan.repoType, scan.repoName, scan.artifactName, scan.artifactVersion);

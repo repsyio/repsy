@@ -35,16 +35,16 @@ import { CopyClipboardComponent } from '../../../../../shared/components/copy-cl
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { BreadcrumbSecurityLinkService } from '../../../../../shared/service/breadcrumb-security-link.service';
+import { BreadcrumbSecurityLinkService } from '../../../../../shared/services/breadcrumb-security-link.service';
 import {
   deleteVersionAndCheckLast$,
   landAfterVersionDelete,
   VERSION_PROBE_SIZE,
-} from '../../../../../shared/util/version-delete-landing.util';
-import { versionLoadError } from '../../../../../shared/util/version-load-error.util';
+} from '../../../../../shared/utils/version-delete-landing.utils';
+import { versionLoadError } from '../../../../../shared/utils/version-load-error.utils';
 import { RepoLookupService } from '../../../repo-entry/repo-lookup.service';
-import { MAVEN_VERSION_PROBE_SORT, MavenService } from '../../service/maven.service';
-import { showVersionDeleteDialog } from '../../util/version-delete-warning.util';
+import { MAVEN_VERSION_PROBE_SORT, MavenService } from '../../services/maven.service';
+import { showVersionDeleteDialog } from '../../utils/version-delete-warning.utils';
 
 /** What the licenses and developers lines show when the POM declares none. */
 const NO_VALUE = '-';
@@ -90,28 +90,28 @@ function joinSorted(entries: (string | undefined)[]): string {
   templateUrl: './maven-artifacts-version-detail.component.html',
 })
 export class MavenArtifactsVersionDetailComponent implements OnDestroy {
-  public readonly securityRepoType = RepoType.Maven;
-  public loading = true;
-  public baseUrl: string;
-  public groupName: string;
-  public artifactName: string;
-  public versionName: string;
-  public error: string;
-  public activeRepo: RepoPermissionInfo;
-  public version: ArtifactVersionInfo;
-  public mavenDependencyHtml: string;
-  public mavenRepositoryHtml: string;
-  public gradleDependencyHtml: string;
-  public gradleKotlinDependencyHtml: string;
-  public sbtDependencyHtml: string;
-  public ivyDependencyHtml: string;
-  public groovyDependencyHtml: string;
-  public leiningenDependencyHtml: string;
-  public buildrDependencyHtml: string;
-  public purlDependencyHtml: string;
-  public bazelDependencyHtml: string;
-  public licensesText = NO_VALUE;
-  public developersText = NO_VALUE;
+  readonly securityRepoType = RepoType.Maven;
+  loading = true;
+  baseUrl: string;
+  groupName: string;
+  artifactName: string;
+  versionName: string;
+  error: string;
+  activeRepo: RepoPermissionInfo;
+  version: ArtifactVersionInfo;
+  mavenDependencyHtml: string;
+  mavenRepositoryHtml: string;
+  gradleDependencyHtml: string;
+  gradleKotlinDependencyHtml: string;
+  sbtDependencyHtml: string;
+  ivyDependencyHtml: string;
+  groovyDependencyHtml: string;
+  leiningenDependencyHtml: string;
+  buildrDependencyHtml: string;
+  purlDependencyHtml: string;
+  bazelDependencyHtml: string;
+  licensesText = NO_VALUE;
+  developersText = NO_VALUE;
 
   private readonly repositoryChanges$: Subscription;
 
@@ -126,7 +126,7 @@ export class MavenArtifactsVersionDetailComponent implements OnDestroy {
   ) {
     this.baseUrl = environment.apiBaseUrl;
     this.activeRepo = {} as RepoPermissionInfo;
-    this.repositoryChanges$ = this.mavenService.repoChanges.subscribe((registry: RepoPermissionInfo) => {
+    this.repositoryChanges$ = this.mavenService.repoChanges$.subscribe((registry: RepoPermissionInfo) => {
       if (registry && this.isRegistryForCurrentRoute(registry)) {
         this.activeRepo = Object.assign({}, registry);
         this.loadVersion();
@@ -135,7 +135,7 @@ export class MavenArtifactsVersionDetailComponent implements OnDestroy {
     this.breadcrumbSecurityLinkService.show(RepoType.Maven);
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     this.repositoryChanges$.unsubscribe();
     this.breadcrumbSecurityLinkService.clear();
   }
@@ -151,11 +151,11 @@ export class MavenArtifactsVersionDetailComponent implements OnDestroy {
     return matches;
   }
 
-  public get securityArtifactName(): string {
+  get securityArtifactName(): string {
     return `${this.version.artifactGroupName}:${this.version.artifactName}`;
   }
 
-  public loadVersion(): void {
+  loadVersion(): void {
     this.loading = true;
     this.error = null;
 
@@ -210,7 +210,7 @@ export class MavenArtifactsVersionDetailComponent implements OnDestroy {
       });
   }
 
-  public deleteVersion() {
+  deleteVersion() {
     this.mavenService.fetchVersionDeleteWarning(this.groupName, this.artifactName).subscribe((warning) => {
       showVersionDeleteDialog(this.dangerModalService, warning, () => this.confirmDeleteVersion());
     });

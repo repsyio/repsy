@@ -20,10 +20,10 @@ import moment from 'moment';
 import { BehaviorSubject, of } from 'rxjs';
 
 import { NuGetPackageInfo, NuGetVersionListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
-import { AuthService } from '../../../../../../auth/pages/service/auth.service';
+import { AuthService } from '../../../../../../auth/pages/services/auth.service';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { SecurityService } from '../../../../security/service/security.service';
+import { SecurityService } from '../../../../security/services/security.service';
 import { permission } from '../../../testing/protocol-service-spec-helpers';
 import { renderComponent, testIds } from '../../../testing/render-spec-helpers';
 import {
@@ -34,7 +34,7 @@ import {
   pageOf,
   REPO_NAME,
 } from '../../../testing/repo-list-spec-helpers';
-import { NuGetService } from '../../service/nuget.service';
+import { NuGetService } from '../../services/nuget.service';
 import { NuGetPackagesVersionListComponent } from './nuget-packages-version-list.component';
 
 const PACKAGE = { packageId: 'Acme.Lib' } as NuGetPackageInfo;
@@ -48,14 +48,14 @@ describe('NuGetPackagesVersionListComponent', () => {
   let toastService: jasmine.SpyObj<ToastService>;
   let router: jasmine.SpyObj<Router>;
   let dangerModalService: DangerModalService;
-  let repoChanges: BehaviorSubject<RepoPermissionInfo | null>;
+  let repoChanges$: BehaviorSubject<RepoPermissionInfo | null>;
 
   function build(): ListFixture {
-    repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
+    repoChanges$ = new BehaviorSubject<RepoPermissionInfo | null>(null);
     nugetService = jasmine.createSpyObj<NuGetService>(
       'NuGetService',
       ['fetchPackage', 'fetchPackageVersions', 'deletePackage', 'deletePackageVersion'],
-      { repoChanges },
+      { repoChanges$ },
     );
     nugetService.fetchPackage.and.resolveTo(PACKAGE);
     securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['watchVersionSecuritySummary']);
@@ -75,7 +75,7 @@ describe('NuGetPackagesVersionListComponent', () => {
     );
     return {
       component,
-      repoChanges,
+      repoChanges$,
       load: nugetService.fetchPackageVersions,
       args: { search: 1, sort: 2, page: 3 },
       respond: (content, totalPages) =>
@@ -100,7 +100,7 @@ describe('NuGetPackagesVersionListComponent', () => {
     it('loads the package of the route, then its versions', fakeAsync(() => {
       build().respond([VERSION], 1);
 
-      repoChanges.next(permission(REPO_NAME));
+      repoChanges$.next(permission(REPO_NAME));
       flushMicrotasks();
 
       expect(component.packageId).toBe('Acme.Lib');
@@ -115,7 +115,7 @@ describe('NuGetPackagesVersionListComponent', () => {
       build();
       nugetService.fetchPackage.and.rejectWith(new HttpErrorResponse({ status: 500 }));
 
-      repoChanges.next(permission(REPO_NAME));
+      repoChanges$.next(permission(REPO_NAME));
       flushMicrotasks();
 
       expect(nugetService.fetchPackageVersions).not.toHaveBeenCalled();
@@ -175,7 +175,7 @@ describe('NuGetPackagesVersionListComponent', () => {
 describe('NuGetPackagesVersionListComponent template', () => {
   async function render(canManage: boolean): Promise<HTMLElement> {
     const nugetService = jasmine.createSpyObj<NuGetService>('NuGetService', ['fetchPackage', 'fetchPackageVersions'], {
-      repoChanges: new BehaviorSubject<RepoPermissionInfo | null>(permission(REPO_NAME, { canManage })),
+      repoChanges$: new BehaviorSubject<RepoPermissionInfo | null>(permission(REPO_NAME, { canManage })),
     });
     nugetService.fetchPackage.and.resolveTo(PACKAGE);
     nugetService.fetchPackageVersions.and.resolveTo(

@@ -24,17 +24,17 @@ import { NuGetVersionInfo, NuGetVersionListItem, RepoPermissionInfo } from '../.
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { PagedData } from '../../../../../shared/dto/paged-data';
-import { NuGetService } from '../../service/nuget.service';
+import { PagedData } from '../../../../../shared/dtos/paged-data';
+import { NuGetService } from '../../services/nuget.service';
 import { NuGetPackagesVersionDetailComponent } from './nuget-packages-version-detail.component';
 
 @Component({ selector: 'app-security-scan-section', standalone: true, template: '' })
 class SecurityScanSectionStubComponent {
-  @Input() public repoType: string;
-  @Input() public repoName: string;
-  @Input() public artifactName: string;
-  @Input() public artifactVersion: string;
-  @Input() public canTriggerScan: boolean;
+  @Input() repoType: string;
+  @Input() repoName: string;
+  @Input() artifactName: string;
+  @Input() artifactVersion: string;
+  @Input() canTriggerScan: boolean;
 }
 
 describe('NuGetPackagesVersionDetailComponent README', () => {
@@ -61,7 +61,7 @@ describe('NuGetPackagesVersionDetailComponent README', () => {
   }
 
   beforeEach(() => {
-    const repoChanges = new BehaviorSubject<RepoPermissionInfo>({
+    const repoChanges$ = new BehaviorSubject<RepoPermissionInfo>({
       repoName: 'nuget-repo',
       canRead: true,
       canWrite: false,
@@ -69,7 +69,7 @@ describe('NuGetPackagesVersionDetailComponent README', () => {
       private: false,
     });
     nugetService = jasmine.createSpyObj<NuGetService>('NuGetService', ['fetchPackageVersion'], {
-      repoChanges,
+      repoChanges$,
     });
 
     TestBed.configureTestingModule({
@@ -225,7 +225,7 @@ describe('NuGetPackagesVersionDetailComponent delete (RPS-1288)', () => {
       'NuGetService',
       ['fetchPackageVersion', 'fetchPackageVersions', 'deletePackageVersion'],
       {
-        repoChanges: new BehaviorSubject<RepoPermissionInfo>({
+        repoChanges$: new BehaviorSubject<RepoPermissionInfo>({
           repoName: REPO,
           canRead: true,
           canWrite: true,

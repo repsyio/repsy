@@ -23,7 +23,7 @@ import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
 import { ArtifactListItem, RepoPermissionInfo, VersionSecuritySummary } from '../../../../../../../generated/api';
-import { AuthService } from '../../../../../../auth/pages/service/auth.service';
+import { AuthService } from '../../../../../../auth/pages/services/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
 import { EmptyListComponent } from '../../../../../shared/components/empty-list/empty-list.component';
@@ -34,12 +34,12 @@ import { SearchboxComponent } from '../../../../../shared/components/searchbox/s
 import { SortSelectorComponent } from '../../../../../shared/components/sort-selector/sort-selector.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
-import { PagedData } from '../../../../../shared/dto/paged-data';
-import { Sort } from '../../../../../shared/dto/sort';
-import { emptiesList, pageAfterDelete } from '../../../../../shared/util/list-page-after-delete.util';
-import { SecurityService } from '../../../../security/service/security.service';
+import { PagedData } from '../../../../../shared/dtos/paged-data';
+import { Sort } from '../../../../../shared/dtos/sort';
+import { emptiesList, pageAfterDelete } from '../../../../../shared/utils/list-page-after-delete.utils';
+import { SecurityService } from '../../../../security/services/security.service';
 import { MavenConfigComponent } from '../../config/maven-config.component';
-import { MavenService } from '../../service/maven.service';
+import { MavenService } from '../../services/maven.service';
 
 @Component({
   selector: 'app-maven-artifacts-list',
@@ -61,21 +61,21 @@ import { MavenService } from '../../service/maven.service';
   templateUrl: './maven-artifacts-list.component.html',
 })
 export class MavenArtifactsListComponent implements OnDestroy {
-  public loading = true;
-  public showConfig = false;
-  public baseUrl: string;
-  public username: string;
-  public pageNum = 0;
-  public pageSize = 10;
-  public pagedData: PagedData<ArtifactListItem>;
-  public activeRepo: RepoPermissionInfo;
-  public artifacts: ArtifactListItem[];
-  public searchText = '';
-  public error: string;
-  public groupName: string;
-  public securitySummary: Record<string, VersionSecuritySummary> = {};
-  public sortOption: Sort = { name: 'Newest', column: 'groupName', type: 'DESC' };
-  public sortOptions: Sort[] = [
+  loading = true;
+  showConfig = false;
+  baseUrl: string;
+  username: string;
+  pageNum = 0;
+  pageSize = 10;
+  pagedData: PagedData<ArtifactListItem>;
+  activeRepo: RepoPermissionInfo;
+  artifacts: ArtifactListItem[];
+  searchText = '';
+  error: string;
+  groupName: string;
+  securitySummary: Record<string, VersionSecuritySummary> = {};
+  sortOption: Sort = { name: 'Newest', column: 'groupName', type: 'DESC' };
+  sortOptions: Sort[] = [
     { name: 'Newest', column: 'groupName', type: 'DESC' },
     { name: 'Oldest', column: 'groupName', type: 'ASC' },
   ];
@@ -97,7 +97,7 @@ export class MavenArtifactsListComponent implements OnDestroy {
     this.pagedData = new PagedData<ArtifactListItem>();
     this.activeRepo = {} as RepoPermissionInfo;
     this.groupName = this.route.snapshot.paramMap.get('groupName');
-    this.repositoryChanges$ = this.mavenService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
+    this.repositoryChanges$ = this.mavenService.repoChanges$.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
         this.activeRepo = Object.assign({}, repo);
         this.fetchGroupArtifacts();
@@ -106,45 +106,45 @@ export class MavenArtifactsListComponent implements OnDestroy {
     });
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     this.repositoryChanges$.unsubscribe();
     this.securitySummarySubscription?.unsubscribe();
   }
 
-  public loadPage(pageNum: number): void {
+  loadPage(pageNum: number): void {
     this.pageNum = pageNum;
     this.fetchGroupArtifacts();
   }
 
-  public refreshPage(): void {
+  refreshPage(): void {
     this.fetchGroupArtifacts();
   }
 
-  public sort(option: Sort) {
+  sort(option: Sort) {
     this.sortOption = option;
     this.fetchGroupArtifacts();
   }
 
-  public search(groupName: string) {
+  search(groupName: string) {
     this.pageNum = 0;
     this.searchText = groupName;
     this.fetchGroupArtifacts();
   }
 
-  public openConfig(open: boolean) {
+  openConfig(open: boolean) {
     this.showConfig = open;
   }
 
-  public timeAgo(date: Date | string): string {
+  timeAgo(date: Date | string): string {
     return moment(date).fromNow();
   }
 
-  public imageContain(image: string): boolean {
+  imageContain(image: string): boolean {
     const images: string[] = ['jar', 'war', 'maven-plugin', 'pom', 'aar'];
     return images.includes(image);
   }
 
-  public deleteArtifact(artifact: ArtifactListItem) {
+  deleteArtifact(artifact: ArtifactListItem) {
     this.dangerModalService.show('Delete Artifact', 'Delete', () => {
       this.loading = true;
       this.mavenService
@@ -189,15 +189,15 @@ export class MavenArtifactsListComponent implements OnDestroy {
       });
   }
 
-  public get canManage(): boolean {
+  get canManage(): boolean {
     return this.activeRepo?.canManage ?? false;
   }
 
-  public packageSecurityKey(artifact: ArtifactListItem): string {
+  packageSecurityKey(artifact: ArtifactListItem): string {
     return `${artifact.groupName}:${artifact.artifactName}`;
   }
 
-  public packageRoute(artifact: ArtifactListItem): string {
+  packageRoute(artifact: ArtifactListItem): string {
     return `/${this.activeRepo.repoName}/${artifact.groupName}/${artifact.artifactName}`;
   }
 

@@ -23,10 +23,10 @@ import { ScanOverview, ScanStatus, SecurityScansApi } from '../../../../../gener
 import { SpinnerComponent } from '../../../../shared/components/spinner/spinner.component';
 import { DialogDirective } from '../../directives/dialog.directive';
 import { PortalToBodyDirective } from '../../directives/portal-to-body.directive';
-import { toApiRepoType } from '../../util/repo-api-type';
-import { recentScanNote } from '../../util/rescan-status.util';
-import { splitScopedArtifactName } from '../../util/scoped-artifact.util';
-import { buildArtifactDetailRoute } from '../../util/security-detail-route.util';
+import { toApiRepoType } from '../../utils/repo-api-type';
+import { recentScanNote } from '../../utils/rescan-status.utils';
+import { splitScopedArtifactName } from '../../utils/scoped-artifact.utils';
+import { buildArtifactDetailRoute } from '../../utils/security-detail-route.utils';
 import { RescanNoteComponent } from '../rescan-note/rescan-note.component';
 import { ScanFailureReasonComponent } from '../scan-failure-reason/scan-failure-reason.component';
 import { SeverityBreakdownComponent } from '../severity-breakdown/severity-breakdown.component';
@@ -46,43 +46,43 @@ import { SeverityBreakdownComponent } from '../severity-breakdown/severity-break
   templateUrl: './version-security-modal.component.html',
 })
 export class VersionSecurityModalComponent implements OnChanges {
-  @Input() public open = false;
-  @Output() public openChange = new EventEmitter<boolean>();
-  @Input({ required: true }) public repoName: string;
-  @Input({ required: true }) public repoType: string;
-  @Input({ required: true }) public artifactName: string;
-  @Input({ required: true }) public artifactVersion: string;
+  @Input() open = false;
+  @Output() openChange = new EventEmitter<boolean>();
+  @Input({ required: true }) repoName: string;
+  @Input({ required: true }) repoType: string;
+  @Input({ required: true }) artifactName: string;
+  @Input({ required: true }) artifactVersion: string;
 
   protected readonly ScanStatus = ScanStatus;
 
-  public loading = false;
-  public overview: ScanOverview | null = null;
+  loading = false;
+  overview: ScanOverview | null = null;
 
   constructor(
     private readonly securityScansApi: SecurityScansApi,
     private readonly router: Router,
   ) {}
 
-  public ngOnChanges(changes: SimpleChanges): void {
+  ngOnChanges(changes: SimpleChanges): void {
     if (changes['open'] && this.open && this.repoName && this.artifactName && this.artifactVersion) {
       this.fetchOverview();
     }
   }
 
-  public closeModal(): void {
+  closeModal(): void {
     this.openChange.emit(false);
   }
 
   /** Whether the newest scan is unfinished, so the counters below are the last known ones. */
-  public get hasRescanNote(): boolean {
+  get hasRescanNote(): boolean {
     return !!this.overview && recentScanNote(this.overview.status, !!this.overview.lastCompletedAt) !== '';
   }
 
-  public get isDetailClickable(): boolean {
+  get isDetailClickable(): boolean {
     return this.buildDetailRoute() !== null;
   }
 
-  public openDetail(event: Event): void {
+  openDetail(event: Event): void {
     event.stopPropagation();
 
     const route = this.buildDetailRoute();

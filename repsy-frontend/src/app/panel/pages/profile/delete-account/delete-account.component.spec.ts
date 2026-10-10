@@ -18,11 +18,11 @@ import { TestBed } from '@angular/core/testing';
 import { Router } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 
-import { AuthService } from '../../../../auth/pages/service/auth.service';
+import { AuthService } from '../../../../auth/pages/services/auth.service';
 import { DangerModalService } from '../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../shared/components/toast/toast.service';
 import { renderComponent } from '../../repository/testing/render-spec-helpers';
-import { ProfileService } from '../service/profile.service';
+import { ProfileService } from '../services/profile.service';
 import { DeleteAccountComponent } from './delete-account.component';
 
 describe('DeleteAccountComponent', () => {

@@ -16,7 +16,7 @@
 
 import { describeProtocolShell } from '../testing/protocol-shell-spec-helpers';
 import { NuGetComponent } from './nuget.component';
-import { NuGetService } from './service/nuget.service';
+import { NuGetService } from './services/nuget.service';
 
 describeProtocolShell({
   component: NuGetComponent,

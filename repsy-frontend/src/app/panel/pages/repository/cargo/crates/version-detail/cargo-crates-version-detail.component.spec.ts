@@ -27,25 +27,25 @@ import { CrateInfo, CrateVersionInfo, RepoPermissionInfo } from '../../../../../
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { VERSION_PROBE_SORT } from '../../../../../shared/util/version-delete-landing.util';
-import { CargoService } from '../../service/cargo.service';
+import { VERSION_PROBE_SORT } from '../../../../../shared/utils/version-delete-landing.utils';
+import { CargoService } from '../../services/cargo.service';
 import { CargoCratesVersionDetailComponent } from './cargo-crates-version-detail.component';
 
 @Component({ selector: 'app-security-scan-section', standalone: true, template: '' })
 class SecurityScanSectionStubComponent {
-  @Input() public repoType: string;
-  @Input() public repoName: string;
-  @Input() public artifactName: string;
-  @Input() public artifactVersion: string;
-  @Input() public canTriggerScan: boolean;
+  @Input() repoType: string;
+  @Input() repoName: string;
+  @Input() artifactName: string;
+  @Input() artifactVersion: string;
+  @Input() canTriggerScan: boolean;
 }
 
 // highlight.js is loaded lazily and is irrelevant to the README, so the highlighting directives are stubbed.
 // eslint-disable-next-line @angular-eslint/directive-selector -- must match the selector of the real directive
 @Directive({ selector: '[highlight]', standalone: true })
 class HighlightStubDirective {
-  @Input() public highlight: string;
-  @Input() public language: string;
+  @Input() highlight: string;
+  @Input() language: string;
 }
 
 // eslint-disable-next-line @angular-eslint/directive-selector -- must match the selector of the real directive
@@ -77,7 +77,7 @@ describe('CargoCratesVersionDetailComponent README', () => {
   }
 
   beforeEach(() => {
-    const repoChanges = new BehaviorSubject<RepoPermissionInfo>({
+    const repoChanges$ = new BehaviorSubject<RepoPermissionInfo>({
       repoName: 'cargo-repo',
       canRead: true,
       canWrite: true,
@@ -85,7 +85,7 @@ describe('CargoCratesVersionDetailComponent README', () => {
       private: false,
     });
     cargoService = jasmine.createSpyObj<CargoService>('CargoService', ['fetchCrate', 'fetchCrateVersion'], {
-      repoChanges,
+      repoChanges$,
     });
 
     TestBed.configureTestingModule({
@@ -192,7 +192,7 @@ describe('CargoCratesVersionDetailComponent registry snippet and delete (RPS-128
       'CargoService',
       ['fetchCrate', 'fetchCrateVersion', 'fetchCrateVersions', 'deleteCrateVersion'],
       {
-        repoChanges: new BehaviorSubject<RepoPermissionInfo>({
+        repoChanges$: new BehaviorSubject<RepoPermissionInfo>({
           repoName: REPO,
           canRead: true,
           canWrite: true,

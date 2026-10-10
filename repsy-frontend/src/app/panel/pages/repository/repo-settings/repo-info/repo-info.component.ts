@@ -20,7 +20,7 @@ import { Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs/operators';
 
 import { RepoPermissionInfo, ReposApi, RepoUpdateForm } from '../../../../../../generated/api';
-import { idFactory } from '../../../../../shared/util/unique-id';
+import { idFactory } from '../../../../../shared/utils/unique-id';
 import {
   DESCRIPTION_MAX_LENGTH,
   DESCRIPTION_MAX_MESSAGE,
@@ -28,7 +28,7 @@ import {
 } from '../../../../../shared/validators/description.validators';
 import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
-import { reservedRepoNameValidator } from '../../../../shared/util/reserved-repo-names';
+import { reservedRepoNameValidator } from '../../../../shared/utils/reserved-repo-names';
 
 @Component({
   selector: 'app-repo-info',
@@ -38,17 +38,17 @@ import { reservedRepoNameValidator } from '../../../../shared/util/reserved-repo
 })
 export class RepoInfoComponent implements OnInit {
   /** Element ids of this instance: see `idFactory`. */
-  public readonly id = idFactory('repo-info');
+  readonly id = idFactory('repo-info');
 
-  @Input() public repoType: string;
-  @Input() public activeRepository: RepoPermissionInfo;
-  public renameForm: FormGroup;
-  public descriptionForm: FormGroup;
+  @Input() repoType: string;
+  @Input() activeRepository: RepoPermissionInfo;
+  renameForm: FormGroup;
+  descriptionForm: FormGroup;
 
-  public loading = false;
-  public private = false;
-  public readonly descriptionMaxLength = DESCRIPTION_MAX_LENGTH;
-  public readonly descriptionMaxMessage = DESCRIPTION_MAX_MESSAGE;
+  loading = false;
+  private = false;
+  readonly descriptionMaxLength = DESCRIPTION_MAX_LENGTH;
+  readonly descriptionMaxMessage = DESCRIPTION_MAX_MESSAGE;
 
   constructor(
     private readonly reposApi: ReposApi,
@@ -75,7 +75,7 @@ export class RepoInfoComponent implements OnInit {
     this.descriptionForm?.get('description').setValue(this.activeRepository.description);
   }
 
-  public renameRepo() {
+  renameRepo() {
     const form: RepoUpdateForm = { name: this.renameForm.value.name };
 
     this.dangerModalService.show('Rename Repository', 'Rename', () => {
@@ -100,7 +100,7 @@ export class RepoInfoComponent implements OnInit {
     });
   }
 
-  public updateRepoDescription() {
+  updateRepoDescription() {
     const form: RepoUpdateForm = { description: this.descriptionForm.value.description };
 
     this.loading = true;
@@ -124,7 +124,7 @@ export class RepoInfoComponent implements OnInit {
       });
   }
 
-  public resetForms() {
+  resetForms() {
     this.resetRenameForm();
     this.resetDescriptionForm();
   }

@@ -18,9 +18,9 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { of } from 'rxjs';
 
-import { AuthService } from '../../../auth/pages/service/auth.service';
+import { AuthService } from '../../../auth/pages/services/auth.service';
 import { SplashService } from '../../../shared/components/splash/splash.service';
-import { ProfileService } from '../../pages/profile/service/profile.service';
+import { ProfileService } from '../../pages/profile/services/profile.service';
 import { PanelLayoutComponent } from './panel-layout.component';
 
 @Component({ standalone: true, template: '' })
@@ -40,10 +40,10 @@ class ProjectingHostComponent {}
 
 /** A `MediaQueryList` the test can flip: `setDesktop(true)` is the viewport reaching the `md` width. */
 class FakeMediaQueryList extends EventTarget {
-  public matches = false;
-  public readonly media = '(min-width: 48rem)';
+  matches = false;
+  readonly media = '(min-width: 48rem)';
 
-  public setDesktop(matches: boolean): void {
+  setDesktop(matches: boolean): void {
     this.matches = matches;
     this.dispatchEvent(Object.assign(new Event('change'), { matches }));
   }

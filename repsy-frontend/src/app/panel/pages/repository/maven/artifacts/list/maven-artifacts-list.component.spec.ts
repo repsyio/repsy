@@ -19,10 +19,10 @@ import moment from 'moment';
 import { BehaviorSubject, of, throwError } from 'rxjs';
 
 import { ArtifactListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
-import { AuthService } from '../../../../../../auth/pages/service/auth.service';
+import { AuthService } from '../../../../../../auth/pages/services/auth.service';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { SecurityService } from '../../../../security/service/security.service';
+import { SecurityService } from '../../../../security/services/security.service';
 import { permission } from '../../../testing/protocol-service-spec-helpers';
 import {
   describeEmptyingDelete,
@@ -32,7 +32,7 @@ import {
   pageOf,
   REPO_NAME,
 } from '../../../testing/repo-list-spec-helpers';
-import { MavenService } from '../../service/maven.service';
+import { MavenService } from '../../services/maven.service';
 import { MavenArtifactsListComponent } from './maven-artifacts-list.component';
 
 const ARTIFACT = { groupName: 'org.acme', artifactName: 'lib' } as ArtifactListItem;
@@ -44,12 +44,12 @@ describe('MavenArtifactsListComponent', () => {
   let toastService: jasmine.SpyObj<ToastService>;
   let router: jasmine.SpyObj<Router>;
   let dangerModalService: DangerModalService;
-  let repoChanges: BehaviorSubject<RepoPermissionInfo | null>;
+  let repoChanges$: BehaviorSubject<RepoPermissionInfo | null>;
 
   function build(): ListFixture {
-    repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
+    repoChanges$ = new BehaviorSubject<RepoPermissionInfo | null>(null);
     mavenService = jasmine.createSpyObj<MavenService>('MavenService', ['searchArtifacts', 'deleteArtifact'], {
-      repoChanges,
+      repoChanges$,
     });
     securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['watchArtifactSecuritySummary']);
     securityService.watchArtifactSecuritySummary.and.returnValue(of({}));
@@ -67,7 +67,7 @@ describe('MavenArtifactsListComponent', () => {
     );
     return {
       component,
-      repoChanges,
+      repoChanges$,
       load: mavenService.searchArtifacts,
       args: { search: 1, sort: 2, page: 3 },
       respond: (content, totalPages) =>
@@ -84,7 +84,7 @@ describe('MavenArtifactsListComponent', () => {
     it('is scoped to the group from the route', fakeAsync(() => {
       build().respond([], 0);
 
-      repoChanges.next(permission(REPO_NAME));
+      repoChanges$.next(permission(REPO_NAME));
       flushMicrotasks();
 
       expect(mavenService.searchArtifacts).toHaveBeenCalledOnceWith('org.acme', '', component.sortOption, 0, 10);
@@ -125,7 +125,7 @@ describe('MavenArtifactsListComponent', () => {
 
     it('packageRoute links to the artifact inside its group', fakeAsync(() => {
       mavenService.searchArtifacts.and.returnValue(of(pageOf([], 0) as never));
-      repoChanges.next(permission(REPO_NAME));
+      repoChanges$.next(permission(REPO_NAME));
       flushMicrotasks();
 
       expect(component.packageRoute(ARTIFACT)).toBe(`/${REPO_NAME}/org.acme/lib`);

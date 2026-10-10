@@ -27,7 +27,7 @@ import { DangerModalService } from './danger-modal.service';
   styleUrl: './danger-modal.component.css',
 })
 export class DangerModalComponent {
-  constructor(public readonly dangerModalService: DangerModalService) {}
+  constructor(readonly dangerModalService: DangerModalService) {}
 
   onClose() {
     this.dangerModalService.close();

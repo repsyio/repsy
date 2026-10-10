@@ -21,16 +21,16 @@ import { Router } from '@angular/router';
 import { finalize } from 'rxjs/operators';
 
 import { RepoCreateForm, RepoListInfo, ReposApi } from '../../../../../../generated/api';
-import { idFactory } from '../../../../../shared/util/unique-id';
+import { idFactory } from '../../../../../shared/utils/unique-id';
 import {
   DESCRIPTION_MAX_LENGTH,
   DESCRIPTION_MAX_MESSAGE,
   descriptionValidators,
 } from '../../../../../shared/validators/description.validators';
 import { DialogDirective } from '../../../directives/dialog.directive';
-import { RepoType } from '../../../dto/repo/repo-type';
-import { toApiRepoType } from '../../../util/repo-api-type';
-import { reservedRepoNameValidator } from '../../../util/reserved-repo-names';
+import { RepoType } from '../../../dtos/repo/repo-type';
+import { toApiRepoType } from '../../../utils/repo-api-type';
+import { reservedRepoNameValidator } from '../../../utils/reserved-repo-names';
 import { SelectorComponent } from '../../selector/selector.component';
 import { ToastService } from '../../toast/toast.service';
 import { ToggleComponent } from '../../toggle/toggle.component';
@@ -44,15 +44,15 @@ import { ToggleComponent } from '../../toggle/toggle.component';
 })
 export class RepositoryCreateModalComponent implements OnInit {
   /** Element ids of this instance: see `idFactory`. */
-  public readonly id = idFactory('repo-create');
+  readonly id = idFactory('repo-create');
 
   @Output() openChange = new EventEmitter<boolean>();
   /** The repository the server created, as the list shows it. */
   @Output() created = new EventEmitter<RepoListInfo | undefined>();
-  @Input() public open: boolean;
+  @Input() open: boolean;
   @Input() selectedOption: RepoType;
 
-  public options = [
+  options = [
     RepoType.DOCKER,
     RepoType.MAVEN,
     RepoType.NPM,
@@ -63,11 +63,11 @@ export class RepositoryCreateModalComponent implements OnInit {
     RepoType.NUGET,
     RepoType.RUBY,
   ];
-  public form: FormGroup;
+  form: FormGroup;
 
-  public loading = false;
-  public readonly descriptionMaxLength = DESCRIPTION_MAX_LENGTH;
-  public readonly descriptionMaxMessage = DESCRIPTION_MAX_MESSAGE;
+  loading = false;
+  readonly descriptionMaxLength = DESCRIPTION_MAX_LENGTH;
+  readonly descriptionMaxMessage = DESCRIPTION_MAX_MESSAGE;
 
   constructor(
     private readonly reposApi: ReposApi,
@@ -77,7 +77,7 @@ export class RepositoryCreateModalComponent implements OnInit {
     private readonly changeDetector: ChangeDetectorRef,
   ) {}
 
-  public ngOnInit(): void {
+  ngOnInit(): void {
     if (this.selectedOption == null) {
       this.selectedOption = RepoType.DOCKER;
     }
@@ -97,17 +97,17 @@ export class RepositoryCreateModalComponent implements OnInit {
     });
   }
 
-  public closeModal() {
+  closeModal() {
     this.form.reset();
     this.form.get('privateRepo').setValue(true);
     this.openChange.emit(false);
   }
 
-  public selectOption(option: string) {
+  selectOption(option: string) {
     this.selectedOption = option as RepoType;
   }
 
-  public createRepo() {
+  createRepo() {
     this.loading = true;
     this.form.disable();
 

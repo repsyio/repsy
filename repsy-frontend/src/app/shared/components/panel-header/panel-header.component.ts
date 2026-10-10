@@ -18,7 +18,7 @@ import { NgOptimizedImage, ViewportScroller } from '@angular/common';
 import { Component, ElementRef, EventEmitter, HostListener, Input, Output, viewChild } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 
-import { AuthService } from '../../../auth/pages/service/auth.service';
+import { AuthService } from '../../../auth/pages/services/auth.service';
 import { ProfileAvatarComponent } from '../../../panel/shared/components/avatar/profile-avatar.component';
 import { DividerComponent } from '../divider/divider.component';
 
@@ -30,11 +30,11 @@ import { DividerComponent } from '../divider/divider.component';
   standalone: true,
 })
 export class PanelHeaderComponent {
-  public username: string;
+  username: string;
   // Owned by the layout: the burger only asks for a state, it never keeps one of its own.
-  @Input() public isMobileMenuOpen = false;
+  @Input() isMobileMenuOpen = false;
   // The burger opens the sidebar, so it only exists where there is one (not without a session).
-  @Input() public hasMobileMenu = true;
+  @Input() hasMobileMenu = true;
 
   @Output() mobileMenuToggle = new EventEmitter<boolean>();
 
@@ -52,7 +52,7 @@ export class PanelHeaderComponent {
   }
 
   /** Read on every check, so the header follows a login or a logout without being told. */
-  public get isAuthenticated(): boolean {
+  get isAuthenticated(): boolean {
     return this.authService.isAuthenticated();
   }
 
@@ -68,7 +68,7 @@ export class PanelHeaderComponent {
     this.docDropdown = false;
   }
 
-  public logOut(): void {
+  logOut(): void {
     this.authService.logOut();
     this.router.navigateByUrl('login');
   }

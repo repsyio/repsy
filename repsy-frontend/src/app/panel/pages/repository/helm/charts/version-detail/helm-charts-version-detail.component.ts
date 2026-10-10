@@ -28,15 +28,15 @@ import { CopyClipboardComponent } from '../../../../../shared/components/copy-cl
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { ByteFormatter } from '../../../../../shared/util/byte-formatter';
+import { ByteFormatter } from '../../../../../shared/utils/byte-formatter';
 import {
   deleteVersionAndCheckLast$,
   landAfterVersionDelete,
   VERSION_PROBE_SIZE,
   VERSION_PROBE_SORT,
-} from '../../../../../shared/util/version-delete-landing.util';
-import { versionLoadError } from '../../../../../shared/util/version-load-error.util';
-import { HelmService } from '../../service/helm.service';
+} from '../../../../../shared/utils/version-delete-landing.utils';
+import { versionLoadError } from '../../../../../shared/utils/version-load-error.utils';
+import { HelmService } from '../../services/helm.service';
 
 @Component({
   selector: 'app-helm-charts-version-detail',
@@ -53,17 +53,17 @@ import { HelmService } from '../../service/helm.service';
   templateUrl: './helm-charts-version-detail.component.html',
 })
 export class HelmChartsVersionDetailComponent implements OnDestroy {
-  public readonly securityRepoType = RepoType.Helm;
-  public loading = true;
-  public error: string;
-  public chartName: string;
-  public versionName: string;
-  public chart: HelmChartDetail;
-  public classicInstallCommand: string;
-  public ociPullCommand: string;
-  public chartYaml = '';
-  public formattedSize = '';
-  public activeRepo: RepoPermissionInfo = {} as RepoPermissionInfo;
+  readonly securityRepoType = RepoType.Helm;
+  loading = true;
+  error: string;
+  chartName: string;
+  versionName: string;
+  chart: HelmChartDetail;
+  classicInstallCommand: string;
+  ociPullCommand: string;
+  chartYaml = '';
+  formattedSize = '';
+  activeRepo: RepoPermissionInfo = {} as RepoPermissionInfo;
 
   private readonly repositoryChanges$: Subscription;
 
@@ -74,7 +74,7 @@ export class HelmChartsVersionDetailComponent implements OnDestroy {
     private readonly dangerModalService: DangerModalService,
     private readonly router: Router,
   ) {
-    this.repositoryChanges$ = this.helmService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
+    this.repositoryChanges$ = this.helmService.repoChanges$.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
         this.activeRepo = Object.assign({}, repo);
         this.loadDetail();
@@ -82,11 +82,11 @@ export class HelmChartsVersionDetailComponent implements OnDestroy {
     });
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     this.repositoryChanges$.unsubscribe();
   }
 
-  public deleteVersion(): void {
+  deleteVersion(): void {
     this.dangerModalService.show('Delete Version', 'Delete', () => {
       this.loading = true;
       // Deleting the last version removes the chart, so its versions page would answer 404: the page
