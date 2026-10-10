@@ -222,7 +222,7 @@ class HelmHandlerRoutesTest {
   }
 
   @Test
-  @DisplayName("OCI blob uploads: start, chunk and finalize write; status has no writeOperation")
+  @DisplayName("OCI blob uploads: start, chunk, finalize and status are write operations")
   void blobUploads() {
     final var writeProperties =
         Map.<String, Object>of(
@@ -247,7 +247,9 @@ class HelmHandlerRoutesTest {
 
     final var status = handler(AbstractHelmOciBlobUploadStatusProtocolMethodHandler.class);
     assertRoute(
-        status, List.of(HttpMethod.GET, HttpMethod.HEAD), Map.of("permission", Permission.WRITE));
+        status,
+        List.of(HttpMethod.GET, HttpMethod.HEAD),
+        Map.of("permission", Permission.WRITE, "writeOperation", true));
     assertThat(parse(status, "GET", "/img/blobs/uploads/" + UPLOAD_ID)).isPresent();
     assertThat(parse(status, "HEAD", "/img/blobs/uploads/" + UPLOAD_ID)).isPresent();
     assertThat(parse(status, "PATCH", "/img/blobs/uploads/" + UPLOAD_ID)).isEmpty();
