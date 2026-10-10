@@ -21,12 +21,12 @@ import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
 import io.repsy.protocols.helm.protocol.facades.HelmProtocolFacade;
 import io.repsy.protocols.oci.handlers.AbstractOciUploadStartProtocolMethodHandler;
 import io.repsy.protocols.shared.handlers.HandlerRoute;
+import io.repsy.protocols.shared.http.PublicUrls;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 /** Handles POST /v2/{repo}/{name}/blobs/uploads/ — starts a blob upload session. */
 @NullMarked
@@ -57,10 +57,7 @@ public abstract class AbstractHelmOciBlobUploadStartProtocolMethodHandler<ID>
   protected String uploadLocation(final HttpServletRequest request, final UUID uploadId) {
     final var requestPath = stripTrailingSlashes(request.getRequestURI());
 
-    return ServletUriComponentsBuilder.fromCurrentContextPath()
-        .path(requestPath + "/" + uploadId)
-        .build()
-        .toUriString();
+    return PublicUrls.currentContextRoot() + requestPath + "/" + uploadId;
   }
 
   /** Drops the slashes at the end of the path, a loop instead of a regex so it stays linear. */

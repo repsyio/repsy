@@ -22,6 +22,7 @@ import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
 import io.repsy.protocols.cargo.protocol.facades.contracts.CargoProtocolFacade;
 import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
 import io.repsy.protocols.shared.handlers.HandlerRoute;
+import io.repsy.protocols.shared.http.ResourceResponses;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -30,7 +31,6 @@ import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
-import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -95,10 +95,7 @@ public abstract class AbstractCargoDownloadProtocolMethodHandler
       return null;
     }
 
-    return ContentDisposition.attachment()
-        .filename(matcher.group(1) + "-" + matcher.group(2) + ".crate")
-        .build()
-        .toString();
+    return ResourceResponses.attachment(matcher.group(1) + "-" + matcher.group(2) + ".crate");
   }
 
   /** The status and headers of the {@code GET}; the crate is only measured, never streamed. */

@@ -16,11 +16,11 @@
 package io.repsy.protocols.helm.protocol.handlers.oci;
 
 import io.repsy.protocols.oci.utils.OciPathUtils;
+import io.repsy.protocols.shared.http.PublicUrls;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.regex.Pattern;
 import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.NullMarked;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 /** The Helm OCI blob path (sha256 digests only) and the Location Helm reports for a session. */
 @UtilityClass
@@ -31,9 +31,6 @@ final class HelmOciPaths {
 
   /** The request's own URI under the current context path. */
   static String requestLocation(final HttpServletRequest request) {
-    return ServletUriComponentsBuilder.fromCurrentContextPath()
-        .path(request.getRequestURI())
-        .build()
-        .toUriString();
+    return PublicUrls.currentContextRoot() + request.getRequestURI();
   }
 }

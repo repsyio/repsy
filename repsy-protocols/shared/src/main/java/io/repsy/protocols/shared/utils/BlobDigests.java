@@ -163,6 +163,38 @@ public class BlobDigests {
     }
   }
 
+  /**
+   * The lowercase hex SHA-256 of {@code content}.
+   *
+   * @param content The bytes to hash
+   * @return 64 hex characters
+   */
+  public static String sha256Hex(final byte[] content) {
+
+    return HexFormat.of().formatHex(newMessageDigest("sha256").digest(content));
+  }
+
+  /**
+   * The lowercase hex SHA-256 of what {@code content} yields until its end, streamed so a large
+   * file is never held in memory. The stream is not closed.
+   *
+   * @param content The stream to hash
+   * @return 64 hex characters
+   * @throws IOException When the content cannot be read
+   */
+  public static String sha256Hex(final InputStream content) throws IOException {
+
+    final var messageDigest = newMessageDigest("sha256");
+    final var buffer = new byte[BUFFER_SIZE];
+
+    int read;
+    while ((read = content.read(buffer)) != -1) {
+      messageDigest.update(buffer, 0, read);
+    }
+
+    return HexFormat.of().formatHex(messageDigest.digest());
+  }
+
   private static MessageDigest newMessageDigest(final String algorithm) {
 
     try {

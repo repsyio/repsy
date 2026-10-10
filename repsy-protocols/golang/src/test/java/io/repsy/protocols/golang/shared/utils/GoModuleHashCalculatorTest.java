@@ -81,12 +81,6 @@ class GoModuleHashCalculatorTest {
   }
 
   @Test
-  @DisplayName("computeSha256Hex matches the well-known SHA-256 of the empty string")
-  void computeSha256HexMatchesKnownVector() {
-    assertThat(GoModuleHashCalculator.computeSha256Hex(new byte[0])).isEqualTo(SHA256_OF_EMPTY);
-  }
-
-  @Test
   @DisplayName("hashMod matches a known-correct dirhash.HashGoMod value (RPS-1231)")
   void hashModMatchesKnownValue() {
     final var hash = GoModuleHashCalculator.hashMod(MOD_CONTENT.getBytes(StandardCharsets.UTF_8));

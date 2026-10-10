@@ -16,10 +16,10 @@
 package io.repsy.protocols.golang.protocol.handlers;
 
 import io.repsy.libs.protocol.router.ProtocolContext;
+import io.repsy.protocols.shared.http.ResourceResponses;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
-import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -59,7 +59,7 @@ final class GoDownloadResponses {
   static ResponseEntity.BodyBuilder notFound() {
     return ResponseEntity.status(HttpStatus.NOT_FOUND)
         .contentType(MediaType.TEXT_PLAIN)
-        .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline().build().toString());
+        .header(HttpHeaders.CONTENT_DISPOSITION, ResourceResponses.inline());
   }
 
   static String notFoundText(final ProtocolContext context) {
@@ -76,11 +76,11 @@ final class GoDownloadResponses {
     final var filename = path.substring(path.lastIndexOf('/') + 1);
 
     if (filename.endsWith(".zip")) {
-      return ContentDisposition.attachment().filename(filename).build().toString();
+      return ResourceResponses.attachment(filename);
     }
 
     if (filename.endsWith(".info") || filename.endsWith(".mod")) {
-      return ContentDisposition.inline().filename(filename).build().toString();
+      return ResourceResponses.inline(filename);
     }
 
     return null;

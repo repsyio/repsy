@@ -18,6 +18,7 @@ package io.repsy.protocols.maven.shared.utils;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
+import io.repsy.protocols.shared.limits.FieldLimits;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import org.apache.maven.index.artifact.Gav;
@@ -166,9 +167,9 @@ public final class MavenPublishLimits {
    */
   public static void dropOverLongFields(final Model model) {
 
-    model.setName(dropIfTooLong(model.getName(), MAX_NAME_LENGTH));
-    model.setUrl(dropIfTooLong(model.getUrl(), MAX_URL_LENGTH));
-    model.setPackaging(dropIfTooLong(model.getPackaging(), MAX_PACKAGING_LENGTH));
+    model.setName(FieldLimits.dropIfTooLong(model.getName(), MAX_NAME_LENGTH));
+    model.setUrl(FieldLimits.dropIfTooLong(model.getUrl(), MAX_URL_LENGTH));
+    model.setPackaging(FieldLimits.dropIfTooLong(model.getPackaging(), MAX_PACKAGING_LENGTH));
 
     dropOverLongOrganization(model);
     dropOverLongScm(model);
@@ -177,10 +178,13 @@ public final class MavenPublishLimits {
     dropOverLongDevelopers(model);
   }
 
-  /** {@code value}, or {@code null} when it is longer than {@code maxLength}. */
+  /**
+   * {@code value}, or {@code null} when it is longer than {@code maxLength}. Delegates to {@link
+   * FieldLimits}; kept for {@code ArtifactService}, which drops over-long fields itself.
+   */
   public static @Nullable String dropIfTooLong(final @Nullable String value, final int maxLength) {
 
-    return value != null && value.length() > maxLength ? null : value;
+    return FieldLimits.dropIfTooLong(value, maxLength);
   }
 
   private static void dropOverLongOrganization(final Model model) {
@@ -188,7 +192,8 @@ public final class MavenPublishLimits {
     final var organization = model.getOrganization();
 
     if (organization != null) {
-      organization.setName(dropIfTooLong(organization.getName(), MAX_ORGANIZATION_LENGTH));
+      organization.setName(
+          FieldLimits.dropIfTooLong(organization.getName(), MAX_ORGANIZATION_LENGTH));
     }
   }
 
@@ -197,7 +202,7 @@ public final class MavenPublishLimits {
     final var scm = model.getScm();
 
     if (scm != null) {
-      scm.setUrl(dropIfTooLong(scm.getUrl(), MAX_URL_LENGTH));
+      scm.setUrl(FieldLimits.dropIfTooLong(scm.getUrl(), MAX_URL_LENGTH));
     }
   }
 
@@ -222,7 +227,7 @@ public final class MavenPublishLimits {
   }
 
   private static void dropOverLongLicenseUrl(final License license) {
-    license.setUrl(dropIfTooLong(license.getUrl(), MAX_LICENSE_URL_LENGTH));
+    license.setUrl(FieldLimits.dropIfTooLong(license.getUrl(), MAX_LICENSE_URL_LENGTH));
   }
 
   private static void dropOverLongDevelopers(final Model model) {
@@ -234,7 +239,7 @@ public final class MavenPublishLimits {
   }
 
   private static void dropOverLongDeveloperEmail(final Developer developer) {
-    developer.setEmail(dropIfTooLong(developer.getEmail(), MAX_DEVELOPER_EMAIL_LENGTH));
+    developer.setEmail(FieldLimits.dropIfTooLong(developer.getEmail(), MAX_DEVELOPER_EMAIL_LENGTH));
   }
 
   /** A {@code NOT NULL} name is usable when it is present and fits. */

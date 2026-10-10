@@ -22,13 +22,13 @@ import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import io.repsy.protocols.oci.handlers.AbstractOciUploadStartProtocolMethodHandler;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.handlers.HandlerRoute;
+import io.repsy.protocols.shared.http.PublicUrls;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.BlobDigests;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 /**
  * The Docker upload start: honours the {@code digest-algorithm} hint (RPS-1594) and keeps no state
@@ -66,10 +66,10 @@ public abstract class AbstractDockerUploadStartProtocolMethodHandler
 
   @Override
   protected String uploadLocation(final HttpServletRequest request, final UUID uploadId) {
-    return ServletUriComponentsBuilder.fromCurrentRequestUri()
-        .path("/{sessionId}")
-        .buildAndExpand(uploadId)
-        .toUriString();
+    final var requestPath = request.getRequestURI();
+    final var end = requestPath.endsWith("/") ? requestPath.length() - 1 : requestPath.length();
+
+    return PublicUrls.origin(request) + requestPath.substring(0, end) + "/" + uploadId;
   }
 
   protected UUID getUuid() {

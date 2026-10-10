@@ -27,6 +27,7 @@ import io.repsy.protocols.nuget.protocol.NuGetProtocolProvider;
 import io.repsy.protocols.nuget.protocol.facades.contracts.NuGetProtocolFacade;
 import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
 import io.repsy.protocols.shared.handlers.HandlerRoute;
+import io.repsy.protocols.shared.http.ResourceResponses;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -34,7 +35,6 @@ import java.io.IOException;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
-import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -69,9 +69,8 @@ public abstract class AbstractNuGetDownloadProtocolMethodHandler
   static String contentDisposition(final ProtocolContext context, final boolean attach) {
     final var path = ProtocolContextUtils.getRelativePath(context).getPath();
     final var filename = path.substring(path.lastIndexOf('/') + 1);
-    final var builder = attach ? ContentDisposition.attachment() : ContentDisposition.inline();
 
-    return builder.filename(filename).build().toString();
+    return attach ? ResourceResponses.attachment(filename) : ResourceResponses.inline(filename);
   }
 
   @Override

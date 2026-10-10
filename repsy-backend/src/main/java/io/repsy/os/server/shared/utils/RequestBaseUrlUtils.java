@@ -15,7 +15,7 @@
  */
 package io.repsy.os.server.shared.utils;
 
-import io.repsy.protocols.shared.utils.ForwardedHostUtils;
+import io.repsy.protocols.shared.http.PublicUrls;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
@@ -27,29 +27,8 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 @UtilityClass
 public class RequestBaseUrlUtils {
 
-  private static final int PORT_HTTPS = 443;
-  private static final int PORT_HTTP = 80;
-  private static final String PROTO_HTTPS = "https";
-  private static final String PROTO_HTTP = "http";
-
   public static @NonNull String resolveBaseUrl(final @NonNull HttpServletRequest request) {
-    final var scheme = request.getScheme();
-    final var host = request.getServerName();
-    // RPS-1515: server.forward-headers-strategy: native wires up Tomcat's RemoteIpValve, which
-    // reads the port only from X-Forwarded-Port. A port embedded in X-Forwarded-Host
-    // (host:port) is parsed out and discarded there, so recover it from the raw header when the
-    // proxy sent no separate X-Forwarded-Port.
-    final var port =
-        ForwardedHostUtils.resolvePort(
-            request.getHeader(ForwardedHostUtils.X_FORWARDED_HOST),
-            request.getHeader(ForwardedHostUtils.X_FORWARDED_PORT),
-            request.getServerPort());
-    return scheme + "://" + (isDefaultPort(scheme, port) ? host : host + ":" + port);
-  }
-
-  private static boolean isDefaultPort(final String scheme, final int port) {
-    return (PROTO_HTTP.equals(scheme) && port == PORT_HTTP)
-        || (PROTO_HTTPS.equals(scheme) && port == PORT_HTTPS);
+    return PublicUrls.origin(request);
   }
 
   public static @NonNull String resolveBaseUrl() {

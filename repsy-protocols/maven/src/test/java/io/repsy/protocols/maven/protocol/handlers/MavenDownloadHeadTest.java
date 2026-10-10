@@ -137,7 +137,7 @@ class MavenDownloadHeadTest {
     assertThat(response.getHeaders().getContentType())
         .isEqualTo(MediaType.APPLICATION_OCTET_STREAM);
     assertThat(response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION))
-        .isEqualTo("attachment; filename=demo-1.0.jar");
+        .isEqualTo("attachment; filename=\"demo-1.0.jar\"");
     assertThat(response.getHeaders().getContentLength()).isEqualTo(1234);
   }
 
@@ -169,7 +169,7 @@ class MavenDownloadHeadTest {
     assertThat(head.getBody()).isNull();
     assertThat(head.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_OCTET_STREAM);
     assertThat(head.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION))
-        .isEqualTo("attachment; filename=maven-metadata.xml");
+        .isEqualTo("attachment; filename=\"maven-metadata.xml\"");
     assertThat(head.getHeaders().getContentLength()).isEqualTo(xml.length);
     assertThat(head.getHeaders().containsHeader(HttpHeaders.LAST_MODIFIED)).isFalse();
     assertThat(head.getHeaders().containsHeader(HttpHeaders.ETAG)).isFalse();
@@ -178,7 +178,7 @@ class MavenDownloadHeadTest {
     assertThat(get.getBody()).isInstanceOf(SynthesizedFileResource.class);
     assertThat(get.getHeaders().getContentType()).isEqualTo(MediaType.APPLICATION_OCTET_STREAM);
     assertThat(get.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION))
-        .isEqualTo("attachment; filename=maven-metadata.xml");
+        .isEqualTo("attachment; filename=\"maven-metadata.xml\"");
   }
 
   @Test

@@ -17,10 +17,10 @@ package io.repsy.protocols.docker.protocol.handlers;
 
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
+import io.repsy.protocols.shared.http.PublicUrls;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.NullMarked;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 /** Where a Docker upload session is stored and the URLs Docker reports for it. */
 @UtilityClass
@@ -38,9 +38,12 @@ final class DockerUploadPaths {
 
     final var urlProperties = ProtocolContextUtils.getUrlProperties(context);
 
-    return ServletUriComponentsBuilder.fromCurrentContextPath()
-        .path("/v2/{repoName}/{imageName}/blobs/uploads/{sessionId}")
-        .buildAndExpand(urlProperties.getRepoName(), imageName, sessionId)
-        .toUriString();
+    return PublicUrls.currentContextRoot()
+        + "/v2/"
+        + urlProperties.getRepoName()
+        + "/"
+        + imageName
+        + "/blobs/uploads/"
+        + sessionId;
   }
 }

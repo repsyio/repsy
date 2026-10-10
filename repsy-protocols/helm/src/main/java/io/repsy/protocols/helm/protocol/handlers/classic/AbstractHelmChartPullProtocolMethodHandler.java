@@ -24,6 +24,7 @@ import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
 import io.repsy.protocols.helm.protocol.facades.HelmProtocolFacade;
 import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
 import io.repsy.protocols.shared.handlers.HandlerRoute;
+import io.repsy.protocols.shared.http.ResourceResponses;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -74,7 +75,7 @@ public abstract class AbstractHelmChartPullProtocolMethodHandler<ID>
 
     return ResponseEntity.ok()
         .header(CONTENT_TYPE, MediaType.APPLICATION_OCTET_STREAM_VALUE)
-        .header(CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+        .header(CONTENT_DISPOSITION, ResourceResponses.attachment(filename))
         .body(resource);
   }
 }

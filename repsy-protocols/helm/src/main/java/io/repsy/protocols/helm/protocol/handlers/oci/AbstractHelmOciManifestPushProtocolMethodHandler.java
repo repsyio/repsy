@@ -34,15 +34,14 @@ import io.repsy.protocols.helm.shared.utils.HelmChartParser;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
 import io.repsy.protocols.shared.handlers.HandlerRoute;
+import io.repsy.protocols.shared.http.PublicUrls;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.utils.BlobDigests;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
 import java.util.regex.Pattern;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -54,7 +53,6 @@ import org.springframework.dao.PessimisticLockingFailureException;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -173,10 +171,7 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
     final var requestPath = request.getRequestURI();
     final var manifestsBasePath = requestPath.substring(0, requestPath.lastIndexOf('/') + 1);
     final var location =
-        ServletUriComponentsBuilder.fromCurrentContextPath()
-            .path(manifestsBasePath + manifestInfo.digest())
-            .build()
-            .toUriString();
+        PublicUrls.currentContextRoot() + manifestsBasePath + manifestInfo.digest();
 
     return ResponseEntity.status(HttpStatus.CREATED)
         .header(LOCATION, location)
@@ -327,10 +322,8 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
     }
   }
 
-  @SneakyThrows(NoSuchAlgorithmException.class)
   private String calculateDigest(final byte[] contentBytes) {
-    final var md = MessageDigest.getInstance("SHA-256");
-    return HelmConstants.SHA256_PREFIX + HexFormat.of().formatHex(md.digest(contentBytes));
+    return HelmConstants.SHA256_PREFIX + BlobDigests.sha256Hex(contentBytes);
   }
 
   /**

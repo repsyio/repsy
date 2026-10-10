@@ -39,8 +39,7 @@ public class DockerDigestCalculator {
 
   public static String calculateDigest(final byte[] bytes) throws NoSuchAlgorithmException {
 
-    return SHA256_PREFIX
-        + HexFormat.of().formatHex(getInstance(MessageDigestAlgorithms.SHA_256).digest(bytes));
+    return SHA256_PREFIX + BlobDigests.sha256Hex(bytes);
   }
 
   public static String calculateSha512Digest(final byte[] bytes) throws NoSuchAlgorithmException {

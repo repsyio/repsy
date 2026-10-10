@@ -17,6 +17,7 @@ package io.repsy.protocols.golang.shared.utils;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
+import io.repsy.protocols.shared.utils.BlobDigests;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -73,15 +74,9 @@ public class GoModuleHashCalculator {
    */
   public static final int MAX_ENTRY_COUNT = 100_000;
 
-  /** Returns the lowercase hex-encoded SHA-256 digest of {@code content}. */
-  @SneakyThrows
-  public static String computeSha256Hex(final byte[] content) {
-    return HexFormat.of().formatHex(MessageDigest.getInstance(SHA_256).digest(content));
-  }
-
   @SneakyThrows
   public static String hashMod(final byte[] content) {
-    return outerHash(List.of(entryLine(computeSha256Hex(content), GO_MOD_ENTRY_NAME)));
+    return outerHash(List.of(entryLine(BlobDigests.sha256Hex(content), GO_MOD_ENTRY_NAME)));
   }
 
   /**

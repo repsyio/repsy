@@ -26,13 +26,13 @@ import io.repsy.protocols.npm.shared.utils.ExtractPath;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
 import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
 import io.repsy.protocols.shared.handlers.HandlerRoute;
+import io.repsy.protocols.shared.http.ResourceResponses;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -94,8 +94,7 @@ public abstract class AbstractNpmPackageDownloadProtocolMethodHandler
       return ResponseEntity.ok()
           .contentType(MediaType.APPLICATION_OCTET_STREAM)
           .header(
-              HttpHeaders.CONTENT_DISPOSITION,
-              ContentDisposition.attachment().filename(bareFilename(filename)).build().toString())
+              HttpHeaders.CONTENT_DISPOSITION, ResourceResponses.attachment(bareFilename(filename)))
           .body(resource);
 
     } catch (final UnAuthorizedException e) {

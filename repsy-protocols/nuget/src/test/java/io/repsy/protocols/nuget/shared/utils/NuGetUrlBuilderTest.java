@@ -57,4 +57,14 @@ class NuGetUrlBuilderTest {
     assertThat(NuGetUrlBuilder.buildBaseUrl(request("https", "repo.internal", 80), "my-repo"))
         .isEqualTo("https://repo.internal:80/my-repo");
   }
+
+  @Test
+  @DisplayName("names the port embedded in X-Forwarded-Host when no X-Forwarded-Port is sent")
+  void embeddedForwardedPort() {
+    final var request = request("https", "repo.internal", 443);
+    request.addHeader("X-Forwarded-Host", "repo.example.com:8443");
+
+    assertThat(NuGetUrlBuilder.buildBaseUrl(request, "my-repo"))
+        .isEqualTo("https://repo.internal:8443/my-repo");
+  }
 }

@@ -26,6 +26,7 @@ import io.repsy.protocols.nuget.shared.dtos.NuGetRegistrationLeafItem;
 import io.repsy.protocols.nuget.shared.dtos.NuGetRegistrationPageItem;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetDependencyGroupInfo;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetDependencyInfo;
+import io.repsy.protocols.shared.limits.FieldLimits;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.BoundedEntryReader;
 import io.repsy.protocols.shared.utils.EntryTooLargeException;
@@ -374,7 +375,8 @@ public final class NuGetPackageUtils {
    * so the full value is not lost.
    */
   public static @Nullable String extractUrl(final String nuspecXml, final String tagName) {
-    return dropIfTooLong(extractMetadataField(nuspecXml, tagName), tagName);
+    return FieldLimits.dropIfTooLong(
+        extractMetadataField(nuspecXml, tagName), MAX_URL_LENGTH, tagName + " URL");
   }
 
   /**
@@ -384,15 +386,8 @@ public final class NuGetPackageUtils {
    * repository_url} column is dropped rather than failing the publish.
    */
   public static @Nullable String extractRepositoryUrl(final String nuspecXml) {
-    return dropIfTooLong(readRepositoryUrl(nuspecXml), "repository");
-  }
-
-  private static @Nullable String dropIfTooLong(final @Nullable String url, final String field) {
-    if (url != null && url.length() > MAX_URL_LENGTH) {
-      log.warn("Skipping {} URL: longer than {} characters", field, MAX_URL_LENGTH);
-      return null;
-    }
-    return url;
+    return FieldLimits.dropIfTooLong(
+        readRepositoryUrl(nuspecXml), MAX_URL_LENGTH, "repository URL");
   }
 
   private static @Nullable String truncate(

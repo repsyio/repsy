@@ -22,6 +22,7 @@ import io.repsy.protocols.pypi.protocol.PypiProtocolProvider;
 import io.repsy.protocols.pypi.protocol.facades.PypiProtocolFacade;
 import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
 import io.repsy.protocols.shared.handlers.HandlerRoute;
+import io.repsy.protocols.shared.http.ResourceResponses;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -73,13 +74,8 @@ public abstract class AbstractPypiFileDownloadProtocolMethodHandler<ID>
 
     return ResponseEntity.ok()
         .contentType(MediaType.APPLICATION_OCTET_STREAM)
-        .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition(fileName))
+        .header(HttpHeaders.CONTENT_DISPOSITION, ResourceResponses.attachment(fileName))
         .body(resource);
-  }
-
-  /** The header of a file download; the {@code HEAD} of the same file answers it too. */
-  static String contentDisposition(final String fileName) {
-    return "attachment; filename=\"" + fileName + "\"";
   }
 
   /** The status and headers of the {@code GET} with the file's length; the file is not streamed. */
@@ -108,7 +104,7 @@ public abstract class AbstractPypiFileDownloadProtocolMethodHandler<ID>
 
     return ResponseEntity.ok()
         .contentType(MediaType.APPLICATION_OCTET_STREAM)
-        .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition(fileName))
+        .header(HttpHeaders.CONTENT_DISPOSITION, ResourceResponses.attachment(fileName))
         .header(HttpHeaders.ACCEPT_RANGES, "bytes")
         .contentLength(resource.contentLength())
         .build();

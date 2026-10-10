@@ -22,6 +22,7 @@ import io.repsy.protocols.cargo.shared.crate.dtos.CratePublishDep;
 import io.repsy.protocols.cargo.shared.crate.dtos.CratePublishRequest;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateVersionListItem;
 import io.repsy.protocols.cargo.shared.crate.services.SemverComparator;
+import io.repsy.protocols.shared.limits.FieldLimits;
 import io.repsy.protocols.shared.utils.BoundedEntryReader;
 import io.repsy.protocols.shared.utils.EntryTooLargeException;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
@@ -211,51 +212,22 @@ public class CrateUtils {
         request.hasLib(),
         request.deps(),
         request.features(),
-        dropEntriesIfTooLong(request.authors(), MAX_AUTHOR_LENGTH, "author"),
+        FieldLimits.dropEntriesIfTooLong(request.authors(), MAX_AUTHOR_LENGTH, "author"),
         request.description(),
-        dropIfTooLong(request.documentation(), MAX_DOCUMENTATION_LENGTH, "documentation"),
-        dropIfTooLong(request.homepage(), MAX_HOMEPAGE_LENGTH, "homepage"),
+        FieldLimits.dropIfTooLong(
+            request.documentation(), MAX_DOCUMENTATION_LENGTH, "documentation"),
+        FieldLimits.dropIfTooLong(request.homepage(), MAX_HOMEPAGE_LENGTH, "homepage"),
         request.readme(),
         request.readmeFile(),
         request.keywords(),
-        dropEntriesIfTooLong(request.categories(), MAX_CATEGORY_LENGTH, "category"),
-        dropIfTooLong(request.license(), MAX_LICENSE_LENGTH, "license"),
-        dropIfTooLong(request.licenseFile(), MAX_LICENSE_FILE_LENGTH, "license_file"),
-        dropIfTooLong(request.repository(), MAX_REPOSITORY_LENGTH, "repository"),
+        FieldLimits.dropEntriesIfTooLong(request.categories(), MAX_CATEGORY_LENGTH, "category"),
+        FieldLimits.dropIfTooLong(request.license(), MAX_LICENSE_LENGTH, "license"),
+        FieldLimits.dropIfTooLong(request.licenseFile(), MAX_LICENSE_FILE_LENGTH, "license_file"),
+        FieldLimits.dropIfTooLong(request.repository(), MAX_REPOSITORY_LENGTH, "repository"),
         request.links(),
         request.rustVersion(),
         request.cksum(),
         request.features2());
-  }
-
-  private static @Nullable String dropIfTooLong(
-      final @Nullable String value, final int maxLength, final String field) {
-
-    if (value != null && value.length() > maxLength) {
-      log.warn("Skipping {}: longer than {} characters", field, maxLength);
-      return null;
-    }
-
-    return value;
-  }
-
-  private static @Nullable List<String> dropEntriesIfTooLong(
-      final @Nullable List<String> values, final int maxLength, final String field) {
-
-    if (values == null) {
-      return null;
-    }
-
-    return values.stream()
-        .filter(
-            value -> {
-              final var fits = value == null || value.length() <= maxLength;
-              if (!fits) {
-                log.warn("Skipping a {}: longer than {} characters", field, maxLength);
-              }
-              return fits;
-            })
-        .toList();
   }
 
   private static void validateCrateName(final @Nullable String name) {

@@ -133,7 +133,7 @@ class MavenGroupMetadataSynthesisIT extends AbstractIT {
     assertThat(response.getStatus()).isEqualTo(200);
     assertThat(response.getContentType()).isEqualTo("application/octet-stream");
     assertThat(response.getHeader(CONTENT_DISPOSITION))
-        .isEqualTo("attachment; filename=maven-metadata.xml");
+        .isEqualTo("attachment; filename=\"maven-metadata.xml\"");
     assertThat(response.getContentAsString())
         .isEqualTo(
             """

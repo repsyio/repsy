@@ -16,6 +16,7 @@
 package io.repsy.protocols.maven.protocol.handlers;
 
 import io.repsy.protocols.maven.protocol.resources.SynthesizedFileResource;
+import io.repsy.protocols.shared.http.ResourceResponses;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
@@ -43,7 +44,7 @@ final class MavenResourceResponses {
     } else {
       builder.contentType(MediaType.APPLICATION_OCTET_STREAM);
       builder.header(
-          HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + resource.getFilename());
+          HttpHeaders.CONTENT_DISPOSITION, ResourceResponses.attachment(resource.getFilename()));
     }
 
     return builder;

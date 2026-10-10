@@ -24,6 +24,7 @@ import io.repsy.protocols.helm.shared.constants.HelmConstants;
 import io.repsy.protocols.oci.handlers.AbstractOciUploadFinalizeProtocolMethodHandler;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.handlers.HandlerRoute;
+import io.repsy.protocols.shared.http.PublicUrls;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.BlobDigests;
 import jakarta.servlet.http.HttpServletRequest;
@@ -32,7 +33,6 @@ import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpMethod;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 /** Handles PUT /v2/{repo}/{name}/blobs/uploads/{uuid}?digest= — finalizes a blob upload. */
 @NullMarked
@@ -109,9 +109,6 @@ public abstract class AbstractHelmOciBlobUploadFinalizeProtocolMethodHandler<ID>
     final var requestPath = request.getRequestURI();
     final var blobsBasePath = requestPath.substring(0, requestPath.lastIndexOf("/uploads/"));
 
-    return ServletUriComponentsBuilder.fromCurrentContextPath()
-        .path(blobsBasePath + "/" + digest)
-        .build()
-        .toUriString();
+    return PublicUrls.currentContextRoot() + blobsBasePath + "/" + digest;
   }
 }
