@@ -15,14 +15,14 @@
  */
 package io.repsy.os.server.security.shared.schedulers;
 
+import io.repsy.libs.scanner.trivy.ScanJobNotFoundException;
+import io.repsy.libs.scanner.trivy.ScanJobStatusResponse;
+import io.repsy.libs.scanner.trivy.TrivyScannerClientProperties;
+import io.repsy.libs.scanner.trivy.TrivyScannerStatusClient;
 import io.repsy.os.server.security.scan.dtos.ScanStatus;
 import io.repsy.os.server.security.scan.entities.VulnerabilityScan;
 import io.repsy.os.server.security.scan.repositories.VulnerabilityScanRepository;
 import io.repsy.os.server.security.scan.services.VulnerabilityScanTxService;
-import io.repsy.os.server.security.scanner.trivy.ScanJobNotFoundException;
-import io.repsy.os.server.security.scanner.trivy.ScanJobStatusResponse;
-import io.repsy.os.server.security.scanner.trivy.TrivyScannerClientProperties;
-import io.repsy.os.server.security.scanner.trivy.TrivyScannerStatusClient;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;

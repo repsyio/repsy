@@ -16,11 +16,11 @@
 package io.repsy.os;
 
 import io.repsy.libs.multiport.annotations.EnableMultiport;
+import io.repsy.libs.scanner.trivy.DockerRegistryProperties;
+import io.repsy.libs.scanner.trivy.TrivyAdvisoryLookupProperties;
+import io.repsy.libs.scanner.trivy.TrivyScannerClientProperties;
 import io.repsy.os.config.ssl.RepsySslProperties;
 import io.repsy.os.server.protocols.shared.configs.StorageTrashProperties;
-import io.repsy.os.server.security.scanner.trivy.DockerRegistryProperties;
-import io.repsy.os.server.security.scanner.trivy.TrivyAdvisoryLookupProperties;
-import io.repsy.os.server.security.scanner.trivy.TrivyScannerClientProperties;
 import io.repsy.os.shared.configs.AppCorsProperties;
 import io.repsy.os.shared.configs.AppHstsProperties;
 import io.repsy.os.shared.configs.ContentSecurityPolicyProperties;

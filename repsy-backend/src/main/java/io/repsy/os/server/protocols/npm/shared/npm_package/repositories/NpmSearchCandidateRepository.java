@@ -70,7 +70,7 @@ public class NpmSearchCandidateRepository {
           and s.status = io.repsy.os.server.security.scan.dtos.ScanStatus.COMPLETED
           and f.packageName = %s
           and f.packageVersion = p.latest
-          and f.fixStatus <> io.repsy.os.server.security.scan.dtos.FixStatus.NOT_AFFECTED
+          and f.fixStatus <> io.repsy.libs.scanner.dtos.FixStatus.NOT_AFFECTED
           and s.createdAt = (
             select max(s2.createdAt) from VulnerabilityScan s2
             where s2.repo.id = s.repo.id

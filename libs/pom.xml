@@ -20,5 +20,6 @@
     <module>protocol-router</module>
     <module>multiport</module>
     <module>storage</module>
+    <module>scanner-client</module>
   </modules>
 </project>

@@ -20,7 +20,7 @@ import io.repsy.libs.protocol.router.ProcessorResult;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.libs.protocol.router.ProtocolProvider;
-import io.repsy.os.server.security.scanner.VulnerabilityScannerRegistry;
+import io.repsy.libs.scanner.VulnerabilityScannerRegistry;
 import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
 import io.repsy.protocols.shared.handlers.HandlerPropertyKeys;
 import io.repsy.protocols.shared.utils.BlobDigests;

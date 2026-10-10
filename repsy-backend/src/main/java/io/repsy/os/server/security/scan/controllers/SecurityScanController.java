@@ -19,11 +19,11 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 
 import io.repsy.core.web.paging.SortValidator;
 import io.repsy.libs.multiport.annotations.RestApiPort;
+import io.repsy.libs.scanner.VulnerabilityScannerRegistry;
+import io.repsy.libs.scanner.dtos.Severity;
 import io.repsy.os.generated.model.SecurityScansSummary;
 import io.repsy.os.generated.model.VulnerabilityScanInfo;
-import io.repsy.os.server.security.scan.dtos.Severity;
 import io.repsy.os.server.security.scan.services.VulnerabilityScanTxService;
-import io.repsy.os.server.security.scanner.VulnerabilityScannerRegistry;
 import io.repsy.os.shared.auth.PanelAuthHelper;
 import io.repsy.os.shared.utils.MultiPortNames;
 import io.repsy.protocols.shared.repo.dtos.RepoType;

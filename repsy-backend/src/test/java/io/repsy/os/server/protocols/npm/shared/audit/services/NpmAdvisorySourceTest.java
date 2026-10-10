@@ -23,13 +23,13 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import io.repsy.os.server.security.scan.dtos.FixStatus;
+import io.repsy.libs.scanner.VulnerabilityAdvisoryLookup;
+import io.repsy.libs.scanner.dtos.AdvisoryLookupResult;
+import io.repsy.libs.scanner.dtos.FixStatus;
+import io.repsy.libs.scanner.dtos.ScannerFinding;
+import io.repsy.libs.scanner.dtos.Severity;
 import io.repsy.os.server.security.scan.dtos.KnownVulnerabilityRow;
-import io.repsy.os.server.security.scan.dtos.Severity;
 import io.repsy.os.server.security.scan.services.VulnerabilityScanTxService;
-import io.repsy.os.server.security.scanner.VulnerabilityAdvisoryLookup;
-import io.repsy.os.server.security.scanner.dtos.AdvisoryLookupResult;
-import io.repsy.os.server.security.scanner.dtos.ScannerFinding;
 import io.repsy.protocols.npm.shared.audit.NpmSeverity;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.time.Instant;

@@ -28,16 +28,16 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
+import io.repsy.libs.scanner.VulnerabilityScanner;
+import io.repsy.libs.scanner.VulnerabilityScannerRegistry;
+import io.repsy.libs.scanner.dtos.FixStatus;
+import io.repsy.libs.scanner.dtos.ScanOutcome;
+import io.repsy.libs.scanner.dtos.ScanRequest;
+import io.repsy.libs.scanner.dtos.ScannerFinding;
+import io.repsy.libs.scanner.dtos.Severity;
 import io.repsy.os.AbstractIT;
-import io.repsy.os.server.security.scan.dtos.FixStatus;
-import io.repsy.os.server.security.scan.dtos.Severity;
 import io.repsy.os.server.security.scan.repositories.VulnerabilityScanRepository;
 import io.repsy.os.server.security.scan.services.VulnerabilityScanTxService;
-import io.repsy.os.server.security.scanner.VulnerabilityScanner;
-import io.repsy.os.server.security.scanner.VulnerabilityScannerRegistry;
-import io.repsy.os.server.security.scanner.dtos.ScanOutcome;
-import io.repsy.os.server.security.scanner.dtos.ScanRequest;
-import io.repsy.os.server.security.scanner.dtos.ScannerFinding;
 import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
