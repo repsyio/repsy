@@ -39,7 +39,7 @@ import io.repsy.os.server.protocols.pypi.shared.python_package.repositories.Rele
 import io.repsy.os.server.protocols.pypi.shared.python_package.repositories.ReleaseRepository;
 import io.repsy.os.server.protocols.pypi.shared.storage.services.PypiStorageService;
 import io.repsy.os.server.shared.utils.RequestBaseUrlUtils;
-import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.pypi.shared.python_package.dtos.PackageUploadForm;
 import io.repsy.protocols.pypi.shared.python_package.dtos.ReleaseVersionRequiresPython;
 import io.repsy.protocols.pypi.shared.python_package.services.AbstractPypiPackageService;
@@ -76,7 +76,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 @NullMarked
 public class PypiPackageService extends AbstractPypiPackageService<UUID> {
 
-  private final RepoRepository repoRepository;
+  private final RepoTxService repoTxService;
   private final PypiStorageService pypiStorageService;
   private final ReleaseRepository releaseRepository;
   private final ConversionService conversionService;
@@ -399,7 +399,7 @@ public class PypiPackageService extends AbstractPypiPackageService<UUID> {
       return existing.get();
     }
 
-    if (!this.repoRepository.existsById(repoId)) {
+    if (!this.repoTxService.repoExists(repoId)) {
       throw new ItemNotFoundException(ProtocolErrorCodes.REPO_NOT_FOUND);
     }
 

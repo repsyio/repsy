@@ -27,6 +27,7 @@ import static org.mockito.Mockito.when;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
+import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.os.generated.model.RepoSettingsForm;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.entities.Repo;
@@ -625,6 +626,64 @@ class RepoTxServiceTest {
 
       assertThat(settings.getPgpVerifyAllSignaturesEnabled()).isTrue();
       assertThat(settings.getPgpKeyServerLookupEnabled()).isFalse();
+    }
+  }
+
+  @Nested
+  @DisplayName("repo lookups for the protocol services (RPS-2055)")
+  class Lookups {
+
+    @Test
+    @DisplayName("requireRepo answers the entity, or repoNotFound")
+    void requireRepoById() {
+      final var id = UUID.randomUUID();
+      final var repo = new Repo();
+      when(RepoTxServiceTest.this.repoRepository.findById(id)).thenReturn(Optional.of(repo));
+
+      assertThat(RepoTxServiceTest.this.service.requireRepo(id)).isSameAs(repo);
+
+      final var missing = UUID.randomUUID();
+      when(RepoTxServiceTest.this.repoRepository.findById(missing)).thenReturn(Optional.empty());
+
+      assertThatThrownBy(() -> RepoTxServiceTest.this.service.requireRepo(missing))
+          .isInstanceOf(ItemNotFoundException.class)
+          .hasMessage("repoNotFound");
+    }
+
+    @Test
+    @DisplayName("requireRepo by name and type answers the entity, or repoNotFound")
+    void requireRepoByNameAndType() {
+      final var repo = new Repo();
+      when(RepoTxServiceTest.this.repoRepository.findByNameAndType("a", RepoType.MAVEN))
+          .thenReturn(Optional.of(repo));
+      when(RepoTxServiceTest.this.repoRepository.findByNameAndType("b", RepoType.MAVEN))
+          .thenReturn(Optional.empty());
+
+      assertThat(RepoTxServiceTest.this.service.requireRepo("a", RepoType.MAVEN)).isSameAs(repo);
+      assertThatThrownBy(() -> RepoTxServiceTest.this.service.requireRepo("b", RepoType.MAVEN))
+          .isInstanceOf(ItemNotFoundException.class)
+          .hasMessage("repoNotFound");
+    }
+
+    @Test
+    @DisplayName("the total disk usage is 0 when there is no repo")
+    void totalDiskUsageOfNothingIsZero() {
+      when(RepoTxServiceTest.this.repoRepository.getTotalDiskUsage()).thenReturn(null);
+
+      assertThat(RepoTxServiceTest.this.service.getTotalDiskUsage()).isZero();
+    }
+
+    @Test
+    @DisplayName("findRepoNames keys the names by id")
+    void repoNamesByIds() {
+      final var repo = new Repo();
+      repo.setId(UUID.randomUUID());
+      repo.setName("mvn");
+      when(RepoTxServiceTest.this.repoRepository.findAllById(List.of(repo.getId())))
+          .thenReturn(List.of(repo));
+
+      assertThat(RepoTxServiceTest.this.service.findRepoNames(List.of(repo.getId())))
+          .containsExactly(java.util.Map.entry(repo.getId(), "mvn"));
     }
   }
 }

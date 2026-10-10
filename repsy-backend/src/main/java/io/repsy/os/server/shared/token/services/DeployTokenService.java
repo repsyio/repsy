@@ -99,7 +99,7 @@ public class DeployTokenService {
   public @NonNull NewTokenInfo createDeployToken(
       final @NonNull UUID repoId, final @NonNull DeployTokenForm deployTokenForm) {
 
-    final var repo = this.repoTxService.getRepoEntity(repoId);
+    final var repo = this.repoTxService.requireRepo(repoId);
     final var now = Instant.now();
     final var generatedToken = TokenFactory.deployToken();
     final var repoDeployToken = this.deployTokenConverter.toDeployToken(deployTokenForm);

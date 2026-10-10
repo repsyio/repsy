@@ -37,7 +37,7 @@ import io.repsy.os.server.protocols.ruby.shared.ruby_gem.repositories.RubyGemDep
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.repositories.RubyGemRepository;
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.repositories.RubyGemVersionRepository;
 import io.repsy.os.shared.repo.entities.Repo;
-import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.ruby.shared.gem.dtos.GemCompactEntry;
 import io.repsy.protocols.ruby.shared.gem.dtos.GemDependency;
 import io.repsy.protocols.ruby.shared.gem.dtos.GemMetadata;
@@ -79,7 +79,7 @@ public class RubyGemService implements RubyGemProtocolService<UUID> {
   private final RubyGemRepository gemRepository;
   private final RubyGemVersionRepository versionRepository;
   private final RubyGemDependencyRepository dependencyRepository;
-  private final RepoRepository repoRepository;
+  private final RepoTxService repoTxService;
   private final RubyGemMapper converter;
 
   @Override
@@ -443,9 +443,7 @@ public class RubyGemService implements RubyGemProtocolService<UUID> {
   }
 
   private Repo requireRepo(final UUID repoId) {
-    return this.repoRepository
-        .findById(repoId)
-        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.REPO_NOT_FOUND));
+    return this.repoTxService.requireRepo(repoId);
   }
 
   private RubyGem upsertGem(final Repo repo, final String name, final String version) {

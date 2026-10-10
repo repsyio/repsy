@@ -42,7 +42,7 @@ import io.repsy.os.server.protocols.maven.shared.artifact.repositories.VersionLi
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.VersionSignatureRepository;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreService;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
-import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.maven.shared.keystore.services.PgpVerifierService;
 import io.repsy.protocols.shared.storage.StorageStrategyRegistry;
 import java.nio.file.Path;
@@ -79,7 +79,7 @@ class ArtifactServiceQueriesTest {
   @Mock StorageStrategyRegistry storageStrategyRegistry;
   @Mock PgpVerifierService pgpVerifierService;
   @Mock KeyStoreService keyStoreService;
-  @Mock RepoRepository repoRepository;
+  @Mock RepoTxService repoTxService;
   @Mock VersionDeveloperRepository versionDeveloperRepository;
   @Mock VersionLicenseRepository versionLicenseRepository;
   @Mock ArtifactUpsertHelper artifactUpsertHelper;
@@ -116,7 +116,7 @@ class ArtifactServiceQueriesTest {
             this.storageStrategyRegistry);
     this.artifactService =
         new ArtifactDeploymentService(
-            this.repoRepository,
+            this.repoTxService,
             this.artifactRepository,
             this.artifactVersionRepository,
             this.versionDeveloperRepository,

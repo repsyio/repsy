@@ -31,7 +31,7 @@ import io.repsy.os.server.protocols.maven.shared.keystore.repositories.KeyStoreR
 import io.repsy.os.server.protocols.maven.shared.keystore.repositories.PgpPublicKeyRepository;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.events.PgpKeySourcesChangedEvent;
-import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.maven.shared.keystore.dtos.PublicKeySources;
 import io.repsy.protocols.maven.shared.keystore.services.PgpVerifierService;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
@@ -62,7 +62,7 @@ public class KeyStoreService {
 
   private final AllowedKeyserverRepository allowedKeyserverRepository;
   private final KeyStoreRepository keyStoreRepository;
-  private final RepoRepository repoRepository;
+  private final RepoTxService repoTxService;
   private final PgpPublicKeyRepository pgpPublicKeyRepository;
   private final ArtifactMapper artifactConverter;
   private final ApplicationEventPublisher eventPublisher;
@@ -88,10 +88,7 @@ public class KeyStoreService {
       throw new ItemAlreadyExistException(ProtocolErrorCodes.KEY_STORE_ALREADY_EXISTS);
     }
 
-    final var repo =
-        this.repoRepository
-            .findById(repoInfo.getStorageKey())
-            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.REPO_NOT_FOUND));
+    final var repo = this.repoTxService.requireRepo(repoInfo.getStorageKey());
 
     final var keyStore = new KeyStore();
     keyStore.setRepo(repo);
@@ -188,10 +185,7 @@ public class KeyStoreService {
       throw new BadRequestException(ProtocolErrorCodes.PGP_PUBLIC_KEY_LIMIT_REACHED);
     }
 
-    final var repo =
-        this.repoRepository
-            .findById(repoInfo.getStorageKey())
-            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.REPO_NOT_FOUND));
+    final var repo = this.repoTxService.requireRepo(repoInfo.getStorageKey());
 
     final var pgpPublicKey = new PgpPublicKey();
     pgpPublicKey.setRepo(repo);

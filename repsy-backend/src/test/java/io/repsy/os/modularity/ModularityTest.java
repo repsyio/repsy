@@ -78,7 +78,7 @@ class ModularityTest {
         "NpmAdvisorySource and NuGetBuildMetadataVersionMigrationService read the scan services and repository, and the security module reads the Ruby repositories; give the scan data a port interface that the protocols implement (RPS-2055 follow-up)");
     FROZEN_CYCLES.put(
         "io.repsy.os.server.protocols.(*).shared.(*).. :: docker - image -> docker - layer -> docker - tag",
-        "the Image, Layer and Manifest entities and their services reference each other; merge image, layer and tag into one aggregate package (RPS-2055 follow-up, held back to avoid conflicts with the docker facade split RPS-2061)");
+        "the Image, Layer and Manifest entities and their services reference each other; merge image, layer and tag into one aggregate package (RPS-2055 follow-up: moves 36 classes and changes the imports of about 80 files, so it is its own change)");
     FROZEN_CYCLES.put(
         "io.repsy.os.server.protocols.(*).shared.(*).. :: docker - image -> docker - tag",
         "same aggregate as the three-slice cycle above: image and tag use each other's entities and repositories");

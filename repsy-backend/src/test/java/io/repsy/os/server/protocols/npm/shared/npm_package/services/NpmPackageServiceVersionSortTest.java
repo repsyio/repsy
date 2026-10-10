@@ -29,7 +29,7 @@ import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageD
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageKeywordRepository;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageMaintainerRepository;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageVersionRepository;
-import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.os.shared.repo.services.RepoTxService;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -50,7 +50,7 @@ import org.springframework.data.domain.Sort;
 @DisplayName("NpmPackageService.getVersionsContainsVersion version sort (RPS-1688)")
 class NpmPackageServiceVersionSortTest {
 
-  private final RepoRepository repoRepository = mock(RepoRepository.class);
+  private final RepoTxService repoTxService = mock(RepoTxService.class);
   private final NpmPackageRepository npmPackageRepository = mock(NpmPackageRepository.class);
   private final PackageVersionRepository packageVersionRepository =
       mock(PackageVersionRepository.class);
@@ -64,7 +64,7 @@ class NpmPackageServiceVersionSortTest {
 
   private final NpmPackageService service =
       new NpmPackageService(
-          this.repoRepository,
+          this.repoTxService,
           this.npmPackageRepository,
           this.packageVersionRepository,
           this.packageDistTagRepository,

@@ -29,7 +29,7 @@ import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactV
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.PendingSignatureRepository;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreService;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.MavenPgpCaps;
-import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.protocols.maven.shared.keystore.services.PgpVerifierService;
@@ -139,7 +139,7 @@ public class PendingSignatureService {
   private final PendingSignatureRepository pendingSignatureRepository;
   private final ArtifactRepository artifactRepository;
   private final ArtifactVersionRepository artifactVersionRepository;
-  private final RepoRepository repoRepository;
+  private final RepoTxService repoTxService;
   private final ArtifactSignatureService artifactSignatureService;
   private final PgpVerifierService pgpVerifierService;
   private final KeyStoreService keyStoreService;
@@ -153,7 +153,7 @@ public class PendingSignatureService {
       final PendingSignatureRepository pendingSignatureRepository,
       final ArtifactRepository artifactRepository,
       final ArtifactVersionRepository artifactVersionRepository,
-      final RepoRepository repoRepository,
+      final RepoTxService repoTxService,
       @Lazy final ArtifactSignatureService artifactSignatureService,
       final PgpVerifierService pgpVerifierService,
       final KeyStoreService keyStoreService,
@@ -165,7 +165,7 @@ public class PendingSignatureService {
     this.pendingSignatureRepository = pendingSignatureRepository;
     this.artifactRepository = artifactRepository;
     this.artifactVersionRepository = artifactVersionRepository;
-    this.repoRepository = repoRepository;
+    this.repoTxService = repoTxService;
     this.artifactSignatureService = artifactSignatureService;
     this.pgpVerifierService = pgpVerifierService;
     this.keyStoreService = keyStoreService;
@@ -582,9 +582,7 @@ public class PendingSignatureService {
     final Map<UUID, Long> perRepo =
         expired.stream()
             .collect(Collectors.groupingBy(PendingSignature::getRepoId, Collectors.counting()));
-    final var names =
-        this.repoRepository.findAllById(perRepo.keySet()).stream()
-            .collect(Collectors.toMap(repo -> repo.getId(), repo -> repo.getName()));
+    final var names = this.repoTxService.findRepoNames(perRepo.keySet());
 
     log.info(
         "Purging {} pending Maven signature(s) older than {}: {}",

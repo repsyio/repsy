@@ -35,7 +35,7 @@ import io.repsy.os.server.protocols.maven.shared.artifact.repositories.VersionDe
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.VersionLicenseRepository;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.entities.Repo;
-import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
 import io.repsy.protocols.maven.shared.artifact.dtos.PluginPrefixChange;
 import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredPlugin;
@@ -89,7 +89,7 @@ public class ArtifactDeploymentService extends AbstractArtifactService<UUID> {
   private static final String ARTIFACT_VERSION_UNIQUE_CONSTRAINT =
       "ux_maven_artifact_version__artifact_id_version_name";
 
-  private final RepoRepository repoRepository;
+  private final RepoTxService repoTxService;
   private final ArtifactRepository artifactRepository;
   private final ArtifactVersionRepository artifactVersionRepository;
   private final VersionDeveloperRepository versionDeveloperRepository;
@@ -302,10 +302,7 @@ public class ArtifactDeploymentService extends AbstractArtifactService<UUID> {
       return;
     }
 
-    final var repo =
-        this.repoRepository
-            .findByNameAndType(repoInfo.getName(), RepoType.MAVEN)
-            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.REPO_NOT_FOUND));
+    final var repo = this.repoTxService.requireRepo(repoInfo.getName(), RepoType.MAVEN);
 
     final var gav = MavenGavUtils.convertPathToGav(storagePath.getRelativePath().getPath());
     final var pomModel = PomModelUtils.readModel(resource);
@@ -400,10 +397,7 @@ public class ArtifactDeploymentService extends AbstractArtifactService<UUID> {
   @SuppressWarnings("all")
   public void deleteGroup(final UUID repoId, final String groupName) {
 
-    final var repo =
-        this.repoRepository
-            .findById(repoId)
-            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.REPO_NOT_FOUND));
+    final var repo = this.repoTxService.requireRepo(repoId);
 
     final var artifacts =
         this.artifactRepository.findAllByRepoIdAndGroupName(repo.getId(), groupName);

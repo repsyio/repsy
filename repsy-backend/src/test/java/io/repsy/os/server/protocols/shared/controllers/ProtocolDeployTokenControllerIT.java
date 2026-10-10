@@ -157,7 +157,7 @@ class ProtocolDeployTokenControllerIT extends AbstractIT {
       final boolean readOnly,
       final Instant expirationDate) {
     final var entity = new RepoDeployToken();
-    entity.setRepo(this.repoTxService.getRepoEntity(repo.getStorageKey()));
+    entity.setRepo(this.repoTxService.requireRepo(repo.getStorageKey()));
     entity.setName(name);
     entity.setDescription("seeded " + name);
     entity.setUsername(TokenUsernameGenerator.deployTokenUsername());

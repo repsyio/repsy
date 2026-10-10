@@ -34,7 +34,7 @@ import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoCrateMe
 import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoCrateRepository;
 import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoKeywordRepository;
 import io.repsy.os.shared.repo.entities.Repo;
-import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.cargo.protocol.utils.CrateUtils;
 import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateInfo;
 import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateVersionInfo;
@@ -76,7 +76,7 @@ public class CargoCrateService extends AbstractCargoCrateService<UUID> {
 
   private static final String VERSION_UNIQUE_CONSTRAINT = "ux_cargo_crate_index__crate_id_vers";
 
-  private final RepoRepository repoRepository;
+  private final RepoTxService repoTxService;
   private final CargoCrateRepository crateRepository;
   private final CargoCrateIndexRepository crateIndexRepository;
   private final CargoCrateMetaRepository crateMetaRepository;
@@ -613,8 +613,6 @@ public class CargoCrateService extends AbstractCargoCrateService<UUID> {
 
   private Repo findRepoById(final UUID repoId) {
 
-    return this.repoRepository
-        .findById(repoId)
-        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.REPO_NOT_FOUND));
+    return this.repoTxService.requireRepo(repoId);
   }
 }

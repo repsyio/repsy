@@ -15,27 +15,17 @@
  */
 package io.repsy.os.server.protocols.golang.ui.facades;
 
-import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
-import io.repsy.core.events.ArtifactVersionDeletedEvent;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
-import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.os.generated.model.GoModuleInfo;
 import io.repsy.os.generated.model.GoModuleListItem;
 import io.repsy.os.generated.model.GoModuleVersionListItem;
-import io.repsy.os.server.protocols.golang.shared.go_module.entities.GoModule;
-import io.repsy.os.server.protocols.golang.shared.go_module.repositories.GoModuleRepository;
-import io.repsy.os.server.protocols.golang.shared.go_module.repositories.GoModuleVersionRepository;
 import io.repsy.os.server.protocols.golang.shared.go_module.services.GoModuleService;
 import io.repsy.os.server.protocols.golang.shared.storage.services.GoStorageService;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
-import io.repsy.protocols.golang.shared.utils.GoVersionUtils;
-import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
-import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
@@ -48,9 +38,6 @@ public class GoApiFacade implements ProtocolApiFacade {
 
   private final @NonNull GoStorageService golangStorageService;
   private final @NonNull GoModuleService goModuleService;
-  private final @NonNull GoModuleRepository goModuleRepository;
-  private final @NonNull GoModuleVersionRepository goModuleVersionRepository;
-  private final @NonNull ApplicationEventPublisher eventPublisher;
 
   @Transactional
   @Override
@@ -85,25 +72,18 @@ public class GoApiFacade implements ProtocolApiFacade {
 
   /**
    * Deletes the module with its versions, rows and files, in one transaction that holds the module
-   * row's lock: a publish of the module waits for it, and finds the module gone (RPS-1288).
+   * row's lock (RPS-1288).
    *
    * @return the usage the deletion frees, to be given back to the repo
    */
   @Transactional
   public @NonNull BaseUsages deleteModule(
       final @NonNull RepoInfo repoInfo, final @NonNull String modulePath) {
-    final var goModule = this.lockModule(repoInfo, modulePath);
-
-    final var versions = this.goModuleVersionRepository.findVersionsByModuleId(goModule.getId());
-
-    return this.removeModule(repoInfo, goModule, versions, 0L);
+    return this.goModuleService.deleteModule(repoInfo, modulePath);
   }
 
   /**
-   * Deletes the version, and the module with it when that was its last version (RPS-1288): a module
-   * without a version has nothing to serve, and would only be a row that the module list shows and
-   * the wire does not know. The module row is locked first, so a publish of the module, which
-   * shares that lock, is either counted here or finds the module gone and creates it again.
+   * Deletes the version, and the module with it when that was its last version (RPS-1288).
    *
    * @return the usage the deletion frees, to be given back to the repo
    */
@@ -112,85 +92,6 @@ public class GoApiFacade implements ProtocolApiFacade {
       final @NonNull RepoInfo repoInfo,
       final @NonNull String modulePath,
       final @NonNull String version) {
-
-    final var goModule = this.lockModule(repoInfo, modulePath);
-
-    final var moduleVersion =
-        this.goModuleVersionRepository
-            .findByGoModuleIdAndVersion(goModule.getId(), version)
-            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.VERSION_NOT_FOUND));
-
-    this.goModuleVersionRepository.delete(moduleVersion);
-    // Flush so a rejection by the database fails here, before any file is removed, and so the
-    // count below does not include the row.
-    this.goModuleVersionRepository.flush();
-
-    final var versionFilesBytes =
-        this.golangStorageService.deleteVersionFiles(
-            StoragePath.of(
-                repoInfo.getStorageKey(),
-                "/" + GoVersionUtils.escapeModulePath(modulePath) + "/@v/" + version),
-            repoInfo.getName());
-
-    if (this.goModuleVersionRepository.countByGoModuleId(goModule.getId()) == 0L) {
-      return this.removeModule(repoInfo, goModule, List.of(version), versionFilesBytes);
-    }
-
-    this.publishVersionDeleted(repoInfo, modulePath, version);
-
-    return BaseUsages.ofDisk(-versionFilesBytes);
-  }
-
-  private @NonNull GoModule lockModule(
-      final @NonNull RepoInfo repoInfo, final @NonNull String modulePath) {
-    return this.goModuleRepository
-        .findLockedByRepoIdAndModulePath(repoInfo.getStorageKey(), modulePath)
-        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.MODULE_NOT_FOUND));
-  }
-
-  /**
-   * Removes the module row and what is left of its files, and reports the events of the versions
-   * that went with it.
-   *
-   * <p>Only the module's own {@code @v} directory is removed, never the module's directory: the
-   * directory of {@code example.com/mod} also holds {@code example.com/mod/v2}, a module of its
-   * own. modulePath is the DB's case-preserved path and storage keys the module by its !-escaped
-   * form (RPS-1232), which is the same for an all-lower-case path such as a legacy module's.
-   */
-  private @NonNull BaseUsages removeModule(
-      final @NonNull RepoInfo repoInfo,
-      final @NonNull GoModule goModule,
-      final @NonNull List<String> deletedVersions,
-      final long alreadyFreedBytes) {
-
-    this.goModuleRepository.delete(goModule);
-    // Flush so a rejection by the database fails here, before any file is removed.
-    this.goModuleRepository.flush();
-
-    final var freedBytes =
-        alreadyFreedBytes
-            + this.golangStorageService.deleteDirectory(
-                StoragePath.of(
-                    repoInfo.getStorageKey(),
-                    "/" + GoVersionUtils.escapeModulePath(goModule.getModulePath()) + "/@v"));
-
-    deletedVersions.forEach(
-        deleted -> this.publishVersionDeleted(repoInfo, goModule.getModulePath(), deleted));
-
-    return BaseUsages.ofDisk(-freedBytes);
-  }
-
-  private void publishVersionDeleted(
-      final @NonNull RepoInfo repoInfo,
-      final @NonNull String modulePath,
-      final @NonNull String version) {
-
-    this.eventPublisher.publishEvent(
-        new ArtifactVersionDeletedEvent(
-            repoInfo.getStorageKey(),
-            repoInfo.getType().name(),
-            repoInfo.getName(),
-            modulePath,
-            version));
+    return this.goModuleService.deleteModuleVersion(repoInfo, modulePath, version);
   }
 }

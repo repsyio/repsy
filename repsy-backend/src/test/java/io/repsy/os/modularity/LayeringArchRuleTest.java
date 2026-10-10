@@ -36,6 +36,10 @@ import org.junit.jupiter.api.Test;
  * <ul>
  *   <li>A class in a {@code controllers} or {@code facades} package does not use a Spring Data
  *       repository: it goes through a service, which owns the transaction and the mapping.
+ *   <li>{@code RepoRepository} is used by the code of {@code shared.repo} only; everyone else gets
+ *       a repo through {@code RepoTxService}. It cannot be package-private: the repository sits in
+ *       {@code repositories} and the service in {@code services}, and the naming rules keep the two
+ *       kinds of class in their own packages.
  *   <li>A concrete protocol ({@code protocols.docker}, {@code protocols.maven}, ...) does not use
  *       another concrete protocol, and {@code protocols.shared} does not use a concrete protocol.
  *       What protocols have in common sits in {@code protocols.shared} or behind an interface that
@@ -57,6 +61,9 @@ class LayeringArchRuleTest {
   private static final Set<String> CONCRETE_PROTOCOLS =
       Set.of("cargo", "docker", "golang", "helm", "maven", "npm", "nuget", "pypi", "ruby");
 
+  private static final String REPO_REPOSITORY =
+      "io.repsy.os.shared.repo.repositories.RepoRepository";
+
   private static final JavaClasses PRODUCTION =
       new ClassFileImporter()
           .withImportOption(new ImportOption.DoNotIncludeTests())
@@ -65,40 +72,8 @@ class LayeringArchRuleTest {
   /** Edges "origin -> target" of controllers and facades that use a repository. */
   private static final Map<String, String> FROZEN_WEB_TO_REPOSITORY = new LinkedHashMap<>();
 
-  static {
-    final var go = "io.repsy.os.server.protocols.golang.shared.go_module.repositories.";
-    final var facade = "io.repsy.os.server.protocols.golang.ui.facades.GoApiFacade -> ";
-    final var goReason =
-        "GoApiFacade deletes modules and versions with the repositories; move it into GoModuleService";
-    FROZEN_WEB_TO_REPOSITORY.put(facade + go + "GoModuleRepository", goReason);
-    FROZEN_WEB_TO_REPOSITORY.put(facade + go + "GoModuleVersionRepository", goReason);
-  }
-
   /** Edges "origin -> target" between protocols, or from the shared protocol code to one. */
   private static final Map<String, String> FROZEN_PROTOCOL_EDGES = new LinkedHashMap<>();
-
-  static {
-    final var shared = "io.repsy.os.server.protocols.shared.";
-    final var abandoned = shared + "services.AbandonedBlobUploadCleanupService -> ";
-    final var reason =
-        "the cleanup service names the Docker and Helm repositories and storage; replace them with an AbandonedBlobUploadSource SPI";
-    for (final var target :
-        new String[] {
-          "docker.shared.layer.repositories.LayerRepository",
-          "docker.shared.storage.services.DockerStorageService",
-          "helm.shared.chart.entities.HelmChartVersion",
-          "helm.shared.chart.repositories.HelmChartVersionRepository",
-          "helm.shared.oci.repositories.HelmOciBlobRepository",
-          "helm.shared.oci.repositories.HelmOciManifestRepository",
-          "helm.shared.storage.services.HelmStorageService"
-        }) {
-      FROZEN_PROTOCOL_EDGES.put(abandoned + "io.repsy.os.server.protocols." + target, reason);
-    }
-    FROZEN_PROTOCOL_EDGES.put(
-        shared
-            + "configs.DefaultRepoDefinitionsConfig -> io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService",
-        "the Docker default repo bean sits with the other eight; move it into the docker package");
-  }
 
   @Test
   @DisplayName("Controllers and facades do not use repositories")
@@ -149,6 +124,31 @@ class LayeringArchRuleTest {
     }
 
     assertFrozen(found, FROZEN_PROTOCOL_EDGES, "protocol -> other protocol");
+  }
+
+  @Test
+  @DisplayName("Only the repo services use RepoRepository")
+  void repoRepositoryIsUsedByTheRepoServicesOnly() {
+
+    final var found = new TreeSet<String>();
+
+    for (final var origin : PRODUCTION) {
+      final var pkg = origin.getPackageName();
+
+      if (pkg.startsWith("io.repsy.os.shared.repo.")) {
+        continue;
+      }
+
+      for (final var dependency : origin.getDirectDependenciesFromSelf()) {
+        if (dependency.getTargetClass().getName().equals(REPO_REPOSITORY)) {
+          found.add(origin.getName());
+        }
+      }
+    }
+
+    assertThat(found)
+        .as("use RepoTxService (requireRepo, findReposByType, ...) instead of RepoRepository")
+        .isEmpty();
   }
 
   @Test

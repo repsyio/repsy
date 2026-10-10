@@ -37,7 +37,7 @@ import io.repsy.os.server.protocols.maven.shared.keystore.repositories.PgpPublic
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.events.PgpKeySourcesChangedEvent;
-import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.maven.shared.keystore.dtos.PublicKeySources;
 import io.repsy.protocols.maven.shared.keystore.services.PgpVerifierService;
 import java.util.List;
@@ -65,7 +65,7 @@ class KeyStoreServiceTest {
 
   @Mock AllowedKeyserverRepository allowedKeyserverRepository;
   @Mock KeyStoreRepository keyStoreRepository;
-  @Mock RepoRepository repoRepository;
+  @Mock RepoTxService repoTxService;
   @Mock PgpPublicKeyRepository pgpPublicKeyRepository;
   @Mock ArtifactMapper artifactConverter;
   @Mock ApplicationEventPublisher eventPublisher;
@@ -84,7 +84,7 @@ class KeyStoreServiceTest {
         new KeyStoreService(
             this.allowedKeyserverRepository,
             this.keyStoreRepository,
-            this.repoRepository,
+            this.repoTxService,
             this.pgpPublicKeyRepository,
             this.artifactConverter,
             this.eventPublisher,
@@ -99,7 +99,7 @@ class KeyStoreServiceTest {
   @Test
   @DisplayName("registering a public key publishes the event for its repo")
   void registeringAKeyPublishes() {
-    when(this.repoRepository.findById(this.repoId)).thenReturn(Optional.of(new Repo()));
+    when(this.repoTxService.requireRepo(this.repoId)).thenReturn(new Repo());
     when(this.pgpPublicKeyRepository.saveAndFlush(any(PgpPublicKey.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -165,7 +165,7 @@ class KeyStoreServiceTest {
     when(allowed.getId()).thenReturn(allowedId);
     when(this.allowedKeyserverRepository.findByIdAndActiveTrue(allowedId))
         .thenReturn(Optional.of(allowed));
-    when(this.repoRepository.findById(this.repoId)).thenReturn(Optional.of(new Repo()));
+    when(this.repoTxService.requireRepo(this.repoId)).thenReturn(new Repo());
     when(this.keyStoreRepository.save(any(KeyStore.class)))
         .thenAnswer(invocation -> invocation.getArgument(0));
 
