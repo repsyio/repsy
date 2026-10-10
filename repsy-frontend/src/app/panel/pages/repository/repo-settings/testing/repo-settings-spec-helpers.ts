@@ -70,7 +70,7 @@ export function releaseAwareParentForm(values: Partial<ParentFormValues> = {}): 
 
 /**
  * The form a spy was last called with, as the plain object that goes over the wire: the components build their
- * payloads from DTO classes (`RepoSettingsForm`, `MavenRepoSettingsForm`), which `toEqual` would otherwise tell apart
+ * payloads from typed objects (`RepoSettingsForm`, `RepoSettingsInfo`), which `toEqual` could otherwise tell apart
  * from an object literal, and JSON drops an unset optional field such as `releases` on a non-Maven/NuGet repository
  * (the backend refuses it there, RPS-1210).
  */

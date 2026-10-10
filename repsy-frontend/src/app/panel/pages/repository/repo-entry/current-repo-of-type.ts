@@ -17,7 +17,8 @@
 import { Observable } from 'rxjs';
 import { filter } from 'rxjs/operators';
 
-import { RepoContext, RepoLookupService, RepoType } from './repo-lookup.service';
+import { RepoRouteSlug } from '../../../shared/util/repo-api-type';
+import { RepoContext, RepoLookupService } from './repo-lookup.service';
 
 /**
  * The repository the panel is on, as long as it is of the given protocol.
@@ -29,7 +30,7 @@ import { RepoContext, RepoLookupService, RepoType } from './repo-lookup.service'
  */
 export function currentRepoOfType(
   repoLookupService: Pick<RepoLookupService, 'currentRepo$'>,
-  repoType: RepoType,
+  repoType: RepoRouteSlug,
 ): Observable<RepoContext> {
   return repoLookupService.currentRepo$.pipe(
     filter((repo): repo is RepoContext => repo !== null && repo.repoType === repoType),

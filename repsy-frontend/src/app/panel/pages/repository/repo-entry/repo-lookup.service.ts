@@ -22,19 +22,16 @@ import { ReposApi } from '../../../../../generated/api';
 import { SILENT_ERROR } from '../../../../shared/interceptor/error-handler.interceptor';
 import { RepoRouteSlug, toRouteSlug } from '../../../shared/util/repo-api-type';
 
-/** A repository type as the routes spell it (`maven`); the API's own spelling is the upper-case enum. */
-export type RepoType = RepoRouteSlug;
-
 export interface RepoContext {
   repoName: string;
-  repoType: RepoType;
+  repoType: RepoRouteSlug;
 }
 
 @Injectable({
   providedIn: 'root',
 })
 export class RepoLookupService {
-  private readonly cache = new Map<string, RepoType>();
+  private readonly cache = new Map<string, RepoRouteSlug>();
 
   /**
    * One request per repository name in flight at a time (RPS-1670): an unknown route's resolver and its
@@ -43,7 +40,7 @@ export class RepoLookupService {
    * about ten - and the error interceptor toasted "Repository not found" once per call. `share()`
    * multicasts the single underlying request (and its error) to every concurrent caller instead.
    */
-  private readonly inFlight = new Map<string, Observable<RepoType>>();
+  private readonly inFlight = new Map<string, Observable<RepoRouteSlug>>();
 
   private readonly currentRepoSubject = new BehaviorSubject<RepoContext | null>(null);
   public readonly currentRepo$ = this.currentRepoSubject.asObservable();
@@ -54,7 +51,7 @@ export class RepoLookupService {
     return this.currentRepoSubject.getValue();
   }
 
-  public getRepoType(repoName: string): Observable<RepoType> {
+  public getRepoType(repoName: string): Observable<RepoRouteSlug> {
     const cachedType = this.cache.get(repoName);
 
     if (cachedType) {
@@ -65,7 +62,7 @@ export class RepoLookupService {
     return this.sharedFetch(repoName).pipe(tap((repoType) => this.currentRepoSubject.next({ repoName, repoType })));
   }
 
-  public checkRepoType(repoName: string): Observable<RepoType> {
+  public checkRepoType(repoName: string): Observable<RepoRouteSlug> {
     const cachedType = this.cache.get(repoName);
 
     if (cachedType) {
@@ -80,7 +77,7 @@ export class RepoLookupService {
    * tick (the resolver, and each protocol's `canMatch`) shares the one HTTP request through `share()`;
    * `cache` is filled once it succeeds, so the next lookup of the same name never re-fetches.
    */
-  private sharedFetch(repoName: string): Observable<RepoType> {
+  private sharedFetch(repoName: string): Observable<RepoRouteSlug> {
     const running = this.inFlight.get(repoName);
     if (running) {
       return running;
@@ -95,7 +92,7 @@ export class RepoLookupService {
     return request;
   }
 
-  private fetchRepoType(repoName: string): Observable<RepoType> {
+  private fetchRepoType(repoName: string): Observable<RepoRouteSlug> {
     // Structural: a route guard or resolver checking whether repoName exists, not a user action. Its
     // caller decides the outcome (canMatch says no, the resolver redirects to /not-found), so a 404 here
     // must not also raise the "Repository not found" toast (RPS-1670).
