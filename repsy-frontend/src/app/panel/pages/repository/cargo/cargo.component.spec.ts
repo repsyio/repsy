@@ -22,6 +22,6 @@ describeProtocolShell({
   component: CargoComponent,
   repoType: 'cargo',
   service: CargoService,
-  loadMethod: 'getRepository',
+  loadMethod: 'fetchRepoPermission',
   permissionsField: 'permissions',
 });

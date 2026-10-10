@@ -46,8 +46,8 @@ describe('MavenComponent', () => {
 
   beforeEach(() => {
     currentRepo$ = new BehaviorSubject<RepoContext | null>({ repoName: 'maven-repo', repoType: 'maven' });
-    mavenService = jasmine.createSpyObj<MavenService>('MavenService', ['getRepository']);
-    mavenService.getRepository.and.returnValue(of(permission('maven-repo', { canManage: true })));
+    mavenService = jasmine.createSpyObj<MavenService>('MavenService', ['fetchRepoPermission']);
+    mavenService.fetchRepoPermission.and.returnValue(of(permission('maven-repo', { canManage: true })));
     router = jasmine.createSpyObj<Router>('Router', ['navigate']);
 
     TestBed.configureTestingModule({
@@ -76,7 +76,7 @@ describe('MavenComponent', () => {
   it('loads the permissions of the current repository once on a cold load (RPS-1297)', () => {
     const component = create();
 
-    expect(mavenService.getRepository).toHaveBeenCalledOnceWith('maven-repo');
+    expect(mavenService.fetchRepoPermission).toHaveBeenCalledOnceWith('maven-repo');
     expect(component.permissions?.canManage).toBeTrue();
     expect(component.loading).toBeFalse();
   });
@@ -86,7 +86,7 @@ describe('MavenComponent', () => {
 
     currentRepo$.next({ repoName: 'other-repo', repoType: 'maven' });
 
-    expect(mavenService.getRepository.calls.allArgs()).toEqual([['maven-repo'], ['other-repo']]);
+    expect(mavenService.fetchRepoPermission.calls.allArgs()).toEqual([['maven-repo'], ['other-repo']]);
   });
 
   it('ignores a current repository of another type', () => {
@@ -94,11 +94,11 @@ describe('MavenComponent', () => {
 
     create();
 
-    expect(mavenService.getRepository).not.toHaveBeenCalled();
+    expect(mavenService.fetchRepoPermission).not.toHaveBeenCalled();
   });
 
   it('sends an anonymous visitor of a private repository to not-found', () => {
-    mavenService.getRepository.and.returnValue(
+    mavenService.fetchRepoPermission.and.returnValue(
       of({ ...permission('maven-repo'), private: true } as RepoPermissionInfo),
     );
 
@@ -111,7 +111,7 @@ describe('MavenComponent', () => {
   });
 
   it('replaces the entry of a repository that cannot be loaded with the 404 page, so Back can leave it (RPS-1650)', () => {
-    mavenService.getRepository.and.returnValue(throwError(() => new Error('404')));
+    mavenService.fetchRepoPermission.and.returnValue(throwError(() => new Error('404')));
 
     create();
 

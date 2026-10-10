@@ -22,6 +22,6 @@ describeProtocolShell({
   component: DockerComponent,
   repoType: 'docker',
   service: DockerService,
-  loadMethod: 'getRepository',
+  loadMethod: 'fetchRepoPermission',
   permissionsField: 'permissions',
 });

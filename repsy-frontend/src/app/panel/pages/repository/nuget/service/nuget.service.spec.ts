@@ -252,8 +252,8 @@ describe('NuGetService', () => {
         expected: undefined,
       },
       {
-        name: 'getDeployTokens',
-        invoke: (s) => from(s.getDeployTokens(1, 5)),
+        name: 'fetchDeployTokens',
+        invoke: (s) => from(s.fetchDeployTokens(1, 5)),
         api: () => tokenApi.listDeployTokens,
         args: ['', 1, 5],
         response: tokenPage,

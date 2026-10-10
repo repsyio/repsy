@@ -63,7 +63,7 @@ export class GoComponent implements OnInit, OnDestroy {
   private loadRepo(repoName: string): void {
     this.loading = true;
 
-    this.goService.getRepository(repoName).subscribe({
+    this.goService.fetchRepoPermission(repoName).subscribe({
       next: (repo: RepoPermissionInfo) => {
         if (repo.private && !this.isAuthenticated) {
           this.router.navigate(['/not-found'], {

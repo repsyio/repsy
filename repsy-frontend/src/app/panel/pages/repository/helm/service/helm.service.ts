@@ -48,7 +48,7 @@ export class HelmService {
     return this.repoSubject.getValue()?.repoName ?? '';
   }
 
-  public getRepository(repoName: string): Observable<RepoPermissionInfo> {
+  public fetchRepoPermission(repoName: string): Observable<RepoPermissionInfo> {
     this.resetActiveRepoIfChanged(repoName);
 
     return this.reposApi.getRepoPermissions(repoName).pipe(tap((info) => this.repoSubject.next(info)));
@@ -75,7 +75,7 @@ export class HelmService {
       .pipe(map((r) => ({ content: r?.content ?? [], page: r?.page }) as unknown as PagedData<HelmChartListItem>));
   }
 
-  public getChart(name: string): Observable<HelmChartSummary> {
+  public fetchChart(name: string): Observable<HelmChartSummary> {
     return this.helmChartsApi.getHelmChart(this.repoName, name);
   }
 
@@ -93,7 +93,7 @@ export class HelmService {
       .pipe(map((r) => ({ content: r?.content ?? [], page: r?.page }) as unknown as PagedData<HelmChartVersionItem>));
   }
 
-  public getChartDetail(name: string, version: string): Observable<HelmChartDetail> {
+  public fetchChartDetail(name: string, version: string): Observable<HelmChartDetail> {
     return this.helmChartsApi.getHelmChartDetail(this.repoName, name, version);
   }
 
@@ -105,7 +105,7 @@ export class HelmService {
     return this.helmChartsApi.deleteHelmChartVersion(this.repoName, name, version).pipe(map(() => undefined));
   }
 
-  public getOciTags(name: string): Observable<string[]> {
+  public fetchOciTags(name: string): Observable<string[]> {
     return this.helmChartsApi.getHelmChartOciTags(this.repoName, name).pipe(map((r) => r ?? []));
   }
 }

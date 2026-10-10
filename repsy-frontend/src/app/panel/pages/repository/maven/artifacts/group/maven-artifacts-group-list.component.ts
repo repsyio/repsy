@@ -148,7 +148,7 @@ export class MavenArtifactsGroupListComponent implements OnDestroy {
    */
   public deleteGroup(artifact: ArtifactListItem) {
     const groupName = artifact.groupName;
-    this.mavenService.getGroupSummary(groupName).subscribe({
+    this.mavenService.fetchGroupSummary(groupName).subscribe({
       next: (summary) => this.confirmGroupDelete(groupName, groupDeleteWarning(groupName, summary)),
       // The counts are a courtesy: without them the dialog still names the group and what goes with it.
       error: () => this.confirmGroupDelete(groupName, groupDeleteWarning(groupName)),

@@ -22,6 +22,6 @@ describeProtocolShell({
   component: GoComponent,
   repoType: 'golang',
   service: GoService,
-  loadMethod: 'getRepository',
+  loadMethod: 'fetchRepoPermission',
   permissionsField: 'activeRepo',
 });

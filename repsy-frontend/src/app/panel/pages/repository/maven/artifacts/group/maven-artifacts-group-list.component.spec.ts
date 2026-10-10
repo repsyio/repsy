@@ -36,7 +36,7 @@ describe('MavenArtifactsGroupListComponent', () => {
 
   function build(): ListFixture {
     repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
-    service = jasmine.createSpyObj<MavenService>('MavenService', ['searchGroups', 'deleteGroup', 'getGroupSummary'], {
+    service = jasmine.createSpyObj<MavenService>('MavenService', ['searchGroups', 'deleteGroup', 'fetchGroupSummary'], {
       repoChanges,
     });
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
@@ -67,7 +67,7 @@ describe('MavenArtifactsGroupListComponent', () => {
     // A row is one artifact, but the delete removes the whole group: the dialog says so (RPS-1288).
     beforeEach(() => {
       build();
-      service.getGroupSummary.and.returnValue(of({ groupName: 'org.acme', artifactCount: 3, versionCount: 12 }));
+      service.fetchGroupSummary.and.returnValue(of({ groupName: 'org.acme', artifactCount: 3, versionCount: 12 }));
       service.deleteGroup.and.returnValue(of(undefined as never));
       service.searchGroups.and.returnValue(of(pageOf([], 1) as never));
     });
@@ -75,7 +75,7 @@ describe('MavenArtifactsGroupListComponent', () => {
     it('names the group and says how many artifacts and versions go with it', () => {
       component.deleteGroup(ITEM_UNDER_TEST);
 
-      expect(service.getGroupSummary).toHaveBeenCalledOnceWith('org.acme');
+      expect(service.fetchGroupSummary).toHaveBeenCalledOnceWith('org.acme');
       expect(dangerModalService.modal).toEqual({
         title: 'Delete Group',
         action: 'Delete',
@@ -86,7 +86,7 @@ describe('MavenArtifactsGroupListComponent', () => {
     });
 
     it('counts one artifact and one version in the singular', () => {
-      service.getGroupSummary.and.returnValue(of({ groupName: 'org.acme', artifactCount: 1, versionCount: 1 }));
+      service.fetchGroupSummary.and.returnValue(of({ groupName: 'org.acme', artifactCount: 1, versionCount: 1 }));
 
       component.deleteGroup(ITEM_UNDER_TEST);
 
@@ -94,7 +94,7 @@ describe('MavenArtifactsGroupListComponent', () => {
     });
 
     it('still names the group and what goes when the counts cannot be read', () => {
-      service.getGroupSummary.and.returnValue(throwError(() => 'boom'));
+      service.fetchGroupSummary.and.returnValue(throwError(() => 'boom'));
 
       component.deleteGroup(ITEM_UNDER_TEST);
 

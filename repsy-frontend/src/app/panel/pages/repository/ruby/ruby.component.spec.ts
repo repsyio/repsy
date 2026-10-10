@@ -22,6 +22,6 @@ describeProtocolShell({
   component: RubyComponent,
   repoType: 'ruby',
   service: RubyService,
-  loadMethod: 'getRepository',
+  loadMethod: 'fetchRepoPermission',
   permissionsField: 'permissions',
 });

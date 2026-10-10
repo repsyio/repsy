@@ -74,7 +74,7 @@ describe('MavenService', () => {
   describeRepoSelection({
     service: () => service,
     getPermission: () => repoApi.getRepoPermissions,
-    probe: (s) => s.getPathContent(PATH),
+    probe: (s) => s.fetchPathContent(PATH),
     probeApi: () => repoApi.getPathContent,
     probeRepoArg: 1,
     resetsOnChange: true,
@@ -123,7 +123,7 @@ describe('MavenService', () => {
       },
       {
         name: 'getPathContent',
-        invoke: (s) => s.getPathContent(PATH),
+        invoke: (s) => s.fetchPathContent(PATH),
         api: () => repoApi.getPathContent,
         args: [PATH, REPO],
         response: files,
@@ -146,8 +146,8 @@ describe('MavenService', () => {
         expected: info,
       },
       {
-        name: 'getGroupSummary',
-        invoke: (s) => s.getGroupSummary(GROUP),
+        name: 'fetchGroupSummary',
+        invoke: (s) => s.fetchGroupSummary(GROUP),
         api: () => groupApi.getMavenGroupSummary,
         args: [GROUP, REPO],
         response: summary,
@@ -185,7 +185,7 @@ describe('MavenService', () => {
     describeCalls(() => service, calls);
 
     // RPS-1348: the extra sentence of the delete-version confirmation, from the versions probe and the summary.
-    describe('getVersionDeleteWarning', () => {
+    describe('fetchVersionDeleteWarning', () => {
       const versionsPage = (count: number) => ({
         content: Array.from({ length: count }, (_, i) => ({ versionName: `${i}.0` })),
         page: {},
@@ -193,7 +193,7 @@ describe('MavenService', () => {
 
       function warning(): string | null | undefined {
         let result: string | null | undefined;
-        service.getVersionDeleteWarning(GROUP, ARTIFACT).subscribe((w) => (result = w));
+        service.fetchVersionDeleteWarning(GROUP, ARTIFACT).subscribe((w) => (result = w));
         return result;
       }
 

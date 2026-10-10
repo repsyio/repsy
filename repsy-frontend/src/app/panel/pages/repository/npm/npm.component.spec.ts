@@ -22,6 +22,6 @@ describeProtocolShell({
   component: NpmComponent,
   repoType: 'npm',
   service: NpmService,
-  loadMethod: 'getRepository',
+  loadMethod: 'fetchRepoPermission',
   permissionsField: 'activeRegistry',
 });

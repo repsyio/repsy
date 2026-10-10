@@ -22,6 +22,6 @@ describeProtocolShell({
   component: NuGetComponent,
   repoType: 'nuget',
   service: NuGetService,
-  loadMethod: 'selectRepository',
+  loadMethod: 'fetchRepoPermission',
   permissionsField: 'activeRepo',
 });

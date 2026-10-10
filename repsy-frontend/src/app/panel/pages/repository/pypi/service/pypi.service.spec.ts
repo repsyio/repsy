@@ -57,7 +57,6 @@ describe('PypiService', () => {
     service = TestBed.inject(PypiService);
   });
 
-  // PyPI names the entry point selectRepository where the other services call it getRepository.
   describeRepoSelection({
     service: () => service,
     getPermission: () => repoApi.getRepoPermissions,

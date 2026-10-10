@@ -49,10 +49,10 @@ describe('MavenBrowserComponent', () => {
       '/org/acme/': [dir('../'), file('lib-1.0.jar')],
     };
     repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
-    mavenService = jasmine.createSpyObj<MavenService>('MavenService', ['getPathContent', 'createDownloadToken'], {
+    mavenService = jasmine.createSpyObj<MavenService>('MavenService', ['fetchPathContent', 'createDownloadToken'], {
       repoChanges,
     });
-    mavenService.getPathContent.and.callFake((path: string) => of(contents[path] ?? []));
+    mavenService.fetchPathContent.and.callFake((path: string) => of(contents[path] ?? []));
     mavenService.createDownloadToken.and.returnValue(NEVER);
     component = new MavenBrowserComponent(mavenService, jasmine.createSpyObj<ToastService>('ToastService', ['show']));
   });
@@ -67,7 +67,7 @@ describe('MavenBrowserComponent', () => {
 
   describe('before a repository is selected', () => {
     it('shows nothing and loads nothing', () => {
-      expect(mavenService.getPathContent).not.toHaveBeenCalled();
+      expect(mavenService.fetchPathContent).not.toHaveBeenCalled();
       expect(component.directoryStack).toEqual([]);
       expect(component.loading).toBeFalse();
     });
@@ -77,7 +77,7 @@ describe('MavenBrowserComponent', () => {
     it('lists its root directory', () => {
       open();
 
-      expect(mavenService.getPathContent).toHaveBeenCalledOnceWith('/');
+      expect(mavenService.fetchPathContent).toHaveBeenCalledOnceWith('/');
       expect(paths()).toEqual(['/']);
       expect(component.fsItems.map((i) => i.name)).toEqual(['org/', 'com/', 'readme.txt']);
       expect(component.filteredFsItems).toBe(component.fsItems);
@@ -104,17 +104,17 @@ describe('MavenBrowserComponent', () => {
       expect(component.forwardStack.length).toBe(1);
 
       repoChanges.next(permission('other-repo'));
-      mavenService.getPathContent.calls.reset();
+      mavenService.fetchPathContent.calls.reset();
       component.next();
 
       expect(component.forwardStack).toEqual([]);
       expect(paths()).toEqual(['/']);
-      expect(mavenService.getPathContent).not.toHaveBeenCalled();
+      expect(mavenService.fetchPathContent).not.toHaveBeenCalled();
     });
 
     it('keeps the path when the permissions of the open repository are emitted again (RPS-1297)', () => {
       const answer = new Subject<FsItemInfo[]>();
-      mavenService.getPathContent.and.returnValue(answer);
+      mavenService.fetchPathContent.and.returnValue(answer);
       open();
       const root = component.directoryStack[0];
 
@@ -124,9 +124,9 @@ describe('MavenBrowserComponent', () => {
       answer.complete();
 
       expect(component.directoryStack).toEqual([root]);
-      expect(mavenService.getPathContent).toHaveBeenCalledOnceWith('/');
+      expect(mavenService.fetchPathContent).toHaveBeenCalledOnceWith('/');
 
-      mavenService.getPathContent.and.callFake((path: string) => of(contents[path] ?? []));
+      mavenService.fetchPathContent.and.callFake((path: string) => of(contents[path] ?? []));
       component.go(dir('org/'));
 
       expect(paths()).toEqual(['/', '/org/']);
@@ -135,24 +135,24 @@ describe('MavenBrowserComponent', () => {
     it('takes over the new permissions of the open repository without leaving its directory', () => {
       open();
       component.go(dir('org/'));
-      mavenService.getPathContent.calls.reset();
+      mavenService.fetchPathContent.calls.reset();
 
       repoChanges.next(permission(REPO, { canManage: false }));
 
       expect(component.activeRepo.canManage).toBeFalse();
       expect(paths()).toEqual(['/', '/org/']);
-      expect(mavenService.getPathContent).not.toHaveBeenCalled();
+      expect(mavenService.fetchPathContent).not.toHaveBeenCalled();
     });
 
     it('ignores an empty repository value', () => {
       repoChanges.next(null);
 
-      expect(mavenService.getPathContent).not.toHaveBeenCalled();
+      expect(mavenService.fetchPathContent).not.toHaveBeenCalled();
     });
 
     it('keeps the lock and the loading state until the listing has arrived', () => {
       const answer = new Subject<FsItemInfo[]>();
-      mavenService.getPathContent.and.returnValue(answer);
+      mavenService.fetchPathContent.and.returnValue(answer);
 
       open();
 
@@ -170,7 +170,7 @@ describe('MavenBrowserComponent', () => {
     // under the breadcrumb of the directory asked for, and its entries could be opened from there.
     it('shows no listing, under the path that was asked for, when a directory cannot be loaded', () => {
       open();
-      mavenService.getPathContent.and.returnValue(throwError(() => new Error('404')));
+      mavenService.fetchPathContent.and.returnValue(throwError(() => new Error('404')));
 
       component.go(dir('org/'));
 
@@ -183,9 +183,9 @@ describe('MavenBrowserComponent', () => {
 
     it('goes back from a directory that cannot be loaded, and lists the parent again', () => {
       open();
-      mavenService.getPathContent.and.returnValue(throwError(() => new Error('404')));
+      mavenService.fetchPathContent.and.returnValue(throwError(() => new Error('404')));
       component.go(dir('org/'));
-      mavenService.getPathContent.and.callFake((path: string) => of(contents[path] ?? []));
+      mavenService.fetchPathContent.and.callFake((path: string) => of(contents[path] ?? []));
 
       component.prev();
 
@@ -194,7 +194,7 @@ describe('MavenBrowserComponent', () => {
     });
 
     it('releases the lock, and stops loading, when the listing cannot be loaded', () => {
-      mavenService.getPathContent.and.returnValue(throwError(() => new Error('boom')));
+      mavenService.fetchPathContent.and.returnValue(throwError(() => new Error('boom')));
 
       open();
 
@@ -210,7 +210,7 @@ describe('MavenBrowserComponent', () => {
       component.go(dir('org/'));
 
       expect(paths()).toEqual(['/', '/org/']);
-      expect(mavenService.getPathContent).toHaveBeenCalledWith('/org/');
+      expect(mavenService.fetchPathContent).toHaveBeenCalledWith('/org/');
       expect(component.repoUrl).toBe(`${environment.repoBaseUrl}/${REPO}/org/`);
 
       component.go(dir('acme/'));
@@ -227,7 +227,7 @@ describe('MavenBrowserComponent', () => {
 
       expect(paths()).toEqual(['/', '/org/']);
       expect(component.forwardStack.map((d) => d.path)).toEqual(['/org/acme/']);
-      expect(mavenService.getPathContent).toHaveBeenCalledWith('/org/');
+      expect(mavenService.fetchPathContent).toHaveBeenCalledWith('/org/');
     });
 
     it('go into a directory after going back drops the directories next would have returned to', () => {
@@ -286,17 +286,17 @@ describe('MavenBrowserComponent', () => {
     });
 
     it('go and goToDir do nothing while a listing is still loading', () => {
-      mavenService.getPathContent.and.returnValue(NEVER);
+      mavenService.fetchPathContent.and.returnValue(NEVER);
       component.go(dir('org/'));
       const root = component.directoryStack[0];
-      mavenService.getPathContent.calls.reset();
+      mavenService.fetchPathContent.calls.reset();
 
       component.go(dir('acme/'));
       component.go(file('x.jar'));
       component.goToDir(root);
 
       expect(paths()).toEqual(['/', '/org/']);
-      expect(mavenService.getPathContent).not.toHaveBeenCalled();
+      expect(mavenService.fetchPathContent).not.toHaveBeenCalled();
       expect(mavenService.createDownloadToken).not.toHaveBeenCalled();
     });
 
@@ -308,7 +308,7 @@ describe('MavenBrowserComponent', () => {
       component.goToDir(org);
 
       expect(paths()).toEqual(['/', '/org/']);
-      expect(mavenService.getPathContent).toHaveBeenCalledWith('/org/');
+      expect(mavenService.fetchPathContent).toHaveBeenCalledWith('/org/');
       expect(component.repoUrl).toBe(`${environment.repoBaseUrl}/${REPO}/org/`);
     });
 
@@ -323,17 +323,17 @@ describe('MavenBrowserComponent', () => {
       component.next();
       expect(paths()).toEqual(['/', '/org/', '/org/acme/']);
       expect(component.forwardStack).toEqual([]);
-      expect(mavenService.getPathContent.calls.mostRecent().args).toEqual(['/org/acme/']);
+      expect(mavenService.fetchPathContent.calls.mostRecent().args).toEqual(['/org/acme/']);
     });
 
     it('prev does nothing at the root, and next does nothing with nothing to go forward to', () => {
-      mavenService.getPathContent.calls.reset();
+      mavenService.fetchPathContent.calls.reset();
 
       component.prev();
       component.next();
 
       expect(paths()).toEqual(['/']);
-      expect(mavenService.getPathContent).not.toHaveBeenCalled();
+      expect(mavenService.fetchPathContent).not.toHaveBeenCalled();
     });
   });
 
@@ -373,7 +373,7 @@ describe('MavenBrowserComponent', () => {
     });
 
     it('does nothing, and does not throw, while there is no listing to filter (RPS-1626)', () => {
-      mavenService.getPathContent.and.returnValue(throwError(() => new Error('404')));
+      mavenService.fetchPathContent.and.returnValue(throwError(() => new Error('404')));
       component.go(dir('org/'));
 
       expect(() => component.search('acme')).not.toThrow();
@@ -403,7 +403,7 @@ describe('MavenBrowserComponent', () => {
 
       open();
 
-      expect(mavenService.getPathContent).not.toHaveBeenCalled();
+      expect(mavenService.fetchPathContent).not.toHaveBeenCalled();
     });
   });
 });
@@ -411,10 +411,14 @@ describe('MavenBrowserComponent', () => {
 describe('MavenBrowserComponent template', () => {
   function render(flags: { canManage: boolean }, listing: Observable<FsItemInfo[]> = of([])): HTMLElement {
     const repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(permission(REPO, flags));
-    const mavenService = jasmine.createSpyObj<MavenService>('MavenService', ['getPathContent', 'createDownloadToken'], {
-      repoChanges,
-    });
-    mavenService.getPathContent.and.returnValue(listing);
+    const mavenService = jasmine.createSpyObj<MavenService>(
+      'MavenService',
+      ['fetchPathContent', 'createDownloadToken'],
+      {
+        repoChanges,
+      },
+    );
+    mavenService.fetchPathContent.and.returnValue(listing);
     TestBed.configureTestingModule({
       providers: [
         provideRouter([]),

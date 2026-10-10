@@ -56,12 +56,12 @@ describe('HelmChartsVersionDetailComponent', () => {
     repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
     helmService = jasmine.createSpyObj<HelmService>(
       'HelmService',
-      ['getChartDetail', 'fetchChartVersions', 'deleteChart'],
+      ['fetchChartDetail', 'fetchChartVersions', 'deleteChart'],
       {
         repoChanges,
       },
     );
-    helmService.getChartDetail.and.returnValue(of(FULL));
+    helmService.fetchChartDetail.and.returnValue(of(FULL));
     helmService.fetchChartVersions.and.returnValue(
       of({ content: [{ version: '1.2.3' }, { version: '1.2.4' }] } as never),
     );
@@ -81,7 +81,7 @@ describe('HelmChartsVersionDetailComponent', () => {
 
   describe('when a repository is selected', () => {
     it('keeps a not-found message and no data when the version does not exist', () => {
-      helmService.getChartDetail.and.returnValue(throwError(() => new HttpErrorResponse({ status: 404 })));
+      helmService.fetchChartDetail.and.returnValue(throwError(() => new HttpErrorResponse({ status: 404 })));
 
       select();
 
@@ -91,13 +91,13 @@ describe('HelmChartsVersionDetailComponent', () => {
     });
 
     it('says the version could not be loaded for a server error, and clears the message on the next load', () => {
-      helmService.getChartDetail.and.returnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
+      helmService.fetchChartDetail.and.returnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
       select();
       expect(component.error).toBe('The version could not be loaded');
       expect(component.chart).toBeUndefined();
 
-      helmService.getChartDetail.and.callThrough();
-      helmService.getChartDetail.and.returnValue(throwError(() => new HttpErrorResponse({ status: 404 })));
+      helmService.fetchChartDetail.and.callThrough();
+      helmService.fetchChartDetail.and.returnValue(throwError(() => new HttpErrorResponse({ status: 404 })));
       select();
       expect(component.error).toBe("Version '1.2.3' not found");
     });
@@ -105,7 +105,7 @@ describe('HelmChartsVersionDetailComponent', () => {
     it('loads the chart version of the route', () => {
       select();
 
-      expect(helmService.getChartDetail).toHaveBeenCalledOnceWith('nginx', '1.2.3');
+      expect(helmService.fetchChartDetail).toHaveBeenCalledOnceWith('nginx', '1.2.3');
       expect(component.chartName).toBe('nginx');
       expect(component.versionName).toBe('1.2.3');
       expect(component.chart).toBe(FULL);
@@ -139,7 +139,7 @@ describe('HelmChartsVersionDetailComponent', () => {
     });
 
     it('leaves the optional Chart.yaml fields out when the chart has none', () => {
-      helmService.getChartDetail.and.returnValue(of({ name: 'nginx', version: '1.2.3', size: 0 }));
+      helmService.fetchChartDetail.and.returnValue(of({ name: 'nginx', version: '1.2.3', size: 0 }));
 
       select();
 
@@ -151,18 +151,18 @@ describe('HelmChartsVersionDetailComponent', () => {
 
       select();
 
-      expect(helmService.getChartDetail).not.toHaveBeenCalled();
+      expect(helmService.fetchChartDetail).not.toHaveBeenCalled();
       expect(component.loading).toBeFalse();
     });
 
     it('ignores an empty repository value', () => {
       repoChanges.next(null);
 
-      expect(helmService.getChartDetail).not.toHaveBeenCalled();
+      expect(helmService.fetchChartDetail).not.toHaveBeenCalled();
     });
 
     it('stops loading and shows no chart when the request fails', () => {
-      helmService.getChartDetail.and.returnValue(throwError(() => 'boom'));
+      helmService.fetchChartDetail.and.returnValue(throwError(() => 'boom'));
 
       select();
 
@@ -176,7 +176,7 @@ describe('HelmChartsVersionDetailComponent', () => {
 
       select();
 
-      expect(helmService.getChartDetail).not.toHaveBeenCalled();
+      expect(helmService.fetchChartDetail).not.toHaveBeenCalled();
     });
   });
 

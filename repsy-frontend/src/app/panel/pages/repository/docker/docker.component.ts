@@ -63,7 +63,7 @@ export class DockerComponent implements OnInit, OnDestroy {
   private loadPermissions(repoName: string): void {
     this.loading = true;
 
-    this.dockerService.getRepository(repoName).subscribe({
+    this.dockerService.fetchRepoPermission(repoName).subscribe({
       next: (permissions: RepoPermissionInfo) => {
         // If repo is private and user is not authenticated, redirect to 404
         if (permissions.private && !this.isAuthenticated) {

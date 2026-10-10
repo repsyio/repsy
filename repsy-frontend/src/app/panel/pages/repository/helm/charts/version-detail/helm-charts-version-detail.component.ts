@@ -135,7 +135,7 @@ export class HelmChartsVersionDetailComponent implements OnDestroy {
     this.error = null;
 
     this.helmService
-      .getChartDetail(name, version)
+      .fetchChartDetail(name, version)
       .pipe(
         finalize(() => {
           this.loading = false;

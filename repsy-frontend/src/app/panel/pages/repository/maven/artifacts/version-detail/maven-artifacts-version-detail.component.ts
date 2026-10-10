@@ -211,7 +211,7 @@ export class MavenArtifactsVersionDetailComponent implements OnDestroy {
   }
 
   public deleteVersion() {
-    this.mavenService.getVersionDeleteWarning(this.groupName, this.artifactName).subscribe((warning) => {
+    this.mavenService.fetchVersionDeleteWarning(this.groupName, this.artifactName).subscribe((warning) => {
       showVersionDeleteDialog(this.dangerModalService, warning, () => this.confirmDeleteVersion());
     });
   }
