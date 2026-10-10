@@ -30,6 +30,7 @@
  * accepted) and the `.asc` (exactly 64 KiB passes the size rule and meets the next one, the 422 of the
  * signature check).
  */
+import { ERROR_CODES } from '../../src/error-codes.js';
 import { RepoType } from '../../src/api/panel-api.js';
 import { deploy } from '../../src/clients/maven.js';
 import { mavenAdapter } from '../../src/clients/maven-adapter.js';
@@ -109,7 +110,12 @@ test.describe('maven upload size limits', { tag: '@negative' }, () => {
     const [groupId, artifactId] = splitPackageName(world.publishTarget.packageName);
     const pomPath = `${versionDir(groupId, artifactId, world.publishTarget.version)}/${artifactId}-${world.publishTarget.version}.pom`;
     const replay = await rawPut(repo.name, credential, pomPath, deployed.pomBytes, OCTET);
-    expectRefused(replay, 'pomFileTooLarge', 'The POM file is larger than 10 MiB.', 'raw replay');
+    expectRefused(
+      replay,
+      ERROR_CODES.POM_FILE_TOO_LARGE,
+      'The POM file is larger than 10 MiB.',
+      'raw replay',
+    );
 
     // A deploy is not one transaction: mvn uploads the jar (and its checksums) BEFORE the POM, and they
     // stay when the POM is refused (the same as an unregistered signing key, gpg-signed-deploy.spec.ts).
@@ -139,7 +145,12 @@ test.describe('maven upload size limits', { tag: '@negative' }, () => {
       pomOfSize(groupId, 'over', '1.0', MAX_POM_BYTES + 1),
       OCTET,
     );
-    expectRefused(over, 'pomFileTooLarge', 'The POM file is larger than 10 MiB.', '10 MiB + 1');
+    expectRefused(
+      over,
+      ERROR_CODES.POM_FILE_TOO_LARGE,
+      'The POM file is larger than 10 MiB.',
+      '10 MiB + 1',
+    );
     expect(await repoTree(repo.name), 'the refused POM stored nothing').toEqual({});
 
     const exact = await rawPut(
@@ -175,7 +186,7 @@ test.describe('maven upload size limits', { tag: '@negative' }, () => {
 
     expectRefused(
       res,
-      'mavenMetadataTooLarge',
+      ERROR_CODES.MAVEN_METADATA_TOO_LARGE,
       'The maven-metadata.xml file is larger than 10 MiB.',
       'metadata',
     );
@@ -202,7 +213,7 @@ test.describe('maven upload size limits', { tag: '@negative' }, () => {
     );
     expectRefused(
       over,
-      'mavenSignatureTooLarge',
+      ERROR_CODES.MAVEN_SIGNATURE_TOO_LARGE,
       'The signature file is larger than 64 KiB.',
       '64 KiB + 1',
     );
@@ -217,7 +228,7 @@ test.describe('maven upload size limits', { tag: '@negative' }, () => {
       OCTET,
     );
     expect(exact.status, `64 KiB: ${exact.body.toString('utf8').slice(0, 300)}`).toBe(422);
-    expect(exact.msgId).toBe('artifactSignatureNotVerified');
+    expect(exact.msgId).toBe(ERROR_CODES.ARTIFACT_SIGNATURE_NOT_VERIFIED);
     expect(await repoTree(repo.name), 'nor did that one').toEqual(before);
   });
 });

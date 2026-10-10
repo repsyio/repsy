@@ -43,6 +43,7 @@
  * `publish-consume.spec.ts`, each test builds its `World` by hand, since a coordinate other than the
  * catalog's own is not a scenario.
  */
+import { ERROR_CODES } from '../../src/error-codes.js';
 import { createHash } from 'node:crypto';
 
 import { RepoType } from '../../src/api/panel-api.js';
@@ -532,7 +533,7 @@ test.describe('ivy first-configuration pitfalls', () => {
       'application/octet-stream',
     );
     expect(ivyFile.status).toBe(400);
-    expect(ivyFile.msgId).toBe('invalidArtifactPath');
+    expect(ivyFile.msgId).toBe(ERROR_CODES.INVALID_ARTIFACT_PATH);
   });
 
   test("ivy > the panel's dependency line, used as it is, retrieves the artifact, and a bare line does too", async ({

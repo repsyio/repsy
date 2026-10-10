@@ -81,6 +81,12 @@ export default tseslint.config(
           selector,
           message: "Name a data type by its role (Info, Item, Form, Payload), not Dto or Model (RPS-2127).",
         })),
+        // RPS-2132: an API error code is a client contract and is written once, in ERROR_CODES
+        // (src/app/shared/constants/error-codes.ts); everything else compares against the constant.
+        {
+          selector: "Literal[value=/^(accessDenied|accessNotAllowed|invalidCredentials|loginRequired|refreshTokenExpired|resourceBusy|sessionExpired)$/]",
+          message: "Use ERROR_CODES from shared/constants/error-codes instead of an inline error code (RPS-2132).",
+        },
       ],
       "check-file/filename-naming-convention": [
         "warn",
@@ -132,6 +138,10 @@ export default tseslint.config(
       "**/env.d.ts",
       "src/generated/**"
     ]
+  },
+  {
+    files: ["src/app/shared/constants/error-codes.ts"],
+    rules: { "no-restricted-syntax": "off" },
   },
   {
     files: ["**/*.html"],

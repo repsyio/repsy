@@ -33,6 +33,7 @@
  *    the same, real bytes; `fixTarballUrl` used to splice the repo name into the path at an offset
  *    that assumed a cloud, multi-tenant URL shape Repsy OS does not have.
  */
+import { ERROR_CODES } from '../../src/error-codes.js';
 import { RepoType } from '../../src/api/panel-api.js';
 import { repoUrl } from '../../src/repo-url.js';
 import {
@@ -127,7 +128,7 @@ test.describe('npm registry rules (raw HTTP)', () => {
       expectPut(
         await rawPublish(layout.repoName, admin, layout.packageName, overrideDoc),
         403,
-        'packageVersionAlreadyExists',
+        ERROR_CODES.PACKAGE_VERSION_ALREADY_EXISTS,
         'republish of an existing version',
       );
 
@@ -183,7 +184,7 @@ test.describe('npm registry rules (raw HTTP)', () => {
       expectPut(
         await rawPublish(layout.repoName, admin, layout.packageName, doc),
         400,
-        'invalidPackageVersion',
+        ERROR_CODES.INVALID_PACKAGE_VERSION,
         'malformed version string',
       );
 
@@ -216,7 +217,9 @@ test.describe('npm registry rules (raw HTTP)', () => {
       // (a remote target) reserves one failure slot for this `@negative` test.
       const revoked = await rawGetPackument(layout.repoName, credential, layout.packageName);
       expect(revoked.status, 'a revoked deploy token as Bearer').toBe(401);
-      expect(revoked.msgId, 'the error message id of a revoked Bearer token').toBe('unAuthorized');
+      expect(revoked.msgId, 'the error message id of a revoked Bearer token').toBe(
+        ERROR_CODES.UN_AUTHORIZED,
+      );
     },
   );
 

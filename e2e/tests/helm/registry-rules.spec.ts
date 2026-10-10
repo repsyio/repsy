@@ -21,6 +21,7 @@
  * `HelmHeaderPreProcessor`/`HelmAuthPreProcessor` first and then confirmed live against a running
  * instance. Sections R1-R14 mirror the plan's own hypothesis/rule numbering.
  */
+import { ERROR_CODES } from '../../src/error-codes.js';
 import { RepoType } from '../../src/api/panel-api.js';
 import {
   buildChart,
@@ -242,7 +243,9 @@ test.describe('helm registry rules (raw HTTP)', () => {
       // BadRequestException, rendered as the OCI errors[] envelope like every other push failure,
       // instead of a bare bodyless 400.
       expectOci(noContentType, 400, 'MANIFEST_INVALID');
-      expect(ociErrorOf(noContentType.body)?.detail).toBe('manifestContentTypeMissing');
+      expect(ociErrorOf(noContentType.body)?.detail).toBe(
+        ERROR_CODES.MANIFEST_CONTENT_TYPE_MISSING,
+      );
     },
   );
 
@@ -301,7 +304,7 @@ test.describe('helm registry rules (raw HTTP)', () => {
       'application/vnd.oci.image.manifest.v1+json',
     );
     expectOci(refused, 409, 'DENIED');
-    expect(ociErrorOf(refused.body)?.detail).toBe('chartAlreadyExists');
+    expect(ociErrorOf(refused.body)?.detail).toBe(ERROR_CODES.CHART_ALREADY_EXISTS);
 
     const getAfterRefused = await rawGetManifest(layout.repoName, admin, layout.chart, 'tag1');
     expect(sha256Hex(getAfterRefused.body)).toBe(sha256Hex(manifest1));
@@ -477,71 +480,71 @@ test.describe('helm registry rules (raw HTTP)', () => {
 
       const cases: TestCase[] = [
         {
-          name: 'chartYamlNotFound',
+          name: ERROR_CODES.CHART_YAML_NOT_FOUND,
           chartYaml: '', // Placeholder; buildChartWithoutChartYaml handles this case
-          expectedMsgId: 'chartYamlNotFound',
+          expectedMsgId: ERROR_CODES.CHART_YAML_NOT_FOUND,
         },
         {
-          name: 'chartYamlInvalid',
+          name: ERROR_CODES.CHART_YAML_INVALID,
           chartYaml: '{ invalid yaml : [}',
-          expectedMsgId: 'chartYamlInvalid',
+          expectedMsgId: ERROR_CODES.CHART_YAML_INVALID,
         },
         {
-          name: 'chartNameMissing',
+          name: ERROR_CODES.CHART_NAME_MISSING,
           chartYaml: 'apiVersion: v2\nversion: 1.0.0\n',
-          expectedMsgId: 'chartNameMissing',
+          expectedMsgId: ERROR_CODES.CHART_NAME_MISSING,
         },
         {
-          name: 'chartNameInvalid',
+          name: ERROR_CODES.CHART_NAME_INVALID,
           chartYaml: 'apiVersion: v2\nname: UPPERCASE\nversion: 1.0.0\n',
-          expectedMsgId: 'chartNameInvalid',
+          expectedMsgId: ERROR_CODES.CHART_NAME_INVALID,
         },
         {
-          name: 'chartNameTooLong',
+          name: ERROR_CODES.CHART_NAME_TOO_LONG,
           chartYaml: `apiVersion: v2\nname: ${'a'.repeat(256)}\nversion: 1.0.0\n`,
-          expectedMsgId: 'chartNameTooLong',
+          expectedMsgId: ERROR_CODES.CHART_NAME_TOO_LONG,
         },
         {
-          name: 'chartVersionMissing',
+          name: ERROR_CODES.CHART_VERSION_MISSING,
           chartYaml: 'apiVersion: v2\nname: test-chart\n',
-          expectedMsgId: 'chartVersionMissing',
+          expectedMsgId: ERROR_CODES.CHART_VERSION_MISSING,
         },
         {
-          name: 'chartVersionInvalid',
+          name: ERROR_CODES.CHART_VERSION_INVALID,
           chartYaml: 'apiVersion: v2\nname: test-chart\nversion: not-a-version\n',
-          expectedMsgId: 'chartVersionInvalid',
+          expectedMsgId: ERROR_CODES.CHART_VERSION_INVALID,
         },
         {
-          name: 'chartVersionTooLong',
+          name: ERROR_CODES.CHART_VERSION_TOO_LONG,
           chartYaml: `apiVersion: v2\nname: test-chart\nversion: "${'1'.repeat(256)}"\n`,
-          expectedMsgId: 'chartVersionTooLong',
+          expectedMsgId: ERROR_CODES.CHART_VERSION_TOO_LONG,
         },
         {
-          name: 'chartApiVersionInvalid',
+          name: ERROR_CODES.CHART_API_VERSION_INVALID,
           chartYaml: `apiVersion: ${'x'.repeat(256)}\nname: test-chart\nversion: 1.0.0\n`,
-          expectedMsgId: 'chartApiVersionInvalid',
+          expectedMsgId: ERROR_CODES.CHART_API_VERSION_INVALID,
         },
         {
           name: 'chartDependenciesInvalid (non-list)',
           chartYaml:
             'apiVersion: v2\nname: test-chart\nversion: 1.0.0\ndependencies: "not-a-list"\n',
-          expectedMsgId: 'chartDependenciesInvalid',
+          expectedMsgId: ERROR_CODES.CHART_DEPENDENCIES_INVALID,
         },
         {
-          name: 'chartAppVersionTooLong',
+          name: ERROR_CODES.CHART_APP_VERSION_TOO_LONG,
           chartYaml: `apiVersion: v2\nname: test-chart\nversion: 1.0.0\nappVersion: ${'x'.repeat(256)}\n`,
-          expectedMsgId: 'chartAppVersionTooLong',
+          expectedMsgId: ERROR_CODES.CHART_APP_VERSION_TOO_LONG,
         },
         {
-          name: 'chartTypeInvalid',
+          name: ERROR_CODES.CHART_TYPE_INVALID,
           chartYaml: `apiVersion: v2\nname: test-chart\nversion: 1.0.0\ntype: ${'x'.repeat(256)}\n`,
-          expectedMsgId: 'chartTypeInvalid',
+          expectedMsgId: ERROR_CODES.CHART_TYPE_INVALID,
         },
       ];
 
       for (const testCase of cases) {
         const built =
-          testCase.name === 'chartYamlNotFound'
+          testCase.name === ERROR_CODES.CHART_YAML_NOT_FOUND
             ? await buildChartWithoutChartYaml({
                 name: 'test-chart',
                 marker: `r11b-${testCase.name}`,
@@ -633,7 +636,7 @@ test.describe('helm registry rules (raw HTTP)', () => {
         classicPush.status,
         'classic push of same coordinate with different bytes is refused',
       ).toBe(409);
-      expect(classicPush.msgId).toBe('chartAlreadyExists');
+      expect(classicPush.msgId).toBe(ERROR_CODES.CHART_ALREADY_EXISTS);
 
       // Verify original OCI chart is still accessible
       const ociPull = await rawGetManifest(layout.repoName, admin, 'mychart', '1.0.0');

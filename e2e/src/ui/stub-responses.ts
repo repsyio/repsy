@@ -28,6 +28,7 @@
  * forbids the other spellings, `route.fulfill({ body })` and `route.fulfill({ json })`, outside this file;
  * a body that is not JSON on purpose (a proxy's HTML error page) goes through `fulfillText`.
  */
+import { ERROR_CODES } from '../error-codes.js';
 import type { Route } from '@playwright/test';
 
 import type { ProblemDetail } from './stub-models.js';
@@ -67,5 +68,5 @@ export async function fulfillText(
  * leaves them out.
  */
 export function errorBody(fields: Partial<ProblemDetail> = {}): ErrorResponse {
-  return { status: 500, code: 'errorOccurred', ...fields };
+  return { status: 500, code: ERROR_CODES.ERROR_OCCURRED, ...fields };
 }

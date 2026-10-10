@@ -30,6 +30,7 @@
  * `src/clients/ruby-manage.ts` (`gem yank`) and `tests/pypi/panel-api.spec.ts` (the shared contract helpers). The
  * paging sweeps seed their rows over raw HTTP (`seedPackage`): the pages are the subject there, not the client.
  */
+import { ERROR_CODES } from '../../src/error-codes.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
@@ -321,7 +322,7 @@ test.describe('the Ruby panel API against what gem push stored', () => {
       'getGemVersion',
       await callOperation('getGemVersion', values(names, platformed)),
       404,
-      'gemVersionNotFound',
+      ERROR_CODES.GEM_VERSION_NOT_FOUND,
     );
     // The digest the panel shows is the digest of the file the wire serves and of the checksum `/info` advertises.
     for (const [version, platform] of [
@@ -356,40 +357,45 @@ test.describe('the Ruby panel API against what gem push stored', () => {
       'listGems',
       await callOperation('listGems', { repoName: 'e2e-no-such-repo' }),
       404,
-      'repoNotFound',
+      ERROR_CODES.REPO_NOT_FOUND,
     );
     expectFailure(
       'listGems',
       await callOperation('listGems', { repoName: names.repoName }, { anonymous: true }),
       401,
-      'loginRequired',
+      ERROR_CODES.LOGIN_REQUIRED,
     );
     expectFailure(
       'listGemVersions',
       await callOperation('listGemVersions', missing),
       404,
-      'gemNotFound',
+      ERROR_CODES.GEM_NOT_FOUND,
     );
     expectFailure(
       'getGemVersion',
       await callOperation('getGemVersion', values(names, '9.9.9')),
       404,
-      'gemVersionNotFound',
+      ERROR_CODES.GEM_VERSION_NOT_FOUND,
     );
     expectFailure(
       'getGemVersion',
       await callOperation('getGemVersion', values(names, '1.0.0'), { query: 'platform=java' }),
       404,
-      'gemVersionNotFound',
+      ERROR_CODES.GEM_VERSION_NOT_FOUND,
     );
     expectFailure(
       'deleteGemVersion',
       await callOperation('deleteGemVersion', values(names, '9.9.9')),
       404,
-      'gemVersionNotFound',
+      ERROR_CODES.GEM_VERSION_NOT_FOUND,
     );
-    expectFailure('getGem', await callOperation('getGem', missing), 404, 'gemNotFound');
-    expectFailure('deleteGem', await callOperation('deleteGem', missing), 404, 'gemNotFound');
+    expectFailure('getGem', await callOperation('getGem', missing), 404, ERROR_CODES.GEM_NOT_FOUND);
+    expectFailure(
+      'deleteGem',
+      await callOperation('deleteGem', missing),
+      404,
+      ERROR_CODES.GEM_NOT_FOUND,
+    );
 
     // Every failure above left the gem where it was.
     expect((await panelVersions(names)).map((row) => row.version)).toEqual(['1.0.0']);
@@ -468,7 +474,7 @@ test.describe('the Ruby panel API against what gem push stored', () => {
       'getGemVersion',
       await callOperation('getGemVersion', values(names, removed)),
       404,
-      'gemVersionNotFound',
+      ERROR_CODES.GEM_VERSION_NOT_FOUND,
     );
     expect(await infoEntries(names), 'the compact index drops the version').toEqual({
       [kept]: seeds.get(kept),
@@ -487,7 +493,7 @@ test.describe('the Ruby panel API against what gem push stored', () => {
       'deleteGemVersion',
       await callOperation('deleteGemVersion', values(names, removed)),
       404,
-      'gemVersionNotFound',
+      ERROR_CODES.GEM_VERSION_NOT_FOUND,
     );
 
     // The java variant of 1.1.0: only that platform goes, the plain 1.1.0 stays.
@@ -502,7 +508,7 @@ test.describe('the Ruby panel API against what gem push stored', () => {
       'getGemVersion',
       await callOperation('getGemVersion', values(names, kept), { query: 'platform=java' }),
       404,
-      'gemVersionNotFound',
+      ERROR_CODES.GEM_VERSION_NOT_FOUND,
     );
     expect((await ruby.resolve(worldOf(names, kept))).contentSha256).toBe(seeds.get(kept));
 
@@ -532,13 +538,18 @@ test.describe('the Ruby panel API against what gem push stored', () => {
       'listGemVersions',
       await callOperation('listGemVersions', values(whole)),
       404,
-      'gemNotFound',
+      ERROR_CODES.GEM_NOT_FOUND,
     );
     const rows = expectBare(
       'listGems',
       await callOperation('listGems', { repoName: names.repoName }),
     ) as { content: unknown[] };
     expect(rows.content).toEqual([]);
-    expectFailure('deleteGem', await callOperation('deleteGem', values(whole)), 404, 'gemNotFound');
+    expectFailure(
+      'deleteGem',
+      await callOperation('deleteGem', values(whole)),
+      404,
+      ERROR_CODES.GEM_NOT_FOUND,
+    );
   });
 });

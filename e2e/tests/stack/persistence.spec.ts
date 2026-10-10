@@ -48,6 +48,7 @@
  * `@local-only`: it needs the container of a stack this harness owns, so it skips on a remote target.
  * Runs in the "stack" runner: `./run.sh test --protocol stack --grep persistence` (README.md "Stack runner").
  */
+import { ERROR_CODES } from '../../src/error-codes.js';
 import { randomBytes } from 'node:crypto';
 
 import { createPanelBackend, loginPanel } from '../../src/api/backend-registry.js';
@@ -87,7 +88,7 @@ import { target } from '../../src/target.js';
 const JWT_OVERLAY = 'docker-compose.stack-jwt.yml';
 /** Repsy answers a token it cannot verify (unknown session, wrong secret) with this. */
 const REFUSED_STATUS = 401;
-const REFUSED_MSG_ID = 'accessNotAllowed';
+const REFUSED_MSG_ID = ERROR_CODES.ACCESS_NOT_ALLOWED;
 
 let panelApi: PanelBackend;
 let seeder: Seeder;

@@ -53,6 +53,7 @@
  *    existence never checked. `AbstractPypiHeadProtocolMethodHandler` now mirrors `GET`'s status via
  *    existence-only facade lookups (a non-normalized project name mirrors `GET`'s `307` redirect too).
  */
+import { ERROR_CODES } from '../../src/error-codes.js';
 import { RepoType } from '../../src/api/panel-api.js';
 import { pypiAdapter } from '../../src/clients/pypi.js';
 import {
@@ -118,11 +119,11 @@ test.describe('pypi registry rules (raw HTTP)', () => {
       const built = buildWheel({ name: layout.packageName, version });
 
       const res = await rawUpload(layout.repoName, credential, built);
-      expectMsgId(res, 401, 'unAuthorized');
+      expectMsgId(res, 401, ERROR_CODES.UN_AUTHORIZED);
 
       // Real Repsy panel envelope (not a bodyless 401), with the Basic challenge header every
       // other protocol in this harness gives too.
-      expect(res.msgId, 'msgId').toBe('unAuthorized');
+      expect(res.msgId, 'msgId').toBe(ERROR_CODES.UN_AUTHORIZED);
 
       // Seed a file with admin so the read side has something to read.
       const seedRes = await rawUpload(layout.repoName, adminCredential(), built);
@@ -147,7 +148,7 @@ test.describe('pypi registry rules (raw HTTP)', () => {
         body: JSON.stringify({}),
       });
       const jsonBytes = Buffer.from(await jsonRes.arrayBuffer());
-      expectMsgId({ status: jsonRes.status, body: jsonBytes }, 404, 'unknownPath');
+      expectMsgId({ status: jsonRes.status, body: jsonBytes }, 404, ERROR_CODES.UNKNOWN_PATH);
 
       const form = new FormData();
       form.append('name', 'not-a-real-upload');
@@ -211,7 +212,7 @@ test.describe('pypi registry rules (raw HTTP)', () => {
         body: form2,
       });
       const simpleBytes = Buffer.from(await simpleRes.arrayBuffer());
-      expectMsgId({ status: simpleRes.status, body: simpleBytes }, 404, 'unknownPath');
+      expectMsgId({ status: simpleRes.status, body: simpleBytes }, 404, ERROR_CODES.UNKNOWN_PATH);
     },
   );
 
@@ -244,7 +245,7 @@ test.describe('pypi registry rules (raw HTTP)', () => {
         body: form,
       });
       const bytes = Buffer.from(await res.arrayBuffer());
-      expectMsgId({ status: res.status, body: bytes }, 400, 'archiveFileNameInvalid');
+      expectMsgId({ status: res.status, body: bytes }, 400, ERROR_CODES.ARCHIVE_FILE_NAME_INVALID);
     },
   );
 
@@ -271,7 +272,11 @@ test.describe('pypi registry rules (raw HTTP)', () => {
 
       // Same filename, same declared version: a real override attempt, refused (fileAlreadyExists).
       const builtB = buildWheel({ name: layout.packageName, version, marker: 'v1-again' });
-      expectMsgId(await rawUpload(layout.repoName, admin, builtB), 403, 'fileAlreadyExists');
+      expectMsgId(
+        await rawUpload(layout.repoName, admin, builtB),
+        403,
+        ERROR_CODES.FILE_ALREADY_EXISTS,
+      );
 
       const dlAfterRefused = await rawDownload(
         layout.repoName,
@@ -308,7 +313,11 @@ test.describe('pypi registry rules (raw HTTP)', () => {
       });
       const bypassBytes = Buffer.from(await bypassRes.arrayBuffer());
 
-      expectMsgId({ status: bypassRes.status, body: bypassBytes }, 400, 'archiveVersionMismatch');
+      expectMsgId(
+        { status: bypassRes.status, body: bypassBytes },
+        400,
+        ERROR_CODES.ARCHIVE_VERSION_MISMATCH,
+      );
     },
   );
 
@@ -336,7 +345,7 @@ test.describe('pypi registry rules (raw HTTP)', () => {
         body: form,
       });
       const bytes = Buffer.from(await res.arrayBuffer());
-      expectMsgId({ status: res.status, body: bytes }, 400, 'badVersionString');
+      expectMsgId({ status: res.status, body: bytes }, 400, ERROR_CODES.BAD_VERSION_STRING);
 
       // P4 (fixed, RPS-1124/#508): the form version is validated BEFORE the archive is written, so
       // the refused upload leaves nothing behind -- no orphaned, downloadable file (nor a DB row).
@@ -367,7 +376,11 @@ test.describe('pypi registry rules (raw HTTP)', () => {
       });
       const missingBytes = Buffer.from(await missingRes.arrayBuffer());
 
-      expectMsgId({ status: missingRes.status, body: missingBytes }, 400, 'sha256DigestMissing');
+      expectMsgId(
+        { status: missingRes.status, body: missingBytes },
+        400,
+        ERROR_CODES.SHA256_DIGEST_MISSING,
+      );
     },
   );
 
@@ -383,7 +396,7 @@ test.describe('pypi registry rules (raw HTTP)', () => {
       // stored and served back verbatim.
       const wrong = buildWheel({ name: layout.packageName, version: '1.0.0' });
       const wrongRes = await rawUpload(layout.repoName, admin, wrong, { sha256Digest: 'deadbeef' });
-      expectMsgId(wrongRes, 400, 'sha256DigestMismatch');
+      expectMsgId(wrongRes, 400, ERROR_CODES.SHA256_DIGEST_MISMATCH);
 
       const wrongDl = await rawDownload(layout.repoName, admin, wrong.name, wrong.filename);
       expect(wrongDl.status, 'the rejected upload left nothing downloadable').toBe(404);
@@ -533,11 +546,11 @@ test.describe('pypi registry rules (raw HTTP)', () => {
     const admin = adminCredential();
     const name = `e2e-${seeder.runId}-unknown`;
 
-    expectMsgId(await rawGetSimplePage(repo.name, admin, name), 404, 'packageNotFound');
+    expectMsgId(await rawGetSimplePage(repo.name, admin, name), 404, ERROR_CODES.PACKAGE_NOT_FOUND);
     expectMsgId(
       await rawDownload(repo.name, admin, name, wheelFilename(name, '1.0.0')),
       404,
-      'itemNotFound',
+      ERROR_CODES.ITEM_NOT_FOUND,
     );
   });
 

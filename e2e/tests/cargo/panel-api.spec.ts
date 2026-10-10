@@ -27,6 +27,7 @@
  * `cargo yank`) and `tests/pypi/panel-api.spec.ts` (the shared contract helpers). The paging sweeps seed their
  * rows over raw HTTP (`seedPackage`): the pages are the subject there, not the client.
  */
+import { ERROR_CODES } from '../../src/error-codes.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
@@ -417,43 +418,43 @@ test.describe('the Cargo panel API against what cargo publish stored', () => {
       'searchCargoCrates',
       await callOperation('searchCargoCrates', { repoName: 'e2e-no-such-repo' }),
       404,
-      'repoNotFound',
+      ERROR_CODES.REPO_NOT_FOUND,
     );
     expectFailure(
       'searchCargoCrates',
       await callOperation('searchCargoCrates', { repoName: names.repoName }, { anonymous: true }),
       401,
-      'loginRequired',
+      ERROR_CODES.LOGIN_REQUIRED,
     );
     expectFailure(
       'getCargoCrate',
       await callOperation('getCargoCrate', missing),
       404,
-      'crateNotFound',
+      ERROR_CODES.CRATE_NOT_FOUND,
     );
     expectFailure(
       'listCargoCrateVersions',
       await callOperation('listCargoCrateVersions', missing),
       404,
-      'crateNotFound',
+      ERROR_CODES.CRATE_NOT_FOUND,
     );
     expectFailure(
       'getCargoCrateVersion',
       await callOperation('getCargoCrateVersion', values(names, '9.9.9')),
       404,
-      'crateVersionNotFound',
+      ERROR_CODES.CRATE_VERSION_NOT_FOUND,
     );
     expectFailure(
       'deleteCargoCrateVersion',
       await callOperation('deleteCargoCrateVersion', values(names, '9.9.9')),
       404,
-      'crateVersionNotFound',
+      ERROR_CODES.CRATE_VERSION_NOT_FOUND,
     );
     expectFailure(
       'deleteCargoCrate',
       await callOperation('deleteCargoCrate', missing),
       404,
-      'crateNotFound',
+      ERROR_CODES.CRATE_NOT_FOUND,
     );
 
     // Every failure above left the crate where it was.
@@ -529,7 +530,7 @@ test.describe('the Cargo panel API against what cargo publish stored', () => {
       'getCargoCrateVersion',
       await callOperation('getCargoCrateVersion', values(names, removed)),
       404,
-      'crateVersionNotFound',
+      ERROR_CODES.CRATE_VERSION_NOT_FOUND,
     );
     expect(await indexEntries(names), 'the sparse index drops the version').toEqual({
       [kept]: false,
@@ -552,7 +553,7 @@ test.describe('the Cargo panel API against what cargo publish stored', () => {
       'deleteCargoCrateVersion',
       await callOperation('deleteCargoCrateVersion', values(names, removed)),
       404,
-      'crateVersionNotFound',
+      ERROR_CODES.CRATE_VERSION_NOT_FOUND,
     );
 
     // The last version takes the crate with it.
@@ -564,7 +565,7 @@ test.describe('the Cargo panel API against what cargo publish stored', () => {
       'getCargoCrate',
       await callOperation('getCargoCrate', values(names)),
       404,
-      'crateNotFound',
+      ERROR_CODES.CRATE_NOT_FOUND,
     );
     expect(await indexEntries(names)).toBe(404);
     expect(await crateStatus(names, kept)).toBe(404);
@@ -584,7 +585,7 @@ test.describe('the Cargo panel API against what cargo publish stored', () => {
       'getCargoCrate',
       await callOperation('getCargoCrate', values(whole)),
       404,
-      'crateNotFound',
+      ERROR_CODES.CRATE_NOT_FOUND,
     );
     const rows = expectBare(
       'searchCargoCrates',
@@ -595,7 +596,7 @@ test.describe('the Cargo panel API against what cargo publish stored', () => {
       'deleteCargoCrate',
       await callOperation('deleteCargoCrate', values(whole)),
       404,
-      'crateNotFound',
+      ERROR_CODES.CRATE_NOT_FOUND,
     );
   });
 });

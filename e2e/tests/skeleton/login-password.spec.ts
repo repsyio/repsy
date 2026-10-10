@@ -24,6 +24,7 @@
  *
  * `@cloud-skip` (RPS-1498): this is Repsy OS's `POST /api/auth/login`; Repsy Cloud has its own login.
  */
+import { ERROR_CODES } from '../../src/error-codes.js';
 import { env } from '../../src/env.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 
@@ -74,7 +75,7 @@ test(
 
         expect(answer.status, `${username} / ${password}`).toBe(401);
         // A failure on a panel route is problem+json (RFC 9457): the stable key is `code`.
-        expect(answer.body.code, `${username} / ${password}`).toBe('invalidCredentials');
+        expect(answer.body.code, `${username} / ${password}`).toBe(ERROR_CODES.INVALID_CREDENTIALS);
       }
     }
   },

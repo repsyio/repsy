@@ -31,6 +31,7 @@
  *  - The file browser tells three states apart: files, an empty repository (the empty list) and a
  *    directory it cannot list (`maven-browser-not-found`).
  */
+import { ERROR_CODES } from '../../../src/error-codes.js';
 import type { Page } from '@playwright/test';
 
 import { RepoType } from '../../../src/api/panel-api.js';
@@ -647,7 +648,11 @@ test.describe('Maven file browser states', { tag: '@packages' }, () => {
           fulfillJson<ErrorResponse>(
             route,
             status,
-            errorBody({ status: 404, code: 'itemNotFound', detail: 'Resource not found.' }),
+            errorBody({
+              status: 404,
+              code: ERROR_CODES.ITEM_NOT_FOUND,
+              detail: 'Resource not found.',
+            }),
           ),
         );
         await openBrowser(adminPage, repo.name);

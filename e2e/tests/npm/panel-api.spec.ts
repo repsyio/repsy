@@ -26,6 +26,7 @@
  * `tests/maven/panel-api.spec.ts` (the shared contract helpers). The paging sweeps seed their rows over raw
  * HTTP (`seedPackage`): the pages are the subject there, not the client.
  */
+import { ERROR_CODES } from '../../src/error-codes.js';
 import {
   callOperation,
   contractWorld,
@@ -340,61 +341,61 @@ test.describe('the npm panel API against what npm publish stored', { tag: ['@clo
       'listNpmPackages',
       await callOperation('listNpmPackages', { repoName: 'e2e-no-such-repo' }),
       404,
-      'repoNotFound',
+      ERROR_CODES.REPO_NOT_FOUND,
     );
     expectFailure(
       'listNpmPackages',
       await callOperation('listNpmPackages', { repoName: names.repoName }, { anonymous: true }),
       401,
-      'loginRequired',
+      ERROR_CODES.LOGIN_REQUIRED,
     );
     expectFailure(
       'getNpmPackage',
       await callOperation('getNpmPackage', missing),
       404,
-      'packageNotFound',
+      ERROR_CODES.PACKAGE_NOT_FOUND,
     );
     expectFailure(
       'getNpmPackageVersion',
       await callOperation('getNpmPackageVersion', { ...plain, version: '9.9.9' }),
       404,
-      'packageVersionNotFound',
+      ERROR_CODES.PACKAGE_VERSION_NOT_FOUND,
     );
     expectFailure(
       'listNpmPackageTags',
       await callOperation('listNpmPackageTags', missing),
       404,
-      'packageNotFound',
+      ERROR_CODES.PACKAGE_NOT_FOUND,
     );
     expectFailure(
       'listNpmPackageVersions',
       await callOperation('listNpmPackageVersions', missing),
       404,
-      'packageNotFound',
+      ERROR_CODES.PACKAGE_NOT_FOUND,
     );
     expectFailure(
       'getNpmScopedPackage',
       await callOperation('getNpmScopedPackage', { ...missing, scope: 'no-such-scope' }),
       404,
-      'packageNotFound',
+      ERROR_CODES.PACKAGE_NOT_FOUND,
     );
     expectFailure(
       'deleteNpmPackageVersion',
       await callOperation('deleteNpmPackageVersion', { ...plain, version: '9.9.9' }),
       404,
-      'packageVersionNotFound',
+      ERROR_CODES.PACKAGE_VERSION_NOT_FOUND,
     );
     expectFailure(
       'deleteNpmPackage',
       await callOperation('deleteNpmPackage', missing),
       404,
-      'packageNotFound',
+      ERROR_CODES.PACKAGE_NOT_FOUND,
     );
     expectFailure(
       'deleteScopedNpmPackage',
       await callOperation('deleteScopedNpmPackage', { ...missing, scope: 'no-such-scope' }),
       404,
-      'packageNotFound',
+      ERROR_CODES.PACKAGE_NOT_FOUND,
     );
     expectFailure(
       'deleteNpmScopedPackageVersion',
@@ -404,7 +405,7 @@ test.describe('the npm panel API against what npm publish stored', { tag: ['@clo
         version: version,
       }),
       404,
-      'packageNotFound',
+      ERROR_CODES.PACKAGE_NOT_FOUND,
     );
 
     // Every failure above left the package where it was.
@@ -479,7 +480,7 @@ test.describe('the npm panel API against what npm publish stored', { tag: ['@clo
       'getNpmScopedPackageVersion',
       await callOperation('getNpmScopedPackageVersion', { ...path, version: removed }),
       404,
-      'packageVersionNotFound',
+      ERROR_CODES.PACKAGE_VERSION_NOT_FOUND,
     );
     expect(await packument(names, names.scoped)).toMatchObject({
       versions: [kept],
@@ -496,7 +497,7 @@ test.describe('the npm panel API against what npm publish stored', { tag: ['@clo
       'deleteNpmScopedPackageVersion',
       await callOperation('deleteNpmScopedPackageVersion', { ...path, version: removed }),
       404,
-      'packageVersionNotFound',
+      ERROR_CODES.PACKAGE_VERSION_NOT_FOUND,
     );
 
     // Now the whole package.
@@ -509,7 +510,7 @@ test.describe('the npm panel API against what npm publish stored', { tag: ['@clo
       'getNpmScopedPackage',
       await callOperation('getNpmScopedPackage', path),
       404,
-      'packageNotFound',
+      ERROR_CODES.PACKAGE_NOT_FOUND,
     );
     const rows = expectBare(
       'listNpmPackagesByScope',
@@ -523,7 +524,7 @@ test.describe('the npm panel API against what npm publish stored', { tag: ['@clo
       'deleteScopedNpmPackage',
       await callOperation('deleteScopedNpmPackage', path),
       404,
-      'packageNotFound',
+      ERROR_CODES.PACKAGE_NOT_FOUND,
     );
   });
 
@@ -566,13 +567,13 @@ test.describe('the npm panel API against what npm publish stored', { tag: ['@clo
       'getNpmPackage',
       await callOperation('getNpmPackage', path),
       404,
-      'packageNotFound',
+      ERROR_CODES.PACKAGE_NOT_FOUND,
     );
     expectFailure(
       'deleteNpmPackage',
       await callOperation('deleteNpmPackage', path),
       404,
-      'packageNotFound',
+      ERROR_CODES.PACKAGE_NOT_FOUND,
     );
   });
 });

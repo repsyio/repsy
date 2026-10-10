@@ -28,6 +28,7 @@
  * helpers). The paging sweeps seed their rows over raw HTTP (`seedPackage`): the pages are the subject there,
  * not the client.
  */
+import { ERROR_CODES } from '../../src/error-codes.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
@@ -445,43 +446,43 @@ test.describe('the NuGet panel API against what dotnet nuget push stored', () =>
       'searchNuGetPackages',
       await callOperation('searchNuGetPackages', { repoName: 'e2e-no-such-repo' }),
       404,
-      'repoNotFound',
+      ERROR_CODES.REPO_NOT_FOUND,
     );
     expectFailure(
       'searchNuGetPackages',
       await callOperation('searchNuGetPackages', { repoName: names.repoName }, { anonymous: true }),
       401,
-      'loginRequired',
+      ERROR_CODES.LOGIN_REQUIRED,
     );
     expectFailure(
       'getNuGetPackage',
       await callOperation('getNuGetPackage', missing),
       404,
-      'packageNotFound',
+      ERROR_CODES.PACKAGE_NOT_FOUND,
     );
     expectFailure(
       'listNuGetVersions',
       await callOperation('listNuGetVersions', missing),
       404,
-      'packageNotFound',
+      ERROR_CODES.PACKAGE_NOT_FOUND,
     );
     expectFailure(
       'getNuGetVersion',
       await callOperation('getNuGetVersion', values(names, '9.9.9')),
       404,
-      'versionNotFound',
+      ERROR_CODES.VERSION_NOT_FOUND,
     );
     expectFailure(
       'deleteNuGetVersion',
       await callOperation('deleteNuGetVersion', values(names, '9.9.9')),
       404,
-      'versionNotFound',
+      ERROR_CODES.VERSION_NOT_FOUND,
     );
     expectFailure(
       'deleteNuGetPackage',
       await callOperation('deleteNuGetPackage', missing),
       404,
-      'packageNotFound',
+      ERROR_CODES.PACKAGE_NOT_FOUND,
     );
 
     // Every failure above left the package where it was.
@@ -559,7 +560,7 @@ test.describe('the NuGet panel API against what dotnet nuget push stored', () =>
       'getNuGetVersion',
       await callOperation('getNuGetVersion', values(names, removed)),
       404,
-      'versionNotFound',
+      ERROR_CODES.VERSION_NOT_FOUND,
     );
     expect(await flatVersions(names), 'the flat container drops the version').toEqual([kept]);
     expect(await registrationListed(names), 'the registration drops the leaf').toEqual({
@@ -578,7 +579,7 @@ test.describe('the NuGet panel API against what dotnet nuget push stored', () =>
       'deleteNuGetVersion',
       await callOperation('deleteNuGetVersion', values(names, removed)),
       404,
-      'versionNotFound',
+      ERROR_CODES.VERSION_NOT_FOUND,
     );
 
     // The last version: 204, and the package is gone with it.
@@ -590,7 +591,7 @@ test.describe('the NuGet panel API against what dotnet nuget push stored', () =>
       'getNuGetPackage',
       await callOperation('getNuGetPackage', values(names)),
       404,
-      'packageNotFound',
+      ERROR_CODES.PACKAGE_NOT_FOUND,
     );
     expect(await flatVersions(names)).toBe(404);
     expect(await registrationListed(names)).toBe(404);
@@ -618,7 +619,7 @@ test.describe('the NuGet panel API against what dotnet nuget push stored', () =>
       'getNuGetPackage',
       await callOperation('getNuGetPackage', values(wholeNames)),
       404,
-      'packageNotFound',
+      ERROR_CODES.PACKAGE_NOT_FOUND,
     );
     const rows = expectBare(
       'searchNuGetPackages',
@@ -629,7 +630,7 @@ test.describe('the NuGet panel API against what dotnet nuget push stored', () =>
       'deleteNuGetPackage',
       await callOperation('deleteNuGetPackage', values(wholeNames)),
       404,
-      'packageNotFound',
+      ERROR_CODES.PACKAGE_NOT_FOUND,
     );
   });
 });

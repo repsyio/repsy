@@ -43,6 +43,7 @@
  *  - **RPS-1238** (fixed): a yanked version's `.gem` file stays downloadable by exact URL, matching
  *    rubygems.org -- yank only unpublishes from the index.
  */
+import { ERROR_CODES } from '../../src/error-codes.js';
 import zlib from 'node:zlib';
 
 import { RepoType } from '../../src/api/panel-api.js';
@@ -266,7 +267,7 @@ test.describe('ruby registry rules (raw HTTP)', () => {
       expectMsgId(
         await rawPublish(layout.repoName, admin, builtB.bytes),
         409,
-        'gemVersionAlreadyExists',
+        ERROR_CODES.GEM_VERSION_ALREADY_EXISTS,
       );
 
       const dlAfter = await rawDownload(layout.repoName, admin, filename);
@@ -299,15 +300,15 @@ test.describe('ruby registry rules (raw HTTP)', () => {
 
       const noMetadata = buildRawGem([{ name: 'data.tar.gz', data: Buffer.from('not even gzip') }]);
       const res1 = await rawPublish(layout.repoName, admin, noMetadata.bytes);
-      expectMsgId(res1, 400, 'invalidGemFile');
+      expectMsgId(res1, 400, ERROR_CODES.INVALID_GEM_FILE);
 
       const badGzip = buildRawGem([{ name: 'metadata.gz', data: Buffer.from('not gzip at all') }]);
       const res2 = await rawPublish(layout.repoName, admin, badGzip.bytes);
-      expectMsgId(res2, 400, 'invalidGemFile');
+      expectMsgId(res2, 400, ERROR_CODES.INVALID_GEM_FILE);
 
       const notEvenATar = Buffer.from('this is not a tar file at all, just plain bytes');
       const res3 = await rawPublish(layout.repoName, admin, notEvenATar);
-      expectMsgId(res3, 400, 'invalidGemFile');
+      expectMsgId(res3, 400, ERROR_CODES.INVALID_GEM_FILE);
 
       const namesRes = await rawGet(layout.repoName, admin, namesRelPath());
       expect(parseNames(namesRes.body)).toHaveLength(0);
@@ -354,7 +355,7 @@ test.describe('ruby registry rules (raw HTTP)', () => {
         gemName: layout.packageName,
         version: '1.0.0',
       });
-      expectMsgId(reyank, 400, 'gemVersionAlreadyYanked');
+      expectMsgId(reyank, 400, ERROR_CODES.GEM_VERSION_ALREADY_YANKED);
 
       const unknown = await rawYank(layout.repoName, admin, {
         gemName: layout.packageName,
@@ -383,7 +384,7 @@ test.describe('ruby registry rules (raw HTTP)', () => {
         marker: 'again',
       });
       const republish = await rawPublish(layout.repoName, admin, rebuilt.bytes);
-      expectMsgId(republish, 409, 'gemVersionAlreadyExists');
+      expectMsgId(republish, 409, ERROR_CODES.GEM_VERSION_ALREADY_EXISTS);
     },
   );
 
@@ -476,7 +477,7 @@ test.describe('ruby registry rules (raw HTTP)', () => {
       expectMsgId(
         await rawGet(layout.repoName, admin, infoRelPath(layout.packageName)),
         404,
-        'gemNotFound',
+        ERROR_CODES.GEM_NOT_FOUND,
       );
       expect(
         (await rawDownload(layout.repoName, admin, gemFilename(layout.packageName, '1.0.0')))

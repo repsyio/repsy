@@ -44,6 +44,7 @@
  * of the repo in the background (RPS-1316), and turning it on verifies the `.asc` files that were
  * stored while it was off, so an honest publisher's versions stay signed (RPS-1323).
  */
+import { ERROR_CODES } from '../../src/error-codes.js';
 import { RepoType } from '../../src/api/panel-api.js';
 import {
   adminCredential,
@@ -129,7 +130,7 @@ test.describe('maven PGP registered public keys (raw HTTP)', () => {
       const put = await layout.put(layout.ascPath, signature, OCTET);
 
       expect(put.status, `PUT ${layout.ascPath} answered ${put.status}`).toBe(422);
-      expect(put.msgId, 'error message id').toBe('artifactSignatureNotVerified');
+      expect(put.msgId, 'error message id').toBe(ERROR_CODES.ARTIFACT_SIGNATURE_NOT_VERIFIED);
       expect(await repoTree(layout.repoName), 'repo tree unchanged').toEqual(before);
     },
   );
@@ -220,12 +221,12 @@ test.describe('maven verifies every signature when the repo asks for it (RPS-118
       const armorOnly = '-----BEGIN PGP SIGNATURE-----\n\n-----END PGP SIGNATURE-----\n';
       const garbage = await layout.put(`${jarPath}.asc`, armorOnly, OCTET);
       expect(garbage.status, 'an armor-only .jar.asc').toBe(422);
-      expect(garbage.msgId).toBe('artifactSignatureNotVerified');
+      expect(garbage.msgId).toBe(ERROR_CODES.ARTIFACT_SIGNATURE_NOT_VERIFIED);
 
       const wrong = await detachedSign(key.privateKeyArmored, Buffer.from('not the jar'));
       const refused = await layout.put(`${jarPath}.asc`, wrong, OCTET);
       expect(refused.status, 'a signature over other bytes').toBe(422);
-      expect(refused.msgId).toBe('artifactSignatureNotVerified');
+      expect(refused.msgId).toBe(ERROR_CODES.ARTIFACT_SIGNATURE_NOT_VERIFIED);
 
       expect(await repoTree(layout.repoName), 'repo tree unchanged').toEqual(before);
     },
@@ -317,7 +318,7 @@ test.describe('maven verifies every signature when the repo asks for it (RPS-118
       const file = await layout.put(sourcesPath, 'the sources', OCTET);
 
       expect(file.status, `PUT ${sourcesPath} answered ${file.status}`).toBe(422);
-      expect(file.msgId, 'error message id').toBe('pendingSignatureNotVerified');
+      expect(file.msgId, 'error message id').toBe(ERROR_CODES.PENDING_SIGNATURE_NOT_VERIFIED);
       expect(
         await repoTree(layout.repoName),
         'repo tree unchanged: the file was taken back',
@@ -339,7 +340,7 @@ test.describe('maven verifies every signature when the repo asks for it (RPS-118
       );
 
       expect(put.status, 'an armor-only .asc before its file').toBe(422);
-      expect(put.msgId).toBe('artifactSignatureNotVerified');
+      expect(put.msgId).toBe(ERROR_CODES.ARTIFACT_SIGNATURE_NOT_VERIFIED);
       expect(await repoTree(layout.repoName), 'repo tree unchanged').toEqual(before);
     },
   );
@@ -378,7 +379,7 @@ test.describe('maven key-server lookup switched off (RPS-1204)', () => {
       const elapsedMs = Date.now() - started;
 
       expect(put.status, `PUT ${layout.ascPath} answered ${put.status}`).toBe(404);
-      expect(put.msgId, 'error message id').toBe('artifactSigningKeyNotRegistered');
+      expect(put.msgId, 'error message id').toBe(ERROR_CODES.ARTIFACT_SIGNING_KEY_NOT_REGISTERED);
       // With the lookup on, the default key servers are asked and may take their whole timeout
       // when this sandbox has no network; switched off, nothing is asked.
       expect(elapsedMs, 'answered without waiting for a key server').toBeLessThan(2_000);

@@ -30,6 +30,7 @@
  *  - `PUT`/`DELETE /-/package/<pkg>/dist-tags/<tag>` (RPS-1362): answer `{"ok": true, "id": ...,
  *    "dist-tags": {...}}`, because yarn classic takes an answer without `ok` for a failure.
  */
+import { ERROR_CODES } from '../../src/error-codes.js';
 import { RepoType } from '../../src/api/panel-api.js';
 import { env } from '../../src/env.js';
 import {
@@ -174,7 +175,7 @@ test.describe('npm search qualifiers and paging (raw HTTP)', () => {
       for (const query of ['size=many', 'size=-1', 'size=1.5', 'from=x', 'from=-3', 'from=1e3']) {
         const res = await search(repo, query);
         expect(res.status, query).toBe(400);
-        expect(res.text, query).toContain('invalidSearchParameter');
+        expect(res.text, query).toContain(ERROR_CODES.INVALID_SEARCH_PARAMETER);
       }
     },
   );
@@ -249,7 +250,7 @@ test.describe('npm token revocation (raw HTTP)', () => {
 
       const refused = await rawRequestPath(repo, 'DELETE', `-/user/token/${deploy.token}`, bearer);
       expect(refused.status, 'a deploy token is managed in the panel').toBe(403);
-      expect(refused.msgId).toBe('deployTokenNotRevocable');
+      expect(refused.msgId).toBe(ERROR_CODES.DEPLOY_TOKEN_NOT_REVOCABLE);
       // The npm error shape, so `npm logout` and `pnpm logout` print why (RPS-1391).
       const refusedBody = JSON.parse(refused.body.toString('utf8')) as { error?: string };
       expect(refusedBody.error).toContain('managed in the web UI');

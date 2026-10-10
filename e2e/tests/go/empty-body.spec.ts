@@ -19,6 +19,7 @@
  * filter used to read such a body before the handler saw it). No module zip is empty, so the answer is
  * `400 goModuleZipEmpty` and nothing is stored.
  */
+import { ERROR_CODES } from '../../src/error-codes.js';
 import { RepoType } from '../../src/api/panel-api.js';
 import {
   adminCredential,
@@ -51,7 +52,7 @@ test.describe('go empty upload body (raw HTTP)', () => {
           { contentType },
         );
         expect(res.status, `answered ${res.status}`).toBe(400);
-        expect(msgIdOf(res.body), 'the error msgId').toBe('goModuleZipEmpty');
+        expect(msgIdOf(res.body), 'the error msgId').toBe(ERROR_CODES.GO_MODULE_ZIP_EMPTY);
 
         const list = await rawGet(repo.name, admin, listRelPath(modulePath));
         expect(list.status === 404 ? [] : parseVersionList(list.body), 'nothing stored').toEqual(

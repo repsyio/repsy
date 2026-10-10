@@ -33,6 +33,7 @@
  * and `tests/pypi/panel-api.spec.ts` (the shared contract helpers). The paging sweep seeds its rows over raw
  * HTTP (`seedPackage`): the pages are the subject there, not the client.
  */
+import { ERROR_CODES } from '../../src/error-codes.js';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -466,40 +467,45 @@ test.describe('the Helm panel API against what helm pushed', () => {
       'searchHelmCharts',
       await callOperation('searchHelmCharts', { repoName: 'e2e-no-such-repo' }),
       404,
-      'repoNotFound',
+      ERROR_CODES.REPO_NOT_FOUND,
     );
     expectFailure(
       'searchHelmCharts',
       await callOperation('searchHelmCharts', { repoName: session.repoName }, { anonymous: true }),
       401,
-      'loginRequired',
+      ERROR_CODES.LOGIN_REQUIRED,
     );
     for (const operation of ['getHelmChart', 'listHelmChartVersions']) {
-      expectFailure(operation, await callOperation(operation, missing), 404, 'chartNotFound');
+      expectFailure(
+        operation,
+        await callOperation(operation, missing),
+        404,
+        ERROR_CODES.CHART_NOT_FOUND,
+      );
     }
     expectFailure(
       'getHelmChartOciTags',
       await callOperation('getHelmChartOciTags', missing),
       404,
-      'chartNotFound',
+      ERROR_CODES.CHART_NOT_FOUND,
     );
     expectFailure(
       'getHelmChartDetail',
       await callOperation('getHelmChartDetail', missingVersion),
       404,
-      'chartNotFound',
+      ERROR_CODES.CHART_NOT_FOUND,
     );
     expectFailure(
       'deleteHelmChartVersion',
       await callOperation('deleteHelmChartVersion', missingVersion),
       404,
-      'chartNotFound',
+      ERROR_CODES.CHART_NOT_FOUND,
     );
     expectFailure(
       'deleteAllHelmChartVersions',
       await callOperation('deleteAllHelmChartVersions', missing),
       404,
-      'chartNotFound',
+      ERROR_CODES.CHART_NOT_FOUND,
     );
 
     // A delete of a version that does not exist deleted nothing: the chart has exactly one version and
@@ -555,7 +561,7 @@ test.describe('the Helm panel API against what helm pushed', () => {
       'getHelmChartDetail',
       await callOperation('getHelmChartDetail', chartValues(session, web, '1.0.0')),
       404,
-      'chartNotFound',
+      ERROR_CODES.CHART_NOT_FOUND,
     );
     const tags = expectBare(
       'getHelmChartOciTags',
@@ -611,7 +617,7 @@ test.describe('the Helm panel API against what helm pushed', () => {
       'listHelmChartVersions',
       await callOperation('listHelmChartVersions', chartValues(session, web)),
       404,
-      'chartNotFound',
+      ERROR_CODES.CHART_NOT_FOUND,
     );
     expect((await indexOf(session)).entries[web] ?? [], 'index.yaml').toEqual([]);
     expect(await pullExitCode(session, 'oci', web, '1.1.0')).not.toBe(0);
@@ -654,7 +660,7 @@ test.describe('the Helm panel API against what helm pushed', () => {
       'deleteHelmChartVersion',
       await callOperation('deleteHelmChartVersion', chartValues(session, lib, '0.1.0')),
       404,
-      'chartNotFound',
+      ERROR_CODES.CHART_NOT_FOUND,
     );
 
     // The whole chart.
@@ -667,13 +673,13 @@ test.describe('the Helm panel API against what helm pushed', () => {
       'listHelmChartVersions',
       await callOperation('listHelmChartVersions', chartValues(session, lib)),
       404,
-      'chartNotFound',
+      ERROR_CODES.CHART_NOT_FOUND,
     );
     expectFailure(
       'deleteAllHelmChartVersions',
       await callOperation('deleteAllHelmChartVersions', chartValues(session, lib)),
       404,
-      'chartNotFound',
+      ERROR_CODES.CHART_NOT_FOUND,
     );
     const afterAll = await indexOf(session);
     expect(afterAll.entries[lib] ?? [], 'index.yaml has no version of the chart').toEqual([]);

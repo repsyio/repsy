@@ -23,6 +23,7 @@ import { catchError, finalize, share, switchMap } from 'rxjs/operators';
 import { AuthService } from '../../auth/pages/service/auth.service';
 import { loginUrlReturningTo } from '../../auth/util/return-url';
 import { ToastService } from '../../panel/shared/components/toast/toast.service';
+import { ERROR_CODES } from '../constants/error-codes';
 import { problemCode } from '../error-handler/problem.util';
 
 const LOGIN_PATH = '/api/auth/login';
@@ -74,7 +75,7 @@ export class RefreshTokenInterceptor implements HttpInterceptor {
   ) {}
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  public intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
+  intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
     return next.handle(req).pipe(
       catchError((res: HttpErrorResponse) => {
         if (res?.status !== 401 || RefreshTokenInterceptor._isPath(req, LOGIN_PATH)) {
@@ -88,7 +89,7 @@ export class RefreshTokenInterceptor implements HttpInterceptor {
           return this._logOut(SESSION_EXPIRED_MESSAGE);
         }
 
-        if (problemCode(res) === 'sessionExpired') {
+        if (problemCode(res) === ERROR_CODES.SESSION_EXPIRED) {
           return this._refreshToken().pipe(
             switchMap((accessToken: string) =>
               next.handle(req.clone({ setHeaders: { Authorization: `Bearer ${accessToken}` } })).pipe(
@@ -102,7 +103,7 @@ export class RefreshTokenInterceptor implements HttpInterceptor {
         }
 
         return this._logOut(
-          problemCode(res) === 'refreshTokenExpired' ? SESSION_EXPIRED_MESSAGE : SESSION_INVALID_MESSAGE,
+          problemCode(res) === ERROR_CODES.REFRESH_TOKEN_EXPIRED ? SESSION_EXPIRED_MESSAGE : SESSION_INVALID_MESSAGE,
         );
       }),
     );

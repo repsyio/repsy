@@ -21,6 +21,7 @@
  * filter or a pre-processor ever did (MockMvc cannot reproduce Tomcat's parsing, so the backend's own
  * integration test cannot see it). A push with no byte in its body is refused with `400 invalidGemFile`.
  */
+import { ERROR_CODES } from '../../src/error-codes.js';
 import { RepoType } from '../../src/api/panel-api.js';
 import {
   adminCredential,
@@ -66,7 +67,7 @@ test.describe('ruby form-typed and empty gem push (raw HTTP)', () => {
 
         const res = await rawPublish(repo.name, admin, Buffer.alloc(0), { contentType });
         expect(res.status, `answered ${res.status}`).toBe(400);
-        expect(msgIdOf(res.body), 'the error msgId').toBe('invalidGemFile');
+        expect(msgIdOf(res.body), 'the error msgId').toBe(ERROR_CODES.INVALID_GEM_FILE);
 
         const names = await rawGet(repo.name, admin, namesRelPath());
         expect(names.status).toBe(200);

@@ -20,6 +20,7 @@
  * repo, and it can be deleted again through the danger modal. The built-in servers are listed for
  * information only.
  */
+import { ERROR_CODES } from '../../../src/error-codes.js';
 import type { Route } from '@playwright/test';
 
 import { PanelHttpError, RepoType } from '../../../src/api/panel-api.js';
@@ -233,7 +234,7 @@ test.describe('Repository settings: PGP key stores', { tag: SETTINGS }, () => {
     expect(rejected).toBeInstanceOf(PanelHttpError);
     expect((rejected as PanelHttpError).status).toBe(400);
     expect((rejected as PanelHttpError).body as Record<string, unknown>).toMatchObject({
-      code: 'pgpSettingsUnsupported',
+      code: ERROR_CODES.PGP_SETTINGS_UNSUPPORTED,
     });
 
     // Nothing about the repo changed: there is no PGP state to read back for a non-Maven repo (the

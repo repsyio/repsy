@@ -23,6 +23,7 @@ import { provideRouter, Router } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 
 import { ToastService } from '../../../panel/shared/components/toast/toast.service';
+import { ERROR_CODES } from '../../../shared/constants/error-codes';
 import { AuthService } from '../service/auth.service';
 import { LoginComponent } from './login.component';
 
@@ -117,7 +118,7 @@ describe('LoginComponent', () => {
   });
 
   it('shows the invalidCredentials text on a 401, which errorHandlerInterceptor leaves to the caller', () => {
-    failLogin(401, { code: 'invalidCredentials', detail: INVALID_CREDENTIALS_TEXT });
+    failLogin(401, { code: ERROR_CODES.INVALID_CREDENTIALS, detail: INVALID_CREDENTIALS_TEXT });
 
     expect(toastService.show).toHaveBeenCalledOnceWith(INVALID_CREDENTIALS_TEXT, 'error');
     expect(navigateByUrl).not.toHaveBeenCalled();

@@ -19,6 +19,7 @@ import { HttpTestingController, provideHttpClientTesting } from '@angular/common
 import { TestBed } from '@angular/core/testing';
 
 import { ToastService } from '../../panel/shared/components/toast/toast.service';
+import { ERROR_CODES } from '../constants/error-codes';
 import { errorHandlerInterceptor, SILENT_ERROR } from './error-handler.interceptor';
 
 describe('errorHandlerInterceptor', () => {
@@ -63,7 +64,7 @@ describe('errorHandlerInterceptor', () => {
   });
 
   it('rethrows a 401 without a toast, so the refresh interceptor and callers handle it', () => {
-    const error = fail(401, { code: 'sessionExpired', detail: 'Session expired' });
+    const error = fail(401, { code: ERROR_CODES.SESSION_EXPIRED, detail: 'Session expired' });
 
     expect(error.status).toBe(401);
     expect(toastService.show).not.toHaveBeenCalled();
@@ -91,7 +92,7 @@ describe('errorHandlerInterceptor', () => {
     let caught: HttpErrorResponse | undefined;
     http.get('/api', { context: new HttpContext().set(SILENT_ERROR, true) }).subscribe({ error: (e) => (caught = e) });
 
-    httpTesting.expectOne('/api').flush({ code: 'accessDenied' }, { status: 403, statusText: 'Forbidden' });
+    httpTesting.expectOne('/api').flush({ code: ERROR_CODES.ACCESS_DENIED }, { status: 403, statusText: 'Forbidden' });
 
     expect(caught?.status).toBe(403);
     expect(toastService.show).not.toHaveBeenCalled();
@@ -107,7 +108,7 @@ describe('errorHandlerInterceptor', () => {
 
   it('shows the server text for a 503 that carries one (a lock race or a full scan queue)', () => {
     fail(503, {
-      code: 'resourceBusy',
+      code: ERROR_CODES.RESOURCE_BUSY,
       detail: 'The item is in use by another request. Please try again shortly.',
     });
 

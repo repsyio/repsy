@@ -29,6 +29,7 @@
  * Not covered here: the key-store routes (`/api/mvn/key-stores`, RPS-1483's role sweep and the signing
  * specs), and `GET /api/repos/{repo}/contents` (`tests/api/maven-browser.spec.ts`).
  */
+import { ERROR_CODES } from '../../src/error-codes.js';
 import {
   callOperation,
   contractWorld,
@@ -278,37 +279,37 @@ test.describe('the Maven panel API against what mvn deploy stored', CLOUD_SKIP, 
       'listMavenGroups',
       await callOperation('listMavenGroups', { repoName: 'e2e-no-such-repo' }),
       404,
-      'repoNotFound',
+      ERROR_CODES.REPO_NOT_FOUND,
     );
     expectFailure(
       'listMavenGroups',
       await callOperation('listMavenGroups', { repoName: repo.name }, { anonymous: true }),
       401,
-      'loginRequired',
+      ERROR_CODES.LOGIN_REQUIRED,
     );
     expectFailure(
       'getMavenGroupSummary',
       await callOperation('getMavenGroupSummary', { ...values, groupName: 'no.such.group' }),
       404,
-      'groupNotFound',
+      ERROR_CODES.GROUP_NOT_FOUND,
     );
     expectFailure(
       'getMavenArtifact',
       await callOperation('getMavenArtifact', { ...values, artifactName: 'no-such-artifact' }),
       404,
-      'artifactNotFound',
+      ERROR_CODES.ARTIFACT_NOT_FOUND,
     );
     expectFailure(
       'getMavenArtifactVersion',
       await callOperation('getMavenArtifactVersion', { ...values, version: '9.9.9' }),
       404,
-      'artifactVersionNotFound',
+      ERROR_CODES.ARTIFACT_VERSION_NOT_FOUND,
     );
     expectFailure(
       'deleteMavenArtifactVersion',
       await callOperation('deleteMavenArtifactVersion', { ...values, version: '9.9.9' }),
       404,
-      'artifactVersionNotFound',
+      ERROR_CODES.ARTIFACT_VERSION_NOT_FOUND,
     );
     expectFailure(
       'deleteMavenArtifactVersion',
@@ -318,7 +319,7 @@ test.describe('the Maven panel API against what mvn deploy stored', CLOUD_SKIP, 
         version: pkg.version,
       }),
       404,
-      'artifactNotFound',
+      ERROR_CODES.ARTIFACT_NOT_FOUND,
     );
 
     // Every failure above left the artifact where it was.
@@ -379,7 +380,7 @@ test.describe('the Maven panel API against what mvn deploy stored', CLOUD_SKIP, 
         version: removed,
       }),
       404,
-      'artifactVersionNotFound',
+      ERROR_CODES.ARTIFACT_VERSION_NOT_FOUND,
     );
     // The wire: the deleted version's files are gone, the metadata lists the other, and mvn cannot resolve it.
     expect(await wireStatus(d, fileOf(d, 'lib', removed, 'jar'))).toBe(404);
@@ -404,7 +405,7 @@ test.describe('the Maven panel API against what mvn deploy stored', CLOUD_SKIP, 
         version: removed,
       }),
       404,
-      'artifactVersionNotFound',
+      ERROR_CODES.ARTIFACT_VERSION_NOT_FOUND,
     );
   });
 
@@ -422,7 +423,7 @@ test.describe('the Maven panel API against what mvn deploy stored', CLOUD_SKIP, 
       'getMavenArtifact',
       await callOperation('getMavenArtifact', artifactValues(d, 'lib')),
       404,
-      'artifactNotFound',
+      ERROR_CODES.ARTIFACT_NOT_FOUND,
     );
     for (const v of [version, other]) {
       expect(await wireStatus(d, fileOf(d, 'lib', v, 'jar')), `lib@${v} jar`).toBe(404);
@@ -448,7 +449,7 @@ test.describe('the Maven panel API against what mvn deploy stored', CLOUD_SKIP, 
       'deleteMavenArtifact',
       await callOperation('deleteMavenArtifact', artifactValues(d, 'lib')),
       404,
-      'artifactNotFound',
+      ERROR_CODES.ARTIFACT_NOT_FOUND,
     );
     expect(
       expectBare(
@@ -467,7 +468,7 @@ test.describe('the Maven panel API against what mvn deploy stored', CLOUD_SKIP, 
         groupName: `${d.groupId}.nosuchgroup`,
       }),
       404,
-      'groupNotFound',
+      ERROR_CODES.GROUP_NOT_FOUND,
     );
 
     // Now the group.
@@ -484,7 +485,7 @@ test.describe('the Maven panel API against what mvn deploy stored', CLOUD_SKIP, 
       'getMavenGroupSummary',
       await callOperation('getMavenGroupSummary', { repoName: d.repoName, groupName: d.groupId }),
       404,
-      'groupNotFound',
+      ERROR_CODES.GROUP_NOT_FOUND,
     );
     const rows = expectBare(
       'listMavenGroups',
@@ -496,7 +497,7 @@ test.describe('the Maven panel API against what mvn deploy stored', CLOUD_SKIP, 
       'deleteMavenGroup',
       await callOperation('deleteMavenGroup', { repoName: d.repoName, groupName: d.groupId }),
       404,
-      'groupNotFound',
+      ERROR_CODES.GROUP_NOT_FOUND,
     );
   });
 });

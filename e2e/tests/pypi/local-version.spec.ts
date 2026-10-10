@@ -22,6 +22,7 @@
  * Probed live while writing this file (pip 26, uv 0.12): both clients request the file at the href the
  * project page prints, with a literal `+`, and accept it.
  */
+import { ERROR_CODES } from '../../src/error-codes.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
@@ -303,7 +304,7 @@ test.describe('pypi local versions (PEP 440 +local)', () => {
         'getPypiVersion',
         await callOperation('getPypiVersion', values(LOCAL_2)),
         404,
-        'releaseNotFound',
+        ERROR_CODES.RELEASE_NOT_FOUND,
       );
     },
   );

@@ -23,6 +23,7 @@
  * the implementation plan's own hypothesis numbering 1:1; R14 (RPS-1244) pins the sha512 manifest
  * digests and R15 (RPS-1216) the protocol `DELETE` of a manifest or a tag.
  */
+import { ERROR_CODES } from '../../src/error-codes.js';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 
@@ -610,7 +611,7 @@ test.describe('docker registry rules (raw HTTP)', () => {
       const refused = await rawPushImage(layout, admin, 'tag1', 'v2');
       expectOci(refused.manifestRes, 403, 'DENIED');
       const refusedOci = ociErrorOf(refused.manifestRes.body);
-      expect(refusedOci?.detail).toBe('packageOverrideDisabled');
+      expect(refusedOci?.detail).toBe(ERROR_CODES.PACKAGE_OVERRIDE_DISABLED);
 
       // The tag is unchanged after the refusal.
       const getAfterRefused = await rawGetManifest(layout.repoName, admin, layout.image, 'tag1');

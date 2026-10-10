@@ -38,6 +38,7 @@
  * in the UI suite, which the ui runner runs on this stack after this file (it locks the gateway's
  * bucket, README.md "Auth-throttle leg").
  */
+import { ERROR_CODES } from '../../src/error-codes.js';
 import type { TestInfo } from '@playwright/test';
 
 import { findRepsyContainer, logLinesContaining } from '../../src/clients/stack.js';
@@ -52,7 +53,7 @@ import { target } from '../../src/target.js';
 // docker-compose.stack-throttle.yml
 const MAX_FAILURES = 3;
 const WINDOW_SECONDS = 10;
-const TOO_MANY = 'tooManyRequests';
+const TOO_MANY = ERROR_CODES.TOO_MANY_REQUESTS;
 const TOO_MANY_TEXT = 'Too many failed authentication attempts. Please try again later.';
 
 interface Answer {
@@ -168,7 +169,7 @@ test.describe('auth throttle on the wire', { tag: ['@throttle', '@cloud-skip'] }
     for (let n = 1; n <= MAX_FAILURES; n += 1) {
       const answer = await basicGet(repo, wrong(user), client);
       expect(answer.status, `wrong password #${n}`).toBe(401);
-      expect(answer.msgId).toBe('unAuthorized');
+      expect(answer.msgId).toBe(ERROR_CODES.UN_AUTHORIZED);
     }
     expectRefused(await basicGet(repo, wrong(user), client), 'wrong password #4');
     // A refusal precedes the password check: a password that was never verified before does not get
@@ -185,7 +186,7 @@ test.describe('auth throttle on the wire', { tag: ['@throttle', '@cloud-skip'] }
     for (let n = 1; n <= MAX_FAILURES; n += 1) {
       const answer = await junkBearerWhoami(repo, client);
       expect(answer.status, `junk Bearer #${n}`).toBe(401);
-      expect(answer.msgId).toBe('unAuthorized');
+      expect(answer.msgId).toBe(ERROR_CODES.UN_AUTHORIZED);
     }
     expectRefused(await junkBearerWhoami(repo, client), 'junk Bearer #4');
   });
@@ -199,7 +200,7 @@ test.describe('auth throttle on the wire', { tag: ['@throttle', '@cloud-skip'] }
     for (let n = 1; n <= MAX_FAILURES; n += 1) {
       const answer = await panelLogin(wrong(user), client);
       expect(answer.status, `wrong password #${n}`).toBe(401);
-      expect(answer.msgId).toBe('invalidCredentials');
+      expect(answer.msgId).toBe(ERROR_CODES.INVALID_CREDENTIALS);
     }
     expectRefused(await panelLogin(wrong(user), client), 'wrong password #4');
     expectRefused(await panelLogin(user, client), 'right password');

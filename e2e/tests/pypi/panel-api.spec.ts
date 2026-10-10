@@ -26,6 +26,7 @@
  * `tests/maven/panel-api.spec.ts` (the shared contract helpers). The paging sweeps seed their rows over raw HTTP
  * (`seedPackage`): the pages are the subject there, not the client.
  */
+import { ERROR_CODES } from '../../src/error-codes.js';
 import {
   callOperation,
   contractWorld,
@@ -233,43 +234,43 @@ test.describe('the PyPI panel API against what twine upload stored', () => {
       'listPypiPackages',
       await callOperation('listPypiPackages', { repoName: 'e2e-no-such-repo' }),
       404,
-      'repoNotFound',
+      ERROR_CODES.REPO_NOT_FOUND,
     );
     expectFailure(
       'listPypiPackages',
       await callOperation('listPypiPackages', { repoName: names.repoName }, { anonymous: true }),
       401,
-      'loginRequired',
+      ERROR_CODES.LOGIN_REQUIRED,
     );
     expectFailure(
       'getPypiPackage',
       await callOperation('getPypiPackage', missing),
       404,
-      'packageNotFound',
+      ERROR_CODES.PACKAGE_NOT_FOUND,
     );
     expectFailure(
       'listPypiVersions',
       await callOperation('listPypiVersions', missing),
       404,
-      'packageNotFound',
+      ERROR_CODES.PACKAGE_NOT_FOUND,
     );
     expectFailure(
       'getPypiVersion',
       await callOperation('getPypiVersion', values(names, '9.9.9')),
       404,
-      'releaseNotFound',
+      ERROR_CODES.RELEASE_NOT_FOUND,
     );
     expectFailure(
       'deletePypiVersion',
       await callOperation('deletePypiVersion', values(names, '9.9.9')),
       404,
-      'releaseNotFound',
+      ERROR_CODES.RELEASE_NOT_FOUND,
     );
     expectFailure(
       'deletePypiPackage',
       await callOperation('deletePypiPackage', missing),
       404,
-      'packageNotFound',
+      ERROR_CODES.PACKAGE_NOT_FOUND,
     );
 
     // Every failure above left the package where it was.
@@ -336,7 +337,7 @@ test.describe('the PyPI panel API against what twine upload stored', () => {
       'getPypiVersion',
       await callOperation('getPypiVersion', values(names, removed)),
       404,
-      'releaseNotFound',
+      ERROR_CODES.RELEASE_NOT_FOUND,
     );
     expect(await projectFiles(names), 'the project page drops the file').toEqual([
       wheelFilename(names.name, kept),
@@ -355,7 +356,7 @@ test.describe('the PyPI panel API against what twine upload stored', () => {
       'deletePypiVersion',
       await callOperation('deletePypiVersion', values(names, removed)),
       404,
-      'releaseNotFound',
+      ERROR_CODES.RELEASE_NOT_FOUND,
     );
 
     // Now the whole package.
@@ -368,7 +369,7 @@ test.describe('the PyPI panel API against what twine upload stored', () => {
       'getPypiPackage',
       await callOperation('getPypiPackage', values(names)),
       404,
-      'packageNotFound',
+      ERROR_CODES.PACKAGE_NOT_FOUND,
     );
     const rows = expectBare(
       'listPypiPackages',
@@ -379,7 +380,7 @@ test.describe('the PyPI panel API against what twine upload stored', () => {
       'deletePypiPackage',
       await callOperation('deletePypiPackage', values(names)),
       404,
-      'packageNotFound',
+      ERROR_CODES.PACKAGE_NOT_FOUND,
     );
   });
 });

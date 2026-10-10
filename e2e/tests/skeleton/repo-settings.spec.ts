@@ -25,6 +25,7 @@
  * publish path actually consults them; npm's publish path never reads them, so the PUT now
  * rejects the fields for npm instead of silently accepting a setting that does nothing.
  */
+import { ERROR_CODES } from '../../src/error-codes.js';
 import { RepoType } from '../../src/api/panel-api.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 
@@ -84,7 +85,7 @@ test('a settings PUT with a single field changed leaves every other field alone 
 async function expectReleasesSnapshotsUnsupported(promise: Promise<void>): Promise<void> {
   await expect(promise).rejects.toMatchObject({
     status: 400,
-    body: { code: 'releasesSnapshotsUnsupported' },
+    body: { code: ERROR_CODES.RELEASES_SNAPSHOTS_UNSUPPORTED },
   });
 }
 

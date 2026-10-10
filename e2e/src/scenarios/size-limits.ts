@@ -30,6 +30,7 @@
  * The per-client parts (how to push, what the client prints, what the raw answer looks like) come from
  * `clients/oversize.ts` and the caller; the assertions are the same for every protocol.
  */
+import { ERROR_CODES } from '../error-codes.js';
 import { RepoType } from '../api/panel-api.js';
 import type { OversizePush } from '../clients/oversize.js';
 import { oversizeWorld, SIZE_LIMIT_SCENARIO } from '../clients/oversize.js';
@@ -48,7 +49,7 @@ import type { World } from './world.js';
 /** The envelope of Repsy's own 413 (`ErrorHandler`, `payloadTooLarge`). */
 export const PAYLOAD_TOO_LARGE = {
   status: 413,
-  msgId: 'payloadTooLarge',
+  msgId: ERROR_CODES.PAYLOAD_TOO_LARGE,
   text: 'The uploaded content is too large.',
 } as const;
 
