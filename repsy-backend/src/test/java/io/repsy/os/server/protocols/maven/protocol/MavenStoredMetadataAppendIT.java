@@ -30,7 +30,7 @@ import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.user.entities.UserRole;
-import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
+import io.repsy.protocols.maven.shared.utils.MavenMetadataUtils;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -202,7 +202,7 @@ class MavenStoredMetadataAppendIT extends AbstractIT {
 
     assertThat(response.getStatus()).isEqualTo(200);
 
-    return ArtifactUtils.readMetadata(response.getContentAsByteArray())
+    return MavenMetadataUtils.readMetadata(response.getContentAsByteArray())
         .getVersioning()
         .getVersions();
   }
@@ -222,7 +222,7 @@ class MavenStoredMetadataAppendIT extends AbstractIT {
     deployPom(repo, "2.0");
 
     final var response = getFile(repo, METADATA_PATH);
-    final var metadata = ArtifactUtils.readMetadata(response.getContentAsByteArray());
+    final var metadata = MavenMetadataUtils.readMetadata(response.getContentAsByteArray());
 
     assertThat(metadata.getVersioning().getVersions()).containsExactly("1.0", "2.0");
     assertThat(metadata.getVersioning().getLatest()).isEqualTo("2.0");
@@ -293,7 +293,7 @@ class MavenStoredMetadataAppendIT extends AbstractIT {
     deployPom(repo, snapshot);
 
     final var versioning =
-        ArtifactUtils.readMetadata(getFile(repo, METADATA_PATH).getContentAsByteArray())
+        MavenMetadataUtils.readMetadata(getFile(repo, METADATA_PATH).getContentAsByteArray())
             .getVersioning();
 
     assertThat(versioning.getVersions()).containsExactly("1.0", snapshot);

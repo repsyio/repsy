@@ -31,7 +31,7 @@ import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.user.entities.UserRole;
-import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
+import io.repsy.protocols.maven.shared.utils.MavenMetadataUtils;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -215,7 +215,7 @@ class MavenStoredGroupMetadataAppendIT extends AbstractIT {
 
     assertThat(response.getStatus()).isEqualTo(200);
 
-    return ArtifactUtils.readMetadata(response.getContentAsByteArray()).getPlugins();
+    return MavenMetadataUtils.readMetadata(response.getContentAsByteArray()).getPlugins();
   }
 
   private void assertUsageOf(final Repo repo, final long bytes) {
@@ -235,7 +235,8 @@ class MavenStoredGroupMetadataAppendIT extends AbstractIT {
     deployPlugin(repo, "bar-maven-plugin");
 
     final var response = getFile(repo, METADATA_PATH);
-    final var plugins = ArtifactUtils.readMetadata(response.getContentAsByteArray()).getPlugins();
+    final var plugins =
+        MavenMetadataUtils.readMetadata(response.getContentAsByteArray()).getPlugins();
 
     assertThat(plugins)
         .extracting(Plugin::getArtifactId, Plugin::getPrefix, Plugin::getName)

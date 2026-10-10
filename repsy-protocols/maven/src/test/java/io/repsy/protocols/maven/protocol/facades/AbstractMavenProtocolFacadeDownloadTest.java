@@ -37,7 +37,7 @@ import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredVersion;
 import io.repsy.protocols.maven.shared.artifact.services.contracts.ArtifactService;
 import io.repsy.protocols.maven.shared.storage.services.MavenStorageService;
 import io.repsy.protocols.maven.shared.utils.ArtifactMetadataSynthesizer;
-import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
+import io.repsy.protocols.maven.shared.utils.MavenMetadataUtils;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
 import java.time.Instant;
@@ -155,7 +155,7 @@ class AbstractMavenProtocolFacadeDownloadTest {
     assertThat(resource).isInstanceOf(SynthesizedFileResource.class);
     assertThat(resource.getFilename()).isEqualTo("maven-metadata.xml");
 
-    final var metadata = ArtifactUtils.readMetadata(bytesOf(resource));
+    final var metadata = MavenMetadataUtils.readMetadata(bytesOf(resource));
 
     assertThat(metadata.getGroupId()).isEqualTo("com.acme");
     assertThat(metadata.getArtifactId()).isEqualTo("lib");
@@ -296,7 +296,8 @@ class AbstractMavenProtocolFacadeDownloadTest {
         .thenReturn(VERSIONS);
     requestFor(GROUP_XML_PATH);
 
-    final var metadata = ArtifactUtils.readMetadata(bytesOf(this.facade.download(this.context)));
+    final var metadata =
+        MavenMetadataUtils.readMetadata(bytesOf(this.facade.download(this.context)));
 
     assertThat(metadata.getGroupId()).isEqualTo("com");
     assertThat(metadata.getArtifactId()).isEqualTo("acme");

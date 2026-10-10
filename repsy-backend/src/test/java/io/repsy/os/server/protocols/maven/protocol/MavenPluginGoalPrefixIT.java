@@ -29,7 +29,7 @@ import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.user.entities.UserRole;
-import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
+import io.repsy.protocols.maven.shared.utils.MavenMetadataUtils;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -221,7 +221,7 @@ class MavenPluginGoalPrefixIT extends AbstractIT {
 
     assertThat(response.getStatus()).isEqualTo(200);
 
-    return ArtifactUtils.readMetadata(response.getContentAsByteArray()).getPlugins();
+    return MavenMetadataUtils.readMetadata(response.getContentAsByteArray()).getPlugins();
   }
 
   /** The prefix of the artifact row and of its version row. */

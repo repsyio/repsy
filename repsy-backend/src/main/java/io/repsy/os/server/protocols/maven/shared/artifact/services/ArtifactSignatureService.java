@@ -29,7 +29,10 @@ import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreServi
 import io.repsy.os.server.protocols.maven.shared.keystore.services.PgpVerifierService;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.protocols.maven.shared.artifact.dtos.SignatureOutcome;
-import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
+import io.repsy.protocols.maven.shared.utils.MavenFileNameUtils;
+import io.repsy.protocols.maven.shared.utils.MavenGavUtils;
+import io.repsy.protocols.maven.shared.utils.SignatureFileUtils;
+import io.repsy.protocols.maven.shared.utils.SnapshotNameUtils;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -55,7 +58,7 @@ import org.springframework.transaction.annotation.Transactional;
  * version's {@code signed} flag from it on a repo that verifies every signature (RPS-1188). A
  * version is then signed when it has files to sign and every one of them has a verified signature;
  * for a snapshot only the files of its newest build are the ones to sign ({@link
- * ArtifactUtils#filesToSign}).
+ * SnapshotNameUtils#filesToSign}).
  *
  * <p>It also holds the signature flow of an upload and of a request for a signature (RPS-2064):
  * recording the verified signature of a stored file, recomputing {@code signed} when a signable
@@ -319,8 +322,8 @@ public class ArtifactSignatureService {
     final var items =
         this.mavenStorage().listStorageItems(StoragePath.of(repo.getId(), versionPath));
     final var poms =
-        ArtifactUtils.versionDirFileNames(versionPath, items).stream()
-            .filter(ArtifactUtils::isPomFile)
+        SnapshotNameUtils.versionDirFileNames(versionPath, items).stream()
+            .filter(MavenFileNameUtils::isPomFile)
             .toList();
 
     this.verifyStoredSignatures(repo, version, versionPath, poms);
@@ -412,8 +415,8 @@ public class ArtifactSignatureService {
 
     final var items = this.mavenStorage().listStorageItems(StoragePath.of(storageKey, versionPath));
 
-    return ArtifactUtils.filesToSign(
-        versionPath, ArtifactUtils.versionDirFileNames(versionPath, items));
+    return SnapshotNameUtils.filesToSign(
+        versionPath, SnapshotNameUtils.versionDirFileNames(versionPath, items));
   }
 
   /**
@@ -422,7 +425,7 @@ public class ArtifactSignatureService {
    */
   static boolean isSignedByPom(final Collection<String> verified) {
 
-    return verified.stream().anyMatch(ArtifactUtils::isPomFile);
+    return verified.stream().anyMatch(MavenFileNameUtils::isPomFile);
   }
 
   /** Whether there is something to sign and every file of it has a verified signature. */
@@ -473,7 +476,7 @@ public class ArtifactSignatureService {
       final BaseRepoInfo<UUID> repoInfo, final StoragePath storagePath) {
 
     return repoInfo.isPgpVerifyAllSignaturesEnabled()
-        && ArtifactUtils.isSignableFile(storagePath.getRelativePath().getFileName());
+        && SignatureFileUtils.isSignableFile(storagePath.getRelativePath().getFileName());
   }
 
   /**
@@ -488,7 +491,7 @@ public class ArtifactSignatureService {
     }
 
     final var relativePath = storagePath.getRelativePath();
-    final var gav = ArtifactUtils.convertPathToGav(relativePath.getPath());
+    final var gav = MavenGavUtils.convertPathToGav(relativePath.getPath());
     final var version =
         gav == null
             ? null
@@ -605,7 +608,7 @@ public class ArtifactSignatureService {
 
     final var signedStoragePath = this.getNonSignedStoragePath(signaturePath);
 
-    final var gav = ArtifactUtils.convertPathToGav(signedStoragePath.getRelativePath().getPath());
+    final var gav = MavenGavUtils.convertPathToGav(signedStoragePath.getRelativePath().getPath());
 
     if (null == gav) {
       throw new ItemNotFoundException(ProtocolErrorCodes.ITEM_NOT_FOUND);
@@ -689,7 +692,7 @@ public class ArtifactSignatureService {
       final BaseRepoInfo<UUID> repoInfo, final StoragePath nonSignedStoragePath) {
 
     final var gav =
-        ArtifactUtils.convertPathToGav(nonSignedStoragePath.getRelativePath().getPath());
+        MavenGavUtils.convertPathToGav(nonSignedStoragePath.getRelativePath().getPath());
 
     return gav != null
         && this.artifactQueryService

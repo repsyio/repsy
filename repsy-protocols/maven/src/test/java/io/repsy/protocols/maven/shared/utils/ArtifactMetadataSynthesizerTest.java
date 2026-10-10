@@ -123,7 +123,7 @@ class ArtifactMetadataSynthesizerTest {
         .contains("<latest>2.0-SNAPSHOT</latest>", "<release>1.10</release>")
         .contains("<lastUpdated>20260922080001</lastUpdated>");
 
-    final var metadata = ArtifactUtils.readMetadata(render(mixedVersions()));
+    final var metadata = MavenMetadataUtils.readMetadata(render(mixedVersions()));
 
     assertThat(metadata.getGroupId()).isEqualTo("com.acme");
     assertThat(metadata.getArtifactId()).isEqualTo("lib");
@@ -138,7 +138,7 @@ class ArtifactMetadataSynthesizerTest {
   @DisplayName("has no release for an artifact that has only snapshots")
   void hasNoReleaseForSnapshotsOnly() {
     final var metadata =
-        ArtifactUtils.readMetadata(
+        MavenMetadataUtils.readMetadata(
             ArtifactMetadataSynthesizer.metadataXml(
                 "com.acme",
                 "lib",
@@ -152,7 +152,7 @@ class ArtifactMetadataSynthesizerTest {
   @DisplayName("lists a single version as both its latest and its release")
   void listsASingleVersion() {
     final var metadata =
-        ArtifactUtils.readMetadata(
+        MavenMetadataUtils.readMetadata(
             ArtifactMetadataSynthesizer.metadataXml(
                 "com.acme", "lib", List.of(version("1.0", T1))));
 
@@ -173,9 +173,10 @@ class ArtifactMetadataSynthesizerTest {
         ArtifactMetadataSynthesizer.metadataXml(
             "g", "a", List.of(new RegisteredVersion("1.0", null)));
 
-    assertThat(ArtifactUtils.readMetadata(withTime).getVersioning().getLastUpdated())
+    assertThat(MavenMetadataUtils.readMetadata(withTime).getVersioning().getLastUpdated())
         .isEqualTo("20260102030405");
-    assertThat(ArtifactUtils.readMetadata(withoutTime).getVersioning().getLastUpdated()).isNull();
+    assertThat(MavenMetadataUtils.readMetadata(withoutTime).getVersioning().getLastUpdated())
+        .isNull();
     assertThat(new String(withoutTime, UTF_8)).doesNotContain("lastUpdated");
   }
 
@@ -304,7 +305,7 @@ class ArtifactMetadataSynthesizerTest {
 
     assertThat(xml).doesNotContain("<name>", "groupId", "versioning");
 
-    final var metadata = ArtifactUtils.readMetadata(xml.getBytes(UTF_8));
+    final var metadata = MavenMetadataUtils.readMetadata(xml.getBytes(UTF_8));
 
     assertThat(metadata.getPlugins()).hasSize(2);
     assertThat(metadata.getPlugins().get(1).getPrefix()).isEqualTo("b");
@@ -317,7 +318,7 @@ class ArtifactMetadataSynthesizerTest {
 
     assertThat(ArtifactMetadataSynthesizer.groupMetadataXml(plugins())).isEqualTo(first);
     assertThat(
-            ArtifactUtils.readMetadata(first).getPlugins().stream()
+            MavenMetadataUtils.readMetadata(first).getPlugins().stream()
                 .map(plugin -> plugin.getArtifactId())
                 .toList())
         .containsExactly("hello-maven-plugin", "zed-maven-plugin");

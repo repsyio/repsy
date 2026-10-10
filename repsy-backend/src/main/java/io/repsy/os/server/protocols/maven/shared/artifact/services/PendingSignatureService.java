@@ -33,7 +33,7 @@ import io.repsy.os.server.protocols.maven.shared.keystore.services.PgpVerifierSe
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
-import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
+import io.repsy.protocols.maven.shared.utils.MavenGavUtils;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -531,7 +531,7 @@ public class PendingSignatureService {
   /** The registered version a file belongs to, or {@code null} when it is not registered. */
   private @Nullable ArtifactVersion findVersion(final UUID repoId, final String filePath) {
 
-    final var gav = ArtifactUtils.convertPathToGav(filePath);
+    final var gav = MavenGavUtils.convertPathToGav(filePath);
 
     if (gav == null) {
       return null;

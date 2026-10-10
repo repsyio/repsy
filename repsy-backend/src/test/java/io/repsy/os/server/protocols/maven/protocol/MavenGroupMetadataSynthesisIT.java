@@ -29,7 +29,7 @@ import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactR
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactVersionRepository;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
-import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
+import io.repsy.protocols.maven.shared.utils.MavenMetadataUtils;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -201,7 +201,7 @@ class MavenGroupMetadataSynthesisIT extends AbstractIT {
     final var response = getFile(repo, "acme/maven-metadata.xml");
 
     assertThat(response.getStatus()).isEqualTo(200);
-    assertThat(ArtifactUtils.readMetadata(response.getContentAsByteArray()).getPlugins())
+    assertThat(MavenMetadataUtils.readMetadata(response.getContentAsByteArray()).getPlugins())
         .extracting(plugin -> plugin.getPrefix())
         .containsExactly("hello");
   }
@@ -270,7 +270,7 @@ class MavenGroupMetadataSynthesisIT extends AbstractIT {
     register(repo, "com.acme", "tools", false, "tools", null);
 
     final var metadata =
-        ArtifactUtils.readMetadata(getFile(repo, METADATA).getContentAsByteArray());
+        MavenMetadataUtils.readMetadata(getFile(repo, METADATA).getContentAsByteArray());
 
     assertThat(metadata.getGroupId()).isEqualTo("com.acme");
     assertThat(metadata.getArtifactId()).isEqualTo("tools");

@@ -45,8 +45,8 @@ import org.jspecify.annotations.Nullable;
  * version ranges, Gradle's {@code 1.+} and sbt's {@code latest.release} find no version to pick.
  *
  * <p>The answer is a function of the registered versions alone: the versions are sorted, {@code
- * latest} and {@code release} are told like {@link ArtifactUtils#setReleaseAndLatest} does for the
- * file a delete rewrites, and {@code lastUpdated} is the newest time a version was registered,
+ * latest} and {@code release} are told like {@link MavenMetadataUtils#setReleaseAndLatest} does for
+ * the file a delete rewrites, and {@code lastUpdated} is the newest time a version was registered,
  * never the time of the request. So two requests with no change in between are answered with the
  * same bytes, and a checksum fetched after its file matches it. The group-level file has no time at
  * all, so it holds that too.
@@ -246,7 +246,7 @@ public class ArtifactMetadataSynthesizer {
     metadata.setArtifactId(artifactId);
     metadata.setVersioning(versioning);
 
-    ArtifactUtils.setReleaseAndLatest(metadata);
+    MavenMetadataUtils.setReleaseAndLatest(metadata);
 
     versions.stream()
         .map(RegisteredVersion::lastUpdatedAt)

@@ -24,7 +24,7 @@ import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactV
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.VersionDeveloperRepository;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.VersionLicenseRepository;
 import io.repsy.protocols.maven.shared.artifact.services.VersionComparator;
-import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
+import io.repsy.protocols.maven.shared.utils.SnapshotNameUtils;
 import java.util.ArrayList;
 import lombok.RequiredArgsConstructor;
 import org.apache.maven.model.Model;
@@ -111,7 +111,7 @@ class ArtifactVersionWriteService {
     String release = null;
 
     for (var i = versionNames.size() - 1; i >= 0; i--) {
-      if (!ArtifactUtils.isSnapshot(versionNames.get(i))) {
+      if (!SnapshotNameUtils.isSnapshot(versionNames.get(i))) {
         release = versionNames.get(i);
         break;
       }

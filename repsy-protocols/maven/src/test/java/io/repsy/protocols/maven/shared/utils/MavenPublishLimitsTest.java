@@ -38,12 +38,12 @@ class MavenPublishLimitsTest {
             + elements
             + "</project>";
 
-    return ArtifactUtils.readModel(
+    return PomModelUtils.readModel(
         new java.io.ByteArrayInputStream(pom.getBytes(StandardCharsets.UTF_8)));
   }
 
   private static org.apache.maven.index.artifact.Gav gav(final String path) {
-    return ArtifactUtils.convertPathToGav(path);
+    return MavenGavUtils.convertPathToGav(path);
   }
 
   private static StoragePath storagePath(final String path) {

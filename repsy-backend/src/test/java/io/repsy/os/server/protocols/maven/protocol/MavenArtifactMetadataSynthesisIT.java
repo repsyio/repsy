@@ -31,7 +31,7 @@ import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactR
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactVersionRepository;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
-import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
+import io.repsy.protocols.maven.shared.utils.MavenMetadataUtils;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -138,7 +138,7 @@ class MavenArtifactMetadataSynthesisIT extends AbstractIT {
     assertThat(response.getHeader(LAST_MODIFIED)).isNull();
     assertThat(response.getHeader(ETAG)).isNull();
 
-    final var metadata = ArtifactUtils.readMetadata(response.getContentAsByteArray());
+    final var metadata = MavenMetadataUtils.readMetadata(response.getContentAsByteArray());
 
     assertThat(metadata.getGroupId()).isEqualTo(GROUP);
     assertThat(metadata.getArtifactId()).isEqualTo(ARTIFACT);
@@ -200,7 +200,7 @@ class MavenArtifactMetadataSynthesisIT extends AbstractIT {
     register(repo, ARTIFACT, NEW, "1.0-SNAPSHOT");
 
     final var metadata =
-        ArtifactUtils.readMetadata(getFile(repo, METADATA).getContentAsByteArray());
+        MavenMetadataUtils.readMetadata(getFile(repo, METADATA).getContentAsByteArray());
 
     assertThat(metadata.getVersioning().getLatest()).isEqualTo("1.0-SNAPSHOT");
     assertThat(metadata.getVersioning().getRelease()).isNull();

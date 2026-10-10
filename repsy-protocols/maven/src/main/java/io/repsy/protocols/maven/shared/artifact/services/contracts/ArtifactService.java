@@ -128,7 +128,7 @@ public interface ArtifactService<ID> {
 
   /**
    * Called after the main jar of a version is stored ({@link
-   * io.repsy.protocols.maven.shared.utils.ArtifactUtils#isMainJar}). When the POM of that version
+   * io.repsy.protocols.maven.shared.utils.MavenGavUtils#isMainJar}). When the POM of that version
    * was registered as a plugin's before its jar (what {@code mvn deploy} sends), it registered the
    * prefix derived from the artifactId; the jar's {@code plugin.xml} names the real {@code
    * goalPrefix}, and it replaces the registered one when they differ (RPS-1589). It never fails the
