@@ -358,6 +358,11 @@ them in both repositories together.
 - Test method names are a camelCase sentence about the behaviour, with no `should` or `test` prefix and no
   underscores; `@DisplayName` carries the readable sentence.
 
+`NamingArchRuleTest` (`repsy-backend`, RPS-2029) enforces the layer-package suffixes, `*Properties` for
+`@ConfigurationProperties` and lowercase package names over the backend and the protocol libraries. Classes that
+predate it sit in its freeze lists with a reason; the lists may only shrink, so rename or move a class and delete
+its entry, never add one.
+
 ## Merging to `main`
 
 Two PRs can each pass CI against an older `main`, merge without a textual conflict, and still break
