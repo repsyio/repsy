@@ -40,16 +40,18 @@ public interface ReleaseRepository extends JpaRepository<Release, UUID> {
 
   List<ReleaseVersionRequiresPython> findAllByPypiPackageId(UUID packageId);
 
+  /**
+   * The releases of the package. Pass {@link Pageable#unpaged()} for every release: a {@code
+   * version} sort (RPS-1688) is not a database {@code ORDER BY}, the column sorts as a string
+   * there, so {@code 10.0} would sit above {@code 9.0}. The service sorts the whole set with {@code
+   * PypiVersionComparator} and slices the requested page from it instead.
+   */
   Page<ReleaseListItem> findAllByPypiPackageId(UUID packageId, Pageable pageable);
 
   /**
-   * Every release {@link #findAllByPypiPackageId(UUID, Pageable)} would page through, unpaged. A
-   * {@code version} sort (RPS-1688) is not a database {@code ORDER BY}: the column sorts as a
-   * string there, so {@code 10.0} would sit above {@code 9.0}. The service sorts this whole set
-   * with {@code PypiVersionComparator} and slices the requested page from it instead.
+   * The releases whose version contains {@code name}; {@link Pageable#unpaged()} returns them all
+   * (see the note on {@link #findAllByPypiPackageId(UUID, Pageable)}).
    */
-  List<ReleaseListItem> findAllReleaseListItemsByPypiPackageId(UUID packageId);
-
   @Query(
       """
           select r from Release r
@@ -57,17 +59,6 @@ public interface ReleaseRepository extends JpaRepository<Release, UUID> {
           and r.version like %:name%""")
   Page<ReleaseListItem> findAllByPypiPackageIdContainsName(
       UUID packageId, String name, Pageable pageable);
-
-  /**
-   * Every release {@link #findAllByPypiPackageIdContainsName(UUID, String, Pageable)} would page
-   * through, unpaged (see the note on {@link #findAllReleaseListItemsByPypiPackageId(UUID)}).
-   */
-  @Query(
-      """
-          select r from Release r
-          where r.pypiPackage.id = :packageId
-          and r.version like %:name%""")
-  List<ReleaseListItem> findAllByPypiPackageIdContainsName(UUID packageId, String name);
 
   List<Release> findAllByPypiPackageIdOrderByCreatedAtDesc(UUID packageId);
 

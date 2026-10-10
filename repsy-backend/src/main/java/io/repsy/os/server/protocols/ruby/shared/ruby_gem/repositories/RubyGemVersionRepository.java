@@ -42,21 +42,12 @@ public interface RubyGemVersionRepository extends JpaRepository<RubyGemVersion, 
 
   boolean existsByGemIdAndVersion(UUID gemId, String version);
 
-  @Query(
-      """
-      select gv.version as version, gv.platform as platform,
-        gv.yanked as yanked, gv.createdAt as createdAt
-      from RubyGemVersion gv
-      where gv.gem.id = :gemId
-        and (:version is null or lower(gv.version) like :version escape '\\')
-      """)
-  Page<GemVersionListItem> findAllByGemId(UUID gemId, String version, Pageable pageable);
-
   /**
-   * Every version {@link #findAllByGemId(UUID, String, Pageable)} would page through, unpaged. A
-   * {@code version} sort (RPS-1688) is not a database {@code ORDER BY}: the column sorts as a
-   * string there, so {@code 10.0.0} would sit above {@code 9.0.0}. The service sorts this whole set
-   * with {@code RubyGemVersionComparator} and slices the requested page from it instead.
+   * The versions of the gem matching the lower-cased {@code LIKE} pattern, or all of them for a
+   * null pattern. Pass {@link Pageable#unpaged()} for every one of them: a {@code version} sort
+   * (RPS-1688) is not a database {@code ORDER BY}, the column sorts as a string there, so {@code
+   * 10.0.0} would sit above {@code 9.0.0}. The service sorts the whole set with {@code
+   * RubyGemVersionComparator} and slices the requested page from it instead.
    */
   @Query(
       """
@@ -66,7 +57,7 @@ public interface RubyGemVersionRepository extends JpaRepository<RubyGemVersion, 
       where gv.gem.id = :gemId
         and (:version is null or lower(gv.version) like :version escape '\\')
       """)
-  List<GemVersionListItem> findAllByGemId(UUID gemId, String version);
+  Page<GemVersionListItem> findAllByGemId(UUID gemId, String version, Pageable pageable);
 
   @Query(
       """

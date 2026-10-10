@@ -248,7 +248,9 @@ public class RubyGemService implements RubyGemProtocolService<UUID> {
 
     if (versionOrder != null) {
       final var versions =
-          this.versionRepository.findAllByGemId(gemId, LikePatterns.of("%", version, "%"));
+          this.versionRepository
+              .findAllByGemId(gemId, LikePatterns.of("%", version, "%"), Pageable.unpaged())
+              .getContent();
 
       return VersionSortPaging.sortAndPage(
           versions.stream().map(this.converter::toGemVersionListItemDto).toList(),

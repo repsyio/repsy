@@ -92,7 +92,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
 /**
@@ -2537,8 +2539,9 @@ class ArtifactDeploymentServiceTest {
               .toList();
 
       when(ArtifactDeploymentServiceTest.this.artifactVersionRepository
-              .findAllByRepoIdAndGroupNameAndArtifactName(this.repoId, "com.acme", "lib"))
-          .thenReturn(rows);
+              .findAllByRepoIdAndGroupNameAndArtifactName(
+                  this.repoId, "com.acme", "lib", Pageable.unpaged()))
+          .thenReturn(new PageImpl<>(rows));
 
       when(ArtifactDeploymentServiceTest.this.artifactConverter.toArtifactVersionListItemDto(any()))
           .thenAnswer(
@@ -2613,7 +2616,7 @@ class ArtifactDeploymentServiceTest {
           PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "id")));
 
       verify(ArtifactDeploymentServiceTest.this.artifactVersionRepository, never())
-          .findAllByRepoIdAndGroupNameAndArtifactName(any(), any(), any());
+          .findAllByRepoIdAndGroupNameAndArtifactName(any(), any(), any(), eq(Pageable.unpaged()));
     }
   }
 

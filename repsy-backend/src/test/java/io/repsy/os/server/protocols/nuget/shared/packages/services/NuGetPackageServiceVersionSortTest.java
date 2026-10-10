@@ -35,7 +35,9 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
 /**
@@ -84,8 +86,9 @@ class NuGetPackageServiceVersionSortTest {
         List.of(
             versionEntity(pkg, "9.0.0"), versionEntity(pkg, "10.0.0"), versionEntity(pkg, "1.2.0"));
 
-    when(this.packageVersionRepository.searchByNugetPackageId(eq(pkg.getId()), any()))
-        .thenReturn(entities);
+    when(this.packageVersionRepository.searchByNugetPackageId(
+            eq(pkg.getId()), any(), eq(Pageable.unpaged())))
+        .thenReturn(new PageImpl<>(entities));
     when(this.converter.toVersionInfo(any(), eq("Some.Package")))
         .thenAnswer(inv -> toInfo(inv.getArgument(0)));
 

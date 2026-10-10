@@ -20,6 +20,7 @@ import static io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType.
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -58,6 +59,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
 /**
@@ -179,8 +181,8 @@ class ArtifactServiceQueriesTest {
   void versionsContainingATextAreSortedByMavenOrder() {
     when(this.artifactVersionRepository
             .findAllByRepoIdAndGroupNameAndArtifactNameContainsVersionName(
-                REPO_ID, "com.acme", "lib", "1."))
-        .thenReturn(List.of(row("1.9.0"), row("1.10.0"), row("1.2.0")));
+                REPO_ID, "com.acme", "lib", "1.", Pageable.unpaged()))
+        .thenReturn(new PageImpl<>(List.of(row("1.9.0"), row("1.10.0"), row("1.2.0"))));
     when(this.artifactConverter.toArtifactVersionListItemDto(any()))
         .thenAnswer(
             invocation -> {
@@ -204,7 +206,7 @@ class ArtifactServiceQueriesTest {
     assertThat(page.getTotalElements()).isEqualTo(3);
     verify(this.artifactVersionRepository, never())
         .findAllByRepoIdAndGroupNameAndArtifactNameContainsVersionName(
-            any(), any(), any(), any(), any());
+            any(), any(), any(), any(), argThat(Pageable::isPaged));
   }
 
   @Test

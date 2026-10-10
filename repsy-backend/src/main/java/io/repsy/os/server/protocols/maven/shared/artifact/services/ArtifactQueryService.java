@@ -243,8 +243,10 @@ public class ArtifactQueryService {
 
     if (versionNameOrder != null) {
       return this.sortByVersionAndPage(
-          this.artifactVersionRepository.findAllByRepoIdAndGroupNameAndArtifactName(
-              repoId, groupName, artifactName),
+          this.artifactVersionRepository
+              .findAllByRepoIdAndGroupNameAndArtifactName(
+                  repoId, groupName, artifactName, Pageable.unpaged())
+              .getContent(),
           pageable,
           versionNameOrder);
     }
@@ -268,7 +270,8 @@ public class ArtifactQueryService {
       return this.sortByVersionAndPage(
           this.artifactVersionRepository
               .findAllByRepoIdAndGroupNameAndArtifactNameContainsVersionName(
-                  repoId, groupName, artifactName, version),
+                  repoId, groupName, artifactName, version, Pageable.unpaged())
+              .getContent(),
           pageable,
           versionNameOrder);
     }

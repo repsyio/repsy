@@ -32,7 +32,9 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 
 /**
@@ -69,7 +71,8 @@ class RubyGemServiceVersionSortTest {
     // matches the correct numeric-precedence order asserted below.
     final var rows = List.of(projection("9.0.0"), projection("10.0.0"), projection("1.2.0"));
 
-    when(this.versionRepository.findAllByGemId(eq(gemId), any())).thenReturn(rows);
+    when(this.versionRepository.findAllByGemId(eq(gemId), any(), eq(Pageable.unpaged())))
+        .thenReturn(new PageImpl<>(rows));
     when(this.converter.toGemVersionListItemDto(any()))
         .thenAnswer(inv -> toDto(inv.getArgument(0)));
 
