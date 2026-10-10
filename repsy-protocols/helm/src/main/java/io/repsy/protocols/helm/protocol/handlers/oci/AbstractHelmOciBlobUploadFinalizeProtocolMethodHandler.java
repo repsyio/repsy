@@ -22,19 +22,17 @@ import static org.springframework.http.HttpHeaders.LOCATION;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
 import io.repsy.protocols.helm.protocol.facades.HelmProtocolFacade;
 import io.repsy.protocols.helm.shared.constants.HelmConstants;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
+import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.BlobDigests;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
@@ -47,57 +45,25 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 /** Handles PUT /v2/{repo}/{name}/blobs/uploads/{uuid}?digest= — finalizes a blob upload. */
 @NullMarked
 public abstract class AbstractHelmOciBlobUploadFinalizeProtocolMethodHandler<ID>
-    implements ProtocolMethodHandler {
+    extends AbstractFacadeProtocolMethodHandler<HelmProtocolFacade<ID>> {
 
   private static final Pattern UPLOAD_FINALIZE_PATTERN =
       Pattern.compile("^/([^/]+)/blobs/uploads/([0-9a-fA-F-]{36})/?$");
 
   private static final String DEFAULT_BLOB_MEDIA_TYPE = "application/octet-stream";
 
-  private final PathParser basePathParser;
-  private final HelmProtocolFacade<ID> helmFacade;
-
   public AbstractHelmOciBlobUploadFinalizeProtocolMethodHandler(
       final PathParser basePathParser,
       final HelmProtocolFacade<ID> helmFacade,
       final HelmProtocolProvider provider) {
-    this.basePathParser = basePathParser;
-    this.helmFacade = helmFacade;
-    provider.registerMethodHandler(this);
-  }
-
-  @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.PUT);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of(
-        "permission", Permission.WRITE, "skipHeaderPreProcessor", true, "writeOperation", true);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return request -> {
-      if (!HttpMethod.PUT.equals(HttpMethod.valueOf(request.getMethod()))) {
-        return Optional.empty();
-      }
-
-      final var parsedPathOpt =
-          AbstractHelmOciBlobUploadFinalizeProtocolMethodHandler.this.basePathParser.parse(request);
-      if (parsedPathOpt.isEmpty()) {
-        return Optional.empty();
-      }
-
-      final var relativePath = ProtocolContextUtils.getRelativePath(parsedPathOpt.get()).getPath();
-
-      if (!UPLOAD_FINALIZE_PATTERN.matcher(relativePath).matches()) {
-        return Optional.empty();
-      }
-
-      return parsedPathOpt;
-    };
+    super(
+        HandlerRoute.of(Permission.WRITE, HttpMethod.PUT)
+            .skipHeaderPreProcessor(true)
+            .writeOperation(true)
+            .path(UPLOAD_FINALIZE_PATTERN.asMatchPredicate()),
+        basePathParser,
+        helmFacade,
+        provider);
   }
 
   /**
@@ -143,7 +109,7 @@ public abstract class AbstractHelmOciBlobUploadFinalizeProtocolMethodHandler<ID>
 
     final var contentLength = request.getContentLengthLong();
     final var blobInfo =
-        this.helmFacade.finalizeBlob(
+        this.facade.finalizeBlob(
             context,
             uploadId,
             digest,

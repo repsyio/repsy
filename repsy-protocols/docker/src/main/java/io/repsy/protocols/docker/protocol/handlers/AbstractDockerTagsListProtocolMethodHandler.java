@@ -18,20 +18,18 @@ package io.repsy.protocols.docker.protocol.handlers;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import io.repsy.protocols.docker.protocol.facades.DockerProtocolFacade;
 import io.repsy.protocols.docker.shared.tag.dtos.TagListResponse;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
+import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -53,56 +51,23 @@ import org.springframework.http.ResponseEntity;
  */
 @NullMarked
 public abstract class AbstractDockerTagsListProtocolMethodHandler<ID>
-    implements ProtocolMethodHandler {
+    extends AbstractFacadeProtocolMethodHandler<DockerProtocolFacade<ID>> {
 
   private static final Pattern TAGS_LIST_PATTERN = Pattern.compile("^/([^/]+)/tags/list$");
   private static final String LIMIT_PARAMETER = "n";
   private static final String LAST_PARAMETER = "last";
 
-  private final PathParser basePathParser;
-  private final DockerProtocolFacade<ID> dockerFacade;
-
   public AbstractDockerTagsListProtocolMethodHandler(
       final PathParser basePathParser,
       final DockerProtocolFacade<ID> dockerFacade,
       final DockerProtocolProvider provider) {
-    this.basePathParser = basePathParser;
-    this.dockerFacade = dockerFacade;
-
-    provider.registerMethodHandler(this);
-  }
-
-  @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.GET);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.READ, "writeOperation", false);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return request -> {
-      if (!HttpMethod.GET.equals(HttpMethod.valueOf(request.getMethod()))) {
-        return Optional.empty();
-      }
-
-      final var parsedPathOpt =
-          AbstractDockerTagsListProtocolMethodHandler.this.basePathParser.parse(request);
-      if (parsedPathOpt.isEmpty()) {
-        return Optional.empty();
-      }
-
-      final var relativePath = ProtocolContextUtils.getRelativePath(parsedPathOpt.get()).getPath();
-
-      if (!TAGS_LIST_PATTERN.matcher(relativePath).matches()) {
-        return Optional.empty();
-      }
-
-      return parsedPathOpt;
-    };
+    super(
+        HandlerRoute.of(Permission.READ, HttpMethod.GET)
+            .writeOperation(false)
+            .path(TAGS_LIST_PATTERN.asMatchPredicate()),
+        basePathParser,
+        dockerFacade,
+        provider);
   }
 
   @Override
@@ -122,7 +87,7 @@ public abstract class AbstractDockerTagsListProtocolMethodHandler<ID>
     final var limit = parseLimit(request.getParameter(LIMIT_PARAMETER));
     final var last = request.getParameter(LAST_PARAMETER);
 
-    final var page = this.dockerFacade.listTags(context, imageName, limit, last);
+    final var page = this.facade.listTags(context, imageName, limit, last);
 
     final var repoPath = ProtocolContextUtils.getUrlProperties(context).getRepoPath();
     final var body = new TagListResponse(repoPath + "/" + imageName, page.tags());

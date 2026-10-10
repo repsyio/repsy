@@ -17,21 +17,20 @@ package io.repsy.protocols.helm.protocol.handlers.classic;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
 import io.repsy.protocols.helm.protocol.facades.HelmProtocolFacade;
 import io.repsy.protocols.helm.shared.constants.HelmConstants;
 import io.repsy.protocols.helm.shared.index.dtos.HelmIndexEntryInfo;
 import io.repsy.protocols.helm.shared.index.dtos.HelmIndexInfo;
+import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
-import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -43,53 +42,21 @@ import org.yaml.snakeyaml.Yaml;
 /** Handles GET /{repo}/index.yaml — generates and returns the Helm chart index. */
 @NullMarked
 public abstract class AbstractHelmIndexPullProtocolMethodHandler<ID>
-    implements ProtocolMethodHandler {
+    extends AbstractFacadeProtocolMethodHandler<HelmProtocolFacade<ID>> {
 
   private static final Pattern INDEX_PATTERN = Pattern.compile("^/index\\.yaml$");
-
-  private final PathParser basePathParser;
-  protected final HelmProtocolFacade<ID> helmFacade;
 
   public AbstractHelmIndexPullProtocolMethodHandler(
       final PathParser basePathParser,
       final HelmProtocolFacade<ID> helmFacade,
       final HelmProtocolProvider provider) {
-    this.basePathParser = basePathParser;
-    this.helmFacade = helmFacade;
-    provider.registerMethodHandler(this);
-  }
-
-  @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.GET);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.READ, "writeOperation", false);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return request -> {
-      if (!HttpMethod.GET.equals(HttpMethod.valueOf(request.getMethod()))) {
-        return Optional.empty();
-      }
-
-      final var parsedPathOpt =
-          AbstractHelmIndexPullProtocolMethodHandler.this.basePathParser.parse(request);
-      if (parsedPathOpt.isEmpty()) {
-        return Optional.empty();
-      }
-
-      final var relativePath = ProtocolContextUtils.getRelativePath(parsedPathOpt.get()).getPath();
-
-      if (!INDEX_PATTERN.matcher(relativePath).matches()) {
-        return Optional.empty();
-      }
-
-      return parsedPathOpt;
-    };
+    super(
+        HandlerRoute.of(Permission.READ, HttpMethod.GET)
+            .writeOperation(false)
+            .path(INDEX_PATTERN.asMatchPredicate()),
+        basePathParser,
+        helmFacade,
+        provider);
   }
 
   @Override
@@ -98,7 +65,7 @@ public abstract class AbstractHelmIndexPullProtocolMethodHandler<ID>
       final HttpServletRequest request,
       final HttpServletResponse response) {
 
-    final var indexDto = this.helmFacade.generateIndex(context);
+    final var indexDto = this.facade.generateIndex(context);
     final var yamlBody = serializeToYaml(indexDto);
 
     return ResponseEntity.ok()

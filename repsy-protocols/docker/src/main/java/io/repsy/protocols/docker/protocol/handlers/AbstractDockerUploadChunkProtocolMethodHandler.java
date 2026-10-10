@@ -23,18 +23,16 @@ import static org.springframework.http.HttpHeaders.LOCATION;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import io.repsy.protocols.docker.protocol.facades.DockerProtocolFacade;
+import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
@@ -45,57 +43,22 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 @NullMarked
 public abstract class AbstractDockerUploadChunkProtocolMethodHandler<ID>
-    implements ProtocolMethodHandler {
+    extends AbstractFacadeProtocolMethodHandler<DockerProtocolFacade<ID>> {
 
   private static final Pattern UPLOAD_CHUNK_PATTERN =
       Pattern.compile("^/([^/]+)/blobs/uploads/([0-9a-fA-F-]{36})/?$");
-
-  private final PathParser basePathParser;
-  private final DockerProtocolFacade<ID> dockerFacade;
 
   public AbstractDockerUploadChunkProtocolMethodHandler(
       final PathParser basePathParser,
       final DockerProtocolFacade<ID> dockerFacade,
       final DockerProtocolProvider provider) {
-    this.basePathParser = basePathParser;
-    this.dockerFacade = dockerFacade;
-
-    provider.registerMethodHandler(this);
-  }
-
-  @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.PATCH);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.WRITE, "skipHeaderPreProcessor", true);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return request -> {
-      if (!HttpMethod.PATCH.equals(HttpMethod.valueOf(request.getMethod()))) {
-        return Optional.empty();
-      }
-
-      final var parsedPathOpt =
-          AbstractDockerUploadChunkProtocolMethodHandler.this.basePathParser.parse(request);
-      if (parsedPathOpt.isEmpty()) {
-        return Optional.empty();
-      }
-
-      final var urlProperties = ProtocolContextUtils.getUrlProperties(parsedPathOpt.get());
-
-      final var relativePath = urlProperties.getRelativePath().getPath();
-
-      if (!UPLOAD_CHUNK_PATTERN.matcher(relativePath).matches()) {
-        return Optional.empty();
-      }
-
-      return parsedPathOpt;
-    };
+    super(
+        HandlerRoute.of(Permission.WRITE, HttpMethod.PATCH)
+            .skipHeaderPreProcessor(true)
+            .path(UPLOAD_CHUNK_PATTERN.asMatchPredicate()),
+        basePathParser,
+        dockerFacade,
+        provider);
   }
 
   @Override
@@ -130,7 +93,7 @@ public abstract class AbstractDockerUploadChunkProtocolMethodHandler<ID>
     }
 
     final var uploadSize =
-        this.dockerFacade.uploadLayerChunk(
+        this.facade.uploadLayerChunk(
             context, uploadPath, request.getInputStream(), request.getContentLengthLong());
 
     final var location = this.getServletURILocation(context, imageName, sessionId);
@@ -151,7 +114,7 @@ public abstract class AbstractDockerUploadChunkProtocolMethodHandler<ID>
       throws IOException {
 
     try {
-      return this.dockerFacade.getUploadSize(context, uploadPath);
+      return this.facade.getUploadSize(context, uploadPath);
     } catch (final ItemNotFoundException _) {
       return 0;
     }

@@ -17,16 +17,14 @@ package io.repsy.protocols.helm.protocol.handlers.oci;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
 import io.repsy.protocols.helm.protocol.facades.HelmProtocolFacade;
+import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpHeaders;
@@ -42,53 +40,21 @@ import org.springframework.http.ResponseEntity;
  */
 @NullMarked
 public abstract class AbstractHelmOciTagsListProtocolMethodHandler<ID>
-    implements ProtocolMethodHandler {
+    extends AbstractFacadeProtocolMethodHandler<HelmProtocolFacade<ID>> {
 
   private static final Pattern TAGS_LIST_PATTERN = Pattern.compile("^/([^/]+)/tags/list$");
-
-  private final PathParser basePathParser;
-  private final HelmProtocolFacade<ID> helmFacade;
 
   public AbstractHelmOciTagsListProtocolMethodHandler(
       final PathParser basePathParser,
       final HelmProtocolFacade<ID> helmFacade,
       final HelmProtocolProvider provider) {
-    this.basePathParser = basePathParser;
-    this.helmFacade = helmFacade;
-    provider.registerMethodHandler(this);
-  }
-
-  @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.GET);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.READ, "writeOperation", false);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return request -> {
-      if (!HttpMethod.GET.equals(HttpMethod.valueOf(request.getMethod()))) {
-        return Optional.empty();
-      }
-
-      final var parsedPathOpt =
-          AbstractHelmOciTagsListProtocolMethodHandler.this.basePathParser.parse(request);
-      if (parsedPathOpt.isEmpty()) {
-        return Optional.empty();
-      }
-
-      final var relativePath = ProtocolContextUtils.getRelativePath(parsedPathOpt.get()).getPath();
-
-      if (!TAGS_LIST_PATTERN.matcher(relativePath).matches()) {
-        return Optional.empty();
-      }
-
-      return parsedPathOpt;
-    };
+    super(
+        HandlerRoute.of(Permission.READ, HttpMethod.GET)
+            .writeOperation(false)
+            .path(TAGS_LIST_PATTERN.asMatchPredicate()),
+        basePathParser,
+        helmFacade,
+        provider);
   }
 
   @Override
@@ -105,7 +71,7 @@ public abstract class AbstractHelmOciTagsListProtocolMethodHandler<ID>
     }
 
     final var name = matcher.group(1);
-    final var tags = this.helmFacade.listTags(context, name);
+    final var tags = this.facade.listTags(context, name);
 
     return ResponseEntity.ok()
         .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)

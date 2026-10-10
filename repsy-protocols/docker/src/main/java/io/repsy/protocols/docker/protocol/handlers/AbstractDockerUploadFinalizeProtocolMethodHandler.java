@@ -23,7 +23,6 @@ import static org.springframework.http.HttpHeaders.LOCATION;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import io.repsy.protocols.docker.protocol.facades.DockerProtocolFacade;
@@ -31,13 +30,12 @@ import io.repsy.protocols.docker.shared.layer.dtos.LayerForm;
 import io.repsy.protocols.docker.shared.layer.dtos.LayerInfo;
 import io.repsy.protocols.docker.shared.layer.services.LayerService;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
+import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import lombok.SneakyThrows;
@@ -50,7 +48,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 @NullMarked
 public abstract class AbstractDockerUploadFinalizeProtocolMethodHandler<ID>
-    implements ProtocolMethodHandler {
+    extends AbstractFacadeProtocolMethodHandler<DockerProtocolFacade<ID>> {
 
   private static final Pattern UPLOAD_FINALIZE_PATTERN =
       Pattern.compile("^/([^/]+)/blobs/uploads/([0-9a-fA-F-]{36})/?$");
@@ -58,8 +56,6 @@ public abstract class AbstractDockerUploadFinalizeProtocolMethodHandler<ID>
   private static final int RETRY_COUNT = 3;
   private static final long WAIT_RETRY = 100;
 
-  private final PathParser basePathParser;
-  private final DockerProtocolFacade<ID> dockerFacade;
   private final LayerService<ID> layerService;
 
   public AbstractDockerUploadFinalizeProtocolMethodHandler(
@@ -67,46 +63,14 @@ public abstract class AbstractDockerUploadFinalizeProtocolMethodHandler<ID>
       final DockerProtocolFacade<ID> dockerFacade,
       final LayerService<ID> layerService,
       final DockerProtocolProvider provider) {
-    this.basePathParser = basePathParser;
-    this.dockerFacade = dockerFacade;
+    super(
+        HandlerRoute.of(Permission.WRITE, HttpMethod.PUT)
+            .skipHeaderPreProcessor(true)
+            .path(UPLOAD_FINALIZE_PATTERN.asMatchPredicate()),
+        basePathParser,
+        dockerFacade,
+        provider);
     this.layerService = layerService;
-
-    provider.registerMethodHandler(this);
-  }
-
-  @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.PUT);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.WRITE, "skipHeaderPreProcessor", true);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return request -> {
-      if (!HttpMethod.PUT.equals(HttpMethod.valueOf(request.getMethod()))) {
-        return Optional.empty();
-      }
-
-      final var parsedPathOpt =
-          AbstractDockerUploadFinalizeProtocolMethodHandler.this.basePathParser.parse(request);
-      if (parsedPathOpt.isEmpty()) {
-        return Optional.empty();
-      }
-
-      final var urlProperties = ProtocolContextUtils.getUrlProperties(parsedPathOpt.get());
-
-      final var relativePath = urlProperties.getRelativePath().getPath();
-
-      if (!UPLOAD_FINALIZE_PATTERN.matcher(relativePath).matches()) {
-        return Optional.empty();
-      }
-
-      return parsedPathOpt;
-    };
   }
 
   @Override
@@ -135,13 +99,13 @@ public abstract class AbstractDockerUploadFinalizeProtocolMethodHandler<ID>
     final var uploadPath = new RelativePath("/blobs/" + sessionId);
 
     if (request.getContentLength() > 0) {
-      this.dockerFacade.uploadLayerChunk(
+      this.facade.uploadLayerChunk(
           context, uploadPath, request.getInputStream(), request.getContentLengthLong());
     }
 
     // The upload is only a blob once it is known to hold what the client claims: check it before
     // the layer row that names the digest is created.
-    this.dockerFacade.verifyLayerDigest(context, uploadPath, digest);
+    this.facade.verifyLayerDigest(context, uploadPath, digest);
 
     final var layerForm =
         LayerForm.builder()
@@ -153,7 +117,7 @@ public abstract class AbstractDockerUploadFinalizeProtocolMethodHandler<ID>
 
     final var layerInfo = this.findOrCreateLayer(repoInfo.getId(), layerForm, 1);
 
-    this.dockerFacade.finalizeLayerUpload(context, uploadPath, layerInfo);
+    this.facade.finalizeLayerUpload(context, uploadPath, layerInfo);
 
     final var location = this.getServletURILocation(context, imageName, digest);
 

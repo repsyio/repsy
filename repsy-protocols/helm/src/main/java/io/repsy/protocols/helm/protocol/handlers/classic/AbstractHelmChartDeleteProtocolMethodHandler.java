@@ -17,16 +17,14 @@ package io.repsy.protocols.helm.protocol.handlers.classic;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
 import io.repsy.protocols.helm.protocol.facades.HelmProtocolFacade;
+import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
@@ -40,54 +38,22 @@ import org.springframework.http.ResponseEntity;
  */
 @NullMarked
 public abstract class AbstractHelmChartDeleteProtocolMethodHandler<ID>
-    implements ProtocolMethodHandler {
+    extends AbstractFacadeProtocolMethodHandler<HelmProtocolFacade<ID>> {
 
   private static final Pattern CHART_DELETE_PATTERN =
       Pattern.compile("^/api/charts/([^/]+)/([^/]+)$");
-
-  private final PathParser basePathParser;
-  private final HelmProtocolFacade<ID> helmFacade;
 
   public AbstractHelmChartDeleteProtocolMethodHandler(
       final PathParser basePathParser,
       final HelmProtocolFacade<ID> helmFacade,
       final HelmProtocolProvider provider) {
-    this.basePathParser = basePathParser;
-    this.helmFacade = helmFacade;
-    provider.registerMethodHandler(this);
-  }
-
-  @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.DELETE);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.MANAGE, "writeOperation", true);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return request -> {
-      if (!HttpMethod.DELETE.equals(HttpMethod.valueOf(request.getMethod()))) {
-        return Optional.empty();
-      }
-
-      final var parsedPathOpt =
-          AbstractHelmChartDeleteProtocolMethodHandler.this.basePathParser.parse(request);
-      if (parsedPathOpt.isEmpty()) {
-        return Optional.empty();
-      }
-
-      final var relativePath = ProtocolContextUtils.getRelativePath(parsedPathOpt.get()).getPath();
-
-      if (!CHART_DELETE_PATTERN.matcher(relativePath).matches()) {
-        return Optional.empty();
-      }
-
-      return parsedPathOpt;
-    };
+    super(
+        HandlerRoute.of(Permission.MANAGE, HttpMethod.DELETE)
+            .writeOperation(true)
+            .path(CHART_DELETE_PATTERN.asMatchPredicate()),
+        basePathParser,
+        helmFacade,
+        provider);
   }
 
   @Override
@@ -107,7 +73,7 @@ public abstract class AbstractHelmChartDeleteProtocolMethodHandler<ID>
     final var name = matcher.group(1);
     final var version = matcher.group(2);
 
-    this.helmFacade.deleteChart(context, name, version);
+    this.facade.deleteChart(context, name, version);
 
     return ResponseEntity.ok().build();
   }

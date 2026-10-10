@@ -21,17 +21,15 @@ import static org.springframework.http.HttpHeaders.CONTENT_TYPE;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import io.repsy.protocols.docker.protocol.facades.DockerProtocolFacade;
+import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.BlobDigests;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
@@ -40,57 +38,21 @@ import org.springframework.http.ResponseEntity;
 
 @NullMarked
 public abstract class AbstractDockerLayerPullProtocolMethodHandler<ID>
-    implements ProtocolMethodHandler {
+    extends AbstractFacadeProtocolMethodHandler<DockerProtocolFacade<ID>> {
 
   private static final Pattern LAYER_DOWNLOAD_PATTERN =
       Pattern.compile("^/([^/]+)/blobs/(" + BlobDigests.DIGEST_REGEX + ")/?$");
-
-  private final PathParser basePathParser;
-  private final DockerProtocolFacade<ID> dockerFacade;
 
   public AbstractDockerLayerPullProtocolMethodHandler(
       final PathParser basePathParser,
       final DockerProtocolFacade<ID> dockerFacade,
       final DockerProtocolProvider provider) {
-    this.basePathParser = basePathParser;
-    this.dockerFacade = dockerFacade;
-
-    provider.registerMethodHandler(this);
-  }
-
-  @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.GET);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.READ);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return request -> {
-      if (!HttpMethod.GET.equals(HttpMethod.valueOf(request.getMethod()))) {
-        return Optional.empty();
-      }
-
-      final var parsedPathOpt =
-          AbstractDockerLayerPullProtocolMethodHandler.this.basePathParser.parse(request);
-      if (parsedPathOpt.isEmpty()) {
-        return Optional.empty();
-      }
-
-      final var urlProperties = ProtocolContextUtils.getUrlProperties(parsedPathOpt.get());
-
-      final var relativePath = urlProperties.getRelativePath().getPath();
-
-      if (!LAYER_DOWNLOAD_PATTERN.matcher(relativePath).matches()) {
-        return Optional.empty();
-      }
-
-      return parsedPathOpt;
-    };
+    super(
+        HandlerRoute.of(Permission.READ, HttpMethod.GET)
+            .path(LAYER_DOWNLOAD_PATTERN.asMatchPredicate()),
+        basePathParser,
+        dockerFacade,
+        provider);
   }
 
   @Override
@@ -109,7 +71,7 @@ public abstract class AbstractDockerLayerPullProtocolMethodHandler<ID>
 
     final var digest = matcher.group(2);
 
-    final var resource = this.dockerFacade.getLayer(context, digest, request.getServletPath());
+    final var resource = this.facade.getLayer(context, digest, request.getServletPath());
 
     return ResponseEntity.ok()
         .header(CONTENT_TYPE, DOCKER_CONFIG_JSON)

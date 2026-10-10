@@ -21,17 +21,14 @@ import static org.springframework.http.HttpHeaders.LOCATION;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
+import io.repsy.protocols.shared.handlers.AbstractRoutedProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.BlobDigests;
-import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
@@ -41,55 +38,21 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 @NullMarked
 public abstract class AbstractDockerUploadStartProtocolMethodHandler
-    implements ProtocolMethodHandler {
+    extends AbstractRoutedProtocolMethodHandler {
 
   /** The OCI distribution spec's hint (end-4c) of the algorithm the blob's digest will use. */
   private static final String DIGEST_ALGORITHM_PARAMETER = "digest-algorithm";
 
   private static final Pattern UPLOAD_START_PATTERN = Pattern.compile("^/([^/]+)/blobs/uploads/?$");
 
-  private final PathParser basePathParser;
-
   public AbstractDockerUploadStartProtocolMethodHandler(
       final PathParser basePathParser, final DockerProtocolProvider provider) {
-    this.basePathParser = basePathParser;
-
-    provider.registerMethodHandler(this);
-  }
-
-  @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.POST);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.WRITE, "skipHeaderPreProcessor", true);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return request -> {
-      if (!HttpMethod.POST.equals(HttpMethod.valueOf(request.getMethod()))) {
-        return Optional.empty();
-      }
-
-      final var parsedPathOpt =
-          AbstractDockerUploadStartProtocolMethodHandler.this.basePathParser.parse(request);
-      if (parsedPathOpt.isEmpty()) {
-        return Optional.empty();
-      }
-
-      final var urlProperties = ProtocolContextUtils.getUrlProperties(parsedPathOpt.get());
-
-      final var relativePath = urlProperties.getRelativePath().getPath();
-
-      if (!UPLOAD_START_PATTERN.matcher(relativePath).matches()) {
-        return Optional.empty();
-      }
-
-      return parsedPathOpt;
-    };
+    super(
+        HandlerRoute.of(Permission.WRITE, HttpMethod.POST)
+            .skipHeaderPreProcessor(true)
+            .path(UPLOAD_START_PATTERN.asMatchPredicate()),
+        basePathParser,
+        provider);
   }
 
   @Override

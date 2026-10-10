@@ -20,9 +20,7 @@ import static org.springframework.http.HttpHeaders.WWW_AUTHENTICATE;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
-import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import io.repsy.protocols.docker.protocol.parser.DockerScopeParser;
@@ -32,6 +30,8 @@ import io.repsy.protocols.docker.shared.auth.services.DockerAuthService;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.exceptions.TooManyRequestsException;
+import io.repsy.protocols.shared.handlers.AbstractRoutedProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -54,7 +54,7 @@ import org.springframework.http.ResponseEntity;
 
 @NullMarked
 public abstract class AbstractDockerTokenProtocolMethodHandler<ID>
-    implements ProtocolMethodHandler {
+    extends AbstractRoutedProtocolMethodHandler {
 
   public static final TemporalAmount DEFAULT_TIMEOUT_ACCESS_TOKEN =
       Duration.of(30, ChronoUnit.MINUTES);
@@ -66,45 +66,26 @@ public abstract class AbstractDockerTokenProtocolMethodHandler<ID>
       final DockerAuthService<ID> authService,
       final DockerScopeParser<ID> scopeParser,
       final DockerProtocolProvider provider) {
+    super(
+        HandlerRoute.of(Permission.NONE, HttpMethod.GET, HttpMethod.POST)
+            .skipHeaderPreProcessor(true)
+            .skipUsagePostProcessor(true)
+            .skipPreProcessor(true),
+        provider);
     this.authService = authService;
     this.scopeParser = scopeParser;
-
-    provider.registerMethodHandler(this);
   }
 
   protected abstract Optional<ProtocolContext> findProtocolContext(RelativePath relativePath);
 
   @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.GET, HttpMethod.POST);
+  protected boolean accepts(final HttpMethod method, final HttpServletRequest request) {
+    return super.accepts(method, request) && "/v2/token".equals(request.getServletPath());
   }
 
   @Override
-  public Map<String, Object> getProperties() {
-    return Map.of(
-        "permission", Permission.NONE,
-        "skipHeaderPreProcessor", true,
-        "skipUsagePostProcessor", true,
-        "skipPreProcessor", true);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return request -> {
-      final var method = HttpMethod.valueOf(request.getMethod());
-      if (!HttpMethod.GET.equals(method) && !HttpMethod.POST.equals(method)) {
-        return Optional.empty();
-      }
-
-      final var path = request.getServletPath();
-      if (!"/v2/token".equals(path)) {
-        return Optional.empty();
-      }
-
-      final var relativePath = new RelativePath("/token");
-
-      return this.findProtocolContext(relativePath);
-    };
+  protected Optional<ProtocolContext> parse(final HttpServletRequest request) {
+    return this.findProtocolContext(new RelativePath("/token"));
   }
 
   @Override

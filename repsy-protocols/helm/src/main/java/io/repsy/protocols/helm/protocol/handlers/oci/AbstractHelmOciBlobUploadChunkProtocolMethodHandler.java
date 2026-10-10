@@ -23,17 +23,15 @@ import static org.springframework.http.HttpHeaders.LOCATION;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
 import io.repsy.protocols.helm.protocol.facades.HelmProtocolFacade;
+import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.UUID;
 import java.util.regex.Pattern;
@@ -46,55 +44,23 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 /** Handles PATCH /v2/{repo}/{name}/blobs/uploads/{uuid} — uploads a blob chunk. */
 @NullMarked
 public abstract class AbstractHelmOciBlobUploadChunkProtocolMethodHandler<ID>
-    implements ProtocolMethodHandler {
+    extends AbstractFacadeProtocolMethodHandler<HelmProtocolFacade<ID>> {
 
   private static final Pattern UPLOAD_CHUNK_PATTERN =
       Pattern.compile("^/([^/]+)/blobs/uploads/([0-9a-fA-F-]{36})/?$");
-
-  private final PathParser basePathParser;
-  private final HelmProtocolFacade<ID> helmFacade;
 
   public AbstractHelmOciBlobUploadChunkProtocolMethodHandler(
       final PathParser basePathParser,
       final HelmProtocolFacade<ID> helmFacade,
       final HelmProtocolProvider provider) {
-    this.basePathParser = basePathParser;
-    this.helmFacade = helmFacade;
-    provider.registerMethodHandler(this);
-  }
-
-  @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.PATCH);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of(
-        "permission", Permission.WRITE, "skipHeaderPreProcessor", true, "writeOperation", true);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return request -> {
-      if (!HttpMethod.PATCH.equals(HttpMethod.valueOf(request.getMethod()))) {
-        return Optional.empty();
-      }
-
-      final var parsedPathOpt =
-          AbstractHelmOciBlobUploadChunkProtocolMethodHandler.this.basePathParser.parse(request);
-      if (parsedPathOpt.isEmpty()) {
-        return Optional.empty();
-      }
-
-      final var relativePath = ProtocolContextUtils.getRelativePath(parsedPathOpt.get()).getPath();
-
-      if (!UPLOAD_CHUNK_PATTERN.matcher(relativePath).matches()) {
-        return Optional.empty();
-      }
-
-      return parsedPathOpt;
-    };
+    super(
+        HandlerRoute.of(Permission.WRITE, HttpMethod.PATCH)
+            .skipHeaderPreProcessor(true)
+            .writeOperation(true)
+            .path(UPLOAD_CHUNK_PATTERN.asMatchPredicate()),
+        basePathParser,
+        helmFacade,
+        provider);
   }
 
   @Override
@@ -125,7 +91,7 @@ public abstract class AbstractHelmOciBlobUploadChunkProtocolMethodHandler<ID>
     }
 
     final var uploadSize =
-        this.helmFacade.uploadBlobChunk(
+        this.facade.uploadBlobChunk(
             context, uploadId, request.getInputStream(), request.getContentLengthLong());
 
     final var location =
@@ -150,7 +116,7 @@ public abstract class AbstractHelmOciBlobUploadChunkProtocolMethodHandler<ID>
       throws IOException {
 
     try {
-      return this.helmFacade.getUploadSize(context, uploadId);
+      return this.facade.getUploadSize(context, uploadId);
     } catch (final ItemNotFoundException _) {
       return 0;
     }
