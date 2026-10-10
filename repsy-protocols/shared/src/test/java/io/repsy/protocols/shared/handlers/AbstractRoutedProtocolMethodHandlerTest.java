@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
@@ -109,49 +110,213 @@ class AbstractRoutedProtocolMethodHandlerTest {
     assertThat(new Handler(route, this.provider).getProperties()).isSameAs(route.properties());
   }
 
-  @Test
-  @DisplayName("additional properties are added to the route's and replace a key both set")
-  void additionalProperties() {
-    final var route =
-        HandlerRoute.of(Permission.MANAGE, HttpMethod.DELETE)
-            .writeOperation(true)
-            .skipHeaderPreProcessor(true);
-    final var handler =
-        new Handler(route, this.provider) {
-          private Permission permission = Permission.READ;
+  private Handler handlerAdding(final HandlerRoute route, final Map<String, Object> additional) {
+    return new Handler(route, this.provider) {
+      @Override
+      protected Map<String, Object> additionalProperties() {
+        return additional;
+      }
+    };
+  }
 
-          @Override
-          protected Map<String, Object> additionalProperties() {
-            return Map.of(
-                HandlerPropertyKeys.PERMISSION,
-                this.permission,
-                HandlerPropertyKeys.METHOD,
-                "chartDelete");
-          }
-        };
+  @Test
+  @DisplayName("additional properties add keys the route does not define")
+  void addsKeys() {
+    final var route = HandlerRoute.of(Permission.MANAGE, HttpMethod.DELETE).writeOperation(true);
+    final var handler =
+        this.handlerAdding(route, Map.of(HandlerPropertyKeys.METHOD, "chartDelete"));
 
     assertThat(handler.getProperties())
         .isEqualTo(
             Map.of(
                 HandlerPropertyKeys.PERMISSION,
-                Permission.READ,
+                Permission.MANAGE,
                 HandlerPropertyKeys.WRITE_OPERATION,
-                true,
-                HandlerPropertyKeys.SKIP_HEADER_PRE_PROCESSOR,
                 true,
                 HandlerPropertyKeys.METHOD,
                 "chartDelete"));
     assertThatThrownBy(() -> handler.getProperties().put("x", "y"))
         .isInstanceOf(UnsupportedOperationException.class);
+    assertThat(handler.getSupportedMethods()).containsExactly(HttpMethod.DELETE);
+    assertThat(route.properties()).doesNotContainKey(HandlerPropertyKeys.METHOD);
+  }
 
-    handler.permission = Permission.WRITE;
+  @Test
+  @DisplayName("additional properties may replace the permission with a stronger one")
+  void strengthensPermission() {
+    final var route = HandlerRoute.of(Permission.WRITE, HttpMethod.DELETE).writeOperation(true);
+    final var handler =
+        this.handlerAdding(
+            route,
+            Map.of(
+                HandlerPropertyKeys.PERMISSION,
+                Permission.MANAGE,
+                HandlerPropertyKeys.METHOD,
+                "chartDelete"));
 
     assertThat(handler.getProperties())
-        .containsEntry(HandlerPropertyKeys.PERMISSION, Permission.WRITE);
-    assertThat(handler.getSupportedMethods()).containsExactly(HttpMethod.DELETE);
-    assertThat(route.properties())
         .containsEntry(HandlerPropertyKeys.PERMISSION, Permission.MANAGE)
-        .doesNotContainKey(HandlerPropertyKeys.METHOD);
+        .containsEntry(HandlerPropertyKeys.WRITE_OPERATION, true)
+        .containsEntry(HandlerPropertyKeys.METHOD, "chartDelete");
+    assertThat(route.properties()).containsEntry(HandlerPropertyKeys.PERMISSION, Permission.WRITE);
+  }
+
+  @Test
+  @DisplayName("replacing the permission with the same one is allowed")
+  void samePermission() {
+    final var handler =
+        this.handlerAdding(
+            HandlerRoute.of(Permission.MANAGE, HttpMethod.DELETE),
+            Map.of(HandlerPropertyKeys.PERMISSION, Permission.MANAGE));
+
+    assertThat(handler.getProperties())
+        .containsEntry(HandlerPropertyKeys.PERMISSION, Permission.MANAGE);
+  }
+
+  @Test
+  @DisplayName("replacing the permission with a weaker one throws, naming handler and key")
+  void weakerPermissionThrows() {
+    final var handler =
+        this.handlerAdding(
+            HandlerRoute.of(Permission.MANAGE, HttpMethod.DELETE),
+            Map.of(HandlerPropertyKeys.PERMISSION, Permission.READ));
+
+    assertThatThrownBy(handler::getProperties)
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining(handler.getClass().getName())
+        .hasMessageContaining("'permission'")
+        .hasMessageContaining("MANAGE")
+        .hasMessageContaining("READ");
+  }
+
+  @Test
+  @DisplayName("NONE is the weakest permission, so replacing READ with NONE throws")
+  void nonePermissionIsWeakest() {
+    final var handler =
+        this.handlerAdding(
+            HandlerRoute.read(HttpMethod.GET),
+            Map.of(HandlerPropertyKeys.PERMISSION, Permission.NONE));
+
+    assertThatThrownBy(handler::getProperties).isInstanceOf(IllegalStateException.class);
+  }
+
+  @Test
+  @DisplayName("a permission that is not a Permission value throws")
+  void permissionOfWrongTypeThrows() {
+    final var handler =
+        this.handlerAdding(
+            HandlerRoute.read(HttpMethod.GET), Map.of(HandlerPropertyKeys.PERMISSION, "manage"));
+
+    assertThatThrownBy(handler::getProperties)
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining("'permission'");
+  }
+
+  @Test
+  @DisplayName("replacing a route key other than the permission throws, naming handler and key")
+  void replacingOtherRouteKeyThrows() {
+    final var route =
+        HandlerRoute.write(HttpMethod.PUT)
+            .skipPreProcessor(false)
+            .skipHeaderPreProcessor(false)
+            .skipUsagePostProcessor(false)
+            .requireAuthentication(true)
+            .method("upload");
+
+    for (final var key :
+        List.of(
+            HandlerPropertyKeys.WRITE_OPERATION,
+            HandlerPropertyKeys.SKIP_PRE_PROCESSOR,
+            HandlerPropertyKeys.SKIP_HEADER_PRE_PROCESSOR,
+            HandlerPropertyKeys.SKIP_USAGE_POST_PROCESSOR,
+            HandlerPropertyKeys.REQUIRE_AUTHENTICATION,
+            HandlerPropertyKeys.METHOD)) {
+      final var handler = this.handlerAdding(route, Map.of(key, "other"));
+
+      assertThatThrownBy(handler::getProperties)
+          .as(key)
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessageContaining(handler.getClass().getName())
+          .hasMessageContaining("'" + key + "'");
+    }
+  }
+
+  @Test
+  @DisplayName("the resolved properties are computed once and cached")
+  void resolvedOnce() {
+    final var calls = new AtomicInteger();
+    final var handler =
+        new Handler(HandlerRoute.read(HttpMethod.GET), this.provider) {
+          @Override
+          protected Map<String, Object> additionalProperties() {
+            calls.incrementAndGet();
+            return Map.of(HandlerPropertyKeys.METHOD, "download");
+          }
+        };
+
+    assertThat(handler.getProperties()).isSameAs(handler.getProperties());
+    assertThat(calls).hasValue(1);
+  }
+
+  @Test
+  @DisplayName("head properties follow the same rules: add keys, strengthen the permission")
+  void headPropertiesAddAndStrengthen() {
+    final var route = HandlerRoute.read(HttpMethod.GET).head();
+    final var handler =
+        this.handlerAdding(
+            route,
+            Map.of(
+                HandlerPropertyKeys.PERMISSION,
+                Permission.MANAGE,
+                HandlerPropertyKeys.METHOD,
+                "download"));
+
+    assertThat(handler.getHeadProperties())
+        .containsEntry(HandlerPropertyKeys.PERMISSION, Permission.MANAGE)
+        .containsEntry(HandlerPropertyKeys.METHOD, "download")
+        .containsEntry(HandlerPropertyKeys.SKIP_USAGE_POST_PROCESSOR, true);
+    assertThat(route.headProperties()).doesNotContainKey(HandlerPropertyKeys.METHOD);
+    assertThat(handler.getHeadProperties()).isSameAs(handler.getHeadProperties());
+  }
+
+  @Test
+  @DisplayName("head properties: a weaker permission or another replaced key throws")
+  void headPropertiesRejectReplacement() {
+    final var route =
+        HandlerRoute.of(Permission.MANAGE, HttpMethod.GET)
+            .head(HandlerRoute.of(Permission.MANAGE, HttpMethod.HEAD).skipUsagePostProcessor(true));
+
+    final var weaker =
+        this.handlerAdding(route, Map.of(HandlerPropertyKeys.PERMISSION, Permission.READ));
+    assertThatThrownBy(weaker::getHeadProperties)
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining(weaker.getClass().getName())
+        .hasMessageContaining("'permission'");
+
+    final var replaced =
+        this.handlerAdding(route, Map.of(HandlerPropertyKeys.SKIP_USAGE_POST_PROCESSOR, false));
+    assertThatThrownBy(replaced::getHeadProperties)
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessageContaining(replaced.getClass().getName())
+        .hasMessageContaining("'skipUsagePostProcessor'");
+
+    final var requireAuth =
+        this.handlerAdding(
+            HandlerRoute.read(HttpMethod.GET).requireAuthentication(true).head(),
+            Map.of(HandlerPropertyKeys.REQUIRE_AUTHENTICATION, false));
+    assertThatThrownBy(requireAuth::getProperties).isInstanceOf(IllegalStateException.class);
+  }
+
+  @Test
+  @DisplayName("without additional properties head properties are the route's own maps")
+  void headPropertiesWithoutHook() {
+    final var withHead = HandlerRoute.read(HttpMethod.GET).head();
+    final var withoutHead = HandlerRoute.read(HttpMethod.GET);
+
+    assertThat(new Handler(withHead, this.provider).getHeadProperties())
+        .isSameAs(withHead.headProperties());
+    assertThat(new Handler(withoutHead, this.provider).getHeadProperties())
+        .isSameAs(withoutHead.properties());
   }
 
   @Test

@@ -15,9 +15,22 @@
  */
 package io.repsy.protocols.shared.repo.dtos;
 
+import java.util.List;
+
 public enum Permission {
   WRITE,
   READ,
   MANAGE,
-  NONE
+  NONE;
+
+  private static final List<Permission> LADDER = List.of(NONE, READ, WRITE, MANAGE);
+
+  /**
+   * Whether this permission is at least as strong as {@code other}. The permissions are a ladder,
+   * {@link #NONE} below {@link #READ} below {@link #WRITE} below {@link #MANAGE}; the declaration
+   * order is not the ladder and must not be used for comparing.
+   */
+  public boolean isAtLeast(final Permission other) {
+    return LADDER.indexOf(this) >= LADDER.indexOf(other);
+  }
 }
