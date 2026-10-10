@@ -49,13 +49,13 @@ import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Slf4j
 @Service
-@Transactional
 @RequiredArgsConstructor
 public class DockerApiFacade implements ProtocolApiFacade {
 
@@ -71,7 +71,19 @@ public class DockerApiFacade implements ProtocolApiFacade {
   private final @NonNull UntaggedManifestCleanupService untaggedManifestCleanupService;
   private final @NonNull ApplicationEventPublisher eventPublisher;
 
+  /**
+   * Deletes the rows of the repo, then its files. Not one transaction (RPS-2114): a repo with many
+   * images would hold a pooled connection and row locks on REPO, DOCKER_IMAGE and DOCKER_LAYER
+   * while the whole blob tree is deleted from storage, and concurrent pushes would block on the
+   * repo lock. Each image is deleted in its own short transaction by {@link ImageTxService}, the
+   * layers in one, and the storage delete runs with no transaction open.
+   *
+   * <p>A storage failure leaves the rows gone and the repo row (the caller deletes it last) in
+   * place: the user repeats the delete, which finds no images and deletes the files again. A crash
+   * between the steps is repaired the same way. Nothing is orphaned that a repeat cannot remove.
+   */
   @Override
+  @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public void deleteRepo(final @NonNull RepoInfo repoInfo) {
 
     RepoUtils.validateRepoName(repoInfo.getName());
@@ -88,11 +100,13 @@ public class DockerApiFacade implements ProtocolApiFacade {
   }
 
   // The event is published after the DB image delete but before the storage manifest delete, and
-  // that is safe: this facade is @Transactional, and the listener
+  // that is safe: this method is @Transactional, and the listener
   // (ArtifactScanListener.onArtifactVersionDeleted) is synchronous and calls a @Transactional
   // (REQUIRED) method, so the scan cleanup joins this transaction. If deleteManifests() below
   // fails, the exception rolls back the image, tag and manifest rows and the scan rows together
   // (DockerDeleteStorageFailureIT), and the usage is only updated by the caller once this returns.
+  // The storage call deletes the manifest files of one image only, so the transaction stays short.
+  @Transactional
   public @NonNull BaseUsages deleteImage(
       final @NonNull RepoInfo repoInfo, final @NonNull String imageName) {
 
@@ -154,7 +168,7 @@ public class DockerApiFacade implements ProtocolApiFacade {
         .orElseThrow(() -> new ItemNotFoundException("layerNotFound"));
   }
 
-  @Transactional(readOnly = true)
+  // No transaction: it only reads storage, so it must not hold a connection while it does.
   public @NonNull String getConfig(final @NonNull RepoInfo repoInfo, final @NonNull String fileName)
       throws IOException {
 

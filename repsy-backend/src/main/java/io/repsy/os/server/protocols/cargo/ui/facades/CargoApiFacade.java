@@ -40,13 +40,11 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
 @Slf4j
 @Service
-@Transactional
 @RequiredArgsConstructor
 @NullMarked
 public class CargoApiFacade implements ProtocolApiFacade {
@@ -58,7 +56,6 @@ public class CargoApiFacade implements ProtocolApiFacade {
   private final ObjectMapper objectMapper;
   private final ApplicationEventPublisher eventPublisher;
 
-  @Transactional(propagation = Propagation.NOT_SUPPORTED)
   @Override
   public void deleteRepo(final RepoInfo repoInfo) {
 
