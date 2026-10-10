@@ -34,6 +34,19 @@
     <jacoco.check.phase>none</jacoco.check.phase>
 
     <!--
+      RPS-2054: core's default is "${maven.multiModuleProjectDirectory}/config/checkstyle.xml",
+      which assumes the root of the build holds a config/ directory. Here the shared config is the
+      one in the core submodule.
+    -->
+    <checkstyle.config.location>${maven.multiModuleProjectDirectory}/core/config/checkstyle.xml</checkstyle.config.location>
+
+    <!--
+      RPS-2054: core-dependencies sets sonar.skip=true for itself, but core-parent inherits it, so
+      every module here would be skipped by the SonarCloud scanner. Analyze the modules again.
+    -->
+    <sonar.skip>false</sonar.skip>
+
+    <!--
       RPS-1453: extra JVM arguments of every forked test JVM. core-parent (RPS-1471) appends this
       property to the argLine of Surefire and Failsafe, after the JaCoCo agent and -Duser.timezone.
       C1 only, because a test JVM lives for a few minutes and mostly runs code once (context
@@ -61,8 +74,7 @@
 
       <!--
         RPS-1810: versions that more than one module repeated, kept in one place. core-bom does not
-        manage them. Do not turn the semver4j version into a property named semver4j.version:
-        core-parent already defines that property (3.1.0) for its own purposes.
+        manage them (neither core-bom nor core-parent defines a semver4j.version property).
         repsy-scanner-trivy has its own Spring Boot parent and is outside this reactor, so it keeps
         its own commons-compress version (keep it in sync with the one here).
       -->
