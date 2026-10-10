@@ -24,6 +24,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
 import io.repsy.protocols.cargo.protocol.facades.contracts.CargoProtocolFacade;
@@ -162,6 +163,19 @@ class AbstractCargoYankProtocolMethodHandlerTest {
     void returnsBadRequestOnError() {
       final var ctx = context(YANK_PATH);
       doThrow(new IllegalStateException("crateVersionNotFound")).when(facade).yank(ctx);
+
+      final var result =
+          handler.handle(ctx, new MockHttpServletRequest(), new MockHttpServletResponse());
+
+      assertThat(result.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+      assertThat(errorDetail(result)).isEqualTo("crateVersionNotFound");
+    }
+
+    @Test
+    @DisplayName("returns 400 with a cargo error body when the crate version does not exist")
+    void returnsBadRequestWhenVersionMissing() {
+      final var ctx = context(YANK_PATH);
+      doThrow(new ItemNotFoundException("crateVersionNotFound")).when(facade).yank(ctx);
 
       final var result =
           handler.handle(ctx, new MockHttpServletRequest(), new MockHttpServletResponse());

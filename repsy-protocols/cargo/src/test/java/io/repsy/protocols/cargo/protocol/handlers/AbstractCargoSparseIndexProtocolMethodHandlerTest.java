@@ -20,6 +20,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
@@ -244,6 +245,17 @@ class AbstractCargoSparseIndexProtocolMethodHandlerTest {
     @DisplayName("returns 404 when the facade fails")
     void returnsNotFoundOnError() {
       when(facade.getIndexEntries(ctx)).thenThrow(new IllegalStateException("boom"));
+      when(request.getServletPath()).thenReturn("/se/rd/serde");
+
+      final var result = handler.handle(ctx, request, new MockHttpServletResponse());
+
+      assertThat(result.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("returns 404 when the crate lookup finds nothing")
+    void returnsNotFoundWhenCrateMissing() {
+      when(facade.getIndexEntries(ctx)).thenThrow(new ItemNotFoundException("crateNotFound"));
       when(request.getServletPath()).thenReturn("/se/rd/serde");
 
       final var result = handler.handle(ctx, request, new MockHttpServletResponse());
