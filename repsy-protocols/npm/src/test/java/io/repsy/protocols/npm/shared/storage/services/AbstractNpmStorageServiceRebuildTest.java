@@ -38,6 +38,7 @@ import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.protocols.npm.shared.npm_package.dtos.NpmPackageSnapshot;
 import io.repsy.protocols.npm.shared.npm_package.dtos.NpmPackageSnapshot.Version;
+import io.repsy.protocols.npm.shared.storage.NpmPackumentStore;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -578,7 +579,7 @@ class AbstractNpmStorageServiceRebuildTest {
 
   @BeforeEach
   void captureWarnings() {
-    this.metadataLogger = (Logger) LoggerFactory.getLogger(AbstractNpmStorageService.class);
+    this.metadataLogger = (Logger) LoggerFactory.getLogger(NpmPackumentStore.class);
     this.warnings = new ListAppender<>();
     this.warnings.start();
     this.metadataLogger.addAppender(this.warnings);

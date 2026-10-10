@@ -46,6 +46,7 @@ import io.repsy.protocols.npm.shared.npm_package.dtos.NpmPackageSnapshot;
 import io.repsy.protocols.npm.shared.npm_package.dtos.PackageDistributionTagMapListItem;
 import io.repsy.protocols.npm.shared.npm_package.services.AbstractNpmPackageService;
 import io.repsy.protocols.npm.shared.utils.NpmPackageUtils;
+import io.repsy.protocols.npm.shared.utils.NpmPayloadUtils;
 import io.repsy.protocols.npm.shared.utils.NpmVersionComparator;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
@@ -197,7 +198,7 @@ public class NpmPackageService extends AbstractNpmPackageService<UUID> {
     }
 
     this.replaceVersion(
-        existing.get(), NpmPackageUtils.extractVersionFromPayload(payload).getSecond());
+        existing.get(), NpmPayloadUtils.extractVersionFromPayload(payload).getSecond());
 
     return PublishKind.REPLACES_VERSION;
   }
@@ -208,8 +209,8 @@ public class NpmPackageService extends AbstractNpmPackageService<UUID> {
       final Map<String, Object> payload,
       final boolean firstVersion) {
 
-    final var distTag = NpmPackageUtils.extractFirstDistTagFromPayload(payload);
-    final var versionData = NpmPackageUtils.extractVersionFromPayload(payload).getSecond();
+    final var distTag = NpmPayloadUtils.extractFirstDistTagFromPayload(payload);
+    final var versionData = NpmPayloadUtils.extractVersionFromPayload(payload).getSecond();
     final var packageVersion = this.addVersion(versionData, versionName, npmPackage);
 
     this.addMaintainers(versionData, packageVersion);

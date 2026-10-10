@@ -22,27 +22,24 @@ import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.protocols.npm.shared.constants.NpmConstants;
 import io.repsy.protocols.npm.shared.npm_package.dtos.NpmPackageSnapshot;
+import io.repsy.protocols.npm.shared.storage.NpmPackumentRebuilder;
+import io.repsy.protocols.npm.shared.storage.NpmPackumentStore;
+import io.repsy.protocols.npm.shared.storage.NpmTarballStore;
+import io.repsy.protocols.npm.shared.utils.NpmMetadataUtils;
 import io.repsy.protocols.npm.shared.utils.NpmPackageUtils;
-import io.repsy.protocols.npm.shared.utils.NpmPackumentBuilder;
-import io.repsy.protocols.npm.shared.utils.NpmTarballFacts;
-import io.repsy.protocols.npm.shared.utils.NpmTarballInspector;
+import io.repsy.protocols.npm.shared.utils.NpmPayloadUtils;
+import io.repsy.protocols.npm.shared.utils.NpmTarballUrlUtils;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.binary.Base64;
 import org.jspecify.annotations.NullMarked;
@@ -50,35 +47,31 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 import org.springframework.data.util.Pair;
 import tools.jackson.core.JacksonException;
-import tools.jackson.core.type.TypeReference;
-import tools.jackson.databind.ObjectMapper;
 
+/**
+ * The storage service of an npm registry: the publish, dist-tag, deprecation and removal flows over
+ * the packument and tarball files, and what is served from them. The files themselves are the
+ * business of {@link NpmPackumentStore} and {@link NpmTarballStore}, and building a packument from
+ * the rows of {@link NpmPackumentRebuilder}; what is left here is the order in which a change
+ * touches them, and the hooks a product overrides to name its own registry address.
+ */
 @Slf4j
-@RequiredArgsConstructor
 @SuppressWarnings("unchecked")
 @NullMarked
 public abstract class AbstractNpmStorageService implements NpmStorageService {
 
-  private static final ObjectMapper METADATA_MAPPER = new ObjectMapper();
-
-  /** What the abbreviated document carries of a version when the version has it. */
-  private static final List<String> ABBREVIATED_OPTIONAL_FIELDS =
-      List.of(
-          NpmConstants.DEPRECATED,
-          NpmConstants.HAS_SHRINKWRAP,
-          "os",
-          "cpu",
-          "libc",
-          "peerDependenciesMeta",
-          "hasInstallScript",
-          "funding",
-          "acceptDependencies");
-
-  /** The lifecycle scripts that run on install, which is what {@code hasInstallScript} says. */
-  private static final List<String> INSTALL_SCRIPTS =
-      List.of("preinstall", "install", "postinstall");
-
   private final StorageStrategy storageStrategy;
+  private final NpmPackumentStore packumentStore;
+  private final NpmTarballStore tarballStore;
+  private final NpmPackumentRebuilder packumentRebuilder;
+
+  protected AbstractNpmStorageService(final StorageStrategy storageStrategy) {
+
+    this.storageStrategy = storageStrategy;
+    this.packumentStore = new NpmPackumentStore(storageStrategy);
+    this.tarballStore = new NpmTarballStore(storageStrategy);
+    this.packumentRebuilder = new NpmPackumentRebuilder(this.tarballStore);
+  }
 
   @Override
   public void deleteRepo(final UUID repoId) {
@@ -96,13 +89,11 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
       final UUID repoId, final String repoName, final Path packageBasePath, final String tagName)
       throws IOException {
 
-    final var metadataPath = packageBasePath.resolve(NpmConstants.METADATA_FILENAME);
-
-    final var metadataStoragePath = StoragePath.of(repoId, metadataPath.toString());
+    final var metadataStoragePath = NpmPackumentStore.storagePath(repoId, packageBasePath);
 
     final var metadata = this.getMetadata(metadataStoragePath, repoName);
 
-    final var oldMetadataLength = NpmPackageUtils.getMetadataLength(metadata);
+    final var oldMetadataLength = NpmPayloadUtils.getMetadataLength(metadata);
 
     final var distTags = (Map<String, String>) metadata.get(NpmConstants.DIST_TAGS);
 
@@ -110,7 +101,7 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
 
     this.writeMetadataToFile(repoName, metadata, metadataStoragePath);
 
-    return NpmPackageUtils.getMetadataLength(metadata) - oldMetadataLength;
+    return NpmPayloadUtils.getMetadataLength(metadata) - oldMetadataLength;
   }
 
   @Override
@@ -120,19 +111,7 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
       final StoragePath metadataStoragePath)
       throws IOException {
 
-    // Every write of a packument (a publish, a dist-tag, a deprecation, an unpublish) leaves the
-    // publish-only fields out, so a packument that an earlier version of the registry stored with
-    // the base64 copy of a tarball gives that space back on its next change (RPS-1390). Reads
-    // already filter them (RPS-1357).
-    NpmPackageUtils.removePublishOnlyFields(metadata);
-
-    final var mapper = new ObjectMapper();
-
-    final var metadataBytes = mapper.writeValueAsBytes(metadata);
-
-    try (final var byteArrayInputStream = new ByteArrayInputStream(metadataBytes)) {
-      return this.storageStrategy.write(repoName, metadataStoragePath, byteArrayInputStream);
-    }
+    return this.packumentStore.write(repoName, metadata, metadataStoragePath);
   }
 
   @Override
@@ -144,11 +123,10 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
       final String versionName)
       throws IOException {
 
-    final var metadataPath = packageBasePath.resolve(NpmConstants.METADATA_FILENAME);
-    final var metadataStoragePath = StoragePath.of(repoId, metadataPath.toString());
+    final var metadataStoragePath = NpmPackumentStore.storagePath(repoId, packageBasePath);
 
     final var metadata = this.getMetadata(metadataStoragePath, repoName);
-    final var oldMetadataLength = NpmPackageUtils.getMetadataLength(metadata);
+    final var oldMetadataLength = NpmPayloadUtils.getMetadataLength(metadata);
 
     final var versions = (Map<String, Object>) metadata.get(NpmConstants.VERSIONS);
 
@@ -160,7 +138,7 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
 
     distTags.put(tagName, versionName);
 
-    final var metadataLength = NpmPackageUtils.getMetadataLength(metadata) - oldMetadataLength;
+    final var metadataLength = NpmPayloadUtils.getMetadataLength(metadata) - oldMetadataLength;
 
     return Pair.of(metadata, metadataLength);
   }
@@ -170,7 +148,7 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
       final Map<String, Object> payload, final String repoName)
       throws URISyntaxException, JacksonException {
 
-    final var versionPair = NpmPackageUtils.extractVersionFromPayload(payload);
+    final var versionPair = NpmPayloadUtils.extractVersionFromPayload(payload);
 
     this.fixTarballUrl(versionPair.getSecond(), repoName);
 
@@ -186,10 +164,10 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
 
     payload.put("time", timeField);
 
-    NpmPackageUtils.liftFieldsToTopLevel(payload, versionPair.getFirst());
+    NpmPayloadUtils.liftFieldsToTopLevel(payload, versionPair.getFirst());
 
     return Pair.of(
-        NpmPackageUtils.getMetadataLength(payload), NpmPackageUtils.getTarballLength(payload));
+        NpmPayloadUtils.getMetadataLength(payload), NpmPayloadUtils.getTarballLength(payload));
   }
 
   @Override
@@ -202,27 +180,20 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
       final String versionName)
       throws IOException, URISyntaxException {
 
-    final var metadataPath = packageBasePath.resolve(NpmConstants.METADATA_FILENAME);
-    final var metadataStoragePath = StoragePath.of(repoId, metadataPath.toString());
+    final var metadataStoragePath = NpmPackumentStore.storagePath(repoId, packageBasePath);
 
-    final var tarballFileName = NpmPackageUtils.getTarballFilename(packageName, versionName);
-    final var tarballPath = packageBasePath.resolve(tarballFileName);
-
-    final var data = NpmPackageUtils.extractTarballDataFromPayload(metadata);
+    final var data = NpmPayloadUtils.extractTarballDataFromPayload(metadata);
     final var tarballBytes = Base64.decodeBase64(data);
 
-    NpmPackageUtils.updateDistFields(metadata, versionName, tarballBytes);
+    NpmPayloadUtils.updateDistFields(metadata, versionName, tarballBytes);
 
     // The tarball is written on its own below: the packument keeps neither its base64 copy nor the
     // publisher's local paths (RPS-1357).
-    NpmPackageUtils.removePublishOnlyFields(metadata);
+    NpmMetadataUtils.removePublishOnlyFields(metadata);
 
-    final BaseUsages tarballUsages;
-    try (final var byteArrayInputStream = new ByteArrayInputStream(tarballBytes)) {
-      tarballUsages =
-          this.storageStrategy.write(
-              repoName, StoragePath.of(repoId, tarballPath.toString()), byteArrayInputStream);
-    }
+    final var tarballUsages =
+        this.tarballStore.write(
+            repoId, repoName, packageBasePath, packageName, versionName, tarballBytes);
 
     final var usage = this.writeMetadataToFile(repoName, metadata, metadataStoragePath);
 
@@ -246,14 +217,14 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
     final var fullMetadata =
         this.readMetadataOrRebuild(repoId, repoName, packageBasePath, snapshot);
 
-    final var currentMetadataLength = NpmPackageUtils.getMetadataLength(fullMetadata);
+    final var currentMetadataLength = NpmPayloadUtils.getMetadataLength(fullMetadata);
 
-    final var distTag = NpmPackageUtils.extractFirstDistTagFromPayload(payload);
+    final var distTag = NpmPayloadUtils.extractFirstDistTagFromPayload(payload);
     final var oldVersions = (Map<String, Object>) fullMetadata.get(NpmConstants.VERSIONS);
     final var newVersions = ((Map<String, Object>) payload.get(NpmConstants.VERSIONS));
     final var oldDistributionTags = (Map<String, String>) fullMetadata.get(NpmConstants.DIST_TAGS);
     final var timeField = (Map<String, String>) fullMetadata.get("time");
-    final var versionPair = NpmPackageUtils.extractVersionFromPayload(payload);
+    final var versionPair = NpmPayloadUtils.extractVersionFromPayload(payload);
 
     timeField.put(versionPair.getFirst(), NpmPackageUtils.getFormattedCurrentTime());
     timeField.put(NpmConstants.MODIFIED, NpmPackageUtils.getFormattedCurrentTime());
@@ -262,7 +233,7 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
 
     if (distTag.getKey().equals(NpmConstants.LATEST)) { // npm publish
 
-      NpmPackageUtils.liftFieldsToTopLevel(payload, versionPair.getFirst());
+      NpmPayloadUtils.liftFieldsToTopLevel(payload, versionPair.getFirst());
 
       newVersions.putAll(oldVersions);
 
@@ -276,11 +247,11 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
 
       newDistributionTags.putAll(oldDistributionTags);
 
-      final var newMetadataLength = NpmPackageUtils.getMetadataLength(payload);
+      final var newMetadataLength = NpmPayloadUtils.getMetadataLength(payload);
 
       return Pair.of(
           Pair.of(
-              newMetadataLength - currentMetadataLength, NpmPackageUtils.getTarballLength(payload)),
+              newMetadataLength - currentMetadataLength, NpmPayloadUtils.getTarballLength(payload)),
           payload);
 
     } else { // npm publish --tag next
@@ -289,13 +260,13 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
 
       oldDistributionTags.put(distTag.getKey(), distTag.getValue());
 
-      final var newMetadataLength = NpmPackageUtils.getMetadataLength(fullMetadata);
+      final var newMetadataLength = NpmPayloadUtils.getMetadataLength(fullMetadata);
 
       fullMetadata.put("_attachments", payload.get("_attachments"));
 
       return Pair.of(
           Pair.of(
-              newMetadataLength - currentMetadataLength, NpmPackageUtils.getTarballLength(payload)),
+              newMetadataLength - currentMetadataLength, NpmPayloadUtils.getTarballLength(payload)),
           fullMetadata);
     }
   }
@@ -304,24 +275,7 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
   public byte @Nullable [] readMetadataBytes(
       final UUID repoId, final String repoName, final Path packageBasePath) throws IOException {
 
-    return this.readMetadataBytesIfPresent(repoId, repoName, packageBasePath);
-  }
-
-  /** The stored package metadata as it is, or {@code null} when the file is gone. */
-  private byte @Nullable [] readMetadataBytesIfPresent(
-      final UUID repoId, final String repoName, final Path packageBasePath) throws IOException {
-
-    final var metadataPath = packageBasePath.resolve(NpmConstants.METADATA_FILENAME);
-    final var resource =
-        this.storageStrategy.get(StoragePath.of(repoId, metadataPath.toString()), repoName);
-
-    if (resource.isEmpty()) {
-      return null;
-    }
-
-    try (final var inputStream = resource.get().getInputStream()) {
-      return inputStream.readAllBytes();
-    }
+    return this.packumentStore.readBytes(repoId, repoName, packageBasePath);
   }
 
   @Override
@@ -332,17 +286,7 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
       final byte @Nullable [] metadata)
       throws IOException {
 
-    final var metadataPath = packageBasePath.resolve(NpmConstants.METADATA_FILENAME);
-    final var storagePath = StoragePath.of(repoId, metadataPath.toString());
-
-    if (metadata == null) {
-      this.deleteIfPresent(storagePath, repoName);
-      return;
-    }
-
-    try (final var inputStream = new ByteArrayInputStream(metadata)) {
-      this.storageStrategy.write(repoName, storagePath, inputStream);
-    }
+    this.packumentStore.restoreBytes(repoId, repoName, packageBasePath, metadata);
   }
 
   @Override
@@ -354,9 +298,9 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
       final MetadataChange change)
       throws IOException {
 
-    final var previousMetadata = this.readMetadataBytesIfPresent(repoId, repoName, packageBasePath);
+    final var previousMetadata = this.packumentStore.readBytes(repoId, repoName, packageBasePath);
     final var rebuiltSize =
-        this.usableMetadata(previousMetadata, repoName, packageBasePath) == null
+        this.packumentStore.usable(previousMetadata, repoName, packageBasePath) == null
             ? this.writeRebuiltMetadata(repoId, repoName, packageBasePath, snapshot.get())
             : 0L;
 
@@ -376,11 +320,10 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
       throws IOException {
 
     final var metadata = this.rebuildMetadata(repoId, repoName, snapshot);
-    final var metadataPath = packageBasePath.resolve(NpmConstants.METADATA_FILENAME);
 
     // The same atomic write as any other change of the file: nothing half-written is ever served.
     return this.writeMetadataToFile(
-            repoName, metadata, StoragePath.of(repoId, metadataPath.toString()))
+            repoName, metadata, NpmPackumentStore.storagePath(repoId, packageBasePath))
         .getDiskUsage();
   }
 
@@ -393,8 +336,8 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
       throws IOException {
 
     final var stored =
-        this.usableMetadata(
-            this.readMetadataBytesIfPresent(repoId, repoName, packageBasePath),
+        this.packumentStore.usable(
+            this.packumentStore.readBytes(repoId, repoName, packageBasePath),
             repoName,
             packageBasePath);
 
@@ -402,139 +345,19 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
   }
 
   /**
-   * The metadata as stored, or {@code null} when there is none to use: the file is gone ({@code
-   * bytes} is {@code null}) or it is corrupt. A corrupt file is worth a warning, unlike a missing
-   * one: nothing removes it but a fault, and the rows that stand in for it cannot bring back what
-   * only the file held (see {@link NpmPackumentBuilder}).
-   */
-  private @Nullable Map<String, Object> usableMetadata(
-      final byte @Nullable [] bytes, final String repoName, final Path packageBasePath) {
-
-    if (bytes == null) {
-      return null;
-    }
-
-    final var metadata = this.parseMetadata(bytes, repoName, packageBasePath);
-
-    if (metadata == null) {
-      return null;
-    }
-
-    if (!hasPackumentShape(metadata)) {
-      log.warn(
-          "The {} of npm package {} in repo {} has no versions, dist-tags and time: its rows are"
-              + " used instead",
-          NpmConstants.METADATA_FILENAME,
-          packageBasePath,
-          repoName);
-      return null;
-    }
-
-    return metadata;
-  }
-
-  private @Nullable Map<String, Object> parseStoredMetadata(
-      final byte @Nullable [] bytes, final String repoName, final Path packageBasePath) {
-
-    return bytes == null ? null : this.parseMetadata(bytes, repoName, packageBasePath);
-  }
-
-  /**
-   * The metadata as a map, or {@code null} (with a warning) when the bytes are not a JSON object.
-   */
-  private @Nullable Map<String, Object> parseMetadata(
-      final byte[] bytes, final String repoName, final Path packageBasePath) {
-
-    try {
-      final var metadata =
-          METADATA_MAPPER.readValue(bytes, new TypeReference<Map<String, Object>>() {});
-
-      if (metadata != null) {
-        return metadata;
-      }
-    } catch (final JacksonException e) {
-      log.warn(
-          "The {} of npm package {} in repo {} is corrupt ({}): its rows are used instead",
-          NpmConstants.METADATA_FILENAME,
-          packageBasePath,
-          repoName,
-          e.getOriginalMessage());
-      return null;
-    }
-
-    log.warn(
-        "The {} of npm package {} in repo {} is corrupt (it holds no object): its rows are used"
-            + " instead",
-        NpmConstants.METADATA_FILENAME,
-        packageBasePath,
-        repoName);
-
-    return null;
-  }
-
-  /** What every change of the metadata relies on being there. */
-  private static boolean hasPackumentShape(final Map<String, Object> metadata) {
-
-    return metadata.get(NpmConstants.VERSIONS) instanceof Map
-        && metadata.get(NpmConstants.DIST_TAGS) instanceof Map
-        && metadata.get("time") instanceof Map;
-  }
-
-  /**
    * Builds the metadata of the package from its rows, reading the tarball of each version for what
-   * the rows do not keep: see {@link NpmPackumentBuilder}. Writes nothing.
+   * the rows do not keep: see {@link NpmPackumentRebuilder}. Writes nothing.
    */
   private Map<String, Object> rebuildMetadata(
       final UUID repoId, final String repoName, final NpmPackageSnapshot snapshot)
       throws IOException {
 
-    final var packageBasePath = this.getPackageBasePath(snapshot.scope(), snapshot.name());
-    final var tarballs = new HashMap<String, NpmTarballFacts>();
-
-    for (final var version : snapshot.versions()) {
-      this.inspectTarball(repoId, repoName, packageBasePath, snapshot.name(), version.version())
-          .ifPresent(facts -> tarballs.put(version.version(), facts));
-    }
-
-    return NpmPackumentBuilder.build(
-        snapshot, tarballs, this.packageUrl(repoName, snapshot), Instant.now());
-  }
-
-  private Optional<NpmTarballFacts> inspectTarball(
-      final UUID repoId,
-      final String repoName,
-      final Path packageBasePath,
-      final String packageName,
-      final String versionName)
-      throws IOException {
-
-    final var tarballPath =
-        packageBasePath.resolve(NpmPackageUtils.getTarballFilename(packageName, versionName));
-    final var resource =
-        this.storageStrategy.get(StoragePath.of(repoId, tarballPath.toString()), repoName);
-
-    if (resource.isEmpty()) {
-      return Optional.empty();
-    }
-
-    try (final var inputStream = resource.get().getInputStream()) {
-      return Optional.of(NpmTarballInspector.inspect(inputStream));
-    }
-  }
-
-  private @Nullable String packageUrl(final String repoName, final NpmPackageSnapshot snapshot) {
-
-    final var base = this.registryBaseUrl();
-
-    if (base == null || base.isBlank()) {
-      return null;
-    }
-
-    return base.replaceAll("/+$", "")
-        + "/"
-        + repoName
-        + "/"
-        + NpmPackageUtils.buildFullName(snapshot.scope(), snapshot.name());
+    return this.packumentRebuilder.rebuild(
+        repoId,
+        repoName,
+        this.getPackageBasePath(snapshot.scope(), snapshot.name()),
+        snapshot,
+        this.registryBaseUrl());
   }
 
   /**
@@ -557,12 +380,7 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
       final String packageName,
       final String versionName) {
 
-    final var tarballPath =
-        packageBasePath.resolve(NpmPackageUtils.getTarballFilename(packageName, versionName));
-
-    return this.storageStrategy
-        .get(StoragePath.of(repoId, tarballPath.toString()), repoName)
-        .isPresent();
+    return this.tarballStore.exists(repoId, repoName, packageBasePath, packageName, versionName);
   }
 
   @Override
@@ -575,28 +393,8 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
       final byte @Nullable [] previousMetadata)
       throws IOException {
 
-    final var tarballPath =
-        packageBasePath.resolve(NpmPackageUtils.getTarballFilename(packageName, versionName));
-    final var metadataPath = packageBasePath.resolve(NpmConstants.METADATA_FILENAME);
-    final var metadataStoragePath = StoragePath.of(repoId, metadataPath.toString());
-
-    this.deleteIfPresent(StoragePath.of(repoId, tarballPath.toString()), repoName);
-
-    if (previousMetadata == null) {
-      this.deleteIfPresent(metadataStoragePath, repoName);
-      return;
-    }
-
-    try (final var inputStream = new ByteArrayInputStream(previousMetadata)) {
-      this.storageStrategy.write(repoName, metadataStoragePath, inputStream);
-    }
-  }
-
-  private void deleteIfPresent(final StoragePath storagePath, final String repoName) {
-
-    if (this.storageStrategy.get(storagePath, repoName).isPresent()) {
-      this.storageStrategy.delete(storagePath);
-    }
+    this.tarballStore.deleteIfPresent(repoId, repoName, packageBasePath, packageName, versionName);
+    this.packumentStore.restoreBytes(repoId, repoName, packageBasePath, previousMetadata);
   }
 
   @Override
@@ -650,7 +448,7 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
         this.removeVersionFromMetadata(repoId, repoName, packageBasePath, versionName, newLatest);
 
     final var tarballSize =
-        this.removeTarball(repoId, repoName, packageBasePath, packageName, versionName);
+        this.tarballStore.remove(repoId, repoName, packageBasePath, packageName, versionName);
 
     return metadataGrowth - tarballSize;
   }
@@ -678,8 +476,7 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
       final @Nullable String newLatest)
       throws IOException {
 
-    final var metadataPath = packageBasePath.resolve(NpmConstants.METADATA_FILENAME);
-    final var storagePath = StoragePath.of(repoId, metadataPath.toString());
+    final var storagePath = NpmPackumentStore.storagePath(repoId, packageBasePath);
 
     final var metadata = this.getMetadata(storagePath, repoName);
 
@@ -690,37 +487,16 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
     time.remove(versionName);
 
     if (newLatest != null) {
-      NpmPackageUtils.liftFieldsToTopLevel(metadata, newLatest);
+      NpmPayloadUtils.liftFieldsToTopLevel(metadata, newLatest);
 
       final var distTags = (Map<String, String>) metadata.get(NpmConstants.DIST_TAGS);
 
       distTags.put(NpmConstants.LATEST, newLatest);
     }
 
-    NpmPackageUtils.removeAllTagsPointingToVersion(metadata, versionName);
+    NpmMetadataUtils.removeAllTagsPointingToVersion(metadata, versionName);
 
     return this.writeMetadataToFile(repoName, metadata, storagePath).getDiskUsage();
-  }
-
-  /** Removes the tarball, if there is one, and tells how many bytes it took. */
-  private long removeTarball(
-      final UUID repoId,
-      final String repoName,
-      final Path packageBasePath,
-      final String packageName,
-      final String versionName)
-      throws IOException {
-
-    final var tarballPath =
-        packageBasePath.resolve(NpmPackageUtils.getTarballFilename(packageName, versionName));
-    final var tarballStoragePath = StoragePath.of(repoId, tarballPath.toString());
-
-    final var tarballSize = this.calculateFileUsage(tarballStoragePath, repoName);
-
-    // A version whose tarball is already gone (an interrupted removal) can still be removed.
-    this.deleteIfPresent(tarballStoragePath, repoName);
-
-    return tarballSize;
   }
 
   @Override
@@ -731,8 +507,7 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
       final List<Pair<String, String>> deprecations)
       throws IOException {
 
-    final var metadataPath = packageBasePath.resolve(NpmConstants.METADATA_FILENAME);
-    final var storagePath = StoragePath.of(repoId, metadataPath.toString());
+    final var storagePath = NpmPackumentStore.storagePath(repoId, packageBasePath);
 
     final var metadata = this.getMetadata(storagePath, repoName);
     final var versions = (Map<String, Object>) metadata.get(NpmConstants.VERSIONS);
@@ -755,7 +530,7 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
       }
     }
 
-    NpmPackageUtils.updateModifiedTime(metadata);
+    NpmMetadataUtils.updateModifiedTime(metadata);
 
     return this.writeMetadataToFile(repoName, metadata, storagePath).getDiskUsage();
   }
@@ -766,8 +541,8 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
    * <p>When the registry knows its own address ({@link #registryBaseUrl()}) the URL is computed
    * from it, not taken from the client: libnpmpublish and yarn classic write {@code http://} for an
    * HTTPS registry, and the publisher may have reached the registry under an address the consumers
-   * cannot. Otherwise it delegates to {@link NpmPackageUtils#fixTarballUrl(Map)}, which normalizes
-   * only the filename after {@code /-/} and leaves the client-computed URL untouched.
+   * cannot. Otherwise it delegates to {@link NpmTarballUrlUtils#fixTarballUrl(Map)}, which
+   * normalizes only the filename after {@code /-/} and leaves the client-computed URL untouched.
    *
    * <p>This is also the seam for a subclass that serves a URL layout of its own (for example a
    * multi-tenant registry): it can override just this method, and {@link #rewriteTarballUrls(Map,
@@ -786,12 +561,12 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
       ((Map<String, Object>) dist)
           .put(
               NpmConstants.TARBALL,
-              NpmPackageUtils.buildTarballUrl(base, repoName, fullName, versionName));
+              NpmTarballUrlUtils.buildTarballUrl(base, repoName, fullName, versionName));
 
       return;
     }
 
-    NpmPackageUtils.fixTarballUrl(version);
+    NpmTarballUrlUtils.fixTarballUrl(version);
   }
 
   /**
@@ -806,15 +581,8 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
     final var base = this.registryBaseUrl();
 
     if (base != null && !base.isBlank()) {
-      NpmPackageUtils.rewriteTarballUrls(metadata, base, repoName);
+      NpmTarballUrlUtils.rewriteTarballUrls(metadata, base, repoName);
     }
-  }
-
-  private Resource getResource(final StoragePath storagePath, final String repoName) {
-
-    return this.storageStrategy
-        .get(storagePath, repoName)
-        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.ITEM_NOT_FOUND));
   }
 
   @Override
@@ -833,9 +601,9 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
               .normalize();
 
       final var storagePath = StoragePath.of(repoId, path.toString());
-      final var resource = this.getResource(storagePath, repoName);
+      final var resource = this.packumentStore.require(storagePath, repoName);
 
-      final var fullMetadata = NpmPackageUtils.readMetadataFromResource(resource);
+      final var fullMetadata = NpmMetadataUtils.readMetadataFromResource(resource);
 
       this.prepareForServing(fullMetadata, repoName);
 
@@ -858,8 +626,8 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
 
     final var packageBasePath = this.getPackageBasePath(scopeName, packageName);
     final var stored =
-        this.usableMetadata(
-            this.readMetadataBytesIfPresent(repoId, repoName, packageBasePath),
+        this.packumentStore.usable(
+            this.packumentStore.readBytes(repoId, repoName, packageBasePath),
             repoName,
             packageBasePath);
     final var metadata =
@@ -884,8 +652,8 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
    */
   private void prepareForServing(final Map<String, Object> metadata, final String repoName) {
 
-    NpmPackageUtils.removePublishOnlyFields(metadata);
-    NpmPackageUtils.removeEmptyDeprecations(metadata);
+    NpmMetadataUtils.removePublishOnlyFields(metadata);
+    NpmMetadataUtils.removeEmptyDeprecations(metadata);
     this.rewriteTarballUrls(metadata, repoName);
   }
 
@@ -911,87 +679,7 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
   @Override
   public Map<String, Object> createAbbreviatedMetadata(final Map<String, Object> fullMetadata) {
 
-    final var abbreviatedMetadata = new LinkedHashMap<String, Object>();
-
-    abbreviatedMetadata.put("name", fullMetadata.get("name"));
-    abbreviatedMetadata.put(NpmConstants.DIST_TAGS, fullMetadata.get(NpmConstants.DIST_TAGS));
-
-    final var timeField = (Map<String, String>) fullMetadata.get("time");
-
-    if (timeField != null) {
-      abbreviatedMetadata.put(NpmConstants.MODIFIED, timeField.get(NpmConstants.MODIFIED));
-    }
-
-    final var abbreviatedVersions = new LinkedHashMap<String, Object>();
-    final var versions = (Map<String, Object>) fullMetadata.get(NpmConstants.VERSIONS);
-
-    if (versions != null) {
-      for (final var entry : versions.entrySet()) {
-        abbreviatedVersions.put(
-            entry.getKey(), abbreviateVersion((Map<String, Object>) entry.getValue()));
-      }
-    }
-
-    abbreviatedMetadata.put(NpmConstants.VERSIONS, abbreviatedVersions);
-    return abbreviatedMetadata;
-  }
-
-  private static Map<String, Object> abbreviateVersion(final Map<String, Object> version) {
-
-    final var emptyHashMap = new HashMap<String, Object>();
-    final var abbreviatedVersion = new LinkedHashMap<String, Object>();
-
-    // Required fields
-    abbreviatedVersion.put("name", version.get("name"));
-    abbreviatedVersion.put("version", version.get("version"));
-    abbreviatedVersion.put("dist", version.get("dist"));
-
-    // Optional fields that have no default value: what a client decides on before it has the
-    // tarball, such as where a version installs and which peers are optional (RPS-1356)
-    for (final var field : ABBREVIATED_OPTIONAL_FIELDS) {
-      if (version.get(field) != null) {
-        abbreviatedVersion.put(field, version.get(field));
-      }
-    }
-
-    // The public registry derives this from the scripts of the version, so a version that was
-    // published without the flag (an older client) still tells the installer to expect a script
-    if (hasInstallScript(version)) {
-      abbreviatedVersion.put("hasInstallScript", true);
-    }
-
-    // Optional fields that have default values
-    abbreviatedVersion.put("dependencies", version.getOrDefault("dependencies", emptyHashMap));
-    abbreviatedVersion.put(
-        "devDependencies", version.getOrDefault("devDependencies", emptyHashMap));
-    abbreviatedVersion.put(
-        "optionalDependencies", version.getOrDefault("optionalDependencies", emptyHashMap));
-    abbreviatedVersion.put(
-        "peerDependencies", version.getOrDefault("peerDependencies", emptyHashMap));
-    abbreviatedVersion.put(
-        "bundleDependencies", version.getOrDefault("bundleDependencies", new ArrayList<>()));
-    abbreviatedVersion.put("bin", version.getOrDefault("bin", emptyHashMap));
-    abbreviatedVersion.put("directories", version.getOrDefault("directories", emptyHashMap));
-    abbreviatedVersion.put("engines", version.getOrDefault("engines", emptyHashMap));
-
-    return abbreviatedVersion;
-  }
-
-  /**
-   * Whether the version installs with a script: the stored flag, or a non-blank {@code preinstall},
-   * {@code install} or {@code postinstall} in its {@code scripts} (RPS-1390).
-   */
-  private static boolean hasInstallScript(final Map<String, Object> version) {
-    if (Boolean.TRUE.equals(version.get("hasInstallScript"))) {
-      return true;
-    }
-
-    if (!(version.get("scripts") instanceof final Map<?, ?> scripts)) {
-      return false;
-    }
-
-    return INSTALL_SCRIPTS.stream()
-        .anyMatch(name -> scripts.get(name) instanceof final String script && !script.isBlank());
+    return NpmMetadataUtils.createAbbreviatedMetadata(fullMetadata);
   }
 
   @Override
@@ -1020,8 +708,8 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
     // version in the database, so a file missing for it is what RPS-1300 handles everywhere else,
     // and no longer a broken storage worth an error (RPS-1310).
     final var metadata =
-        this.parseStoredMetadata(
-            this.readMetadataBytesIfPresent(repoId, repoName, packageBasePath),
+        this.packumentStore.parseStored(
+            this.packumentStore.readBytes(repoId, repoName, packageBasePath),
             repoName,
             packageBasePath);
 
@@ -1054,29 +742,15 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
       final String packageName,
       final String filename) {
 
-    final var tarballPath =
-        this.getPackageBasePath(scopeName, packageName).resolve(filename).normalize();
-
-    final var storagePath = StoragePath.of(repoId, tarballPath.toString());
-
-    return this.storageStrategy
-        .get(storagePath, repoName)
-        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.ITEM_NOT_FOUND));
-  }
-
-  private long calculateFileUsage(final StoragePath storagePath, final String repoName)
-      throws IOException {
-
-    return this.storageStrategy.getFileUsage(storagePath, repoName);
+    return this.tarballStore.get(
+        repoId, repoName, this.getPackageBasePath(scopeName, packageName), filename);
   }
 
   @Override
   public Map<String, Object> getMetadata(
       final StoragePath metadataStoragePath, final String repoName) throws IOException {
 
-    final var resource = this.getResource(metadataStoragePath, repoName);
-
-    return NpmPackageUtils.readMetadataFromResource(resource);
+    return this.packumentStore.read(metadataStoragePath, repoName);
   }
 
   public void clearTrash() {

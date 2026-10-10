@@ -41,7 +41,7 @@ import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.user.entities.UserRole;
-import io.repsy.protocols.npm.shared.storage.services.AbstractNpmStorageService;
+import io.repsy.protocols.npm.shared.storage.NpmPackumentStore;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -125,13 +125,12 @@ class NpmMissingMetadataIT extends AbstractIT {
   @BeforeEach
   void captureWarnings() {
     this.warnings.start();
-    ((Logger) LoggerFactory.getLogger(AbstractNpmStorageService.class)).addAppender(this.warnings);
+    ((Logger) LoggerFactory.getLogger(NpmPackumentStore.class)).addAppender(this.warnings);
   }
 
   @AfterEach
   void deleteCommittedData() {
-    ((Logger) LoggerFactory.getLogger(AbstractNpmStorageService.class))
-        .detachAppender(this.warnings);
+    ((Logger) LoggerFactory.getLogger(NpmPackumentStore.class)).detachAppender(this.warnings);
     RequestContextHolder.resetRequestAttributes();
     this.jdbcTemplate.execute(
         "drop trigger if exists " + VERSION_TRIGGER + " on npm_package_version");

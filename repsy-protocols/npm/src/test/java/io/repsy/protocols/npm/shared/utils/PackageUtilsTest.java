@@ -66,7 +66,7 @@ class PackageUtilsTest {
       final var version =
           versionWithTarball("demo", "1.0.0", "http://h:9090/myrepo/demo/-/demo-1.0.0.tgz");
 
-      NpmPackageUtils.fixTarballUrl(version);
+      NpmTarballUrlUtils.fixTarballUrl(version);
 
       assertThat(tarballOf(version)).isEqualTo("http://h:9090/myrepo/demo/-/demo-1.0.0.tgz");
     }
@@ -78,7 +78,7 @@ class PackageUtilsTest {
           versionWithTarball(
               "@foo/demo", "1.0.0", "http://h:9090/myrepo/@foo/demo/-/demo-1.0.0.tgz");
 
-      NpmPackageUtils.fixTarballUrl(version);
+      NpmTarballUrlUtils.fixTarballUrl(version);
 
       assertThat(tarballOf(version)).isEqualTo("http://h:9090/myrepo/@foo/demo/-/demo-1.0.0.tgz");
     }
@@ -90,7 +90,7 @@ class PackageUtilsTest {
           versionWithTarball(
               "@foo/demo", "1.0.0", "http://h:9090/myrepo/@foo/demo/-/@foo/demo-1.0.0.tgz");
 
-      NpmPackageUtils.fixTarballUrl(version);
+      NpmTarballUrlUtils.fixTarballUrl(version);
 
       assertThat(tarballOf(version)).isEqualTo("http://h:9090/myrepo/@foo/demo/-/demo-1.0.0.tgz");
     }
@@ -101,7 +101,7 @@ class PackageUtilsTest {
       final var version =
           versionWithTarball("demo", "1.0.0", "http://h/ctx/myrepo/demo/-/demo-1.0.0.tgz");
 
-      NpmPackageUtils.fixTarballUrl(version);
+      NpmTarballUrlUtils.fixTarballUrl(version);
 
       assertThat(tarballOf(version)).isEqualTo("http://h/ctx/myrepo/demo/-/demo-1.0.0.tgz");
     }
@@ -111,7 +111,7 @@ class PackageUtilsTest {
     void noSeparatorLeftUntouched() throws URISyntaxException {
       final var version = versionWithTarball("demo", "1.0.0", "http://h:9090/myrepo/demo.tgz");
 
-      NpmPackageUtils.fixTarballUrl(version);
+      NpmTarballUrlUtils.fixTarballUrl(version);
 
       assertThat(tarballOf(version)).isEqualTo("http://h:9090/myrepo/demo.tgz");
     }
@@ -123,7 +123,7 @@ class PackageUtilsTest {
           versionWithTarball(
               "demo", "1.0.0", "https://registry.example.test:8443/myrepo/demo/-/demo-1.0.0.tgz");
 
-      NpmPackageUtils.fixTarballUrl(version);
+      NpmTarballUrlUtils.fixTarballUrl(version);
 
       assertThat(tarballOf(version))
           .isEqualTo("https://registry.example.test:8443/myrepo/demo/-/demo-1.0.0.tgz");
@@ -153,21 +153,21 @@ class PackageUtilsTest {
     @Test
     @DisplayName("builds the URL of an unscoped package")
     void buildsUnscopedUrl() {
-      assertThat(NpmPackageUtils.buildTarballUrl("http://h:9090", "myrepo", "demo", "1.0.0"))
+      assertThat(NpmTarballUrlUtils.buildTarballUrl("http://h:9090", "myrepo", "demo", "1.0.0"))
           .isEqualTo("http://h:9090/myrepo/demo/-/demo-1.0.0.tgz");
     }
 
     @Test
     @DisplayName("builds the URL of a scoped package with the scope in the path only")
     void buildsScopedUrl() {
-      assertThat(NpmPackageUtils.buildTarballUrl("https://h", "myrepo", "@foo/demo", "1.0.0"))
+      assertThat(NpmTarballUrlUtils.buildTarballUrl("https://h", "myrepo", "@foo/demo", "1.0.0"))
           .isEqualTo("https://h/myrepo/@foo/demo/-/demo-1.0.0.tgz");
     }
 
     @Test
     @DisplayName("keeps a path prefix of the base and drops its trailing slashes")
     void keepsPrefixAndDropsTrailingSlash() {
-      assertThat(NpmPackageUtils.buildTarballUrl("https://h/ctx//", "myrepo", "demo", "1.0.0"))
+      assertThat(NpmTarballUrlUtils.buildTarballUrl("https://h/ctx//", "myrepo", "demo", "1.0.0"))
           .isEqualTo("https://h/ctx/myrepo/demo/-/demo-1.0.0.tgz");
     }
 
@@ -183,7 +183,7 @@ class PackageUtilsTest {
                       versionWithTarball(
                           "demo", "2.0.0", "http://b/x/y/demo/-/@s/demo-2.0.0.tgz")));
 
-      NpmPackageUtils.rewriteTarballUrls(packument, "https://repo.test", "myrepo");
+      NpmTarballUrlUtils.rewriteTarballUrls(packument, "https://repo.test", "myrepo");
 
       assertThat(tarballOfVersion(packument, "1.0.0"))
           .isEqualTo("https://repo.test/myrepo/demo/-/demo-1.0.0.tgz");
@@ -198,7 +198,7 @@ class PackageUtilsTest {
       version.remove("name");
       final var packument = packument(Map.of("1.0.0", version));
 
-      NpmPackageUtils.rewriteTarballUrls(packument, "https://repo.test", "myrepo");
+      NpmTarballUrlUtils.rewriteTarballUrls(packument, "https://repo.test", "myrepo");
 
       assertThat(tarballOfVersion(packument, "1.0.0"))
           .isEqualTo("https://repo.test/myrepo/demo/-/demo-1.0.0.tgz");
@@ -213,7 +213,7 @@ class PackageUtilsTest {
               Map.of("name", "demo", "version", "2.0.0", "dist", new HashMap<String, Object>()));
       final var packument = packument(Map.of("1.0.0", noDist, "2.0.0", noTarball));
 
-      NpmPackageUtils.rewriteTarballUrls(packument, "https://repo.test", "myrepo");
+      NpmTarballUrlUtils.rewriteTarballUrls(packument, "https://repo.test", "myrepo");
 
       assertThat(noDist).doesNotContainKey("dist");
       assertThat(noTarball.get("dist")).isEqualTo(Map.of());
@@ -225,8 +225,8 @@ class PackageUtilsTest {
       final var noVersions = new HashMap<String, Object>(Map.of("name", "demo"));
       final var malformed = packument(Map.of("1.0.0", "not a map"));
 
-      NpmPackageUtils.rewriteTarballUrls(noVersions, "https://repo.test", "myrepo");
-      NpmPackageUtils.rewriteTarballUrls(malformed, "https://repo.test", "myrepo");
+      NpmTarballUrlUtils.rewriteTarballUrls(noVersions, "https://repo.test", "myrepo");
+      NpmTarballUrlUtils.rewriteTarballUrls(malformed, "https://repo.test", "myrepo");
 
       assertThat(noVersions).containsOnlyKeys("name");
       assertThat(malformed.get(NpmConstants.VERSIONS)).isEqualTo(Map.of("1.0.0", "not a map"));
@@ -251,7 +251,7 @@ class PackageUtilsTest {
       final var version = new HashMap<String, Object>();
       final var payload = payloadWithVersion("1.0.0", version);
 
-      NpmPackageUtils.liftFieldsToTopLevel(payload, "1.0.0");
+      NpmPayloadUtils.liftFieldsToTopLevel(payload, "1.0.0");
 
       assertThat(payload.get("keywords")).isInstanceOf(List.class);
       assertThat((List<?>) payload.get("keywords")).isEmpty();
@@ -264,7 +264,7 @@ class PackageUtilsTest {
       version.put("keywords", new ArrayList<>(List.of("a", "b")));
       final var payload = payloadWithVersion("1.0.0", version);
 
-      NpmPackageUtils.liftFieldsToTopLevel(payload, "1.0.0");
+      NpmPayloadUtils.liftFieldsToTopLevel(payload, "1.0.0");
 
       assertThat(payload.get("keywords")).isEqualTo(List.of("a", "b"));
     }
@@ -275,7 +275,7 @@ class PackageUtilsTest {
       final var version = new HashMap<String, Object>();
       final var payload = payloadWithVersion("1.0.0", version);
 
-      NpmPackageUtils.liftFieldsToTopLevel(payload, "1.0.0");
+      NpmPayloadUtils.liftFieldsToTopLevel(payload, "1.0.0");
 
       assertThat(payload).doesNotContainKey("maintainers");
     }
@@ -288,7 +288,7 @@ class PackageUtilsTest {
       version.put("maintainers", maintainers);
       final var payload = payloadWithVersion("1.0.0", version);
 
-      NpmPackageUtils.liftFieldsToTopLevel(payload, "1.0.0");
+      NpmPayloadUtils.liftFieldsToTopLevel(payload, "1.0.0");
 
       assertThat(payload.get("maintainers")).isEqualTo(maintainers);
     }
@@ -299,7 +299,7 @@ class PackageUtilsTest {
       final var version = new HashMap<String, Object>();
       final var payload = payloadWithVersion("1.0.0", version);
 
-      NpmPackageUtils.liftFieldsToTopLevel(payload, "1.0.0");
+      NpmPayloadUtils.liftFieldsToTopLevel(payload, "1.0.0");
 
       assertThat(payload.get("description")).isEqualTo("");
       assertThat(payload.get("homepage")).isEqualTo("");
@@ -387,7 +387,7 @@ class PackageUtilsTest {
       final var version = new HashMap<String, Object>(Map.of("name", "demo", "version", "1.0.0"));
       final var payload = this.payload("demo", "demo", Map.of("1.0.0", version));
 
-      assertThatCode(() -> NpmPackageUtils.checkPackageNameMatchesUrl(payload, null, "demo"))
+      assertThatCode(() -> NpmPayloadUtils.checkPackageNameMatchesUrl(payload, null, "demo"))
           .doesNotThrowAnyException();
     }
 
@@ -398,7 +398,7 @@ class PackageUtilsTest {
           new HashMap<String, Object>(Map.of("name", "@foo/demo", "version", "1.0.0"));
       final var payload = this.payload("@foo/demo", "@foo/demo", Map.of("1.0.0", version));
 
-      assertThatCode(() -> NpmPackageUtils.checkPackageNameMatchesUrl(payload, "foo", "demo"))
+      assertThatCode(() -> NpmPayloadUtils.checkPackageNameMatchesUrl(payload, "foo", "demo"))
           .doesNotThrowAnyException();
     }
 
@@ -407,7 +407,7 @@ class PackageUtilsTest {
     void refusesMismatchedName() {
       final var payload = this.payload("b", "a", Map.of());
 
-      assertThatThrownBy(() -> NpmPackageUtils.checkPackageNameMatchesUrl(payload, null, "a"))
+      assertThatThrownBy(() -> NpmPayloadUtils.checkPackageNameMatchesUrl(payload, null, "a"))
           .isInstanceOf(BadRequestException.class)
           .hasMessage("packageNameMismatch");
     }
@@ -417,7 +417,7 @@ class PackageUtilsTest {
     void refusesMismatchedId() {
       final var payload = this.payload("a", "b", Map.of());
 
-      assertThatThrownBy(() -> NpmPackageUtils.checkPackageNameMatchesUrl(payload, null, "a"))
+      assertThatThrownBy(() -> NpmPayloadUtils.checkPackageNameMatchesUrl(payload, null, "a"))
           .isInstanceOf(BadRequestException.class)
           .hasMessage("packageNameMismatch");
     }
@@ -428,7 +428,7 @@ class PackageUtilsTest {
       final var version = new HashMap<String, Object>(Map.of("name", "b", "version", "1.0.0"));
       final var payload = this.payload("a", "a", Map.of("1.0.0", version));
 
-      assertThatThrownBy(() -> NpmPackageUtils.checkPackageNameMatchesUrl(payload, null, "a"))
+      assertThatThrownBy(() -> NpmPayloadUtils.checkPackageNameMatchesUrl(payload, null, "a"))
           .isInstanceOf(BadRequestException.class)
           .hasMessage("packageNameMismatch");
     }
@@ -438,7 +438,7 @@ class PackageUtilsTest {
     void ignoresAbsentFields() {
       final var payload = new HashMap<String, Object>();
 
-      assertThatCode(() -> NpmPackageUtils.checkPackageNameMatchesUrl(payload, null, "a"))
+      assertThatCode(() -> NpmPayloadUtils.checkPackageNameMatchesUrl(payload, null, "a"))
           .doesNotThrowAnyException();
     }
   }
@@ -471,7 +471,7 @@ class PackageUtilsTest {
       deprecatedOne.put("deprecated", "use 1.1");
       final var sent = metadataOf(Map.of("1.0.0", deprecatedOne));
 
-      assertThat(NpmPackageUtils.findDeprecatedVersions(stored, sent))
+      assertThat(NpmPayloadUtils.findDeprecatedVersions(stored, sent))
           .containsExactly(Pair.of("1.0.0", "use 1.1"));
     }
 
@@ -504,7 +504,7 @@ class PackageUtilsTest {
     @DisplayName("is the one stored version the payload lacks")
     void theOneMissingVersion() {
       assertThat(
-              NpmPackageUtils.findUnpublishedVersion(
+              NpmPayloadUtils.findUnpublishedVersion(
                   this.packument("1.0.0", "1.1.0", "2.0.0"), this.packument("1.0.0", "2.0.0")))
           .isEqualTo("1.1.0");
     }
@@ -513,7 +513,7 @@ class PackageUtilsTest {
     @DisplayName("ignores a version only the payload has")
     void aVersionOnlyThePayloadHas() {
       assertThat(
-              NpmPackageUtils.findUnpublishedVersion(
+              NpmPayloadUtils.findUnpublishedVersion(
                   this.packument("1.0.0", "1.1.0"), this.packument("1.0.0", "0.9.0")))
           .isEqualTo("1.1.0");
     }
@@ -521,7 +521,7 @@ class PackageUtilsTest {
     @Test
     @DisplayName("is the only version when the payload has none left")
     void theLastVersion() {
-      assertThat(NpmPackageUtils.findUnpublishedVersion(this.packument("1.0.0"), this.packument()))
+      assertThat(NpmPayloadUtils.findUnpublishedVersion(this.packument("1.0.0"), this.packument()))
           .isEqualTo("1.0.0");
     }
 
@@ -530,7 +530,7 @@ class PackageUtilsTest {
     void nothingMissing() {
       assertThatThrownBy(
               () ->
-                  NpmPackageUtils.findUnpublishedVersion(
+                  NpmPayloadUtils.findUnpublishedVersion(
                       this.packument("1.0.0"), this.packument("1.0.0")))
           .isInstanceOf(ItemAlreadyExistException.class)
           .hasMessage("unpublishPayloadStale");
@@ -542,7 +542,7 @@ class PackageUtilsTest {
       // The client removed 1.0.0 from what it read; 2.0.0 was published in between.
       assertThatThrownBy(
               () ->
-                  NpmPackageUtils.findUnpublishedVersion(
+                  NpmPayloadUtils.findUnpublishedVersion(
                       this.packument("1.0.0", "2.0.0"), this.packument()))
           .isInstanceOf(ItemAlreadyExistException.class)
           .hasMessage("unpublishPayloadStale");
@@ -553,7 +553,7 @@ class PackageUtilsTest {
     void payloadWithoutVersions() {
       assertThatThrownBy(
               () ->
-                  NpmPackageUtils.findUnpublishedVersion(this.packument("1.0.0"), new HashMap<>()))
+                  NpmPayloadUtils.findUnpublishedVersion(this.packument("1.0.0"), new HashMap<>()))
           .isInstanceOf(BadRequestException.class);
     }
   }
@@ -576,7 +576,7 @@ class PackageUtilsTest {
         })
     @DisplayName("is asked for when the abbreviated type is the one preferred, at any position")
     void asked(final String accept) {
-      assertThat(NpmPackageUtils.isRequestedAbbreviatedMetadata(accept)).isTrue();
+      assertThat(NpmMetadataUtils.isRequestedAbbreviatedMetadata(accept)).isTrue();
     }
 
     @ParameterizedTest
@@ -592,14 +592,14 @@ class PackageUtilsTest {
         })
     @DisplayName("is not when the full document is preferred, or the abbreviated one is refused")
     void notAsked(final String accept) {
-      assertThat(NpmPackageUtils.isRequestedAbbreviatedMetadata(accept)).isFalse();
+      assertThat(NpmMetadataUtils.isRequestedAbbreviatedMetadata(accept)).isFalse();
     }
 
     @Test
     @DisplayName("a broken quality counts as 1")
     void brokenQuality() {
       assertThat(
-              NpmPackageUtils.isRequestedAbbreviatedMetadata(
+              NpmMetadataUtils.isRequestedAbbreviatedMetadata(
                   "application/vnd.npm.install-v1+json; q=x, application/json; q=0.9"))
           .isTrue();
     }
@@ -623,35 +623,35 @@ class PackageUtilsTest {
     @Test
     @DisplayName("the etag is a quoted weak tag that follows the content")
     void etagFollowsTheContent() {
-      final var first = NpmPackageUtils.computeEtag(this.packument("2026-01-01T00:00:00.000Z"));
+      final var first = NpmMetadataUtils.computeEtag(this.packument("2026-01-01T00:00:00.000Z"));
 
       assertThat(first).matches("W/\"[0-9a-f]{64}\"");
-      assertThat(NpmPackageUtils.computeEtag(this.packument("2026-01-01T00:00:00.000Z")))
+      assertThat(NpmMetadataUtils.computeEtag(this.packument("2026-01-01T00:00:00.000Z")))
           .isEqualTo(first);
-      assertThat(NpmPackageUtils.computeEtag(this.packument("2026-01-02T00:00:00.000Z")))
+      assertThat(NpmMetadataUtils.computeEtag(this.packument("2026-01-02T00:00:00.000Z")))
           .isNotEqualTo(first);
     }
 
     @Test
     @DisplayName("the modification time is time.modified of the full document")
     void lastModifiedOfTheFullDocument() {
-      assertThat(NpmPackageUtils.lastModifiedOf(this.packument("2026-03-04T05:06:07.089Z")))
+      assertThat(NpmMetadataUtils.lastModifiedOf(this.packument("2026-03-04T05:06:07.089Z")))
           .isEqualTo(Instant.parse("2026-03-04T05:06:07.089Z"));
     }
 
     @Test
     @DisplayName("the modification time is modified of the abbreviated document")
     void lastModifiedOfTheAbbreviatedDocument() {
-      assertThat(NpmPackageUtils.lastModifiedOf(Map.of("modified", "2026-03-04T05:06:07.089Z")))
+      assertThat(NpmMetadataUtils.lastModifiedOf(Map.of("modified", "2026-03-04T05:06:07.089Z")))
           .isEqualTo(Instant.parse("2026-03-04T05:06:07.089Z"));
     }
 
     @Test
     @DisplayName("there is none when the document has no usable one")
     void noLastModified() {
-      assertThat(NpmPackageUtils.lastModifiedOf(Map.of("name", "demo"))).isNull();
-      assertThat(NpmPackageUtils.lastModifiedOf(this.packument("yesterday"))).isNull();
-      assertThat(NpmPackageUtils.lastModifiedOf(Map.of("time", Map.of("modified", 5)))).isNull();
+      assertThat(NpmMetadataUtils.lastModifiedOf(Map.of("name", "demo"))).isNull();
+      assertThat(NpmMetadataUtils.lastModifiedOf(this.packument("yesterday"))).isNull();
+      assertThat(NpmMetadataUtils.lastModifiedOf(Map.of("time", Map.of("modified", 5)))).isNull();
     }
   }
 
@@ -685,7 +685,7 @@ class PackageUtilsTest {
     void removesPublishOnlyFields() {
       final var packument = this.packument();
 
-      NpmPackageUtils.removePublishOnlyFields(packument);
+      NpmMetadataUtils.removePublishOnlyFields(packument);
 
       assertThat(packument).doesNotContainKeys("_attachments", "_from", "_resolved");
       assertThat(packument).containsEntry("readme", "kept");
@@ -701,7 +701,7 @@ class PackageUtilsTest {
     void removesEmptyDeprecations() {
       final var packument = this.packument();
 
-      NpmPackageUtils.removeEmptyDeprecations(packument);
+      NpmMetadataUtils.removeEmptyDeprecations(packument);
 
       final var versions = (Map<String, Map<String, Object>>) packument.get("versions");
       assertThat(versions.get("1.0.0")).doesNotContainKey("deprecated");
@@ -713,8 +713,8 @@ class PackageUtilsTest {
     void noVersions() {
       final var packument = new HashMap<String, Object>(Map.of("name", "demo"));
 
-      NpmPackageUtils.removePublishOnlyFields(packument);
-      NpmPackageUtils.removeEmptyDeprecations(packument);
+      NpmMetadataUtils.removePublishOnlyFields(packument);
+      NpmMetadataUtils.removeEmptyDeprecations(packument);
 
       assertThat(packument).containsOnlyKeys("name");
     }
