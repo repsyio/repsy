@@ -13,27 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.panel.profile.entities;
+@ApplicationModule(displayName = "Ruby Shared", type = ApplicationModule.Type.OPEN)
+package io.repsy.os.server.protocols.ruby.shared;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.EqualsAndHashCode;
-import lombok.NoArgsConstructor;
-
-@Data
-@Entity
-@Builder
-@NoArgsConstructor
-@EqualsAndHashCode
-@AllArgsConstructor
-@Table(name = "reserved_username")
-public class ReservedUsername {
-  @Id
-  @Column(name = "username", nullable = false, length = 100)
-  private String username;
-}
+import org.springframework.modulith.ApplicationModule;

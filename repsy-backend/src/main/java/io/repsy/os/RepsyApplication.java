@@ -20,7 +20,7 @@ import io.repsy.libs.scanner.trivy.DockerRegistryProperties;
 import io.repsy.libs.scanner.trivy.TrivyAdvisoryLookupProperties;
 import io.repsy.libs.scanner.trivy.TrivyScannerClientProperties;
 import io.repsy.os.config.ssl.RepsySslProperties;
-import io.repsy.os.server.protocols.shared.configs.StorageTrashProperties;
+import io.repsy.os.server.protocols.shared.storage.StorageTrashProperties;
 import io.repsy.os.shared.configs.AppCorsProperties;
 import io.repsy.os.shared.configs.AppHstsProperties;
 import io.repsy.os.shared.configs.ContentSecurityPolicyProperties;

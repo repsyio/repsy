@@ -25,7 +25,7 @@ import io.repsy.os.generated.model.TagDetail;
 import io.repsy.os.server.protocols.docker.shared.image.services.ImageTxService;
 import io.repsy.os.server.protocols.docker.shared.layer.dtos.OrphanLayerInfo;
 import io.repsy.os.server.protocols.docker.shared.layer.services.LayerTxService;
-import io.repsy.os.server.protocols.docker.shared.layer.services.OrphanLayerCleanupService;
+import io.repsy.os.server.protocols.docker.shared.layer.services.OrphanLayerService;
 import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
 import io.repsy.os.server.protocols.docker.shared.tag.entities.Tag;
 import io.repsy.os.server.protocols.docker.shared.tag.services.ManifestFileService;
@@ -52,8 +52,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Slf4j
 @Service
@@ -68,7 +66,7 @@ public class DockerApiFacade implements ProtocolApiFacade {
   private final @NonNull ManifestTxService manifestService;
   private final @NonNull ManifestFileService manifestFileService;
   private final @NonNull DockerStorageService dockerStorageService;
-  private final @NonNull OrphanLayerCleanupService orphanLayerCleanupService;
+  private final @NonNull OrphanLayerService orphanLayerService;
   private final @NonNull UntaggedManifestCleanupService untaggedManifestCleanupService;
   private final @NonNull ApplicationEventPublisher eventPublisher;
 
@@ -255,38 +253,7 @@ public class DockerApiFacade implements ProtocolApiFacade {
    * @return The layers whose rows are gone and whose blobs are being deleted in the background
    */
   public @NonNull List<OrphanLayerInfo> deleteOrphanLayers(final @NonNull RepoInfo repoInfo) {
-
-    // The rows go first so a concurrent push cannot re-reference a row whose blob is about to be
-    // deleted. The price: a blob whose delete fails stays on disk, still charged to the repo and
-    // unreachable from the DB. AbandonedBlobUploadCleanupService sweeps it once it is older than
-    // the TTL: it also collects a digest-named blob with no docker_layer row, not just UUID-named
-    // upload files (RPS-1172).
-    final var orphans = this.layerTxService.deleteOrphanLayers(repoInfo.getStorageKey());
-
-    // The blobs are deleted on another thread, so only once the row deletion has committed: were
-    // it to roll back, the rows would come back without their blobs (RPS-1318).
-    this.afterCommit(
-        () -> this.orphanLayerCleanupService.cleanupBlobs(repoInfo.getStorageKey(), orphans));
-
-    return orphans;
-  }
-
-  /** Runs the action when the current transaction commits, and never if it rolls back. */
-  private void afterCommit(final @NonNull Runnable action) {
-
-    if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-      action.run();
-
-      return;
-    }
-
-    TransactionSynchronizationManager.registerSynchronization(
-        new TransactionSynchronization() {
-          @Override
-          public void afterCommit() {
-            action.run();
-          }
-        });
+    return this.orphanLayerService.deleteOrphanLayers(repoInfo);
   }
 
   @Override

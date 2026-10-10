@@ -19,7 +19,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.os.server.protocols.shared.configs.ProtocolStorageConfig;
-import io.repsy.os.server.protocols.shared.configs.StorageTrashProperties;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.nio.file.Path;
 import java.time.Duration;

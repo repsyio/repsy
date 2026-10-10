@@ -17,7 +17,6 @@ package io.repsy.os.server.protocols.shared.storage;
 
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.libs.storage.gateway.filesystem.services.FileSystemStorageStrategy;
-import io.repsy.os.server.protocols.shared.configs.StorageTrashProperties;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.EnumMap;
 import java.util.Locale;

@@ -136,10 +136,16 @@ annotated `@ApplicationModule` is a module (`panel.auth`, `panel.profile`, each 
 `protocol`, `shared` and `ui`, and so on), and packages marked `Type.OPEN` (`shared`, `server.core`,
 `server.shared`, `server.security`, each protocol's `shared`) may be used by any module. Anything
 else should not reach into another module's internals. Modules talk through Spring events, for
-example an `ArtifactPushedEvent` that starts a vulnerability scan. The `spring-modulith-starter-test`
-and ArchUnit dependencies are on the backend's classpath, but no test verifies the module structure
-yet, so nothing fails the build if a boundary is crossed: keep to it by hand, and give shared code
-an OPEN `shared` home or an event rather than a direct dependency on another module's internals.
+example an `ArtifactPushedEvent` that starts a vulnerability scan.
+
+`ModularityTest` (RPS-2055, no Docker) enforces this in the build: Spring Modulith's `verify()`
+fails on a cycle between modules or on use of another module's internals (the generated OpenAPI
+model is excluded), and an ArchUnit rule fails on a package cycle below the modules. The cycles
+that predate the rule are a frozen list in the test, each with its reason. The list may only
+shrink: delete an entry when you fix its cycle (a stale entry fails), and never add one; break the
+cycle with an event, a port interface or by moving the class. A new package that holds protocol
+code needs its own `package-info.java` with `@ApplicationModule`, otherwise its classes count as
+internals of the parent module.
 
 ### Data and storage
 
