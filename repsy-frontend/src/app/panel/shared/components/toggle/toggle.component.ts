@@ -24,7 +24,7 @@ import { uniqueId } from '../../../../shared/util/unique-id';
  * (`formControlName`/`formControl`), where it follows the control's value and its disabled state.
  */
 @Component({
-  selector: 'app-toggle-component',
+  selector: 'app-toggle',
   templateUrl: './toggle.component.html',
   imports: [],
   providers: [{ provide: NG_VALUE_ACCESSOR, useExisting: forwardRef(() => ToggleComponent), multi: true }],

@@ -18,7 +18,7 @@ import { RepositorySettingsComponent } from '../repo-settings/repository-setting
 import { NpmComponent } from './npm.component';
 import { NPM_ROUTES } from './npm.routes';
 import { NpmPackagesListComponent } from './packages/list/npm-packages-list.component';
-import { NpmPackagesScopeFilterComponent } from './packages/scoped-list/npm-packages-scoped-list.component';
+import { NpmPackagesScopeFilterComponent } from './packages/scope-filter/npm-packages-scope-filter.component';
 import { NpmPackagesVersionDetailComponent } from './packages/version-detail/npm-packages-version-detail.component';
 import { NpmPackagesVersionListComponent } from './packages/version-list/npm-packages-version-list.component';
 

@@ -37,7 +37,7 @@ import { DockerService } from '../../service/docker.service';
 type Classifiers = Record<string, [string]>;
 
 @Component({
-  selector: 'app-docker-tag-detail',
+  selector: 'app-docker-images-tag-detail',
   standalone: true,
   imports: [
     CommonModule,

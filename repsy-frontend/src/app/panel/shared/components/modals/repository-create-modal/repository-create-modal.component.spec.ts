@@ -223,7 +223,7 @@ describe('RepositoryCreateModalComponent create', () => {
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RepositoryCreateModalComponent],
-  template: '<app-repository-modal [open]="true" />',
+  template: '<app-repository-create-modal [open]="true" />',
 })
 class OnPushHostComponent {}
 

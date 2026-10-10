@@ -42,7 +42,7 @@ import { MavenConfigComponent } from '../../config/maven-config.component';
 import { MavenService } from '../../service/maven.service';
 
 @Component({
-  selector: 'app-maven-artifact',
+  selector: 'app-maven-artifacts-list',
   standalone: true,
   imports: [
     CommonModule,

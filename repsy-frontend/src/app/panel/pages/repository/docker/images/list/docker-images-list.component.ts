@@ -43,7 +43,7 @@ import { DockerConfigComponent } from '../../config/docker-config.component';
 import { DockerService } from '../../service/docker.service';
 
 @Component({
-  selector: 'app-docker-image-list',
+  selector: 'app-docker-images-list',
   standalone: true,
   imports: [
     CommonModule,

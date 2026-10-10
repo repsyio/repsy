@@ -36,7 +36,7 @@ import { ToastService } from '../../toast/toast.service';
 import { ToggleComponent } from '../../toggle/toggle.component';
 
 @Component({
-  selector: 'app-repository-modal',
+  selector: 'app-repository-create-modal',
   standalone: true,
   imports: [DialogDirective, SelectorComponent, ReactiveFormsModule, ToggleComponent],
   templateUrl: './repository-create-modal.component.html',

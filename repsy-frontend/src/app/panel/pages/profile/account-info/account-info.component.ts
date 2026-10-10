@@ -32,16 +32,7 @@ import {
 import { DangerModalService } from '../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../shared/components/toast/toast.service';
 import { ProfileService } from '../service/profile.service';
-
-class PasswordFormUiInputElement {
-  public inputType = 'password';
-  public visiblePassword = false;
-}
-
-export class PasswordFormUi {
-  public readonly passwordElement = new PasswordFormUiInputElement();
-  public readonly passwordConfirmationElement = new PasswordFormUiInputElement();
-}
+import { PasswordForm, PasswordFormInputElement } from './password-form';
 
 @Component({
   selector: 'app-account-info',
@@ -61,7 +52,7 @@ export class AccountInfoComponent implements OnInit {
 
   public loading = false;
 
-  public readonly formUi = new PasswordFormUi();
+  public readonly formUi = new PasswordForm();
   public readonly usernameMessages = USERNAME_MESSAGES;
   public readonly passwordMessages = PASSWORD_MESSAGES;
   public readonly mismatchMessage = PASSWORD_MISMATCH_MESSAGE;
@@ -104,7 +95,7 @@ export class AccountInfoComponent implements OnInit {
     return pass === confirmPass ? null : { notSame: true };
   }
 
-  toggleVisibility(element: PasswordFormUiInputElement) {
+  toggleVisibility(element: PasswordFormInputElement) {
     element.visiblePassword = !element.visiblePassword;
     element.inputType = element.visiblePassword ? 'text' : 'password';
   }

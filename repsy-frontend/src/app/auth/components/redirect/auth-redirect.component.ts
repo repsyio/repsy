@@ -30,7 +30,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ReactiveFormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 
-import { SplashService } from '../../../shared/components/splash-screen/splasht.service';
+import { SplashService } from '../../../shared/components/splash/splash.service';
 import { AuthService } from '../../pages/service/auth.service';
 
 @Component({

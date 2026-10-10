@@ -25,13 +25,13 @@ import { RepoSupport, RepoType } from '../../../../shared/dto/repo/repo-type';
 import { saveRepoSetting } from '../save-repo-setting';
 
 @Component({
-  selector: 'app-maven-version-allowence',
-  templateUrl: './maven-version-allowence.component.html',
-  styleUrls: ['./maven-version-allowence.component.css'],
+  selector: 'app-maven-version-allowance',
+  templateUrl: './maven-version-allowance.component.html',
+  styleUrls: ['./maven-version-allowance.component.css'],
   standalone: true,
   imports: [ReactiveFormsModule, SelectorComponent, RouterLink],
 })
-export class VersionAllowanceComponent implements OnInit {
+export class MavenVersionAllowanceComponent implements OnInit {
   @Input() public parentForm: FormGroup;
   @Input() public repoType: string;
   @Input() public repoName: string;

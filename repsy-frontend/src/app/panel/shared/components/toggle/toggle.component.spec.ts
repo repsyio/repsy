@@ -111,12 +111,7 @@ describe('ToggleComponent', () => {
 
 @Component({
   imports: [ReactiveFormsModule, ToggleComponent],
-  template: `<app-toggle-component
-    data-testid="host-toggle"
-    [formControl]="control"
-    checkedLabel="On"
-    uncheckedLabel="Off"
-  />`,
+  template: `<app-toggle data-testid="host-toggle" [formControl]="control" checkedLabel="On" uncheckedLabel="Off" />`,
 })
 class HostComponent {
   public control = new FormControl(false, { nonNullable: true });

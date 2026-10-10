@@ -14,16 +14,12 @@
 /// limitations under the License.
 ///
 
-import { Component } from '@angular/core';
+export class PasswordFormInputElement {
+  public inputType = 'password';
+  public visiblePassword = false;
+}
 
-import { SplashService } from './splasht.service';
-
-@Component({
-  selector: 'app-splash-screen',
-  templateUrl: './splash-screen.component.html',
-  imports: [],
-  styleUrls: ['./splash-screen.component.css'],
-})
-export class SplashComponent {
-  constructor(public splashService: SplashService) {}
+export class PasswordForm {
+  public readonly passwordElement = new PasswordFormInputElement();
+  public readonly passwordConfirmationElement = new PasswordFormInputElement();
 }

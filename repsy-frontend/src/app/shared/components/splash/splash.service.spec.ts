@@ -17,7 +17,7 @@
 import { PLATFORM_ID } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 
-import { SplashService } from './splasht.service';
+import { SplashService } from './splash.service';
 
 function createService(platform: string): SplashService {
   TestBed.configureTestingModule({ providers: [{ provide: PLATFORM_ID, useValue: platform }] });

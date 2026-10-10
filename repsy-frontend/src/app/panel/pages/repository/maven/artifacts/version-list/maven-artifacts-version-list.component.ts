@@ -47,7 +47,7 @@ import { MavenService } from '../../service/maven.service';
 import { showVersionDeleteDialog } from '../../util/version-delete-warning.util';
 
 @Component({
-  selector: 'app-maven-artifacts-list',
+  selector: 'app-maven-artifacts-version-list',
   standalone: true,
   imports: [
     CommonModule,

@@ -51,7 +51,7 @@ export function groupDeleteWarning(groupName: string, summary?: MavenGroupSummar
 }
 
 @Component({
-  selector: 'app-maven-group-list',
+  selector: 'app-maven-artifacts-group-list',
   standalone: true,
   imports: [
     CommonModule,

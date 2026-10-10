@@ -20,7 +20,7 @@ import { Subject } from 'rxjs';
 
 import { RepoListInfo, ReposApi, RepoSecuritySummary, RepoType, TotalUsageInfo } from '../../../../generated/api';
 import { AuthService } from '../../../auth/pages/service/auth.service';
-import { SplashService } from '../../../shared/components/splash-screen/splasht.service';
+import { SplashService } from '../../../shared/components/splash/splash.service';
 import { ProfileService } from '../profile/service/profile.service';
 import { SecurityService } from '../security/service/security.service';
 import { DashboardComponent } from './dashboard.component';

@@ -163,7 +163,7 @@
         <!-- Admin Role Toggle -->
         <div class="form-group w-full">
           <span [id]="id('role')" class="mb-2 block text-[14px] text-neutral-200">Role</span>
-          <app-toggle-component
+          <app-toggle
             data-testid="user-create-role"
             [labelledBy]="id('role')"
             [checked]="form.get('isAdmin').value"

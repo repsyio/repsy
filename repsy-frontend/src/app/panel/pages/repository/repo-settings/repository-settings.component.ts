@@ -31,7 +31,7 @@ import { DeleteOrphanLayersComponent } from './delete-orphan-layers/delete-orpha
 import { DeleteRepoComponent } from './delete-repo/delete-repo.component';
 import { DeleteUntaggedManifestsComponent } from './delete-untagged-manifests/delete-untagged-manifests.component';
 import { DeployTokenComponent } from './deploy-token/deploy-token.component';
-import { VersionAllowanceComponent } from './maven-version-allowence/maven-version-allowence.component';
+import { MavenVersionAllowanceComponent } from './maven-version-allowance/maven-version-allowance.component';
 import { PackageOverrideComponent } from './package-override/package-override.component';
 import { RepoInfoComponent } from './repo-info/repo-info.component';
 import { RepoStorageComponent } from './repo-storage/repo-storage.component';
@@ -54,7 +54,7 @@ import { VulnerabilityScanningComponent } from './vulnerability-scanning/vulnera
     CleanupPolicyComponent,
     DeleteUntaggedManifestsComponent,
     DeleteOrphanLayersComponent,
-    VersionAllowanceComponent,
+    MavenVersionAllowanceComponent,
     RepoStorageComponent,
     PackageOverrideComponent,
     VulnerabilityScanningComponent,

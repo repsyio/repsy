@@ -20,12 +20,12 @@ import { ReposApi } from '../../../../../../generated/api';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { RepoSupport, RepoType } from '../../../../shared/dto/repo/repo-type';
 import { lastSentForm, releaseAwareParentForm } from '../testing/repo-settings-spec-helpers';
-import { VersionAllowanceComponent } from './maven-version-allowence.component';
+import { MavenVersionAllowanceComponent } from './maven-version-allowance.component';
 
 const REPO = 'acme-repo';
 
-describe('VersionAllowanceComponent', () => {
-  let component: VersionAllowanceComponent;
+describe('MavenVersionAllowanceComponent', () => {
+  let component: MavenVersionAllowanceComponent;
   let repoApi: jasmine.SpyObj<ReposApi>;
   let toastService: jasmine.SpyObj<ToastService>;
   let fetchCount: number;
@@ -35,7 +35,7 @@ describe('VersionAllowanceComponent', () => {
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
     repoApi.updateRepoSettings.and.returnValue(of({}) as never);
 
-    component = new VersionAllowanceComponent(repoApi, toastService);
+    component = new MavenVersionAllowanceComponent(repoApi, toastService);
     component.repoName = REPO;
     fetchCount = 0;
     component.fetch.subscribe(() => fetchCount++);

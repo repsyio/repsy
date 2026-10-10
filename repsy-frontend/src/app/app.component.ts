@@ -22,7 +22,7 @@ import { AuthService } from './auth/pages/service/auth.service';
 import { loginUrlReturningTo } from './auth/util/return-url';
 import { DangerModalComponent } from './panel/shared/components/modals/danger-modal/danger-modal.component';
 import { ToastComponent } from './panel/shared/components/toast/toast.component';
-import { SplashComponent } from './shared/components/splash-screen/splash-screen.component';
+import { SplashComponent } from './shared/components/splash/splash.component';
 
 @Component({
   selector: 'app-root',
