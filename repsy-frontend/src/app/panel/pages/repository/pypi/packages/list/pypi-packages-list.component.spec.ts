@@ -42,12 +42,12 @@ describe('PypiPackagesListComponent', () => {
   let securityService: jasmine.SpyObj<SecurityService>;
   let toastService: jasmine.SpyObj<ToastService>;
   let dangerModalService: DangerModalService;
-  let repoChanges: BehaviorSubject<RepoPermissionInfo | null>;
+  let repoChanges$: BehaviorSubject<RepoPermissionInfo | null>;
 
   function build(): ListFixture {
-    repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
+    repoChanges$ = new BehaviorSubject<RepoPermissionInfo | null>(null);
     service = jasmine.createSpyObj<PypiService>('PypiService', ['fetchRepositoryPackagesLikeName', 'deletePackage'], {
-      repoChanges,
+      repoChanges$,
     });
     securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['watchArtifactSecuritySummary']);
     securityService.watchArtifactSecuritySummary.and.returnValue(of({}));
@@ -62,7 +62,7 @@ describe('PypiPackagesListComponent', () => {
     );
     return {
       component,
-      repoChanges,
+      repoChanges$,
       load: service.fetchRepositoryPackagesLikeName,
       args: { search: 0, sort: 1, page: 2 },
       respond: (content, totalPages) =>
@@ -100,7 +100,7 @@ describe('PypiPackagesListComponent', () => {
 
     it('packageRoute links to the item inside the active repository', fakeAsync(() => {
       service.fetchRepositoryPackagesLikeName.and.returnValue(of(pageOf([], 0) as never));
-      repoChanges.next(permission(REPO_NAME));
+      repoChanges$.next(permission(REPO_NAME));
       flushMicrotasks();
 
       expect(component.packageRoute(ITEM_UNDER_TEST)).toBe(`/${REPO_NAME}/requests`);
@@ -122,7 +122,7 @@ describe('PypiPackagesListComponent', () => {
 describe('PypiPackagesListComponent template', () => {
   async function render(flags: Parameters<typeof permission>[1]): Promise<HTMLElement> {
     const service = jasmine.createSpyObj<PypiService>('PypiService', ['fetchRepositoryPackagesLikeName'], {
-      repoChanges: new BehaviorSubject<RepoPermissionInfo | null>(permission(REPO_NAME, flags)),
+      repoChanges$: new BehaviorSubject<RepoPermissionInfo | null>(permission(REPO_NAME, flags)),
     });
     service.fetchRepositoryPackagesLikeName.and.returnValue(
       of(pageOf([{ name: 'requests', latestVersion: '2.0.0', stableVersion: '1.0.0' }], 1) as never),

@@ -77,7 +77,7 @@ export class RubyGemsVersionDetailComponent implements OnDestroy {
     private readonly router: Router,
   ) {
     this.activeRepo = {} as RepoPermissionInfo;
-    this.repositoryChanges$ = this.rubyService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
+    this.repositoryChanges$ = this.rubyService.repoChanges$.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
         this.activeRepo = Object.assign({}, repo);
         this.loadVersion();

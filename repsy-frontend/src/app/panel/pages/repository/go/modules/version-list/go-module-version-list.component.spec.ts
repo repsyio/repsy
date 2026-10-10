@@ -43,13 +43,13 @@ describe('GoModuleVersionListComponent', () => {
   let toastService: jasmine.SpyObj<ToastService>;
   let router: jasmine.SpyObj<Router>;
   let dangerModalService: DangerModalService;
-  let repoChanges: BehaviorSubject<RepoPermissionInfo | null>;
+  let repoChanges$: BehaviorSubject<RepoPermissionInfo | null>;
   const VERSION = { version: 'v1.2.3' } as Parameters<GoModuleVersionListComponent['deleteVersion']>[0];
 
   function build(modulePath: string | null = 'github.com/acme/lib'): ListFixture {
-    repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
+    repoChanges$ = new BehaviorSubject<RepoPermissionInfo | null>(null);
     goService = jasmine.createSpyObj<GoService>('GoService', ['fetchModuleVersions', 'deleteModuleVersion'], {
-      repoChanges,
+      repoChanges$,
     });
     securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['watchVersionSecuritySummary']);
     securityService.watchVersionSecuritySummary.and.returnValue(of({}));
@@ -69,7 +69,7 @@ describe('GoModuleVersionListComponent', () => {
     );
     return {
       component,
-      repoChanges,
+      repoChanges$,
       load: goService.fetchModuleVersions,
       args: { search: 1, sort: 2, page: 3 },
       respond: (content, totalPages) =>
@@ -89,7 +89,7 @@ describe('GoModuleVersionListComponent', () => {
     it('loads the versions of the module in the modulePath query parameter', fakeAsync(() => {
       build().respond([VERSION], 1);
 
-      repoChanges.next(permission(REPO_NAME));
+      repoChanges$.next(permission(REPO_NAME));
       flushMicrotasks();
 
       expect(component.modulePath).toBe('github.com/acme/lib');
@@ -105,7 +105,7 @@ describe('GoModuleVersionListComponent', () => {
     it('goes back to the repository without loading anything when the module path is missing', fakeAsync(() => {
       build(null);
 
-      repoChanges.next(permission(REPO_NAME));
+      repoChanges$.next(permission(REPO_NAME));
       flushMicrotasks();
 
       expect(router.navigate).toHaveBeenCalledOnceWith([`/${REPO_NAME}`]);
@@ -158,7 +158,7 @@ describe('GoModuleVersionListComponent', () => {
 describe('GoModuleVersionListComponent template', () => {
   async function render(content: unknown[], totalPages: number): Promise<HTMLElement> {
     const goService = jasmine.createSpyObj<GoService>('GoService', ['fetchModuleVersions'], {
-      repoChanges: new BehaviorSubject<RepoPermissionInfo | null>(permission(REPO_NAME, { canManage: true })),
+      repoChanges$: new BehaviorSubject<RepoPermissionInfo | null>(permission(REPO_NAME, { canManage: true })),
     });
     goService.fetchModuleVersions.and.returnValue(of(pageOf(content, totalPages) as never));
     const securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['watchVersionSecuritySummary']);

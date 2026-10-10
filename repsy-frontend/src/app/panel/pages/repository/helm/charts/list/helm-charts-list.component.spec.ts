@@ -42,11 +42,11 @@ describe('HelmChartsListComponent', () => {
   let securityService: jasmine.SpyObj<SecurityService>;
   let toastService: jasmine.SpyObj<ToastService>;
   let dangerModalService: DangerModalService;
-  let repoChanges: BehaviorSubject<RepoPermissionInfo | null>;
+  let repoChanges$: BehaviorSubject<RepoPermissionInfo | null>;
 
   function build(): ListFixture {
-    repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
-    service = jasmine.createSpyObj<HelmService>('HelmService', ['searchCharts', 'deleteAllVersions'], { repoChanges });
+    repoChanges$ = new BehaviorSubject<RepoPermissionInfo | null>(null);
+    service = jasmine.createSpyObj<HelmService>('HelmService', ['searchCharts', 'deleteAllVersions'], { repoChanges$ });
     securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['watchArtifactSecuritySummary']);
     securityService.watchArtifactSecuritySummary.and.returnValue(of({}));
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
@@ -60,7 +60,7 @@ describe('HelmChartsListComponent', () => {
     );
     return {
       component,
-      repoChanges,
+      repoChanges$,
       load: service.searchCharts,
       args: { search: 0, sort: 1, page: 2 },
       respond: (content, totalPages) => service.searchCharts.and.returnValue(of(pageOf(content, totalPages) as never)),
@@ -101,7 +101,7 @@ describe('HelmChartsListComponent', () => {
 
     it('packageRoute links to the item inside the active repository', fakeAsync(() => {
       service.searchCharts.and.returnValue(of(pageOf([], 0) as never));
-      repoChanges.next(permission(REPO_NAME));
+      repoChanges$.next(permission(REPO_NAME));
       flushMicrotasks();
 
       expect(component.packageRoute(ITEM_UNDER_TEST)).toBe(`/${REPO_NAME}/nginx`);

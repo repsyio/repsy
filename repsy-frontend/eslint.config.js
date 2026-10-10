@@ -94,7 +94,12 @@ export default tseslint.config(
         { ignoreMiddleExtensions: true },
       ],
       "@typescript-eslint/explicit-member-accessibility": ["warn", { accessibility: "no-public" }],
-      "rxjs-x/finnish": "warn",
+      // RPS-2131: `$` marks an Observable/Subject stored in a field. Methods and functions that return one
+      // (`getPackages()`) stay plain verbs, as the Angular style guide and HttpClient do.
+      "rxjs-x/finnish": [
+        "warn",
+        { functions: false, methods: false, parameters: false, variables: false, properties: true },
+      ],
       "no-restricted-imports": [
         "warn",
         {

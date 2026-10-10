@@ -108,7 +108,7 @@ export class DockerImagesTagListComponent implements OnDestroy {
     this.pagedData = new PagedData<TagListItem>();
     this.activeRepo = {} as RepoPermissionInfo;
 
-    this.repositoryChanges$ = this.dockerService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
+    this.repositoryChanges$ = this.dockerService.repoChanges$.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
         this.activeRepo = Object.assign({}, repo);
         this.imageName = this.route.snapshot.paramMap.get('imageName');

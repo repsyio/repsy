@@ -99,7 +99,7 @@ describe('NuGetService', () => {
 
     it('sends the rename for the active repository and re-emits it under the new name', async () => {
       await selectRepo(service, repoApi.getRepoPermissions, REPO, { canManage: true });
-      const emissions = collect(service.repoChanges);
+      const emissions = collect(service.repoChanges$);
       asSpy(repoApi.updateRepo).and.returnValue(of(restResponse(undefined)));
 
       await service.updateRepositoryName(form);
@@ -121,7 +121,7 @@ describe('NuGetService', () => {
 
     it('keeps the old name and emits nothing when the rename fails', async () => {
       await selectRepo(service, repoApi.getRepoPermissions, REPO);
-      const emissions = collect(service.repoChanges);
+      const emissions = collect(service.repoChanges$);
       const error = httpError(409);
       asSpy(repoApi.updateRepo).and.returnValue(throwError(() => error));
 
@@ -137,7 +137,7 @@ describe('NuGetService', () => {
       await service.updateRepositoryName(form);
 
       expect(repoApi.updateRepo).toHaveBeenCalledOnceWith('', form);
-      expect(collect(service.repoChanges)).toEqual([null]);
+      expect(collect(service.repoChanges$)).toEqual([null]);
     });
   });
 

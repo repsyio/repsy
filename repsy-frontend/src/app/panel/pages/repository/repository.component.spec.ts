@@ -46,7 +46,7 @@ interface ListCall {
   page: number;
   size: number;
   sort: string[];
-  answer: Subject<unknown>;
+  answer$: Subject<unknown>;
 }
 
 /** A fake `ActivatedRoute` carrying the query params a test wants the component to start from. */
@@ -90,8 +90,8 @@ describe('RepositoryComponent', () => {
   function answer(content: RepoListInfo[], totalPages = 1, number = 0): void {
     // The call is fixed first: an answer can start the next call (an emptied page asks for the one before).
     const call = last();
-    call.answer.next(page(content, totalPages, number));
-    call.answer.complete();
+    call.answer$.next(page(content, totalPages, number));
+    call.answer$.complete();
   }
 
   beforeEach(() => {
@@ -110,7 +110,7 @@ describe('RepositoryComponent', () => {
       sort: string[],
     ) => {
       const answerSubject = new Subject<unknown>();
-      calls.push({ type, q, page: pageIndex, size, sort, answer: answerSubject });
+      calls.push({ type, q, page: pageIndex, size, sort, answer$: answerSubject });
       return answerSubject;
     }) as never);
     protocolApi = repoApi;
@@ -299,7 +299,7 @@ describe('RepositoryComponent', () => {
     it('shows the error state, no rows, no security watch and no partial state', () => {
       const component = create();
 
-      last().answer.error(new Error('boom'));
+      last().answer$.error(new Error('boom'));
 
       expect(component.loading).toBeFalse();
       expect(component.error).not.toBe('');
@@ -310,7 +310,7 @@ describe('RepositoryComponent', () => {
 
     it('is retried by refresh, which clears the error and lists what now loads', () => {
       const component = create();
-      last().answer.error(new Error('boom'));
+      last().answer$.error(new Error('boom'));
 
       component.refreshPage();
       expect(component.error).toBe('');
@@ -327,7 +327,7 @@ describe('RepositoryComponent', () => {
       answer([repo('a-maven')]);
 
       component.refreshPage();
-      last().answer.error(new Error('boom'));
+      last().answer$.error(new Error('boom'));
 
       expect(component.error).not.toBe('');
       expect(component.paginatedRepos).toEqual([]);
@@ -338,7 +338,7 @@ describe('RepositoryComponent', () => {
       answer([repo('a-maven')], 2);
 
       component.loadPage(1);
-      last().answer.error(new Error('boom'));
+      last().answer$.error(new Error('boom'));
 
       expect(component.error).not.toBe('');
     }));
@@ -433,14 +433,14 @@ describe('RepositoryComponent', () => {
       component.search('one');
       tick(SEARCH_DEBOUNCE_MS);
       const first = last();
-      expect(first.answer.observed).toBeTrue();
+      expect(first.answer$.observed).toBeTrue();
 
       component.search('two');
       tick(SEARCH_DEBOUNCE_MS);
 
-      expect(first.answer.observed).toBeFalse();
+      expect(first.answer$.observed).toBeFalse();
       expect(last().q).toBe('two');
-      expect(last().answer.observed).toBeTrue();
+      expect(last().answer$.observed).toBeTrue();
     }));
 
     it('never lists the rows of a search that was superseded, even when its answer arrives late', fakeAsync(() => {
@@ -452,8 +452,8 @@ describe('RepositoryComponent', () => {
       component.search('two');
       tick(SEARCH_DEBOUNCE_MS);
 
-      first.answer.next(page([repo('stale-one')]));
-      last().answer.next(page([repo('fresh-two')]));
+      first.answer$.next(page([repo('stale-one')]));
+      last().answer$.next(page([repo('fresh-two')]));
 
       expect(names(component)).toEqual(['fresh-two']);
     }));
@@ -534,8 +534,8 @@ describe('RepositoryComponent', () => {
       const first = last();
 
       component.filterRepos(RepoType.NPM);
-      expect(first.answer.observed).toBeFalse();
-      first.answer.next(page([repo('old-maven')]));
+      expect(first.answer$.observed).toBeFalse();
+      first.answer$.next(page([repo('old-maven')]));
       answer([repo('web-app', ApiRepoType.Npm)]);
 
       expect(names(component)).toEqual(['web-app']);
@@ -591,7 +591,7 @@ describe('RepositoryComponent', () => {
       expect(securityService.watchSecuritySummary).toHaveBeenCalledTimes(1);
 
       component.refreshPage();
-      last().answer.error(new Error('boom'));
+      last().answer$.error(new Error('boom'));
       expect(securityService.watchSecuritySummary).toHaveBeenCalledTimes(1);
     });
 
@@ -623,8 +623,8 @@ describe('RepositoryComponent', () => {
       const first = last();
 
       component.refreshPage();
-      expect(first.answer.observed).toBeFalse();
-      first.answer.next(page([repo('old')]));
+      expect(first.answer$.observed).toBeFalse();
+      first.answer$.next(page([repo('old')]));
       answer([repo('new')]);
 
       expect(names(component)).toEqual(['new']);
@@ -636,7 +636,7 @@ describe('RepositoryComponent', () => {
       const first = last();
 
       component.refreshPage();
-      first.answer.error(new Error('boom'));
+      first.answer$.error(new Error('boom'));
       expect(component.error).toBe('');
       expect(component.loading).toBeTrue();
       answer([repo('new')]);
@@ -650,7 +650,7 @@ describe('RepositoryComponent', () => {
 
       component.ngOnDestroy();
 
-      expect(last().answer.observed).toBeFalse();
+      expect(last().answer$.observed).toBeFalse();
     });
   });
 
@@ -749,7 +749,7 @@ describe('RepositoryComponent', () => {
     it('shows repo-error, not the empty list, when the list request fails', () => {
       const fixture = render();
 
-      last().answer.error(new Error('boom'));
+      last().answer$.error(new Error('boom'));
       fixture.detectChanges();
 
       const root: HTMLElement = fixture.nativeElement;

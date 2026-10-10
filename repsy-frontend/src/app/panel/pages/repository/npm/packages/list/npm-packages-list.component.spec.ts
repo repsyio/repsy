@@ -45,7 +45,7 @@ describe('NpmPackagesListComponent', () => {
   let toastService: jasmine.SpyObj<ToastService>;
   let dangerModalService: DangerModalService;
   let router: jasmine.SpyObj<Router>;
-  let repoChanges: BehaviorSubject<RepoPermissionInfo | null>;
+  let repoChanges$: BehaviorSubject<RepoPermissionInfo | null>;
 
   /** A fake `ActivatedRoute` carrying the query params a test wants the component to start from. */
   function activatedRoute(queryParams: Record<string, string> = {}): ActivatedRoute {
@@ -53,8 +53,8 @@ describe('NpmPackagesListComponent', () => {
   }
 
   function build(queryParams: Record<string, string> = {}): ListFixture {
-    repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
-    npmService = jasmine.createSpyObj<NpmService>('NpmService', ['searchPackages', 'deletePackage'], { repoChanges });
+    repoChanges$ = new BehaviorSubject<RepoPermissionInfo | null>(null);
+    npmService = jasmine.createSpyObj<NpmService>('NpmService', ['searchPackages', 'deletePackage'], { repoChanges$ });
     securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['watchArtifactSecuritySummary']);
     securityService.watchArtifactSecuritySummary.and.returnValue(of({}));
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
@@ -72,7 +72,7 @@ describe('NpmPackagesListComponent', () => {
     );
     return {
       component,
-      repoChanges,
+      repoChanges$,
       load: npmService.searchPackages,
       args: { search: 0, sort: 1, page: 2 },
       respond: (content, totalPages) =>
@@ -113,7 +113,7 @@ describe('NpmPackagesListComponent', () => {
     it('starts with the search, sort and page given in the URL', fakeAsync(() => {
       build({ q: 'acme', sort: 'Oldest', page: '2' }).respond([], 1);
 
-      repoChanges.next(permission(REPO_NAME));
+      repoChanges$.next(permission(REPO_NAME));
       flushMicrotasks();
 
       expect(component.searchText).toBe('acme');
@@ -125,7 +125,7 @@ describe('NpmPackagesListComponent', () => {
     it('does not navigate when the URL already matches what is loaded (no reload loop)', fakeAsync(() => {
       build().respond([], 1);
 
-      repoChanges.next(permission(REPO_NAME));
+      repoChanges$.next(permission(REPO_NAME));
       flushMicrotasks();
 
       expect(router.navigate).not.toHaveBeenCalled();
@@ -133,7 +133,7 @@ describe('NpmPackagesListComponent', () => {
 
     it('puts the sort and page into the URL, replacing the current entry', fakeAsync(() => {
       build().respond([], 3);
-      repoChanges.next(permission(REPO_NAME));
+      repoChanges$.next(permission(REPO_NAME));
       flushMicrotasks();
       router.navigate.calls.reset();
 
@@ -180,7 +180,7 @@ describe('NpmPackagesListComponent', () => {
     });
 
     it('packageRoute puts an unscoped package under ~ and a scoped one under its scope', fakeAsync(() => {
-      repoChanges.next(permission(REPO_NAME));
+      repoChanges$.next(permission(REPO_NAME));
       flushMicrotasks();
 
       expect(component.packageRoute(SCOPED)).toBe(`/${REPO_NAME}/acme/ui`);

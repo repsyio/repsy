@@ -55,14 +55,14 @@ describe('NpmPackagesVersionDetailComponent README', () => {
   }
 
   beforeEach(() => {
-    const repoChanges = new BehaviorSubject<RepoPermissionInfo>({
+    const repoChanges$ = new BehaviorSubject<RepoPermissionInfo>({
       repoName: 'npm-repo',
       canRead: true,
       canWrite: true,
       canManage: true,
       private: false,
     });
-    npmService = jasmine.createSpyObj<NpmService>('NpmService', ['fetchPackageVersion'], { repoChanges });
+    npmService = jasmine.createSpyObj<NpmService>('NpmService', ['fetchPackageVersion'], { repoChanges$ });
 
     TestBed.configureTestingModule({
       imports: [NpmPackagesVersionDetailComponent],
@@ -204,7 +204,7 @@ describe('NpmPackagesVersionDetailComponent registry snippet and delete (RPS-128
       'NpmService',
       ['fetchPackageVersion', 'searchPackageVersions', 'deletePackageVersion'],
       {
-        repoChanges: new BehaviorSubject<RepoPermissionInfo>({
+        repoChanges$: new BehaviorSubject<RepoPermissionInfo>({
           repoName: REPO,
           canRead: true,
           canWrite: true,

@@ -95,7 +95,7 @@ export class NpmPackagesScopeFilterComponent implements OnDestroy {
     this.pagedData = new PagedData<NpmPackageListItem>();
     this.activeRegistry = {} as RepoPermissionInfo;
 
-    this.registryChanges$ = this.npmService.repoChanges.subscribe((registry: RepoPermissionInfo) => {
+    this.registryChanges$ = this.npmService.repoChanges$.subscribe((registry: RepoPermissionInfo) => {
       if (registry) {
         this.activeRegistry = registry;
         this.scopeName = this.route.snapshot.paramMap.get('scope');

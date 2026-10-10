@@ -47,14 +47,14 @@ describe('CargoCratesVersionListComponent', () => {
   let toastService: jasmine.SpyObj<ToastService>;
   let router: jasmine.SpyObj<Router>;
   let dangerModalService: DangerModalService;
-  let repoChanges: BehaviorSubject<RepoPermissionInfo | null>;
+  let repoChanges$: BehaviorSubject<RepoPermissionInfo | null>;
 
   function build(): ListFixture {
-    repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
+    repoChanges$ = new BehaviorSubject<RepoPermissionInfo | null>(null);
     cargoService = jasmine.createSpyObj<CargoService>(
       'CargoService',
       ['fetchCrate', 'fetchCrateVersions', 'deleteCrate', 'deleteCrateVersion'],
-      { repoChanges },
+      { repoChanges$ },
     );
     cargoService.fetchCrate.and.returnValue(of(CRATE));
     securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['watchVersionSecuritySummary']);
@@ -74,7 +74,7 @@ describe('CargoCratesVersionListComponent', () => {
     );
     return {
       component,
-      repoChanges,
+      repoChanges$,
       load: cargoService.fetchCrateVersions,
       args: { search: 1, sort: 2, page: 3 },
       respond: (content, totalPages) =>
@@ -95,7 +95,7 @@ describe('CargoCratesVersionListComponent', () => {
     it('loads the crate of the route, then its versions', fakeAsync(() => {
       build().respond([VERSION], 1);
 
-      repoChanges.next(permission(REPO_NAME));
+      repoChanges$.next(permission(REPO_NAME));
       flushMicrotasks();
 
       expect(component.packageName).toBe('serde');
@@ -109,7 +109,7 @@ describe('CargoCratesVersionListComponent', () => {
       build();
       cargoService.fetchCrate.and.returnValue(throwError(() => 'gone'));
 
-      repoChanges.next(permission(REPO_NAME));
+      repoChanges$.next(permission(REPO_NAME));
       flushMicrotasks();
 
       expect(cargoService.fetchCrateVersions).not.toHaveBeenCalled();
@@ -163,7 +163,7 @@ describe('CargoCratesVersionListComponent', () => {
 describe('CargoCratesVersionListComponent template', () => {
   async function render(canManage: boolean, yankedVersion?: string): Promise<HTMLElement> {
     const cargoService = jasmine.createSpyObj<CargoService>('CargoService', ['fetchCrate', 'fetchCrateVersions'], {
-      repoChanges: new BehaviorSubject<RepoPermissionInfo | null>(permission(REPO_NAME, { canManage })),
+      repoChanges$: new BehaviorSubject<RepoPermissionInfo | null>(permission(REPO_NAME, { canManage })),
     });
     cargoService.fetchCrate.and.returnValue(of(CRATE));
     cargoService.fetchCrateVersions.and.returnValue(

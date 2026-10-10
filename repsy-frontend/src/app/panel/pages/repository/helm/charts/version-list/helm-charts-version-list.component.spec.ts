@@ -62,12 +62,12 @@ describe('HelmChartsVersionListComponent', () => {
   let toastService: jasmine.SpyObj<ToastService>;
   let router: jasmine.SpyObj<Router>;
   let dangerModalService: DangerModalService;
-  let repoChanges: BehaviorSubject<RepoPermissionInfo | null>;
+  let repoChanges$: BehaviorSubject<RepoPermissionInfo | null>;
 
   beforeEach(() => {
-    repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
+    repoChanges$ = new BehaviorSubject<RepoPermissionInfo | null>(null);
     helmService = jasmine.createSpyObj<HelmService>('HelmService', ['fetchChartVersions', 'deleteChart'], {
-      repoChanges,
+      repoChanges$,
     });
     helmService.fetchChartVersions.and.returnValue(of(page([NEW, MIDDLE, OLD])));
     helmService.deleteChart.and.returnValue(of(undefined));
@@ -92,7 +92,7 @@ describe('HelmChartsVersionListComponent', () => {
   afterEach(() => component.ngOnDestroy());
 
   function selectRepo(canManage = true): void {
-    repoChanges.next(permission(REPO_NAME, { canManage }));
+    repoChanges$.next(permission(REPO_NAME, { canManage }));
     flushMicrotasks();
   }
 
@@ -125,7 +125,7 @@ describe('HelmChartsVersionListComponent', () => {
     }));
 
     it('ignores an empty repository value', fakeAsync(() => {
-      repoChanges.next(null);
+      repoChanges$.next(null);
       flushMicrotasks();
 
       expect(helmService.fetchChartVersions).not.toHaveBeenCalled();

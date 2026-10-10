@@ -86,7 +86,7 @@ export class PypiPackagesVersionDetailComponent implements OnDestroy {
     this.baseUrl = environment.repoBaseUrl;
     this.activeRepo = {} as RepoPermissionInfo;
 
-    this.repositoryChanges$ = this.pypiService.repoChanges.subscribe((registry: RepoPermissionInfo) => {
+    this.repositoryChanges$ = this.pypiService.repoChanges$.subscribe((registry: RepoPermissionInfo) => {
       if (registry && this.isRegistryForCurrentRoute(registry)) {
         this.activeRepo = Object.assign({}, registry);
         this.loadVersion();

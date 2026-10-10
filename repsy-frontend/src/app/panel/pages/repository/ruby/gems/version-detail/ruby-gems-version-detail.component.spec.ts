@@ -38,7 +38,7 @@ describe('RubyGemsVersionDetailComponent', () => {
   let toastService: jasmine.SpyObj<ToastService>;
   let router: jasmine.SpyObj<Router>;
   let dangerModalService: DangerModalService;
-  let repoChanges: BehaviorSubject<RepoPermissionInfo | null>;
+  let repoChanges$: BehaviorSubject<RepoPermissionInfo | null>;
 
   function build(params: Record<string, string> = { packageName: 'rails', version: '7.1.0' }): void {
     component?.ngOnDestroy();
@@ -47,11 +47,11 @@ describe('RubyGemsVersionDetailComponent', () => {
   }
 
   beforeEach(() => {
-    repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
+    repoChanges$ = new BehaviorSubject<RepoPermissionInfo | null>(null);
     rubyService = jasmine.createSpyObj<RubyService>(
       'RubyService',
       ['fetchGemVersion', 'fetchGemVersions', 'deleteGemVersion'],
-      { repoChanges },
+      { repoChanges$ },
     );
     rubyService.fetchGemVersions.and.returnValue(of(pageOf([{ version: '7.1.0' }, { version: '7.0.0' }])));
     rubyService.fetchGemVersion.and.returnValue(of(GEM_VERSION));
@@ -66,7 +66,7 @@ describe('RubyGemsVersionDetailComponent', () => {
   afterEach(() => component.ngOnDestroy());
 
   function select(): void {
-    repoChanges.next(permission(REPO, { canManage: true }));
+    repoChanges$.next(permission(REPO, { canManage: true }));
   }
 
   it('loads nothing before a repository is selected', () => {
@@ -125,7 +125,7 @@ describe('RubyGemsVersionDetailComponent', () => {
     });
 
     it('ignores an empty repository value', () => {
-      repoChanges.next(null);
+      repoChanges$.next(null);
 
       expect(rubyService.fetchGemVersion).not.toHaveBeenCalled();
     });

@@ -90,8 +90,8 @@ export class UserManagementComponent implements OnInit, OnDestroy {
   /** Admins on the server (not only on the loaded page); null until the first answer arrives. */
   adminCount: number | null = null;
 
-  private readonly requests = new Subject<ListRequest>();
-  private readonly typedSearches = new Subject<string>();
+  private readonly requests$ = new Subject<ListRequest>();
+  private readonly typedSearches$ = new Subject<string>();
   private readonly subscriptions = new Subscription();
   private adminCountSubscription?: Subscription;
 
@@ -107,7 +107,7 @@ export class UserManagementComponent implements OnInit, OnDestroy {
     // A request supersedes the one before it: switchMap unsubscribes from it, which cancels it on the wire,
     // so a slow answer of an old search never reaches the view.
     this.subscriptions.add(
-      this.requests
+      this.requests$
         .pipe(
           switchMap((request) =>
             this.userService.listUsers(request.q || undefined, request.page, this.pageSize).pipe(
@@ -128,7 +128,7 @@ export class UserManagementComponent implements OnInit, OnDestroy {
 
     // The typed text is sent once the box has been idle; a reload that emptied the box meanwhile drops it.
     this.subscriptions.add(
-      this.typedSearches
+      this.typedSearches$
         .pipe(
           switchMap((text) => timer(USER_SEARCH_DEBOUNCE_MS).pipe(map(() => text))),
           filter((text) => text === this.searchQuery),
@@ -160,7 +160,7 @@ export class UserManagementComponent implements OnInit, OnDestroy {
    *  out; a plain reload needs no fallback and leaves it out. */
   fetchUsers(previouslyFocused: Element | null = null): void {
     this.syncUrl();
-    this.requests.next({ q: this.appliedQuery, page: this.pageNum, previouslyFocused });
+    this.requests$.next({ q: this.appliedQuery, page: this.pageNum, previouslyFocused });
     this.adminCountSubscription?.unsubscribe();
     this.adminCountSubscription = this.userService.countAdmins().subscribe({
       next: (count) => {
@@ -179,7 +179,7 @@ export class UserManagementComponent implements OnInit, OnDestroy {
   /** Called on every keystroke; the request goes out when the typing pauses, and it starts from the first page. */
   search(username: string): void {
     this.searchQuery = username;
-    this.typedSearches.next(username);
+    this.typedSearches$.next(username);
   }
 
   refreshPage(): void {

@@ -43,15 +43,15 @@ describe('PypiPackagesVersionListComponent', () => {
   let toastService: jasmine.SpyObj<ToastService>;
   let router: jasmine.SpyObj<Router>;
   let dangerModalService: DangerModalService;
-  let repoChanges: BehaviorSubject<RepoPermissionInfo | null>;
+  let repoChanges$: BehaviorSubject<RepoPermissionInfo | null>;
   const VERSION = { version: '2.31.0', finalRelease: false } as Parameters<
     PypiPackagesVersionListComponent['deleteVersion']
   >[0];
 
   function build(): ListFixture {
-    repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
+    repoChanges$ = new BehaviorSubject<RepoPermissionInfo | null>(null);
     pypiService = jasmine.createSpyObj<PypiService>('PypiService', ['fetchPackageReleasesLikeName', 'deleteRelease'], {
-      repoChanges,
+      repoChanges$,
     });
     securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['watchVersionSecuritySummary']);
     securityService.watchVersionSecuritySummary.and.returnValue(of({}));
@@ -69,7 +69,7 @@ describe('PypiPackagesVersionListComponent', () => {
     );
     return {
       component,
-      repoChanges,
+      repoChanges$,
       load: pypiService.fetchPackageReleasesLikeName,
       args: { search: 1, sort: 2, page: 3 },
       respond: (content, totalPages) =>
@@ -89,7 +89,7 @@ describe('PypiPackagesVersionListComponent', () => {
     it('loads the releases of the package in the route', fakeAsync(() => {
       build().respond([VERSION], 1);
 
-      repoChanges.next(permission(REPO_NAME));
+      repoChanges$.next(permission(REPO_NAME));
       flushMicrotasks();
 
       expect(pypiService.fetchPackageReleasesLikeName).toHaveBeenCalledOnceWith(
@@ -110,7 +110,7 @@ describe('PypiPackagesVersionListComponent', () => {
         1,
       );
 
-      repoChanges.next(permission(REPO_NAME));
+      repoChanges$.next(permission(REPO_NAME));
       flushMicrotasks();
 
       expect(component.finalRelease).toBe('2.31.0');
@@ -119,7 +119,7 @@ describe('PypiPackagesVersionListComponent', () => {
     it('has no final release when the page has none', fakeAsync(() => {
       build().respond([{ version: '3.0.0rc1', finalRelease: false }], 1);
 
-      repoChanges.next(permission(REPO_NAME));
+      repoChanges$.next(permission(REPO_NAME));
       flushMicrotasks();
 
       expect(component.finalRelease).toBeUndefined();
@@ -170,7 +170,7 @@ describe('PypiPackagesVersionListComponent', () => {
 describe('PypiPackagesVersionListComponent template', () => {
   async function render(flags: Parameters<typeof permission>[1]): Promise<HTMLElement> {
     const pypiService = jasmine.createSpyObj<PypiService>('PypiService', ['fetchPackageReleasesLikeName'], {
-      repoChanges: new BehaviorSubject<RepoPermissionInfo | null>(permission(REPO_NAME, flags)),
+      repoChanges$: new BehaviorSubject<RepoPermissionInfo | null>(permission(REPO_NAME, flags)),
     });
     pypiService.fetchPackageReleasesLikeName.and.returnValue(
       of(pageOf([{ version: '2.31.0', createdAt: '2026-01-01T00:00:00Z' }], 1) as never),

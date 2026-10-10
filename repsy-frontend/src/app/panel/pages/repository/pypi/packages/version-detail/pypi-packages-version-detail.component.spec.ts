@@ -66,7 +66,7 @@ describe('PypiPackagesVersionDetailComponent description', () => {
   }
 
   beforeEach(() => {
-    const repoChanges = new BehaviorSubject<RepoPermissionInfo>({
+    const repoChanges$ = new BehaviorSubject<RepoPermissionInfo>({
       repoName: 'pypi-repo',
       canRead: true,
       canWrite: true,
@@ -74,7 +74,7 @@ describe('PypiPackagesVersionDetailComponent description', () => {
       private: false,
     });
     pypiService = jasmine.createSpyObj<PypiService>('PypiService', ['fetchRelease', 'deleteRelease'], {
-      repoChanges,
+      repoChanges$,
     });
 
     TestBed.configureTestingModule({
@@ -254,7 +254,7 @@ describe('PypiPackagesVersionDetailComponent delete (RPS-1288)', () => {
       'PypiService',
       ['fetchRelease', 'fetchPackageReleasesLikeName', 'deleteRelease'],
       {
-        repoChanges: new BehaviorSubject<RepoPermissionInfo>({
+        repoChanges$: new BehaviorSubject<RepoPermissionInfo>({
           repoName: REPO,
           canRead: true,
           canWrite: true,

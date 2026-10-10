@@ -93,7 +93,7 @@ export class RubyGemsListComponent implements OnDestroy {
     this.baseUrl = environment.repoBaseUrl;
     this.username = this.authService.username;
     this.activeRepo = {} as RepoPermissionInfo;
-    this.repositoryChanges$ = this.rubyService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
+    this.repositoryChanges$ = this.rubyService.repoChanges$.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
         this.activeRepo = Object.assign({}, repo);
         this.fetchGems();

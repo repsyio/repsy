@@ -77,7 +77,7 @@ describe('CargoCratesVersionDetailComponent README', () => {
   }
 
   beforeEach(() => {
-    const repoChanges = new BehaviorSubject<RepoPermissionInfo>({
+    const repoChanges$ = new BehaviorSubject<RepoPermissionInfo>({
       repoName: 'cargo-repo',
       canRead: true,
       canWrite: true,
@@ -85,7 +85,7 @@ describe('CargoCratesVersionDetailComponent README', () => {
       private: false,
     });
     cargoService = jasmine.createSpyObj<CargoService>('CargoService', ['fetchCrate', 'fetchCrateVersion'], {
-      repoChanges,
+      repoChanges$,
     });
 
     TestBed.configureTestingModule({
@@ -192,7 +192,7 @@ describe('CargoCratesVersionDetailComponent registry snippet and delete (RPS-128
       'CargoService',
       ['fetchCrate', 'fetchCrateVersion', 'fetchCrateVersions', 'deleteCrateVersion'],
       {
-        repoChanges: new BehaviorSubject<RepoPermissionInfo>({
+        repoChanges$: new BehaviorSubject<RepoPermissionInfo>({
           repoName: REPO,
           canRead: true,
           canWrite: true,

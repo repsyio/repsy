@@ -32,11 +32,11 @@ import { DockerImagesManifestListComponent } from './docker-images-manifest-list
 describe('DockerImagesManifestListComponent', () => {
   let component: DockerImagesManifestListComponent;
   let dockerService: jasmine.SpyObj<DockerService>;
-  let repoChanges: BehaviorSubject<RepoPermissionInfo | null>;
+  let repoChanges$: BehaviorSubject<RepoPermissionInfo | null>;
 
   function build(): ListFixture {
-    repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
-    dockerService = jasmine.createSpyObj<DockerService>('DockerService', ['searchManifests'], { repoChanges });
+    repoChanges$ = new BehaviorSubject<RepoPermissionInfo | null>(null);
+    dockerService = jasmine.createSpyObj<DockerService>('DockerService', ['searchManifests'], { repoChanges$ });
     component = new DockerImagesManifestListComponent(
       { snapshot: { paramMap: convertToParamMap({ imageName: 'nginx', tagName: 'latest' }) } } as ActivatedRoute,
       dockerService,
@@ -45,7 +45,7 @@ describe('DockerImagesManifestListComponent', () => {
     );
     return {
       component,
-      repoChanges,
+      repoChanges$,
       load: dockerService.searchManifests,
       args: { search: 0, sort: 1, page: 4 },
       respond: (content, totalPages) =>
@@ -65,7 +65,7 @@ describe('DockerImagesManifestListComponent', () => {
     it('loads the manifests of the image tag in the route and builds the pull command', fakeAsync(() => {
       build().respond([], 0);
 
-      repoChanges.next(permission(REPO_NAME));
+      repoChanges$.next(permission(REPO_NAME));
       flushMicrotasks();
 
       expect(component.imageName).toBe('nginx');
@@ -85,7 +85,7 @@ describe('DockerImagesManifestListComponent', () => {
   describe('a tag that cannot be loaded (RPS-1627)', () => {
     it('says the tag is not found for a 404 and keeps no rows', fakeAsync(() => {
       build().respond([{ name: 'latest' }] as never, 1);
-      repoChanges.next(permission(REPO_NAME));
+      repoChanges$.next(permission(REPO_NAME));
       flushMicrotasks();
       expect(component.manifests?.length).toBe(1);
 
@@ -102,7 +102,7 @@ describe('DockerImagesManifestListComponent', () => {
       build();
       dockerService.searchManifests.and.returnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
 
-      repoChanges.next(permission(REPO_NAME));
+      repoChanges$.next(permission(REPO_NAME));
       flushMicrotasks();
 
       expect(component.error).toBe('The version could not be loaded');
@@ -112,7 +112,7 @@ describe('DockerImagesManifestListComponent', () => {
     it('clears the error when the next load succeeds', fakeAsync(() => {
       build();
       dockerService.searchManifests.and.returnValue(throwError(() => new HttpErrorResponse({ status: 404 })));
-      repoChanges.next(permission(REPO_NAME));
+      repoChanges$.next(permission(REPO_NAME));
       flushMicrotasks();
       expect(component.error).toBeTruthy();
 
@@ -145,7 +145,7 @@ describe('DockerImagesManifestListComponent template', () => {
     const digest = 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
     const configDigest = 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
     const dockerService = jasmine.createSpyObj<DockerService>('DockerService', ['searchManifests'], {
-      repoChanges: new BehaviorSubject<RepoPermissionInfo | null>(permission(REPO_NAME)),
+      repoChanges$: new BehaviorSubject<RepoPermissionInfo | null>(permission(REPO_NAME)),
     });
     dockerService.searchManifests.and.returnValue(
       of(
@@ -175,7 +175,7 @@ describe('DockerImagesManifestListComponent template', () => {
 
   it('shows the not-found state, not an empty list, for a tag that does not exist (RPS-1627)', async () => {
     const dockerService = jasmine.createSpyObj<DockerService>('DockerService', ['searchManifests'], {
-      repoChanges: new BehaviorSubject<RepoPermissionInfo | null>(permission(REPO_NAME)),
+      repoChanges$: new BehaviorSubject<RepoPermissionInfo | null>(permission(REPO_NAME)),
     });
     dockerService.searchManifests.and.returnValue(throwError(() => new HttpErrorResponse({ status: 404 })));
 

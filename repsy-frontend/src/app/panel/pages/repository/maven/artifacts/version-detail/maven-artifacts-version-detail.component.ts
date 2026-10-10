@@ -126,7 +126,7 @@ export class MavenArtifactsVersionDetailComponent implements OnDestroy {
   ) {
     this.baseUrl = environment.apiBaseUrl;
     this.activeRepo = {} as RepoPermissionInfo;
-    this.repositoryChanges$ = this.mavenService.repoChanges.subscribe((registry: RepoPermissionInfo) => {
+    this.repositoryChanges$ = this.mavenService.repoChanges$.subscribe((registry: RepoPermissionInfo) => {
       if (registry && this.isRegistryForCurrentRoute(registry)) {
         this.activeRepo = Object.assign({}, registry);
         this.loadVersion();

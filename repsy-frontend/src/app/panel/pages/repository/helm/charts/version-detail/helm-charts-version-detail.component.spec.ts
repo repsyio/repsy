@@ -44,7 +44,7 @@ describe('HelmChartsVersionDetailComponent', () => {
   let toastService: jasmine.SpyObj<ToastService>;
   let router: jasmine.SpyObj<Router>;
   let dangerModalService: DangerModalService;
-  let repoChanges: BehaviorSubject<RepoPermissionInfo | null>;
+  let repoChanges$: BehaviorSubject<RepoPermissionInfo | null>;
 
   function build(params: Record<string, string> = { packageName: 'nginx', version: '1.2.3' }): void {
     component?.ngOnDestroy();
@@ -53,12 +53,12 @@ describe('HelmChartsVersionDetailComponent', () => {
   }
 
   beforeEach(() => {
-    repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
+    repoChanges$ = new BehaviorSubject<RepoPermissionInfo | null>(null);
     helmService = jasmine.createSpyObj<HelmService>(
       'HelmService',
       ['fetchChartDetail', 'fetchChartVersions', 'deleteChart'],
       {
-        repoChanges,
+        repoChanges$,
       },
     );
     helmService.fetchChartDetail.and.returnValue(of(FULL));
@@ -76,7 +76,7 @@ describe('HelmChartsVersionDetailComponent', () => {
   afterEach(() => component.ngOnDestroy());
 
   function select(): void {
-    repoChanges.next(permission(REPO, { canManage: true }));
+    repoChanges$.next(permission(REPO, { canManage: true }));
   }
 
   describe('when a repository is selected', () => {
@@ -156,7 +156,7 @@ describe('HelmChartsVersionDetailComponent', () => {
     });
 
     it('ignores an empty repository value', () => {
-      repoChanges.next(null);
+      repoChanges$.next(null);
 
       expect(helmService.fetchChartDetail).not.toHaveBeenCalled();
     });

@@ -74,7 +74,7 @@ export class HelmChartsVersionDetailComponent implements OnDestroy {
     private readonly dangerModalService: DangerModalService,
     private readonly router: Router,
   ) {
-    this.repositoryChanges$ = this.helmService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
+    this.repositoryChanges$ = this.helmService.repoChanges$.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
         this.activeRepo = Object.assign({}, repo);
         this.loadDetail();

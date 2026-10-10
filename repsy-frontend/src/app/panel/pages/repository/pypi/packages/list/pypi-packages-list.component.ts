@@ -95,7 +95,7 @@ export class PypiPackagesListComponent implements OnDestroy {
     this.pagedData = new PagedData<PypiPackageListItem>();
     this.activeRepo = {} as RepoPermissionInfo;
 
-    this.repositoryChanges$ = this.pypiService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
+    this.repositoryChanges$ = this.pypiService.repoChanges$.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
         this.activeRepo = Object.assign({}, repo);
         this.fetchPackages();

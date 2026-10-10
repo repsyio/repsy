@@ -42,12 +42,12 @@ describe('CargoCratesListComponent', () => {
   let securityService: jasmine.SpyObj<SecurityService>;
   let toastService: jasmine.SpyObj<ToastService>;
   let dangerModalService: DangerModalService;
-  let repoChanges: BehaviorSubject<RepoPermissionInfo | null>;
+  let repoChanges$: BehaviorSubject<RepoPermissionInfo | null>;
 
   function build(): ListFixture {
-    repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
+    repoChanges$ = new BehaviorSubject<RepoPermissionInfo | null>(null);
     cargoService = jasmine.createSpyObj<CargoService>('CargoService', ['searchCrates', 'deleteCrate'], {
-      repoChanges,
+      repoChanges$,
     });
     securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['watchArtifactSecuritySummary']);
     securityService.watchArtifactSecuritySummary.and.returnValue(of({}));
@@ -62,7 +62,7 @@ describe('CargoCratesListComponent', () => {
     );
     return {
       component,
-      repoChanges,
+      repoChanges$,
       load: cargoService.searchCrates,
       args: { search: 0, sort: 1, page: 2 },
       respond: (content, totalPages) =>
@@ -111,7 +111,7 @@ describe('CargoCratesListComponent', () => {
 
     it('packageRoute links to the crate inside the active repository', fakeAsync(() => {
       cargoService.searchCrates.and.returnValue(of(pageOf([], 0) as never));
-      repoChanges.next(permission(REPO_NAME));
+      repoChanges$.next(permission(REPO_NAME));
       flushMicrotasks();
 
       expect(component.packageRoute(CRATE)).toBe(`/${REPO_NAME}/serde`);

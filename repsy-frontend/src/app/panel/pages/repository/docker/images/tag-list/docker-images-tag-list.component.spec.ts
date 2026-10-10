@@ -38,16 +38,16 @@ describe('DockerImagesTagListComponent', () => {
   let toastService: jasmine.SpyObj<ToastService>;
   let router: jasmine.SpyObj<Router>;
   let dangerModalService: DangerModalService;
-  let repoChanges: BehaviorSubject<RepoPermissionInfo | null>;
+  let repoChanges$: BehaviorSubject<RepoPermissionInfo | null>;
   const TAG = { name: 'latest' } as TagListItem;
 
   function build(): ListFixture {
-    repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
+    repoChanges$ = new BehaviorSubject<RepoPermissionInfo | null>(null);
     dockerService = jasmine.createSpyObj<DockerService>(
       'DockerService',
       ['searchTags', 'deleteTag', 'deleteImage', 'fetchImageSummary'],
       {
-        repoChanges,
+        repoChanges$,
       },
     );
     securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['watchVersionSecuritySummary']);
@@ -66,7 +66,7 @@ describe('DockerImagesTagListComponent', () => {
     );
     return {
       component,
-      repoChanges,
+      repoChanges$,
       load: dockerService.searchTags,
       args: { search: 0, sort: 1, page: 3 },
       respond: (content, totalPages) =>
@@ -86,7 +86,7 @@ describe('DockerImagesTagListComponent', () => {
     it('loads the tags of the image in the route and builds the pull command', fakeAsync(() => {
       build().respond([TAG], 1);
 
-      repoChanges.next(permission(REPO_NAME));
+      repoChanges$.next(permission(REPO_NAME));
       flushMicrotasks();
 
       expect(component.imageName).toBe('nginx');
@@ -105,7 +105,7 @@ describe('DockerImagesTagListComponent', () => {
       dockerService.deleteTag.and.returnValue(of(undefined));
       dockerService.fetchImageSummary.and.returnValue(of({ name: 'nginx', tagCount: 0 } as ImageListItem));
       router.navigate.and.returnValue(Promise.resolve(true));
-      repoChanges.next(permission(REPO_NAME, { canManage }));
+      repoChanges$.next(permission(REPO_NAME, { canManage }));
       flushMicrotasks();
       dockerService.searchTags.calls.reset();
     }
@@ -177,7 +177,7 @@ describe('DockerImagesTagListComponent', () => {
             : of({ name: 'nginx', ...summary } as ImageListItem),
       );
       component.searchText = search;
-      repoChanges.next(permission(REPO_NAME, { canManage: true }));
+      repoChanges$.next(permission(REPO_NAME, { canManage: true }));
       flushMicrotasks();
     }
 
@@ -215,7 +215,7 @@ describe('DockerImagesTagListComponent', () => {
       dockerService.searchTags.and.returnValue(throwError(() => new HttpErrorResponse({ status: 404 })));
       router.navigate.and.returnValue(Promise.resolve(true));
 
-      repoChanges.next(permission(REPO_NAME, { canManage: true }));
+      repoChanges$.next(permission(REPO_NAME, { canManage: true }));
       flushMicrotasks();
 
       expect(fixture.component.loading).toBeFalse();
@@ -228,7 +228,7 @@ describe('DockerImagesTagListComponent', () => {
       build();
       dockerService.searchTags.and.returnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
 
-      repoChanges.next(permission(REPO_NAME, { canManage: true }));
+      repoChanges$.next(permission(REPO_NAME, { canManage: true }));
       flushMicrotasks();
 
       expect(router.navigate).not.toHaveBeenCalled();

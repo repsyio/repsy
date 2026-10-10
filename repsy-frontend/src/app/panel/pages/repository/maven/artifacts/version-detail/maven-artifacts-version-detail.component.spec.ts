@@ -60,7 +60,7 @@ describe('MavenArtifactsVersionDetailComponent', () => {
   let router: jasmine.SpyObj<Router>;
   let dangerModalService: DangerModalService;
   let breadcrumbSecurityLinkService: BreadcrumbSecurityLinkService;
-  let repoChanges: BehaviorSubject<RepoPermissionInfo | null>;
+  let repoChanges$: BehaviorSubject<RepoPermissionInfo | null>;
   let currentRepo: { repoName: string; repoType: string } | null;
   const route = {
     snapshot: { paramMap: convertToParamMap({ groupName: 'org.acme', artifactName: 'lib', version: '1.2.3' }) },
@@ -69,13 +69,13 @@ describe('MavenArtifactsVersionDetailComponent', () => {
   beforeEach(() => {
     // The component logs every repository emission it ignores; keep that out of the test output.
     spyOn(console, 'debug');
-    repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
+    repoChanges$ = new BehaviorSubject<RepoPermissionInfo | null>(null);
     currentRepo = { repoName: REPO, repoType: 'maven' };
     mavenService = jasmine.createSpyObj<MavenService>(
       'MavenService',
       ['fetchArtifactVersion', 'deleteVersion', 'fetchVersionDeleteWarning', 'searchArtifactVersions'],
       {
-        repoChanges,
+        repoChanges$,
       },
     );
     mavenService.fetchArtifactVersion.and.returnValue(of(VERSION));
@@ -105,7 +105,7 @@ describe('MavenArtifactsVersionDetailComponent', () => {
   afterEach(() => component.ngOnDestroy());
 
   function select(name = REPO): void {
-    repoChanges.next(permission(name, { canManage: true }));
+    repoChanges$.next(permission(name, { canManage: true }));
   }
 
   it('announces the repository type to the breadcrumb, and withdraws it when destroyed', () => {
@@ -190,7 +190,7 @@ describe('MavenArtifactsVersionDetailComponent', () => {
     });
 
     it('ignores an empty repository value', () => {
-      repoChanges.next(null);
+      repoChanges$.next(null);
 
       expect(mavenService.fetchArtifactVersion).not.toHaveBeenCalled();
     });
@@ -306,7 +306,7 @@ describe('MavenArtifactsVersionDetailComponent', () => {
 describe('MavenArtifactsVersionDetailComponent template', () => {
   async function render(version: ArtifactVersionInfo = VERSION) {
     const mavenService = jasmine.createSpyObj<MavenService>('MavenService', ['fetchArtifactVersion'], {
-      repoChanges: new BehaviorSubject<RepoPermissionInfo | null>(permission(REPO, { canManage: true })),
+      repoChanges$: new BehaviorSubject<RepoPermissionInfo | null>(permission(REPO, { canManage: true })),
     });
     mavenService.fetchArtifactVersion.and.returnValue(of(version));
 

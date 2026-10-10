@@ -93,7 +93,7 @@ export class NuGetPackagesListComponent implements OnDestroy {
     this.baseUrl = environment.repoBaseUrl;
     this.username = this.authService.username;
     this.activeRepo = {} as RepoPermissionInfo;
-    this.repositoryChanges$ = this.nugetService.repoChanges.subscribe((repo) => {
+    this.repositoryChanges$ = this.nugetService.repoChanges$.subscribe((repo) => {
       if (repo) {
         this.activeRepo = Object.assign({}, repo);
         this.fetchPackages();

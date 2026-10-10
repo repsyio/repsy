@@ -32,8 +32,7 @@ import {
   throwError,
 } from 'rxjs';
 
-import { LoginForm, LoginInfo } from '../../../../generated/api';
-import { AuthApi } from '../../../../generated/api/api/auth.api';
+import { AuthApi, LoginForm, LoginInfo } from '../../../../generated/api';
 import { SILENT_ERROR } from '../../../shared/interceptor/error-handler.interceptor';
 
 const USERNAME_KEY = 'username';

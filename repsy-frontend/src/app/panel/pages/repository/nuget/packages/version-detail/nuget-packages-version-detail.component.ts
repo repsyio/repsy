@@ -82,7 +82,7 @@ export class NuGetPackagesVersionDetailComponent implements OnDestroy {
     private readonly router: Router,
   ) {
     this.activeRepo = {} as RepoPermissionInfo;
-    this.repositoryChanges$ = this.nugetService.repoChanges.subscribe((repo) => {
+    this.repositoryChanges$ = this.nugetService.repoChanges$.subscribe((repo) => {
       if (repo) {
         this.activeRepo = Object.assign({}, repo);
         this.loadVersion();

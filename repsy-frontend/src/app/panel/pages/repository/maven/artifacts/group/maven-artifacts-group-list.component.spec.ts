@@ -32,12 +32,12 @@ describe('MavenArtifactsGroupListComponent', () => {
   let service: jasmine.SpyObj<MavenService>;
   let toastService: jasmine.SpyObj<ToastService>;
   let dangerModalService: DangerModalService;
-  let repoChanges: BehaviorSubject<RepoPermissionInfo | null>;
+  let repoChanges$: BehaviorSubject<RepoPermissionInfo | null>;
 
   function build(): ListFixture {
-    repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
+    repoChanges$ = new BehaviorSubject<RepoPermissionInfo | null>(null);
     service = jasmine.createSpyObj<MavenService>('MavenService', ['searchGroups', 'deleteGroup', 'fetchGroupSummary'], {
-      repoChanges,
+      repoChanges$,
     });
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
     dangerModalService = new DangerModalService();
@@ -49,7 +49,7 @@ describe('MavenArtifactsGroupListComponent', () => {
     );
     return {
       component,
-      repoChanges,
+      repoChanges$,
       load: service.searchGroups,
       args: { search: 0, sort: 1, page: 2 },
       respond: (content, totalPages) => service.searchGroups.and.returnValue(of(pageOf(content, totalPages) as never)),

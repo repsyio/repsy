@@ -107,7 +107,7 @@ export class MavenArtifactsVersionListComponent implements OnDestroy {
     this.activeRepo = {} as RepoPermissionInfo;
     this.groupName = this.route.snapshot.paramMap.get('groupName');
     this.artifactName = this.route.snapshot.paramMap.get('artifactName');
-    this.repositoryChanges$ = this.mavenService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
+    this.repositoryChanges$ = this.mavenService.repoChanges$.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
         this.activeRepo = Object.assign({}, repo);
         this.fetchArtifactVersions();

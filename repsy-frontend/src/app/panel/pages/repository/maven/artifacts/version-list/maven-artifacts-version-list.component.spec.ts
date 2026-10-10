@@ -42,15 +42,15 @@ describe('MavenArtifactsVersionListComponent', () => {
   let toastService: jasmine.SpyObj<ToastService>;
   let router: jasmine.SpyObj<Router>;
   let dangerModalService: DangerModalService;
-  let repoChanges: BehaviorSubject<RepoPermissionInfo | null>;
+  let repoChanges$: BehaviorSubject<RepoPermissionInfo | null>;
   const VERSION = { versionName: '1.2.3' } as Parameters<MavenArtifactsVersionListComponent['deleteVersion']>[0];
 
   function build(): ListFixture {
-    repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
+    repoChanges$ = new BehaviorSubject<RepoPermissionInfo | null>(null);
     mavenService = jasmine.createSpyObj<MavenService>(
       'MavenService',
       ['searchArtifactVersions', 'deleteVersion', 'fetchVersionDeleteWarning'],
-      { repoChanges },
+      { repoChanges$ },
     );
     mavenService.fetchVersionDeleteWarning.and.returnValue(of(null));
     securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['watchVersionSecuritySummary']);
@@ -71,7 +71,7 @@ describe('MavenArtifactsVersionListComponent', () => {
     );
     return {
       component,
-      repoChanges,
+      repoChanges$,
       load: mavenService.searchArtifactVersions,
       args: { search: 2, sort: 3, page: 4 },
       respond: (content, totalPages) =>
@@ -91,7 +91,7 @@ describe('MavenArtifactsVersionListComponent', () => {
     it('loads the versions of the group and artifact in the route', fakeAsync(() => {
       build().respond([VERSION], 1);
 
-      repoChanges.next(permission(REPO_NAME));
+      repoChanges$.next(permission(REPO_NAME));
       flushMicrotasks();
 
       expect(mavenService.searchArtifactVersions).toHaveBeenCalledOnceWith(

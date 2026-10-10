@@ -42,34 +42,34 @@ import { Sort } from '../../../../shared/dto/sort';
   providedIn: 'root',
 })
 export class NuGetService {
-  readonly repoChanges: Observable<RepoPermissionInfo>;
+  readonly repoChanges$: Observable<RepoPermissionInfo>;
 
-  private readonly repoSubject = new BehaviorSubject<RepoPermissionInfo>(null);
+  private readonly repoSubject$ = new BehaviorSubject<RepoPermissionInfo>(null);
 
   constructor(
     private readonly reposApi: ReposApi,
     private readonly deployTokensApi: DeployTokensApi,
     private readonly nugetPackagesApi: NugetPackagesApi,
   ) {
-    this.repoChanges = this.repoSubject.asObservable();
+    this.repoChanges$ = this.repoSubject$.asObservable();
   }
 
   private get repoName(): string {
-    return this.repoSubject.getValue()?.repoName ?? '';
+    return this.repoSubject$.getValue()?.repoName ?? '';
   }
 
   fetchRepoPermission(repoName: string): Observable<RepoPermissionInfo> {
     this.resetActiveRepoIfChanged(repoName);
 
-    return this.reposApi.getRepoPermissions(repoName).pipe(tap((info) => this.repoSubject.next(info)));
+    return this.reposApi.getRepoPermissions(repoName).pipe(tap((info) => this.repoSubject$.next(info)));
   }
 
   private resetActiveRepoIfChanged(repoName: string): void {
-    if (this.repoSubject.getValue()?.repoName === repoName) {
+    if (this.repoSubject$.getValue()?.repoName === repoName) {
       return;
     }
 
-    this.repoSubject.next(null);
+    this.repoSubject$.next(null);
   }
 
   async fetchRepositoryUsage(): Promise<RepoUsageInfo> {
@@ -88,9 +88,9 @@ export class NuGetService {
   async updateRepositoryName(repositoryNameForm: RepoUpdateForm): Promise<void> {
     await firstValueFrom(this.reposApi.updateRepo(this.repoName, repositoryNameForm));
 
-    const active = this.repoSubject.getValue();
+    const active = this.repoSubject$.getValue();
     if (active) {
-      this.repoSubject.next({ ...active, repoName: repositoryNameForm.name ?? active.repoName });
+      this.repoSubject$.next({ ...active, repoName: repositoryNameForm.name ?? active.repoName });
     }
   }
 

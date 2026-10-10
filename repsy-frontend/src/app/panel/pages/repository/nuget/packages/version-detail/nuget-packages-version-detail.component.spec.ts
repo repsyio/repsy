@@ -61,7 +61,7 @@ describe('NuGetPackagesVersionDetailComponent README', () => {
   }
 
   beforeEach(() => {
-    const repoChanges = new BehaviorSubject<RepoPermissionInfo>({
+    const repoChanges$ = new BehaviorSubject<RepoPermissionInfo>({
       repoName: 'nuget-repo',
       canRead: true,
       canWrite: false,
@@ -69,7 +69,7 @@ describe('NuGetPackagesVersionDetailComponent README', () => {
       private: false,
     });
     nugetService = jasmine.createSpyObj<NuGetService>('NuGetService', ['fetchPackageVersion'], {
-      repoChanges,
+      repoChanges$,
     });
 
     TestBed.configureTestingModule({
@@ -225,7 +225,7 @@ describe('NuGetPackagesVersionDetailComponent delete (RPS-1288)', () => {
       'NuGetService',
       ['fetchPackageVersion', 'fetchPackageVersions', 'deletePackageVersion'],
       {
-        repoChanges: new BehaviorSubject<RepoPermissionInfo>({
+        repoChanges$: new BehaviorSubject<RepoPermissionInfo>({
           repoName: REPO,
           canRead: true,
           canWrite: true,

@@ -65,7 +65,7 @@ export class GoModuleVersionDetailComponent implements OnDestroy {
     this.repoBaseUrl = environment.repoBaseUrl;
     this.activeRepo = {} as RepoPermissionInfo;
 
-    this.repositoryChanges$ = this.goService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
+    this.repositoryChanges$ = this.goService.repoChanges$.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
         this.activeRepo = Object.assign({}, repo);
         this.modulePath = this.route.snapshot.queryParamMap.get('modulePath');

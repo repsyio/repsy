@@ -102,7 +102,7 @@ export class NpmPackagesListComponent implements OnDestroy {
     this.pagedData = new PagedData<NpmPackageListItem>();
     this.activeRegistry = {} as RepoPermissionInfo;
     this.username = this.authService.username;
-    this.registryChanges$ = this.npmService.repoChanges.subscribe((registry: RepoPermissionInfo) => {
+    this.registryChanges$ = this.npmService.repoChanges$.subscribe((registry: RepoPermissionInfo) => {
       if (registry) {
         this.activeRegistry = Object.assign({}, registry);
 

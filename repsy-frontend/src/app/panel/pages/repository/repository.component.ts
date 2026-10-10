@@ -114,8 +114,8 @@ export class RepositoryComponent implements OnDestroy {
   /** The search the list currently shows; `searchQuery` runs ahead of it while the typing is debounced. */
   private appliedQuery = '';
   private securitySummarySubscription?: Subscription;
-  private readonly requests = new Subject<ListRequest>();
-  private readonly typedSearches = new Subject<string>();
+  private readonly requests$ = new Subject<ListRequest>();
+  private readonly typedSearches$ = new Subject<string>();
   private readonly subscriptions = new Subscription();
 
   constructor(
@@ -130,7 +130,7 @@ export class RepositoryComponent implements OnDestroy {
   ) {
     // A request supersedes the one before it: switchMap unsubscribes from it, which cancels it on the wire.
     this.subscriptions.add(
-      this.requests
+      this.requests$
         .pipe(
           tap((request) => this.startLoading(request)),
           switchMap((request) =>
@@ -150,7 +150,7 @@ export class RepositoryComponent implements OnDestroy {
 
     // The typed text is sent once the box has been idle; a reload that emptied the box meanwhile drops it.
     this.subscriptions.add(
-      this.typedSearches
+      this.typedSearches$
         .pipe(
           switchMap((text) => timer(SEARCH_DEBOUNCE_MS).pipe(map(() => text))),
           filter((text) => text === this.searchQuery),
@@ -192,7 +192,7 @@ export class RepositoryComponent implements OnDestroy {
   /** Called on every keystroke; the request goes out when the typing pauses, and it starts from the first page. */
   search(repoName: string) {
     this.searchQuery = repoName;
-    this.typedSearches.next(repoName);
+    this.typedSearches$.next(repoName);
   }
 
   /** `previouslyFocused` lets a caller (a delete, whose opener is about to vanish) name the control that
@@ -271,7 +271,7 @@ export class RepositoryComponent implements OnDestroy {
       q: request.q || null,
       page: request.page || null,
     });
-    this.requests.next(request);
+    this.requests$.next(request);
   }
 
   private startLoading(request: ListRequest): void {
