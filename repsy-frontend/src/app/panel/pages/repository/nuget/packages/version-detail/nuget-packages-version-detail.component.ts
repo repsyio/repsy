@@ -95,7 +95,7 @@ export class NugetPackagesVersionDetailComponent implements OnDestroy {
   }
 
   public loadVersion(): void {
-    const packageId = this.route.snapshot.paramMap.get('packageId');
+    const packageId = this.route.snapshot.paramMap.get('packageName');
     const version = this.route.snapshot.paramMap.get('version');
     if (!packageId || !version) {
       this.loading = false;

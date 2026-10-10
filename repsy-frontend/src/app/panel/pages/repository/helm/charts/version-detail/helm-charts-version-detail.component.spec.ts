@@ -46,7 +46,7 @@ describe('HelmChartsVersionDetailComponent', () => {
   let dangerModalService: DangerModalService;
   let repoChanges: BehaviorSubject<RepoPermissionInfo | null>;
 
-  function build(params: Record<string, string> = { name: 'nginx', version: '1.2.3' }): void {
+  function build(params: Record<string, string> = { packageName: 'nginx', version: '1.2.3' }): void {
     component?.ngOnDestroy();
     route = { snapshot: { paramMap: convertToParamMap(params) } } as ActivatedRoute;
     component = new HelmChartsVersionDetailComponent(route, helmService, toastService, dangerModalService, router);
@@ -147,7 +147,7 @@ describe('HelmChartsVersionDetailComponent', () => {
     });
 
     it('does not load anything, and stops loading, when the route has no chart or version', () => {
-      build({ name: 'nginx' });
+      build({ packageName: 'nginx' });
 
       select();
 

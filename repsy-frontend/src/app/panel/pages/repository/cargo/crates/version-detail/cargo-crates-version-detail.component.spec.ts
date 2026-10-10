@@ -94,7 +94,7 @@ describe('CargoCratesVersionDetailComponent README', () => {
         { provide: CargoService, useValue: cargoService },
         {
           provide: ActivatedRoute,
-          useValue: { snapshot: { paramMap: convertToParamMap({ crate: 'acme-lib', version: '1.2.3' }) } },
+          useValue: { snapshot: { paramMap: convertToParamMap({ packageName: 'acme-lib', version: '1.2.3' }) } },
         },
         { provide: ToastService, useValue: jasmine.createSpyObj<ToastService>('ToastService', ['show']) },
         {
@@ -178,7 +178,7 @@ describe('CargoCratesVersionDetailComponent registry snippet and delete (RPS-128
   let toast: jasmine.SpyObj<ToastService>;
   let danger: jasmine.SpyObj<DangerModalService>;
   const route = {
-    snapshot: { paramMap: convertToParamMap({ crate: 'acme-lib', version: '1.2.3' }) },
+    snapshot: { paramMap: convertToParamMap({ packageName: 'acme-lib', version: '1.2.3' }) },
   } as ActivatedRoute;
 
   function render(): ComponentFixture<CargoCratesVersionDetailComponent> {

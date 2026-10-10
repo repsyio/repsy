@@ -159,8 +159,8 @@ export class MavenArtifactsVersionDetailComponent implements OnDestroy {
     this.loading = true;
     this.error = null;
 
-    this.groupName = this.route.snapshot.paramMap.get('group');
-    this.artifactName = this.route.snapshot.paramMap.get('artifact');
+    this.groupName = this.route.snapshot.paramMap.get('groupName');
+    this.artifactName = this.route.snapshot.paramMap.get('artifactName');
     this.versionName = this.route.snapshot.paramMap.get('version');
 
     this.mavenService

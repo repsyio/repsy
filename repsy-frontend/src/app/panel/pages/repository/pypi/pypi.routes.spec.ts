@@ -33,15 +33,15 @@ describe('PYPI_ROUTES', () => {
         title: 'repsy | Pypi Repository Settings',
         full: true,
       },
-      { path: ':package' },
+      { path: ':packageName' },
       {
-        path: ':package',
+        path: ':packageName',
         component: PypiPackagesVersionListComponent,
         title: 'repsy | Pypi Package Versions',
         full: true,
       },
       {
-        path: ':package/:version',
+        path: ':packageName/:version',
         component: PypiPackagesVersionDetailComponent,
         title: 'repsy | Pypi Version Details',
         full: true,

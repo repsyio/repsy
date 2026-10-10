@@ -115,7 +115,7 @@ export class PypiPackagesVersionDetailComponent implements OnDestroy {
     this.loading = true;
     this.error = null;
 
-    this.packageName = this.route.snapshot.paramMap.get('package');
+    this.packageName = this.route.snapshot.paramMap.get('packageName');
     this.versionName = this.route.snapshot.paramMap.get('version');
 
     this.installation = `pip install ${this.packageName}==${this.versionName} --extra-index-url ${this.baseUrl}/${this.activeRepo.repoName}/simple`;

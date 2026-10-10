@@ -50,7 +50,7 @@ export const NPM_ROUTES: Routes = [
             title: 'repsy | Npm Package Scopes',
           },
           {
-            path: ':package',
+            path: ':packageName',
             children: [
               {
                 path: '',

@@ -63,7 +63,7 @@ describe('NugetPackagesVersionListComponent', () => {
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
     router = jasmine.createSpyObj<Router>('Router', ['navigate']);
     dangerModalService = new DangerModalService();
-    route = { snapshot: { paramMap: convertToParamMap({ packageId: 'Acme.Lib' }) } } as ActivatedRoute;
+    route = { snapshot: { paramMap: convertToParamMap({ packageName: 'Acme.Lib' }) } } as ActivatedRoute;
     component = new NugetPackagesVersionListComponent(
       route,
       { username: 'alice' } as AuthService,
@@ -191,7 +191,7 @@ describe('NugetPackagesVersionListComponent template', () => {
     securityService.watchVersionSecuritySummary.and.returnValue(of({}));
 
     const { el } = await renderComponent(NugetPackagesVersionListComponent, [
-      { provide: ActivatedRoute, useValue: { snapshot: { paramMap: convertToParamMap({ packageId: 'Acme.Lib' }) } } },
+      { provide: ActivatedRoute, useValue: { snapshot: { paramMap: convertToParamMap({ packageName: 'Acme.Lib' }) } } },
       { provide: AuthService, useValue: { username: 'alice' } },
       { provide: NugetService, useValue: nugetService },
       { provide: SecurityService, useValue: securityService },

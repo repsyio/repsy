@@ -77,7 +77,7 @@ describe('HelmChartsVersionListComponent', () => {
     router = jasmine.createSpyObj<Router>('Router', ['navigate']);
     router.navigate.and.resolveTo(true);
     dangerModalService = new DangerModalService();
-    route = { snapshot: { paramMap: convertToParamMap({ name: 'nginx' }) } } as ActivatedRoute;
+    route = { snapshot: { paramMap: convertToParamMap({ packageName: 'nginx' }) } } as ActivatedRoute;
     component = new HelmChartsVersionListComponent(
       route,
       { username: 'alice' } as AuthService,

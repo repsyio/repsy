@@ -83,7 +83,7 @@ describe('PypiPackagesVersionDetailComponent description', () => {
         { provide: PypiService, useValue: pypiService },
         {
           provide: ActivatedRoute,
-          useValue: { snapshot: { paramMap: convertToParamMap({ package: 'acme-lib', version: '1.2.3' }) } },
+          useValue: { snapshot: { paramMap: convertToParamMap({ packageName: 'acme-lib', version: '1.2.3' }) } },
         },
         { provide: ToastService, useValue: jasmine.createSpyObj<ToastService>('ToastService', ['show']) },
         {
@@ -234,7 +234,7 @@ describe('PypiPackagesVersionDetailComponent delete (RPS-1288)', () => {
   let toast: jasmine.SpyObj<ToastService>;
   let danger: jasmine.SpyObj<DangerModalService>;
   const route = {
-    snapshot: { paramMap: convertToParamMap({ package: 'acme-lib', version: '1.2.3' }) },
+    snapshot: { paramMap: convertToParamMap({ packageName: 'acme-lib', version: '1.2.3' }) },
   } as ActivatedRoute;
 
   function render(): ComponentFixture<PypiPackagesVersionDetailComponent> {

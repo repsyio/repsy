@@ -59,7 +59,7 @@ describe('RubyGemsVersionListComponent', () => {
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
     router = jasmine.createSpyObj<Router>('Router', ['navigate']);
     dangerModalService = new DangerModalService();
-    route = { snapshot: { paramMap: convertToParamMap({ gem: 'rails' }) } } as ActivatedRoute;
+    route = { snapshot: { paramMap: convertToParamMap({ packageName: 'rails' }) } } as ActivatedRoute;
     component = new RubyGemsVersionListComponent(
       route,
       { username: 'alice' } as AuthService,

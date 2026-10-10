@@ -59,7 +59,7 @@ describe('MavenArtifactsListComponent', () => {
     component = new MavenArtifactsListComponent(
       { username: 'alice' } as AuthService,
       mavenService,
-      { snapshot: { paramMap: convertToParamMap({ group: 'org.acme' }) } } as ActivatedRoute,
+      { snapshot: { paramMap: convertToParamMap({ groupName: 'org.acme' }) } } as ActivatedRoute,
       toastService,
       dangerModalService,
       router,

@@ -62,7 +62,7 @@ describe('MavenArtifactsVersionListComponent', () => {
       { username: 'alice' } as AuthService,
       mavenService,
       {
-        snapshot: { paramMap: convertToParamMap({ group: 'org.acme', artifact: 'lib' }) },
+        snapshot: { paramMap: convertToParamMap({ groupName: 'org.acme', artifactName: 'lib' }) },
       } as ActivatedRoute,
       router,
       toastService,

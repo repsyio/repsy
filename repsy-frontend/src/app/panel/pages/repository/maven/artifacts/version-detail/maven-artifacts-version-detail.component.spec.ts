@@ -63,7 +63,7 @@ describe('MavenArtifactsVersionDetailComponent', () => {
   let repoChanges: BehaviorSubject<RepoPermissionInfo | null>;
   let currentRepo: { repoName: string; repoType: string } | null;
   const route = {
-    snapshot: { paramMap: convertToParamMap({ group: 'org.acme', artifact: 'lib', version: '1.2.3' }) },
+    snapshot: { paramMap: convertToParamMap({ groupName: 'org.acme', artifactName: 'lib', version: '1.2.3' }) },
   } as ActivatedRoute;
 
   beforeEach(() => {
@@ -328,7 +328,7 @@ describe('MavenArtifactsVersionDetailComponent template', () => {
       {
         provide: ActivatedRoute,
         useValue: {
-          snapshot: { paramMap: convertToParamMap({ group: 'org.acme', artifact: 'lib', version: '1.2.3' }) },
+          snapshot: { paramMap: convertToParamMap({ groupName: 'org.acme', artifactName: 'lib', version: '1.2.3' }) },
         },
       },
       { provide: HIGHLIGHT_OPTIONS, useValue: {} },

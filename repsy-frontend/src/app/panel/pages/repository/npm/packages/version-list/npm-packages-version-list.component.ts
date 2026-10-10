@@ -114,7 +114,7 @@ export class NpmPackagesVersionListComponent implements OnDestroy {
       if (registry) {
         this.activeRegistry = Object.assign({}, registry);
         this.scopeName = this.route.snapshot.paramMap.get('scope');
-        this.packageName = this.route.snapshot.paramMap.get('package');
+        this.packageName = this.route.snapshot.paramMap.get('packageName');
 
         if (this.scopeName == '~') {
           this.scopeName = null;

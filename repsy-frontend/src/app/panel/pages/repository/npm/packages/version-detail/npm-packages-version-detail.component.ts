@@ -110,7 +110,7 @@ export class NpmPackagesVersionDetailComponent implements OnDestroy {
     this.error = null;
 
     this.scopeName = this.route.snapshot.paramMap.get('scope');
-    this.packageName = this.route.snapshot.paramMap.get('package');
+    this.packageName = this.route.snapshot.paramMap.get('packageName');
     this.versionName = this.route.snapshot.paramMap.get('version');
 
     if (this.scopeName == '~') {

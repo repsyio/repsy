@@ -39,7 +39,7 @@ export const RUBY_ROUTES: Routes = [
         title: 'repsy | Ruby Repository Settings',
       },
       {
-        path: ':gem',
+        path: ':packageName',
         children: [
           {
             path: '',

@@ -36,15 +36,15 @@ describe('NPM_ROUTES', () => {
       },
       { path: ':scope' },
       { path: ':scope', component: NpmPackagesScopeFilterComponent, title: 'repsy | Npm Package Scopes', full: true },
-      { path: ':scope/:package' },
+      { path: ':scope/:packageName' },
       {
-        path: ':scope/:package',
+        path: ':scope/:packageName',
         component: NpmPackagesVersionListComponent,
         title: 'Npm Package Versions | Repsy',
         full: true,
       },
       {
-        path: ':scope/:package/:version',
+        path: ':scope/:packageName/:version',
         component: NpmPackagesVersionDetailComponent,
         title: 'repsy | Npm Version Details',
         full: true,

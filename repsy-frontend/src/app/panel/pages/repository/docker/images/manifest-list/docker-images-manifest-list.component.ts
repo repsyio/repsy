@@ -96,8 +96,8 @@ export class DockerImagesManifestListComponent implements OnDestroy {
     this.repositoryChanges$ = this.dockerService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
         this.activeRepo = Object.assign({}, repo);
-        this.imageName = this.route.snapshot.paramMap.get('image');
-        this.tagName = this.route.snapshot.paramMap.get('tag');
+        this.imageName = this.route.snapshot.paramMap.get('imageName');
+        this.tagName = this.route.snapshot.paramMap.get('tagName');
         this.installText = `docker pull ${getRepoDomain()}/${this.activeRepo.repoName}/${this.imageName}:${this.tagName}`;
         this.fetchManifests();
       }

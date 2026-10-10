@@ -41,7 +41,7 @@ export const DOCKER_ROUTES: Routes = [
         title: 'repsy | Docker Repository Settings',
       },
       {
-        path: ':image',
+        path: ':imageName',
         children: [
           {
             path: '',
@@ -50,7 +50,7 @@ export const DOCKER_ROUTES: Routes = [
             title: 'repsy | Docker Image Tags',
           },
           {
-            path: ':tag',
+            path: ':tagName',
             children: [
               {
                 path: '',

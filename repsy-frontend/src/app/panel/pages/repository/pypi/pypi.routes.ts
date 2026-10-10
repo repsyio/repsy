@@ -40,7 +40,7 @@ export const PYPI_ROUTES: Routes = [
         title: 'repsy | Pypi Repository Settings',
       },
       {
-        path: ':package',
+        path: ':packageName',
         children: [
           {
             path: '',
