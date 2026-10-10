@@ -21,6 +21,7 @@ import com.github.f4b6a3.uuid.UuidCreator;
 import freemarker.template.Configuration;
 import freemarker.template.TemplateException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
+import io.repsy.core.web.paging.VersionSortPaging;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.generated.model.ReleaseDetail;
 import io.repsy.os.server.protocols.pypi.shared.python_package.dtos.PypiDeletion;
@@ -38,7 +39,6 @@ import io.repsy.os.server.protocols.pypi.shared.python_package.repositories.Rele
 import io.repsy.os.server.protocols.pypi.shared.storage.services.PypiStorageService;
 import io.repsy.os.server.shared.utils.RequestBaseUrlUtils;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
-import io.repsy.os.shared.utils.VersionSortPaging;
 import io.repsy.protocols.pypi.shared.python_package.dtos.PackageUploadForm;
 import io.repsy.protocols.pypi.shared.python_package.dtos.ReleaseVersionRequiresPython;
 import io.repsy.protocols.pypi.shared.python_package.services.AbstractPypiPackageService;

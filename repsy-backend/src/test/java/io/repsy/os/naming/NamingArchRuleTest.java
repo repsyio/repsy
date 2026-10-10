@@ -86,16 +86,12 @@ class NamingArchRuleTest {
               "io.repsy.os.server.shared.token.utils.TokenUsernameGenerator",
               "io.repsy.os.shared.auth.utils.PasswordHasher",
               "io.repsy.os.shared.auth.utils.TokenRealm",
-              "io.repsy.os.shared.error_handling.utils.ConstraintViolations",
               "io.repsy.os.shared.error_handling.utils.OciErrors",
               "io.repsy.os.shared.token.utils.TokenFactory",
               "io.repsy.os.shared.token.utils.TokenGenerator",
               "io.repsy.os.shared.token.utils.TokenHash",
               "io.repsy.os.shared.token.utils.TokenScopeConverter",
-              "io.repsy.os.shared.utils.LikePatterns",
               "io.repsy.os.shared.utils.MultiPortNames",
-              "io.repsy.os.shared.utils.SortValidator",
-              "io.repsy.os.shared.utils.VersionSortPaging",
               "io.repsy.protocols.docker.shared.utils.AcceptHeaderParser",
               "io.repsy.protocols.docker.shared.utils.BaseParsedPath",
               "io.repsy.protocols.docker.shared.utils.DockerDigestCalculator",
@@ -138,7 +134,6 @@ class NamingArchRuleTest {
               "io.repsy.protocols.shared.utils.RequestBodies")
           .group(
               "value type, stream wrapper or helper that is not a static *Utils holder; move or rename",
-              "io.repsy.os.shared.utils.OffsetPageRequest",
               "io.repsy.protocols.npm.shared.utils.NpmTarballFacts",
               "io.repsy.protocols.pypi.shared.utils.Pep440Version",
               "io.repsy.protocols.pypi.shared.utils.ReleaseVersion",
@@ -209,8 +204,6 @@ class NamingArchRuleTest {
               "filter, interceptor or matcher in configs; move out of configs or rename to *Config",
               "io.repsy.libs.multiport.configs.RepsyConnectorSettings",
               "io.repsy.os.shared.configs.ApiPortMatcher",
-              "io.repsy.os.shared.configs.PagingParameterInterceptor",
-              "io.repsy.os.shared.configs.PutBodyPreservingFormContentFilter",
               "io.repsy.os.shared.configs.SecurityHeadersFilter")
           .build();
 

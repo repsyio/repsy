@@ -17,7 +17,7 @@ package db.migration.h2;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.repsy.os.panel.shared.config.configs.XmlMapperConfig;
+import io.repsy.core.web.configs.XmlMapperConfig;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetDependencyInfo;
 import io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils;
 import java.sql.Connection;

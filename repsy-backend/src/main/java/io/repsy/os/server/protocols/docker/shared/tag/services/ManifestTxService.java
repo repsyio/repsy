@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.docker.shared.tag.services;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
+import io.repsy.core.web.utils.LikePatterns;
 import io.repsy.os.generated.model.ManifestListItem;
 import io.repsy.os.server.protocols.docker.shared.image.dtos.ImageInfo;
 import io.repsy.os.server.protocols.docker.shared.image.entities.Image;
@@ -31,7 +32,6 @@ import io.repsy.os.server.protocols.docker.shared.tag.mappers.ManifestMapper;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestChildRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.TagRepository;
-import io.repsy.os.shared.utils.LikePatterns;
 import io.repsy.protocols.docker.shared.constants.DockerConstants;
 import io.repsy.protocols.docker.shared.image.dtos.BaseImageInfo;
 import io.repsy.protocols.docker.shared.image.exceptions.ImageDeletedException;

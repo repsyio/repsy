@@ -1850,7 +1850,7 @@ class OpenApiSpecConsistencyIT extends AbstractIntegrationTest {
                           final boolean itf) {
 
                         if (owner.equals("org/springframework/http/ResponseEntity")
-                            || owner.equals("io/repsy/os/shared/http/ResponseEntities")) {
+                            || owner.equals("io/repsy/core/web/http/ResponseEntities")) {
                           switch (callee) {
                             case "created" -> codes.add(201);
                             case "accepted" -> codes.add(202);

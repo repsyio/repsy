@@ -15,6 +15,8 @@
  */
 package io.repsy.os.server.protocols.golang.ui.controllers;
 
+import io.repsy.core.web.http.ResponseEntities;
+import io.repsy.core.web.paging.SortValidator;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.generated.model.GoModuleInfo;
@@ -22,12 +24,10 @@ import io.repsy.os.generated.model.GoModuleListItem;
 import io.repsy.os.generated.model.GoModuleVersionListItem;
 import io.repsy.os.server.protocols.golang.ui.facades.GoApiFacade;
 import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
-import io.repsy.os.shared.http.ResponseEntities;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.utils.MultiPortNames;
-import io.repsy.os.shared.utils.SortValidator;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;

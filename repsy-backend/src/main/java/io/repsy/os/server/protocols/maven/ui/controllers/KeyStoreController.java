@@ -15,6 +15,8 @@
  */
 package io.repsy.os.server.protocols.maven.ui.controllers;
 
+import io.repsy.core.web.http.ResponseEntities;
+import io.repsy.core.web.paging.SortValidator;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.os.generated.model.AllowedKeyserverItem;
 import io.repsy.os.generated.model.KeyStoreForm;
@@ -24,10 +26,8 @@ import io.repsy.os.generated.model.PgpPublicKeyItem;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreService;
 import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
 import io.repsy.os.shared.auth.PanelAuthHelper;
-import io.repsy.os.shared.http.ResponseEntities;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.utils.MultiPortNames;
-import io.repsy.os.shared.utils.SortValidator;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.repo.dtos.RepoScope;
 import jakarta.validation.Valid;

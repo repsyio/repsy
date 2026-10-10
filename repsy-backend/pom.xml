@@ -42,6 +42,12 @@
 
         <dependency>
             <groupId>io.repsy.core</groupId>
+            <artifactId>core-web</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>io.repsy.core</groupId>
             <artifactId>core-response</artifactId>
             <version>${project.version}</version>
         </dependency>

@@ -17,6 +17,7 @@ package io.repsy.os.server.protocols.docker.shared.image.services;
 
 import com.github.f4b6a3.uuid.UuidCreator;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
+import io.repsy.core.web.utils.LikePatterns;
 import io.repsy.os.server.protocols.docker.shared.image.dtos.ImageInfo;
 import io.repsy.os.server.protocols.docker.shared.image.entities.Image;
 import io.repsy.os.server.protocols.docker.shared.image.mappers.ImageMapper;
@@ -26,7 +27,6 @@ import io.repsy.os.server.protocols.docker.shared.tag.entities.Tag;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.TagRepository;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
-import io.repsy.os.shared.utils.LikePatterns;
 import io.repsy.protocols.docker.shared.image.exceptions.ImageDeletedException;
 import io.repsy.protocols.docker.shared.image.services.ImageService;
 import java.time.Instant;

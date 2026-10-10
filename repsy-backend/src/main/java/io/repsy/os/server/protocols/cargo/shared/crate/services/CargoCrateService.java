@@ -18,6 +18,7 @@ package io.repsy.os.server.protocols.cargo.shared.crate.services;
 import com.github.f4b6a3.uuid.UuidCreator;
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
+import io.repsy.core.web_error.ConstraintViolations;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.server.protocols.cargo.shared.crate.entities.CargoAuthor;
 import io.repsy.os.server.protocols.cargo.shared.crate.entities.CargoCategory;
@@ -32,7 +33,6 @@ import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoCrateIn
 import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoCrateMetaRepository;
 import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoCrateRepository;
 import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoKeywordRepository;
-import io.repsy.os.shared.error_handling.utils.ConstraintViolations;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.protocols.cargo.protocol.utils.CrateUtils;

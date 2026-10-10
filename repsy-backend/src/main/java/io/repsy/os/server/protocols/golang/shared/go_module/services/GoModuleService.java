@@ -18,6 +18,7 @@ package io.repsy.os.server.protocols.golang.shared.go_module.services;
 import com.github.f4b6a3.uuid.UuidCreator;
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
+import io.repsy.core.web_error.ConstraintViolations;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.generated.model.GoModuleInfo;
 import io.repsy.os.server.protocols.golang.shared.go_module.dtos.GoModuleVersionListItem;
@@ -26,7 +27,6 @@ import io.repsy.os.server.protocols.golang.shared.go_module.entities.GoModuleVer
 import io.repsy.os.server.protocols.golang.shared.go_module.mappers.GoModuleMapper;
 import io.repsy.os.server.protocols.golang.shared.go_module.repositories.GoModuleRepository;
 import io.repsy.os.server.protocols.golang.shared.go_module.repositories.GoModuleVersionRepository;
-import io.repsy.os.shared.error_handling.utils.ConstraintViolations;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.protocols.golang.shared.module.services.AbstractGoModuleService;
