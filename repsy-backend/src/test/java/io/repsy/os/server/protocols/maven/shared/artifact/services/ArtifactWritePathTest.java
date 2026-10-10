@@ -123,21 +123,35 @@ class ArtifactWritePathTest {
             queryService,
             this.storageStrategyRegistry);
 
-    this.artifactService =
-        new ArtifactDeploymentService(
-            this.repoTxService,
+    final var rowWriteService =
+        new ArtifactRowWriteService(
             this.artifactRepository,
             this.artifactVersionRepository,
             this.versionDeveloperRepository,
             this.versionLicenseRepository,
             this.artifactUpsertHelper,
             this.artifactVersionWriteService,
-            this.pendingSignatureService,
-            this.pendingSignatureRepository,
+            queryService,
+            this.storageStrategyRegistry);
+    this.artifactService =
+        new ArtifactDeploymentService(
             queryService,
             signatureService,
             pluginMetadataService,
-            this.storageStrategyRegistry);
+            new ArtifactDeploymentRulesService(
+                this.artifactRepository, this.storageStrategyRegistry),
+            new ArtifactPomRegistrationService(
+                this.repoTxService,
+                rowWriteService,
+                this.pendingSignatureService,
+                signatureService,
+                pluginMetadataService),
+            new ArtifactRowDeleteService(
+                this.repoTxService,
+                this.artifactRepository,
+                this.artifactVersionRepository,
+                this.pendingSignatureRepository,
+                this.artifactVersionWriteService));
 
     final var repo = new Repo();
     repo.setId(this.repoId);

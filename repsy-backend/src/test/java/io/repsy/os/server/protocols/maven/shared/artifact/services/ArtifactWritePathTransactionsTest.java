@@ -102,4 +102,29 @@ class ArtifactWritePathTransactionsTest {
     assertThat(wrong).as("write entry points that are not plain @Transactional").isEmpty();
     assertThat(byPropagation).containsEntry("class", "REQUIRED/true");
   }
+
+  @Test
+  @DisplayName("the services split out of the deployment service run in the transaction they join")
+  void theSplitServicesOpenNoTransactionOfTheirOwn() {
+    final var withOwn = new ArrayList<String>();
+
+    for (final var type :
+        List.of(
+            ArtifactDeploymentRulesService.class,
+            ArtifactPomRegistrationService.class,
+            ArtifactRowWriteService.class,
+            ArtifactRowDeleteService.class)) {
+      if (AnnotatedElementUtils.findMergedAnnotation(type, Transactional.class) != null) {
+        withOwn.add(type.getSimpleName());
+      }
+
+      for (final Method method : type.getDeclaredMethods()) {
+        if (AnnotatedElementUtils.findMergedAnnotation(method, Transactional.class) != null) {
+          withOwn.add(type.getSimpleName() + "#" + method.getName());
+        }
+      }
+    }
+
+    assertThat(withOwn).as("split services with a transaction of their own").isEmpty();
+  }
 }
