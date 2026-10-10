@@ -16,6 +16,8 @@
 package io.repsy.os.server.protocols.shared.aop;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.when;
 
 import io.repsy.os.server.protocols.shared.aop.interceptors.ProtocolAuthInterceptor;
 import io.repsy.os.server.protocols.shared.aop.resolvers.ApiFacadeResolver;
@@ -29,6 +31,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.handler.MappedInterceptor;
@@ -43,18 +46,32 @@ class ProtocolEndpointDispatcherTest {
   @Mock private RepoPermissionInfoResolver permissionInfoResolver;
   @Mock private ProtocolAuthInterceptor authInterceptor;
 
+  @Mock private ObjectProvider<RepoInfoResolver> repoInfoProvider;
+  @Mock private ObjectProvider<AuthServiceResolver> authServiceProvider;
+  @Mock private ObjectProvider<ApiFacadeResolver> apiFacadeProvider;
+  @Mock private ObjectProvider<RepoPermissionInfoResolver> permissionInfoProvider;
+  @Mock private ObjectProvider<ProtocolAuthInterceptor> authInterceptorProvider;
+
+  private void provide() {
+    when(this.repoInfoProvider.getObject()).thenReturn(this.repoInfoResolver);
+    when(this.authServiceProvider.getObject()).thenReturn(this.authServiceResolver);
+    when(this.apiFacadeProvider.getObject()).thenReturn(this.apiFacadeResolver);
+    when(this.permissionInfoProvider.getObject()).thenReturn(this.permissionInfoResolver);
+  }
+
   private ProtocolEndpointDispatcher dispatcher() {
     return new ProtocolEndpointDispatcher(
-        this.repoInfoResolver,
-        this.authServiceResolver,
-        this.apiFacadeResolver,
-        this.permissionInfoResolver,
-        this.authInterceptor);
+        this.repoInfoProvider,
+        this.authServiceProvider,
+        this.apiFacadeProvider,
+        this.permissionInfoProvider,
+        this.authInterceptorProvider);
   }
 
   @Test
   @DisplayName("registers the four argument resolvers in order")
   void registersTheArgumentResolversInOrder() {
+    this.provide();
     final List<HandlerMethodArgumentResolver> resolvers = new ArrayList<>();
 
     dispatcher().addArgumentResolvers(resolvers);
@@ -70,6 +87,7 @@ class ProtocolEndpointDispatcherTest {
   @Test
   @DisplayName("maps the auth interceptor onto every panel route")
   void mapsTheAuthInterceptorOntoEveryPanelRoute() {
+    when(this.authInterceptorProvider.getObject()).thenReturn(this.authInterceptor);
     final var registry = new ExposedInterceptorRegistry();
 
     dispatcher().addInterceptors(registry);
@@ -80,6 +98,19 @@ class ProtocolEndpointDispatcherTest {
     final var mapped = (MappedInterceptor) interceptors.getFirst();
     assertThat(mapped.getInterceptor()).isSameAs(this.authInterceptor);
     assertThat(mapped.getIncludePathPatterns()).containsExactly("/api/**");
+  }
+
+  @Test
+  @DisplayName("resolves nothing at construction, so the MVC conversion service is not in a cycle")
+  void resolvesNothingAtConstruction() {
+    dispatcher();
+
+    verifyNoInteractions(
+        this.repoInfoProvider,
+        this.authServiceProvider,
+        this.apiFacadeProvider,
+        this.permissionInfoProvider,
+        this.authInterceptorProvider);
   }
 
   private static final class ExposedInterceptorRegistry extends InterceptorRegistry {
