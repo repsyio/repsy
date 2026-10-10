@@ -20,6 +20,12 @@ package io.repsy.os.server.protocols.shared;
  * handlers before they moved onto the shared OCI module (RPS-2058). Placeholders: {@code {repo}}
  * and {@code {other}} are the two repos of the run, {@code {uuid-N}} and {@code {digest-N}} number
  * the upload ids and digests in their order of appearance.
+ *
+ * <p>RPS-2165: the Docker blob pull used to be recorded as 404 {@code layerNotFound} next to a 200
+ * blob check. That was the harness, not the registry: the pull runs outside the test transaction
+ * and could not see the uncommitted layer row. The script now commits the uploads first, and the
+ * pull is the 200 a real registry answers. The pull's {@code Content-Type} stays the config type
+ * for every Docker blob, while the blob check reports the layer's own type.
  */
 final class OciWireTranscripts {
 
@@ -180,9 +186,11 @@ final class OciWireTranscripts {
       < Content-Length: 12
       ## blob pull
       > GET /v2/{repo}/app/blobs/{digest-2}
-      < 404
-      < Content-Type: application/json
-      < body: {"errors":[{"code":"BLOB_UNKNOWN","message":"Layer not found.","detail":"layerNotFound"}]}
+      < 200
+      < Docker-Content-Digest: {digest-2}
+      < Content-Type: application/vnd.docker.container.image.v1+json
+      < Content-Length: 12
+      < body: hello world!
       ## blob check of the layer
       > HEAD /v2/{repo}/app/blobs/{digest-5}
       < 200
@@ -219,9 +227,11 @@ final class OciWireTranscripts {
       < Content-Type: application/vnd.oci.image.manifest.v1+json
       ## blob pull of the layer
       > GET /v2/{repo}/app/blobs/{digest-5}
-      < 404
-      < Content-Type: application/json
-      < body: {"errors":[{"code":"BLOB_UNKNOWN","message":"Layer not found.","detail":"layerNotFound"}]}
+      < 200
+      < Docker-Content-Digest: {digest-5}
+      < Content-Type: application/vnd.docker.container.image.v1+json
+      < Content-Length: 12
+      < body: docker-layer
       ## manifest check by tag
       > HEAD /v2/{repo}/app/manifests/1.0.0
       < 200
