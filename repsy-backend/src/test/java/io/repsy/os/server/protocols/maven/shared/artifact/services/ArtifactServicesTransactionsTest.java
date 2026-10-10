@@ -43,7 +43,11 @@ class ArtifactServicesTransactionsTest {
   private static final String READ_WRITE = "readWrite";
 
   private static final List<Class<?>> SERVICES =
-      List.of(ArtifactService.class, VersionSignatureService.class);
+      List.of(
+          ArtifactDeploymentService.class,
+          ArtifactQueryService.class,
+          ArtifactSignatureService.class,
+          MavenPluginMetadataService.class);
 
   private static final Map<String, String> EXPECTED =
       Map.ofEntries(

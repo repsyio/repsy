@@ -46,10 +46,10 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * request's thread) and a rolled back change starts nothing. A repo whose run is still waiting in
  * the queue is not queued again: the run reads the setting when it starts and again for every
  * version. The setting is read again for every version, right before that version's row lock is
- * taken for the write of {@code signed} (see {@link VersionSignatureService#recompute}), so what a
+ * taken for the write of {@code signed} (see {@link ArtifactSignatureService#recompute}), so what a
  * run applies is always the rule of the setting as it is when the version is done: a second toggle
  * while a run is going, a second run, or a run that overlaps an upload all end in the same state.
- * The rule itself is the one of the upload path ({@link VersionSignatureService#refreshSigned}),
+ * The rule itself is the one of the upload path ({@link ArtifactSignatureService#refreshSigned}),
  * not a copy of it.
  *
  * <p>The versions are walked in pages of ids and each one is recomputed in a transaction of its
@@ -63,7 +63,7 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * taken (RPS-1469: looking an unregistered key up asks a key server, so this must not sit under the
  * lock, or a slow or unreachable one would block uploads to that version), by the same verifier and
  * key rules as an upload, so that the toggle alone does not turn an honest publisher's versions
- * unsigned ({@link VersionSignatureService#recompute}, RPS-1323).
+ * unsigned ({@link ArtifactSignatureService#recompute}, RPS-1323).
  *
  * <p>It also runs when the places a signature's key is looked up change, for a repo that verifies
  * every signature ({@link #onKeySourcesChanged}, RPS-1334).
@@ -82,7 +82,7 @@ public class SignedRecomputeService {
 
   private final ArtifactVersionRepository artifactVersionRepository;
   private final RepoRepository repoRepository;
-  private final VersionSignatureService versionSignatureService;
+  private final ArtifactSignatureService artifactSignatureService;
   private final Executor executor;
   private final int batchSize;
 
@@ -92,13 +92,13 @@ public class SignedRecomputeService {
   public SignedRecomputeService(
       final ArtifactVersionRepository artifactVersionRepository,
       final RepoRepository repoRepository,
-      final VersionSignatureService versionSignatureService,
+      final ArtifactSignatureService artifactSignatureService,
       @Qualifier(SignedRecomputeExecutorConfig.BEAN_NAME) final Executor executor,
       @Value("${repsy.maven.signed-recompute.batch-size:200}") final int batchSize) {
 
     this.artifactVersionRepository = artifactVersionRepository;
     this.repoRepository = repoRepository;
-    this.versionSignatureService = versionSignatureService;
+    this.artifactSignatureService = artifactSignatureService;
     this.executor = executor;
     this.batchSize = Math.max(1, batchSize);
   }
@@ -131,10 +131,10 @@ public class SignedRecomputeService {
    *
    * <p>What it does not do: it does not unsign a version by the removal of a key. A signature that
    * was verified is recorded and stays recorded when its key is gone or cannot be found ({@link
-   * VersionSignatureService#recompute}: only a signature that is found not to verify is forgotten),
-   * so deleting a key changes nothing for the versions it signed, and what the recomputation adds
-   * are the versions whose signatures verify with a key that was just added. What a revocation
-   * should mean is a product question of its own.
+   * ArtifactSignatureService#recompute}: only a signature that is found not to verify is
+   * forgotten), so deleting a key changes nothing for the versions it signed, and what the
+   * recomputation adds are the versions whose signatures verify with a key that was just added.
+   * What a revocation should mean is a product question of its own.
    */
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void onKeySourcesChanged(final PgpKeySourcesChangedEvent event) {
@@ -237,7 +237,7 @@ public class SignedRecomputeService {
   private boolean recomputeVersion(final UUID repoId, final UUID versionId) {
 
     try {
-      this.versionSignatureService.recompute(versionId);
+      this.artifactSignatureService.recompute(versionId);
 
       return true;
     } catch (final RuntimeException e) {

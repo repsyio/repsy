@@ -35,8 +35,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Shared version-dependent write operations (developer/license rows, latest/release update) used by
- * both {@link ArtifactService} (outer-transaction "already exists" update path) and {@link
- * ArtifactUpsertHelper} (REQUIRES_NEW "newly inserted" path).
+ * both {@link ArtifactDeploymentService} (outer-transaction "already exists" update path) and
+ * {@link ArtifactUpsertHelper} (REQUIRES_NEW "newly inserted" path).
  *
  * <p>Depends only on repositories, not on either of those two classes, so both can depend on this
  * one without forming a circular bean dependency. Its write methods use plain

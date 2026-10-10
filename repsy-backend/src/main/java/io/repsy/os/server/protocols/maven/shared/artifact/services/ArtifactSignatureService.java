@@ -28,9 +28,14 @@ import io.repsy.os.server.protocols.maven.shared.keystore.dtos.PublicKeySources;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreService;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.PgpVerifierService;
 import io.repsy.os.shared.repo.entities.Repo;
+import io.repsy.protocols.maven.shared.artifact.dtos.SignatureOutcome;
 import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
+import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import io.repsy.protocols.shared.storage.StorageStrategyRegistry;
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.HashSet;
@@ -41,6 +46,7 @@ import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
+import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,14 +57,19 @@ import org.springframework.transaction.annotation.Transactional;
  * for a snapshot only the files of its newest build are the ones to sign ({@link
  * ArtifactUtils#filesToSign}).
  *
- * <p>It joins the transaction of the upload it is called from.
+ * <p>It also holds the signature flow of an upload and of a request for a signature (RPS-2064):
+ * recording the verified signature of a stored file, recomputing {@code signed} when a signable
+ * file is stored, verifying a signature before it is stored or parking it until its file and
+ * version are there. It joins the transaction of the upload it is called from, except for {@link
+ * #verifySignature} and {@link #getNonSignedStoragePath}, which run read only as they did on the
+ * artifact service.
  */
 @Slf4j
 @Component
 @Transactional
 @RequiredArgsConstructor
 @NullMarked
-public class VersionSignatureService {
+public class ArtifactSignatureService {
 
   private static final String SIGNATURE_SUFFIX = ".asc";
 
@@ -69,6 +80,9 @@ public class VersionSignatureService {
 
   private final KeyStoreService keyStoreService;
   private final PgpVerifierService pgpVerifierService;
+
+  private final ArtifactQueryService artifactQueryService;
+  private final PendingSignatureService pendingSignatureService;
 
   /** Records that the signature of {@code signedFileName} verified now (an upsert). */
   public void recordVerified(final ArtifactVersion version, final String signedFileName) {
@@ -415,6 +429,322 @@ public class VersionSignatureService {
   static boolean isSigned(final Collection<String> filesToSign, final Collection<String> verified) {
 
     return !filesToSign.isEmpty() && verified.containsAll(filesToSign);
+  }
+
+  /**
+   * A signable file was stored into a repo that verifies every signature (RPS-1188). The signature
+   * that arrived before it, if any, is checked now and recorded ({@link
+   * PendingSignatureService#reconcileFile}); otherwise its bytes are new, so the verified signature
+   * of the previous ones is forgotten. Whether the version is signed is recomputed either way. A
+   * file of a version that is not registered yet (a jar before its POM) is left to the POM's
+   * registration.
+   *
+   * <p>Known window, accepted (RPS-1335): whether the repo verifies every signature is taken from
+   * {@code repoInfo}, which is from the start of the request, and a repo for which it says no
+   * returns before any lock or query. A toggle-on that commits while such a file is being uploaded
+   * starts its recomputation, and if that has already passed the file's version, the version keeps
+   * a {@code signed} that was computed without the new file until the next upload into it or the
+   * next toggle. It is bounded (one version per upload that raced the toggle), heals itself, and
+   * needs an upload and a toggle within the same moment. Closing it needs the setting read for
+   * every signable file of a flag-off repo, which is the query per file that RPS-1179 removed; a
+   * plain {@code mvn deploy} uploads many of them.
+   */
+  public void refreshSignedForFile(
+      final BaseRepoInfo<UUID> repoInfo, final StoragePath storagePath) {
+
+    if (!this.isSignableInVerifyAllRepo(repoInfo, storagePath)) {
+      return;
+    }
+
+    final var recorded =
+        this.pendingSignatureService.reconcileFile(
+            repoInfo, PendingSignatureService.pathOf(storagePath));
+
+    this.updateSignedForFile(repoInfo, storagePath, recorded);
+  }
+
+  /**
+   * From the setting as {@code repoInfo} has it, so a request that began before a toggle is decided
+   * by the old value. When that says on, {@link #updateSignedForFile} reads the setting again under
+   * the version's lock; when it says off nothing is read, and that is the accepted window of {@link
+   * #refreshSignedForFile} (RPS-1335).
+   */
+  private boolean isSignableInVerifyAllRepo(
+      final BaseRepoInfo<UUID> repoInfo, final StoragePath storagePath) {
+
+    return repoInfo.isPgpVerifyAllSignaturesEnabled()
+        && ArtifactUtils.isSignableFile(storagePath.getRelativePath().getFileName());
+  }
+
+  /**
+   * Forgets the verified signature of a signable file that was stored again, unless it was just
+   * recorded for the new bytes, and recomputes whether the version is signed.
+   */
+  public void updateSignedForFile(
+      final BaseRepoInfo<UUID> repoInfo, final StoragePath storagePath, final boolean recorded) {
+
+    if (!this.isSignableInVerifyAllRepo(repoInfo, storagePath)) {
+      return;
+    }
+
+    final var relativePath = storagePath.getRelativePath();
+    final var gav = ArtifactUtils.convertPathToGav(relativePath.getPath());
+    final var version =
+        gav == null
+            ? null
+            : this.artifactQueryService
+                .findRegisteredVersion(repoInfo.getStorageKey(), gav)
+                .orElse(null);
+
+    if (version == null) {
+      return;
+    }
+
+    // Locked first: a signature request that recorded this file's signature holds the lock until it
+    // commits, so the record is either visible from here on or comes after the recomputation below
+    // (RPS-1320). The setting is read after the lock and not taken from repoInfo, which is from the
+    // start of the request: a toggle that committed since has its recomputation waiting for this
+    // lock, and what is written here must be by the setting it will find (RPS-1323).
+    final var verifyAll = this.lockAndIsVerifyAll(version);
+
+    if (verifyAll && !recorded) {
+      this.forgetUnlessStillVerifies(repoInfo, version, storagePath);
+    }
+
+    this.refreshSigned(repoInfo.getStorageKey(), version, versionPathOf(storagePath), verifyAll);
+  }
+
+  private void forgetUnlessStillVerifies(
+      final BaseRepoInfo<UUID> repoInfo,
+      final ArtifactVersion version,
+      final StoragePath storagePath) {
+
+    final var fileName = storagePath.getRelativePath().getFileName();
+    final var recordedId = this.findRecordedId(version, fileName);
+
+    // Nothing recorded, nothing to forget. Deleting by file name here would take a record that a
+    // signature request commits after this read, and leave the version unsigned (RPS-1984).
+    if (recordedId.isEmpty()) {
+      return;
+    }
+
+    if (!this.stillVerifies(repoInfo, PendingSignatureService.pathOf(storagePath))) {
+      this.forget(recordedId.get());
+    }
+  }
+
+  /**
+   * Whether the verified signature recorded for a file that was just stored is the one of the bytes
+   * that are stored now, and not of the ones they replaced. Called only when a record exists.
+   *
+   * <p>A signature is small and its request often runs whole between the moment the file it signs
+   * is stored and the moment that file's own request gets here: it finds the file, verifies against
+   * these very bytes and records them. Forgetting that record on the file's behalf would leave the
+   * version unsigned for good, as nothing recomputes it afterwards (RPS-1320). So a record that is
+   * there is checked once more against the file and the signature that are stored, and is kept if
+   * it holds. When the file is new no record exists and nothing is read. When it replaced another
+   * (a redeploy) the record is, in general, the one of the old bytes, does not verify and goes; if
+   * the same bytes were stored again it holds, and stays.
+   */
+  private boolean stillVerifies(final BaseRepoInfo<UUID> repoInfo, final String filePath) {
+
+    final var repoName = repoInfo.getName();
+    final var file =
+        this.mavenStorage().get(StoragePath.of(repoInfo.getStorageKey(), filePath), repoName);
+    final var signature =
+        this.mavenStorage()
+            .get(StoragePath.of(repoInfo.getStorageKey(), filePath + SIGNATURE_SUFFIX), repoName);
+
+    if (file.isEmpty() || signature.isEmpty()) {
+      return false;
+    }
+
+    try {
+      this.verifyAgainst(repoInfo, file.get(), signature.get());
+
+      return true;
+    } catch (final RuntimeException e) {
+      // Not verified, or not verifiable now (a key that cannot be found): not vouched for.
+      log.debug("The recorded signature of {} no longer verifies: {}", filePath, e.toString());
+
+      return false;
+    }
+  }
+
+  /** The version directory a file sits in, {@code <group>/<artifactId>/<version>}. */
+  public static String versionPathOf(final StoragePath storagePath) {
+
+    final var fullPath = storagePath.getPath().replace("\\", "/");
+
+    return fullPath.substring(fullPath.indexOf("/") + 1, fullPath.lastIndexOf("/"));
+  }
+
+  /**
+   * Replaces a signature's path with the path of the file it signs, {@code .asc} dropped, in the
+   * same repo.
+   */
+  @Transactional(readOnly = true)
+  public StoragePath getNonSignedStoragePath(final StoragePath signedStoragePath) {
+
+    final var signaturePath = signedStoragePath.getRelativePath().getPath();
+
+    final var suffixLength = SIGNATURE_SUFFIX.length();
+
+    final var nonSignedFileName = signaturePath.substring(0, signaturePath.length() - suffixLength);
+
+    return StoragePath.of(signedStoragePath.getStorageKey(), nonSignedFileName);
+  }
+
+  /**
+   * Records the verified signature of the file {@code signaturePath} signs and updates {@code
+   * signed}: set directly on a repo that only verifies the POM signature, recomputed from all the
+   * files of the version on one that verifies every signature (RPS-1188).
+   */
+  public void processSignedFile(
+      final BaseRepoInfo<UUID> repoInfo, final StoragePath signaturePath) {
+
+    final var signedStoragePath = this.getNonSignedStoragePath(signaturePath);
+
+    final var gav = ArtifactUtils.convertPathToGav(signedStoragePath.getRelativePath().getPath());
+
+    if (null == gav) {
+      throw new ItemNotFoundException(ProtocolErrorCodes.ITEM_NOT_FOUND);
+    }
+
+    final var artifactVersion =
+        this.artifactQueryService.findRegisteredVersion(repoInfo.getStorageKey(), gav).orElse(null);
+
+    // verifySignature refuses a signature without a registered version before it is stored, so
+    // this is a defensive check for a version that vanished in between.
+    if (artifactVersion == null) {
+      throw new ItemNotFoundException(ProtocolErrorCodes.ARTIFACT_VERSION_NOT_FOUND);
+    }
+
+    if (repoInfo.isPgpVerifyAllSignaturesEnabled()) {
+      // A copy of this signature parked earlier goes, after any check of it that is running.
+      this.pendingSignatureService.claim(
+          repoInfo.getStorageKey(), PendingSignatureService.pathOf(signedStoragePath));
+    }
+
+    // The version's lock is taken before its signature is recorded, and the setting is read after
+    // it: repoInfo is from the start of the request, and a toggle may have committed since. The
+    // recomputation that toggle started waits for this lock, so it comes after what is written here
+    // (RPS-1323). The lock comes after the claim above, as it always did, so the two locks are
+    // taken in the same order as by the checks of parked signatures.
+    final var verifyAll = this.lockAndIsVerifyAll(artifactVersion);
+
+    this.recordVerified(artifactVersion, signedStoragePath.getRelativePath().getFileName());
+
+    // The rule of the setting it is now: every file has a verified signature, or the POM's has.
+    this.refreshSigned(
+        repoInfo.getStorageKey(), artifactVersion, versionPathOf(signedStoragePath), verifyAll);
+  }
+
+  /**
+   * Verifies the signature of a stored file before the signature itself is stored, so a refused
+   * signature leaves no trace: nothing is written and no row or file is deleted (RPS-1186). It used
+   * to run after the signature was stored, and the facade then rolled the whole version back.
+   *
+   * <p>On a repo that verifies every signature (RPS-1188) a signature whose file is not stored, or
+   * whose version is not registered, is parked instead of refused: Maven uploads in parallel, so it
+   * may overtake either. It is parked in a transaction of its own that commits first, and the file
+   * and the version are looked at once more after that, so a file that landed in between is not
+   * missed: the file's own upload finds the parked row if it comes later, this request finds the
+   * file if it came earlier.
+   *
+   * @throws ItemNotFoundException {@code itemNotFound} when the signed file is not stored
+   * @throws ItemNotFoundException {@code artifactVersionNotFound} when the POM is stored but its
+   *     version is not registered (RPS-1191)
+   */
+  @Transactional(readOnly = true)
+  public SignatureOutcome verifySignature(
+      final BaseRepoInfo<UUID> repoInfo,
+      final StoragePath signedStoragePath,
+      final Resource signature) {
+
+    final var nonSignedStoragePath = this.getNonSignedStoragePath(signedStoragePath);
+    final var storedFile = this.mavenStorage().get(nonSignedStoragePath, repoInfo.getName());
+
+    if (storedFile.isPresent() && this.isVersionRegistered(repoInfo, nonSignedStoragePath)) {
+      this.verifyAgainst(repoInfo, storedFile.get(), signature);
+
+      return SignatureOutcome.VERIFIED;
+    }
+
+    if (!repoInfo.isPgpVerifyAllSignaturesEnabled()) {
+      // A POM stored before RPS-1193, or whose rows are gone, can lack a registered version (a POM
+      // of another group was stored but skipped by checkExtractedInfos). A signature could then
+      // not be recorded, so it is refused here, before the key lookup and before anything is
+      // stored (RPS-1191).
+      throw new ItemNotFoundException(
+          storedFile.isPresent()
+              ? ProtocolErrorCodes.ARTIFACT_VERSION_NOT_FOUND
+              : ProtocolErrorCodes.ITEM_NOT_FOUND);
+    }
+
+    return this.parkOrVerify(repoInfo, nonSignedStoragePath, signature);
+  }
+
+  private boolean isVersionRegistered(
+      final BaseRepoInfo<UUID> repoInfo, final StoragePath nonSignedStoragePath) {
+
+    final var gav =
+        ArtifactUtils.convertPathToGav(nonSignedStoragePath.getRelativePath().getPath());
+
+    return gav != null
+        && this.artifactQueryService
+            .findRegisteredVersion(repoInfo.getStorageKey(), gav)
+            .isPresent();
+  }
+
+  private void verifyAgainst(
+      final BaseRepoInfo<UUID> repoInfo, final Resource storedFile, final Resource signature) {
+
+    final var sources =
+        this.keyStoreService.getPublicKeySources(
+            repoInfo.getStorageKey(), repoInfo.isPgpKeyServerLookupEnabled());
+
+    this.pgpVerifierService.verify(storedFile, signature, sources);
+  }
+
+  /**
+   * Parks the signature, then looks for the file and the version once more: if both are there now,
+   * the signature is verified after all and the request stores it like any other (its parked copy
+   * is dropped when it is recorded, or here when it does not verify).
+   */
+  private SignatureOutcome parkOrVerify(
+      final BaseRepoInfo<UUID> repoInfo,
+      final StoragePath nonSignedStoragePath,
+      final Resource signature) {
+
+    final var filePath = PendingSignatureService.pathOf(nonSignedStoragePath);
+
+    this.pendingSignatureService.park(repoInfo.getStorageKey(), filePath, readBytes(signature));
+
+    final var storedFile = this.mavenStorage().get(nonSignedStoragePath, repoInfo.getName());
+
+    if (storedFile.isEmpty() || !this.isVersionRegistered(repoInfo, nonSignedStoragePath)) {
+      return SignatureOutcome.PARKED;
+    }
+
+    try {
+      this.verifyAgainst(repoInfo, storedFile.get(), signature);
+    } catch (final RuntimeException e) {
+      this.pendingSignatureService.discard(repoInfo.getStorageKey(), filePath);
+
+      throw e;
+    }
+
+    return SignatureOutcome.VERIFIED;
+  }
+
+  private static byte[] readBytes(final Resource signature) {
+
+    try {
+      return signature.getContentAsByteArray();
+    } catch (final IOException e) {
+      throw new UncheckedIOException(e);
+    }
   }
 
   private StorageStrategy mavenStorage() {

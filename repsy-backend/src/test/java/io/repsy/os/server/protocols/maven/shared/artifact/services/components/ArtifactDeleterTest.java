@@ -27,7 +27,8 @@ import static org.mockito.Mockito.when;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.os.server.protocols.maven.shared.artifact.dtos.DeletedItem;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.Artifact;
-import io.repsy.os.server.protocols.maven.shared.artifact.services.ArtifactService;
+import io.repsy.os.server.protocols.maven.shared.artifact.services.ArtifactDeploymentService;
+import io.repsy.os.server.protocols.maven.shared.artifact.services.ArtifactQueryService;
 import io.repsy.os.server.protocols.maven.shared.storage.services.MavenStorageService;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -55,7 +56,8 @@ class ArtifactDeleterTest {
   private static final String GROUP = "com.acme";
 
   @Mock private MavenStorageService mavenStorageService;
-  @Mock private ArtifactService artifactService;
+  @Mock private ArtifactQueryService artifactQueryService;
+  @Mock private ArtifactDeploymentService artifactDeploymentService;
   @Mock private ApplicationEventPublisher eventPublisher;
 
   @InjectMocks private ArtifactDeleter component;
@@ -73,7 +75,7 @@ class ArtifactDeleterTest {
   @DisplayName("an artifact that does not exist is a 404 before hasOnlyOneArtifact is asked")
   void missingArtifactIsRefusedBeforeTheCascade() {
     doThrow(new ItemNotFoundException("artifactNotFound"))
-        .when(this.artifactService)
+        .when(this.artifactQueryService)
         .requireArtifact(REPO_ID, GROUP, "ghost");
 
     assertThatThrownBy(() -> this.component.deleteArtifact(repo(), GROUP, "ghost"))
@@ -81,8 +83,8 @@ class ArtifactDeleterTest {
 
     // The group holds exactly one artifact in the reported case: the answer must not depend on it,
     // and nothing may be moved or removed.
-    verify(this.artifactService).requireArtifact(REPO_ID, GROUP, "ghost");
-    verifyNoMoreInteractions(this.artifactService);
+    verify(this.artifactQueryService).requireArtifact(REPO_ID, GROUP, "ghost");
+    verifyNoMoreInteractions(this.artifactQueryService, this.artifactDeploymentService);
     verifyNoInteractions(this.mavenStorageService, this.eventPublisher);
   }
 
@@ -90,14 +92,14 @@ class ArtifactDeleterTest {
   @DisplayName("a group without artifacts is a 404 that deletes nothing")
   void missingGroupIsRefused() {
     doThrow(new ItemNotFoundException("groupNotFound"))
-        .when(this.artifactService)
+        .when(this.artifactQueryService)
         .requireGroup(REPO_ID, GROUP);
 
     assertThatThrownBy(() -> this.component.deleteGroup(repo(), GROUP))
         .isInstanceOf(ItemNotFoundException.class);
 
-    verify(this.artifactService).requireGroup(REPO_ID, GROUP);
-    verifyNoMoreInteractions(this.artifactService);
+    verify(this.artifactQueryService).requireGroup(REPO_ID, GROUP);
+    verifyNoMoreInteractions(this.artifactQueryService, this.artifactDeploymentService);
     verifyNoInteractions(this.mavenStorageService, this.eventPublisher);
   }
 
@@ -106,32 +108,32 @@ class ArtifactDeleterTest {
   void theOnlyRealArtifactStillCascadesToTheGroup() {
     final var artifact = new Artifact();
     artifact.setArtifactName("lib");
-    when(this.artifactService.hasOnlyOneArtifact(REPO_ID, GROUP)).thenReturn(true);
-    when(this.artifactService.getArtifacts(REPO_ID, GROUP)).thenReturn(List.of(artifact));
-    when(this.artifactService.getArtifactVersionNames(REPO_ID, GROUP, "lib"))
+    when(this.artifactQueryService.hasOnlyOneArtifact(REPO_ID, GROUP)).thenReturn(true);
+    when(this.artifactQueryService.getArtifacts(REPO_ID, GROUP)).thenReturn(List.of(artifact));
+    when(this.artifactQueryService.getArtifactVersionNames(REPO_ID, GROUP, "lib"))
         .thenReturn(List.of("1.0"));
     when(this.mavenStorageService.deleteGroup(REPO_ID, GROUP, List.of("lib"))).thenReturn(10L);
 
     final var deleted = this.component.deleteArtifact(repo(), GROUP, "lib");
 
     assertThat(deleted.getFirst()).isEqualTo(DeletedItem.GROUP);
-    verify(this.artifactService).requireArtifact(REPO_ID, GROUP, "lib");
-    verify(this.artifactService).requireGroup(REPO_ID, GROUP);
-    verify(this.artifactService).deleteGroup(REPO_ID, GROUP);
+    verify(this.artifactQueryService).requireArtifact(REPO_ID, GROUP, "lib");
+    verify(this.artifactQueryService).requireGroup(REPO_ID, GROUP);
+    verify(this.artifactDeploymentService).deleteGroup(REPO_ID, GROUP);
     verify(this.eventPublisher).publishEvent(any(Object.class));
   }
 
   @Test
   @DisplayName("an artifact of a group with siblings is deleted alone")
   void anArtifactWithSiblingsIsDeletedAlone() {
-    when(this.artifactService.hasOnlyOneArtifact(REPO_ID, GROUP)).thenReturn(false);
-    when(this.artifactService.getArtifactVersionNames(REPO_ID, GROUP, "lib"))
+    when(this.artifactQueryService.hasOnlyOneArtifact(REPO_ID, GROUP)).thenReturn(false);
+    when(this.artifactQueryService.getArtifactVersionNames(REPO_ID, GROUP, "lib"))
         .thenReturn(List.of("1.0", "2.0"));
     when(this.mavenStorageService.deleteArtifact(REPO_ID, GROUP, "lib")).thenReturn(5L);
 
     final var deleted = this.component.deleteArtifact(repo(), GROUP, "lib");
 
     assertThat(deleted.getFirst()).isEqualTo(DeletedItem.ARTIFACT);
-    verify(this.artifactService).deleteArtifact(REPO_ID, GROUP, "lib");
+    verify(this.artifactDeploymentService).deleteArtifact(REPO_ID, GROUP, "lib");
   }
 }

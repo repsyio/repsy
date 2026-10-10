@@ -35,17 +35,24 @@ import io.repsy.os.server.protocols.maven.shared.artifact.entities.ArtifactVersi
 import io.repsy.os.server.protocols.maven.shared.artifact.mappers.ArtifactMapper;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactRepository;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactVersionRepository;
+import io.repsy.os.server.protocols.maven.shared.artifact.repositories.PendingSignatureRepository;
+import io.repsy.os.server.protocols.maven.shared.artifact.repositories.VersionDeveloperRepository;
+import io.repsy.os.server.protocols.maven.shared.artifact.repositories.VersionLicenseRepository;
+import io.repsy.os.server.protocols.maven.shared.artifact.repositories.VersionSignatureRepository;
+import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreService;
+import io.repsy.os.server.protocols.maven.shared.keystore.services.PgpVerifierService;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
+import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.protocols.shared.storage.StorageStrategyRegistry;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
@@ -68,8 +75,59 @@ class ArtifactServiceQueriesTest {
   @Mock ArtifactVersionRepository artifactVersionRepository;
   @Mock ArtifactMapper artifactConverter;
   @Mock StorageStrategyRegistry storageStrategyRegistry;
+  @Mock PgpVerifierService pgpVerifierService;
+  @Mock KeyStoreService keyStoreService;
+  @Mock RepoRepository repoRepository;
+  @Mock VersionDeveloperRepository versionDeveloperRepository;
+  @Mock VersionLicenseRepository versionLicenseRepository;
+  @Mock ArtifactUpsertHelper artifactUpsertHelper;
+  @Mock ArtifactVersionWriteService artifactVersionWriteService;
+  @Mock VersionSignatureRepository versionSignatureRepository;
+  @Mock PendingSignatureService pendingSignatureService;
+  @Mock PendingSignatureRepository pendingSignatureRepository;
 
-  @InjectMocks ArtifactService artifactService;
+  ArtifactQueryService artifactQueryService;
+  ArtifactDeploymentService artifactService;
+
+  @BeforeEach
+  void buildTheServices() {
+    this.artifactQueryService =
+        new ArtifactQueryService(
+            this.artifactRepository,
+            this.artifactVersionRepository,
+            this.artifactConverter,
+            this.storageStrategyRegistry);
+    final var signatureService =
+        new ArtifactSignatureService(
+            this.versionSignatureRepository,
+            this.artifactVersionRepository,
+            this.storageStrategyRegistry,
+            this.keyStoreService,
+            this.pgpVerifierService,
+            this.artifactQueryService,
+            this.pendingSignatureService);
+    final var pluginMetadataService =
+        new MavenPluginMetadataService(
+            this.artifactRepository,
+            this.artifactVersionRepository,
+            this.artifactQueryService,
+            this.storageStrategyRegistry);
+    this.artifactService =
+        new ArtifactDeploymentService(
+            this.repoRepository,
+            this.artifactRepository,
+            this.artifactVersionRepository,
+            this.versionDeveloperRepository,
+            this.versionLicenseRepository,
+            this.artifactUpsertHelper,
+            this.artifactVersionWriteService,
+            this.pendingSignatureService,
+            this.pendingSignatureRepository,
+            this.artifactQueryService,
+            signatureService,
+            pluginMetadataService,
+            this.storageStrategyRegistry);
+  }
 
   private Artifact stubArtifact(final String latest) {
     final var artifact = new Artifact();
@@ -94,7 +152,8 @@ class ArtifactServiceQueriesTest {
         .thenReturn(new PageImpl<>(List.of(row), pageable, 1));
     when(this.artifactConverter.toArtifactVersionListItemDto(row)).thenReturn(item);
 
-    final var page = this.artifactService.getArtifactVersions(REPO_ID, "com.acme", "lib", pageable);
+    final var page =
+        this.artifactQueryService.getArtifactVersions(REPO_ID, "com.acme", "lib", pageable);
 
     assertThat(page.getContent()).containsExactly(item);
     assertThat(page.getTotalElements()).isEqualTo(1);
@@ -110,7 +169,7 @@ class ArtifactServiceQueriesTest {
         .thenReturn(Page.empty());
 
     assertThat(
-            this.artifactService.getArtifactVersionsContainsVersion(
+            this.artifactQueryService.getArtifactVersionsContainsVersion(
                 REPO_ID, "com.acme", "lib", "1.0", pageable))
         .isEmpty();
   }
@@ -132,7 +191,7 @@ class ArtifactServiceQueriesTest {
             });
 
     final var page =
-        this.artifactService.getArtifactVersionsContainsVersion(
+        this.artifactQueryService.getArtifactVersionsContainsVersion(
             REPO_ID,
             "com.acme",
             "lib",
@@ -159,10 +218,10 @@ class ArtifactServiceQueriesTest {
             REPO_ID, "com.acme", LikePatterns.of("%", "li", "%"), pageable))
         .thenReturn(Page.empty());
 
-    assertThat(this.artifactService.getArtifactsContainsGroupName(REPO_ID, "acme", pageable))
+    assertThat(this.artifactQueryService.getArtifactsContainsGroupName(REPO_ID, "acme", pageable))
         .isEmpty();
     assertThat(
-            this.artifactService.getArtifactsContainsArtifactName(
+            this.artifactQueryService.getArtifactsContainsArtifactName(
                 REPO_ID, "com.acme", "li", pageable))
         .isEmpty();
   }
@@ -174,7 +233,8 @@ class ArtifactServiceQueriesTest {
     when(this.artifactRepository.findAllByRepoIdAndGroupName(REPO_ID, "com.acme"))
         .thenReturn(List.of(artifact));
 
-    assertThat(this.artifactService.getArtifacts(REPO_ID, "com.acme")).containsExactly(artifact);
+    assertThat(this.artifactQueryService.getArtifacts(REPO_ID, "com.acme"))
+        .containsExactly(artifact);
   }
 
   @Test
@@ -188,10 +248,10 @@ class ArtifactServiceQueriesTest {
     when(this.artifactVersionRepository.findByArtifactId(artifact.getId()))
         .thenReturn(List.of(one, two));
 
-    assertThat(this.artifactService.getArtifactVersionNames(REPO_ID, "com.acme", "lib"))
+    assertThat(this.artifactQueryService.getArtifactVersionNames(REPO_ID, "com.acme", "lib"))
         .containsExactly("1.0", "1.1");
     assertThatThrownBy(
-            () -> this.artifactService.getArtifactVersionNames(REPO_ID, "com.acme", "ghost"))
+            () -> this.artifactQueryService.getArtifactVersionNames(REPO_ID, "com.acme", "ghost"))
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessage("artifactNotFound");
   }
@@ -209,11 +269,11 @@ class ArtifactServiceQueriesTest {
             REPO_ID, "com.acme", "many"))
         .thenReturn(3L);
 
-    assertThat(this.artifactService.hasOnlyOneArtifact(REPO_ID, "one")).isTrue();
-    assertThat(this.artifactService.hasOnlyOneArtifact(REPO_ID, "two")).isFalse();
-    assertThat(this.artifactService.hasOnlyOneArtifact(REPO_ID, "none")).isFalse();
-    assertThat(this.artifactService.hasOnlyOneVersion(REPO_ID, "com.acme", "one")).isTrue();
-    assertThat(this.artifactService.hasOnlyOneVersion(REPO_ID, "com.acme", "many")).isFalse();
+    assertThat(this.artifactQueryService.hasOnlyOneArtifact(REPO_ID, "one")).isTrue();
+    assertThat(this.artifactQueryService.hasOnlyOneArtifact(REPO_ID, "two")).isFalse();
+    assertThat(this.artifactQueryService.hasOnlyOneArtifact(REPO_ID, "none")).isFalse();
+    assertThat(this.artifactQueryService.hasOnlyOneVersion(REPO_ID, "com.acme", "one")).isTrue();
+    assertThat(this.artifactQueryService.hasOnlyOneVersion(REPO_ID, "com.acme", "many")).isFalse();
   }
 
   @Test
@@ -225,14 +285,17 @@ class ArtifactServiceQueriesTest {
     when(this.artifactVersionRepository.findByArtifactIdAndVersionName(artifact.getId(), "9.9"))
         .thenReturn(Optional.empty());
 
-    this.artifactService.requireArtifactVersion(REPO_ID, "com.acme", "lib", "1.0");
+    this.artifactQueryService.requireArtifactVersion(REPO_ID, "com.acme", "lib", "1.0");
 
     assertThatThrownBy(
-            () -> this.artifactService.requireArtifactVersion(REPO_ID, "com.acme", "lib", "9.9"))
+            () ->
+                this.artifactQueryService.requireArtifactVersion(REPO_ID, "com.acme", "lib", "9.9"))
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessage("artifactVersionNotFound");
     assertThatThrownBy(
-            () -> this.artifactService.requireArtifactVersion(REPO_ID, "com.acme", "ghost", "1.0"))
+            () ->
+                this.artifactQueryService.requireArtifactVersion(
+                    REPO_ID, "com.acme", "ghost", "1.0"))
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessage("artifactNotFound");
   }
@@ -253,9 +316,9 @@ class ArtifactServiceQueriesTest {
     when(this.artifactConverter.toArtifactVersionInfo(artifact, latest)).thenReturn(latestInfo);
     when(this.artifactConverter.toArtifactVersionInfo(artifact, named)).thenReturn(namedInfo);
 
-    assertThat(this.artifactService.getArtifactVersion(REPO_ID, "com.acme", "lib", null))
+    assertThat(this.artifactQueryService.getArtifactVersion(REPO_ID, "com.acme", "lib", null))
         .isSameAs(latestInfo);
-    assertThat(this.artifactService.getArtifactVersion(REPO_ID, "com.acme", "lib", "1.0"))
+    assertThat(this.artifactQueryService.getArtifactVersion(REPO_ID, "com.acme", "lib", "1.0"))
         .isSameAs(namedInfo);
   }
 
@@ -267,7 +330,7 @@ class ArtifactServiceQueriesTest {
         .thenReturn(Optional.empty());
 
     assertThatThrownBy(
-            () -> this.artifactService.getArtifactVersion(REPO_ID, "com.acme", "lib", "9.9"))
+            () -> this.artifactQueryService.getArtifactVersion(REPO_ID, "com.acme", "lib", "9.9"))
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessage("artifactVersionNotFound");
   }
@@ -278,11 +341,11 @@ class ArtifactServiceQueriesTest {
     final var repoInfo = RepoInfo.builder().id(REPO_ID).storageKey(REPO_ID).name("mvn").build();
 
     assertThat(
-            this.artifactService.getArtifactVersionPomFilename(
+            this.artifactQueryService.getArtifactVersionPomFilename(
                 repoInfo, Path.of("/com/acme/lib"), RELEASE, "lib", "1.0"))
         .isEqualTo("lib-1.0.pom");
     assertThat(
-            this.artifactService.getArtifactVersionPomFilename(
+            this.artifactQueryService.getArtifactVersionPomFilename(
                 repoInfo, Path.of("/com/acme/lib"), PLUGIN, "lib", "1.0"))
         .isNull();
   }

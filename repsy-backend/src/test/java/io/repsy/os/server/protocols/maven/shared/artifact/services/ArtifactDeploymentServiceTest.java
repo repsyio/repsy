@@ -25,6 +25,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
@@ -49,6 +50,7 @@ import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactV
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.PendingSignatureRepository;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.VersionDeveloperRepository;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.VersionLicenseRepository;
+import io.repsy.os.server.protocols.maven.shared.artifact.repositories.VersionSignatureRepository;
 import io.repsy.os.server.protocols.maven.shared.keystore.dtos.PublicKeySources;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreService;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.PgpVerifierService;
@@ -85,7 +87,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.io.ByteArrayResource;
@@ -118,9 +119,9 @@ import org.springframework.data.domain.Sort;
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName(
-    "Maven ArtifactService version-type rules (RPS-1174, RPS-1176, RPS-1182, RPS-1183,"
+    "Maven ArtifactDeploymentService version-type rules (RPS-1174, RPS-1176, RPS-1182, RPS-1183,"
         + " RPS-1185)")
-class ArtifactServiceTest {
+class ArtifactDeploymentServiceTest {
 
   private static final UUID RECORDED_ID = UUID.fromString("00000000-0000-0000-0000-000000000007");
   private static final String SNAPSHOT_JAR =
@@ -164,13 +165,21 @@ class ArtifactServiceTest {
   @Mock KeyStoreService keyStoreService;
   @Mock ArtifactUpsertHelper artifactUpsertHelper;
   @Mock ArtifactVersionWriteService artifactVersionWriteService;
-  @Mock VersionSignatureService versionSignatureService;
+  @Mock VersionSignatureRepository versionSignatureRepository;
   @Mock PendingSignatureService pendingSignatureService;
   @Mock PendingSignatureRepository pendingSignatureRepository;
   @Mock StorageStrategy storageStrategy;
   @Mock StorageStrategyRegistry storageStrategyRegistry;
 
-  @InjectMocks ArtifactService artifactService;
+  /**
+   * The signature flow with the state operations that used to be a collaborator ({@code
+   * VersionSignatureService}) stubbed on a spy: what these tests pin is the orchestration, and what
+   * it asks of the state is asserted on the spy as it was on the mock.
+   */
+  ArtifactSignatureService versionSignatureService;
+
+  ArtifactQueryService artifactQueryService;
+  ArtifactDeploymentService artifactService;
 
   /**
    * The setting as it is committed once the version is locked (RPS-1323): on unless a test says
@@ -178,10 +187,73 @@ class ArtifactServiceTest {
    */
   @BeforeEach
   void theSettingReadUnderTheLockIsOn() {
-    lenient().when(this.versionSignatureService.lockAndIsVerifyAll(any())).thenReturn(true);
     lenient()
         .when(this.storageStrategyRegistry.get(RepoType.MAVEN))
         .thenReturn(this.storageStrategy);
+
+    this.artifactQueryService =
+        new ArtifactQueryService(
+            this.artifactRepository,
+            this.artifactVersionRepository,
+            this.artifactConverter,
+            this.storageStrategyRegistry);
+    this.versionSignatureService =
+        org.mockito.Mockito.spy(
+            new ArtifactSignatureService(
+                this.versionSignatureRepository,
+                this.artifactVersionRepository,
+                this.storageStrategyRegistry,
+                this.keyStoreService,
+                this.pgpVerifierService,
+                this.artifactQueryService,
+                this.pendingSignatureService));
+    final var pluginMetadataService =
+        new MavenPluginMetadataService(
+            this.artifactRepository,
+            this.artifactVersionRepository,
+            this.artifactQueryService,
+            this.storageStrategyRegistry);
+    this.artifactService =
+        new ArtifactDeploymentService(
+            this.repoRepository,
+            this.artifactRepository,
+            this.artifactVersionRepository,
+            this.versionDeveloperRepository,
+            this.versionLicenseRepository,
+            this.artifactUpsertHelper,
+            this.artifactVersionWriteService,
+            this.pendingSignatureService,
+            this.pendingSignatureRepository,
+            this.artifactQueryService,
+            this.versionSignatureService,
+            pluginMetadataService,
+            this.storageStrategyRegistry);
+
+    // The state operations are what the old mock answered: the setting is read under the lock (on
+    // unless a test says otherwise), nothing is recorded, nothing is forgotten.
+    lenient().doReturn(true).when(this.versionSignatureService).lockAndIsVerifyAll(any());
+    lenient()
+        .doReturn(Optional.empty())
+        .when(this.versionSignatureService)
+        .findRecordedId(any(), any());
+    lenient().doNothing().when(this.versionSignatureService).recordVerified(any(), any());
+    lenient()
+        .doNothing()
+        .when(this.versionSignatureService)
+        .refreshSigned(any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean());
+    lenient().doNothing().when(this.versionSignatureService).forget(any(UUID.class));
+    lenient().doNothing().when(this.versionSignatureService).forget(any(), any());
+  }
+
+  /** What {@code verifyNoInteractions} of the old mock meant: no state operation was asked. */
+  private void verifyNoSignatureStateTouched() {
+    verify(this.versionSignatureService, never()).lockAndIsVerifyAll(any());
+    verify(this.versionSignatureService, never()).findRecordedId(any(), any());
+    verify(this.versionSignatureService, never()).recordVerified(any(), any());
+    verify(this.versionSignatureService, never())
+        .refreshSigned(any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean());
+    verify(this.versionSignatureService, never()).forget(any(UUID.class));
+    verify(this.versionSignatureService, never()).forget(any(), any());
   }
 
   private static RepoInfo repoVerifyingAllSignatures(final UUID id) {
@@ -742,7 +814,7 @@ class ArtifactServiceTest {
   }
 
   private String pomFilenameOf(final String versionName) throws Exception {
-    return this.artifactService.getArtifactVersionPomFilename(
+    return this.artifactQueryService.getArtifactVersionPomFilename(
         repo(UUID.randomUUID(), true, true, true),
         Path.of("/com.acme/lib"),
         SNAPSHOT,
@@ -879,7 +951,7 @@ class ArtifactServiceTest {
     final var version = new ArtifactVersion();
     when(this.artifactVersionRepository.findByArtifactIdAndVersionName(artifact.getId(), "1.0"))
         .thenReturn(Optional.of(version));
-    when(this.versionSignatureService.lockAndIsVerifyAll(version)).thenReturn(false);
+    doReturn(false).when(this.versionSignatureService).lockAndIsVerifyAll(version);
 
     this.artifactService.createOrUpdateArtifact(
         repo(id, true, true, true),
@@ -902,7 +974,7 @@ class ArtifactServiceTest {
     when(this.artifactVersionRepository.findByArtifactIdAndVersionName(artifact.getId(), "1.0"))
         .thenReturn(Optional.of(version));
     // repoInfo, read when the request started, says on; a toggle committed since.
-    when(this.versionSignatureService.lockAndIsVerifyAll(version)).thenReturn(false);
+    doReturn(false).when(this.versionSignatureService).lockAndIsVerifyAll(version);
 
     this.artifactService.createOrUpdateArtifact(
         repoVerifyingAllSignatures(id),
@@ -927,7 +999,7 @@ class ArtifactServiceTest {
     when(this.artifactVersionRepository.findByArtifactIdAndVersionName(artifact.getId(), "1.0"))
         .thenReturn(Optional.of(version));
     // repoInfo says off; the toggle committed after it was read.
-    when(this.versionSignatureService.lockAndIsVerifyAll(version)).thenReturn(true);
+    doReturn(true).when(this.versionSignatureService).lockAndIsVerifyAll(version);
 
     this.artifactService.createOrUpdateArtifact(
         repo(id, true, true, true),
@@ -946,7 +1018,7 @@ class ArtifactServiceTest {
     final var version = new ArtifactVersion();
     when(this.artifactVersionRepository.findByArtifactIdAndVersionName(artifact.getId(), "1.0"))
         .thenReturn(Optional.of(version));
-    when(this.versionSignatureService.lockAndIsVerifyAll(version)).thenReturn(false);
+    doReturn(false).when(this.versionSignatureService).lockAndIsVerifyAll(version);
 
     this.artifactService.createOrUpdateArtifact(
         repoVerifyingAllSignatures(id),
@@ -974,9 +1046,9 @@ class ArtifactServiceTest {
     verifyNoInteractions(
         this.artifactRepository,
         this.artifactVersionRepository,
-        this.versionSignatureService,
         this.storageStrategy,
         this.repoRepository);
+    this.verifyNoSignatureStateTouched();
   }
 
   @Test
@@ -1025,8 +1097,9 @@ class ArtifactServiceTest {
     final var version = new ArtifactVersion();
     when(this.artifactVersionRepository.findByArtifactIdAndVersionName(artifact.getId(), "1.0"))
         .thenReturn(Optional.of(version));
-    when(this.versionSignatureService.findRecordedId(version, "lib-1.0-sources.jar"))
-        .thenReturn(Optional.of(RECORDED_ID));
+    doReturn(Optional.of(RECORDED_ID))
+        .when(this.versionSignatureService)
+        .findRecordedId(version, "lib-1.0-sources.jar");
 
     this.artifactService.createOrUpdateArtifact(
         repoVerifyingAllSignatures(id),
@@ -1046,8 +1119,9 @@ class ArtifactServiceTest {
     final var version = new ArtifactVersion();
     when(this.artifactVersionRepository.findByArtifactIdAndVersionName(artifact.getId(), "1.0"))
         .thenReturn(Optional.of(version));
-    when(this.versionSignatureService.findRecordedId(version, "lib-1.0.jar"))
-        .thenReturn(Optional.of(RECORDED_ID));
+    doReturn(Optional.of(RECORDED_ID))
+        .when(this.versionSignatureService)
+        .findRecordedId(version, "lib-1.0.jar");
     final var jar = new ByteArrayResource("jar".getBytes(UTF_8));
     final var signature = new ByteArrayResource(ARMORED_SIGNATURE.getBytes(UTF_8));
     when(this.storageStrategy.get(pathOfNullSafe("com/acme/lib/1.0/lib-1.0.jar"), eq("mvn")))
@@ -1075,8 +1149,9 @@ class ArtifactServiceTest {
     final var version = new ArtifactVersion();
     when(this.artifactVersionRepository.findByArtifactIdAndVersionName(artifact.getId(), "1.0"))
         .thenReturn(Optional.of(version));
-    when(this.versionSignatureService.findRecordedId(version, "lib-1.0.jar"))
-        .thenReturn(Optional.of(RECORDED_ID));
+    doReturn(Optional.of(RECORDED_ID))
+        .when(this.versionSignatureService)
+        .findRecordedId(version, "lib-1.0.jar");
     final var jar = new ByteArrayResource("another jar".getBytes(UTF_8));
     final var signature = new ByteArrayResource(ARMORED_SIGNATURE.getBytes(UTF_8));
     when(this.storageStrategy.get(pathOfNullSafe("com/acme/lib/1.0/lib-1.0.jar"), eq("mvn")))
@@ -1106,8 +1181,9 @@ class ArtifactServiceTest {
     final var version = new ArtifactVersion();
     when(this.artifactVersionRepository.findByArtifactIdAndVersionName(artifact.getId(), "1.0"))
         .thenReturn(Optional.of(version));
-    when(this.versionSignatureService.findRecordedId(version, "lib-1.0.jar"))
-        .thenReturn(Optional.of(RECORDED_ID));
+    doReturn(Optional.of(RECORDED_ID))
+        .when(this.versionSignatureService)
+        .findRecordedId(version, "lib-1.0.jar");
     when(this.storageStrategy.get(any(StoragePath.class), eq("mvn"))).thenReturn(Optional.empty());
 
     this.artifactService.createOrUpdateArtifact(
@@ -1128,8 +1204,9 @@ class ArtifactServiceTest {
     final var version = new ArtifactVersion();
     when(this.artifactVersionRepository.findByArtifactIdAndVersionName(artifact.getId(), "1.0"))
         .thenReturn(Optional.of(version));
-    when(this.versionSignatureService.findRecordedId(version, "lib-1.0.jar"))
-        .thenReturn(Optional.empty());
+    doReturn(Optional.empty())
+        .when(this.versionSignatureService)
+        .findRecordedId(version, "lib-1.0.jar");
 
     this.artifactService.createOrUpdateArtifact(
         repoVerifyingAllSignatures(id),
@@ -1159,7 +1236,7 @@ class ArtifactServiceTest {
         StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.jar"),
         new ByteArrayResource(new byte[0]));
 
-    verifyNoInteractions(this.versionSignatureService);
+    this.verifyNoSignatureStateTouched();
   }
 
   @Test
@@ -1393,7 +1470,7 @@ class ArtifactServiceTest {
         .isInstanceOf(SignatureNotVerifiedException.class)
         .hasMessage("pendingSignatureNotVerified");
 
-    verifyNoInteractions(this.versionSignatureService);
+    this.verifyNoSignatureStateTouched();
   }
 
   @Test
@@ -1468,9 +1545,9 @@ class ArtifactServiceTest {
     final var id = UUID.randomUUID();
     this.stubArtifact(id);
 
-    assertThatCode(() -> this.artifactService.requireArtifact(id, "com.acme", "lib"))
+    assertThatCode(() -> this.artifactQueryService.requireArtifact(id, "com.acme", "lib"))
         .doesNotThrowAnyException();
-    assertThatThrownBy(() -> this.artifactService.requireArtifact(id, "com.acme", "ghost"))
+    assertThatThrownBy(() -> this.artifactQueryService.requireArtifact(id, "com.acme", "ghost"))
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessage("artifactNotFound");
   }
@@ -1482,9 +1559,9 @@ class ArtifactServiceTest {
     when(this.artifactRepository.countByRepoIdAndGroupName(id, "com.acme")).thenReturn(2L);
     when(this.artifactRepository.countByRepoIdAndGroupName(id, "com.ghost")).thenReturn(0L);
 
-    assertThatCode(() -> this.artifactService.requireGroup(id, "com.acme"))
+    assertThatCode(() -> this.artifactQueryService.requireGroup(id, "com.acme"))
         .doesNotThrowAnyException();
-    assertThatThrownBy(() -> this.artifactService.requireGroup(id, "com.ghost"))
+    assertThatThrownBy(() -> this.artifactQueryService.requireGroup(id, "com.ghost"))
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessage("groupNotFound");
   }
@@ -2459,11 +2536,11 @@ class ArtifactServiceTest {
               .map(row -> (ArtifactVersionListItem) row)
               .toList();
 
-      when(ArtifactServiceTest.this.artifactVersionRepository
+      when(ArtifactDeploymentServiceTest.this.artifactVersionRepository
               .findAllByRepoIdAndGroupNameAndArtifactName(this.repoId, "com.acme", "lib"))
           .thenReturn(rows);
 
-      when(ArtifactServiceTest.this.artifactConverter.toArtifactVersionListItemDto(any()))
+      when(ArtifactDeploymentServiceTest.this.artifactConverter.toArtifactVersionListItemDto(any()))
           .thenAnswer(
               invocation -> {
                 final ArtifactVersionListItem source = invocation.getArgument(0);
@@ -2480,7 +2557,7 @@ class ArtifactServiceTest {
       this.stubUnpagedVersions("1.9.0", "1.10.0", "1.10.0-SNAPSHOT", "1.11.0");
 
       final var descending =
-          ArtifactServiceTest.this.artifactService.getArtifactVersions(
+          ArtifactDeploymentServiceTest.this.artifactQueryService.getArtifactVersions(
               this.repoId,
               "com.acme",
               "lib",
@@ -2492,7 +2569,7 @@ class ArtifactServiceTest {
       assertThat(descending.getTotalElements()).isEqualTo(4);
 
       final var ascending =
-          ArtifactServiceTest.this.artifactService.getArtifactVersions(
+          ArtifactDeploymentServiceTest.this.artifactQueryService.getArtifactVersions(
               this.repoId,
               "com.acme",
               "lib",
@@ -2509,7 +2586,7 @@ class ArtifactServiceTest {
       this.stubUnpagedVersions("1.9.0", "1.10.0", "1.10.0-SNAPSHOT", "1.11.0");
 
       final var secondPage =
-          ArtifactServiceTest.this.artifactService.getArtifactVersions(
+          ArtifactDeploymentServiceTest.this.artifactQueryService.getArtifactVersions(
               this.repoId,
               "com.acme",
               "lib",
@@ -2525,17 +2602,17 @@ class ArtifactServiceTest {
     @Test
     @DisplayName("a plain id/lastUpdatedAt sort stays a database page, no unpaged fetch")
     void otherSortsStayOnTheDatabase() {
-      when(ArtifactServiceTest.this.artifactVersionRepository
+      when(ArtifactDeploymentServiceTest.this.artifactVersionRepository
               .findAllByRepoIdAndGroupNameAndArtifactName(any(), any(), any(), any()))
           .thenReturn(Page.empty());
 
-      ArtifactServiceTest.this.artifactService.getArtifactVersions(
+      ArtifactDeploymentServiceTest.this.artifactQueryService.getArtifactVersions(
           this.repoId,
           "com.acme",
           "lib",
           PageRequest.of(0, 10, Sort.by(Sort.Direction.DESC, "id")));
 
-      verify(ArtifactServiceTest.this.artifactVersionRepository, never())
+      verify(ArtifactDeploymentServiceTest.this.artifactVersionRepository, never())
           .findAllByRepoIdAndGroupNameAndArtifactName(any(), any(), any());
     }
   }

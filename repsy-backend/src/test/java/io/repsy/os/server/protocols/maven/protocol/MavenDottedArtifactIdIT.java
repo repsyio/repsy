@@ -51,9 +51,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * {@code ArtifactUtils.isPomToParse} and {@code isPomSignature}, and {@code
- * ArtifactService.createOrUpdateArtifact}, used to test for {@code .pom} as a substring of the
- * whole relative path rather than the file name's suffix. An artifactId (or a directory) that
- * merely contains {@code .pom} (for example {@code bar.pom.utils}, or a directory named {@code
+ * ArtifactDeploymentService.createOrUpdateArtifact}, used to test for {@code .pom} as a substring
+ * of the whole relative path rather than the file name's suffix. An artifactId (or a directory)
+ * that merely contains {@code .pom} (for example {@code bar.pom.utils}, or a directory named {@code
  * x.pom}) made every one of its non-POM files look like a POM to parse or a POM signature to
  * verify:
  *

@@ -22,7 +22,7 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.generated.model.ArtifactListItem;
 import io.repsy.os.generated.model.ArtifactVersionInfo;
 import io.repsy.os.generated.model.ArtifactVersionListItem;
-import io.repsy.os.server.protocols.maven.shared.artifact.services.ArtifactService;
+import io.repsy.os.server.protocols.maven.shared.artifact.services.ArtifactQueryService;
 import io.repsy.os.server.protocols.maven.shared.artifact.services.components.ArtifactDeleter;
 import io.repsy.os.server.protocols.maven.ui.facades.MavenApiFacade;
 import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
@@ -64,7 +64,7 @@ public class MavenArtifactController {
       Set.of("id", "versionName", "lastUpdatedAt");
 
   private final UsageUpdateService usageUpdateService;
-  private final ArtifactService artifactService;
+  private final ArtifactQueryService artifactQueryService;
   private final MavenApiFacade mavenApiFacade;
   private final ArtifactDeleter artifactDeleter;
 
@@ -141,7 +141,7 @@ public class MavenArtifactController {
     SortValidator.requireSortableBy(pageable, VERSION_SORT_PROPERTIES);
 
     final var artifactVersions =
-        this.artifactService.getArtifactVersions(
+        this.artifactQueryService.getArtifactVersions(
             repoInfo.getStorageKey(), groupName, artifactName, pageable);
 
     return ResponseEntity.ok(new PagedModel<>(artifactVersions));
@@ -159,7 +159,7 @@ public class MavenArtifactController {
     SortValidator.requireSortableBy(pageable, VERSION_SORT_PROPERTIES);
 
     final var artifactVersions =
-        this.artifactService.getArtifactVersionsContainsVersion(
+        this.artifactQueryService.getArtifactVersionsContainsVersion(
             repoInfo.getStorageKey(), groupName, artifactName, version, pageable);
 
     return ResponseEntity.ok(new PagedModel<>(artifactVersions));
@@ -175,7 +175,7 @@ public class MavenArtifactController {
     SortValidator.requireSortableBy(pageable, ARTIFACT_SORT_PROPERTIES);
 
     final var artifacts =
-        this.artifactService.getArtifactsContainsGroupName(
+        this.artifactQueryService.getArtifactsContainsGroupName(
             repoInfo.getStorageKey(), groupName, pageable);
 
     return ResponseEntity.ok(new PagedModel<>(artifacts));
@@ -192,7 +192,7 @@ public class MavenArtifactController {
     SortValidator.requireSortableBy(pageable, ARTIFACT_SORT_PROPERTIES);
 
     final var artifacts =
-        this.artifactService.getArtifactsContainsArtifactName(
+        this.artifactQueryService.getArtifactsContainsArtifactName(
             repoInfo.getStorageKey(), groupName, artifactName, pageable);
 
     return ResponseEntity.ok(new PagedModel<>(artifacts));
