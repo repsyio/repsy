@@ -49,6 +49,7 @@
  * Real clients hit these routes too, so their consequences are noted next to each pin; the real
  * `skopeo`/`regctl` runs that prove them arrive with parts B and C.
  */
+import { ERROR_CODES } from '../../src/error-codes.js';
 import path from 'node:path';
 
 import { RepoType } from '../../src/api/panel-api.js';
@@ -136,8 +137,8 @@ function expectNoRoute(res: RawResponse & { wwwAuthenticate?: string }, what: st
   expect(res.status, `${what} answered ${res.status}: ${res.body.toString('utf8')}`).toBe(404);
   const oci = ociErrorOf(res.body);
   expect(oci?.code, `${what}: the OCI error code`).toBe('NAME_UNKNOWN');
-  expect(oci?.message, `${what}: the message`).toBe('unknownPath');
-  expect(oci?.detail, `${what}: the detail`).toBe('unknownPath');
+  expect(oci?.message, `${what}: the message`).toBe(ERROR_CODES.UNKNOWN_PATH);
+  expect(oci?.detail, `${what}: the detail`).toBe(ERROR_CODES.UNKNOWN_PATH);
   expect(res.wwwAuthenticate, `${what}: no auth challenge on an unknown route`).toBeUndefined();
 }
 
@@ -221,7 +222,7 @@ test.describe('docker registry API gaps (raw HTTP, pinned at current behaviour)'
       const noImage = await rawTagsList(layout.repoName, admin, `${layout.image}-none`);
       expect(noImage.status, 'tags/list of an unknown image').toBe(404);
       expect(ociErrorOf(noImage.body)?.code).toBe('NAME_UNKNOWN');
-      expect(ociErrorOf(noImage.body)?.detail).toBe('imageNotFound');
+      expect(ociErrorOf(noImage.body)?.detail).toBe(ERROR_CODES.IMAGE_NOT_FOUND);
       const noRepo = await rawTagsList(`${layout.repoName}-none`, admin, layout.image);
       expectNoRoute(noRepo, 'tags/list of an unknown repo');
 
@@ -345,7 +346,7 @@ test.describe('docker registry API gaps (raw HTTP, pinned at current behaviour)'
     expect(missing.status, 'the fallback tag is absent until a referrer is attached').toBe(404);
     const missingOci = ociErrorOf(missing.body);
     expect(missingOci?.code).toBe('MANIFEST_UNKNOWN');
-    expect(missingOci?.detail).toBe('tagNotFound');
+    expect(missingOci?.detail).toBe(ERROR_CODES.TAG_NOT_FOUND);
 
     // ... then writes the referrers index under it: a plain OCI image index, accepted like any tag.
     const index = Buffer.from(

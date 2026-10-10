@@ -27,6 +27,7 @@
  * And the repository list is ONE `GET /api/repos` call (RPS-1268): it either answers or the page is in
  * its error state, with no partial list in between.
  */
+import { ERROR_CODES } from '../../../src/error-codes.js';
 import type { Page, Route } from '@playwright/test';
 
 import { RepoType } from '../../../src/api/panel-api.js';
@@ -312,7 +313,7 @@ test.describe('Error handling', () => {
         fulfillJson<ErrorResponse>(
           route,
           503,
-          errorBody({ status: 503, code: 'resourceBusy', detail: busy }),
+          errorBody({ status: 503, code: ERROR_CODES.RESOURCE_BUSY, detail: busy }),
           {
             'Retry-After': '1',
           },

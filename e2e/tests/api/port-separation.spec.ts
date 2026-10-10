@@ -25,6 +25,7 @@
  * with `index.html`. So "not served" on 8080 means "answered by the SPA, not by the protocol handler":
  * `text/html`, no registry header, no challenge, no package bytes.
  */
+import { ERROR_CODES } from '../../src/error-codes.js';
 import { RepoType } from '../../src/api/panel-api.js';
 import { adminBearer, apiUrl, edgeRequest, repoUrl } from '../../src/clients/edge-raw.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
@@ -39,7 +40,7 @@ test.describe('the panel API is not served on the protocol port', { tag: ['@smok
     const res = await edgeRequest(repoUrl('/api/users'));
 
     expect(res.status).toBe(404);
-    expect(res.json).toMatchObject({ msgId: 'unknownPath', type: 'ERROR' });
+    expect(res.json).toMatchObject({ msgId: ERROR_CODES.UNKNOWN_PATH, type: 'ERROR' });
   });
 
   test('an admin GET /api/users is a 404 too, and lists no user', async () => {
@@ -50,7 +51,7 @@ test.describe('the panel API is not served on the protocol port', { tag: ['@smok
     });
 
     expect(res.status).toBe(404);
-    expect(res.json).toMatchObject({ msgId: 'unknownPath', type: 'ERROR' });
+    expect(res.json).toMatchObject({ msgId: ERROR_CODES.UNKNOWN_PATH, type: 'ERROR' });
     expect(res.text).not.toContain('"content"');
   });
 
@@ -62,7 +63,7 @@ test.describe('the panel API is not served on the protocol port', { tag: ['@smok
     });
 
     expect(res.status).toBe(404);
-    expect(res.json).toMatchObject({ msgId: 'unknownPath', type: 'ERROR' });
+    expect(res.json).toMatchObject({ msgId: ERROR_CODES.UNKNOWN_PATH, type: 'ERROR' });
     expect(res.text).not.toContain('token');
   });
 

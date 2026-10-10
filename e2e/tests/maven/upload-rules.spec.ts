@@ -73,6 +73,7 @@
  *    signature look up a POM that was never stored (404), and its stored `maven-metadata.xml` and
  *    that file's signature fail the same way right after being written.
  */
+import { ERROR_CODES } from '../../src/error-codes.js';
 import { RepoType } from '../../src/api/panel-api.js';
 import {
   adminCredential,
@@ -209,7 +210,7 @@ test.describe('maven upload rules (raw HTTP)', () => {
         releases: true,
         snapshots: true,
       });
-      const override = 'artifactOverrideIsProhibited';
+      const override = ERROR_CODES.ARTIFACT_OVERRIDE_IS_PROHIBITED;
 
       // Re-uploading a file that exists is an override, whatever kind of file it is.
       expectPut(await layout.put(...firstPom), 403, override, 'existing timestamped pom');
@@ -275,7 +276,7 @@ test.describe('maven upload rules (raw HTTP)', () => {
       expect(jar.body.toString(), 'the second round replaced the jar').toBe('literal jar 2');
 
       // A timestamped build and a release stay immutable.
-      const override = 'artifactOverrideIsProhibited';
+      const override = ERROR_CODES.ARTIFACT_OVERRIDE_IS_PROHIBITED;
       const [firstPom, firstJar] = snapshotDeployFiles(layout, FIRST_BUILD);
       expectPut(await layout.put(...firstPom), 403, override, 'existing timestamped pom');
       expectPut(await layout.put(...firstJar), 403, override, 'existing timestamped jar');
@@ -307,7 +308,7 @@ test.describe('maven upload rules (raw HTTP)', () => {
       expectPut(
         await layout.put(...round(3)[1]),
         403,
-        'snapshotVersionsAreProhibited',
+        ERROR_CODES.SNAPSHOT_VERSIONS_ARE_PROHIBITED,
         'literal jar with snapshots off',
       );
     },
@@ -327,7 +328,7 @@ test.describe('maven upload rules (raw HTTP)', () => {
       });
 
       const [secondPom, , secondVersionMetadata] = snapshotDeployFiles(layout, SECOND_BUILD);
-      const refused = 'snapshotVersionsAreProhibited';
+      const refused = ERROR_CODES.SNAPSHOT_VERSIONS_ARE_PROHIBITED;
 
       // RPS-1174: the version exists, and a redeploy is refused all the same, on its first file.
       expectPut(await layout.put(...secondPom), 403, refused, 'redeploy of an existing snapshot');
@@ -371,7 +372,7 @@ test.describe('maven upload rules (raw HTTP)', () => {
         snapshots: true,
       });
 
-      const refused = 'releaseVersionsAreProhibited';
+      const refused = ERROR_CODES.RELEASE_VERSIONS_ARE_PROHIBITED;
       const releaseDir = versionDir(layout.groupId, ARTIFACT_ID, RELEASE);
 
       expectPut(
@@ -430,7 +431,12 @@ test.describe('maven upload rules (raw HTTP)', () => {
       const admin = adminCredential();
 
       for (const path of stray) {
-        expectPut(await layout.put(path, 'hello', TEXT), 400, 'invalidArtifactPath', path);
+        expectPut(
+          await layout.put(path, 'hello', TEXT),
+          400,
+          ERROR_CODES.INVALID_ARTIFACT_PATH,
+          path,
+        );
       }
       for (const path of stray) {
         const res = await rawGet(layout.repoName, admin, path);
@@ -470,7 +476,12 @@ test.describe('maven upload rules (raw HTTP)', () => {
       const admin = adminCredential();
 
       for (const path of wrong) {
-        expectPut(await layout.put(path, 'hello', OCTET), 400, 'invalidArtifactPath', path);
+        expectPut(
+          await layout.put(path, 'hello', OCTET),
+          400,
+          ERROR_CODES.INVALID_ARTIFACT_PATH,
+          path,
+        );
       }
       for (const path of wrong) {
         const res = await rawGet(layout.repoName, admin, path);
@@ -504,7 +515,7 @@ test.describe('maven upload rules (raw HTTP)', () => {
       expectPut(
         await layout.put(newRelease, 'da39', TEXT),
         403,
-        'releaseVersionsAreProhibited',
+        ERROR_CODES.RELEASE_VERSIONS_ARE_PROHIBITED,
         'checksum of a new release',
       );
       for (const path of [newRelease, `${newReleaseDir}/`]) {
@@ -520,7 +531,7 @@ test.describe('maven upload rules (raw HTTP)', () => {
         releases: true,
         snapshots: false,
       });
-      const refused = 'snapshotVersionsAreProhibited';
+      const refused = ERROR_CODES.SNAPSHOT_VERSIONS_ARE_PROHIBITED;
       expectPut(
         await layout.put(`${secondPom[0]}.sha1`, 'da39', TEXT),
         403,
@@ -606,7 +617,7 @@ test.describe('maven upload rules (raw HTTP)', () => {
       expectPut(
         await layout.put(snapshotSignature, ARMOR_ONLY, OCTET),
         403,
-        'snapshotVersionsAreProhibited',
+        ERROR_CODES.SNAPSHOT_VERSIONS_ARE_PROHIBITED,
         'signature of the version-level snapshot metadata',
       );
       expectPut(
@@ -639,7 +650,7 @@ test.describe('maven upload rules (raw HTTP)', () => {
         expectPut(
           await layout.put(`${pom}.asc`, ARMOR_ONLY, OCTET),
           422,
-          'artifactSignatureNotVerified',
+          ERROR_CODES.ARTIFACT_SIGNATURE_NOT_VERIFIED,
           `${pom}.asc`,
         );
         const res = await rawGet(layout.repoName, admin, `${pom}.asc`);
@@ -658,7 +669,12 @@ test.describe('maven upload rules (raw HTTP)', () => {
       const layout = await newRepo(seeder);
       const pom = `${versionDir(layout.groupId, ARTIFACT_ID, RELEASE)}/${ARTIFACT_ID}-${RELEASE}.pom`;
 
-      expectPut(await layout.put(`${pom}.asc`, ARMOR_ONLY, OCTET), 404, 'itemNotFound', pom);
+      expectPut(
+        await layout.put(`${pom}.asc`, ARMOR_ONLY, OCTET),
+        404,
+        ERROR_CODES.ITEM_NOT_FOUND,
+        pom,
+      );
 
       expect(await repoTree(layout.repoName)).toEqual({});
     },
@@ -679,7 +695,7 @@ test.describe('maven upload rules (raw HTTP)', () => {
         expectPut(
           await layout.put(`${pom}.asc`, '', OCTET),
           400,
-          'mavenUploadBodyEmpty',
+          ERROR_CODES.MAVEN_UPLOAD_BODY_EMPTY,
           `${pom}.asc`,
         );
         const res = await rawGet(layout.repoName, admin, `${pom}.asc`);
@@ -705,7 +721,7 @@ test.describe('maven upload rules (raw HTTP)', () => {
         expectPut(
           await layout.put(`${pom}.asc`, ARMOR_ONLY, OCTET),
           422,
-          'artifactSignatureNotVerified',
+          ERROR_CODES.ARTIFACT_SIGNATURE_NOT_VERIFIED,
           `${pom}.asc`,
         );
         const res = await rawGet(layout.repoName, admin, `${pom}.asc`);
@@ -734,7 +750,7 @@ test.describe('maven upload rules (raw HTTP)', () => {
         '</project>\n';
       const parentOf = (groupId: string): string =>
         `<parent><groupId>${groupId}</groupId><artifactId>par</artifactId><version>1</version></parent>`;
-      const refusedMessage = 'pomGroupIdMismatch';
+      const refusedMessage = ERROR_CODES.POM_GROUP_ID_MISMATCH;
 
       const refused: [string, string][] = [
         ['its own groupId is another', minimalPom('org.other', ARTIFACT_ID, RELEASE)],
@@ -867,7 +883,7 @@ test.describe('maven upload rules (raw HTTP)', () => {
       expectPut(
         await layout.put(malformedPath, '<project><groupId>', OCTET),
         400,
-        'malformedPomFile',
+        ERROR_CODES.MALFORMED_POM_FILE,
         malformedPath,
       );
       const malformedRes = await rawGet(layout.repoName, admin, malformedPath);
@@ -877,7 +893,7 @@ test.describe('maven upload rules (raw HTTP)', () => {
       expectPut(
         await layout.put(`${base}.pom.asc`, ARMOR_ONLY, OCTET),
         422,
-        'artifactSignatureNotVerified',
+        ERROR_CODES.ARTIFACT_SIGNATURE_NOT_VERIFIED,
         `${base}.pom.asc`,
       );
       const ascRes = await rawGet(layout.repoName, admin, `${base}.pom.asc`);

@@ -26,6 +26,7 @@
  * its own page's `localStorage`. The SPA reads `localStorage` once at boot (`AuthService`), so a
  * change takes effect on the next load: `seedSession()` writes once per tab, so a reload keeps it.
  */
+import { ERROR_CODES } from '../../../src/error-codes.js';
 import type { Page, Route } from '@playwright/test';
 
 import { RepoType } from '../../../src/api/panel-api.js';
@@ -243,7 +244,11 @@ test.describe('AUTH-09 refresh call that fails without a 401 (RPS-1754)', () => 
     {
       name: 'a 503',
       fail: (route: Route) =>
-        fulfillJson<ErrorResponse>(route, 503, errorBody({ status: 503, code: 'resourceBusy' })),
+        fulfillJson<ErrorResponse>(
+          route,
+          503,
+          errorBody({ status: 503, code: ERROR_CODES.RESOURCE_BUSY }),
+        ),
     },
     { name: 'a dropped connection', fail: (route: Route) => route.abort('connectionreset') },
   ];
@@ -328,7 +333,7 @@ test.describe('AUTH-12 permission failure is not a lost session', { tag: ['@clou
     ];
     for (const response of refused) {
       expect(response.status(), `${response.url()}`).toBe(403);
-      expect(((await response.json()) as { code: string }).code).toBe('accessDenied');
+      expect(((await response.json()) as { code: string }).code).toBe(ERROR_CODES.ACCESS_DENIED);
     }
     expect(
       (await userPage.request.get(`${repoUrl}/permissions`, { headers: authorization })).ok(),
@@ -357,7 +362,7 @@ test.describe('AUTH-12 permission failure is not a lost session', { tag: ['@clou
     );
     expect(response.status()).toBe(401);
     // A msgId of its own, so nothing can mistake it for the permission failure above.
-    expect(((await response.json()) as { code: string }).code).toBe('accessNotAllowed');
+    expect(((await response.json()) as { code: string }).code).toBe(ERROR_CODES.ACCESS_NOT_ALLOWED);
 
     await setStoredSessionValue(userPage, 'token', tampered);
     await userPage.reload();

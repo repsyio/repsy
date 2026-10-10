@@ -20,6 +20,7 @@
  * (`spec-contract.ts`), the bounded paging sweep of a list operation, and the coverage check that a spec
  * names every operation of its protocol.
  */
+import { ERROR_CODES } from '../error-codes.js';
 import { expect } from '@playwright/test';
 
 import type { World } from '../scenarios/world.js';
@@ -233,14 +234,14 @@ export async function expectPagingSweep<T>(sweep: PagingSweep<T>): Promise<void>
     const res = await callOperation(sweep.operationId, sweep.values, {
       query: withBase(sweep, query),
     });
-    expectFailure(sweep.operationId, res, 400, 'validationError');
+    expectFailure(sweep.operationId, res, 400, ERROR_CODES.VALIDATION_ERROR);
     // problem+json names the parameter in `errors[].field`; a backend still on the `RestResponse` envelope
     // (Repsy Cloud, until its migration) names it in `data`.
     const body = res.json as { data?: string; errors?: { field?: string; code?: string }[] };
     const named = body.errors ? body.errors.map((error) => error.field) : [body.data];
     expect(named, `${query}: the offending parameter`).toEqual([offending]);
     for (const error of body.errors ?? []) {
-      expect(error.code, `${query}: the error code`).toBe('validationError');
+      expect(error.code, `${query}: the error code`).toBe(ERROR_CODES.VALIDATION_ERROR);
     }
   }
 }

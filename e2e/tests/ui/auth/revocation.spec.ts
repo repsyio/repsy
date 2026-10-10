@@ -47,6 +47,7 @@
  * `refreshTokenExpired` afterwards, the same way a replayed one already does
  * (`RefreshTokenService.consume`/`revoke`, `AuthControllerIT$Logout`).
  */
+import { ERROR_CODES } from '../../../src/error-codes.js';
 import { UserRole } from '../../../src/api/panel-api.js';
 import { expect, test } from '../../../src/ui/fixtures.js';
 import { DashboardPage } from '../../../src/ui/pages/dashboard.js';
@@ -225,7 +226,9 @@ test.describe('RPS-1622 G06 logout revokes the refresh token family', () => {
       data: { refreshToken: copiedRefreshToken },
     });
     expect(replayed.status()).toBe(401);
-    expect(((await replayed.json()) as { code: string }).code).toBe('refreshTokenExpired');
+    expect(((await replayed.json()) as { code: string }).code).toBe(
+      ERROR_CODES.REFRESH_TOKEN_EXPIRED,
+    );
   });
 
   test('logging out calls the backend: POST /api/auth/logout answers 204', async ({

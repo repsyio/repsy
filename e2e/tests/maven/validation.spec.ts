@@ -26,6 +26,7 @@
  *   observe the behavior.
  */
 
+import { ERROR_CODES } from '../../src/error-codes.js';
 import { RepoType } from '../../src/api/panel-api.js';
 import {
   adminCredential,
@@ -102,7 +103,7 @@ test.describe('maven validation edge cases (RPS-1716)', () => {
     expectPut(
       result,
       400,
-      'groupIdTooLong',
+      ERROR_CODES.GROUP_ID_TOO_LONG,
       'groupId over max length (256 chars) should fail with groupIdTooLong',
     );
   });
@@ -158,7 +159,7 @@ test.describe('maven validation edge cases (RPS-1716)', () => {
       expectPut(
         result,
         400,
-        'mavenFileNameTooLong',
+        ERROR_CODES.MAVEN_FILE_NAME_TOO_LONG,
         'artifactId at 255 chars (max) combines into an over-long file name and should be' +
           ' refused with mavenFileNameTooLong, not a raw 500',
       );
@@ -184,7 +185,7 @@ test.describe('maven validation edge cases (RPS-1716)', () => {
       expectPut(
         result,
         400,
-        'artifactIdTooLong',
+        ERROR_CODES.ARTIFACT_ID_TOO_LONG,
         'artifactId over max length (256 chars) should fail with artifactIdTooLong',
       );
     },
@@ -237,7 +238,7 @@ test.describe('maven validation edge cases (RPS-1716)', () => {
       expectPut(
         result,
         400,
-        'mavenFileNameTooLong',
+        ERROR_CODES.MAVEN_FILE_NAME_TOO_LONG,
         'version at 255 chars (max) combines into an over-long file name and should be refused' +
           ' with mavenFileNameTooLong, not a raw 500',
       );
@@ -259,7 +260,7 @@ test.describe('maven validation edge cases (RPS-1716)', () => {
     expectPut(
       result,
       400,
-      'mavenVersionTooLong',
+      ERROR_CODES.MAVEN_VERSION_TOO_LONG,
       'version over max length (256 chars) should fail with mavenVersionTooLong',
     );
   });

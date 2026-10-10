@@ -52,6 +52,7 @@
  *    its GET (RPS-1562), so `uv pip install -v` does not log "Range requests not supported" and
  *    stream the whole wheel.
  */
+import { ERROR_CODES } from '../../src/error-codes.js';
 import { createServer, type IncomingHttpHeaders, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import fs from 'node:fs/promises';
@@ -729,7 +730,7 @@ test.describe('pypi uv client', () => {
         'no credential in the check URL: uv uploads and the repo refuses',
       ).not.toBe(0);
       expect(blind.stderr).toContain('403');
-      expect(blind.stderr).toContain('fileAlreadyExists');
+      expect(blind.stderr).toContain(ERROR_CODES.FILE_ALREADY_EXISTS);
 
       expect(await stored(), 'the stored wheel never changed').toBe(built.sha256Hex);
     },

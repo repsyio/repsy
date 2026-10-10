@@ -25,6 +25,7 @@
  * with family revocation on reuse (`RefreshTokenService.consume` in the backend), which shapes
  * everything here: never share one token pair between tests or contexts.
  */
+import { ERROR_CODES } from '../error-codes.js';
 import type { BrowserContext, Page, Request, Route } from '@playwright/test';
 
 import { loginPanel } from '../api/backend-registry.js';
@@ -192,7 +193,7 @@ export function answerSessionExpired(route: Route): Promise<void> {
   return fulfillJson<ErrorResponse>(
     route,
     401,
-    errorBody({ status: 401, code: 'sessionExpired', detail: 'Session expired.' }),
+    errorBody({ status: 401, code: ERROR_CODES.SESSION_EXPIRED, detail: 'Session expired.' }),
   );
 }
 
@@ -201,7 +202,11 @@ export function answerRefreshTokenExpired(route: Route): Promise<void> {
   return fulfillJson<ErrorResponse>(
     route,
     401,
-    errorBody({ status: 401, code: 'refreshTokenExpired', detail: 'Refresh token expired.' }),
+    errorBody({
+      status: 401,
+      code: ERROR_CODES.REFRESH_TOKEN_EXPIRED,
+      detail: 'Refresh token expired.',
+    }),
   );
 }
 

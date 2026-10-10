@@ -38,6 +38,7 @@
  * case-sensitive), has since been fixed. The test below now pins the corrected, case-sensitive
  * behaviour instead of `test.fail()`-ing the collision.
  */
+import { ERROR_CODES } from '../../src/error-codes.js';
 import { RepoType } from '../../src/api/panel-api.js';
 import { goAdapter } from '../../src/clients/go.js';
 import { expectHeadMirrorsGet } from '../../src/clients/head-parity.js';
@@ -175,7 +176,7 @@ test.describe('go registry rules (raw HTTP)', () => {
       expectMsgId(
         await rawUpload(layout.repoName, admin, wrong, { contentSha256: 'deadbeef' }),
         400,
-        'sha256Mismatch',
+        ERROR_CODES.SHA256_MISMATCH,
       );
 
       // An upper-case hex digest is lower-cased before comparison.
@@ -240,7 +241,7 @@ test.describe('go registry rules (raw HTTP)', () => {
         expectMsgId(
           await rawUpload(layout.repoName, admin, duplicate),
           409,
-          'goModuleVersionAlreadyExists',
+          ERROR_CODES.GO_MODULE_VERSION_ALREADY_EXISTS,
         );
 
         const modAfter = await rawGet(
@@ -277,7 +278,7 @@ test.describe('go registry rules (raw HTTP)', () => {
       expectMsgId(
         await rawPut(layout.repoName, admin, `${layout.modulePath}/@v/v0.1.0`, notAZip),
         400,
-        'goModNotFoundInZip',
+        ERROR_CODES.GO_MOD_NOT_FOUND_IN_ZIP,
       );
 
       // A zip whose go.mod entry is missing entirely (wrong version in the entry name).
@@ -328,7 +329,7 @@ test.describe('go registry rules (raw HTTP)', () => {
         built.bytes,
       );
 
-      expectMsgId(res, 400, 'goModModulePathMismatch');
+      expectMsgId(res, 400, ERROR_CODES.GO_MOD_MODULE_PATH_MISMATCH);
     },
   );
 
@@ -342,7 +343,7 @@ test.describe('go registry rules (raw HTTP)', () => {
       const built = await buildModuleZip({ modulePath: layout.modulePath, version: 'banana' });
       const res = await rawUpload(layout.repoName, admin, built);
 
-      expectMsgId(res, 400, 'invalidModuleVersion');
+      expectMsgId(res, 400, ERROR_CODES.INVALID_MODULE_VERSION);
     },
   );
 
@@ -547,7 +548,7 @@ test.describe('go registry rules (raw HTTP)', () => {
       expectMsgId(
         { status: longPathRes.status, body: Buffer.from(await longPathRes.arrayBuffer()) },
         400,
-        'modulePathTooLong',
+        ERROR_CODES.MODULE_PATH_TOO_LONG,
       );
 
       // > 100 chars -- MAX_VERSION_LENGTH.
@@ -563,7 +564,7 @@ test.describe('go registry rules (raw HTTP)', () => {
       expectMsgId(
         { status: longVersionRes.status, body: Buffer.from(await longVersionRes.arrayBuffer()) },
         400,
-        'moduleVersionTooLong',
+        ERROR_CODES.MODULE_VERSION_TOO_LONG,
       );
     },
   );

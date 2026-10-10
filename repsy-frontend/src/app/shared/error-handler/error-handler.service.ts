@@ -18,6 +18,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Router } from '@angular/router';
 
+import { ERROR_CODES } from '../constants/error-codes';
 import { problemOf } from './problem.util';
 
 @Injectable({
@@ -26,14 +27,17 @@ import { problemOf } from './problem.util';
 export class ErrorHandlerService {
   constructor(private readonly router: Router) {}
 
-  public handle(res: HttpErrorResponse): string | null {
+  handle(res: HttpErrorResponse): string | null {
     if (!res || !res.status) {
       return 'Service unavailable';
     }
 
     const problem = problemOf(res);
 
-    if (res.status === 401 && (problem?.code === 'sessionExpired' || problem?.code === 'refreshTokenExpired')) {
+    if (
+      res.status === 401 &&
+      (problem?.code === ERROR_CODES.SESSION_EXPIRED || problem?.code === ERROR_CODES.REFRESH_TOKEN_EXPIRED)
+    ) {
       localStorage.clear();
       this.router.navigateByUrl('/');
     } else {

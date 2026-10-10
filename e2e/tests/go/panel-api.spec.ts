@@ -26,6 +26,7 @@
  * `tests/pypi/panel-api.spec.ts` (the shared contract helpers). The paging sweeps seed their rows over raw HTTP
  * (`seedPackage`): the pages are the subject there, not the client.
  */
+import { ERROR_CODES } from '../../src/error-codes.js';
 import {
   callOperation,
   contractWorld,
@@ -229,25 +230,25 @@ test.describe('the Go panel API against what the curl upload stored', () => {
       'listGoModules',
       await callOperation('listGoModules', { repoName: 'e2e-no-such-repo' }),
       404,
-      'repoNotFound',
+      ERROR_CODES.REPO_NOT_FOUND,
     );
     expectFailure(
       'listGoModules',
       await callOperation('listGoModules', repoOnly(names), { anonymous: true }),
       401,
-      'loginRequired',
+      ERROR_CODES.LOGIN_REQUIRED,
     );
     expectFailure(
       'getGoModuleInfo',
       await callOperation('getGoModuleInfo', repoOnly(names), { query: missing }),
       404,
-      'moduleNotFound',
+      ERROR_CODES.MODULE_NOT_FOUND,
     );
     expectFailure(
       'listGoModuleVersions',
       await callOperation('listGoModuleVersions', repoOnly(names), { query: missing }),
       404,
-      'moduleNotFound',
+      ERROR_CODES.MODULE_NOT_FOUND,
     );
     expectFailure(
       'deleteGoModuleVersion',
@@ -255,7 +256,7 @@ test.describe('the Go panel API against what the curl upload stored', () => {
         query: moduleQuery(names.modulePath, 'v9.9.9'),
       }),
       404,
-      'versionNotFound',
+      ERROR_CODES.VERSION_NOT_FOUND,
     );
     expectFailure(
       'deleteGoModuleVersion',
@@ -263,13 +264,13 @@ test.describe('the Go panel API against what the curl upload stored', () => {
         query: moduleQuery(`${MODULE_DOMAIN}/e2e-no-such-module`, 'v1.0.0'),
       }),
       404,
-      'moduleNotFound',
+      ERROR_CODES.MODULE_NOT_FOUND,
     );
     expectFailure(
       'deleteGoModule',
       await callOperation('deleteGoModule', repoOnly(names), { query: missing }),
       404,
-      'moduleNotFound',
+      ERROR_CODES.MODULE_NOT_FOUND,
     );
 
     // The module path is required: a request without it is a 400, not a server error.
@@ -376,7 +377,7 @@ test.describe('the Go panel API against what the curl upload stored', () => {
         query: moduleQuery(names.modulePath, removed),
       }),
       404,
-      'versionNotFound',
+      ERROR_CODES.VERSION_NOT_FOUND,
     );
 
     // Now the whole module: both the panel and the wire forget it, and the /v2 module stays.
@@ -392,7 +393,7 @@ test.describe('the Go panel API against what the curl upload stored', () => {
         query: moduleQuery(names.modulePath),
       }),
       404,
-      'moduleNotFound',
+      ERROR_CODES.MODULE_NOT_FOUND,
     );
     expect(await listedVersions(names)).toBe(404);
     expect(await zipStatus(names, kept)).toBe(404);
@@ -414,7 +415,7 @@ test.describe('the Go panel API against what the curl upload stored', () => {
         query: moduleQuery(names.modulePath),
       }),
       404,
-      'moduleNotFound',
+      ERROR_CODES.MODULE_NOT_FOUND,
     );
 
     // The last version of a module takes the module with it.
@@ -428,7 +429,7 @@ test.describe('the Go panel API against what the curl upload stored', () => {
       'getGoModuleInfo',
       await callOperation('getGoModuleInfo', repoOnly(names), { query: moduleQuery(v2Path) }),
       404,
-      'moduleNotFound',
+      ERROR_CODES.MODULE_NOT_FOUND,
     );
     expect(await listedVersions(names, v2Path)).toBe(404);
     const empty = expectBare(

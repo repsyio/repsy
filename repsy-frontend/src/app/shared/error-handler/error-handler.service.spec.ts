@@ -17,6 +17,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Router } from '@angular/router';
 
+import { ERROR_CODES } from '../constants/error-codes';
 import { ErrorHandlerService } from './error-handler.service';
 
 describe('ErrorHandlerService', () => {
@@ -50,7 +51,7 @@ describe('ErrorHandlerService', () => {
   });
 
   it('logs the error body for anything but an expired session', () => {
-    const body = { code: 'invalidCredentials', detail: 'Nope' };
+    const body = { code: ERROR_CODES.INVALID_CREDENTIALS, detail: 'Nope' };
 
     service.handle(error(401, body));
 
@@ -59,7 +60,7 @@ describe('ErrorHandlerService', () => {
     expect(router.navigateByUrl).not.toHaveBeenCalled();
   });
 
-  ['sessionExpired', 'refreshTokenExpired'].forEach((msgId) => {
+  [ERROR_CODES.SESSION_EXPIRED, ERROR_CODES.REFRESH_TOKEN_EXPIRED].forEach((msgId) => {
     it(`clears the stored session and goes to the root on a 401 ${msgId}`, () => {
       const text = service.handle(error(401, { code: msgId, detail: 'Please sign in again' }));
 
@@ -71,7 +72,7 @@ describe('ErrorHandlerService', () => {
   });
 
   it('does not treat an expired-session code on another status as a sign-out', () => {
-    service.handle(error(403, { code: 'sessionExpired' }));
+    service.handle(error(403, { code: ERROR_CODES.SESSION_EXPIRED }));
 
     expect(clearStorage).not.toHaveBeenCalled();
     expect(router.navigateByUrl).not.toHaveBeenCalled();

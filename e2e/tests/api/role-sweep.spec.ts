@@ -33,6 +33,7 @@
  * A floor on the size of the set (48 today) and a check of names that must be in it stop a parser bug
  * from emptying the sweep without a failure.
  */
+import { ERROR_CODES } from '../../src/error-codes.js';
 import { loadSpecOperations, requestFor, type SpecOperation } from '../../src/api/spec-ops.js';
 import { bodyFor, seedSweepWorld, snapshotWorld, valuesFor } from '../../src/api/sweep-world.js';
 import { createPanelBackend } from '../../src/api/backend-registry.js';
@@ -164,7 +165,7 @@ test.describe('the operations the spec declares 403 on', { tag: ['@smoke'] }, ()
       );
 
       expect(res.status, res.text.slice(0, 200)).toBe(403);
-      expect(msgId(res)).toBe('accessDenied');
+      expect(msgId(res)).toBe(ERROR_CODES.ACCESS_DENIED);
     });
   }
 });

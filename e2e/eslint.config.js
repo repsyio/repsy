@@ -36,6 +36,13 @@ const PROCESS_ENV_MESSAGE =
   'variables): build it with clientEnv() (src/clients/client-env.ts), or give run() { extendEnv: true } ' +
   'for a harness tool that needs the runner environment.';
 
+// RPS-2132: an API error code is a client contract and is written once, in ERROR_CODES (src/error-codes.ts).
+const ERROR_CODE_LITERAL = {
+  selector:
+    'Literal[value=/^(accessDenied|accessNotAllowed|archiveFileNameInvalid|archiveVersionMismatch|artifactIdTooLong|artifactNotFound|artifactOverrideIsProhibited|artifactSignatureNotVerified|artifactSigningKeyNotRegistered|artifactVersionNotFound|badVersionString|chartAlreadyExists|chartApiVersionInvalid|chartAppVersionTooLong|chartDependenciesInvalid|chartNameInvalid|chartNameMissing|chartNameTooLong|chartNotFound|chartTypeInvalid|chartVersionInvalid|chartVersionMissing|chartVersionTooLong|chartYamlInvalid|chartYamlNotFound|cleanupPolicyDisabled|crateNotFound|crateVersionNotFound|deployTokenNotRevocable|downloadTokenExpired|errorOccurred|fileAlreadyExists|gemNotFound|gemVersionAlreadyExists|gemVersionAlreadyYanked|gemVersionNotFound|goModModulePathMismatch|goModNotFoundInZip|goModuleVersionAlreadyExists|goModuleZipEmpty|groupIdTooLong|groupNotFound|helmChartEmpty|imageNotFound|invalidArtifactPath|invalidCredentials|invalidGemFile|invalidModuleVersion|invalidPackageVersion|invalidSearchParameter|invalidStoragePath|itemNotFound|layerNotFound|loginRequired|malformedPomFile|manifestContentTypeMissing|manifestNotFound|mavenFileNameTooLong|mavenMetadataTooLarge|mavenSignatureTooLarge|mavenUploadBodyEmpty|mavenVersionTooLong|moduleNotFound|modulePathTooLong|moduleVersionTooLong|npmPublishBodyEmpty|packageNotFound|packageOverrideDisabled|packageVersionAlreadyExists|packageVersionNotFound|payloadTooLarge|pendingSignatureNotVerified|pgpSettingsUnsupported|pomFileTooLarge|pomGroupIdMismatch|refreshTokenExpired|releaseNotFound|releaseVersionsAreProhibited|releasesSnapshotsUnsupported|repoNotFound|repoScopeNotMatched|resourceBusy|resourceNotFound|sessionExpired|sha256DigestMismatch|sha256DigestMissing|sha256Mismatch|snapshotVersionsAreProhibited|tagNotFound|tooManyRequests|unAuthorized|unknownPath|validationError|versionNotFound)$/]',
+  message: 'Use ERROR_CODES from src/error-codes.js instead of an inline error code (RPS-2132).',
+};
+
 const PROCESS_ENV = "MemberExpression[object.name='process'][property.name='env']";
 
 const PROCESS_ENV_COPIES = [
@@ -138,7 +145,7 @@ export default tseslint.config(
     // `Object.entries(process.env)` and passing `process.env` to a function stay allowed.
     files: ['src/**/*.ts', 'tests/**/*.ts'],
     rules: {
-      'no-restricted-syntax': ['error', ...PROCESS_ENV_COPIES],
+      'no-restricted-syntax': ['error', ...PROCESS_ENV_COPIES, ERROR_CODE_LITERAL],
     },
   },
   {
@@ -150,8 +157,13 @@ export default tseslint.config(
         ...PROCESS_ENV_COPIES,
         UNTYPED_STUB_BODY,
         ...HARDCODED_REPO_API,
+        ERROR_CODE_LITERAL,
       ],
     },
+  },
+  {
+    files: ['src/error-codes.ts'],
+    rules: { 'no-restricted-syntax': 'off' },
   },
   {
     files: ['tests/**/*.ts'],

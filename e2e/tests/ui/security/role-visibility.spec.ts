@@ -36,6 +36,7 @@
  *    Scan Now / Re-scan on a version they can already publish to, same as any other write action; this
  *    is asserted here as the deliberate behaviour it is, not assumed away.
  */
+import { ERROR_CODES } from '../../../src/error-codes.js';
 import { RepoType } from '../../../src/api/panel-api.js';
 import { DashboardPage } from '../../../src/ui/pages/dashboard.js';
 import { DESCRIPTORS, protocolPages } from '../../../src/ui/pages/protocol.js';
@@ -77,7 +78,7 @@ test.describe('SEC-02e security: sidebar and route, by role', { tag: MOCKED }, (
     });
     expect(res.status).toBe(403);
     const body = (await res.json()) as { code?: string };
-    expect(body.code).toBe('accessDenied');
+    expect(body.code).toBe(ERROR_CODES.ACCESS_DENIED);
   });
 });
 

@@ -32,6 +32,7 @@
  * `tests/pypi/panel-api.spec.ts` (the shared contract helpers). The paging sweeps seed their rows over raw HTTP
  * (`seedPackage`): the pages are the subject there, not the client.
  */
+import { ERROR_CODES } from '../../src/error-codes.js';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 
@@ -256,13 +257,13 @@ test.describe('the Docker panel API against what crane pushed', () => {
       'updateDockerCleanupPolicy',
       await callOperation('updateDockerCleanupPolicy', { repoName }, { body: rules }),
       400,
-      'cleanupPolicyDisabled',
+      ERROR_CODES.CLEANUP_POLICY_DISABLED,
     );
     expectFailure(
       'runDockerCleanupPolicy',
       await callOperation('runDockerCleanupPolicy', { repoName }),
       400,
-      'cleanupPolicyDisabled',
+      ERROR_CODES.CLEANUP_POLICY_DISABLED,
     );
 
     const enabled = expectBare(
@@ -310,13 +311,13 @@ test.describe('the Docker panel API against what crane pushed', () => {
       'getDockerCleanupPolicy',
       await callOperation('getDockerCleanupPolicy', { repoName: 'e2e-no-such-repo' }),
       404,
-      'repoNotFound',
+      ERROR_CODES.REPO_NOT_FOUND,
     );
     expectFailure(
       'getDockerCleanupPolicy',
       await callOperation('getDockerCleanupPolicy', { repoName }, { anonymous: true }),
       401,
-      'loginRequired',
+      ERROR_CODES.LOGIN_REQUIRED,
     );
   });
 
@@ -328,7 +329,7 @@ test.describe('the Docker panel API against what crane pushed', () => {
       'getDockerCleanupPolicy',
       await callOperation('getDockerCleanupPolicy', { repoName: repo.name }),
       400,
-      'repoScopeNotMatched',
+      ERROR_CODES.REPO_SCOPE_NOT_MATCHED,
     );
   });
 
@@ -529,31 +530,31 @@ test.describe('the Docker panel API against what crane pushed', () => {
       'listDockerImages',
       await callOperation('listDockerImages', { repoName: 'e2e-no-such-repo' }),
       404,
-      'repoNotFound',
+      ERROR_CODES.REPO_NOT_FOUND,
     );
     expectFailure(
       'listDockerImages',
       await callOperation('listDockerImages', { repoName: session.repoName }, { anonymous: true }),
       401,
-      'loginRequired',
+      ERROR_CODES.LOGIN_REQUIRED,
     );
     expectFailure(
       'getDockerImage',
       await callOperation('getDockerImage', missingImage),
       404,
-      'imageNotFound',
+      ERROR_CODES.IMAGE_NOT_FOUND,
     );
     expectFailure(
       'getDockerImageTag',
       await callOperation('getDockerImageTag', missingTag),
       404,
-      'tagNotFound',
+      ERROR_CODES.TAG_NOT_FOUND,
     );
     expectFailure(
       'listDockerTagManifests',
       await callOperation('listDockerTagManifests', missingTag),
       404,
-      'tagNotFound',
+      ERROR_CODES.TAG_NOT_FOUND,
     );
     expectFailure(
       'getDockerImageConfig',
@@ -562,31 +563,31 @@ test.describe('the Docker panel API against what crane pushed', () => {
         values(session, image, { digest: sha256('not a config') }),
       ),
       404,
-      'layerNotFound',
+      ERROR_CODES.LAYER_NOT_FOUND,
     );
     expectFailure(
       'deleteDockerTag',
       await callOperation('deleteDockerTag', missingTag),
       404,
-      'tagNotFound',
+      ERROR_CODES.TAG_NOT_FOUND,
     );
     expectFailure(
       'deleteDockerImage',
       await callOperation('deleteDockerImage', missingImage),
       404,
-      'imageNotFound',
+      ERROR_CODES.IMAGE_NOT_FOUND,
     );
     expectFailure(
       'deleteDockerUntaggedManifests',
       await callOperation('deleteDockerUntaggedManifests', { repoName: 'e2e-no-such-repo' }),
       404,
-      'repoNotFound',
+      ERROR_CODES.REPO_NOT_FOUND,
     );
     expectFailure(
       'deleteDockerOrphanLayers',
       await callOperation('deleteDockerOrphanLayers', { repoName: 'e2e-no-such-repo' }),
       404,
-      'repoNotFound',
+      ERROR_CODES.REPO_NOT_FOUND,
     );
 
     // An image that does not exist: 404 `imageNotFound` wherever the operation reads or deletes one.
@@ -594,7 +595,7 @@ test.describe('the Docker panel API against what crane pushed', () => {
       'getDockerImageTag',
       await callOperation('getDockerImageTag', values(session, 'no-such-image', { tagName: 'v1' })),
       404,
-      'imageNotFound',
+      ERROR_CODES.IMAGE_NOT_FOUND,
     );
     expectFailure(
       'listDockerTagManifests',
@@ -603,13 +604,13 @@ test.describe('the Docker panel API against what crane pushed', () => {
         values(session, 'no-such-image', { tagName: 'v1' }),
       ),
       404,
-      'imageNotFound',
+      ERROR_CODES.IMAGE_NOT_FOUND,
     );
     expectFailure(
       'deleteDockerTag',
       await callOperation('deleteDockerTag', values(session, 'no-such-image', { tagName: 'v1' })),
       404,
-      'imageNotFound',
+      ERROR_CODES.IMAGE_NOT_FOUND,
     );
     expectFailure(
       'deleteDockerUntaggedManifests',
@@ -619,7 +620,7 @@ test.describe('the Docker panel API against what crane pushed', () => {
         { query: 'image=no-such-image' },
       ),
       404,
-      'imageNotFound',
+      ERROR_CODES.IMAGE_NOT_FOUND,
     );
     // The tags of an image that does not exist: 404 `imageNotFound` like every other image route, not an
     // empty page (RPS-1579).
@@ -627,7 +628,7 @@ test.describe('the Docker panel API against what crane pushed', () => {
       'listDockerImageTags',
       await callOperation('listDockerImageTags', missingImage),
       404,
-      'imageNotFound',
+      ERROR_CODES.IMAGE_NOT_FOUND,
     );
     // The manifest route names what is missing: the image, the tag, or the digest the image does not store.
     expectFailure(
@@ -637,7 +638,7 @@ test.describe('the Docker panel API against what crane pushed', () => {
         values(session, 'no-such-image', { reference: 'v1' }),
       ),
       404,
-      'imageNotFound',
+      ERROR_CODES.IMAGE_NOT_FOUND,
     );
     expectFailure(
       'getDockerImageManifest',
@@ -646,7 +647,7 @@ test.describe('the Docker panel API against what crane pushed', () => {
         values(session, image, { reference: 'no-such-tag' }),
       ),
       404,
-      'tagNotFound',
+      ERROR_CODES.TAG_NOT_FOUND,
     );
     expectFailure(
       'getDockerImageManifest',
@@ -655,7 +656,7 @@ test.describe('the Docker panel API against what crane pushed', () => {
         values(session, image, { reference: sha256('no such manifest') }),
       ),
       404,
-      'manifestNotFound',
+      ERROR_CODES.MANIFEST_NOT_FOUND,
     );
 
     // A delete of a tag or an image that does not exist deleted nothing: the image has its one tag and
@@ -753,13 +754,13 @@ test.describe('the Docker panel API against what crane pushed', () => {
       'getDockerImageTag',
       await callOperation('getDockerImageTag', values(session, imageA, { tagName: 'v1' })),
       404,
-      'tagNotFound',
+      ERROR_CODES.TAG_NOT_FOUND,
     );
     expectFailure(
       'deleteDockerTag',
       await callOperation('deleteDockerTag', values(session, imageA, { tagName: 'v1' })),
       404,
-      'tagNotFound',
+      ERROR_CODES.TAG_NOT_FOUND,
     );
     expect(await summaryOf(session, imageA)).toMatchObject({
       tagCount: 2,
@@ -970,13 +971,13 @@ test.describe('the Docker panel API against what crane pushed', () => {
       'getDockerImage',
       await callOperation('getDockerImage', values(session, imageA)),
       404,
-      'imageNotFound',
+      ERROR_CODES.IMAGE_NOT_FOUND,
     );
     expectFailure(
       'deleteDockerImage',
       await callOperation('deleteDockerImage', values(session, imageA)),
       404,
-      'imageNotFound',
+      ERROR_CODES.IMAGE_NOT_FOUND,
     );
     const listed = expectBare(
       'listDockerImages',

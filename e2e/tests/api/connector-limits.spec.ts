@@ -27,6 +27,7 @@
  *    accepted (so chunked is not refused wholesale). It needs the limits overlay (`@limits`, skips
  *    itself without it, `./run.sh local up --limits`).
  */
+import { ERROR_CODES } from '../../src/error-codes.js';
 import { randomUUID } from 'node:crypto';
 
 import { RepoType } from '../../src/api/panel-api.js';
@@ -63,7 +64,7 @@ const HEADER_TARGETS = [
     name: 'the repo port',
     url: () => repoUrl('/api/users'),
     plain: 404,
-    msgId: 'unknownPath',
+    msgId: ERROR_CODES.UNKNOWN_PATH,
     contentType: 'application/json',
   },
   {

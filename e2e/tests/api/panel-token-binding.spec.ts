@@ -24,6 +24,7 @@
  *
  * The probes are raw requests with the access token the login handed out, kept across the event.
  */
+import { ERROR_CODES } from '../../src/error-codes.js';
 import { createPanelBackend } from '../../src/api/backend-registry.js';
 import { RepoType, UserRole } from '../../src/api/panel-api.js';
 import { apiUrl, edgeRequest } from '../../src/clients/edge-raw.js';
@@ -80,7 +81,7 @@ test.describe('panel access token binding (RPS-1604)', { tag: ['@smoke'] }, () =
 
       const after = await call(path, token);
       expect(after.status, `after the change: ${after.text}`).toBe(401);
-      expect(after.text).toContain('sessionExpired');
+      expect(after.text).toContain(ERROR_CODES.SESSION_EXPIRED);
     });
 
     test(`a reused username does not inherit the panel token on ${route.name}`, async ({
@@ -105,7 +106,7 @@ test.describe('panel access token binding (RPS-1604)', { tag: ['@smoke'] }, () =
 
       const stale = await call(path, token);
       expect(stale.status, stale.text).toBe(401);
-      expect(stale.text).toContain('sessionExpired');
+      expect(stale.text).toContain(ERROR_CODES.SESSION_EXPIRED);
 
       const successorToken = (
         await (await createPanelBackend()).login(successor.username, successor.password)

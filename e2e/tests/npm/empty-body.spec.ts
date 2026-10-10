@@ -18,6 +18,7 @@
  * --data-binary`, which declares a form content type too, RPS-1443). It used to answer a bare `500`
  * (the JSON reader had no content); it is now `400 npmPublishBodyEmpty` and nothing is stored.
  */
+import { ERROR_CODES } from '../../src/error-codes.js';
 import { RepoType } from '../../src/api/panel-api.js';
 import { adminCredential, rawGetPackument, rawPublishBody } from '../../src/clients/npm-raw.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
@@ -36,7 +37,7 @@ test.describe('npm empty publish body (raw HTTP)', () => {
 
         const res = await rawPublishBody(repo.name, admin, name, Buffer.alloc(0), contentType);
         expect(res.status, `answered ${res.status}`).toBe(400);
-        expect(res.msgId, 'the error msgId').toBe('npmPublishBodyEmpty');
+        expect(res.msgId, 'the error msgId').toBe(ERROR_CODES.NPM_PUBLISH_BODY_EMPTY);
 
         const packument = await rawGetPackument(repo.name, admin, name);
         expect(packument.status, 'nothing stored').toBe(404);

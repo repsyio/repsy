@@ -20,6 +20,7 @@
  * it, a `500`). The OCI side is pinned by the backend's integration tests: an empty manifest is
  * `400 manifestInvalidJson`, and the empty blob is a valid blob that is stored.
  */
+import { ERROR_CODES } from '../../src/error-codes.js';
 import { RepoType } from '../../src/api/panel-api.js';
 import {
   adminCredential,
@@ -46,7 +47,7 @@ test.describe('helm empty chart upload (raw HTTP)', () => {
 
       const res = await rawUploadChart(repo.name, admin, Buffer.alloc(0), 'empty-0.1.0.tgz');
       expect(res.status, `answered ${res.status}`).toBe(400);
-      expect(res.msgId, 'the error msgId').toBe('helmChartEmpty');
+      expect(res.msgId, 'the error msgId').toBe(ERROR_CODES.HELM_CHART_EMPTY);
 
       expect(await chartNames(repo.name), 'nothing stored').toEqual([]);
     },
