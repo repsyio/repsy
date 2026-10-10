@@ -63,6 +63,8 @@ COPY libs/pom.xml ./libs/pom.xml
 COPY libs/protocol-router/ ./libs/protocol-router/
 COPY libs/multiport/ ./libs/multiport/
 COPY libs/storage/ ./libs/storage/
+COPY libs/scanner-client/ ./libs/scanner-client/
+COPY libs/test-support/ ./libs/test-support/
 
 RUN mvn -f ./pom.xml install -N -DskipTests -Dcheckstyle.skip=true -Dfmt.skip=true -B && \
     mvn -f ./libs/pom.xml install -DskipTests -Dcheckstyle.skip=true -Dfmt.skip=true -B

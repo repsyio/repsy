@@ -14,7 +14,7 @@ installation, configuration and usage.
 | --- | --- |
 | `core/` | Git submodule ([`repsy-core`](https://github.com/repsyio/repsy-core)): shared parent POM, BOM and libraries. It is the Maven parent of the root `pom.xml` |
 | `repsy-backend/` | Spring Boot application (`io.repsy.os`): `panel/` (web UI API, e.g. `profile`, `auth`), `server/` (repository serving), `spa/`, `config/` |
-| `libs/` | Shared libraries: `protocol-router`, `multiport`, `storage`, `scanner-client` |
+| `libs/` | Shared libraries: `protocol-router`, `multiport`, `storage`, `scanner-client`, `test-support` |
 | `repsy-protocols/` | One module per package format, plus `shared` |
 | `repsy-frontend/` | Angular app (pnpm) |
 | `repsy-scanner-trivy/` | Optional standalone vulnerability-scanner service; not part of the root Maven reactor |
@@ -111,7 +111,9 @@ is one container plus, optionally, PostgreSQL (embedded H2 is the default) and t
   (`storage-gateway` defines `StorageStrategy`, a path-based API where deletes are soft and
   recoverable until the trash is cleared; `storage-gateway-fs` is the filesystem implementation),
   `scanner-client` (`io.repsy.libs.scanner`: the `VulnerabilityScanner` and
-  `VulnerabilityAdvisoryLookup` SPI, the scan DTOs and the Trivy HTTP client; RPS-2065).
+  `VulnerabilityAdvisoryLookup` SPI, the scan DTOs and the Trivy HTTP client; RPS-2065),
+  `test-support` (`io.repsy.libs.testsupport`: the `Abstract*Guard` JUnit extensions, `ScanThreadsSettler`,
+  `PgpTestKeys` and `StubKeyServers`; only ever a `<scope>test</scope>` dependency, RPS-2067).
 - **`repsy-protocols/<format>`** (`maven`, `npm`, `pypi`, `docker`, `cargo`, `golang`, `helm`,
   `nuget`, `ruby`) holds the format's wire-protocol logic that does not depend on Repsy's database:
   the `ProtocolProvider`, abstract handlers and facades, contracts (interfaces) the backend must

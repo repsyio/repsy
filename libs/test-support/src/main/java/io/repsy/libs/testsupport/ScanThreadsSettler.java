@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os;
+package io.repsy.libs.testsupport;
 
 import java.time.Duration;
 import java.util.concurrent.locks.LockSupport;
@@ -52,7 +52,8 @@ public final class ScanThreadsSettler implements AfterTestExecutionCallback {
 
   private static final String EXECUTOR_BEAN = "scanTaskExecutor";
   private static final Duration TIMEOUT = Duration.ofSeconds(10);
-  private static final long POLL_NANOS = Duration.ofMillis(10).toNanos();
+  private static final long POLL_MILLIS = 10;
+  private static final long POLL_NANOS = Duration.ofMillis(POLL_MILLIS).toNanos();
 
   @Override
   public void afterTestExecution(final ExtensionContext context) {

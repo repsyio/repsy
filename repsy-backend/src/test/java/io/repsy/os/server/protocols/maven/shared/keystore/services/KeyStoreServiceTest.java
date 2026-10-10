@@ -24,10 +24,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
+import io.repsy.libs.testsupport.pgp.PgpTestKeys;
 import io.repsy.os.generated.model.KeyStoreForm;
 import io.repsy.os.generated.model.PgpPublicKeyForm;
 import io.repsy.os.server.protocols.maven.shared.artifact.mappers.ArtifactMapper;
-import io.repsy.os.server.protocols.maven.shared.keystore.PgpTestKeys;
 import io.repsy.os.server.protocols.maven.shared.keystore.entities.AllowedKeyserver;
 import io.repsy.os.server.protocols.maven.shared.keystore.entities.KeyStore;
 import io.repsy.os.server.protocols.maven.shared.keystore.entities.PgpPublicKey;

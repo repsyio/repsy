@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.protocols.maven.shared.keystore.support;
+package io.repsy.libs.testsupport.pgp;
 
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -26,11 +26,7 @@ import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.mock.http.client.MockClientHttpResponse;
 import org.springframework.web.client.RestClient;
 
-/**
- * In-memory key servers for tests: a {@link RestClient} whose requests never reach a network. A
- * copy of the backend's {@code StubKeyServers} until both move into a shared test-support module
- * (RPS-2067).
- */
+/** In-memory key servers for tests: a {@link RestClient} whose requests never reach a network. */
 public final class StubKeyServers {
 
   private StubKeyServers() {}

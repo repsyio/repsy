@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os;
+package io.repsy.libs.testsupport;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -22,16 +22,16 @@ import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-@DisplayName("ContextCountGuard: the limit on distinct Spring contexts of a run")
-class ContextCountGuardTest {
+@DisplayName("AbstractContextCountGuard: the limit on distinct Spring contexts of a run")
+class AbstractContextCountGuardTest {
 
   @Test
   @DisplayName("configurations up to the limit are accepted")
   void acceptsConfigurationsUpToTheLimit() {
     final Set<Object> seen = new HashSet<>();
 
-    assertThat(ContextCountGuard.record(seen, "a", 2)).isNull();
-    assertThat(ContextCountGuard.record(seen, "b", 2)).isNull();
+    assertThat(AbstractContextCountGuard.record(seen, "a", 2)).isNull();
+    assertThat(AbstractContextCountGuard.record(seen, "b", 2)).isNull();
     assertThat(seen).hasSize(2);
   }
 
@@ -40,7 +40,7 @@ class ContextCountGuardTest {
   void aKnownConfigurationIsFree() {
     final Set<Object> seen = new HashSet<>(Set.of("a", "b"));
 
-    assertThat(ContextCountGuard.record(seen, "a", 2)).isNull();
+    assertThat(AbstractContextCountGuard.record(seen, "a", 2)).isNull();
     assertThat(seen).hasSize(2);
   }
 
@@ -49,7 +49,7 @@ class ContextCountGuardTest {
   void reportsTheConfigurationOverTheLimit() {
     final Set<Object> seen = new HashSet<>(Set.of("a", "b"));
 
-    final var message = ContextCountGuard.record(seen, "c", 2);
+    final var message = AbstractContextCountGuard.record(seen, "c", 2);
 
     assertThat(message)
         .contains("number 3")

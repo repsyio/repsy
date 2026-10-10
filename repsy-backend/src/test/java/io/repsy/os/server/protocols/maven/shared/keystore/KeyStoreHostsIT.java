@@ -20,6 +20,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
+import io.repsy.libs.testsupport.pgp.PgpTestKeys;
+import io.repsy.libs.testsupport.pgp.StubKeyServers;
 import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.maven.shared.keystore.dtos.KeyStoreItem;
 import io.repsy.os.server.protocols.maven.shared.keystore.entities.AllowedKeyserver;
@@ -27,7 +29,6 @@ import io.repsy.os.server.protocols.maven.shared.keystore.entities.KeyStore;
 import io.repsy.os.server.protocols.maven.shared.keystore.repositories.AllowedKeyserverRepository;
 import io.repsy.os.server.protocols.maven.shared.keystore.repositories.KeyStoreRepository;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreService;
-import io.repsy.os.server.protocols.maven.shared.keystore.support.StubKeyServers;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.protocols.maven.shared.keystore.services.PgpVerifierService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
