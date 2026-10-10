@@ -34,7 +34,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class RevokedProtocolToken {
   @Id
-  @Column(name = "token_hash", length = 64)
+  @Column(name = "token_hash", length = 64, nullable = false)
   private String tokenHash;
 
   @Column(name = "expires_at", nullable = false)
