@@ -168,6 +168,8 @@ class DockerImageControllerIT extends AbstractIT {
             .build();
     this.manifestService.createSinglePlatformManifest(
         repo.getId(), image, TagForm.of(form, imageName, "linux/amd64", manifestInfo));
+    // As the push handler does after saving a manifest: the list's tag statistics are stored.
+    this.imageService.refreshImageSize(repo.getId(), image.getId());
 
     final var storage = storageDirOf(repo);
     Files.createDirectories(storage.resolve("blobs"));
@@ -274,6 +276,7 @@ class DockerImageControllerIT extends AbstractIT {
             .build();
     this.manifestService.createManifestList(
         repo.getId(), image.getId(), TagForm.of(form, imageName, "Multiplatform", manifestList));
+    this.imageService.refreshImageSize(repo.getId(), image.getId());
     this.entityManager.flush();
     this.entityManager.clear();
     return new MultiPlatformFixture(imageName, tag, listDigest, listJson, childDigests, childJsons);
@@ -972,6 +975,63 @@ class DockerImageControllerIT extends AbstractIT {
       assertThat(((Number) summary.get("untaggedSize")).longValue())
           .isEqualTo(((Number) listed.get("untaggedSize")).longValue())
           .isEqualTo(CONFIG_JSON.length() + LAYER_SIZE);
+    }
+
+    @Test
+    @DisplayName("the stored tag statistics match the live tag rows after pushes and deletes")
+    void storedTagStatsMatchTheTags() throws Exception {
+      final var it = DockerImageControllerIT.this;
+      final var repo = it.dockerRepo();
+      it.seedImage(repo, "multi", "a");
+      it.seedImage(repo, "multi", "b");
+      it.seedImage(repo, "multi", "c");
+      this.deleteTag(repo, "multi", "a");
+      it.seedImage(repo, "gone", "latest");
+      this.deleteTag(repo, "gone", "latest");
+      it.seedImage(repo, "plain", "latest");
+      // A tag moved to another manifest keeps its row, so its created_at: the stats do not move.
+      it.seedImage(repo, "plain", "latest", "sha256:" + "7".repeat(64));
+
+      final var listed = this.listedImages(repo);
+
+      assertThat(listed).hasSize(3);
+      for (final var image : this.imageRepository.findAllByRepoId(repo.getId())) {
+        final var row =
+            (Object[])
+                it.entityManager
+                    .createNativeQuery(
+                        """
+                        select
+                          (select count(*) from "public"."docker_tag" t where t."image_id" = i."id"),
+                          (select max(t."created_at") from "public"."docker_tag" t
+                            where t."image_id" = i."id"),
+                          i."tag_count",
+                          i."last_tag_at"
+                        from "public"."docker_image" i where i."id" = :id""")
+                    .setParameter("id", image.getId())
+                    .getSingleResult();
+
+        assertThat(((Number) row[2]).longValue())
+            .as("stored count of %s", image.getName())
+            .isEqualTo(((Number) row[0]).longValue());
+        assertThat(row[3]).as("stored last_tag_at of %s", image.getName()).isEqualTo(row[1]);
+        assertThat(((Number) listed.get(image.getName()).get("tagCount")).longValue())
+            .as("listed tagCount of %s", image.getName())
+            .isEqualTo(((Number) row[0]).longValue());
+      }
+      assertThat(((Number) listed.get("multi").get("tagCount")).intValue()).isEqualTo(2);
+      assertThat(((Number) listed.get("gone").get("tagCount")).intValue()).isZero();
+      assertThat(((Number) listed.get("plain").get("tagCount")).intValue()).isEqualTo(1);
+
+      // Sorting by updatedAt reads the stored column: both directions answer, newest tag first.
+      final var body =
+          BareBodyAssertions.expectBare(
+              it.perform(
+                  get("/api/docker/images/%s".formatted(repo.getName()))
+                      .param("sort", "updatedAt,desc")
+                      .header(AUTHORIZATION, it.adminBearerToken())));
+      final List<Map<String, Object>> content = JsonPath.read(body, "$.content");
+      assertThat(content).hasSize(3);
     }
   }
 
