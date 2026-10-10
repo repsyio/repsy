@@ -52,7 +52,8 @@ public final class ScanThreadsSettler implements AfterTestExecutionCallback {
 
   private static final String EXECUTOR_BEAN = "scanTaskExecutor";
   private static final Duration TIMEOUT = Duration.ofSeconds(10);
-  private static final long POLL_NANOS = Duration.ofMillis(10).toNanos();
+  private static final long POLL_MILLIS = 10;
+  private static final long POLL_NANOS = Duration.ofMillis(POLL_MILLIS).toNanos();
 
   @Override
   public void afterTestExecution(final ExtensionContext context) {

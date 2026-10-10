@@ -129,7 +129,7 @@ public abstract class AbstractCommittedRowsGuard implements BeforeAllCallback, A
 
     final var jdbc = jdbcTemplate(context);
 
-    awaitDefaultRepos(jdbc);
+    this.awaitDefaultRepos(jdbc);
     context.getStore(NAMESPACE).put(BASELINE_KEY, snapshot(jdbc));
   }
 
@@ -173,7 +173,7 @@ public abstract class AbstractCommittedRowsGuard implements BeforeAllCallback, A
   private void awaitDefaultRepos(final JdbcTemplate jdbc) throws InterruptedException {
     final var deadline = System.nanoTime() + SEEDING_TIMEOUT.toNanos();
 
-    while (count(jdbc, REPO_COUNT_SQL) < defaultRepoCount()) {
+    while (count(jdbc, REPO_COUNT_SQL) < this.defaultRepoCount()) {
       if (System.nanoTime() > deadline) {
         throw new IllegalStateException("Default repos were not seeded within " + SEEDING_TIMEOUT);
       }

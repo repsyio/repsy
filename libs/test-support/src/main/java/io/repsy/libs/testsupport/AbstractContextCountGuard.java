@@ -62,13 +62,13 @@ public abstract class AbstractContextCountGuard implements AfterAllCallback {
         BootstrapUtils.resolveTestContextBootstrapper(testClass).buildMergedContextConfiguration();
 
     final var known = CONFIGURATIONS.size();
-    final var overLimit = record(CONFIGURATIONS, configuration, maxContexts());
+    final var overLimit = record(CONFIGURATIONS, configuration, this.maxContexts());
 
     if (CONFIGURATIONS.size() > known) {
       LOG.info(
           "Spring context configuration {} of the run (limit {}) first used by {}",
           CONFIGURATIONS.size(),
-          maxContexts(),
+          this.maxContexts(),
           testClass.getName());
     }
 
