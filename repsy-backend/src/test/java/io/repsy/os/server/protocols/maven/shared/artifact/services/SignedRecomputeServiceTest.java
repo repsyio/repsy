@@ -53,7 +53,7 @@ class SignedRecomputeServiceTest {
 
   @Mock ArtifactVersionRepository artifactVersionRepository;
   @Mock RepoRepository repoRepository;
-  @Mock VersionSignatureService versionSignatureService;
+  @Mock ArtifactSignatureService artifactSignatureService;
 
   private SignedRecomputeService service;
   private final UUID repoId = UUID.randomUUID();
@@ -69,7 +69,7 @@ class SignedRecomputeServiceTest {
         new SignedRecomputeService(
             this.artifactVersionRepository,
             this.repoRepository,
-            this.versionSignatureService,
+            this.artifactSignatureService,
             this::submit,
             2);
   }
@@ -109,8 +109,8 @@ class SignedRecomputeServiceTest {
     final var result = this.service.recomputeRepo(this.repoId);
 
     assertThat(result).isEqualTo(new SignedRecomputeService.Result(5, 0));
-    final var order = inOrder(this.versionSignatureService);
-    all.forEach(id -> order.verify(this.versionSignatureService).recompute(id));
+    final var order = inOrder(this.artifactSignatureService);
+    all.forEach(id -> order.verify(this.artifactSignatureService).recompute(id));
   }
 
   @Test
@@ -135,7 +135,7 @@ class SignedRecomputeServiceTest {
     final var result = this.service.recomputeRepo(this.repoId);
 
     assertThat(result).isEqualTo(new SignedRecomputeService.Result(0, 0));
-    verify(this.versionSignatureService, never()).recompute(any());
+    verify(this.artifactSignatureService, never()).recompute(any());
   }
 
   @Test
@@ -145,14 +145,14 @@ class SignedRecomputeServiceTest {
     this.pageAfter(BEFORE_THE_FIRST, all.subList(0, 2));
     this.pageAfter(all.get(1), all.subList(2, 3));
     doThrow(new IllegalStateException("storage is down"))
-        .when(this.versionSignatureService)
+        .when(this.artifactSignatureService)
         .recompute(all.get(0));
 
     final var result = this.service.recomputeRepo(this.repoId);
 
     assertThat(result).isEqualTo(new SignedRecomputeService.Result(2, 1));
-    verify(this.versionSignatureService).recompute(all.get(1));
-    verify(this.versionSignatureService).recompute(all.get(2));
+    verify(this.artifactSignatureService).recompute(all.get(1));
+    verify(this.artifactSignatureService).recompute(all.get(2));
   }
 
   @Test
@@ -164,11 +164,11 @@ class SignedRecomputeServiceTest {
 
     // Handed to the executor, not run on the thread that committed the toggle.
     assertThat(this.queue).hasSize(1);
-    verify(this.versionSignatureService, never()).recompute(any());
+    verify(this.artifactSignatureService, never()).recompute(any());
 
     this.runQueued();
 
-    verify(this.versionSignatureService).recompute(ids(1).getFirst());
+    verify(this.artifactSignatureService).recompute(ids(1).getFirst());
   }
 
   @Test
@@ -183,7 +183,7 @@ class SignedRecomputeServiceTest {
 
     this.runQueued();
 
-    verify(this.versionSignatureService).recompute(ids(1).getFirst());
+    verify(this.artifactSignatureService).recompute(ids(1).getFirst());
   }
 
   @Test
@@ -214,7 +214,7 @@ class SignedRecomputeServiceTest {
 
     this.service.onToggled(new PgpVerifyAllSignaturesToggledEvent(this.repoId));
 
-    verifyNoInteractions(this.versionSignatureService, this.artifactVersionRepository);
+    verifyNoInteractions(this.artifactSignatureService, this.artifactVersionRepository);
 
     // The repo is not stuck as waiting: the next toggle is queued once there is room again.
     this.full = false;
@@ -253,11 +253,11 @@ class SignedRecomputeServiceTest {
 
     // Handed to the executor, not run on the thread that committed the change.
     assertThat(this.queue).hasSize(1);
-    verify(this.versionSignatureService, never()).recompute(any());
+    verify(this.artifactSignatureService, never()).recompute(any());
 
     this.runQueued();
 
-    verify(this.versionSignatureService).recompute(ids(1).getFirst());
+    verify(this.artifactSignatureService).recompute(ids(1).getFirst());
   }
 
   @Test
@@ -268,7 +268,7 @@ class SignedRecomputeServiceTest {
     this.service.onKeySourcesChanged(new PgpKeySourcesChangedEvent(this.repoId));
 
     assertThat(this.queue).isEmpty();
-    verifyNoInteractions(this.versionSignatureService, this.artifactVersionRepository);
+    verifyNoInteractions(this.artifactSignatureService, this.artifactVersionRepository);
   }
 
   @Test
@@ -304,7 +304,7 @@ class SignedRecomputeServiceTest {
             () -> this.service.onKeySourcesChanged(new PgpKeySourcesChangedEvent(this.repoId)))
         .doesNotThrowAnyException();
 
-    verifyNoInteractions(this.versionSignatureService, this.artifactVersionRepository);
+    verifyNoInteractions(this.artifactSignatureService, this.artifactVersionRepository);
 
     // The repo is not stuck as waiting: the next change is queued once there is room again.
     this.full = false;
@@ -333,7 +333,7 @@ class SignedRecomputeServiceTest {
         new SignedRecomputeService(
             this.artifactVersionRepository,
             this.repoRepository,
-            this.versionSignatureService,
+            this.artifactSignatureService,
             this::submit,
             0);
     final var all = ids(2);

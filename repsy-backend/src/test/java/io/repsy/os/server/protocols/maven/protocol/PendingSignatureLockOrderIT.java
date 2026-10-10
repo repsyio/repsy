@@ -24,8 +24,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import io.repsy.os.AbstractIT;
+import io.repsy.os.server.protocols.maven.shared.artifact.services.ArtifactSignatureService;
 import io.repsy.os.server.protocols.maven.shared.artifact.services.PendingSignatureService;
-import io.repsy.os.server.protocols.maven.shared.artifact.services.VersionSignatureService;
 import io.repsy.os.server.protocols.maven.shared.keystore.PgpTestKeys;
 import io.repsy.os.server.protocols.maven.shared.storage.services.MavenStorageService;
 import io.repsy.os.shared.repo.entities.Repo;
@@ -59,7 +59,7 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * RPS-1352: the lock order of {@link PendingSignatureService} and the version row lock of {@link
- * VersionSignatureService}, forced in the two interleavings that could deadlock if the order were
+ * ArtifactSignatureService}, forced in the two interleavings that could deadlock if the order were
  * not one.
  *
  * <p>The order the code keeps: a parked signature's row comes first, the version's row lock second
@@ -95,7 +95,7 @@ class PendingSignatureLockOrderIT extends AbstractIT {
 
   @MockitoBean private UsageUpdateService usageUpdateService;
   @MockitoSpyBean private PendingSignatureService pendingSignatureService;
-  @MockitoSpyBean private VersionSignatureService versionSignatureService;
+  @MockitoSpyBean private ArtifactSignatureService artifactSignatureService;
 
   @Autowired private RepoTxService repoTxService;
   @Autowired private MavenStorageService mavenStorageService;
@@ -107,7 +107,7 @@ class PendingSignatureLockOrderIT extends AbstractIT {
 
   @AfterEach
   void deleteCommittedData() throws InterruptedException {
-    org.mockito.Mockito.reset(this.pendingSignatureService, this.versionSignatureService);
+    org.mockito.Mockito.reset(this.pendingSignatureService, this.artifactSignatureService);
     this.stopPools();
     this.createdRepoIds.forEach(
         id -> this.jdbcTemplate.update("delete from repo where id = ?", id));
@@ -368,7 +368,7 @@ class PendingSignatureLockOrderIT extends AbstractIT {
 
               return invocation.callRealMethod();
             })
-        .when(this.versionSignatureService)
+        .when(this.artifactSignatureService)
         .lockAndIsVerifyAll(any());
 
     final var pool = this.pool(2);
@@ -422,7 +422,7 @@ class PendingSignatureLockOrderIT extends AbstractIT {
 
               return invocation.callRealMethod();
             })
-        .when(this.versionSignatureService)
+        .when(this.artifactSignatureService)
         .forget(any(), any());
 
     final var pool = this.pool(2);

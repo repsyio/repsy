@@ -62,8 +62,8 @@ import org.springframework.core.io.Resource;
  * one of them has a verified signature (RPS-1188).
  */
 @ExtendWith(MockitoExtension.class)
-@DisplayName("VersionSignatureService (RPS-1188)")
-class VersionSignatureServiceTest {
+@DisplayName("ArtifactSignatureService (RPS-1188)")
+class ArtifactSignatureServiceTest {
 
   private static final String VERSION_PATH = "com/acme/lib/1.0";
 
@@ -72,20 +72,24 @@ class VersionSignatureServiceTest {
   @Mock StorageStrategy storageStrategy;
   @Mock KeyStoreService keyStoreService;
   @Mock PgpVerifierService pgpVerifierService;
+  @Mock ArtifactQueryService artifactQueryService;
+  @Mock PendingSignatureService pendingSignatureService;
 
-  private VersionSignatureService service;
+  private ArtifactSignatureService service;
   private final UUID storageKey = UUID.randomUUID();
   private final ArtifactVersion version = new ArtifactVersion();
 
   @BeforeEach
   void setUp() {
     this.service =
-        new VersionSignatureService(
+        new ArtifactSignatureService(
             this.versionSignatureRepository,
             this.artifactVersionRepository,
             TestStorageRegistries.of(this.storageStrategy),
             this.keyStoreService,
-            this.pgpVerifierService);
+            this.pgpVerifierService,
+            this.artifactQueryService,
+            this.pendingSignatureService);
     this.version.setId(UUID.randomUUID());
     // Nothing is stored unless a test says so.
     lenient()

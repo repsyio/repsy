@@ -83,7 +83,7 @@ class PendingSignatureServiceTest {
   @Mock ArtifactRepository artifactRepository;
   @Mock ArtifactVersionRepository artifactVersionRepository;
   @Mock RepoRepository repoRepository;
-  @Mock VersionSignatureService versionSignatureService;
+  @Mock ArtifactSignatureService artifactSignatureService;
   @Mock PgpVerifierService pgpVerifierService;
   @Mock KeyStoreService keyStoreService;
   @Mock UsageUpdateService usageUpdateService;
@@ -114,7 +114,7 @@ class PendingSignatureServiceTest {
             this.artifactRepository,
             this.artifactVersionRepository,
             this.repoRepository,
-            this.versionSignatureService,
+            this.artifactSignatureService,
             this.pgpVerifierService,
             this.keyStoreService,
             this.usageUpdateService,
@@ -255,7 +255,7 @@ class PendingSignatureServiceTest {
     final var target = ArgumentCaptor.forClass(StoragePath.class);
     verify(this.storageStrategy).write(eq("mvn"), target.capture(), any(InputStream.class));
     assertThat(target.getValue().getRelativePath().getPath()).isEqualTo(FILE + ".asc");
-    verify(this.versionSignatureService).recordVerified(this.version, "lib-1.0-javadoc.jar");
+    verify(this.artifactSignatureService).recordVerified(this.version, "lib-1.0-javadoc.jar");
     verify(this.pendingSignatureRepository).delete(row);
     verify(this.usageUpdateService)
         .updateUsage(new UsageChangedInfo(this.repoId, BaseUsages.ofDisk(ARMORED.length())));
@@ -277,11 +277,11 @@ class PendingSignatureServiceTest {
         .hasMessage("pendingSignatureNotVerified");
 
     verify(this.pendingSignatureRepository).delete(row);
-    verify(this.versionSignatureService).forget(this.version, "lib-1.0-javadoc.jar");
-    verify(this.versionSignatureService)
+    verify(this.artifactSignatureService).forget(this.version, "lib-1.0-javadoc.jar");
+    verify(this.artifactSignatureService)
         .refreshSigned(this.repoId, this.version, "com/acme/lib/1.0");
     verify(this.storageStrategy, never()).write(anyString(), any(), any());
-    verify(this.versionSignatureService, never()).recordVerified(any(), anyString());
+    verify(this.artifactSignatureService, never()).recordVerified(any(), anyString());
     verifyNoInteractions(this.usageUpdateService);
   }
 

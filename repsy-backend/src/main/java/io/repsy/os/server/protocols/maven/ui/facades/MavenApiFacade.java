@@ -22,7 +22,7 @@ import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.os.generated.model.ArtifactVersionInfo;
 import io.repsy.os.generated.model.RepoSettingsForm;
 import io.repsy.os.generated.model.RepoSettingsInfo;
-import io.repsy.os.server.protocols.maven.shared.artifact.services.ArtifactService;
+import io.repsy.os.server.protocols.maven.shared.artifact.services.ArtifactQueryService;
 import io.repsy.os.server.protocols.maven.shared.storage.services.MavenStorageService;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacadeMavenAdapter;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
@@ -49,7 +49,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class MavenApiFacade implements ProtocolApiFacadeMavenAdapter {
 
   private final @NonNull RepoTxService repoTxService;
-  private final @NonNull ArtifactService artifactService;
+  private final @NonNull ArtifactQueryService artifactQueryService;
   private final @NonNull MavenStorageService mavenStorageService;
 
   @Transactional
@@ -112,7 +112,7 @@ public class MavenApiFacade implements ProtocolApiFacadeMavenAdapter {
       throws IOException, XmlPullParserException {
 
     final var artifactVersionInfo =
-        this.artifactService.getArtifactVersion(
+        this.artifactQueryService.getArtifactVersion(
             repoInfo.getStorageKey(), groupName, artifactName, versionName);
 
     final var artifactBasePath =
@@ -121,7 +121,7 @@ public class MavenApiFacade implements ProtocolApiFacadeMavenAdapter {
             artifactVersionInfo.getArtifactName());
 
     final var pomFileName =
-        this.artifactService.getArtifactVersionPomFilename(
+        this.artifactQueryService.getArtifactVersionPomFilename(
             repoInfo,
             artifactBasePath,
             artifactVersionInfo.getType() != null

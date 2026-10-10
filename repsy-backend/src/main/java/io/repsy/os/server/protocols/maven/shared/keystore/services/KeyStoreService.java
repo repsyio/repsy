@@ -269,7 +269,7 @@ public class KeyStoreService {
    * concerned, whatever else has the same key. Handled after this transaction commits: the versions
    * of the repo are recomputed in the background if it verifies every signature (RPS-1334, {@code
    * SignedRecomputeService#onKeySourcesChanged}). Deleting a key does not unsign a version whose
-   * signature was verified with it: see {@code VersionSignatureService#recompute}.
+   * signature was verified with it: see {@code ArtifactSignatureService#recompute}.
    */
   private void publishKeySourcesChanged(final RepoInfo repoInfo) {
 

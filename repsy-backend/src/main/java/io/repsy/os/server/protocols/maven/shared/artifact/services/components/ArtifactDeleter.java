@@ -19,7 +19,8 @@ import io.repsy.core.events.ArtifactVersionDeletedEvent;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.server.protocols.maven.shared.artifact.dtos.DeletedItem;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.Artifact;
-import io.repsy.os.server.protocols.maven.shared.artifact.services.ArtifactService;
+import io.repsy.os.server.protocols.maven.shared.artifact.services.ArtifactDeploymentService;
+import io.repsy.os.server.protocols.maven.shared.artifact.services.ArtifactQueryService;
 import io.repsy.os.server.protocols.maven.shared.storage.services.MavenStorageService;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import java.io.IOException;
@@ -39,7 +40,8 @@ import org.springframework.stereotype.Component;
 public class ArtifactDeleter {
 
   private final MavenStorageService mavenStorageService;
-  private final ArtifactService artifactService;
+  private final ArtifactQueryService artifactQueryService;
+  private final ArtifactDeploymentService artifactDeploymentService;
   private final ApplicationEventPublisher eventPublisher;
 
   public Pair<DeletedItem, BaseUsages> deleteArtifactVersion(
@@ -53,10 +55,11 @@ public class ArtifactDeleter {
     // check, a version name that does not exist on an artifact that has exactly one real version
     // reached hasOnlyOneVersion() as true and cascaded into deleteArtifact() (and potentially
     // deleteGroup()), deleting the whole artifact instead of answering 404 (RPS-1190).
-    this.artifactService.requireArtifactVersion(
+    this.artifactQueryService.requireArtifactVersion(
         repoInfo.getStorageKey(), groupName, artifactName, versionName);
 
-    if (this.artifactService.hasOnlyOneVersion(repoInfo.getStorageKey(), groupName, artifactName)) {
+    if (this.artifactQueryService.hasOnlyOneVersion(
+        repoInfo.getStorageKey(), groupName, artifactName)) {
       // deleteArtifact() (and whatever it delegates to, e.g. deleteGroup()) publishes
       // ArtifactVersionDeletedEvent for every version it removes, which at this point is only
       // this one — no separate publish needed here.
@@ -78,7 +81,8 @@ public class ArtifactDeleter {
     final var totalUsage = artifactUsage - metadataUsages.getDiskUsage();
     final var usages = BaseUsages.builder().diskUsage(totalUsage * -1L).build();
 
-    this.artifactService.deleteArtifactVersion(repoInfo, groupName, artifactName, versionName);
+    this.artifactDeploymentService.deleteArtifactVersion(
+        repoInfo, groupName, artifactName, versionName);
 
     this.publishVersionDeleted(repoInfo, groupName, artifactName, versionName);
 
@@ -92,14 +96,14 @@ public class ArtifactDeleter {
     // it, an artifact name that does not exist in a group holding exactly one artifact reached
     // hasOnlyOneArtifact() as true and deleted the whole group (files and rows) instead of
     // answering 404 (RPS-1573, the shape RPS-1190 fixed for versions).
-    this.artifactService.requireArtifact(repoInfo.getStorageKey(), groupName, artifactName);
+    this.artifactQueryService.requireArtifact(repoInfo.getStorageKey(), groupName, artifactName);
 
-    if (this.artifactService.hasOnlyOneArtifact(repoInfo.getStorageKey(), groupName)) {
+    if (this.artifactQueryService.hasOnlyOneArtifact(repoInfo.getStorageKey(), groupName)) {
       return this.deleteGroup(repoInfo, groupName);
     }
 
     final var versionNames =
-        this.artifactService.getArtifactVersionNames(
+        this.artifactQueryService.getArtifactVersionNames(
             repoInfo.getStorageKey(), groupName, artifactName);
 
     final var usage =
@@ -107,7 +111,8 @@ public class ArtifactDeleter {
 
     final var usages = BaseUsages.builder().diskUsage(usage * -1L).build();
 
-    this.artifactService.deleteArtifact(repoInfo.getStorageKey(), groupName, artifactName);
+    this.artifactDeploymentService.deleteArtifact(
+        repoInfo.getStorageKey(), groupName, artifactName);
 
     this.publishVersionsDeleted(repoInfo, groupName, artifactName, versionNames);
 
@@ -120,12 +125,13 @@ public class ArtifactDeleter {
     // A group that holds no artifact is not there: 404 instead of a 200 that deleted nothing
     // (RPS-1573). The cascade from deleteArtifact() and deleteArtifactVersion() passes it, the
     // artifact being deleted still holds a row.
-    this.artifactService.requireGroup(repoInfo.getStorageKey(), groupName);
+    this.artifactQueryService.requireGroup(repoInfo.getStorageKey(), groupName);
 
     // No special case for a "root group" (the one whose name prefixes every other group): its own
     // artifacts are removed like any group's, and a nested group such as com.acme.sub next to
     // com.acme is never touched (RPS-1190, RPS-1349).
-    final var artifacts = this.artifactService.getArtifacts(repoInfo.getStorageKey(), groupName);
+    final var artifacts =
+        this.artifactQueryService.getArtifacts(repoInfo.getStorageKey(), groupName);
     final var versionNamesByArtifact =
         this.collectVersionNamesByArtifact(repoInfo, groupName, artifacts);
     final var artifactNames = artifacts.stream().map(Artifact::getArtifactName).toList();
@@ -138,7 +144,7 @@ public class ArtifactDeleter {
 
     final BaseUsages usages = BaseUsages.builder().diskUsage(usage * -1L).build();
 
-    this.artifactService.deleteGroup(repoInfo.getStorageKey(), groupName);
+    this.artifactDeploymentService.deleteGroup(repoInfo.getStorageKey(), groupName);
 
     versionNamesByArtifact.forEach(
         (artifactName, versionNames) ->
@@ -155,7 +161,7 @@ public class ArtifactDeleter {
     for (final var artifact : artifacts) {
       versionNamesByArtifact.put(
           artifact.getArtifactName(),
-          this.artifactService.getArtifactVersionNames(
+          this.artifactQueryService.getArtifactVersionNames(
               repoInfo.getStorageKey(), groupName, artifact.getArtifactName()));
     }
 

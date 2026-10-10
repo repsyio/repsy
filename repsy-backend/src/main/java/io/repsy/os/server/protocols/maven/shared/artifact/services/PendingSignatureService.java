@@ -52,6 +52,7 @@ import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -84,7 +85,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * does not answer, a key not registered yet) keeps the row.
  *
  * <p><b>Lock order (RPS-1352).</b> Two kinds of row lock meet here: the parked row ({@code
- * maven_pending_signature}) and the version's row lock that {@link VersionSignatureService#lock}
+ * maven_pending_signature}) and the version's row lock that {@link ArtifactSignatureService#lock}
  * takes ({@code update ... set signed = signed}). Every request that needs both takes them in one
  * order, the parked row first and the version second:
  *
@@ -139,7 +140,7 @@ public class PendingSignatureService {
   private final ArtifactRepository artifactRepository;
   private final ArtifactVersionRepository artifactVersionRepository;
   private final RepoRepository repoRepository;
-  private final VersionSignatureService versionSignatureService;
+  private final ArtifactSignatureService artifactSignatureService;
   private final PgpVerifierService pgpVerifierService;
   private final KeyStoreService keyStoreService;
   private final UsageUpdateService usageUpdateService;
@@ -153,7 +154,7 @@ public class PendingSignatureService {
       final ArtifactRepository artifactRepository,
       final ArtifactVersionRepository artifactVersionRepository,
       final RepoRepository repoRepository,
-      final VersionSignatureService versionSignatureService,
+      @Lazy final ArtifactSignatureService artifactSignatureService,
       final PgpVerifierService pgpVerifierService,
       final KeyStoreService keyStoreService,
       final UsageUpdateService usageUpdateService,
@@ -165,7 +166,7 @@ public class PendingSignatureService {
     this.artifactRepository = artifactRepository;
     this.artifactVersionRepository = artifactVersionRepository;
     this.repoRepository = repoRepository;
-    this.versionSignatureService = versionSignatureService;
+    this.artifactSignatureService = artifactSignatureService;
     this.pgpVerifierService = pgpVerifierService;
     this.keyStoreService = keyStoreService;
     this.usageUpdateService = usageUpdateService;
@@ -492,10 +493,10 @@ public class PendingSignatureService {
       return;
     }
 
-    this.versionSignatureService.forget(version, fileNameOf(row.getSignedFilePath()));
+    this.artifactSignatureService.forget(version, fileNameOf(row.getSignedFilePath()));
 
     if (mode == Mode.FILE) {
-      this.versionSignatureService.refreshSigned(
+      this.artifactSignatureService.refreshSigned(
           repoInfo.getStorageKey(), version, parentOf(row.getSignedFilePath()));
     }
   }
@@ -521,7 +522,7 @@ public class PendingSignatureService {
             signaturePath,
             new ByteArrayInputStream(row.getArmoredSignature().getBytes(UTF_8)));
 
-    this.versionSignatureService.recordVerified(version, fileNameOf(row.getSignedFilePath()));
+    this.artifactSignatureService.recordVerified(version, fileNameOf(row.getSignedFilePath()));
     this.pendingSignatureRepository.delete(row);
 
     return usages.getDiskUsage();

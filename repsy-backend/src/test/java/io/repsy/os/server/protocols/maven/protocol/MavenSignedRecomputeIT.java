@@ -32,8 +32,8 @@ import io.repsy.os.AbstractIT;
 import io.repsy.os.config.async.SignedRecomputeExecutorConfig;
 import io.repsy.os.generated.model.RepoSettingsForm;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactVersionRepository;
+import io.repsy.os.server.protocols.maven.shared.artifact.services.ArtifactSignatureService;
 import io.repsy.os.server.protocols.maven.shared.artifact.services.SignedRecomputeService;
-import io.repsy.os.server.protocols.maven.shared.artifact.services.VersionSignatureService;
 import io.repsy.os.server.protocols.maven.shared.keystore.PgpTestKeys;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreService;
 import io.repsy.os.server.protocols.maven.shared.storage.services.MavenStorageService;
@@ -95,7 +95,7 @@ class MavenSignedRecomputeIT extends AbstractIT {
   @Autowired private PlatformTransactionManager transactionManager;
   @Autowired private ObjectMapper objectMapper;
   @Autowired private ArtifactVersionRepository artifactVersionRepository;
-  @Autowired private VersionSignatureService versionSignatureService;
+  @Autowired private ArtifactSignatureService artifactSignatureService;
 
   @Qualifier(SignedRecomputeExecutorConfig.BEAN_NAME)
   @Autowired
@@ -502,7 +502,7 @@ class MavenSignedRecomputeIT extends AbstractIT {
                   return List.of(
                       cached,
                       version.getArtifact().getRepo().isPgpVerifyAllSignaturesEnabled(),
-                      this.versionSignatureService.lockAndIsVerifyAll(version));
+                      this.artifactSignatureService.lockAndIsVerifyAll(version));
                 });
 
     // The entity still says off (it is what a request that began before the toggle sees), the
