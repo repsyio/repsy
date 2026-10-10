@@ -26,7 +26,7 @@ import { DialogDirective } from '../../../../shared/directives/dialog.directive'
   styleUrl: './nuget-config.component.css',
   templateUrl: './nuget-config.component.html',
 })
-export class NugetConfigComponent implements OnInit, OnChanges {
+export class NuGetConfigComponent implements OnInit, OnChanges {
   @Input() baseUrl: string;
   @Input() username = '<username>';
   @Input() repoName = '<repo_name>';

@@ -17,20 +17,20 @@
 import { Routes } from '@angular/router';
 
 import { RepositorySettingsComponent } from '../repo-settings/repository-settings.component';
-import { NugetComponent } from './nuget.component';
-import { NugetPackagesListComponent } from './packages/list/nuget-packages-list.component';
-import { NugetPackagesVersionDetailComponent } from './packages/version-detail/nuget-packages-version-detail.component';
-import { NugetPackagesVersionListComponent } from './packages/version-list/nuget-packages-version-list.component';
+import { NuGetComponent } from './nuget.component';
+import { NuGetPackagesListComponent } from './packages/list/nuget-packages-list.component';
+import { NuGetPackagesVersionDetailComponent } from './packages/version-detail/nuget-packages-version-detail.component';
+import { NuGetPackagesVersionListComponent } from './packages/version-list/nuget-packages-version-list.component';
 
 export const NUGET_ROUTES: Routes = [
   {
     path: '',
-    component: NugetComponent,
+    component: NuGetComponent,
     children: [
       {
         path: '',
         pathMatch: 'full',
-        component: NugetPackagesListComponent,
+        component: NuGetPackagesListComponent,
         title: 'Repsy | NuGet Packages',
       },
       {
@@ -45,13 +45,13 @@ export const NUGET_ROUTES: Routes = [
           {
             path: '',
             pathMatch: 'full',
-            component: NugetPackagesVersionListComponent,
+            component: NuGetPackagesVersionListComponent,
             title: 'Repsy | NuGet Package Versions',
           },
           {
             path: ':version',
             pathMatch: 'full',
-            component: NugetPackagesVersionDetailComponent,
+            component: NuGetPackagesVersionDetailComponent,
             title: 'Repsy | NuGet Version Detail',
           },
         ],

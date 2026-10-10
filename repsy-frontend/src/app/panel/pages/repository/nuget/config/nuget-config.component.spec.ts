@@ -14,13 +14,13 @@
 /// limitations under the License.
 ///
 
-import { NugetConfigComponent } from './nuget-config.component';
+import { NuGetConfigComponent } from './nuget-config.component';
 
-describe('NugetConfigComponent (RPS-1570)', () => {
-  let component: NugetConfigComponent;
+describe('NuGetConfigComponent (RPS-1570)', () => {
+  let component: NuGetConfigComponent;
 
   beforeEach(() => {
-    component = new NugetConfigComponent();
+    component = new NuGetConfigComponent();
     component.baseUrl = 'https://repo.example.com';
     component.repoName = 'my-repo';
     component.username = 'alice';

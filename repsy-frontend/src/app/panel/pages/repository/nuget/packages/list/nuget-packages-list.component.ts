@@ -38,8 +38,8 @@ import { TooltipComponent } from '../../../../../shared/components/tooltip/toolt
 import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
 import { SecurityService } from '../../../../security/service/security.service';
-import { NugetConfigComponent } from '../../config/nuget-config.component';
-import { NugetService } from '../../service/nuget.service';
+import { NuGetConfigComponent } from '../../config/nuget-config.component';
+import { NuGetService } from '../../service/nuget.service';
 
 @Component({
   selector: 'app-nuget-packages-list',
@@ -51,7 +51,7 @@ import { NugetService } from '../../service/nuget.service';
     SortSelectorComponent,
     PaginationComponent,
     SpinnerComponent,
-    NugetConfigComponent,
+    NuGetConfigComponent,
     DropdownComponent,
     TooltipComponent,
     EmptyListComponent,
@@ -60,7 +60,7 @@ import { NugetService } from '../../service/nuget.service';
   ],
   templateUrl: './nuget-packages-list.component.html',
 })
-export class NugetPackagesListComponent implements OnDestroy {
+export class NuGetPackagesListComponent implements OnDestroy {
   public loading = true;
   public showConfig = false;
   public pageNum = 0;
@@ -85,7 +85,7 @@ export class NugetPackagesListComponent implements OnDestroy {
 
   constructor(
     private readonly authService: AuthService,
-    private readonly nugetService: NugetService,
+    private readonly nugetService: NuGetService,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
     private readonly securityService: SecurityService,

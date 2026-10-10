@@ -15,18 +15,18 @@
 
 import { describeRouteTree } from '../../../../shared/testing/route-spec-helpers';
 import { RepositorySettingsComponent } from '../repo-settings/repository-settings.component';
-import { NugetComponent } from './nuget.component';
+import { NuGetComponent } from './nuget.component';
 import { NUGET_ROUTES } from './nuget.routes';
-import { NugetPackagesListComponent } from './packages/list/nuget-packages-list.component';
-import { NugetPackagesVersionDetailComponent } from './packages/version-detail/nuget-packages-version-detail.component';
-import { NugetPackagesVersionListComponent } from './packages/version-list/nuget-packages-version-list.component';
+import { NuGetPackagesListComponent } from './packages/list/nuget-packages-list.component';
+import { NuGetPackagesVersionDetailComponent } from './packages/version-detail/nuget-packages-version-detail.component';
+import { NuGetPackagesVersionListComponent } from './packages/version-list/nuget-packages-version-list.component';
 
 describe('NUGET_ROUTES', () => {
   describeRouteTree(
     () => NUGET_ROUTES,
     [
-      { path: '', component: NugetComponent },
-      { path: '', component: NugetPackagesListComponent, title: 'Repsy | NuGet Packages', full: true },
+      { path: '', component: NuGetComponent },
+      { path: '', component: NuGetPackagesListComponent, title: 'Repsy | NuGet Packages', full: true },
       {
         path: 'settings',
         component: RepositorySettingsComponent,
@@ -36,13 +36,13 @@ describe('NUGET_ROUTES', () => {
       { path: ':packageName' },
       {
         path: ':packageName',
-        component: NugetPackagesVersionListComponent,
+        component: NuGetPackagesVersionListComponent,
         title: 'Repsy | NuGet Package Versions',
         full: true,
       },
       {
         path: ':packageName/:version',
-        component: NugetPackagesVersionDetailComponent,
+        component: NuGetPackagesVersionDetailComponent,
         title: 'Repsy | NuGet Version Detail',
         full: true,
       },

@@ -31,7 +31,7 @@ import { MavenComponent } from '../maven/maven.component';
 import { MAVEN_ROUTES } from '../maven/maven.routes';
 import { NpmComponent } from '../npm/npm.component';
 import { NPM_ROUTES } from '../npm/npm.routes';
-import { NugetComponent } from '../nuget/nuget.component';
+import { NuGetComponent } from '../nuget/nuget.component';
 import { NUGET_ROUTES } from '../nuget/nuget.routes';
 import { PypiComponent } from '../pypi/pypi.component';
 import { PYPI_ROUTES } from '../pypi/pypi.routes';
@@ -49,7 +49,7 @@ const ENTRIES: { type: RepoRouteSlug; routes: Routes; component: Type<unknown> }
   { type: 'cargo', routes: CARGO_ROUTES, component: CargoComponent },
   { type: 'golang', routes: GO_ROUTES, component: GoComponent },
   { type: 'helm', routes: HELM_ROUTES, component: HelmComponent },
-  { type: 'nuget', routes: NUGET_ROUTES, component: NugetComponent },
+  { type: 'nuget', routes: NUGET_ROUTES, component: NuGetComponent },
   { type: 'ruby', routes: RUBY_ROUTES, component: RubyComponent },
 ];
 

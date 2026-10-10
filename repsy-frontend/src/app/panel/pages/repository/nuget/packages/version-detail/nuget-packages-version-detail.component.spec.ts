@@ -25,8 +25,8 @@ import { DangerModalService } from '../../../../../shared/components/modals/dang
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { PagedData } from '../../../../../shared/dto/paged-data';
-import { NugetService } from '../../service/nuget.service';
-import { NugetPackagesVersionDetailComponent } from './nuget-packages-version-detail.component';
+import { NuGetService } from '../../service/nuget.service';
+import { NuGetPackagesVersionDetailComponent } from './nuget-packages-version-detail.component';
 
 @Component({ selector: 'app-security-scan-section', standalone: true, template: '' })
 class SecurityScanSectionStubComponent {
@@ -37,8 +37,8 @@ class SecurityScanSectionStubComponent {
   @Input() public canTriggerScan: boolean;
 }
 
-describe('NugetPackagesVersionDetailComponent README', () => {
-  let nugetService: jasmine.SpyObj<NugetService>;
+describe('NuGetPackagesVersionDetailComponent README', () => {
+  let nugetService: jasmine.SpyObj<NuGetService>;
 
   async function render(readme: string | undefined): Promise<HTMLElement> {
     const versionInfo: NuGetVersionInfo = {
@@ -51,8 +51,8 @@ describe('NugetPackagesVersionDetailComponent README', () => {
     };
     nugetService.fetchPackageVersion.and.resolveTo(versionInfo);
 
-    const fixture: ComponentFixture<NugetPackagesVersionDetailComponent> = TestBed.createComponent(
-      NugetPackagesVersionDetailComponent,
+    const fixture: ComponentFixture<NuGetPackagesVersionDetailComponent> = TestBed.createComponent(
+      NuGetPackagesVersionDetailComponent,
     );
     fixture.detectChanges();
     await fixture.whenStable();
@@ -68,14 +68,14 @@ describe('NugetPackagesVersionDetailComponent README', () => {
       canManage: false,
       private: false,
     });
-    nugetService = jasmine.createSpyObj<NugetService>('NugetService', ['fetchPackageVersion'], {
+    nugetService = jasmine.createSpyObj<NuGetService>('NuGetService', ['fetchPackageVersion'], {
       repoChanges,
     });
 
     TestBed.configureTestingModule({
-      imports: [NugetPackagesVersionDetailComponent],
+      imports: [NuGetPackagesVersionDetailComponent],
       providers: [
-        { provide: NugetService, useValue: nugetService },
+        { provide: NuGetService, useValue: nugetService },
         {
           provide: ActivatedRoute,
           useValue: { snapshot: { paramMap: convertToParamMap({ packageName: 'Acme.Lib', version: '1.2.3' }) } },
@@ -88,7 +88,7 @@ describe('NugetPackagesVersionDetailComponent README', () => {
         { provide: Router, useValue: jasmine.createSpyObj<Router>('Router', ['navigate']) },
       ],
     });
-    TestBed.overrideComponent(NugetPackagesVersionDetailComponent, {
+    TestBed.overrideComponent(NuGetPackagesVersionDetailComponent, {
       remove: { imports: [SecurityScanSectionComponent] },
       add: { imports: [SecurityScanSectionStubComponent] },
     });
@@ -96,7 +96,7 @@ describe('NugetPackagesVersionDetailComponent README', () => {
 
   async function renderFailure(status: number): Promise<HTMLElement> {
     nugetService.fetchPackageVersion.and.rejectWith(new HttpErrorResponse({ status: status }));
-    const fixture = TestBed.createComponent(NugetPackagesVersionDetailComponent);
+    const fixture = TestBed.createComponent(NuGetPackagesVersionDetailComponent);
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.detectChanges();
@@ -115,8 +115,8 @@ describe('NugetPackagesVersionDetailComponent README', () => {
       downloadCount: 0,
       publishedAt: '2026-01-01T00:00:00Z',
     } as NuGetVersionInfo);
-    const fixture: ComponentFixture<NugetPackagesVersionDetailComponent> = TestBed.createComponent(
-      NugetPackagesVersionDetailComponent,
+    const fixture: ComponentFixture<NuGetPackagesVersionDetailComponent> = TestBed.createComponent(
+      NuGetPackagesVersionDetailComponent,
     );
     fixture.detectChanges();
     await fixture.whenStable();
@@ -179,7 +179,7 @@ describe('NugetPackagesVersionDetailComponent README', () => {
     nugetService.fetchPackageVersion.and.rejectWith(
       new HttpErrorResponse({ status: 404, error: { detail: 'Version not found' } }),
     );
-    const fixture = TestBed.createComponent(NugetPackagesVersionDetailComponent);
+    const fixture = TestBed.createComponent(NuGetPackagesVersionDetailComponent);
 
     fixture.detectChanges();
     await fixture.whenStable();
@@ -192,9 +192,9 @@ describe('NugetPackagesVersionDetailComponent README', () => {
   });
 });
 
-describe('NugetPackagesVersionDetailComponent delete (RPS-1288)', () => {
+describe('NuGetPackagesVersionDetailComponent delete (RPS-1288)', () => {
   const REPO = 'nuget-repo';
-  let nugetService: jasmine.SpyObj<NugetService>;
+  let nugetService: jasmine.SpyObj<NuGetService>;
   let router: jasmine.SpyObj<Router>;
   let toast: jasmine.SpyObj<ToastService>;
   let danger: jasmine.SpyObj<DangerModalService>;
@@ -203,7 +203,7 @@ describe('NugetPackagesVersionDetailComponent delete (RPS-1288)', () => {
   } as ActivatedRoute;
 
   async function confirmDelete(): Promise<void> {
-    const fixture = TestBed.createComponent(NugetPackagesVersionDetailComponent);
+    const fixture = TestBed.createComponent(NuGetPackagesVersionDetailComponent);
     fixture.detectChanges();
     await fixture.whenStable();
     fixture.componentInstance.deleteVersion();
@@ -221,8 +221,8 @@ describe('NugetPackagesVersionDetailComponent delete (RPS-1288)', () => {
   }
 
   beforeEach(() => {
-    nugetService = jasmine.createSpyObj<NugetService>(
-      'NugetService',
+    nugetService = jasmine.createSpyObj<NuGetService>(
+      'NuGetService',
       ['fetchPackageVersion', 'fetchPackageVersions', 'deletePackageVersion'],
       {
         repoChanges: new BehaviorSubject<RepoPermissionInfo>({
@@ -243,16 +243,16 @@ describe('NugetPackagesVersionDetailComponent delete (RPS-1288)', () => {
     danger = jasmine.createSpyObj<DangerModalService>('DangerModalService', ['show']);
 
     TestBed.configureTestingModule({
-      imports: [NugetPackagesVersionDetailComponent],
+      imports: [NuGetPackagesVersionDetailComponent],
       providers: [
-        { provide: NugetService, useValue: nugetService },
+        { provide: NuGetService, useValue: nugetService },
         { provide: ActivatedRoute, useValue: route },
         { provide: ToastService, useValue: toast },
         { provide: DangerModalService, useValue: danger },
         { provide: Router, useValue: router },
       ],
     });
-    TestBed.overrideComponent(NugetPackagesVersionDetailComponent, {
+    TestBed.overrideComponent(NuGetPackagesVersionDetailComponent, {
       remove: { imports: [SecurityScanSectionComponent] },
       add: { imports: [SecurityScanSectionStubComponent] },
     });

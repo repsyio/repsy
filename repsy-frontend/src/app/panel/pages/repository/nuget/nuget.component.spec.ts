@@ -15,13 +15,13 @@
 ///
 
 import { describeProtocolShell } from '../testing/protocol-shell-spec-helpers';
-import { NugetComponent } from './nuget.component';
-import { NugetService } from './service/nuget.service';
+import { NuGetComponent } from './nuget.component';
+import { NuGetService } from './service/nuget.service';
 
 describeProtocolShell({
-  component: NugetComponent,
+  component: NuGetComponent,
   repoType: 'nuget',
-  service: NugetService,
+  service: NuGetService,
   loadMethod: 'selectRepository',
   permissionsField: 'activeRepo',
 });

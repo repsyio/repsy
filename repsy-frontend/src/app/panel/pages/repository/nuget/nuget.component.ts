@@ -23,7 +23,7 @@ import { AuthService } from '../../../../auth/pages/service/auth.service';
 import { RepositoryBreadcrumbComponent } from '../breadcrumb/repository-breadcrumb.component';
 import { currentRepoOfType } from '../repo-entry/current-repo-of-type';
 import { RepoLookupService } from '../repo-entry/repo-lookup.service';
-import { NugetService } from './service/nuget.service';
+import { NuGetService } from './service/nuget.service';
 
 @Component({
   selector: 'app-nuget',
@@ -31,7 +31,7 @@ import { NugetService } from './service/nuget.service';
   standalone: true,
   imports: [RouterOutlet, RepositoryBreadcrumbComponent],
 })
-export class NugetComponent implements OnInit, OnDestroy {
+export class NuGetComponent implements OnInit, OnDestroy {
   public activeRepo: RepoPermissionInfo | null = null;
   public loading = true;
   public isAuthenticated = false;
@@ -41,7 +41,7 @@ export class NugetComponent implements OnInit, OnDestroy {
 
   constructor(
     private readonly repoLookupService: RepoLookupService,
-    private readonly nugetService: NugetService,
+    private readonly nugetService: NuGetService,
     private readonly authService: AuthService,
     private readonly router: Router,
   ) {}

@@ -66,7 +66,7 @@ export class RepositoryCardComponent {
     this.route('helm');
   }
 
-  routeNuget() {
+  routeNuGet() {
     this.route('nuget');
   }
 
