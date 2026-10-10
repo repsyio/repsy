@@ -34,7 +34,7 @@ import { seedGo } from './packages/go.js';
 import { seedHelm } from './packages/helm.js';
 import { type MavenSeedOptions, seedMaven } from './packages/maven.js';
 import { seedNpm } from './packages/npm.js';
-import { seedNuget } from './packages/nuget.js';
+import { seedNuGet } from './packages/nuget.js';
 import { seedPypi } from './packages/pypi.js';
 import { seedRuby } from './packages/ruby.js';
 import type { SeededRepo } from './seeder.js';
@@ -114,7 +114,7 @@ export const SEEDERS: Record<PackageProtocol, PackageSeeder> = {
   docker: seedDocker,
   pypi: seedPypi,
   cargo: seedCargo,
-  nuget: seedNuget,
+  nuget: seedNuGet,
   helm: seedHelm,
   go: seedGo,
   ruby: seedRuby,

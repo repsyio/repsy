@@ -46,7 +46,7 @@ import { bindPrepared, type ManageOperation } from '../scenarios/manage-catalog.
 import type { MaterializedCredential } from '../scenarios/world.js';
 import type { SeededRepo, Seeder } from '../seed/seeder.js';
 import { isolatedWorkDir, run, type RunResult } from './exec.js';
-import { nugetAdapter, nugetEnv, renderNugetConfig, userNugetConfigPath } from './nuget.js';
+import { nugetAdapter, nugetEnv, renderNuGetConfig, userNuGetConfigPath } from './nuget.js';
 import {
   adminCredential,
   buildNupkg,
@@ -143,15 +143,15 @@ const CLIENT_TIMEOUT_MS = 60_000;
  * `--api-key` a push uses (`nugetApiKey`: the token itself, `any` for a password, none for an
  * anonymous caller). Nothing secret is on the command line but the api key, which `run` redacts.
  */
-export async function dotnetNugetDelete(
+export async function dotnetNuGetDelete(
   repoName: string,
   credential: MaterializedCredential,
   packageId: string,
   version: string,
 ): Promise<RunResult> {
   const { home, work } = await isolatedWorkDir('nuget-delete');
-  await renderNugetConfig(home, repoName, credential, {
-    destination: userNugetConfigPath(home),
+  await renderNuGetConfig(home, repoName, credential, {
+    destination: userNuGetConfigPath(home),
   });
   const apiKey = nugetApiKey(credential);
   const args = [
@@ -188,7 +188,7 @@ function unlistOperation(id: string, client: string, viaClient: boolean): Manage
       return bindPrepared<NuGetManageFingerprint>({
         run: async (credential: MaterializedCredential) => {
           if (viaClient) {
-            const res = await dotnetNugetDelete(
+            const res = await dotnetNuGetDelete(
               subject.repoName,
               credential,
               subject.idLower,

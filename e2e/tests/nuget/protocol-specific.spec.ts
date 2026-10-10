@@ -76,7 +76,7 @@ import {
   nugetAdapter,
   nugetEnv,
   packageSearchIds,
-  renderNugetConfig,
+  renderNuGetConfig,
 } from '../../src/clients/nuget.js';
 import {
   adminCredential,
@@ -343,7 +343,7 @@ test(
     );
 
     const { home, work } = await isolatedWorkDir(`nuget-pkgsearch-${seeder.runId}`);
-    const cfgPath = await renderNugetConfig(home, layout.repoName, layout.credential);
+    const cfgPath = await renderNuGetConfig(home, layout.repoName, layout.credential);
 
     const searchResult = await run(
       'dotnet',
@@ -451,7 +451,7 @@ test(
 
     // The real client always sends semVerLevel=2.0.0, so it lists the SemVer 2.0.0 pre-release.
     const { home, work } = await isolatedWorkDir(`nuget-semver-${seeder.runId}`);
-    const cfgPath = await renderNugetConfig(home, layout.repoName, layout.credential);
+    const cfgPath = await renderNuGetConfig(home, layout.repoName, layout.credential);
     const searchResult = await run(
       'dotnet',
       [

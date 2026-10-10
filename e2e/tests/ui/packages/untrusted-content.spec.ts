@@ -39,7 +39,7 @@ import {
   seedHostileCargo,
   seedHostileMaven,
   seedHostileNpm,
-  seedHostileNuget,
+  seedHostileNuGet,
   seedHostilePypi,
   seedHostileRuby,
 } from '../../../src/ui/hostile-packages.js';
@@ -52,7 +52,7 @@ const READMES = [
   { protocol: 'npm', type: RepoType.NPM, seed: seedHostileNpm },
   { protocol: 'pypi', type: RepoType.PYPI, seed: seedHostilePypi },
   { protocol: 'cargo', type: RepoType.CARGO, seed: seedHostileCargo },
-  { protocol: 'nuget', type: RepoType.NUGET, seed: seedHostileNuget },
+  { protocol: 'nuget', type: RepoType.NUGET, seed: seedHostileNuGet },
 ] as const;
 
 test.describe('Untrusted README', { tag: PACKAGES }, () => {
@@ -96,7 +96,7 @@ test.describe('Untrusted metadata', { tag: PACKAGES }, () => {
     seeder,
   }) => {
     const repo = await seeder.createRepo(RepoType.NUGET);
-    const pkg = await seedHostileNuget(repo.name, seeder.runId);
+    const pkg = await seedHostileNuGet(repo.name, seeder.runId);
     const requests = watchRequestsTo(adminPage);
     const detail = protocolPages(adminPage, DESCRIPTORS.nuget, repo.name).detail(pkg);
 

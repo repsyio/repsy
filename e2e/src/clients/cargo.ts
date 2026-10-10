@@ -106,7 +106,7 @@ async function renderTemplate(
  * running with `cwd: work` finds it without touching `CARGO_HOME`'s own global config. Exported
  * (step 5b) for `tests/cargo/protocol-specific.spec.ts`'s hand-built-`World` tests, which run the
  * real `cargo yank`/`search`/`owner` subcommands directly instead of through `publish`/`resolve` --
- * the same precedent as `nuget.ts`'s `renderNugetConfig`/`nugetEnv`.
+ * the same precedent as `nuget.ts`'s `renderNuGetConfig`/`nugetEnv`.
  */
 export async function renderCargoConfig(work: string, repoName: string): Promise<void> {
   const cargoDir = path.join(work, '.cargo');

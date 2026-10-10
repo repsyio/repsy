@@ -44,8 +44,8 @@ import { buildModuleZip, rawUpload as rawGoUpload, uploadUrl as goUploadUrl } fr
 import { buildChart, writeChartFile } from './helm-chart.js';
 import { helmEnv } from './helm.js';
 import { chartFileName, classicRepoUrl, rawUploadChart } from './helm-raw.js';
-import { nugetEnv, renderNugetConfig } from './nuget.js';
-import { buildNupkg, nugetApiKey, rawPublish as rawNugetPublish } from './nuget-raw.js';
+import { nugetEnv, renderNuGetConfig } from './nuget.js';
+import { buildNupkg, nugetApiKey, rawPublish as rawNuGetPublish } from './nuget-raw.js';
 import { buildWheel, rawUpload as rawPypiUpload, uploadUrl as pypiUploadUrl } from './pypi-raw.js';
 import { twineEnv } from './pypi.js';
 import { clientEnv } from './client-env.js';
@@ -156,7 +156,7 @@ export async function pushPypi(
 }
 
 /** `dotnet nuget push` of a `.nupkg` padded with `padBytes` (`nuget.ts` `publishWithClient`). */
-export async function pushNuget(
+export async function pushNuGet(
   world: World,
   padBytes: number,
   label: string,
@@ -167,7 +167,7 @@ export async function pushNuget(
   const nupkgFile = path.join(work, 'package.nupkg');
   await fs.writeFile(nupkgFile, nupkgBytes);
 
-  const cfgPath = await renderNugetConfig(home, world.repoName, world.credential);
+  const cfgPath = await renderNuGetConfig(home, world.repoName, world.credential);
   const apiKey = nugetApiKey(world.credential);
   const args = [
     'nuget',
@@ -192,7 +192,7 @@ export async function pushNuget(
     redact: [...secretsOf(world.credential), ...(apiKey ? [apiKey] : [])],
     label,
   });
-  const replay = await rawNugetPublish(world.repoName, world.credential, nupkgBytes);
+  const replay = await rawNuGetPublish(world.repoName, world.credential, nupkgBytes);
   return {
     exitCode: result.exitCode,
     output: `${result.stdout}\n${result.stderr}`,
