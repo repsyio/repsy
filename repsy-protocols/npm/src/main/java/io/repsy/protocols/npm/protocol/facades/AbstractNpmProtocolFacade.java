@@ -27,7 +27,9 @@ import io.repsy.protocols.npm.shared.npm_package.services.NpmPackageService;
 import io.repsy.protocols.npm.shared.npm_package.services.NpmPackageService.PublishKind;
 import io.repsy.protocols.npm.shared.storage.services.AbstractNpmStorageService;
 import io.repsy.protocols.npm.shared.storage.services.NpmStorageService.MetadataChange;
+import io.repsy.protocols.npm.shared.utils.NpmMetadataUtils;
 import io.repsy.protocols.npm.shared.utils.NpmPackageUtils;
+import io.repsy.protocols.npm.shared.utils.NpmPayloadUtils;
 import io.repsy.protocols.npm.shared.utils.NpmPublishLimits;
 import io.repsy.protocols.npm.shared.utils.NpmRevPath;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
@@ -71,9 +73,9 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
       final Map<String, Object> payload)
       throws IOException {
 
-    NpmPackageUtils.checkPackageNameMatchesUrl(payload, scopeName, packageName);
+    NpmPayloadUtils.checkPackageNameMatchesUrl(payload, scopeName, packageName);
 
-    if (NpmPackageUtils.isMetadataHasDeprecatedVersions(payload)) {
+    if (NpmPayloadUtils.isMetadataHasDeprecatedVersions(payload)) {
       this.deprecate(context, scopeName, packageName, payload);
     } else {
       this.publish(context, scopeName, packageName, payload);
@@ -97,7 +99,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
             repoInfo.getName(),
             packageBasePath,
             this.snapshotOf(repoInfo, scopeName, packageName));
-    final var unpublishedVersion = NpmPackageUtils.findUnpublishedVersion(metadata, payload);
+    final var unpublishedVersion = NpmPayloadUtils.findUnpublishedVersion(metadata, payload);
 
     this.deletePackageVersion(context, scopeName, packageName, unpublishedVersion);
 
@@ -194,7 +196,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
       throws IOException {
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-    final var isAbbreviated = NpmPackageUtils.isRequestedAbbreviatedMetadata(acceptHeader);
+    final var isAbbreviated = NpmMetadataUtils.isRequestedAbbreviatedMetadata(acceptHeader);
 
     // A package the database has and storage lost is served from the rows (RPS-1300): it is what a
     // client reads before it unpublishes, deprecates or tags the package.
@@ -428,7 +430,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
             repoInfo.getName(),
             packageBasePath,
             this.snapshotOf(repoInfo, scopeName, packageName));
-    final var deprecations = NpmPackageUtils.findDeprecatedVersions(metadata, payload);
+    final var deprecations = NpmPayloadUtils.findDeprecatedVersions(metadata, payload);
     deprecations.forEach(entry -> NpmPublishLimits.checkDeprecationMessage(entry.getSecond()));
 
     // The deprecation rows are written first and the package metadata second, in one transaction
@@ -466,7 +468,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
 
     try {
       final var packageBasePath = this.npmStorageService.getPackageBasePath(scopeName, packageName);
-      final var versionName = NpmPackageUtils.extractVersionNameFromPayload(payload);
+      final var versionName = NpmPayloadUtils.extractVersionNameFromPayload(payload);
 
       // Guard every length-limited value before anything is written (RPS-1136): a publish this
       // refuses leaves no orphan tarball, and one it lets through never fails the row insert.
@@ -474,7 +476,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
       NpmPublishLimits.checkVersion(versionName);
       NpmPublishLimits.checkDistTags(payload);
       NpmPublishLimits.dropOverLongFields(
-          NpmPackageUtils.extractVersionFromPayload(payload).getSecond());
+          NpmPayloadUtils.extractVersionFromPayload(payload).getSecond());
 
       // The rows are written first and the files second, in one transaction (RPS-1124): see
       // NpmPackageService#publishVersion.

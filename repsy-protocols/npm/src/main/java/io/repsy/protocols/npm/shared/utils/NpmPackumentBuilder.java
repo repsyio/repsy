@@ -119,7 +119,7 @@ public final class NpmPackumentBuilder {
     final var latest = distTagsOf(snapshot).get(NpmConstants.LATEST);
 
     if (latest != null && ((Map<?, ?>) packument.get(NpmConstants.VERSIONS)).containsKey(latest)) {
-      NpmPackageUtils.liftFieldsToTopLevel(packument, latest);
+      NpmPayloadUtils.liftFieldsToTopLevel(packument, latest);
     }
   }
 

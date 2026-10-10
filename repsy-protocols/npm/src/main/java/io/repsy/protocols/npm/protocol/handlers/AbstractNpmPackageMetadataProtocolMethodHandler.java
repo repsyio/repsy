@@ -23,7 +23,7 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
 import io.repsy.protocols.npm.protocol.facades.NpmProtocolFacade;
 import io.repsy.protocols.npm.shared.utils.ExtractPath;
-import io.repsy.protocols.npm.shared.utils.NpmPackageUtils;
+import io.repsy.protocols.npm.shared.utils.NpmMetadataUtils;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
 import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
 import io.repsy.protocols.shared.handlers.HandlerRoute;
@@ -92,13 +92,13 @@ public abstract class AbstractNpmPackageMetadataProtocolMethodHandler
       // on Accept, and each has its own entity tag. A conditional request that still holds the
       // current document is answered with 304 by Spring, from the ETag and Last-Modified set here
       // (RPS-1359).
-      final var abbreviated = NpmPackageUtils.isRequestedAbbreviatedMetadata(acceptHeader);
+      final var abbreviated = NpmMetadataUtils.isRequestedAbbreviatedMetadata(acceptHeader);
       final var builder =
           ResponseEntity.ok()
               .contentType(abbreviated ? ABBREVIATED_METADATA_TYPE : MediaType.APPLICATION_JSON)
-              .eTag(NpmPackageUtils.computeEtag(metadata))
+              .eTag(NpmMetadataUtils.computeEtag(metadata))
               .varyBy(HttpHeaders.ACCEPT);
-      final var lastModified = NpmPackageUtils.lastModifiedOf(metadata);
+      final var lastModified = NpmMetadataUtils.lastModifiedOf(metadata);
 
       if (lastModified != null) {
         builder.lastModified(lastModified);

@@ -30,7 +30,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.core.io.ByteArrayResource;
 
 /**
- * Pins the payload, name and packument helpers of {@link NpmPackageUtils} that the other tests only
+ * Pins the payload, name and packument helpers of the npm utils classes that the other tests only
  * reach through mocks (RPS-2061), so that moving them by concern changes no behaviour.
  */
 @DisplayName("NpmPackageUtils payload and packument helpers")
@@ -77,16 +77,16 @@ class NpmPackageUtilsPayloadTest {
   void extractsFromPayload() {
     final var payload = payload();
 
-    final var pair = NpmPackageUtils.extractVersionFromPayload(payload);
+    final var pair = NpmPayloadUtils.extractVersionFromPayload(payload);
     assertThat(pair.getFirst()).isEqualTo("1.2.3");
     assertThat(pair.getSecond()).containsEntry("name", "demo");
-    assertThat(NpmPackageUtils.extractVersionNameFromPayload(payload)).isEqualTo("1.2.3");
+    assertThat(NpmPayloadUtils.extractVersionNameFromPayload(payload)).isEqualTo("1.2.3");
 
-    final var tag = NpmPackageUtils.extractFirstDistTagFromPayload(payload);
+    final var tag = NpmPayloadUtils.extractFirstDistTagFromPayload(payload);
     assertThat(tag.getKey()).isEqualTo("beta");
     assertThat(tag.getValue()).isEqualTo("1.2.3");
 
-    assertThat(NpmPackageUtils.extractTarballDataFromPayload(payload))
+    assertThat(NpmPayloadUtils.extractTarballDataFromPayload(payload))
         .isEqualTo(Base64.encodeBase64String("tarball".getBytes()));
   }
 
@@ -94,11 +94,11 @@ class NpmPackageUtilsPayloadTest {
   @DisplayName("the tarball length is the declared one, else the decoded data")
   void tarballLength() {
     final var payload = payload();
-    assertThat(NpmPackageUtils.getTarballLength(payload)).isEqualTo(7);
+    assertThat(NpmPayloadUtils.getTarballLength(payload)).isEqualTo(7);
 
     final var attachments = (Map<String, Map<String, Object>>) payload.get("_attachments");
     attachments.values().iterator().next().remove("length");
-    assertThat(NpmPackageUtils.getTarballLength(payload)).isEqualTo(7);
+    assertThat(NpmPayloadUtils.getTarballLength(payload)).isEqualTo(7);
   }
 
   @Test
@@ -107,7 +107,7 @@ class NpmPackageUtilsPayloadTest {
     final var payload = payload();
     final var attachments = payload.get("_attachments");
 
-    final var length = NpmPackageUtils.getMetadataLength(payload);
+    final var length = NpmPayloadUtils.getMetadataLength(payload);
 
     assertThat(payload.get("_attachments")).isSameAs(attachments);
     payload.remove("_attachments");
@@ -121,7 +121,7 @@ class NpmPackageUtilsPayloadTest {
     final var payload = payload();
     final var bytes = "tarball".getBytes();
 
-    NpmPackageUtils.updateDistFields(payload, "1.2.3", bytes);
+    NpmPayloadUtils.updateDistFields(payload, "1.2.3", bytes);
 
     final var versions = (Map<String, Map<String, Object>>) payload.get("versions");
     final var dist = (Map<String, Object>) versions.get("1.2.3").get("dist");
@@ -136,12 +136,12 @@ class NpmPackageUtilsPayloadTest {
   void updateModifiedTime() {
     final var payload = payload();
 
-    NpmPackageUtils.updateModifiedTime(payload);
+    NpmMetadataUtils.updateModifiedTime(payload);
 
     assertThat(((Map<String, String>) payload.get("time")).get("modified")).isNotEqualTo("old");
 
     final var noTime = new HashMap<String, Object>();
-    NpmPackageUtils.updateModifiedTime(noTime);
+    NpmMetadataUtils.updateModifiedTime(noTime);
     assertThat(noTime).isEmpty();
   }
 
@@ -153,7 +153,7 @@ class NpmPackageUtilsPayloadTest {
         NpmConstants.DIST_TAGS,
         new HashMap<>(Map.of("latest", "1.0.0", "next", "1.0.0", "old", "0.9.0")));
 
-    NpmPackageUtils.removeAllTagsPointingToVersion(metadata, "1.0.0");
+    NpmMetadataUtils.removeAllTagsPointingToVersion(metadata, "1.0.0");
 
     assertThat((Map<String, String>) metadata.get(NpmConstants.DIST_TAGS)).containsOnlyKeys("old");
   }
@@ -165,8 +165,8 @@ class NpmPackageUtilsPayloadTest {
     final var deprecated =
         Map.<String, Object>of("versions", Map.of("1.0.0", Map.of("deprecated", "no")));
 
-    assertThat(NpmPackageUtils.isMetadataHasDeprecatedVersions(plain)).isFalse();
-    assertThat(NpmPackageUtils.isMetadataHasDeprecatedVersions(deprecated)).isTrue();
+    assertThat(NpmPayloadUtils.isMetadataHasDeprecatedVersions(plain)).isFalse();
+    assertThat(NpmPayloadUtils.isMetadataHasDeprecatedVersions(deprecated)).isTrue();
   }
 
   @Test
@@ -174,7 +174,7 @@ class NpmPackageUtilsPayloadTest {
   void readsResource() throws IOException {
     final var resource = new ByteArrayResource("{\"name\":\"demo\",\"n\":[1]}".getBytes());
 
-    assertThat(NpmPackageUtils.readMetadataFromResource(resource))
+    assertThat(NpmMetadataUtils.readMetadataFromResource(resource))
         .containsEntry("name", "demo")
         .containsEntry("n", List.of(1));
   }
