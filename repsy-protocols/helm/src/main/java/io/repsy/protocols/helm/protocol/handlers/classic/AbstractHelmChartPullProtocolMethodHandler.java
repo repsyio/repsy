@@ -20,16 +20,14 @@ import static org.springframework.http.HttpHeaders.CONTENT_TYPE;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
 import io.repsy.protocols.helm.protocol.facades.HelmProtocolFacade;
+import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
@@ -40,53 +38,21 @@ import org.springframework.http.ResponseEntity;
 /** Handles GET /{repo}/charts/{filename} — streams a .tgz chart archive. */
 @NullMarked
 public abstract class AbstractHelmChartPullProtocolMethodHandler<ID>
-    implements ProtocolMethodHandler {
+    extends AbstractFacadeProtocolMethodHandler<HelmProtocolFacade<ID>> {
 
   private static final Pattern CHART_PULL_PATTERN = Pattern.compile("^/charts/([^/]+\\.tgz)$");
-
-  private final PathParser basePathParser;
-  private final HelmProtocolFacade<ID> helmFacade;
 
   public AbstractHelmChartPullProtocolMethodHandler(
       final PathParser basePathParser,
       final HelmProtocolFacade<ID> helmFacade,
       final HelmProtocolProvider provider) {
-    this.basePathParser = basePathParser;
-    this.helmFacade = helmFacade;
-    provider.registerMethodHandler(this);
-  }
-
-  @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.GET);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.READ, "writeOperation", false);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return request -> {
-      if (!HttpMethod.GET.equals(HttpMethod.valueOf(request.getMethod()))) {
-        return Optional.empty();
-      }
-
-      final var parsedPathOpt =
-          AbstractHelmChartPullProtocolMethodHandler.this.basePathParser.parse(request);
-      if (parsedPathOpt.isEmpty()) {
-        return Optional.empty();
-      }
-
-      final var relativePath = ProtocolContextUtils.getRelativePath(parsedPathOpt.get()).getPath();
-
-      if (!CHART_PULL_PATTERN.matcher(relativePath).matches()) {
-        return Optional.empty();
-      }
-
-      return parsedPathOpt;
-    };
+    super(
+        HandlerRoute.of(Permission.READ, HttpMethod.GET)
+            .writeOperation(false)
+            .path(CHART_PULL_PATTERN.asMatchPredicate()),
+        basePathParser,
+        helmFacade,
+        provider);
   }
 
   @Override
@@ -104,7 +70,7 @@ public abstract class AbstractHelmChartPullProtocolMethodHandler<ID>
     }
 
     final var filename = matcher.group(1);
-    final var resource = this.helmFacade.getChart(context, filename);
+    final var resource = this.facade.getChart(context, filename);
 
     return ResponseEntity.ok()
         .header(CONTENT_TYPE, MediaType.APPLICATION_OCTET_STREAM_VALUE)

@@ -20,16 +20,14 @@ import static org.springframework.http.HttpHeaders.CONTENT_TYPE;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
 import io.repsy.protocols.helm.protocol.facades.HelmProtocolFacade;
+import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
@@ -39,54 +37,22 @@ import org.springframework.http.ResponseEntity;
 /** Handles GET /v2/{repo}/{name}/blobs/{digest} — downloads a blob. */
 @NullMarked
 public abstract class AbstractHelmOciBlobPullProtocolMethodHandler<ID>
-    implements ProtocolMethodHandler {
+    extends AbstractFacadeProtocolMethodHandler<HelmProtocolFacade<ID>> {
 
   private static final Pattern BLOB_PULL_PATTERN =
       Pattern.compile("^/([^/]+)/blobs/(sha256:[0-9a-fA-F]{64})/?$");
-
-  private final PathParser basePathParser;
-  private final HelmProtocolFacade<ID> helmFacade;
 
   public AbstractHelmOciBlobPullProtocolMethodHandler(
       final PathParser basePathParser,
       final HelmProtocolFacade<ID> helmFacade,
       final HelmProtocolProvider provider) {
-    this.basePathParser = basePathParser;
-    this.helmFacade = helmFacade;
-    provider.registerMethodHandler(this);
-  }
-
-  @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.GET);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.READ, "writeOperation", false);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return request -> {
-      if (!HttpMethod.GET.equals(HttpMethod.valueOf(request.getMethod()))) {
-        return Optional.empty();
-      }
-
-      final var parsedPathOpt =
-          AbstractHelmOciBlobPullProtocolMethodHandler.this.basePathParser.parse(request);
-      if (parsedPathOpt.isEmpty()) {
-        return Optional.empty();
-      }
-
-      final var relativePath = ProtocolContextUtils.getRelativePath(parsedPathOpt.get()).getPath();
-
-      if (!BLOB_PULL_PATTERN.matcher(relativePath).matches()) {
-        return Optional.empty();
-      }
-
-      return parsedPathOpt;
-    };
+    super(
+        HandlerRoute.of(Permission.READ, HttpMethod.GET)
+            .writeOperation(false)
+            .path(BLOB_PULL_PATTERN.asMatchPredicate()),
+        basePathParser,
+        helmFacade,
+        provider);
   }
 
   @Override
@@ -104,7 +70,7 @@ public abstract class AbstractHelmOciBlobPullProtocolMethodHandler<ID>
     }
 
     final var digest = matcher.group(2);
-    final var resource = this.helmFacade.getBlob(context, digest);
+    final var resource = this.facade.getBlob(context, digest);
 
     return ResponseEntity.ok()
         .header(CONTENT_TYPE, "application/octet-stream")

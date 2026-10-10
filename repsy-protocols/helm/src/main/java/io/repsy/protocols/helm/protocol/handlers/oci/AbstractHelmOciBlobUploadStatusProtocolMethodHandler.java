@@ -21,16 +21,14 @@ import static org.springframework.http.HttpHeaders.LOCATION;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
 import io.repsy.protocols.helm.protocol.facades.HelmProtocolFacade;
+import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
@@ -47,55 +45,21 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
  */
 @NullMarked
 public abstract class AbstractHelmOciBlobUploadStatusProtocolMethodHandler<ID>
-    implements ProtocolMethodHandler {
+    extends AbstractFacadeProtocolMethodHandler<HelmProtocolFacade<ID>> {
 
   private static final Pattern UPLOAD_STATUS_PATTERN =
       Pattern.compile("^/([^/]+)/blobs/uploads/([0-9a-fA-F-]{36})/?$");
-
-  private final PathParser basePathParser;
-  private final HelmProtocolFacade<ID> helmFacade;
 
   public AbstractHelmOciBlobUploadStatusProtocolMethodHandler(
       final PathParser basePathParser,
       final HelmProtocolFacade<ID> helmFacade,
       final HelmProtocolProvider provider) {
-    this.basePathParser = basePathParser;
-    this.helmFacade = helmFacade;
-    provider.registerMethodHandler(this);
-  }
-
-  @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.GET, HttpMethod.HEAD);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.WRITE);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return request -> {
-      final var method = HttpMethod.valueOf(request.getMethod());
-      if (!HttpMethod.GET.equals(method) && !HttpMethod.HEAD.equals(method)) {
-        return Optional.empty();
-      }
-
-      final var parsedPathOpt =
-          AbstractHelmOciBlobUploadStatusProtocolMethodHandler.this.basePathParser.parse(request);
-      if (parsedPathOpt.isEmpty()) {
-        return Optional.empty();
-      }
-
-      final var relativePath = ProtocolContextUtils.getRelativePath(parsedPathOpt.get()).getPath();
-
-      if (!UPLOAD_STATUS_PATTERN.matcher(relativePath).matches()) {
-        return Optional.empty();
-      }
-
-      return parsedPathOpt;
-    };
+    super(
+        HandlerRoute.of(Permission.WRITE, HttpMethod.GET, HttpMethod.HEAD)
+            .path(UPLOAD_STATUS_PATTERN.asMatchPredicate()),
+        basePathParser,
+        helmFacade,
+        provider);
   }
 
   @Override
@@ -116,7 +80,7 @@ public abstract class AbstractHelmOciBlobUploadStatusProtocolMethodHandler<ID>
 
     // Throws ItemNotFoundException when no such upload session exists, which ErrorHandler turns
     // into the 404 BLOB_UPLOAD_UNKNOWN the OCI distribution spec asks for.
-    final var uploadSize = this.helmFacade.getUploadSize(context, uploadId);
+    final var uploadSize = this.facade.getUploadSize(context, uploadId);
 
     final var location =
         ServletUriComponentsBuilder.fromCurrentContextPath()

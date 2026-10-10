@@ -21,17 +21,15 @@ import static org.springframework.http.HttpHeaders.CONTENT_TYPE;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import io.repsy.protocols.docker.shared.layer.services.LayerService;
+import io.repsy.protocols.shared.handlers.AbstractRoutedProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.BlobDigests;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
@@ -40,55 +38,23 @@ import org.springframework.http.ResponseEntity;
 
 @NullMarked
 public abstract class AbstractDockerLayerCheckProtocolMethodHandler<ID>
-    implements ProtocolMethodHandler {
+    extends AbstractRoutedProtocolMethodHandler {
 
   private static final Pattern LAYER_CHECK_PATTERN =
       Pattern.compile("^/([^/]+)/blobs/(" + BlobDigests.DIGEST_REGEX + ")/?$");
 
-  private final PathParser basePathParser;
   private final LayerService<ID> layerService;
 
   public AbstractDockerLayerCheckProtocolMethodHandler(
       final PathParser basePathParser,
       final LayerService<ID> layerTxService,
       final DockerProtocolProvider provider) {
-    this.basePathParser = basePathParser;
+    super(
+        HandlerRoute.of(Permission.READ, HttpMethod.HEAD)
+            .path(LAYER_CHECK_PATTERN.asMatchPredicate()),
+        basePathParser,
+        provider);
     this.layerService = layerTxService;
-
-    provider.registerMethodHandler(this);
-  }
-
-  @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.HEAD);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.READ);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return request -> {
-      if (!HttpMethod.HEAD.equals(HttpMethod.valueOf(request.getMethod()))) {
-        return Optional.empty();
-      }
-
-      final var parsedPathOpt =
-          AbstractDockerLayerCheckProtocolMethodHandler.this.basePathParser.parse(request);
-      if (parsedPathOpt.isEmpty()) {
-        return Optional.empty();
-      }
-
-      final var relativePath = ProtocolContextUtils.getRelativePath(parsedPathOpt.get()).getPath();
-
-      if (!LAYER_CHECK_PATTERN.matcher(relativePath).matches()) {
-        return Optional.empty();
-      }
-
-      return parsedPathOpt;
-    };
   }
 
   @Override

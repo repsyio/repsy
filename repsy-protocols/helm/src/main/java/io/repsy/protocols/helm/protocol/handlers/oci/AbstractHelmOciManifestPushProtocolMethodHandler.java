@@ -23,7 +23,6 @@ import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
 import io.repsy.protocols.helm.protocol.facades.HelmProtocolFacade;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartForm;
@@ -33,6 +32,8 @@ import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestPushForm;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestPushResult;
 import io.repsy.protocols.helm.shared.utils.HelmChartParser;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
+import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
@@ -42,9 +43,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.regex.Pattern;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -64,7 +62,7 @@ import tools.jackson.databind.ObjectMapper;
 @Slf4j
 @NullMarked
 public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
-    implements ProtocolMethodHandler {
+    extends AbstractFacadeProtocolMethodHandler<HelmProtocolFacade<ID>> {
 
   private static final Pattern MANIFEST_PUSH_PATTERN = Pattern.compile("^/([^/]+)/manifests/(.+)$");
   private static final int RETRY_COUNT = 3;
@@ -75,50 +73,18 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
   private static final Pattern SHA256_DIGEST_PATTERN = Pattern.compile("^sha256:[0-9a-fA-F]{64}$");
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-  private final PathParser basePathParser;
-  private final HelmProtocolFacade<ID> helmFacade;
-
   public AbstractHelmOciManifestPushProtocolMethodHandler(
       final PathParser basePathParser,
       final HelmProtocolFacade<ID> helmFacade,
       final HelmProtocolProvider provider) {
-    this.basePathParser = basePathParser;
-    this.helmFacade = helmFacade;
-    provider.registerMethodHandler(this);
-  }
-
-  @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.PUT);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of(
-        "permission", Permission.WRITE, "skipHeaderPreProcessor", true, "writeOperation", true);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return request -> {
-      if (!HttpMethod.PUT.equals(HttpMethod.valueOf(request.getMethod()))) {
-        return Optional.empty();
-      }
-
-      final var parsedPathOpt =
-          AbstractHelmOciManifestPushProtocolMethodHandler.this.basePathParser.parse(request);
-      if (parsedPathOpt.isEmpty()) {
-        return Optional.empty();
-      }
-
-      final var relativePath = ProtocolContextUtils.getRelativePath(parsedPathOpt.get()).getPath();
-
-      if (!MANIFEST_PUSH_PATTERN.matcher(relativePath).matches()) {
-        return Optional.empty();
-      }
-
-      return parsedPathOpt;
-    };
+    super(
+        HandlerRoute.of(Permission.WRITE, HttpMethod.PUT)
+            .skipHeaderPreProcessor(true)
+            .writeOperation(true)
+            .path(MANIFEST_PUSH_PATTERN.asMatchPredicate()),
+        basePathParser,
+        helmFacade,
+        provider);
   }
 
   @Override
@@ -146,7 +112,7 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
     rejectOverLongIdentifiers(name, reference, mediaType);
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-    final var existingManifest = this.helmFacade.checkManifest(context, name, reference);
+    final var existingManifest = this.facade.checkManifest(context, name, reference);
     if (existingManifest.isPresent() && !repoInfo.isAllowOverride()) {
       log.info("Chart {}:{} already exists in repo {}", name, reference, repoInfo.getName());
       throw new ItemAlreadyExistException(ProtocolErrorCodes.CHART_ALREADY_EXISTS);
@@ -161,7 +127,7 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
 
     final var digest = this.calculateDigest(contentBytes);
 
-    final var blobResource = this.helmFacade.getBlob(context, layerDigest);
+    final var blobResource = this.facade.getBlob(context, layerDigest);
     final var metadata = HelmChartParser.parseChartYaml(blobResource.getInputStream());
 
     this.requireMatchingChartName(name, metadata.getName());
@@ -237,8 +203,7 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
       final String layerDigest) {
 
     final var existingChart =
-        this.helmFacade.findChartByNameAndVersion(
-            context, metadata.getName(), metadata.getVersion());
+        this.facade.findChartByNameAndVersion(context, metadata.getName(), metadata.getVersion());
     if (existingChart.isEmpty()) {
       return;
     }
@@ -393,7 +358,7 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
       final byte[] contentBytes,
       final int counter) {
     try {
-      return this.helmFacade.pushManifest(context, form, contentBytes);
+      return this.facade.pushManifest(context, form, contentBytes);
     } catch (final DataIntegrityViolationException
         | OptimisticLockingFailureException
         | PessimisticLockingFailureException e) {

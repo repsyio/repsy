@@ -15,15 +15,13 @@
  */
 package io.repsy.protocols.docker.protocol.handlers;
 
-import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
+import io.repsy.protocols.shared.handlers.AbstractRoutedProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
@@ -36,7 +34,7 @@ import org.springframework.http.ResponseEntity;
  */
 @NullMarked
 public abstract class AbstractDockerRegistryCheckProtocolMethodHandler
-    implements ProtocolMethodHandler {
+    extends AbstractRoutedProtocolMethodHandler {
 
   /** The header that names the registry API version. */
   public static final String API_VERSION_HEADER = "Docker-Distribution-API-Version";
@@ -56,27 +54,23 @@ public abstract class AbstractDockerRegistryCheckProtocolMethodHandler
   }
 
   public AbstractDockerRegistryCheckProtocolMethodHandler(final DockerProtocolProvider provider) {
-
-    provider.registerMethodHandler(this);
+    super(
+        HandlerRoute.of(Permission.NONE, HttpMethod.GET, HttpMethod.HEAD)
+            .skipPreProcessor(true)
+            .skipUsagePostProcessor(true),
+        provider);
   }
 
   protected abstract Optional<ProtocolContext> createWithEmptyRepo();
 
   @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.GET, HttpMethod.HEAD);
+  protected boolean accepts(final HttpMethod method, final HttpServletRequest request) {
+    return super.accepts(method, request) && isPingPath(request.getServletPath());
   }
 
   @Override
-  public Map<String, Object> getProperties() {
-    return Map.of(
-        "permission", Permission.NONE, "skipPreProcessor", true, "skipUsagePostProcessor", true);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-
-    return this::createProtocolContext;
+  protected Optional<ProtocolContext> parse(final HttpServletRequest request) {
+    return this.createWithEmptyRepo();
   }
 
   @Override
@@ -86,22 +80,5 @@ public abstract class AbstractDockerRegistryCheckProtocolMethodHandler
       final HttpServletResponse response) {
 
     return ResponseEntity.ok().header(API_VERSION_HEADER, API_VERSION).build();
-  }
-
-  private Optional<ProtocolContext> createProtocolContext(final HttpServletRequest request) {
-
-    final var method = HttpMethod.valueOf(request.getMethod());
-
-    if (!HttpMethod.GET.equals(method) && !HttpMethod.HEAD.equals(method)) {
-      return Optional.empty();
-    }
-
-    final var path = request.getServletPath();
-
-    if (!isPingPath(path)) {
-      return Optional.empty();
-    }
-
-    return this.createWithEmptyRepo();
   }
 }

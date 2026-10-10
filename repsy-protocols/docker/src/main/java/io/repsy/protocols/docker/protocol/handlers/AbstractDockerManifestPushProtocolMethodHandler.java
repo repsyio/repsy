@@ -24,7 +24,6 @@ import static org.springframework.http.HttpHeaders.LOCATION;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import io.repsy.protocols.docker.protocol.facades.DockerProtocolFacade;
 import io.repsy.protocols.docker.protocol.parser.DockerPathParserManifest;
@@ -37,6 +36,8 @@ import io.repsy.protocols.docker.shared.utils.DockerDigestCalculator;
 import io.repsy.protocols.docker.shared.utils.DockerManifestValidator;
 import io.repsy.protocols.docker.shared.utils.DockerPushGuards;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
+import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -44,9 +45,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
 import org.jspecify.annotations.NullMarked;
@@ -59,7 +57,8 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 @NullMarked
 public abstract class AbstractDockerManifestPushProtocolMethodHandler<ID>
-    implements ProtocolMethodHandler, DockerPathParserManifest {
+    extends AbstractFacadeProtocolMethodHandler<DockerProtocolFacade<ID>>
+    implements DockerPathParserManifest {
 
   private static final String MANIFEST_JSON = "manifestJson";
   private static final Pattern MANIFEST_PUSH_PATTERN = Pattern.compile("^/([^/]+)/manifests/(.+)$");
@@ -68,8 +67,6 @@ public abstract class AbstractDockerManifestPushProtocolMethodHandler<ID>
   private static final int MAX_IMAGE_RECREATIONS = 20;
   private static final long WAIT_RETRY = 100;
 
-  private final PathParser basePathParser;
-  private final DockerProtocolFacade<ID> dockerFacade;
   private final ImageService<ID> imageTxService;
   private final AbstractDockerLayerRenamer<ID> layerRenamer;
 
@@ -80,29 +77,17 @@ public abstract class AbstractDockerManifestPushProtocolMethodHandler<ID>
       final AbstractDockerLayerRenamer<ID> layerRenamer,
       final ImageService<ID> imageService) {
 
+    super(
+        HandlerRoute.of(Permission.WRITE, HttpMethod.PUT)
+            .skipHeaderPreProcessor(true)
+            .writeOperation(true)
+            .path(MANIFEST_PUSH_PATTERN.asMatchPredicate()),
+        basePathParser,
+        dockerFacade,
+        provider);
+
     this.imageTxService = imageService;
-    this.basePathParser = basePathParser;
-    this.dockerFacade = dockerFacade;
     this.layerRenamer = layerRenamer;
-
-    provider.registerMethodHandler(this);
-  }
-
-  @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.PUT);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of(
-        "permission", Permission.WRITE, "skipHeaderPreProcessor", true, "writeOperation", true);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-
-    return this::createProtocolContext;
   }
 
   @Override
@@ -243,7 +228,7 @@ public abstract class AbstractDockerManifestPushProtocolMethodHandler<ID>
 
     for (var attempt = 1; ; ) {
       try {
-        return this.dockerFacade.saveManifest(context, imageName, form);
+        return this.facade.saveManifest(context, imageName, form);
       } catch (final ImageDeletedException e) {
         if (++recreations > MAX_IMAGE_RECREATIONS) {
           throw e;
@@ -272,27 +257,5 @@ public abstract class AbstractDockerManifestPushProtocolMethodHandler<ID>
     final var inputStream = request.getInputStream();
     final var bytes = inputStream.readAllBytes();
     return new String(bytes, StandardCharsets.UTF_8);
-  }
-
-  private Optional<ProtocolContext> createProtocolContext(final HttpServletRequest request) {
-
-    if (!HttpMethod.PUT.equals(HttpMethod.valueOf(request.getMethod()))) {
-      return Optional.empty();
-    }
-
-    final var parsedPathOpt =
-        AbstractDockerManifestPushProtocolMethodHandler.this.basePathParser.parse(request);
-    if (parsedPathOpt.isEmpty()) {
-      return Optional.empty();
-    }
-
-    final var urlProperties = ProtocolContextUtils.getUrlProperties(parsedPathOpt.get());
-    final var relativePath = urlProperties.getRelativePath().getPath();
-
-    if (!MANIFEST_PUSH_PATTERN.matcher(relativePath).matches()) {
-      return Optional.empty();
-    }
-
-    return parsedPathOpt;
   }
 }
