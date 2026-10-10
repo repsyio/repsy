@@ -33,15 +33,15 @@ describe('NUGET_ROUTES', () => {
         title: 'Repsy | NuGet Repository Settings',
         full: true,
       },
-      { path: ':packageId' },
+      { path: ':packageName' },
       {
-        path: ':packageId',
+        path: ':packageName',
         component: NugetPackagesVersionListComponent,
         title: 'Repsy | NuGet Package Versions',
         full: true,
       },
       {
-        path: ':packageId/:version',
+        path: ':packageName/:version',
         component: NugetPackagesVersionDetailComponent,
         title: 'Repsy | NuGet Version Detail',
         full: true,

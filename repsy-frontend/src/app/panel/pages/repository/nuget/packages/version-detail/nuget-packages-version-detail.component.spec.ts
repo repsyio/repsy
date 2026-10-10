@@ -78,7 +78,7 @@ describe('NugetPackagesVersionDetailComponent README', () => {
         { provide: NugetService, useValue: nugetService },
         {
           provide: ActivatedRoute,
-          useValue: { snapshot: { paramMap: convertToParamMap({ packageId: 'Acme.Lib', version: '1.2.3' }) } },
+          useValue: { snapshot: { paramMap: convertToParamMap({ packageName: 'Acme.Lib', version: '1.2.3' }) } },
         },
         { provide: ToastService, useValue: jasmine.createSpyObj<ToastService>('ToastService', ['show']) },
         {
@@ -199,7 +199,7 @@ describe('NugetPackagesVersionDetailComponent delete (RPS-1288)', () => {
   let toast: jasmine.SpyObj<ToastService>;
   let danger: jasmine.SpyObj<DangerModalService>;
   const route = {
-    snapshot: { paramMap: convertToParamMap({ packageId: 'Acme.Lib', version: '1.2.3' }) },
+    snapshot: { paramMap: convertToParamMap({ packageName: 'Acme.Lib', version: '1.2.3' }) },
   } as ActivatedRoute;
 
   async function confirmDelete(): Promise<void> {

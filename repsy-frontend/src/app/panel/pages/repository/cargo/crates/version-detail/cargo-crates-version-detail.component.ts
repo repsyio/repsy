@@ -95,7 +95,7 @@ export class CargoCratesVersionDetailComponent implements OnDestroy {
   }
 
   public loadVersion(): void {
-    const crateName = this.route.snapshot.paramMap.get('crate');
+    const crateName = this.route.snapshot.paramMap.get('packageName');
     const version = this.route.snapshot.paramMap.get('version');
     if (!crateName || !version) {
       this.loading = false;

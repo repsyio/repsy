@@ -96,7 +96,7 @@ export class HelmChartsVersionListComponent implements OnDestroy {
     this.repositoryChanges$ = this.helmService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
         this.activeRepo = Object.assign({}, repo);
-        this.chartName = this.route.snapshot.paramMap.get('name');
+        this.chartName = this.route.snapshot.paramMap.get('packageName');
         this.fetchVersions();
         this.fetchSecuritySummary();
       }

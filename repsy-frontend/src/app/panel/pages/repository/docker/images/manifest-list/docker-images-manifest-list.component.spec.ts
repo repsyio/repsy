@@ -38,7 +38,7 @@ describe('DockerImagesManifestListComponent', () => {
     repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
     dockerService = jasmine.createSpyObj<DockerService>('DockerService', ['searchManifests'], { repoChanges });
     component = new DockerImagesManifestListComponent(
-      { snapshot: { paramMap: convertToParamMap({ image: 'nginx', tag: 'latest' }) } } as ActivatedRoute,
+      { snapshot: { paramMap: convertToParamMap({ imageName: 'nginx', tagName: 'latest' }) } } as ActivatedRoute,
       dockerService,
       { username: 'alice' } as AuthService,
       jasmine.createSpyObj<ToastService>('ToastService', ['show']),
@@ -159,7 +159,7 @@ describe('DockerImagesManifestListComponent template', () => {
     const { el } = await renderComponent(DockerImagesManifestListComponent, [
       {
         provide: ActivatedRoute,
-        useValue: { snapshot: { paramMap: convertToParamMap({ image: 'nginx', tag: 'latest' }) } },
+        useValue: { snapshot: { paramMap: convertToParamMap({ imageName: 'nginx', tagName: 'latest' }) } },
       },
       { provide: AuthService, useValue: { username: 'alice' } },
       { provide: DockerService, useValue: dockerService },
@@ -182,7 +182,7 @@ describe('DockerImagesManifestListComponent template', () => {
     const { el } = await renderComponent(DockerImagesManifestListComponent, [
       {
         provide: ActivatedRoute,
-        useValue: { snapshot: { paramMap: convertToParamMap({ image: 'nginx', tag: 'sha256:0000' }) } },
+        useValue: { snapshot: { paramMap: convertToParamMap({ imageName: 'nginx', tagName: 'sha256:0000' }) } },
       },
       { provide: AuthService, useValue: { username: 'alice' } },
       { provide: DockerService, useValue: dockerService },

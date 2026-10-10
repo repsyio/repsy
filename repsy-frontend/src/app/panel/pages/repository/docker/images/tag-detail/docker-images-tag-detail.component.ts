@@ -80,8 +80,8 @@ export class DockerImagesTagDetailComponent implements OnDestroy {
     this.repositoryChanges$ = this.dockerService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
       if (repo && this.isRegistryForCurrentRoute(repo)) {
         this.activeRepo = Object.assign({}, repo);
-        this.imageName = this.route.snapshot.paramMap.get('image');
-        this.tagName = this.route.snapshot.paramMap.get('tag');
+        this.imageName = this.route.snapshot.paramMap.get('imageName');
+        this.tagName = this.route.snapshot.paramMap.get('tagName');
         this.loadTag();
       }
     });
@@ -130,7 +130,7 @@ export class DockerImagesTagDetailComponent implements OnDestroy {
   }
 
   public loadManifestText(digest: string): void {
-    const imageName = this.route.snapshot.paramMap.get('image');
+    const imageName = this.route.snapshot.paramMap.get('imageName');
 
     this.dockerService.fetchManifestText(imageName, digest).subscribe({
       next: (manifestText: string) => {
@@ -153,7 +153,7 @@ export class DockerImagesTagDetailComponent implements OnDestroy {
       return;
     }
 
-    const imageName = this.route.snapshot.paramMap.get('image');
+    const imageName = this.route.snapshot.paramMap.get('imageName');
 
     this.dockerService.fetchConfigText(imageName, configDigest).subscribe({
       next: (configText: string) => {

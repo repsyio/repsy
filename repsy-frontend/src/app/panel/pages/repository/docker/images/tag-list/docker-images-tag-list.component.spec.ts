@@ -56,7 +56,7 @@ describe('DockerImagesTagListComponent', () => {
     router = jasmine.createSpyObj<Router>('Router', ['navigate']);
     dangerModalService = new DangerModalService();
     component = new DockerImagesTagListComponent(
-      { snapshot: { paramMap: convertToParamMap({ image: 'nginx' }) } } as ActivatedRoute,
+      { snapshot: { paramMap: convertToParamMap({ imageName: 'nginx' }) } } as ActivatedRoute,
       dockerService,
       { username: 'alice' } as AuthService,
       toastService,

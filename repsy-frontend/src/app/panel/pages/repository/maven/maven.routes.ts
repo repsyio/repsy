@@ -48,7 +48,7 @@ export const MAVEN_ROUTES: Routes = [
         title: 'repsy | Browser',
       },
       {
-        path: ':group',
+        path: ':groupName',
         children: [
           {
             path: '',
@@ -57,7 +57,7 @@ export const MAVEN_ROUTES: Routes = [
             title: 'repsy | Maven Artifacts',
           },
           {
-            path: ':artifact',
+            path: ':artifactName',
             children: [
               {
                 path: '',

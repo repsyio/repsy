@@ -39,7 +39,7 @@ export const HELM_ROUTES: Routes = [
         title: 'repsy | Helm Repository Settings',
       },
       {
-        path: ':name',
+        path: ':packageName',
         children: [
           {
             path: '',

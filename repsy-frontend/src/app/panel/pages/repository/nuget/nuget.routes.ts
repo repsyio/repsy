@@ -40,7 +40,7 @@ export const NUGET_ROUTES: Routes = [
         title: 'Repsy | NuGet Repository Settings',
       },
       {
-        path: ':packageId',
+        path: ':packageName',
         children: [
           {
             path: '',

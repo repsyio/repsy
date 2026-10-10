@@ -63,7 +63,7 @@ describe('NpmPackagesVersionListComponent', () => {
     component = new NpmPackagesVersionListComponent(
       {
         snapshot: {
-          paramMap: convertToParamMap({ scope, package: 'ui' }),
+          paramMap: convertToParamMap({ scope, packageName: 'ui' }),
           queryParamMap: convertToParamMap(queryParams),
         },
       } as ActivatedRoute,
@@ -295,7 +295,7 @@ describe('NpmPackagesVersionListComponent template', () => {
         provide: ActivatedRoute,
         useValue: {
           snapshot: {
-            paramMap: convertToParamMap({ scope: '~', package: 'ui' }),
+            paramMap: convertToParamMap({ scope: '~', packageName: 'ui' }),
             queryParamMap: convertToParamMap({}),
           },
         },

@@ -22,7 +22,7 @@ import { Route, Routes } from '@angular/router';
 /** One route as a spec author writes it; `path` is the full path from the root of the tree, `''` for the root. */
 export interface ExpectedRoute {
   path: string;
-  /** Left out for a route that only groups children (`:package`, the root of a lazy tree, ...). */
+  /** Left out for a route that only groups children (`:packageName`, the root of a lazy tree, ...). */
   component?: Type<unknown>;
   title?: string;
   /** True when the route declares `pathMatch: 'full'`. */

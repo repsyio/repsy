@@ -59,7 +59,7 @@ describe('PypiPackagesVersionListComponent', () => {
     router = jasmine.createSpyObj<Router>('Router', ['navigateByUrl']);
     dangerModalService = new DangerModalService();
     component = new PypiPackagesVersionListComponent(
-      { snapshot: { paramMap: convertToParamMap({ package: 'requests' }) } } as ActivatedRoute,
+      { snapshot: { paramMap: convertToParamMap({ packageName: 'requests' }) } } as ActivatedRoute,
       { username: 'alice' } as AuthService,
       pypiService,
       toastService,
@@ -179,7 +179,7 @@ describe('PypiPackagesVersionListComponent template', () => {
     securityService.watchVersionSecuritySummary.and.returnValue(of({}));
 
     const { el } = await renderComponent(PypiPackagesVersionListComponent, [
-      { provide: ActivatedRoute, useValue: { snapshot: { paramMap: convertToParamMap({ package: 'requests' }) } } },
+      { provide: ActivatedRoute, useValue: { snapshot: { paramMap: convertToParamMap({ packageName: 'requests' }) } } },
       { provide: AuthService, useValue: { username: 'alice' } },
       { provide: PypiService, useValue: pypiService },
       { provide: SecurityService, useValue: securityService },

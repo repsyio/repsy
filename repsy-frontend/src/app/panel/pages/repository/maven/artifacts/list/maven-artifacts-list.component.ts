@@ -96,7 +96,7 @@ export class MavenArtifactsListComponent implements OnDestroy {
     this.username = this.authService.username;
     this.pagedData = new PagedData<ArtifactListItem>();
     this.activeRepo = {} as RepoPermissionInfo;
-    this.groupName = this.route.snapshot.paramMap.get('group');
+    this.groupName = this.route.snapshot.paramMap.get('groupName');
     this.repositoryChanges$ = this.mavenService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
         this.activeRepo = Object.assign({}, repo);

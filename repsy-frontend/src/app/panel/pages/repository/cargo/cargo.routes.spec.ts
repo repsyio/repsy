@@ -33,10 +33,15 @@ describe('CARGO_ROUTES', () => {
         title: 'repsy | Cargo Repository Settings',
         full: true,
       },
-      { path: ':crate' },
-      { path: ':crate', component: CargoCratesVersionListComponent, title: 'repsy | Cargo Crate Versions', full: true },
+      { path: ':packageName' },
       {
-        path: ':crate/:version',
+        path: ':packageName',
+        component: CargoCratesVersionListComponent,
+        title: 'repsy | Cargo Crate Versions',
+        full: true,
+      },
+      {
+        path: ':packageName/:version',
         component: CargoCratesVersionDetailComponent,
         title: 'repsy | Cargo Crate Version Detail',
         full: true,

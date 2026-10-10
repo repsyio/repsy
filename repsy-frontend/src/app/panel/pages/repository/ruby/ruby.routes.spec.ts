@@ -33,10 +33,10 @@ describe('RUBY_ROUTES', () => {
         title: 'repsy | Ruby Repository Settings',
         full: true,
       },
-      { path: ':gem' },
-      { path: ':gem', component: RubyGemsVersionListComponent, title: 'repsy | Ruby Gem Versions', full: true },
+      { path: ':packageName' },
+      { path: ':packageName', component: RubyGemsVersionListComponent, title: 'repsy | Ruby Gem Versions', full: true },
       {
-        path: ':gem/:version',
+        path: ':packageName/:version',
         component: RubyGemsVersionDetailComponent,
         title: 'repsy | Ruby Gem Version Detail',
         full: true,

@@ -62,7 +62,7 @@ describe('CargoCratesVersionListComponent', () => {
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
     router = jasmine.createSpyObj<Router>('Router', ['navigate']);
     dangerModalService = new DangerModalService();
-    route = { snapshot: { paramMap: convertToParamMap({ crate: 'serde' }) } } as ActivatedRoute;
+    route = { snapshot: { paramMap: convertToParamMap({ packageName: 'serde' }) } } as ActivatedRoute;
     component = new CargoCratesVersionListComponent(
       route,
       { username: 'alice' } as AuthService,
@@ -181,7 +181,7 @@ describe('CargoCratesVersionListComponent template', () => {
     securityService.watchVersionSecuritySummary.and.returnValue(of({}));
 
     const { el } = await renderComponent(CargoCratesVersionListComponent, [
-      { provide: ActivatedRoute, useValue: { snapshot: { paramMap: convertToParamMap({ crate: 'serde' }) } } },
+      { provide: ActivatedRoute, useValue: { snapshot: { paramMap: convertToParamMap({ packageName: 'serde' }) } } },
       { provide: AuthService, useValue: { username: 'alice' } },
       { provide: CargoService, useValue: cargoService },
       { provide: SecurityService, useValue: securityService },

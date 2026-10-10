@@ -71,7 +71,7 @@ describe('NpmPackagesVersionDetailComponent README', () => {
         {
           provide: ActivatedRoute,
           useValue: {
-            snapshot: { paramMap: convertToParamMap({ scope: '~', package: 'acme-lib', version: '1.2.3' }) },
+            snapshot: { paramMap: convertToParamMap({ scope: '~', packageName: 'acme-lib', version: '1.2.3' }) },
           },
         },
         { provide: ToastService, useValue: jasmine.createSpyObj<ToastService>('ToastService', ['show']) },
@@ -188,7 +188,7 @@ describe('NpmPackagesVersionDetailComponent registry snippet and delete (RPS-128
 
   function render(scope: string): ComponentFixture<NpmPackagesVersionDetailComponent> {
     route = {
-      snapshot: { paramMap: convertToParamMap({ scope, package: 'acme-lib', version: '1.2.3' }) },
+      snapshot: { paramMap: convertToParamMap({ scope, packageName: 'acme-lib', version: '1.2.3' }) },
     } as ActivatedRoute;
     TestBed.overrideProvider(ActivatedRoute, { useValue: route });
     const fixture = TestBed.createComponent(NpmPackagesVersionDetailComponent);

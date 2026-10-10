@@ -40,7 +40,7 @@ describe('RubyGemsVersionDetailComponent', () => {
   let dangerModalService: DangerModalService;
   let repoChanges: BehaviorSubject<RepoPermissionInfo | null>;
 
-  function build(params: Record<string, string> = { gem: 'rails', version: '7.1.0' }): void {
+  function build(params: Record<string, string> = { packageName: 'rails', version: '7.1.0' }): void {
     component?.ngOnDestroy();
     route = { snapshot: { paramMap: convertToParamMap(params) } } as ActivatedRoute;
     component = new RubyGemsVersionDetailComponent(route, rubyService, toastService, dangerModalService, router);
@@ -115,7 +115,7 @@ describe('RubyGemsVersionDetailComponent', () => {
     });
 
     it('does not load anything, and stops loading, when the route has no gem or version', () => {
-      build({ gem: 'rails' });
+      build({ packageName: 'rails' });
 
       select();
 

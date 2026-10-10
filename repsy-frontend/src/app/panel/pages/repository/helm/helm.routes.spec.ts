@@ -33,10 +33,15 @@ describe('HELM_ROUTES', () => {
         title: 'repsy | Helm Repository Settings',
         full: true,
       },
-      { path: ':name' },
-      { path: ':name', component: HelmChartsVersionListComponent, title: 'repsy | Helm Chart Versions', full: true },
+      { path: ':packageName' },
       {
-        path: ':name/:version',
+        path: ':packageName',
+        component: HelmChartsVersionListComponent,
+        title: 'repsy | Helm Chart Versions',
+        full: true,
+      },
+      {
+        path: ':packageName/:version',
         component: HelmChartsVersionDetailComponent,
         title: 'repsy | Helm Chart Version Detail',
         full: true,

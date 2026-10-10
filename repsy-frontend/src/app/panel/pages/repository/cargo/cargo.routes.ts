@@ -39,7 +39,7 @@ export const CARGO_ROUTES: Routes = [
         title: 'repsy | Cargo Repository Settings',
       },
       {
-        path: ':crate',
+        path: ':packageName',
         children: [
           {
             path: '',

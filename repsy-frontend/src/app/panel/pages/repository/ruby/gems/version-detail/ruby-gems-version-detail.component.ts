@@ -90,7 +90,7 @@ export class RubyGemsVersionDetailComponent implements OnDestroy {
   }
 
   public loadVersion(): void {
-    const gemName = this.route.snapshot.paramMap.get('gem');
+    const gemName = this.route.snapshot.paramMap.get('packageName');
     const version = this.route.snapshot.paramMap.get('version');
     if (!gemName || !version) {
       this.loading = false;

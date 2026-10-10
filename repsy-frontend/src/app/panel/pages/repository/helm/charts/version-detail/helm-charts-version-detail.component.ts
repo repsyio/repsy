@@ -117,7 +117,7 @@ export class HelmChartsVersionDetailComponent implements OnDestroy {
   }
 
   private loadDetail(): void {
-    const name = this.route.snapshot.paramMap.get('name');
+    const name = this.route.snapshot.paramMap.get('packageName');
     const version = this.route.snapshot.paramMap.get('version');
     if (!name || !version) {
       this.loading = false;

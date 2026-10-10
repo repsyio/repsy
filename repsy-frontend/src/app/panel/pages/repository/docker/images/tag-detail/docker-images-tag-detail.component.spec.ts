@@ -67,7 +67,7 @@ describe('DockerImagesTagDetailComponent', () => {
     component = new DockerImagesTagDetailComponent(
       dockerService,
       router,
-      { snapshot: { paramMap: convertToParamMap({ image: 'nginx', tag: 'latest' }) } } as ActivatedRoute,
+      { snapshot: { paramMap: convertToParamMap({ imageName: 'nginx', tagName: 'latest' }) } } as ActivatedRoute,
       toastService,
       dangerModalService,
       breadcrumbSecurityLinkService,
