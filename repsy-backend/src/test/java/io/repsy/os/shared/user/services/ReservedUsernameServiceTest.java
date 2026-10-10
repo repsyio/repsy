@@ -21,7 +21,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
-import io.repsy.os.panel.profile.repositories.ReservedUsernameRepository;
+import io.repsy.os.shared.user.repositories.ReservedUsernameRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;

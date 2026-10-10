@@ -17,9 +17,9 @@ package io.repsy.os.server.protocols.docker.shared.cleanup.services;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.server.protocols.docker.shared.layer.dtos.OrphanLayerInfo;
+import io.repsy.os.server.protocols.docker.shared.layer.services.OrphanLayerService;
 import io.repsy.os.server.protocols.docker.shared.tag.services.TagDeleter;
 import io.repsy.os.server.protocols.docker.shared.tag.services.UntaggedManifestCleanupService;
-import io.repsy.os.server.protocols.docker.ui.facades.DockerApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
@@ -46,7 +46,7 @@ public class CleanupPolicyFacade {
   private final CleanupPolicyService cleanupPolicyService;
   private final TagDeleter tagDeleter;
   private final UntaggedManifestCleanupService untaggedManifestCleanupService;
-  private final DockerApiFacade dockerApiFacade;
+  private final OrphanLayerService orphanLayerService;
   private final UsageUpdateService usageUpdateService;
 
   // No ambient transaction: processCleanup() commits the new run windows before any tag goes, and
@@ -115,7 +115,7 @@ public class CleanupPolicyFacade {
     }
 
     try {
-      final var orphans = this.dockerApiFacade.deleteOrphanLayers(repoInfo);
+      final var orphans = this.orphanLayerService.deleteOrphanLayers(repoInfo);
 
       log.info(
           "Cleanup policy of repository '{}': {} orphan layers scheduled for deletion ({} bytes)",

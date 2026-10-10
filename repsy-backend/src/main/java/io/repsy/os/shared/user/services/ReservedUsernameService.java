@@ -16,8 +16,8 @@
 package io.repsy.os.shared.user.services;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
-import io.repsy.os.panel.profile.repositories.ReservedUsernameRepository;
 import io.repsy.os.shared.constants.ErrorConstants;
+import io.repsy.os.shared.user.repositories.ReservedUsernameRepository;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;

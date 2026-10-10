@@ -13,19 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.panel.profile.repositories;
+package io.repsy.os.server.security.scanner.noop;
 
-import io.repsy.os.panel.profile.entities.ReservedUsername;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
-import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.stereotype.Repository;
 
-@Repository
-public interface ReservedUsernameRepository extends JpaRepository<ReservedUsername, UUID> {
-
-  /**
-   * Matches regardless of case, so {@code Repsy} and {@code REPSY} hit the seeded {@code repsy}.
-   */
-  boolean existsByUsernameIgnoreCase(@NonNull String username);
-}
+/**
+ * Published by {@link NoOpVulnerabilityScanner} when it "scans": the scanner is disabled, so there
+ * is nothing to find. The scan module records the empty outcome in a listener, which keeps the
+ * scanner free of a dependency on the scan services (and of the {@code @Lazy} that cycle needed).
+ *
+ * @param scanId The scan row to complete with no findings
+ */
+public record NoOpScanCompletedEvent(@NonNull UUID scanId) {}
