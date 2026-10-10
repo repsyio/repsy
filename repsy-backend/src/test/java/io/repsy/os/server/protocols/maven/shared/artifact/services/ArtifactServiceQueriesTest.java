@@ -114,21 +114,35 @@ class ArtifactServiceQueriesTest {
             this.artifactVersionRepository,
             this.artifactQueryService,
             this.storageStrategyRegistry);
-    this.artifactService =
-        new ArtifactDeploymentService(
-            this.repoTxService,
+    final var rowWriteService =
+        new ArtifactRowWriteService(
             this.artifactRepository,
             this.artifactVersionRepository,
             this.versionDeveloperRepository,
             this.versionLicenseRepository,
             this.artifactUpsertHelper,
             this.artifactVersionWriteService,
-            this.pendingSignatureService,
-            this.pendingSignatureRepository,
+            this.artifactQueryService,
+            this.storageStrategyRegistry);
+    this.artifactService =
+        new ArtifactDeploymentService(
             this.artifactQueryService,
             signatureService,
             pluginMetadataService,
-            this.storageStrategyRegistry);
+            new ArtifactDeploymentRulesService(
+                this.artifactRepository, this.storageStrategyRegistry),
+            new ArtifactPomRegistrationService(
+                this.repoTxService,
+                rowWriteService,
+                this.pendingSignatureService,
+                signatureService,
+                pluginMetadataService),
+            new ArtifactRowDeleteService(
+                this.repoTxService,
+                this.artifactRepository,
+                this.artifactVersionRepository,
+                this.pendingSignatureRepository,
+                this.artifactVersionWriteService));
   }
 
   private Artifact stubArtifact(final String latest) {

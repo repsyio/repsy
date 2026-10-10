@@ -216,21 +216,35 @@ class ArtifactDeploymentServiceTest {
             this.artifactVersionRepository,
             this.artifactQueryService,
             this.storageStrategyRegistry);
-    this.artifactService =
-        new ArtifactDeploymentService(
-            this.repoTxService,
+    final var rowWriteService =
+        new ArtifactRowWriteService(
             this.artifactRepository,
             this.artifactVersionRepository,
             this.versionDeveloperRepository,
             this.versionLicenseRepository,
             this.artifactUpsertHelper,
             this.artifactVersionWriteService,
-            this.pendingSignatureService,
-            this.pendingSignatureRepository,
+            this.artifactQueryService,
+            this.storageStrategyRegistry);
+    this.artifactService =
+        new ArtifactDeploymentService(
             this.artifactQueryService,
             this.versionSignatureService,
             pluginMetadataService,
-            this.storageStrategyRegistry);
+            new ArtifactDeploymentRulesService(
+                this.artifactRepository, this.storageStrategyRegistry),
+            new ArtifactPomRegistrationService(
+                this.repoTxService,
+                rowWriteService,
+                this.pendingSignatureService,
+                this.versionSignatureService,
+                pluginMetadataService),
+            new ArtifactRowDeleteService(
+                this.repoTxService,
+                this.artifactRepository,
+                this.artifactVersionRepository,
+                this.pendingSignatureRepository,
+                this.artifactVersionWriteService));
 
     // The state operations are what the old mock answered: the setting is read under the lock (on
     // unless a test says otherwise), nothing is recorded, nothing is forgotten.
