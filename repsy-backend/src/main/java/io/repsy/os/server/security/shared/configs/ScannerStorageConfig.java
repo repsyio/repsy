@@ -16,36 +16,23 @@
 package io.repsy.os.server.security.shared.configs;
 
 import io.repsy.libs.storage.core.services.StorageStrategy;
+import io.repsy.protocols.shared.storage.StorageStrategyRegistry;
+import java.util.HashMap;
 import java.util.Map;
 import org.jspecify.annotations.NonNull;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
 public class ScannerStorageConfig {
 
+  /** The strategies keyed by the name of the repo type, for the code that has only an event. */
   @Bean("storageStrategiesByRepoType")
   public @NonNull Map<String, StorageStrategy> storageStrategiesByRepoType(
-      final @Qualifier("osStorageStrategyMaven") @NonNull StorageStrategy mavenStorageStrategy,
-      final @Qualifier("osStorageStrategyNpm") @NonNull StorageStrategy npmStorageStrategy,
-      final @Qualifier("osStorageStrategyPypi") @NonNull StorageStrategy pypiStorageStrategy,
-      final @Qualifier("osStorageStrategyDocker") @NonNull StorageStrategy dockerStorageStrategy,
-      final @Qualifier("osStorageStrategyCargo") @NonNull StorageStrategy cargoStorageStrategy,
-      final @Qualifier("osStorageStrategyGolang") @NonNull StorageStrategy golangStorageStrategy,
-      final @Qualifier("osStorageStrategyHelm") @NonNull StorageStrategy helmStorageStrategy,
-      final @Qualifier("osStorageStrategyNuGet") @NonNull StorageStrategy nuGetStorageStrategy,
-      final @Qualifier("osStorageStrategyRuby") @NonNull StorageStrategy rubyStorageStrategy) {
+      final @NonNull StorageStrategyRegistry registry) {
+    final var byName = new HashMap<String, StorageStrategy>();
+    registry.asMap().forEach((type, strategy) -> byName.put(type.name(), strategy));
 
-    return Map.ofEntries(
-        Map.entry("MAVEN", mavenStorageStrategy),
-        Map.entry("NPM", npmStorageStrategy),
-        Map.entry("PYPI", pypiStorageStrategy),
-        Map.entry("DOCKER", dockerStorageStrategy),
-        Map.entry("CARGO", cargoStorageStrategy),
-        Map.entry("GOLANG", golangStorageStrategy),
-        Map.entry("HELM", helmStorageStrategy),
-        Map.entry("NUGET", nuGetStorageStrategy),
-        Map.entry("RUBY", rubyStorageStrategy));
+    return Map.copyOf(byName);
   }
 }

@@ -21,6 +21,8 @@ import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.os.server.security.shared.ArtifactStorageResolver;
 import io.repsy.protocols.pypi.shared.utils.PackageStorageUtils;
+import io.repsy.protocols.shared.repo.dtos.RepoType;
+import io.repsy.protocols.shared.storage.StorageStrategyRegistry;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.Optional;
@@ -28,7 +30,6 @@ import java.util.Set;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.NullMarked;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -41,9 +42,8 @@ public class PypiArtifactStorageResolver implements ArtifactStorageResolver {
 
   private final @NonNull StorageStrategy pypiStorageStrategy;
 
-  public PypiArtifactStorageResolver(
-      final @Qualifier("osStorageStrategyPypi") @NonNull StorageStrategy pypiStorageStrategy) {
-    this.pypiStorageStrategy = pypiStorageStrategy;
+  public PypiArtifactStorageResolver(final StorageStrategyRegistry storageStrategyRegistry) {
+    this.pypiStorageStrategy = storageStrategyRegistry.get(RepoType.PYPI);
   }
 
   @Override
