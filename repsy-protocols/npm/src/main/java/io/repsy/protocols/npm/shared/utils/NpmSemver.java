@@ -16,6 +16,7 @@
 package io.repsy.protocols.npm.shared.utils;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.math.BigInteger;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
@@ -79,7 +80,7 @@ public final class NpmSemver implements Comparable<NpmSemver> {
     final var matcher = SEMVER_PATTERN.matcher(version);
 
     if (!matcher.matches()) {
-      throw new BadRequestException("invalidPackageVersion");
+      throw new BadRequestException(ProtocolErrorCodes.INVALID_PACKAGE_VERSION);
     }
 
     final var major = new BigInteger(matcher.group(1));

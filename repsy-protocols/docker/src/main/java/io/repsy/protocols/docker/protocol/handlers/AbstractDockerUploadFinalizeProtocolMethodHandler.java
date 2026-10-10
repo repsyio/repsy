@@ -30,6 +30,7 @@ import io.repsy.protocols.docker.protocol.facades.DockerProtocolFacade;
 import io.repsy.protocols.docker.shared.layer.dtos.LayerForm;
 import io.repsy.protocols.docker.shared.layer.dtos.LayerInfo;
 import io.repsy.protocols.docker.shared.layer.services.LayerService;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -128,7 +129,7 @@ public abstract class AbstractDockerUploadFinalizeProtocolMethodHandler<ID>
     final var digest = request.getParameter("digest");
 
     if (digest == null) {
-      throw new BadRequestException("digestMissing");
+      throw new BadRequestException(ProtocolErrorCodes.DIGEST_MISSING);
     }
 
     final var uploadPath = new RelativePath("/blobs/" + sessionId);

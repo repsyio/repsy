@@ -42,6 +42,7 @@ import io.repsy.protocols.docker.shared.tag.services.ManifestService;
 import io.repsy.protocols.docker.shared.utils.DockerDigestCalculator;
 import io.repsy.protocols.docker.shared.utils.ManifestNameGenerator;
 import io.repsy.protocols.docker.shared.utils.MediaTypes;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.utils.BlobDigests;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -193,20 +194,20 @@ public class ManifestTxService implements ManifestService<UUID> {
     final var image =
         this.imageRepository
             .findByRepoIdAndName(repoId, imageName)
-            .orElseThrow(() -> new ItemNotFoundException("imageNotFound"));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.IMAGE_NOT_FOUND));
 
     if (BlobDigests.startsWithDigestPrefix(reference)) {
       return this.manifestRepository
           .findByImageIdAndAnyDigest(image.getId(), DockerDigestCalculator.normalize(reference))
           .map(found -> this.fileNamesOf(repoId, imageName, found))
-          .orElseThrow(() -> new ItemNotFoundException("manifestNotFound"));
+          .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.MANIFEST_NOT_FOUND));
     }
 
     return this.tagRepository
         .findByImageRepoIdAndImageNameAndName(repoId, imageName, reference)
         .map(Tag::getManifest)
         .map(found -> this.fileNamesOf(repoId, imageName, found))
-        .orElseThrow(() -> new ItemNotFoundException("tagNotFound"));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.TAG_NOT_FOUND));
   }
 
   /**
@@ -238,7 +239,7 @@ public class ManifestTxService implements ManifestService<UUID> {
 
     return this.tagRepository
         .findByImageRepoIdAndImageIdAndName(repoId, imageId, tagName)
-        .orElseThrow(() -> new ItemNotFoundException("tagNotFound"));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.TAG_NOT_FOUND));
   }
 
   public Page<io.repsy.os.generated.model.ImageTagListItem> getImageTagsContainsName(
@@ -315,7 +316,7 @@ public class ManifestTxService implements ManifestService<UUID> {
 
     return this.manifestRepository
         .findByImageIdAndAnyDigest(imageId, DockerDigestCalculator.normalize(digest))
-        .orElseThrow(() -> new ItemNotFoundException("manifestNotFound"));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.MANIFEST_NOT_FOUND));
   }
 
   /**
@@ -423,7 +424,7 @@ public class ManifestTxService implements ManifestService<UUID> {
 
     return this.layerRepository
         .findByRepoIdAndDigest(repoId, configDigest)
-        .orElseThrow(() -> new ItemNotFoundException("itemNotFound"));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.ITEM_NOT_FOUND));
   }
 
   private Manifest findOrCreateManifest(

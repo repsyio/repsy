@@ -47,6 +47,7 @@ import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.os.shared.user.mappers.UserMapper;
 import io.repsy.os.shared.user.repositories.UserRepository;
 import io.repsy.os.shared.user.services.UserTxService;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.exceptions.TooManyRequestsException;
 import io.repsy.protocols.shared.repo.dtos.Credentials;
 import io.repsy.protocols.shared.repo.dtos.Permission;
@@ -110,7 +111,7 @@ class ProtocolAuthServiceTest {
   private static void assertUnauthorized(final ThrowingCallable call) {
     assertThatThrownBy(call)
         .isExactlyInstanceOf(UnAuthorizedException.class)
-        .hasMessage(ErrorConstants.UN_AUTHORIZED);
+        .hasMessage(ProtocolErrorCodes.UN_AUTHORIZED);
   }
 
   @BeforeEach
@@ -123,7 +124,7 @@ class ProtocolAuthServiceTest {
   void authenticateUserRejectsNullHeader() {
     assertThatThrownBy(() -> this.authService.authenticateUser(null))
         .isInstanceOf(UnAuthorizedException.class)
-        .hasMessageContaining(ErrorConstants.UN_AUTHORIZED);
+        .hasMessageContaining(ProtocolErrorCodes.UN_AUTHORIZED);
   }
 
   @Test
@@ -131,7 +132,7 @@ class ProtocolAuthServiceTest {
   void authenticateUserRejectsUnknownScheme() {
     assertThatThrownBy(() -> this.authService.authenticateUser("Digest abc"))
         .isInstanceOf(UnAuthorizedException.class)
-        .hasMessageContaining(ErrorConstants.UN_AUTHORIZED);
+        .hasMessageContaining(ProtocolErrorCodes.UN_AUTHORIZED);
   }
 
   /** RPS-906: an unknown username must be indistinguishable from a wrong password. */
@@ -553,7 +554,7 @@ class ProtocolAuthServiceTest {
     }
 
     private void blockTheClientWithBadBearers() {
-      this.rejectBearerAs(ErrorConstants.ACCESS_NOT_ALLOWED);
+      this.rejectBearerAs(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
       for (var i = 0; i < LIMIT; i++) {
         assertUnauthorized(() -> this.bearer(Permission.READ));
       }
@@ -563,7 +564,7 @@ class ProtocolAuthServiceTest {
     @Test
     @DisplayName("a bearer value that is no deploy token and no JWT is unAuthorized and counted")
     void unknownBearerIsCounted() {
-      this.rejectBearerAs(ErrorConstants.ACCESS_NOT_ALLOWED);
+      this.rejectBearerAs(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
 
       for (var i = 0; i < LIMIT; i++) {
         assertUnauthorized(() -> this.bearer(Permission.READ));
@@ -587,7 +588,7 @@ class ProtocolAuthServiceTest {
       }
 
       // Still under the limit: the next wrong bearer is the first one on the count, not a 429.
-      this.rejectBearerAs(ErrorConstants.ACCESS_NOT_ALLOWED);
+      this.rejectBearerAs(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
       assertUnauthorized(() -> this.bearer(Permission.READ));
     }
 
@@ -626,7 +627,7 @@ class ProtocolAuthServiceTest {
       info.setId(UUID.randomUUID());
 
       // One failure is on the count, the limit is two: the raw tokens below must not add to it.
-      this.rejectBearerAs(ErrorConstants.ACCESS_NOT_ALLOWED);
+      this.rejectBearerAs(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
       assertUnauthorized(() -> this.bearer(Permission.READ));
       when(this.deployTokens.findByRepoIdAndToken(this.repoId, "not-a-known-token"))
           .thenReturn(Optional.of(info));
@@ -1047,7 +1048,7 @@ class ProtocolAuthServiceTest {
     @Test
     @DisplayName("a token that fails verification fails the request")
     void failedVerificationFailsTheRequest() {
-      doThrow(new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED))
+      doThrow(new UnAuthorizedException(ProtocolErrorCodes.ACCESS_NOT_ALLOWED))
           .when(this.jwtUtils)
           .verifyDownloadToken(TOKEN, this.repoId, PATH);
 
@@ -1056,7 +1057,7 @@ class ProtocolAuthServiceTest {
                   this.downloadAuthService.handleDownloadToken(
                       TOKEN, this.repoId, PATH, Permission.READ))
           .isInstanceOf(UnAuthorizedException.class)
-          .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+          .hasMessageContaining(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
     }
 
     @Test
@@ -1173,7 +1174,7 @@ class ProtocolAuthServiceTest {
     @DisplayName("a made-up bearer value costs no lookup in the registry")
     void notAJwt() {
       when(this.jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
-          .thenThrow(new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED));
+          .thenThrow(new UnAuthorizedException(ProtocolErrorCodes.ACCESS_NOT_ALLOWED));
 
       assertUnauthorized(
           () -> this.service.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.READ));
@@ -1327,7 +1328,7 @@ class ProtocolAuthServiceTest {
     void deletedUser() {
       this.tokenCarries(4);
       when(this.users.getAuthenticatedUserByUsername(USERNAME))
-          .thenThrow(new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED));
+          .thenThrow(new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED));
 
       assertUnauthorized(
           () -> this.service.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.READ));

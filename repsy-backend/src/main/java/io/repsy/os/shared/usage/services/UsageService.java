@@ -22,6 +22,7 @@ import io.repsy.os.generated.model.RepoUsageInfo;
 import io.repsy.os.generated.model.TotalUsageInfo;
 import io.repsy.os.generated.model.UsageInfo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -43,7 +44,7 @@ public class UsageService {
     final var repo =
         this.repoRepository
             .findByNameAndType(repoName, repoType)
-            .orElseThrow(() -> new ItemNotFoundException("repoNotFound"));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.REPO_NOT_FOUND));
 
     final var diskUsed = this.createUsageInfo(repo.getDiskUsage());
 

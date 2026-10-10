@@ -30,6 +30,7 @@ import io.repsy.os.server.protocols.helm.ui.mappers.HelmChartMapper;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.helm.shared.chart.services.AbstractHelmChartFilesService.DeletedChart;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
@@ -108,7 +109,7 @@ public class HelmApiFacade implements ProtocolApiFacade {
         this.helmChartService.findAllVersionsByName(repoInfo.getStorageKey(), name);
 
     if (versions.isEmpty()) {
-      throw new ItemNotFoundException("chartNotFound");
+      throw new ItemNotFoundException(ProtocolErrorCodes.CHART_NOT_FOUND);
     }
 
     final var deleted =
@@ -172,7 +173,7 @@ public class HelmApiFacade implements ProtocolApiFacade {
     // A chart without tags (one uploaded the classic way) is an empty list, an unknown chart is a
     // 404.
     if (!this.helmChartService.existsByRepoIdAndName(repoInfo.getStorageKey(), name)) {
-      throw new ItemNotFoundException("chartNotFound");
+      throw new ItemNotFoundException(ProtocolErrorCodes.CHART_NOT_FOUND);
     }
 
     return this.helmOciManifestService.listTagsByName(repoInfo.getStorageKey(), name);

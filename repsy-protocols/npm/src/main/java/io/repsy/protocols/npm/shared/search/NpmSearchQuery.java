@@ -16,6 +16,7 @@
 package io.repsy.protocols.npm.shared.search;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -260,7 +261,7 @@ public record NpmSearchQuery(
     final var number = value.trim();
 
     if (!WHOLE_NUMBER.matcher(number).matches()) {
-      throw new BadRequestException("invalidSearchParameter");
+      throw new BadRequestException(ProtocolErrorCodes.INVALID_SEARCH_PARAMETER);
     }
 
     try {
@@ -269,7 +270,7 @@ public record NpmSearchQuery(
       // A whole number that does not fit an int: a huge from skips every result, and a huge
       // negative one is as invalid as a small one.
       if (number.startsWith("-")) {
-        throw new BadRequestException("invalidSearchParameter");
+        throw new BadRequestException(ProtocolErrorCodes.INVALID_SEARCH_PARAMETER);
       }
 
       return Integer.MAX_VALUE;
@@ -278,7 +279,7 @@ public record NpmSearchQuery(
 
   private static int checkNotNegative(final int value) {
     if (value < 0) {
-      throw new BadRequestException("invalidSearchParameter");
+      throw new BadRequestException(ProtocolErrorCodes.INVALID_SEARCH_PARAMETER);
     }
 
     return value;

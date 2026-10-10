@@ -53,6 +53,7 @@ import io.repsy.protocols.maven.shared.artifact.services.contracts.AbstractArtif
 import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
 import io.repsy.protocols.maven.shared.utils.MavenPublishLimits;
 import io.repsy.protocols.maven.shared.utils.PluginDescriptorReader;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import io.repsy.protocols.shared.storage.StorageStrategyRegistry;
@@ -94,8 +95,6 @@ public class ArtifactService extends AbstractArtifactService<UUID> {
   private static final String METADATA_FILENAME = "maven-metadata.xml";
   private static final String POM_SUFFIX = ".pom";
   private static final String SIGNATURE_SUFFIX = ".asc";
-  private static final String ERR_ARTIFACT_VERSION_NOT_FOUND = "artifactVersionNotFound";
-  private static final String ERR_ARTIFACT_NOT_FOUND = "artifactNotFound";
   private static final String ARTIFACT_UNIQUE_CONSTRAINT =
       "ux_maven_artifact__repo_id_group_artifact";
   private static final String ARTIFACT_VERSION_UNIQUE_CONSTRAINT =
@@ -152,7 +151,7 @@ public class ArtifactService extends AbstractArtifactService<UUID> {
           "Refusing a Maven upload outside the artifact layout for repo {}: {}",
           repoInfo.getName(),
           storagePath.getRelativePath().getPath());
-      throw new BadRequestException("invalidArtifactPath");
+      throw new BadRequestException(ProtocolErrorCodes.INVALID_ARTIFACT_PATH);
     }
 
     MavenPublishLimits.checkCoordinates(gav);
@@ -275,7 +274,7 @@ public class ArtifactService extends AbstractArtifactService<UUID> {
     final var repo =
         this.repoRepository
             .findByNameAndType(repoInfo.getName(), RepoType.MAVEN)
-            .orElseThrow(() -> new ItemNotFoundException("repoNotFound"));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.REPO_NOT_FOUND));
 
     final var gav = ArtifactUtils.convertPathToGav(storagePath.getRelativePath().getPath());
     final var pomModel = ArtifactUtils.readModel(resource);
@@ -514,12 +513,12 @@ public class ArtifactService extends AbstractArtifactService<UUID> {
     final var artifact =
         this.artifactRepository
             .findByRepoIdAndGroupNameAndArtifactName(repoId, groupName, artifactName)
-            .orElseThrow(() -> new ItemNotFoundException(ERR_ARTIFACT_NOT_FOUND));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.ARTIFACT_NOT_FOUND));
 
     if (this.artifactVersionRepository
         .findByArtifactIdAndVersionName(artifact.getId(), versionName)
         .isEmpty()) {
-      throw new ItemNotFoundException(ERR_ARTIFACT_VERSION_NOT_FOUND);
+      throw new ItemNotFoundException(ProtocolErrorCodes.ARTIFACT_VERSION_NOT_FOUND);
     }
   }
 
@@ -537,7 +536,7 @@ public class ArtifactService extends AbstractArtifactService<UUID> {
     if (this.artifactRepository
         .findByRepoIdAndGroupNameAndArtifactName(repoId, groupName, artifactName)
         .isEmpty()) {
-      throw new ItemNotFoundException(ERR_ARTIFACT_NOT_FOUND);
+      throw new ItemNotFoundException(ProtocolErrorCodes.ARTIFACT_NOT_FOUND);
     }
   }
 
@@ -551,7 +550,7 @@ public class ArtifactService extends AbstractArtifactService<UUID> {
   public void requireGroup(final UUID repoId, final String groupName) {
 
     if (this.artifactRepository.countByRepoIdAndGroupName(repoId, groupName) == 0) {
-      throw new ItemNotFoundException("groupNotFound");
+      throw new ItemNotFoundException(ProtocolErrorCodes.GROUP_NOT_FOUND);
     }
   }
 
@@ -561,7 +560,7 @@ public class ArtifactService extends AbstractArtifactService<UUID> {
     final var artifact =
         this.artifactRepository
             .findByRepoIdAndGroupNameAndArtifactName(repoId, groupName, artifactName)
-            .orElseThrow(() -> new ItemNotFoundException(ERR_ARTIFACT_NOT_FOUND));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.ARTIFACT_NOT_FOUND));
 
     this.artifactRepository.delete(artifact);
     this.dropPendingSignatures(repoId, groupPath(groupName) + "/" + artifactName + "/");
@@ -578,12 +577,13 @@ public class ArtifactService extends AbstractArtifactService<UUID> {
         this.artifactRepository
             .findByRepoIdAndGroupNameAndArtifactName(
                 repoInfo.getStorageKey(), groupName, artifactName)
-            .orElseThrow(() -> new ItemNotFoundException(ERR_ARTIFACT_NOT_FOUND));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.ARTIFACT_NOT_FOUND));
 
     final var artifactVersion =
         this.artifactVersionRepository
             .findByArtifactIdAndVersionName(artifact.getId(), versionName)
-            .orElseThrow(() -> new ItemNotFoundException(ERR_ARTIFACT_VERSION_NOT_FOUND));
+            .orElseThrow(
+                () -> new ItemNotFoundException(ProtocolErrorCodes.ARTIFACT_VERSION_NOT_FOUND));
 
     this.artifactVersionRepository.delete(artifactVersion);
     this.dropPendingSignatures(
@@ -603,7 +603,7 @@ public class ArtifactService extends AbstractArtifactService<UUID> {
     final var repo =
         this.repoRepository
             .findById(repoId)
-            .orElseThrow(() -> new ItemNotFoundException("repoNotFound"));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.REPO_NOT_FOUND));
 
     final var artifacts =
         this.artifactRepository.findAllByRepoIdAndGroupName(repo.getId(), groupName);
@@ -641,7 +641,7 @@ public class ArtifactService extends AbstractArtifactService<UUID> {
     final var artifact =
         this.artifactRepository
             .findByRepoIdAndGroupNameAndArtifactName(repoId, groupName, artifactName)
-            .orElseThrow(() -> new ItemNotFoundException(ERR_ARTIFACT_NOT_FOUND));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.ARTIFACT_NOT_FOUND));
 
     final ArtifactVersion version;
 
@@ -649,12 +649,14 @@ public class ArtifactService extends AbstractArtifactService<UUID> {
       version =
           this.artifactVersionRepository
               .findByArtifactIdAndVersionName(artifact.getId(), artifact.getLatest())
-              .orElseThrow(() -> new ItemNotFoundException(ERR_ARTIFACT_VERSION_NOT_FOUND));
+              .orElseThrow(
+                  () -> new ItemNotFoundException(ProtocolErrorCodes.ARTIFACT_VERSION_NOT_FOUND));
     } else {
       version =
           this.artifactVersionRepository
               .findByArtifactIdAndVersionName(artifact.getId(), versionName)
-              .orElseThrow(() -> new ItemNotFoundException(ERR_ARTIFACT_VERSION_NOT_FOUND));
+              .orElseThrow(
+                  () -> new ItemNotFoundException(ProtocolErrorCodes.ARTIFACT_VERSION_NOT_FOUND));
     }
 
     return this.artifactConverter.toArtifactVersionInfo(artifact, version);
@@ -799,7 +801,7 @@ public class ArtifactService extends AbstractArtifactService<UUID> {
     final var artifact =
         this.artifactRepository
             .findByRepoIdAndGroupNameAndArtifactName(repoId, groupName, artifactName)
-            .orElseThrow(() -> new ItemNotFoundException(ERR_ARTIFACT_NOT_FOUND));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.ARTIFACT_NOT_FOUND));
 
     return this.artifactVersionRepository.findByArtifactId(artifact.getId()).stream()
         .map(ArtifactVersion::getVersionName)
@@ -816,7 +818,7 @@ public class ArtifactService extends AbstractArtifactService<UUID> {
     final var artifactCount = this.artifactRepository.countByRepoIdAndGroupName(repoId, groupName);
 
     if (artifactCount == 0) {
-      throw new ItemNotFoundException("groupNotFound");
+      throw new ItemNotFoundException(ProtocolErrorCodes.GROUP_NOT_FOUND);
     }
 
     return MavenGroupSummary.builder()
@@ -878,7 +880,7 @@ public class ArtifactService extends AbstractArtifactService<UUID> {
     if (this.artifactRepository
         .existsByRepoIdAndArtifactNameAndGroupNameAndArtifactVersionsVersionName(
             repoId, artifactName, groupName, version)) {
-      throw new AccessNotAllowedException("artifactOverrideIsProhibited");
+      throw new AccessNotAllowedException(ProtocolErrorCodes.ARTIFACT_OVERRIDE_IS_PROHIBITED);
     }
   }
 
@@ -895,7 +897,7 @@ public class ArtifactService extends AbstractArtifactService<UUID> {
     final var resourceOpt = this.mavenStorage().get(storagePath, repoInfo.getName());
 
     if (resourceOpt.isPresent()) {
-      throw new AccessNotAllowedException("artifactOverrideIsProhibited");
+      throw new AccessNotAllowedException(ProtocolErrorCodes.ARTIFACT_OVERRIDE_IS_PROHIBITED);
     }
   }
 
@@ -977,7 +979,7 @@ public class ArtifactService extends AbstractArtifactService<UUID> {
     final var gav = ArtifactUtils.convertPathToGav(signedStoragePath.getRelativePath().getPath());
 
     if (null == gav) {
-      throw new ItemNotFoundException("itemNotFound");
+      throw new ItemNotFoundException(ProtocolErrorCodes.ITEM_NOT_FOUND);
     }
 
     final var artifactVersion = this.findArtifactVersion(repoInfo.getStorageKey(), gav);
@@ -985,7 +987,7 @@ public class ArtifactService extends AbstractArtifactService<UUID> {
     // verifySignature refuses a signature without a registered version before it is stored, so
     // this is a defensive check for a version that vanished in between.
     if (artifactVersion == null) {
-      throw new ItemNotFoundException(ERR_ARTIFACT_VERSION_NOT_FOUND);
+      throw new ItemNotFoundException(ProtocolErrorCodes.ARTIFACT_VERSION_NOT_FOUND);
     }
 
     if (repoInfo.isPgpVerifyAllSignaturesEnabled()) {
@@ -1061,7 +1063,9 @@ public class ArtifactService extends AbstractArtifactService<UUID> {
       // not be recorded, so it is refused here, before the key lookup and before anything is
       // stored (RPS-1191).
       throw new ItemNotFoundException(
-          storedFile.isPresent() ? ERR_ARTIFACT_VERSION_NOT_FOUND : "itemNotFound");
+          storedFile.isPresent()
+              ? ProtocolErrorCodes.ARTIFACT_VERSION_NOT_FOUND
+              : ProtocolErrorCodes.ITEM_NOT_FOUND);
     }
 
     return this.parkOrVerify(repoInfo, nonSignedStoragePath, signature);
@@ -1144,9 +1148,9 @@ public class ArtifactService extends AbstractArtifactService<UUID> {
     }
 
     if (versionType == RELEASE && Boolean.FALSE.equals(repoInfo.getReleases())) {
-      throw new AccessNotAllowedException("releaseVersionsAreProhibited");
+      throw new AccessNotAllowedException(ProtocolErrorCodes.RELEASE_VERSIONS_ARE_PROHIBITED);
     } else if (versionType == SNAPSHOT && Boolean.FALSE.equals(repoInfo.getSnapshots())) {
-      throw new AccessNotAllowedException("snapshotVersionsAreProhibited");
+      throw new AccessNotAllowedException(ProtocolErrorCodes.SNAPSHOT_VERSIONS_ARE_PROHIBITED);
     }
   }
 

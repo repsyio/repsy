@@ -33,9 +33,9 @@ import io.repsy.os.shared.auth.dtos.AuthenticationType;
 import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.TokenRealm;
-import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.token.dtos.TokenType;
 import io.repsy.os.shared.user.services.UserTxService;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.Credentials;
 import java.util.Optional;
 import org.jspecify.annotations.NullMarked;
@@ -78,7 +78,7 @@ public class CargoAuthenticator extends ProtocolAuthService {
       // chose, so exchanging it would hand out the token of the user of that name (RPS-979).
       if (this.jwtUtils.extractAuthenticationType(authHeader, TokenRealm.PROTOCOL)
           != AuthenticationType.USERNAME_PASSWORD) {
-        throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+        throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
       }
 
       this.rejectRevokedToken(removeBearerHeader(authHeader));
@@ -93,7 +93,7 @@ public class CargoAuthenticator extends ProtocolAuthService {
           userInfo.getTokenVersion());
     }
 
-    throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+    throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
   }
 
   private String authenticateBasicAndCreateToken(final String authHeader) {
@@ -101,7 +101,7 @@ public class CargoAuthenticator extends ProtocolAuthService {
     final var credentials = extractCredentialsFromBasicToken(removeBasicPrefix(authHeader));
 
     if (credentials == null) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
 
     // A secret with the personal access token prefix is that and nothing else (RPS-1903).
@@ -111,7 +111,7 @@ public class CargoAuthenticator extends ProtocolAuthService {
 
     return this.authenticateWithDeployToken(credentials)
         .or(() -> this.authenticateWithUsernamePassword(credentials))
-        .orElseThrow(() -> new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED));
+        .orElseThrow(() -> new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED));
   }
 
   /**
@@ -138,7 +138,7 @@ public class CargoAuthenticator extends ProtocolAuthService {
     }
 
     if (deployTokenOpt.get().isExpired()) {
-      throw new UnAuthorizedException("deployTokenExpired");
+      throw new UnAuthorizedException(ProtocolErrorCodes.DEPLOY_TOKEN_EXPIRED);
     }
 
     this.deployTokenService.updateLastUsedTime(deployTokenOpt.get().getId());

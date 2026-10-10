@@ -28,6 +28,7 @@ import io.repsy.os.server.protocols.shared.services.ProtocolApiFacadeMavenAdapte
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.repo.utils.RepoUtils;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -98,7 +99,7 @@ public class MavenApiFacade implements ProtocolApiFacadeMavenAdapter {
 
     for (final var segment : segments) {
       if (segment.equals("..")) {
-        throw new AccessNotAllowedException("invalidRequest");
+        throw new AccessNotAllowedException(ProtocolErrorCodes.INVALID_REQUEST);
       }
     }
   }

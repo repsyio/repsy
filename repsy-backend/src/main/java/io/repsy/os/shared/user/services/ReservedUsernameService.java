@@ -17,6 +17,7 @@ package io.repsy.os.shared.user.services;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.os.panel.profile.repositories.ReservedUsernameRepository;
+import io.repsy.os.shared.constants.ErrorConstants;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
@@ -46,7 +47,7 @@ public class ReservedUsernameService {
   public void requireNotReserved(final @NonNull String username) {
 
     if (this.reservedUsernameRepository.existsByUsernameIgnoreCase(username)) {
-      throw new BadRequestException("usernameInUse");
+      throw new BadRequestException(ErrorConstants.USERNAME_IN_USE);
     }
   }
 }

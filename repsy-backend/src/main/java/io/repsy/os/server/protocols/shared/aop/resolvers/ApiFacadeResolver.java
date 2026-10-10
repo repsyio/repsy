@@ -21,6 +21,7 @@ import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.os.server.protocols.shared.aop.utils.ResolverUtils;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -58,7 +59,7 @@ public class ApiFacadeResolver implements HandlerMethodArgumentResolver {
         (RepoInfo) webRequest.getAttribute(ResolverUtils.REPO_INFO, SCOPE_REQUEST);
 
     if (repoInfoAttr == null) {
-      throw new ItemNotFoundException("repoNotFound");
+      throw new ItemNotFoundException(ProtocolErrorCodes.REPO_NOT_FOUND);
     }
 
     return this.apiFacadeMap.get(repoInfoAttr.getType());

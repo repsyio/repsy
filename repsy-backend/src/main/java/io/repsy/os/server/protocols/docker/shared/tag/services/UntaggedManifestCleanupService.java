@@ -23,6 +23,7 @@ import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorage
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.services.ManifestFileService.ManifestFileRef;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
@@ -106,7 +107,7 @@ public class UntaggedManifestCleanupService {
     return List.of(
         this.imageRepository
             .findByRepoIdAndName(repoInfo.getStorageKey(), imageName)
-            .orElseThrow(() -> new ItemNotFoundException("imageNotFound")));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.IMAGE_NOT_FOUND)));
   }
 
   private Result deleteUntaggedOfImage(

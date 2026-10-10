@@ -26,6 +26,7 @@ import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.golang.protocol.GolangProtocolProvider;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -84,7 +85,7 @@ public class GoAuthPreProcessor extends ProtocolProcessor {
     final var authHeader = this.authenticator.emulateAuthHeader(request);
 
     if (authHeader == null) {
-      return ProcessorResult.of(this.unauthorized("unauthorizedRequest"));
+      return ProcessorResult.of(this.unauthorized(ProtocolErrorCodes.UNAUTHORIZED_REQUEST));
     }
 
     final var permission = (Permission) properties.get(PERMISSION_KEY);
@@ -93,7 +94,7 @@ public class GoAuthPreProcessor extends ProtocolProcessor {
       this.authenticateRequest(authHeader, repoInfo.getStorageKey(), permission);
     } catch (final UnAuthorizedException ex) {
       return ProcessorResult.of(
-          this.unauthorized(Objects.toString(ex.getMessage(), "unAuthorized")));
+          this.unauthorized(Objects.toString(ex.getMessage(), ProtocolErrorCodes.UN_AUTHORIZED)));
     }
 
     return ProcessorResult.next();
@@ -125,7 +126,7 @@ public class GoAuthPreProcessor extends ProtocolProcessor {
           this.authenticator.handleBasicAuth(header, permission, repoId);
       case final String header when header.startsWith(AUTH_BEARER) ->
           this.authenticator.handleBearerAuth(header, repoId, permission);
-      default -> throw new UnAuthorizedException("unAuthorized");
+      default -> throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
   }
 

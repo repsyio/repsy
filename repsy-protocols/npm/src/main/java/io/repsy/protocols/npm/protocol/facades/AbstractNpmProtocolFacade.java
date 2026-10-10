@@ -30,6 +30,7 @@ import io.repsy.protocols.npm.shared.storage.services.NpmStorageService.Metadata
 import io.repsy.protocols.npm.shared.utils.NpmPackageUtils;
 import io.repsy.protocols.npm.shared.utils.NpmPublishLimits;
 import io.repsy.protocols.npm.shared.utils.NpmRevPath;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import io.repsy.protocols.shared.utils.StoredUpload;
@@ -112,14 +113,14 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
 
     final var versionName =
         NpmRevPath.versionOfTarball(packageName, tarballFilename)
-            .orElseThrow(() -> new BadRequestException("badRequest"));
+            .orElseThrow(() -> new BadRequestException(ProtocolErrorCodes.BAD_REQUEST));
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
 
     // The tarball is removed with the version by the packument PUT that comes first in an unpublish
     // (RPS-1289), so this request finds nothing left to delete. A version that is still published
     // is not deleted here: removing its file alone would leave a version without a tarball.
     if (this.isPublished(repoInfo, scopeName, packageName, versionName)) {
-      throw new ItemAlreadyExistException("npmVersionStillPublished");
+      throw new ItemAlreadyExistException(ProtocolErrorCodes.NPM_VERSION_STILL_PUBLISHED);
     }
   }
 
@@ -281,7 +282,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
       throws IOException {
 
     if (tagName.equals("latest")) {
-      throw new BadRequestException("canNotRemoveTagLatest");
+      throw new BadRequestException(ProtocolErrorCodes.CAN_NOT_REMOVE_TAG_LATEST);
     }
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
@@ -504,7 +505,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
       context.addProperty(USAGES, usages);
 
     } catch (final ClassCastException | URISyntaxException _) {
-      throw new BadRequestException("badRequest");
+      throw new BadRequestException(ProtocolErrorCodes.BAD_REQUEST);
     }
   }
 

@@ -31,6 +31,7 @@ import io.repsy.protocols.maven.shared.utils.ArtifactMetadataSynthesizer;
 import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
 import io.repsy.protocols.maven.shared.utils.MavenPublishLimits;
 import io.repsy.protocols.maven.shared.utils.MavenUploadLimits;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.BoundedEntryReader;
 import io.repsy.protocols.shared.utils.EntryTooLargeException;
@@ -228,7 +229,7 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
 
     final var inputStream =
         RequestBodies.nonEmpty(requestBody)
-            .orElseThrow(() -> new BadRequestException("mavenUploadBodyEmpty"));
+            .orElseThrow(() -> new BadRequestException(ProtocolErrorCodes.MAVEN_UPLOAD_BODY_EMPTY));
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     final var relativePath = ProtocolContextUtils.getRelativePath(context);
     final var storagePath = StoragePath.of(repoInfo.getStorageKey(), relativePath.getPath());
@@ -598,7 +599,7 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
             ArtifactUtils.artifactIsPlugin(model));
       }
     } catch (final EntryTooLargeException e) {
-      throw new BadRequestException("pomFileTooLarge");
+      throw new BadRequestException(ProtocolErrorCodes.POM_FILE_TOO_LARGE);
     }
   }
 
@@ -614,7 +615,7 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
       return BoundedEntryReader.readAllBytes(
           inputStream, contentLength, MavenUploadLimits.MAX_METADATA_BYTES);
     } catch (final EntryTooLargeException e) {
-      throw new BadRequestException("mavenMetadataTooLarge");
+      throw new BadRequestException(ProtocolErrorCodes.MAVEN_METADATA_TOO_LARGE);
     }
   }
 
@@ -630,7 +631,7 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
       return BoundedEntryReader.readAllBytes(
           inputStream, contentLength, MavenUploadLimits.MAX_SIGNATURE_BYTES);
     } catch (final EntryTooLargeException e) {
-      throw new BadRequestException("mavenSignatureTooLarge");
+      throw new BadRequestException(ProtocolErrorCodes.MAVEN_SIGNATURE_TOO_LARGE);
     }
   }
 

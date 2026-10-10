@@ -28,6 +28,7 @@ import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.pypi.protocol.PypiProtocolProvider;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -89,7 +90,7 @@ public class PypiAuthPreProcessor extends ProtocolProcessor {
     final var authHeader = this.authenticator.emulateAuthHeader(request);
 
     if (authHeader == null) {
-      throw new UnAuthorizedException("unAuthorized");
+      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
 
     this.authenticateRequest(authHeader, repoId, permission);
@@ -103,7 +104,7 @@ public class PypiAuthPreProcessor extends ProtocolProcessor {
           this.authenticator.handleBasicAuthWithToken(header, permission, repoId);
       case final String header when header.startsWith(AUTH_BEARER) ->
           this.authenticator.handleBearerAuth(header, repoId, permission);
-      default -> throw new UnAuthorizedException("unAuthorized");
+      default -> throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
   }
 

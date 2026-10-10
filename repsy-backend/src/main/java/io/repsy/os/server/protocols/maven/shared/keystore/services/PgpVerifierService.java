@@ -28,6 +28,7 @@ import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.SignatureNotVerifiedException;
 import io.repsy.os.server.protocols.maven.shared.keystore.dtos.ParsedPublicKey;
 import io.repsy.os.server.protocols.maven.shared.keystore.dtos.PublicKeySources;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -151,7 +152,7 @@ public class PgpVerifierService {
         // signature. Only this parsing is caught: an IOException from a key server's answer or from
         // reading the stored file is infrastructure and stays a 5xx.
         log.warn("signature could not be parsed. Cause: {}", exception.toString());
-        throw new SignatureNotVerifiedException("artifactSignatureNotVerified");
+        throw new SignatureNotVerifiedException(ProtocolErrorCodes.ARTIFACT_SIGNATURE_NOT_VERIFIED);
       }
 
       final var matchedKey =
@@ -162,7 +163,8 @@ public class PgpVerifierService {
                     log.warn(
                         "no public key found with Id {}",
                         String.format(KEY_ID_FORMAT, signature.getKeyID()));
-                    return new ItemNotFoundException("artifactSigningKeyNotFound");
+                    return new ItemNotFoundException(
+                        ProtocolErrorCodes.ARTIFACT_SIGNING_KEY_NOT_FOUND);
                   });
 
       this.checkKeyValidity(matchedKey, signature.getCreationTime());
@@ -179,13 +181,13 @@ public class PgpVerifierService {
 
       if (!signature.verify()) {
         log.debug("signature verification failed");
-        throw new SignatureNotVerifiedException("artifactSignatureNotVerified");
+        throw new SignatureNotVerifiedException(ProtocolErrorCodes.ARTIFACT_SIGNATURE_NOT_VERIFIED);
       }
     } catch (final PGPException exception) {
       // The BouncyCastle text ("PGPSignature is not found", ...) is for the log, not for the
       // client.
       log.warn("signature verification failed. Cause: {}", exception.getMessage());
-      throw new SignatureNotVerifiedException("artifactSignatureNotVerified");
+      throw new SignatureNotVerifiedException(ProtocolErrorCodes.ARTIFACT_SIGNATURE_NOT_VERIFIED);
     }
   }
 
@@ -206,7 +208,7 @@ public class PgpVerifierService {
       return String.format(KEY_ID_FORMAT, this.extractSignature(signatureStream).getKeyID());
     } catch (final IOException | PGPException exception) {
       log.warn("signature could not be parsed. Cause: {}", exception.toString());
-      throw new SignatureNotVerifiedException("artifactSignatureNotVerified");
+      throw new SignatureNotVerifiedException(ProtocolErrorCodes.ARTIFACT_SIGNATURE_NOT_VERIFIED);
     }
   }
 
@@ -223,7 +225,7 @@ public class PgpVerifierService {
     if (sources != null && !sources.keyServerLookupEnabled()) {
       // The key id is for the log, the client gets a fixed msgId (RPS-1127).
       log.warn("public key {} is not registered and key-server lookup is off", keyIdHex);
-      throw new ItemNotFoundException("artifactSigningKeyNotRegistered");
+      throw new ItemNotFoundException(ProtocolErrorCodes.ARTIFACT_SIGNING_KEY_NOT_REGISTERED);
     }
 
     return this.findOnKeyServers(sources, keyIdHex, keyId);
@@ -490,7 +492,7 @@ public class PgpVerifierService {
 
     if (signingKey.hasRevocation()) {
       log.warn("the signing key {} carries a revocation", keyIdHex(signingKey));
-      throw new SignatureNotVerifiedException("artifactSignatureNotVerified");
+      throw new SignatureNotVerifiedException(ProtocolErrorCodes.ARTIFACT_SIGNATURE_NOT_VERIFIED);
     }
 
     if (primaryKey.getKeyID() != signingKey.getKeyID() && primaryKey.hasRevocation()) {
@@ -498,7 +500,7 @@ public class PgpVerifierService {
           "the primary key {} of signing key {} carries a revocation",
           keyIdHex(primaryKey),
           keyIdHex(signingKey));
-      throw new SignatureNotVerifiedException("artifactSignatureNotVerified");
+      throw new SignatureNotVerifiedException(ProtocolErrorCodes.ARTIFACT_SIGNATURE_NOT_VERIFIED);
     }
   }
 
@@ -520,7 +522,7 @@ public class PgpVerifierService {
           creationTime,
           expiryTime,
           signatureCreationTime);
-      throw new SignatureNotVerifiedException("artifactSignatureNotVerified");
+      throw new SignatureNotVerifiedException(ProtocolErrorCodes.ARTIFACT_SIGNATURE_NOT_VERIFIED);
     }
   }
 
@@ -542,7 +544,7 @@ public class PgpVerifierService {
     final var trimmed = armored.trim();
 
     if (trimmed.startsWith(PRIVATE_KEY_ARMOR_HEADER)) {
-      throw new BadRequestException("pgpPublicKeyInvalid");
+      throw new BadRequestException(ProtocolErrorCodes.PGP_PUBLIC_KEY_INVALID);
     }
 
     ensureBouncyCastleProvider();
@@ -560,7 +562,7 @@ public class PgpVerifierService {
         | IllegalArgumentException
         | ClassCastException exception) {
       log.warn("a submitted public key could not be parsed. Cause: {}", exception.toString());
-      throw new BadRequestException("pgpPublicKeyInvalid");
+      throw new BadRequestException(ProtocolErrorCodes.PGP_PUBLIC_KEY_INVALID);
     }
   }
 
@@ -579,7 +581,7 @@ public class PgpVerifierService {
       final @NonNull PGPPublicKeyRingCollection collection) {
 
     if (collection.size() != 1) {
-      throw new BadRequestException("pgpPublicKeyInvalid");
+      throw new BadRequestException(ProtocolErrorCodes.PGP_PUBLIC_KEY_INVALID);
     }
 
     return collection.getKeyRings().next().getPublicKey();

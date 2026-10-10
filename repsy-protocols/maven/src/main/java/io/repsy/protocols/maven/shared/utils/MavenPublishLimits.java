@@ -17,6 +17,7 @@ package io.repsy.protocols.maven.shared.utils;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.storage.core.dtos.StoragePath;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 import org.apache.maven.index.artifact.Gav;
@@ -109,16 +110,16 @@ public final class MavenPublishLimits {
   public static void checkCoordinates(final Gav gav) {
 
     if (gav.getGroupId().length() > MAX_GROUP_ID_LENGTH) {
-      throw new BadRequestException("groupIdTooLong");
+      throw new BadRequestException(ProtocolErrorCodes.GROUP_ID_TOO_LONG);
     }
     if (gav.getArtifactId().length() > MAX_ARTIFACT_ID_LENGTH) {
-      throw new BadRequestException("artifactIdTooLong");
+      throw new BadRequestException(ProtocolErrorCodes.ARTIFACT_ID_TOO_LONG);
     }
 
     final var version = gav.isSnapshot() ? gav.getBaseVersion() : gav.getVersion();
 
     if (version.length() > MAX_VERSION_LENGTH) {
-      throw new BadRequestException("mavenVersionTooLong");
+      throw new BadRequestException(ProtocolErrorCodes.MAVEN_VERSION_TOO_LONG);
     }
   }
 
@@ -139,7 +140,7 @@ public final class MavenPublishLimits {
     final var fileName = storagePath.getRelativePath().getFileName();
 
     if (fileName.length() > MAX_FILE_NAME_LENGTH) {
-      throw new BadRequestException("mavenFileNameTooLong");
+      throw new BadRequestException(ProtocolErrorCodes.MAVEN_FILE_NAME_TOO_LONG);
     }
   }
 
@@ -154,7 +155,7 @@ public final class MavenPublishLimits {
     final var packaging = model.getPackaging();
 
     if (packaging != null && packaging.length() > MAX_PACKAGING_LENGTH) {
-      throw new BadRequestException("pomPackagingTooLong");
+      throw new BadRequestException(ProtocolErrorCodes.POM_PACKAGING_TOO_LONG);
     }
   }
 

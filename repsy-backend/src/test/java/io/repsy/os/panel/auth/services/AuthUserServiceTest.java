@@ -24,10 +24,10 @@ import io.repsy.os.server.shared.auth.AuthThrottleProperties;
 import io.repsy.os.shared.auth.dtos.RefreshTokenClaims;
 import io.repsy.os.shared.auth.services.LoginInfoFactory;
 import io.repsy.os.shared.auth.services.RefreshTokenService;
-import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.user.mappers.UserMapper;
 import io.repsy.os.shared.user.repositories.UserRepository;
 import io.repsy.os.shared.user.services.UserTxService;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -57,6 +57,6 @@ class AuthUserServiceTest {
 
     assertThatThrownBy(() -> this.service.refreshToken(claims))
         .isExactlyInstanceOf(UnAuthorizedException.class)
-        .hasMessage(ErrorConstants.UN_AUTHORIZED);
+        .hasMessage(ProtocolErrorCodes.UN_AUTHORIZED);
   }
 }

@@ -16,6 +16,8 @@
 package io.repsy.os.shared.repo.utils;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
+import io.repsy.os.shared.constants.ErrorConstants;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -52,7 +54,7 @@ public class RepoUtils {
 
   public void validateRepoName(final @NonNull String repoName) {
     if (!REPO_NAME_PATTERN.matcher(repoName).matches()) {
-      throw new BadRequestException("invalidRequest");
+      throw new BadRequestException(ProtocolErrorCodes.INVALID_REQUEST);
     }
   }
 
@@ -70,7 +72,7 @@ public class RepoUtils {
     RepoUtils.validateRepoName(repoName);
 
     if (RESERVED_REPO_NAMES.contains(repoName.toLowerCase(Locale.ROOT))) {
-      throw new BadRequestException("repoNameReserved");
+      throw new BadRequestException(ErrorConstants.REPO_NAME_RESERVED);
     }
   }
 }

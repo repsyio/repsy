@@ -17,6 +17,7 @@ package io.repsy.protocols.pypi.shared.utils;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.protocols.pypi.shared.python_package.dtos.PackageUploadForm;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -97,7 +98,7 @@ public final class PypiPackageUtils {
 
       return uploadForm;
     } catch (final Exception _) {
-      throw new BadRequestException("badPackageMetadata");
+      throw new BadRequestException(ProtocolErrorCodes.BAD_PACKAGE_METADATA);
     }
   }
 

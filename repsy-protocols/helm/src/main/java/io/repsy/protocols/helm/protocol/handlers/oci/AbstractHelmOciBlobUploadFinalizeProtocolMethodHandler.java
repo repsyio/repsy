@@ -26,6 +26,7 @@ import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
 import io.repsy.protocols.helm.protocol.facades.HelmProtocolFacade;
 import io.repsy.protocols.helm.shared.constants.HelmConstants;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.BlobDigests;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
@@ -131,13 +132,13 @@ public abstract class AbstractHelmOciBlobUploadFinalizeProtocolMethodHandler<ID>
     final var mediaType = request.getContentType();
 
     if (digest == null) {
-      throw new BadRequestException("digestMissing");
+      throw new BadRequestException(ProtocolErrorCodes.DIGEST_MISSING);
     }
 
     // helm_oci_blob.digest holds "sha256:" and 64 hex characters, but BlobDigests also admits a
     // sha512 one, which is 135 characters and would fail the row insert after the blob was stored.
     if (BlobDigests.isSupported(digest) && !digest.startsWith(HelmConstants.SHA256_PREFIX)) {
-      throw new BadRequestException("blobDigestUnsupported");
+      throw new BadRequestException(ProtocolErrorCodes.BLOB_DIGEST_UNSUPPORTED);
     }
 
     final var contentLength = request.getContentLengthLong();

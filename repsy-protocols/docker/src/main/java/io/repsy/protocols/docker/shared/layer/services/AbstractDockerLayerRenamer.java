@@ -23,6 +23,7 @@ import io.repsy.protocols.docker.shared.layer.dtos.LayerInfo;
 import io.repsy.protocols.docker.shared.storage.services.DockerStorageService;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestInfo;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestLayer;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.BlobDigests;
 import java.nio.file.Paths;
@@ -56,7 +57,7 @@ public abstract class AbstractDockerLayerRenamer<ID> {
     final var configLayer =
         this.layerTxService
             .findLayerInfoByRepoIdAndDigest(repoInfo.getId(), manifestInfo.getConfig().getDigest())
-            .orElseThrow(() -> new ItemNotFoundException("layerNotFound"));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.LAYER_NOT_FOUND));
 
     layers.add(configLayer);
 

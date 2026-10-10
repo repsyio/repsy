@@ -30,6 +30,7 @@ import io.repsy.os.server.protocols.golang.shared.storage.services.GoStorageServ
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.golang.shared.utils.GoVersionUtils;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -117,7 +118,7 @@ public class GoApiFacade implements ProtocolApiFacade {
     final var moduleVersion =
         this.goModuleVersionRepository
             .findByGoModuleIdAndVersion(goModule.getId(), version)
-            .orElseThrow(() -> new ItemNotFoundException("versionNotFound"));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.VERSION_NOT_FOUND));
 
     this.goModuleVersionRepository.delete(moduleVersion);
     // Flush so a rejection by the database fails here, before any file is removed, and so the
@@ -144,7 +145,7 @@ public class GoApiFacade implements ProtocolApiFacade {
       final @NonNull RepoInfo repoInfo, final @NonNull String modulePath) {
     return this.goModuleRepository
         .findLockedByRepoIdAndModulePath(repoInfo.getStorageKey(), modulePath)
-        .orElseThrow(() -> new ItemNotFoundException("moduleNotFound"));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.MODULE_NOT_FOUND));
   }
 
   /**

@@ -16,6 +16,7 @@
 package io.repsy.protocols.golang.shared.utils;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.utils.BoundedEntryReader;
 import io.repsy.protocols.shared.utils.EntryTooLargeException;
 import java.io.InputStream;
@@ -66,9 +67,9 @@ public class GoModuleZipReader {
         entry = zis.getNextEntry();
       }
     } catch (final EntryTooLargeException e) {
-      throw new BadRequestException("goModTooLarge");
+      throw new BadRequestException(ProtocolErrorCodes.GO_MOD_TOO_LARGE);
     }
 
-    throw new BadRequestException("goModNotFoundInZip");
+    throw new BadRequestException(ProtocolErrorCodes.GO_MOD_NOT_FOUND_IN_ZIP);
   }
 }

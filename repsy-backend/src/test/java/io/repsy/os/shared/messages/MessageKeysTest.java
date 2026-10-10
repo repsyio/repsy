@@ -52,11 +52,12 @@ import org.junit.jupiter.api.Test;
  *
  * <p>What it recognises: an identifier-like string literal or an {@code UPPER_SNAKE} constant that
  * is the first argument of {@code success}/{@code warning}/{@code error} on the response factory,
- * or of a msgId-carrying exception constructor, plus the {@code ERR_*} constant {@code
- * ErrorHandler} falls back to when an exception carries no message. Ids held in other variables are
- * not seen. A string literal that starts an exception's msgId but is free text or continued by a
- * concatenation, {@code .formatted(} or {@code String.format(} cannot have a bundle entry, so
- * {@link #msgIdsAreFixedIdentifiers()} fails on it (RPS-992, RPS-1127).
+ * or of a msgId-carrying exception constructor, plus the {@code ProtocolErrorCodes}/{@code
+ * ErrorConstants} constant {@code ErrorHandler} falls back to when an exception carries no message.
+ * Ids held in other variables are not seen. A string literal that starts an exception's msgId but
+ * is free text or continued by a concatenation, {@code .formatted(} or {@code String.format(}
+ * cannot have a bundle entry, so {@link #msgIdsAreFixedIdentifiers()} fails on it (RPS-992,
+ * RPS-1127).
  *
  * <p>Bundle keys that no code uses are not flagged: most of them are leftovers tracked by RPS-959.
  */
@@ -105,13 +106,15 @@ class MessageKeysTest {
               + "|(?<call>(?:String|MessageFormat)\\s*\\.\\s*format\\s*\\())");
 
   /**
-   * The {@code ERR_*} constant an {@code ErrorHandler} handler falls back to, as in {@code
-   * exceptionMessage != null ? exceptionMessage : ERR_UNAUTHORIZED}, when the exception carries no
+   * The constant an {@code ErrorHandler} handler falls back to, as in {@code exceptionMessage !=
+   * null ? exceptionMessage : ProtocolErrorCodes.UN_AUTHORIZED}, when the exception carries no
    * message. It reaches {@code resp.error} through a variable, so {@link #RESPONSE_MSG_ID} misses
    * it.
    */
   private static final Pattern FALLBACK_MSG_ID =
-      Pattern.compile("\\?\\s*\\w+\\s*:\\s*(?<constant>ERR_[A-Z0-9_]+)\\s*;");
+      Pattern.compile(
+          "\\?\\s*\\w+\\s*:\\s*(?<constant>(?:ProtocolErrorCodes|ErrorConstants)\\.[A-Z][A-Z0-9_]*)"
+              + "\\s*;");
 
   /**
    * Helpers that pass their last argument on as the msgId of an exception, so the literal never
@@ -120,7 +123,8 @@ class MessageKeysTest {
   private static final Pattern FORWARDED_MSG_ID =
       Pattern.compile(
           "\\b(?:stringField|requireGemField)\\((?:[^;()\"]|\"[^\"]*\"|\\([^()]*\\))*,\\s*"
-              + "\"(?<literal>\\w+)\"\\s*\\)");
+              + "(?:\"(?<literal>\\w+)\"|(?<constant>(?:ProtocolErrorCodes|ErrorConstants)"
+              + "\\.[A-Z][A-Z0-9_]*))\\s*\\)");
 
   private static final Pattern CONSTANT_DEFINITION =
       Pattern.compile(
@@ -282,7 +286,7 @@ class MessageKeysTest {
                 """
                 throw new BadRequestException("chartNameMissing");
                 throw new ItemNotFoundException(ERR_NOT_FOUND);
-                throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+                throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
                 throw new UnAuthorizedException("unAuthorized", Map.of("k", "v"));
                 throw new ItemAlreadyExistException("crateVersionAlreadyExists");
                 throw new ErrorOccurredException(e);

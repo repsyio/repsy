@@ -18,6 +18,7 @@ package io.repsy.protocols.helm.shared.utils;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartMetadata;
 import io.repsy.protocols.helm.shared.constants.HelmConstants;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -75,14 +76,14 @@ public class HelmChartParser {
           // The tar header gives the inflated size and a tar entry never reads past it, so this
           // refuses a decompression bomb before a single byte of it is buffered.
           if (entry.getSize() > HelmConstants.MAX_CHART_YAML_BYTES) {
-            throw new BadRequestException("chartYamlTooLarge");
+            throw new BadRequestException(ProtocolErrorCodes.CHART_YAML_TOO_LARGE);
           }
           return parseYaml(tar.readAllBytes());
         }
         entry = tar.getNextEntry();
       }
     }
-    throw new BadRequestException("chartYamlNotFound");
+    throw new BadRequestException(ProtocolErrorCodes.CHART_YAML_NOT_FOUND);
   }
 
   private static boolean isChartYaml(final String entryName) {
@@ -100,11 +101,15 @@ public class HelmChartParser {
    */
   private static HelmChartMetadata parseYaml(final byte[] bytes) {
     final var parsed = loadYaml(bytes);
-    final var name = validateName(stringField(parsed, "name", "chartNameInvalid"));
-    final var version = validateVersion(stringField(parsed, "version", "chartVersionInvalid"));
-    final var description = stringField(parsed, "description", "chartDescriptionInvalid");
-    final var appVersion = stringField(parsed, "appVersion", "chartAppVersionInvalid");
-    final var type = stringField(parsed, "type", "chartTypeInvalid");
+    final var name =
+        validateName(stringField(parsed, "name", ProtocolErrorCodes.CHART_NAME_INVALID));
+    final var version =
+        validateVersion(stringField(parsed, "version", ProtocolErrorCodes.CHART_VERSION_INVALID));
+    final var description =
+        stringField(parsed, "description", ProtocolErrorCodes.CHART_DESCRIPTION_INVALID);
+    final var appVersion =
+        stringField(parsed, "appVersion", ProtocolErrorCodes.CHART_APP_VERSION_INVALID);
+    final var type = stringField(parsed, "type", ProtocolErrorCodes.CHART_TYPE_INVALID);
     final var apiVersion = apiVersion(parsed);
     final var dependencies = dependencies(parsed.get("dependencies"));
 
@@ -126,12 +131,13 @@ public class HelmChartParser {
    * loader reads it, so the index entry always names the format the chart is in.
    */
   private static String apiVersion(final Map<?, ?> parsed) {
-    final var apiVersion = stringField(parsed, "apiVersion", "chartApiVersionInvalid");
+    final var apiVersion =
+        stringField(parsed, "apiVersion", ProtocolErrorCodes.CHART_API_VERSION_INVALID);
     if (apiVersion == null || apiVersion.isBlank()) {
       return HelmConstants.DEFAULT_CHART_API_VERSION;
     }
     if (apiVersion.length() > HelmConstants.MAX_CHART_API_VERSION_LENGTH) {
-      throw new BadRequestException("chartApiVersionInvalid");
+      throw new BadRequestException(ProtocolErrorCodes.CHART_API_VERSION_INVALID);
     }
     return apiVersion;
   }
@@ -149,7 +155,7 @@ public class HelmChartParser {
       return null;
     }
     if (!(declared instanceof List<?> list)) {
-      throw new BadRequestException("chartDependenciesInvalid");
+      throw new BadRequestException(ProtocolErrorCodes.CHART_DEPENDENCIES_INVALID);
     }
     final var kept = new ArrayList<Map<String, Object>>();
     for (final var item : list) {
@@ -160,7 +166,7 @@ public class HelmChartParser {
 
   private static Map<String, Object> dependencyOf(final @Nullable Object item) {
     if (!(item instanceof Map<?, ?> dependency)) {
-      throw new BadRequestException("chartDependenciesInvalid");
+      throw new BadRequestException(ProtocolErrorCodes.CHART_DEPENDENCIES_INVALID);
     }
     final var entry = new LinkedHashMap<String, Object>();
     for (final var key : DEPENDENCY_KEYS) {
@@ -177,10 +183,10 @@ public class HelmChartParser {
     try {
       json = DEPENDENCIES_MAPPER.writeValueAsString(dependencies);
     } catch (final JacksonException e) {
-      throw new BadRequestException("chartDependenciesInvalid");
+      throw new BadRequestException(ProtocolErrorCodes.CHART_DEPENDENCIES_INVALID);
     }
     if (json.getBytes(StandardCharsets.UTF_8).length > HelmConstants.MAX_CHART_DEPENDENCIES_BYTES) {
-      throw new BadRequestException("chartDependenciesInvalid");
+      throw new BadRequestException(ProtocolErrorCodes.CHART_DEPENDENCIES_INVALID);
     }
     return json;
   }
@@ -189,12 +195,12 @@ public class HelmChartParser {
       final @Nullable String appVersion, final @Nullable String type) {
 
     if (appVersion != null && appVersion.length() > HelmConstants.MAX_CHART_APP_VERSION_LENGTH) {
-      throw new BadRequestException("chartAppVersionTooLong");
+      throw new BadRequestException(ProtocolErrorCodes.CHART_APP_VERSION_TOO_LONG);
     }
     // Only the length is checked: Helm defines the type as application or library, but a chart of
     // any other type has always been accepted.
     if (type != null && type.length() > HelmConstants.MAX_CHART_TYPE_LENGTH) {
-      throw new BadRequestException("chartTypeInvalid");
+      throw new BadRequestException(ProtocolErrorCodes.CHART_TYPE_INVALID);
     }
   }
 
@@ -207,10 +213,10 @@ public class HelmChartParser {
     try {
       parsed = new Yaml(new SafeConstructor(options)).load(new ByteArrayInputStream(bytes));
     } catch (final YAMLException e) {
-      throw new BadRequestException("chartYamlInvalid");
+      throw new BadRequestException(ProtocolErrorCodes.CHART_YAML_INVALID);
     }
     if (!(parsed instanceof Map<?, ?> map)) {
-      throw new BadRequestException("chartYamlInvalid");
+      throw new BadRequestException(ProtocolErrorCodes.CHART_YAML_INVALID);
     }
     return map;
   }
@@ -231,28 +237,28 @@ public class HelmChartParser {
 
   private static String validateName(final @Nullable String name) {
     if (name == null || name.isBlank()) {
-      throw new BadRequestException("chartNameMissing");
+      throw new BadRequestException(ProtocolErrorCodes.CHART_NAME_MISSING);
     }
     // Before the pattern, which would otherwise scan a value of any length.
     if (name.length() > HelmConstants.MAX_CHART_NAME_LENGTH) {
-      throw new BadRequestException("chartNameTooLong");
+      throw new BadRequestException(ProtocolErrorCodes.CHART_NAME_TOO_LONG);
     }
     if (!CHART_NAME_PATTERN.matcher(name).matches()) {
-      throw new BadRequestException("chartNameInvalid");
+      throw new BadRequestException(ProtocolErrorCodes.CHART_NAME_INVALID);
     }
     return name;
   }
 
   private static String validateVersion(final @Nullable String version) {
     if (version == null || version.isBlank()) {
-      throw new BadRequestException("chartVersionMissing");
+      throw new BadRequestException(ProtocolErrorCodes.CHART_VERSION_MISSING);
     }
     // Before the pattern, which has no bound of its own and would scan a value of any length.
     if (version.length() > HelmConstants.MAX_CHART_VERSION_LENGTH) {
-      throw new BadRequestException("chartVersionTooLong");
+      throw new BadRequestException(ProtocolErrorCodes.CHART_VERSION_TOO_LONG);
     }
     if (!SEMVER_PATTERN.matcher(version).matches()) {
-      throw new BadRequestException("chartVersionInvalid");
+      throw new BadRequestException(ProtocolErrorCodes.CHART_VERSION_INVALID);
     }
     return version;
   }

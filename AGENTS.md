@@ -352,6 +352,11 @@ them in both repositories together.
 - Constants are `UPPER_SNAKE_CASE`, in a `*Constants` class in a `constants` package.
 - Error codes (`msgId`, later `code`) are `camelCase` strings and are a client contract: never rename or reuse
   one. Declare a new one in the constants holder, not as an inline literal.
+  A code a protocol module or shared backend code emits goes in `ProtocolErrorCodes`
+  (`repsy-protocols/shared`), a panel-only one in the backend `ErrorConstants`; the constant is the
+  `UPPER_SNAKE_CASE` of its value. Add it to the `ProblemDetail.code` enum in the spec too
+  (`OpenApiSpecConsistencyIT` fails on a code the spec lacks) and to `protocol-error-codes.txt` /
+  `ErrorConstantsTest`, which pin the wire values (RPS-2017).
 
 ### Packages and modules
 

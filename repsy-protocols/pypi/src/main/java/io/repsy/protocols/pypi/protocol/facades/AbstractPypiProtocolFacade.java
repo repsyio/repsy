@@ -30,6 +30,7 @@ import io.repsy.protocols.pypi.shared.utils.PackageStorageUtils;
 import io.repsy.protocols.pypi.shared.utils.PypiPackageUtils;
 import io.repsy.protocols.pypi.shared.utils.PypiPublishLimits;
 import io.repsy.protocols.pypi.shared.utils.ReleaseVersion;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import io.repsy.protocols.shared.utils.StoredUpload;
@@ -55,7 +56,6 @@ public abstract class AbstractPypiProtocolFacade<ID> implements PypiProtocolFaca
   private static final String ARTIFACT_NAME = "artifactName";
   private static final String ARTIFACT_VERSION = "artifactVersion";
   private static final String STORAGE_PATH = "storagePath";
-  private static final String FILE_ALREADY_EXISTS = "fileAlreadyExists";
 
   private final PypiStorageService<ID> pypiStorageService;
   private final PypiPackageService<ID> pypiPackageService;
@@ -70,7 +70,7 @@ public abstract class AbstractPypiProtocolFacade<ID> implements PypiProtocolFaca
     // An archive has at least one byte: an empty file part would otherwise be stored as a zero-byte
     // wheel whose sha256 the client computed of nothing (RPS-1466).
     if (file.isEmpty()) {
-      throw new BadRequestException("pypiArchiveEmpty");
+      throw new BadRequestException(ProtocolErrorCodes.PYPI_ARCHIVE_EMPTY);
     }
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
@@ -93,7 +93,7 @@ public abstract class AbstractPypiProtocolFacade<ID> implements PypiProtocolFaca
 
     final var actualDigest = PackageStorageUtils.computeSha256(file);
     if (!actualDigest.equalsIgnoreCase(uploadForm.getSha256_digest())) {
-      throw new BadRequestException("sha256DigestMismatch");
+      throw new BadRequestException(ProtocolErrorCodes.SHA256_DIGEST_MISMATCH);
     }
     uploadForm.setSha256_digest(actualDigest);
 
@@ -177,7 +177,7 @@ public abstract class AbstractPypiProtocolFacade<ID> implements PypiProtocolFaca
     }
 
     if (this.archiveExists(repoInfo, uploadForm, file)) {
-      throw new AccessNotAllowedException(FILE_ALREADY_EXISTS);
+      throw new AccessNotAllowedException(ProtocolErrorCodes.FILE_ALREADY_EXISTS);
     }
   }
 
@@ -214,7 +214,7 @@ public abstract class AbstractPypiProtocolFacade<ID> implements PypiProtocolFaca
     final var replacesExisting = this.archiveExists(repoInfo, uploadForm, file);
 
     if (replacesExisting && !repoInfo.isAllowOverride()) {
-      throw new AccessNotAllowedException(FILE_ALREADY_EXISTS);
+      throw new AccessNotAllowedException(ProtocolErrorCodes.FILE_ALREADY_EXISTS);
     }
 
     return StoredUpload.storeOrDiscard(

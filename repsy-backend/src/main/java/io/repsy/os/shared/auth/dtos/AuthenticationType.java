@@ -16,6 +16,7 @@
 package io.repsy.os.shared.auth.dtos;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
+import io.repsy.os.shared.constants.ErrorConstants;
 import lombok.Getter;
 import org.jspecify.annotations.NonNull;
 
@@ -59,6 +60,6 @@ public enum AuthenticationType {
       return ANONYMOUS;
     }
 
-    throw new BadRequestException("invalidAuthType");
+    throw new BadRequestException(ErrorConstants.INVALID_AUTH_TYPE);
   }
 }

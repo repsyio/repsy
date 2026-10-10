@@ -25,6 +25,7 @@ import io.repsy.os.server.protocols.docker.shared.tag.repositories.TagRepository
 import io.repsy.os.server.protocols.docker.shared.tag.services.ManifestFileService.ManifestFileRef;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.docker.shared.utils.DockerDigestCalculator;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.utils.BlobDigests;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -90,7 +91,7 @@ public class ManifestDeleter {
     final var manifest =
         this.manifestRepository
             .findByImageIdAndAnyDigest(imageInfo.getId(), digest)
-            .orElseThrow(() -> new ItemNotFoundException("manifestNotFound"));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.MANIFEST_NOT_FOUND));
 
     final var fileRef = new ManifestFileRef(manifest.getDigest(), manifest.getStorageName());
     final var tags = this.tagRepository.findAllByManifestId(manifest.getId());

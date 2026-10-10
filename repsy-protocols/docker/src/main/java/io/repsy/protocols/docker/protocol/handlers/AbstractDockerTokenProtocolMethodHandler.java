@@ -30,6 +30,7 @@ import io.repsy.protocols.docker.protocol.parser.DockerScopes;
 import io.repsy.protocols.docker.shared.auth.dtos.DockerTokenResponse;
 import io.repsy.protocols.docker.shared.auth.services.DockerAuthService;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.exceptions.TooManyRequestsException;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
@@ -130,7 +131,7 @@ public abstract class AbstractDockerTokenProtocolMethodHandler<ID>
       // ("repoNotFound", RPS-1165): the token endpoint must still refuse it with the same generic
       // 401 an anonymous caller gets for a wrong scope, or the status code would give away that
       // the repo exists.
-      throw challenge("unAuthorized");
+      throw challenge(ProtocolErrorCodes.UN_AUTHORIZED);
     }
   }
 
@@ -184,7 +185,7 @@ public abstract class AbstractDockerTokenProtocolMethodHandler<ID>
     if (scopes.isEmpty()
         || scopes.stream()
             .anyMatch(AbstractDockerTokenProtocolMethodHandler::requiresAuthentication)) {
-      throw challenge("unauthorizedRequest");
+      throw challenge(ProtocolErrorCodes.UNAUTHORIZED_REQUEST);
     }
 
     return this.handlePublicReadRequest(String.join(" ", scopes));
@@ -218,7 +219,7 @@ public abstract class AbstractDockerTokenProtocolMethodHandler<ID>
         return ResponseEntity.ok(this.createLoginResponse(sessionToken));
       }
 
-      throw new UnAuthorizedException("unAuthorized");
+      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
 
     final var repoInfo = repoInfoOpt.get();

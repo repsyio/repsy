@@ -16,6 +16,7 @@
 package io.repsy.protocols.golang.shared.utils;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -110,12 +111,12 @@ public class GoModuleHashCalculator {
       while (entry != null) {
         if (!entry.isDirectory()) {
           if (hashes.size() >= maxEntryCount) {
-            throw new BadRequestException("moduleZipTooManyFiles");
+            throw new BadRequestException(ProtocolErrorCodes.MODULE_ZIP_TOO_MANY_FILES);
           }
 
           final var name = entry.getName();
           if (name.indexOf('\n') >= 0) {
-            throw new BadRequestException("moduleZipEntryNameInvalid");
+            throw new BadRequestException(ProtocolErrorCodes.MODULE_ZIP_ENTRY_NAME_INVALID);
           }
 
           hashes.add(new NamedHash(name, hashEntry(zis, totalInflated, maxInflatedBytes)));
@@ -144,7 +145,7 @@ public class GoModuleHashCalculator {
 
     while (n != -1) {
       if (totalInflated.addAndGet(n) > maxInflatedBytes) {
-        throw new BadRequestException("moduleZipTooLarge");
+        throw new BadRequestException(ProtocolErrorCodes.MODULE_ZIP_TOO_LARGE);
       }
       digest.update(buf, 0, n);
       n = entryStream.read(buf);

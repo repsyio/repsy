@@ -23,7 +23,7 @@ import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.shared.auth.dtos.AuthenticationType;
-import io.repsy.os.shared.constants.ErrorConstants;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -77,7 +77,7 @@ class JwtUtilsTest {
 
     assertThatThrownBy(() -> this.jwtUtils.verifyRefreshToken(accessToken))
         .isInstanceOf(UnAuthorizedException.class)
-        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+        .hasMessageContaining(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
   }
 
   @Test
@@ -90,7 +90,7 @@ class JwtUtilsTest {
 
     assertThatThrownBy(() -> this.jwtUtils.verifyRefreshToken(legacyToken))
         .isInstanceOf(UnAuthorizedException.class)
-        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+        .hasMessageContaining(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
   }
 
   @Test
@@ -105,7 +105,7 @@ class JwtUtilsTest {
     assertThatThrownBy(
             () -> this.jwtUtils.verify(AuthUtils.AUTH_BEARER + refreshToken, TokenRealm.PANEL))
         .isInstanceOf(UnAuthorizedException.class)
-        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+        .hasMessageContaining(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
   }
 
   @Test
@@ -134,7 +134,7 @@ class JwtUtilsTest {
                 this.jwtUtils.verifyAndExtractUsername(
                     AuthUtils.AUTH_BEARER + refreshToken, TokenRealm.PANEL))
         .isInstanceOf(UnAuthorizedException.class)
-        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+        .hasMessageContaining(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
   }
 
   @Test
@@ -165,7 +165,7 @@ class JwtUtilsTest {
             () ->
                 this.jwtUtils.extractUserId(AuthUtils.AUTH_BEARER + refreshToken, TokenRealm.PANEL))
         .isInstanceOf(UnAuthorizedException.class)
-        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+        .hasMessageContaining(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
   }
 
   @Test
@@ -196,7 +196,7 @@ class JwtUtilsTest {
                 this.jwtUtils.extractAuthenticationType(
                     AuthUtils.AUTH_BEARER + refreshToken, TokenRealm.PANEL))
         .isInstanceOf(UnAuthorizedException.class)
-        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+        .hasMessageContaining(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
   }
 
   @Test
@@ -221,7 +221,7 @@ class JwtUtilsTest {
 
     assertThatThrownBy(() -> this.jwtUtils.verifyRefreshToken(token))
         .isInstanceOf(UnAuthorizedException.class)
-        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+        .hasMessageContaining(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
   }
 
   @Test
@@ -231,7 +231,7 @@ class JwtUtilsTest {
 
     assertThatThrownBy(() -> this.jwtUtils.verifyRefreshToken(token))
         .isInstanceOf(UnAuthorizedException.class)
-        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+        .hasMessageContaining(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
   }
 
   @Test
@@ -241,7 +241,7 @@ class JwtUtilsTest {
 
     assertThatThrownBy(() -> this.jwtUtils.getUserId(token, TokenRealm.PANEL))
         .isInstanceOf(UnAuthorizedException.class)
-        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+        .hasMessageContaining(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
   }
 
   @Test
@@ -251,7 +251,7 @@ class JwtUtilsTest {
 
     assertThatThrownBy(() -> this.jwtUtils.getUserId(token, TokenRealm.PANEL))
         .isInstanceOf(UnAuthorizedException.class)
-        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+        .hasMessageContaining(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
   }
 
   @Test
@@ -267,7 +267,7 @@ class JwtUtilsTest {
     assertThatThrownBy(
             () -> this.jwtUtils.verify(AuthUtils.AUTH_BEARER + token, TokenRealm.DOWNLOAD))
         .isInstanceOf(UnAuthorizedException.class)
-        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+        .hasMessageContaining(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
   }
 
   @Test
@@ -350,7 +350,7 @@ class JwtUtilsTest {
 
     assertThatThrownBy(() -> this.jwtUtils.verifyRefreshToken(token))
         .isInstanceOf(UnAuthorizedException.class)
-        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+        .hasMessageContaining(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
   }
 
   @Test
@@ -368,7 +368,7 @@ class JwtUtilsTest {
 
     assertThatThrownBy(() -> this.jwtUtils.verify(AuthUtils.AUTH_BEARER + token, TokenRealm.PANEL))
         .isInstanceOf(UnAuthorizedException.class)
-        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+        .hasMessageContaining(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
   }
 
   @Test
@@ -384,7 +384,7 @@ class JwtUtilsTest {
 
     assertThatThrownBy(() -> this.jwtUtils.verifyRefreshToken(token))
         .isInstanceOf(UnAuthorizedException.class)
-        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+        .hasMessageContaining(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
   }
 
   @Test
@@ -400,7 +400,7 @@ class JwtUtilsTest {
 
     assertThatThrownBy(() -> this.jwtUtils.verifyRefreshToken(token))
         .isInstanceOf(UnAuthorizedException.class)
-        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+        .hasMessageContaining(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
   }
 
   @Test
@@ -442,7 +442,7 @@ class JwtUtilsTest {
     assertThatThrownBy(
             () -> this.jwtUtils.extractSessionStart(AuthUtils.AUTH_BEARER + refreshToken))
         .isInstanceOf(UnAuthorizedException.class)
-        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+        .hasMessageContaining(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
   }
 
   @Test
@@ -512,11 +512,11 @@ class JwtUtilsTest {
 
     assertThatThrownBy(() -> this.jwtUtils.extractPanelClaims(AuthUtils.AUTH_BEARER + refreshToken))
         .isInstanceOf(UnAuthorizedException.class)
-        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+        .hasMessageContaining(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
     assertThatThrownBy(
             () -> this.jwtUtils.extractPanelClaims(AuthUtils.AUTH_BEARER + protocolToken))
         .isInstanceOf(UnAuthorizedException.class)
-        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+        .hasMessageContaining(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
     assertThatThrownBy(() -> this.jwtUtils.extractPanelClaims(AuthUtils.AUTH_BEARER + expiredToken))
         .isInstanceOf(UnAuthorizedException.class)
         .hasMessageContaining("sessionExpired");
@@ -535,10 +535,10 @@ class JwtUtilsTest {
     assertThat(this.jwtUtils.extractUserId(header, TokenRealm.PANEL)).isEqualTo(userId);
     assertThatThrownBy(() -> this.jwtUtils.verifyAndExtractUsername(header, TokenRealm.PROTOCOL))
         .isInstanceOf(UnAuthorizedException.class)
-        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+        .hasMessageContaining(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
     assertThatThrownBy(() -> this.jwtUtils.verify(header, TokenRealm.PROTOCOL))
         .isInstanceOf(UnAuthorizedException.class)
-        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+        .hasMessageContaining(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
   }
 
   @Test
@@ -552,7 +552,7 @@ class JwtUtilsTest {
     assertThat(this.jwtUtils.extractSessionStart(header)).isEqualTo(SESSION_START);
     assertThatThrownBy(() -> this.jwtUtils.verify(header, TokenRealm.PROTOCOL))
         .isInstanceOf(UnAuthorizedException.class)
-        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+        .hasMessageContaining(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
   }
 
   @Test
@@ -569,13 +569,13 @@ class JwtUtilsTest {
     assertThat(this.jwtUtils.extractUserId(header, TokenRealm.PROTOCOL)).isEqualTo(userId);
     assertThatThrownBy(() -> this.jwtUtils.verifyAndExtractUsername(header, TokenRealm.PANEL))
         .isInstanceOf(UnAuthorizedException.class)
-        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+        .hasMessageContaining(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
     assertThatThrownBy(() -> this.jwtUtils.extractUserId(header, TokenRealm.PANEL))
         .isInstanceOf(UnAuthorizedException.class)
-        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+        .hasMessageContaining(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
     assertThatThrownBy(() -> this.jwtUtils.extractSessionStart(header))
         .isInstanceOf(UnAuthorizedException.class)
-        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+        .hasMessageContaining(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
   }
 
   @Test
@@ -593,7 +593,7 @@ class JwtUtilsTest {
         .isEqualTo(AuthenticationType.DEPLOY_TOKEN);
     assertThatThrownBy(() -> this.jwtUtils.extractAuthenticationType(header, TokenRealm.PANEL))
         .isInstanceOf(UnAuthorizedException.class)
-        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+        .hasMessageContaining(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
   }
 
   @Test
@@ -607,7 +607,7 @@ class JwtUtilsTest {
     assertThat(this.jwtUtils.extractUserId(header, TokenRealm.PROTOCOL)).isEqualTo(repoId);
     assertThatThrownBy(() -> this.jwtUtils.extractUserId(header, TokenRealm.PANEL))
         .isInstanceOf(UnAuthorizedException.class)
-        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+        .hasMessageContaining(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
   }
 
   @Test
@@ -653,7 +653,7 @@ class JwtUtilsTest {
     for (final var realm : TokenRealm.values()) {
       assertThatThrownBy(() -> this.jwtUtils.verify(header, realm))
           .isInstanceOf(UnAuthorizedException.class)
-          .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+          .hasMessageContaining(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
     }
   }
 
@@ -666,7 +666,7 @@ class JwtUtilsTest {
     for (final var realm : TokenRealm.values()) {
       assertThatThrownBy(() -> this.jwtUtils.verify(header, realm))
           .isInstanceOf(UnAuthorizedException.class)
-          .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+          .hasMessageContaining(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
     }
   }
 
@@ -700,7 +700,7 @@ class JwtUtilsTest {
 
     assertThatThrownBy(() -> this.jwtUtils.verifyDownloadToken(token, otherRepoId, "/lib.jar"))
         .isInstanceOf(UnAuthorizedException.class)
-        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+        .hasMessageContaining(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
   }
 
   @Test
@@ -713,7 +713,7 @@ class JwtUtilsTest {
     for (final var other : new String[] {"/com/lib/b.jar", "/com/lib", "/com/lib/a.jar/x", ""}) {
       assertThatThrownBy(() -> this.jwtUtils.verifyDownloadToken(token, repoId, other))
           .isInstanceOf(UnAuthorizedException.class)
-          .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+          .hasMessageContaining(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
     }
   }
 
@@ -742,7 +742,7 @@ class JwtUtilsTest {
 
     assertThatThrownBy(() -> this.jwtUtils.verifyDownloadToken(token, repoId, "/lib.jar"))
         .isInstanceOf(UnAuthorizedException.class)
-        .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+        .hasMessageContaining(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
   }
 
   @Test
@@ -763,7 +763,7 @@ class JwtUtilsTest {
     for (final var token : tokens) {
       assertThatThrownBy(() -> this.jwtUtils.verifyDownloadToken(token, repoId, "/lib.jar"))
           .isInstanceOf(UnAuthorizedException.class)
-          .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+          .hasMessageContaining(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
     }
   }
 
@@ -778,7 +778,7 @@ class JwtUtilsTest {
     for (final var realm : new TokenRealm[] {TokenRealm.PANEL, TokenRealm.PROTOCOL}) {
       assertThatThrownBy(() -> this.jwtUtils.verify(header, realm))
           .isInstanceOf(UnAuthorizedException.class)
-          .hasMessageContaining(ErrorConstants.ACCESS_NOT_ALLOWED);
+          .hasMessageContaining(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
     }
   }
 

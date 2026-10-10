@@ -47,6 +47,7 @@ import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.os.shared.user.mappers.UserMapper;
 import io.repsy.os.shared.user.repositories.UserRepository;
 import io.repsy.os.shared.user.services.UserTxService;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.nio.charset.StandardCharsets;
@@ -97,7 +98,7 @@ class DockerAuthenticatorTest {
   private static void assertUnauthorized(final ThrowingCallable call) {
     assertThatThrownBy(call)
         .isExactlyInstanceOf(UnAuthorizedException.class)
-        .hasMessage(ErrorConstants.UN_AUTHORIZED);
+        .hasMessage(ProtocolErrorCodes.UN_AUTHORIZED);
   }
 
   @Test
@@ -105,7 +106,7 @@ class DockerAuthenticatorTest {
   void authenticateUserRejectsNullHeader() {
     assertThatThrownBy(() -> this.authenticator.authenticateUser(null))
         .isInstanceOf(UnAuthorizedException.class)
-        .hasMessageContaining(ErrorConstants.UN_AUTHORIZED);
+        .hasMessageContaining(ProtocolErrorCodes.UN_AUTHORIZED);
   }
 
   @Test
@@ -113,7 +114,7 @@ class DockerAuthenticatorTest {
   void authenticateUserRejectsNonBearerHeader() {
     assertThatThrownBy(() -> this.authenticator.authenticateUser("Basic abc"))
         .isInstanceOf(UnAuthorizedException.class)
-        .hasMessageContaining(ErrorConstants.UN_AUTHORIZED);
+        .hasMessageContaining(ProtocolErrorCodes.UN_AUTHORIZED);
   }
 
   /** RPS-962: a valid bearer token whose user no longer exists is an authentication failure. */
@@ -386,7 +387,7 @@ class DockerAuthenticatorTest {
       when(DockerAuthenticatorTest.this.userTxService.findUserInfoByUsername("ghost"))
           .thenReturn(Optional.empty());
       // What the real service does for a name nobody has.
-      doThrow(new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED))
+      doThrow(new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED))
           .when(DockerAuthenticatorTest.this.userTxService)
           .getAuthenticatedUserByUsername("ghost");
     }
@@ -516,7 +517,7 @@ class DockerAuthenticatorTest {
       when(this.deployTokenService.findByRepoIdAndToken(repoId, "signed.jwt.token"))
           .thenReturn(Optional.of(info));
       when(this.jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
-          .thenThrow(new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED));
+          .thenThrow(new UnAuthorizedException(ProtocolErrorCodes.ACCESS_NOT_ALLOWED));
 
       assertThatThrownBy(() -> this.component.handleBearerAuth(BEARER, repoId, Permission.READ))
           .isInstanceOf(UnAuthorizedException.class);

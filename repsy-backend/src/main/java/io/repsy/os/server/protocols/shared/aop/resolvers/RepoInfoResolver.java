@@ -22,6 +22,7 @@ import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.os.server.protocols.shared.aop.utils.ResolverUtils;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
@@ -58,7 +59,7 @@ public class RepoInfoResolver implements HandlerMethodArgumentResolver {
     final var repoName = ResolverUtils.extractRepoInfo(uriVariables);
 
     if (repoName == null) {
-      throw new ItemNotFoundException("repoNotFound");
+      throw new ItemNotFoundException(ProtocolErrorCodes.REPO_NOT_FOUND);
     }
 
     return this.repoTxService.getRepoByName(repoName);
@@ -72,7 +73,7 @@ public class RepoInfoResolver implements HandlerMethodArgumentResolver {
             webRequest.getAttribute(URI_TEMPLATE_VARIABLES_ATTRIBUTE, SCOPE_REQUEST);
 
     if (uriVariables == null) {
-      throw new ItemNotFoundException("urlVariablesNotFound");
+      throw new ItemNotFoundException(ProtocolErrorCodes.URL_VARIABLES_NOT_FOUND);
     }
 
     return uriVariables;

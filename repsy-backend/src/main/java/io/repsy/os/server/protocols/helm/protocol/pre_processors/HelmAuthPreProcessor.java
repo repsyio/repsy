@@ -30,6 +30,7 @@ import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
 import io.repsy.os.shared.error_handling.utils.OciErrors;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
@@ -103,7 +104,7 @@ public class HelmAuthPreProcessor extends ProtocolProcessor {
           this.authenticator.handleBasicAuth(h, permission, repoId);
       case final String h when h.startsWith(AUTH_BEARER) ->
           this.authenticator.handleBearerAuth(h, repoId, permission);
-      default -> throw new UnAuthorizedException("unAuthorized");
+      default -> throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
   }
 }

@@ -33,6 +33,7 @@ import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.protocols.golang.shared.module.services.AbstractGoModuleService;
 import io.repsy.protocols.golang.shared.module.services.GoModuleFilesWriter;
 import io.repsy.protocols.golang.shared.utils.GoVersionUtils;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.IOException;
 import java.time.Instant;
@@ -81,7 +82,7 @@ public class GoModuleService extends AbstractGoModuleService<UUID> {
     final var repo =
         this.repoRepository
             .findById(repoInfo.getStorageKey())
-            .orElseThrow(() -> new ItemNotFoundException("repoNotFound"));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.REPO_NOT_FOUND));
 
     final var goModule = this.findOrCreateModule(repo, modulePath);
 
@@ -91,7 +92,7 @@ public class GoModuleService extends AbstractGoModuleService<UUID> {
             .isPresent();
 
     if (versionExists) {
-      throw new ItemAlreadyExistException("goModuleVersionAlreadyExists");
+      throw new ItemAlreadyExistException(ProtocolErrorCodes.GO_MODULE_VERSION_ALREADY_EXISTS);
     }
 
     final var moduleVersion = new GoModuleVersion();
@@ -113,7 +114,7 @@ public class GoModuleService extends AbstractGoModuleService<UUID> {
         throw e;
       }
 
-      throw new ItemAlreadyExistException("goModuleVersionAlreadyExists");
+      throw new ItemAlreadyExistException(ProtocolErrorCodes.GO_MODULE_VERSION_ALREADY_EXISTS);
     }
 
     return filesWriter.write();
@@ -157,7 +158,7 @@ public class GoModuleService extends AbstractGoModuleService<UUID> {
 
     // Every attempt lost its row to a concurrent delete of the module: a conflict that a retry
     // resolves.
-    throw new ItemAlreadyExistException("goModuleBusy");
+    throw new ItemAlreadyExistException(ProtocolErrorCodes.GO_MODULE_BUSY);
   }
 
   @Override
@@ -212,7 +213,7 @@ public class GoModuleService extends AbstractGoModuleService<UUID> {
     final var goModule =
         this.goModuleRepository
             .findByRepoIdAndModulePath(repoId, modulePath)
-            .orElseThrow(() -> new ItemNotFoundException("moduleNotFound"));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.MODULE_NOT_FOUND));
     return this.goModuleVersionRepository
         .findAllByModuleIdContainsVersion(goModule.getId(), search, pageable)
         .map(this.goModuleMapper::toVersionDto);
@@ -222,7 +223,7 @@ public class GoModuleService extends AbstractGoModuleService<UUID> {
     final var goModule =
         this.goModuleRepository
             .findByRepoIdAndModulePath(repoId, modulePath)
-            .orElseThrow(() -> new ItemNotFoundException("moduleNotFound"));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.MODULE_NOT_FOUND));
 
     final var versions = this.goModuleVersionRepository.findAllByModuleId(goModule.getId());
 

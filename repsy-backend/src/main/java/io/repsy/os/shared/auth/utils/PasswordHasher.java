@@ -18,6 +18,7 @@ package io.repsy.os.shared.auth.utils;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
+import io.repsy.os.shared.constants.ErrorConstants;
 import java.security.MessageDigest;
 import java.util.Map;
 import java.util.Objects;
@@ -57,7 +58,6 @@ public class PasswordHasher {
 
   private static final String BCRYPT_ID = "bcrypt";
   private static final String ID_PREFIX = "{";
-  private static final String PASSWORD_TOO_LONG = "passwordTooLong";
   private static final int DUMMY_PASSWORD_LENGTH = 32;
 
   /** Only algorithms listed here can verify, so a "noop" plain-text row cannot be planted. */
@@ -95,7 +95,7 @@ public class PasswordHasher {
   public static void requireFitsBcrypt(final @NonNull String password) {
 
     if (!fitsBcrypt(password)) {
-      throw new BadRequestException(PASSWORD_TOO_LONG);
+      throw new BadRequestException(ErrorConstants.PASSWORD_TOO_LONG);
     }
   }
 

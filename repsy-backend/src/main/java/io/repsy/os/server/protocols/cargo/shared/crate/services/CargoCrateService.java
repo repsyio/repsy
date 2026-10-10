@@ -46,6 +46,7 @@ import io.repsy.protocols.cargo.shared.crate.dtos.CratePublishRequest;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateVersionListItem;
 import io.repsy.protocols.cargo.shared.crate.services.AbstractCargoCrateService;
 import io.repsy.protocols.cargo.shared.crate.services.SemverComparator;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.IOException;
 import java.time.Instant;
@@ -73,9 +74,6 @@ import tools.jackson.databind.ObjectMapper;
 @NullMarked
 public class CargoCrateService extends AbstractCargoCrateService<UUID> {
 
-  private static final String ERR_REPO_NOT_FOUND = "repoNotFound";
-  private static final String ERR_CRATE_NOT_FOUND = "crateNotFound";
-  private static final String ERR_CRATE_VERSION_NOT_FOUND = "crateVersionNotFound";
   private static final String VERSION_UNIQUE_CONSTRAINT = "ux_cargo_crate_index__crate_id_vers";
 
   private final RepoRepository repoRepository;
@@ -325,7 +323,7 @@ public class CargoCrateService extends AbstractCargoCrateService<UUID> {
 
     log.warn("crate {}@{} already exists in this registry", request.name(), request.vers());
 
-    return new ItemAlreadyExistException("crateVersionAlreadyExists");
+    return new ItemAlreadyExistException(ProtocolErrorCodes.CRATE_VERSION_ALREADY_EXISTS);
   }
 
   /**
@@ -350,7 +348,7 @@ public class CargoCrateService extends AbstractCargoCrateService<UUID> {
         request.name(),
         crate.getOriginalName());
 
-    throw new ItemAlreadyExistException("crateNameSpellingMismatch");
+    throw new ItemAlreadyExistException(ProtocolErrorCodes.CRATE_NAME_SPELLING_MISMATCH);
   }
 
   /**
@@ -380,7 +378,7 @@ public class CargoCrateService extends AbstractCargoCrateService<UUID> {
     final var crate =
         this.crateRepository
             .findByRepoIdAndName(repoId, normalizedName)
-            .orElseThrow(() -> new ItemNotFoundException(ERR_CRATE_NOT_FOUND));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.CRATE_NOT_FOUND));
 
     if (inserted == 0) {
       checkNameSpelling(crate, request);
@@ -573,7 +571,7 @@ public class CargoCrateService extends AbstractCargoCrateService<UUID> {
 
     return this.crateRepository
         .findByRepoIdAndName(repoId, normalizedName)
-        .orElseThrow(() -> new ItemNotFoundException(ERR_CRATE_NOT_FOUND));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.CRATE_NOT_FOUND));
   }
 
   private CargoCrateIndex findCrateIndex(final UUID repoId, final String name, final String vers) {
@@ -582,7 +580,7 @@ public class CargoCrateService extends AbstractCargoCrateService<UUID> {
 
     return this.crateIndexRepository
         .findByCrateIdAndVers(crate.getId(), vers)
-        .orElseThrow(() -> new ItemNotFoundException(ERR_CRATE_VERSION_NOT_FOUND));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.CRATE_VERSION_NOT_FOUND));
   }
 
   private @Nullable String toJson(final @Nullable Object value) {
@@ -603,20 +601,20 @@ public class CargoCrateService extends AbstractCargoCrateService<UUID> {
 
     return this.crateMetaRepository
         .findByCrateIdAndVersion(crateId, vers)
-        .orElseThrow(() -> new ItemNotFoundException(ERR_CRATE_VERSION_NOT_FOUND));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.CRATE_VERSION_NOT_FOUND));
   }
 
   private CargoCrateIndex findCrateIndex(final UUID crateId, final String vers) {
 
     return this.crateIndexRepository
         .findByCrateIdAndVers(crateId, vers)
-        .orElseThrow(() -> new ItemNotFoundException(ERR_CRATE_VERSION_NOT_FOUND));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.CRATE_VERSION_NOT_FOUND));
   }
 
   private Repo findRepoById(final UUID repoId) {
 
     return this.repoRepository
         .findById(repoId)
-        .orElseThrow(() -> new ItemNotFoundException(ERR_REPO_NOT_FOUND));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.REPO_NOT_FOUND));
   }
 }

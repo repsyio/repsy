@@ -24,6 +24,7 @@ import io.repsy.protocols.helm.protocol.facades.HelmProtocolFacade;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartMetadata;
 import io.repsy.protocols.helm.shared.constants.HelmConstants;
 import io.repsy.protocols.helm.shared.utils.HelmChartParser;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import io.repsy.protocols.shared.utils.SpooledUpload;
@@ -115,7 +116,7 @@ public abstract class AbstractHelmChartPushProtocolMethodHandler<ID>
       // No chart is empty: an empty file part would otherwise fail in the gzip reader with a 500
       // (RPS-1466).
       if (chart.size() == 0) {
-        throw new BadRequestException("helmChartEmpty");
+        throw new BadRequestException(ProtocolErrorCodes.HELM_CHART_EMPTY);
       }
 
       final HelmChartMetadata metadata;

@@ -25,11 +25,11 @@ import static org.mockito.Mockito.when;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
-import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.mappers.UserMapper;
 import io.repsy.os.shared.user.repositories.UserRepository;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -61,7 +61,7 @@ class UserTxServiceTest {
   void byUsernameUnknown() {
     assertThatThrownBy(() -> this.service.getAuthenticatedUserByUsername("ghost"))
         .isExactlyInstanceOf(UnAuthorizedException.class)
-        .hasMessage(ErrorConstants.UN_AUTHORIZED);
+        .hasMessage(ProtocolErrorCodes.UN_AUTHORIZED);
   }
 
   @Test
@@ -81,7 +81,7 @@ class UserTxServiceTest {
   void byIdUnknown() {
     assertThatThrownBy(() -> this.service.getAuthenticatedUserById(UUID.randomUUID()))
         .isExactlyInstanceOf(UnAuthorizedException.class)
-        .hasMessage(ErrorConstants.UN_AUTHORIZED);
+        .hasMessage(ProtocolErrorCodes.UN_AUTHORIZED);
   }
 
   @Test

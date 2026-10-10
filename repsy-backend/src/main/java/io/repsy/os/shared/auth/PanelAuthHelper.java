@@ -28,6 +28,7 @@ import io.repsy.os.shared.token.services.PersonalAccessTokenService;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.os.shared.user.services.UserTxService;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
@@ -38,8 +39,6 @@ import org.springframework.stereotype.Component;
 @Component
 @RequiredArgsConstructor
 public final class PanelAuthHelper {
-
-  private static final @NonNull String ACCESS_DENIED = "accessDenied";
 
   private final @NonNull JwtUtils jwtUtils;
   private final @NonNull UserTxService userTxService;
@@ -76,7 +75,7 @@ public final class PanelAuthHelper {
     // The token version and the user id (RPS-1604), as ProtocolAuthService#authenticatePanelBearer
     // does for the @RepoOperation routes.
     if (!claims.issuedTo(user)) {
-      throw new UnAuthorizedException("sessionExpired");
+      throw new UnAuthorizedException(ErrorConstants.SESSION_EXPIRED);
     }
 
     return new PanelSession(user, claims.sessionStart());
@@ -112,7 +111,7 @@ public final class PanelAuthHelper {
     if (secret == null) {
       this.authenticate(authHeader);
 
-      throw new BadRequestException("notAnAccessToken");
+      throw new BadRequestException(ErrorConstants.NOT_AN_ACCESS_TOKEN);
     }
 
     final var token = this.liveToken(secret);
@@ -135,7 +134,7 @@ public final class PanelAuthHelper {
 
     // Signed in but not allowed is a 403 on the panel API, not a 401 (RPS-1284).
     if (!TokenScope.permits(token.scopes(), required)) {
-      throw new AccessNotAllowedException(ACCESS_DENIED);
+      throw new AccessNotAllowedException(ProtocolErrorCodes.ACCESS_DENIED);
     }
 
     final var user = this.userTxService.getAuthenticatedUserById(token.userId());
@@ -151,7 +150,7 @@ public final class PanelAuthHelper {
     final var found = service == null ? null : service.findByToken(secret).orElse(null);
 
     if (found == null || found.isExpired()) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
 
     return found;
@@ -168,7 +167,7 @@ public final class PanelAuthHelper {
 
   public void requireAdmin(final @NonNull UserInfo userInfo) {
     if (userInfo.getRole() != UserRole.ADMIN) {
-      throw new AccessNotAllowedException(ACCESS_DENIED);
+      throw new AccessNotAllowedException(ProtocolErrorCodes.ACCESS_DENIED);
     }
   }
 }

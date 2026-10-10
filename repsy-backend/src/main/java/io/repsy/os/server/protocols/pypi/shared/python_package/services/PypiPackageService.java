@@ -47,6 +47,7 @@ import io.repsy.protocols.pypi.shared.utils.Pep440Version;
 import io.repsy.protocols.pypi.shared.utils.PypiPackageUtils;
 import io.repsy.protocols.pypi.shared.utils.PypiVersionComparator;
 import io.repsy.protocols.pypi.shared.utils.ReleaseVersion;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.IOException;
 import java.time.Instant;
@@ -75,8 +76,6 @@ import org.springframework.web.util.UriComponentsBuilder;
 @NullMarked
 public class PypiPackageService extends AbstractPypiPackageService<UUID> {
 
-  private static final String ERR_PACKAGE_NOT_FOUND = "packageNotFound";
-
   private final RepoRepository repoRepository;
   private final PypiStorageService pypiStorageService;
   private final ReleaseRepository releaseRepository;
@@ -93,7 +92,7 @@ public class PypiPackageService extends AbstractPypiPackageService<UUID> {
     final var pythonPypiPackage =
         this.pypiPackageRepository
             .findByRepoIdAndNormalizedName(repoId, packageNormalizedName)
-            .orElseThrow(() -> new ItemNotFoundException(ERR_PACKAGE_NOT_FOUND));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.PACKAGE_NOT_FOUND));
 
     return Objects.requireNonNull(
         this.conversionService.convert(pythonPypiPackage, PypiPackageInfo.class));
@@ -203,7 +202,7 @@ public class PypiPackageService extends AbstractPypiPackageService<UUID> {
     final var release =
         this.releaseRepository
             .findByPypiPackageIdAndVersion(pythonPypiPackage.getId(), version)
-            .orElseThrow(() -> new ItemNotFoundException("releaseNotFound"));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.RELEASE_NOT_FOUND));
 
     this.releaseRepository.delete(release);
     this.releaseRepository.flush();
@@ -226,7 +225,7 @@ public class PypiPackageService extends AbstractPypiPackageService<UUID> {
 
     return this.pypiPackageRepository
         .findLockedByRepoIdAndNormalizedName(repoId, normalizedName)
-        .orElseThrow(() -> new ItemNotFoundException(ERR_PACKAGE_NOT_FOUND));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.PACKAGE_NOT_FOUND));
   }
 
   private PypiDeletion removePackage(
@@ -268,7 +267,7 @@ public class PypiPackageService extends AbstractPypiPackageService<UUID> {
     final var release =
         this.releaseRepository
             .findByPypiPackageIdAndVersion(packageId, releaseVersion)
-            .orElseThrow(() -> new ItemNotFoundException("releaseNotFound"));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.RELEASE_NOT_FOUND));
 
     final var classifiers = this.releaseClassifierRepository.findAllByReleaseId(release.getId());
 
@@ -284,7 +283,7 @@ public class PypiPackageService extends AbstractPypiPackageService<UUID> {
         this.pypiPackageRepository
             .findByRepoIdAndNormalizedName(
                 repoId, PypiPackageUtils.normalizePackageName(packageName))
-            .orElseThrow(() -> new ItemNotFoundException(ERR_PACKAGE_NOT_FOUND));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.PACKAGE_NOT_FOUND));
 
     final var versionOrder = VersionSortPaging.directionFor(pageable, "version");
 
@@ -307,7 +306,7 @@ public class PypiPackageService extends AbstractPypiPackageService<UUID> {
         this.pypiPackageRepository
             .findByRepoIdAndNormalizedName(
                 repoId, PypiPackageUtils.normalizePackageName(packageName))
-            .orElseThrow(() -> new ItemNotFoundException(ERR_PACKAGE_NOT_FOUND));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.PACKAGE_NOT_FOUND));
 
     final var versionOrder = VersionSortPaging.directionFor(pageable, "version");
 
@@ -397,7 +396,7 @@ public class PypiPackageService extends AbstractPypiPackageService<UUID> {
     }
 
     if (!this.repoRepository.existsById(repoId)) {
-      throw new ItemNotFoundException("repoNotFound");
+      throw new ItemNotFoundException(ProtocolErrorCodes.REPO_NOT_FOUND);
     }
 
     this.pypiPackageRepository.insertIfAbsent(
@@ -405,7 +404,7 @@ public class PypiPackageService extends AbstractPypiPackageService<UUID> {
 
     return this.pypiPackageRepository
         .findLockedByRepoIdAndNormalizedName(repoId, normalizedName)
-        .orElseThrow(() -> new ItemNotFoundException(ERR_PACKAGE_NOT_FOUND));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.PACKAGE_NOT_FOUND));
   }
 
   private void updateRelease(

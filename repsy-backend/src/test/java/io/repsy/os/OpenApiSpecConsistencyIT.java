@@ -21,7 +21,9 @@ import com.jayway.jsonpath.JsonPath;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
+import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.repo.utils.RepoUtils;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.IOException;
@@ -733,6 +735,32 @@ class OpenApiSpecConsistencyIT extends AbstractIT {
             "type", "title", "status", "detail", "instance", "code", "traceId", "errors");
     assertThat(asMap(schema.get("properties")).keySet()).containsAll(problem.keySet());
     assertThat(problem).containsEntry("code", "validationError");
+  }
+
+  @Test
+  @DisplayName(
+      "ProblemDetail.code lists exactly the codes of ProtocolErrorCodes and ErrorConstants")
+  void problemCodeEnumIsEveryEmittedCode() throws Exception {
+    final var schema =
+        asMap(asMap(asMap(loadSpec().get("components")).get("schemas")).get("ProblemDetail"));
+    final var emitted = new TreeSet<String>();
+    for (final Class<?> holder : List.of(ProtocolErrorCodes.class, ErrorConstants.class)) {
+      for (final var field : holder.getDeclaredFields()) {
+        if (java.lang.reflect.Modifier.isStatic(field.getModifiers())
+            && field.getType() == String.class) {
+          emitted.add((String) field.get(null));
+        }
+      }
+    }
+
+    final var code = asMap(asMap(schema.get("properties")).get("code"));
+    assertThat(asList(code.get("enum"))).doesNotHaveDuplicates();
+    assertThat(asList(code.get("enum"))).containsExactlyInAnyOrderElementsOf(emitted);
+
+    final var result =
+        this.perform(MockMvcRequestBuilders.get("/api/users").param("page", "-1")).andReturn();
+    final String served = JsonPath.read(result.getResponse().getContentAsString(), "$.code");
+    assertThat(asList(code.get("enum"))).contains(served);
   }
 
   @Test

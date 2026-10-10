@@ -32,6 +32,7 @@ import io.repsy.protocols.helm.shared.constants.HelmConstants;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestPushForm;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestPushResult;
 import io.repsy.protocols.helm.shared.utils.HelmChartParser;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
@@ -139,7 +140,7 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
     final var mediaType = request.getContentType();
 
     if (mediaType == null) {
-      throw new BadRequestException("manifestContentTypeMissing");
+      throw new BadRequestException(ProtocolErrorCodes.MANIFEST_CONTENT_TYPE_MISSING);
     }
 
     rejectOverLongIdentifiers(name, reference, mediaType);
@@ -148,7 +149,7 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
     final var existingManifest = this.helmFacade.checkManifest(context, name, reference);
     if (existingManifest.isPresent() && !repoInfo.isAllowOverride()) {
       log.info("Chart {}:{} already exists in repo {}", name, reference, repoInfo.getName());
-      throw new ItemAlreadyExistException("chartAlreadyExists");
+      throw new ItemAlreadyExistException(ProtocolErrorCodes.CHART_ALREADY_EXISTS);
     }
 
     final var contentBytes = request.getInputStream().readAllBytes();
@@ -253,7 +254,7 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
         metadata.getName(),
         metadata.getVersion(),
         repoInfo.getName());
-    throw new ItemAlreadyExistException("chartAlreadyExists");
+    throw new ItemAlreadyExistException(ProtocolErrorCodes.CHART_ALREADY_EXISTS);
   }
 
   /**
@@ -266,13 +267,13 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
       final String name, final String reference, final String mediaType) {
 
     if (name.length() > HelmConstants.MAX_OCI_MANIFEST_NAME_LENGTH) {
-      throw new BadRequestException("manifestNameTooLong");
+      throw new BadRequestException(ProtocolErrorCodes.MANIFEST_NAME_TOO_LONG);
     }
     if (reference.length() > HelmConstants.MAX_OCI_MANIFEST_REFERENCE_LENGTH) {
-      throw new BadRequestException("manifestReferenceTooLong");
+      throw new BadRequestException(ProtocolErrorCodes.MANIFEST_REFERENCE_TOO_LONG);
     }
     if (mediaType.length() > HelmConstants.MAX_OCI_MEDIA_TYPE_LENGTH) {
-      throw new BadRequestException("manifestMediaTypeTooLong");
+      throw new BadRequestException(ProtocolErrorCodes.MANIFEST_MEDIA_TYPE_TOO_LONG);
     }
   }
 
@@ -297,14 +298,14 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
   private ChartLayer parseChartLayer(final String manifestJson) {
     final var layers = this.parseManifest(manifestJson).get("layers");
     if (layers == null || !layers.isArray() || layers.isEmpty()) {
-      throw new BadRequestException("manifestLayersMissing");
+      throw new BadRequestException(ProtocolErrorCodes.MANIFEST_LAYERS_MISSING);
     }
 
     final var layer = this.findChartLayer(layers);
     final var digest = layer.get("digest");
     final var size = layer.get("size");
     if (!isSha256Digest(digest) || !isNonNegativeInteger(size)) {
-      throw new BadRequestException("manifestLayerInvalid");
+      throw new BadRequestException(ProtocolErrorCodes.MANIFEST_LAYER_INVALID);
     }
 
     return new ChartLayer(digest.asString(), size.asLong());
@@ -322,7 +323,7 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
         return candidate;
       }
     }
-    throw new BadRequestException("manifestChartLayerMissing");
+    throw new BadRequestException(ProtocolErrorCodes.MANIFEST_CHART_LAYER_MISSING);
   }
 
   private JsonNode parseManifest(final String manifestJson) {
@@ -330,11 +331,11 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
     try {
       manifest = OBJECT_MAPPER.readTree(manifestJson);
     } catch (final JacksonException e) {
-      throw new BadRequestException("manifestInvalidJson");
+      throw new BadRequestException(ProtocolErrorCodes.MANIFEST_INVALID_JSON);
     }
 
     if (!manifest.isObject()) {
-      throw new BadRequestException("manifestInvalidJson");
+      throw new BadRequestException(ProtocolErrorCodes.MANIFEST_INVALID_JSON);
     }
     return manifest;
   }
@@ -357,7 +358,7 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
    */
   private void requireMatchingChartName(final String pathName, final String chartName) {
     if (!pathName.equals(chartName)) {
-      throw new BadRequestException("chartNameMismatch");
+      throw new BadRequestException(ProtocolErrorCodes.CHART_NAME_MISMATCH);
     }
   }
 

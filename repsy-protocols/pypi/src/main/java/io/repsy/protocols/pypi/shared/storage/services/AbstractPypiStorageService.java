@@ -29,6 +29,7 @@ import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.protocols.pypi.shared.python_package.dtos.PackageUploadForm;
 import io.repsy.protocols.pypi.shared.python_package.dtos.ReleaseArchiveIndexListItem;
 import io.repsy.protocols.pypi.shared.utils.PackageStorageUtils;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -128,7 +129,7 @@ public abstract class AbstractPypiStorageService<ID> implements PypiStorageServi
 
     return this.storageStrategy
         .get(storagePath, repoName)
-        .orElseThrow(() -> new ItemNotFoundException("itemNotFound"));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.ITEM_NOT_FOUND));
   }
 
   private void addDirectoryUpLink(
@@ -207,7 +208,7 @@ public abstract class AbstractPypiStorageService<ID> implements PypiStorageServi
       final var resource =
           this.storageStrategy
               .get(fileStoragePath, repoInfo.getName())
-              .orElseThrow(() -> new ItemNotFoundException("itemNotFound"));
+              .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.ITEM_NOT_FOUND));
 
       final var item =
           ReleaseArchiveIndexListItem.builder()

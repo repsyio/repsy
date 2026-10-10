@@ -19,6 +19,7 @@ import io.repsy.core.response.dtos.RestResponse;
 import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.os.shared.error_handling.dtos.OciErrorCode;
 import io.repsy.os.shared.error_handling.dtos.OciErrorResponse;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Map;
 import java.util.Set;
@@ -37,34 +38,36 @@ import org.springframework.http.ResponseEntity;
 @NullMarked
 public final class OciErrors {
 
-  private static final String ERR_UNAUTHORIZED = "unauthorizedRequest";
   private static final String OCI_ROOT = "/v2";
   private static final String OCI_PREFIX = "/v2/";
 
   /** The failures the registry names itself, by the message id of the exception. */
   private static final Map<String, OciErrorCode> CODE_BY_MSG_ID =
       Map.ofEntries(
-          Map.entry("chartNameMismatch", OciErrorCode.NAME_INVALID),
-          Map.entry("manifestNameTooLong", OciErrorCode.NAME_INVALID),
-          Map.entry("dockerImageNameInvalid", OciErrorCode.NAME_INVALID),
-          Map.entry("dockerReferenceInvalid", OciErrorCode.TAG_INVALID),
-          Map.entry("dockerDigestInvalid", OciErrorCode.DIGEST_INVALID),
-          Map.entry("paginationNumberInvalid", OciErrorCode.PAGINATION_NUMBER_INVALID),
-          Map.entry("dockerDigestAlgorithmUnsupported", OciErrorCode.DIGEST_INVALID),
-          Map.entry("dockerMediaTypeTooLong", OciErrorCode.MANIFEST_INVALID),
-          Map.entry("dockerPlatformTooLong", OciErrorCode.MANIFEST_INVALID),
-          Map.entry("manifestInvalidJson", OciErrorCode.MANIFEST_INVALID),
-          Map.entry("manifestLayersMissing", OciErrorCode.MANIFEST_INVALID),
-          Map.entry("manifestChartLayerMissing", OciErrorCode.MANIFEST_INVALID),
-          Map.entry("manifestLayerInvalid", OciErrorCode.MANIFEST_INVALID),
-          Map.entry("digestMismatch", OciErrorCode.DIGEST_INVALID),
-          Map.entry("blobDigestUnsupported", OciErrorCode.DIGEST_INVALID),
-          Map.entry("manifestNotFound", OciErrorCode.MANIFEST_UNKNOWN),
-          Map.entry("tagNotFound", OciErrorCode.MANIFEST_UNKNOWN),
-          Map.entry("imageNotFound", OciErrorCode.NAME_UNKNOWN),
-          Map.entry("unknownPath", OciErrorCode.NAME_UNKNOWN));
+          Map.entry(ProtocolErrorCodes.CHART_NAME_MISMATCH, OciErrorCode.NAME_INVALID),
+          Map.entry(ProtocolErrorCodes.MANIFEST_NAME_TOO_LONG, OciErrorCode.NAME_INVALID),
+          Map.entry(ProtocolErrorCodes.DOCKER_IMAGE_NAME_INVALID, OciErrorCode.NAME_INVALID),
+          Map.entry(ProtocolErrorCodes.DOCKER_REFERENCE_INVALID, OciErrorCode.TAG_INVALID),
+          Map.entry(ProtocolErrorCodes.DOCKER_DIGEST_INVALID, OciErrorCode.DIGEST_INVALID),
+          Map.entry(
+              ProtocolErrorCodes.PAGINATION_NUMBER_INVALID, OciErrorCode.PAGINATION_NUMBER_INVALID),
+          Map.entry(
+              ProtocolErrorCodes.DOCKER_DIGEST_ALGORITHM_UNSUPPORTED, OciErrorCode.DIGEST_INVALID),
+          Map.entry(ProtocolErrorCodes.DOCKER_MEDIA_TYPE_TOO_LONG, OciErrorCode.MANIFEST_INVALID),
+          Map.entry(ProtocolErrorCodes.DOCKER_PLATFORM_TOO_LONG, OciErrorCode.MANIFEST_INVALID),
+          Map.entry(ProtocolErrorCodes.MANIFEST_INVALID_JSON, OciErrorCode.MANIFEST_INVALID),
+          Map.entry(ProtocolErrorCodes.MANIFEST_LAYERS_MISSING, OciErrorCode.MANIFEST_INVALID),
+          Map.entry(ProtocolErrorCodes.MANIFEST_CHART_LAYER_MISSING, OciErrorCode.MANIFEST_INVALID),
+          Map.entry(ProtocolErrorCodes.MANIFEST_LAYER_INVALID, OciErrorCode.MANIFEST_INVALID),
+          Map.entry(ProtocolErrorCodes.DIGEST_MISMATCH, OciErrorCode.DIGEST_INVALID),
+          Map.entry(ProtocolErrorCodes.BLOB_DIGEST_UNSUPPORTED, OciErrorCode.DIGEST_INVALID),
+          Map.entry(ProtocolErrorCodes.MANIFEST_NOT_FOUND, OciErrorCode.MANIFEST_UNKNOWN),
+          Map.entry(ProtocolErrorCodes.TAG_NOT_FOUND, OciErrorCode.MANIFEST_UNKNOWN),
+          Map.entry(ProtocolErrorCodes.IMAGE_NOT_FOUND, OciErrorCode.NAME_UNKNOWN),
+          Map.entry(ProtocolErrorCodes.UNKNOWN_PATH, OciErrorCode.NAME_UNKNOWN));
 
-  private static final Set<String> MISSING_BLOB_MSG_IDS = Set.of("blobNotFound", "layerNotFound");
+  private static final Set<String> MISSING_BLOB_MSG_IDS =
+      Set.of(ProtocolErrorCodes.BLOB_NOT_FOUND, ProtocolErrorCodes.LAYER_NOT_FOUND);
 
   /** The codes of the statuses that are not a failure of a named resource. */
   private static final Map<Integer, OciErrorCode> CODE_BY_STATUS =
@@ -114,7 +117,9 @@ public final class OciErrors {
       return response.build();
     }
 
-    return response.contentType(MediaType.APPLICATION_JSON).body(resp.error(ERR_UNAUTHORIZED));
+    return response
+        .contentType(MediaType.APPLICATION_JSON)
+        .body(resp.error(ProtocolErrorCodes.UNAUTHORIZED_REQUEST));
   }
 
   /**

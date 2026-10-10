@@ -33,6 +33,7 @@ import io.repsy.os.server.protocols.maven.shared.keystore.repositories.PgpPublic
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.events.PgpKeySourcesChangedEvent;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -74,21 +75,22 @@ public class KeyStoreService {
     final var allowedKeyserver =
         this.allowedKeyserverRepository
             .findByIdAndActiveTrue(form.getAllowedKeyserverId())
-            .orElseThrow(() -> new ItemNotFoundException("allowedKeyserverNotFound"));
+            .orElseThrow(
+                () -> new ItemNotFoundException(ProtocolErrorCodes.ALLOWED_KEYSERVER_NOT_FOUND));
 
     if (this.hasWellKnownHosts(allowedKeyserver.getHost())) {
-      throw new ItemAlreadyExistException("wellknownKeyStoreHost");
+      throw new ItemAlreadyExistException(ProtocolErrorCodes.WELLKNOWN_KEY_STORE_HOST);
     }
 
     if (this.keyStoreRepository.existsByAllowedKeyserverIdAndRepoId(
         allowedKeyserver.getId(), repoInfo.getStorageKey())) {
-      throw new ItemAlreadyExistException("keyStoreAlreadyExists");
+      throw new ItemAlreadyExistException(ProtocolErrorCodes.KEY_STORE_ALREADY_EXISTS);
     }
 
     final var repo =
         this.repoRepository
             .findById(repoInfo.getStorageKey())
-            .orElseThrow(() -> new ItemNotFoundException("repoNotFound"));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.REPO_NOT_FOUND));
 
     final var keyStore = new KeyStore();
     keyStore.setRepo(repo);
@@ -111,7 +113,7 @@ public class KeyStoreService {
     final var keyStore =
         this.keyStoreRepository
             .findByIdAndRepoId(keyStoreId, repoInfo.getStorageKey())
-            .orElseThrow(() -> new ItemNotFoundException("keyStoreNotFound"));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.KEY_STORE_NOT_FOUND));
 
     return io.repsy.os.generated.model.KeyStoreItem.builder()
         .id(keyStore.getId())
@@ -127,7 +129,7 @@ public class KeyStoreService {
     final var keyStore =
         this.keyStoreRepository
             .findByIdAndRepoId(keyStoreId, repoInfo.getStorageKey())
-            .orElseThrow(() -> new ItemNotFoundException("keyStoreNotFound"));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.KEY_STORE_NOT_FOUND));
 
     this.keyStoreRepository.delete(keyStore);
     this.publishKeySourcesChanged(repoInfo);
@@ -166,7 +168,7 @@ public class KeyStoreService {
   public PgpPublicKeyItem createPublicKey(final RepoInfo repoInfo, final PgpPublicKeyForm form) {
 
     if (form.getArmoredKey() == null || form.getArmoredKey().length() > MAX_ARMORED_KEY_LENGTH) {
-      throw new BadRequestException("pgpPublicKeyInvalid");
+      throw new BadRequestException(ProtocolErrorCodes.PGP_PUBLIC_KEY_INVALID);
     }
 
     final var parsed = PgpVerifierService.parseArmoredPublicKey(form.getArmoredKey());
@@ -177,18 +179,18 @@ public class KeyStoreService {
 
     if (this.pgpPublicKeyRepository.existsByRepoIdAndFingerprint(
         repoInfo.getStorageKey(), parsed.fingerprintHex())) {
-      throw new ItemAlreadyExistException("pgpPublicKeyAlreadyExists");
+      throw new ItemAlreadyExistException(ProtocolErrorCodes.PGP_PUBLIC_KEY_ALREADY_EXISTS);
     }
 
     if (this.pgpPublicKeyRepository.countByRepoId(repoInfo.getStorageKey())
         >= this.caps.getMaxPublicKeysPerRepo()) {
-      throw new BadRequestException("pgpPublicKeyLimitReached");
+      throw new BadRequestException(ProtocolErrorCodes.PGP_PUBLIC_KEY_LIMIT_REACHED);
     }
 
     final var repo =
         this.repoRepository
             .findById(repoInfo.getStorageKey())
-            .orElseThrow(() -> new ItemNotFoundException("repoNotFound"));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.REPO_NOT_FOUND));
 
     final var pgpPublicKey = new PgpPublicKey();
     pgpPublicKey.setRepo(repo);
@@ -208,7 +210,7 @@ public class KeyStoreService {
     return this.pgpPublicKeyRepository
         .findByIdAndRepoId(id, repoInfo.getStorageKey())
         .map(this.artifactConverter::toPgpPublicKeyItemDto)
-        .orElseThrow(() -> new ItemNotFoundException("pgpPublicKeyNotFound"));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.PGP_PUBLIC_KEY_NOT_FOUND));
   }
 
   @Transactional
@@ -217,7 +219,8 @@ public class KeyStoreService {
     final var pgpPublicKey =
         this.pgpPublicKeyRepository
             .findByIdAndRepoId(id, repoInfo.getStorageKey())
-            .orElseThrow(() -> new ItemNotFoundException("pgpPublicKeyNotFound"));
+            .orElseThrow(
+                () -> new ItemNotFoundException(ProtocolErrorCodes.PGP_PUBLIC_KEY_NOT_FOUND));
 
     this.pgpPublicKeyRepository.delete(pgpPublicKey);
     this.pgpVerifierService.evictRegisteredKey(pgpPublicKey.getArmoredKey());

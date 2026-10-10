@@ -33,8 +33,12 @@ import type { Route } from '@playwright/test';
 
 import type { ProblemDetail } from './stub-models.js';
 
-/** The body of a failed panel request (RFC 9457 `application/problem+json`), the spec's `ProblemDetail`. */
-export type ErrorResponse = ProblemDetail;
+/**
+ * The body of a failed panel request (RFC 9457 `application/problem+json`), the spec's `ProblemDetail`. `code` is a
+ * plain string here, not the spec's code enum: a stub may answer a code the server never emits to prove the panel
+ * copes with an unknown one.
+ */
+export type ErrorResponse = Omit<ProblemDetail, 'code'> & { code: string };
 
 /** Answers `route` with `status` and `body` as JSON. `Model` is the generated model the body is an instance of. */
 export async function fulfillJson<Model = never>(
@@ -67,6 +71,6 @@ export async function fulfillText(
  * `code` (which message it shows) and `detail` (the message itself); `status` and `code` are filled in when a stub
  * leaves them out.
  */
-export function errorBody(fields: Partial<ProblemDetail> = {}): ErrorResponse {
+export function errorBody(fields: Partial<ErrorResponse> = {}): ErrorResponse {
   return { status: 500, code: ERROR_CODES.ERROR_OCCURRED, ...fields };
 }

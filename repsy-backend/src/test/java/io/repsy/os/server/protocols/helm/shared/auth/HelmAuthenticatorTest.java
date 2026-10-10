@@ -35,10 +35,10 @@ import io.repsy.os.shared.auth.dtos.AuthenticationType;
 import io.repsy.os.shared.auth.dtos.ProtocolUserClaims;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.TokenRealm;
-import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.user.mappers.UserMapper;
 import io.repsy.os.shared.user.repositories.UserRepository;
 import io.repsy.os.shared.user.services.UserTxService;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.util.Optional;
 import java.util.UUID;
@@ -71,7 +71,7 @@ class HelmAuthenticatorTest {
   private static void assertUnauthorized(final ThrowingCallable call) {
     assertThatThrownBy(call)
         .isExactlyInstanceOf(UnAuthorizedException.class)
-        .hasMessage(ErrorConstants.UN_AUTHORIZED);
+        .hasMessage(ProtocolErrorCodes.UN_AUTHORIZED);
   }
 
   /** RPS-986: an anonymous token is minted by Docker; its username claim is only a label. */

@@ -37,8 +37,8 @@ import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.libs.multiport.configs.props.MultiPortProperties;
 import io.repsy.libs.storage.core.exceptions.InvalidStoragePathException;
 import io.repsy.libs.storage.core.exceptions.StorageUnavailableException;
-import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.utils.MultiPortNames;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.exceptions.TooManyRequestsException;
 import jakarta.persistence.LockTimeoutException;
 import jakarta.persistence.OptimisticLockException;
@@ -98,27 +98,6 @@ public class ErrorHandler {
 
   private static final @NonNull String PANEL_AUTH_CHALLENGE = "Bearer";
 
-  private static final @NonNull String ERR_BAD_REQUEST = "badRequest";
-  private static final @NonNull String ERR_VALIDATION = "validationError";
-  private static final @NonNull String ERR_ITEM_NOT_FOUND = "itemNotFound";
-  private static final @NonNull String ERR_ERROR_OCCURRED = "errorOccurred";
-  private static final @NonNull String ERR_METHOD_NOT_SUPPORTED = "methodNotSupported";
-  private static final @NonNull String ERR_UNSUPPORTED_MEDIA_TYPE = "unsupportedMediaType";
-  private static final @NonNull String ERR_NOT_ACCEPTABLE = "notAcceptable";
-  private static final @NonNull String ERR_PAYLOAD_TOO_LARGE = "payloadTooLarge";
-  private static final @NonNull String ERR_ACCESS_NOT_ALLOWED = "accessNotAllowed";
-  private static final @NonNull String ERR_UNAUTHORIZED = "unauthorizedRequest";
-  private static final @NonNull String ERR_PANEL_LOGIN_REQUIRED = "loginRequired";
-  private static final @NonNull String ERR_ITEM_ALREADY_EXISTS = "itemAlreadyExists";
-  private static final @NonNull String ERR_MOVED_TO_PATH = "movedToPath";
-  private static final @NonNull String ERR_MFA_EXCEPTION = "mfaException";
-  private static final @NonNull String ERR_SIGNATURE_NOT_VERIFIED = "artifactSignatureNotVerified";
-  private static final @NonNull String ERR_MISSING_REQUEST_HEADER = "missingRequestHeader";
-  private static final @NonNull String ERR_SCAN_EXECUTOR_SATURATED = "scanExecutorSaturated";
-  private static final @NonNull String ERR_TOO_MANY_REQUESTS = "tooManyRequests";
-  private static final @NonNull String ERR_CONCURRENT_MODIFICATION = "concurrentModification";
-  private static final @NonNull String ERR_RESOURCE_BUSY = "resourceBusy";
-
   /** Seconds a client is told to wait before it repeats a request that lost a lock race. */
   private static final @NonNull String LOCK_FAILURE_RETRY_AFTER = "1";
 
@@ -175,7 +154,9 @@ public class ErrorHandler {
 
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
         .contentType(this.contentType(request))
-        .body(this.error(request, HttpStatus.BAD_REQUEST, ERR_BAD_REQUEST, ex.getMessage()));
+        .body(
+            this.error(
+                request, HttpStatus.BAD_REQUEST, ProtocolErrorCodes.BAD_REQUEST, ex.getMessage()));
   }
 
   @ExceptionHandler(Throwable.class)
@@ -207,7 +188,9 @@ public class ErrorHandler {
 
     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
         .contentType(this.contentType(request))
-        .body(this.error(request, HttpStatus.INTERNAL_SERVER_ERROR, ERR_ERROR_OCCURRED));
+        .body(
+            this.error(
+                request, HttpStatus.INTERNAL_SERVER_ERROR, ProtocolErrorCodes.ERROR_OCCURRED));
   }
 
   @ExceptionHandler(AccessNotAllowedException.class)
@@ -223,7 +206,8 @@ public class ErrorHandler {
     }
 
     final var exceptionMessage = ex.getMessage();
-    final var messageText = exceptionMessage != null ? exceptionMessage : ERR_ACCESS_NOT_ALLOWED;
+    final var messageText =
+        exceptionMessage != null ? exceptionMessage : ProtocolErrorCodes.ACCESS_NOT_ALLOWED;
 
     log.info(exceptionToString(ex, request));
 
@@ -247,7 +231,12 @@ public class ErrorHandler {
 
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
         .contentType(this.contentType(request))
-        .body(this.error(request, HttpStatus.BAD_REQUEST, "invalidStoragePath", ex.getMessage()));
+        .body(
+            this.error(
+                request,
+                HttpStatus.BAD_REQUEST,
+                ProtocolErrorCodes.INVALID_STORAGE_PATH,
+                ex.getMessage()));
   }
 
   @ExceptionHandler(BadRequestException.class)
@@ -263,7 +252,8 @@ public class ErrorHandler {
     }
 
     final var exceptionMessage = ex.getMessage();
-    final var messageText = exceptionMessage != null ? exceptionMessage : ERR_BAD_REQUEST;
+    final var messageText =
+        exceptionMessage != null ? exceptionMessage : ProtocolErrorCodes.BAD_REQUEST;
 
     log.info(exceptionToString(ex, request));
 
@@ -286,7 +276,9 @@ public class ErrorHandler {
 
     final var exceptionMessage = ex.getMessage();
     final var messageText =
-        exceptionMessage != null ? exceptionMessage : ERR_SIGNATURE_NOT_VERIFIED;
+        exceptionMessage != null
+            ? exceptionMessage
+            : ProtocolErrorCodes.ARTIFACT_SIGNATURE_NOT_VERIFIED;
 
     log.info(exceptionToString(ex, request));
 
@@ -311,7 +303,12 @@ public class ErrorHandler {
 
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
         .contentType(this.contentType(request))
-        .body(this.error(request, HttpStatus.BAD_REQUEST, ERR_VALIDATION, ex.getMessage()));
+        .body(
+            this.error(
+                request,
+                HttpStatus.BAD_REQUEST,
+                ProtocolErrorCodes.VALIDATION_ERROR,
+                ex.getMessage()));
   }
 
   @ExceptionHandler(MethodArgumentTypeMismatchException.class)
@@ -330,7 +327,12 @@ public class ErrorHandler {
 
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
         .contentType(this.contentType(request))
-        .body(this.error(request, HttpStatus.BAD_REQUEST, ERR_VALIDATION, ex.getName()));
+        .body(
+            this.error(
+                request,
+                HttpStatus.BAD_REQUEST,
+                ProtocolErrorCodes.VALIDATION_ERROR,
+                ex.getName()));
   }
 
   /**
@@ -365,7 +367,7 @@ public class ErrorHandler {
             this.error(
                 request,
                 HttpStatus.BAD_REQUEST,
-                ERR_VALIDATION,
+                ProtocolErrorCodes.VALIDATION_ERROR,
                 invalidParameters,
                 this.fieldsOf(ex)));
   }
@@ -392,7 +394,12 @@ public class ErrorHandler {
 
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
         .contentType(this.contentType(request))
-        .body(this.error(request, HttpStatus.BAD_REQUEST, ERR_VALIDATION, ex.getParameterNames()));
+        .body(
+            this.error(
+                request,
+                HttpStatus.BAD_REQUEST,
+                ProtocolErrorCodes.VALIDATION_ERROR,
+                ex.getParameterNames()));
   }
 
   @ExceptionHandler(ErrorOccurredException.class)
@@ -408,7 +415,8 @@ public class ErrorHandler {
     }
 
     final var exceptionMessage = ex.getMessage();
-    final var messageText = exceptionMessage != null ? exceptionMessage : ERR_ERROR_OCCURRED;
+    final var messageText =
+        exceptionMessage != null ? exceptionMessage : ProtocolErrorCodes.ERROR_OCCURRED;
 
     log.error(exceptionToString(ex, request));
 
@@ -437,7 +445,7 @@ public class ErrorHandler {
     return ResponseEntity.status(HttpStatus.MOVED_PERMANENTLY)
         .contentType(this.contentType(request))
         .headers(headers)
-        .body(this.error(request, HttpStatus.MOVED_PERMANENTLY, ERR_MOVED_TO_PATH));
+        .body(this.error(request, HttpStatus.MOVED_PERMANENTLY, ProtocolErrorCodes.MOVED_TO_PATH));
   }
 
   @ExceptionHandler(HttpMessageNotReadableException.class)
@@ -456,7 +464,7 @@ public class ErrorHandler {
 
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
         .contentType(this.contentType(request))
-        .body(this.error(request, HttpStatus.BAD_REQUEST, ERR_VALIDATION));
+        .body(this.error(request, HttpStatus.BAD_REQUEST, ProtocolErrorCodes.VALIDATION_ERROR));
   }
 
   /**
@@ -483,7 +491,9 @@ public class ErrorHandler {
     return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
         .headers(ex.getHeaders())
         .contentType(this.contentType(request))
-        .body(this.error(request, HttpStatus.METHOD_NOT_ALLOWED, ERR_METHOD_NOT_SUPPORTED));
+        .body(
+            this.error(
+                request, HttpStatus.METHOD_NOT_ALLOWED, ProtocolErrorCodes.METHOD_NOT_SUPPORTED));
   }
 
   @ExceptionHandler(ItemNotFoundException.class)
@@ -499,7 +509,8 @@ public class ErrorHandler {
     }
 
     final var exceptionMessage = ex.getMessage();
-    final var messageText = exceptionMessage != null ? exceptionMessage : ERR_ITEM_NOT_FOUND;
+    final var messageText =
+        exceptionMessage != null ? exceptionMessage : ProtocolErrorCodes.ITEM_NOT_FOUND;
 
     log.info(exceptionToString(ex, request));
 
@@ -524,7 +535,7 @@ public class ErrorHandler {
 
     return ResponseEntity.status(HttpStatus.NOT_FOUND)
         .contentType(this.contentType(request))
-        .body(this.error(request, HttpStatus.NOT_FOUND, ERR_ITEM_NOT_FOUND));
+        .body(this.error(request, HttpStatus.NOT_FOUND, ProtocolErrorCodes.ITEM_NOT_FOUND));
   }
 
   @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -543,7 +554,13 @@ public class ErrorHandler {
 
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
         .contentType(this.contentType(request))
-        .body(this.error(request, HttpStatus.BAD_REQUEST, ERR_VALIDATION, null, fieldsOf(ex)));
+        .body(
+            this.error(
+                request,
+                HttpStatus.BAD_REQUEST,
+                ProtocolErrorCodes.VALIDATION_ERROR,
+                null,
+                fieldsOf(ex)));
   }
 
   @ExceptionHandler(MissingServletRequestParameterException.class)
@@ -562,7 +579,12 @@ public class ErrorHandler {
 
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
         .contentType(this.contentType(request))
-        .body(this.error(request, HttpStatus.BAD_REQUEST, ERR_VALIDATION, ex.getParameterName()));
+        .body(
+            this.error(
+                request,
+                HttpStatus.BAD_REQUEST,
+                ProtocolErrorCodes.VALIDATION_ERROR,
+                ex.getParameterName()));
   }
 
   @ExceptionHandler(UnAuthorizedException.class)
@@ -601,15 +623,19 @@ public class ErrorHandler {
 
     final var exceptionMessage = ex.getMessage();
 
-    if (ErrorConstants.UN_AUTHORIZED.equals(exceptionMessage) && this.isPanelRequest(request)) {
+    if (ProtocolErrorCodes.UN_AUTHORIZED.equals(exceptionMessage) && this.isPanelRequest(request)) {
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
           .contentType(this.contentType(request))
           .body(
               this.error(
-                  request, HttpStatus.UNAUTHORIZED, ERR_PANEL_LOGIN_REQUIRED, exceptionMessage));
+                  request,
+                  HttpStatus.UNAUTHORIZED,
+                  ProtocolErrorCodes.LOGIN_REQUIRED,
+                  exceptionMessage));
     }
 
-    final var messageText = exceptionMessage != null ? exceptionMessage : ERR_UNAUTHORIZED;
+    final var messageText =
+        exceptionMessage != null ? exceptionMessage : ProtocolErrorCodes.UNAUTHORIZED_REQUEST;
 
     return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
         .contentType(this.contentType(request))
@@ -641,7 +667,9 @@ public class ErrorHandler {
     return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
         .contentType(this.contentType(request))
         .header(HttpHeaders.RETRY_AFTER, Long.toString(ex.getRetryAfterSeconds()))
-        .body(this.error(request, HttpStatus.TOO_MANY_REQUESTS, ERR_TOO_MANY_REQUESTS));
+        .body(
+            this.error(
+                request, HttpStatus.TOO_MANY_REQUESTS, ProtocolErrorCodes.TOO_MANY_REQUESTS));
   }
 
   /**
@@ -753,7 +781,8 @@ public class ErrorHandler {
       final @NonNull String msgId, final @Nullable String data, final @Nullable String text) {
 
     if (data == null
-        || !(ERR_VALIDATION.equals(msgId) || ERR_MISSING_REQUEST_HEADER.equals(msgId))
+        || !(ProtocolErrorCodes.VALIDATION_ERROR.equals(msgId)
+            || ProtocolErrorCodes.MISSING_REQUEST_HEADER.equals(msgId))
         || !isFieldList(data, msgId)) {
       return List.of();
     }
@@ -799,7 +828,7 @@ public class ErrorHandler {
                   error.getDefaultMessage()));
         }
       } else if (result.getResolvableErrors().isEmpty()) {
-        fields.add(new ProblemField(parameter, ERR_VALIDATION, null));
+        fields.add(new ProblemField(parameter, ProtocolErrorCodes.VALIDATION_ERROR, null));
       } else {
         for (final var error : result.getResolvableErrors()) {
           fields.add(
@@ -847,7 +876,7 @@ public class ErrorHandler {
       return codes[codes.length - 1];
     }
 
-    return fallback != null ? fallback : ERR_VALIDATION;
+    return fallback != null ? fallback : ProtocolErrorCodes.VALIDATION_ERROR;
   }
 
   /**
@@ -874,7 +903,11 @@ public class ErrorHandler {
     return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
         .headers(ex.getHeaders())
         .contentType(this.contentType(request))
-        .body(this.error(request, HttpStatus.UNSUPPORTED_MEDIA_TYPE, ERR_UNSUPPORTED_MEDIA_TYPE));
+        .body(
+            this.error(
+                request,
+                HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+                ProtocolErrorCodes.UNSUPPORTED_MEDIA_TYPE));
   }
 
   /**
@@ -902,7 +935,7 @@ public class ErrorHandler {
     return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE)
         .headers(ex.getHeaders())
         .contentType(this.contentType(request))
-        .body(this.error(request, HttpStatus.NOT_ACCEPTABLE, ERR_NOT_ACCEPTABLE));
+        .body(this.error(request, HttpStatus.NOT_ACCEPTABLE, ProtocolErrorCodes.NOT_ACCEPTABLE));
   }
 
   /**
@@ -928,7 +961,9 @@ public class ErrorHandler {
 
     return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
         .contentType(this.contentType(request))
-        .body(this.error(request, HttpStatus.PAYLOAD_TOO_LARGE, ERR_PAYLOAD_TOO_LARGE));
+        .body(
+            this.error(
+                request, HttpStatus.PAYLOAD_TOO_LARGE, ProtocolErrorCodes.PAYLOAD_TOO_LARGE));
   }
 
   /**
@@ -954,7 +989,7 @@ public class ErrorHandler {
 
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
         .contentType(this.contentType(request))
-        .body(this.error(request, HttpStatus.BAD_REQUEST, ERR_BAD_REQUEST));
+        .body(this.error(request, HttpStatus.BAD_REQUEST, ProtocolErrorCodes.BAD_REQUEST));
   }
 
   /**
@@ -981,7 +1016,11 @@ public class ErrorHandler {
         .contentType(this.contentType(request))
         .body(
             this.error(
-                request, HttpStatus.BAD_REQUEST, ERR_VALIDATION, ex.getMessage(), fieldsOf(ex)));
+                request,
+                HttpStatus.BAD_REQUEST,
+                ProtocolErrorCodes.VALIDATION_ERROR,
+                ex.getMessage(),
+                fieldsOf(ex)));
   }
 
   @ExceptionHandler(ItemAlreadyExistException.class)
@@ -996,7 +1035,8 @@ public class ErrorHandler {
     }
 
     final var exceptionMessage = ex.getMessage();
-    final var messageText = exceptionMessage != null ? exceptionMessage : ERR_ITEM_ALREADY_EXISTS;
+    final var messageText =
+        exceptionMessage != null ? exceptionMessage : ProtocolErrorCodes.ITEM_ALREADY_EXISTS;
 
     log.info(exceptionToString(ex, request));
 
@@ -1047,10 +1087,10 @@ public class ErrorHandler {
 
     if (ConstraintViolations.SQL_STATE_VALUE_TOO_LONG.equals(sqlState)) {
       status = HttpStatus.BAD_REQUEST;
-      msgId = ERR_VALIDATION;
+      msgId = ProtocolErrorCodes.VALIDATION_ERROR;
     } else if (ConstraintViolations.SQL_STATE_UNIQUE_VIOLATION.equals(sqlState)) {
       status = HttpStatus.CONFLICT;
-      msgId = ERR_ITEM_ALREADY_EXISTS;
+      msgId = ProtocolErrorCodes.ITEM_ALREADY_EXISTS;
     } else {
       return this.defaultExceptionHandler(ex, request, response);
     }
@@ -1106,13 +1146,14 @@ public class ErrorHandler {
 
     if (!this.isPanelRequest(request)) {
       return this.retryLater(
-          this.error(request, HttpStatus.SERVICE_UNAVAILABLE, ERR_CONCURRENT_MODIFICATION),
+          this.error(
+              request, HttpStatus.SERVICE_UNAVAILABLE, ProtocolErrorCodes.CONCURRENT_MODIFICATION),
           request);
     }
 
     return ResponseEntity.status(HttpStatus.CONFLICT)
         .contentType(this.contentType(request))
-        .body(this.error(request, HttpStatus.CONFLICT, ERR_CONCURRENT_MODIFICATION));
+        .body(this.error(request, HttpStatus.CONFLICT, ProtocolErrorCodes.CONCURRENT_MODIFICATION));
   }
 
   /**
@@ -1155,7 +1196,8 @@ public class ErrorHandler {
     log.warn("Database lock unavailable: {}", exceptionToString(ex, request));
 
     return this.retryLater(
-        this.error(request, HttpStatus.SERVICE_UNAVAILABLE, ERR_RESOURCE_BUSY), request);
+        this.error(request, HttpStatus.SERVICE_UNAVAILABLE, ProtocolErrorCodes.RESOURCE_BUSY),
+        request);
   }
 
   /** A 503 that tells the client to repeat the request after {@code Retry-After} seconds. */
@@ -1202,7 +1244,8 @@ public class ErrorHandler {
     response.resetBuffer();
 
     return this.retryLater(
-        this.error(request, HttpStatus.SERVICE_UNAVAILABLE, ERR_ERROR_OCCURRED), request);
+        this.error(request, HttpStatus.SERVICE_UNAVAILABLE, ProtocolErrorCodes.ERROR_OCCURRED),
+        request);
   }
 
   @ExceptionHandler(RetryableException.class)
@@ -1225,7 +1268,7 @@ public class ErrorHandler {
             this.error(
                 request,
                 HttpStatus.SERVICE_UNAVAILABLE,
-                ERR_SCAN_EXECUTOR_SATURATED,
+                ProtocolErrorCodes.SCAN_EXECUTOR_SATURATED,
                 ex.getMessage()));
   }
 
@@ -1241,7 +1284,8 @@ public class ErrorHandler {
     }
 
     final var exceptionMessage = ex.getMessage();
-    final var messageText = exceptionMessage != null ? exceptionMessage : ERR_MFA_EXCEPTION;
+    final var messageText =
+        exceptionMessage != null ? exceptionMessage : ProtocolErrorCodes.MFA_EXCEPTION;
 
     log.info(exceptionToString(ex, request));
 
@@ -1282,6 +1326,8 @@ public class ErrorHandler {
 
     return ResponseEntity.status(status)
         .contentType(this.contentType(request))
-        .body(this.error(request, status, ERR_MISSING_REQUEST_HEADER, ex.getHeaderName()));
+        .body(
+            this.error(
+                request, status, ProtocolErrorCodes.MISSING_REQUEST_HEADER, ex.getHeaderName()));
   }
 }

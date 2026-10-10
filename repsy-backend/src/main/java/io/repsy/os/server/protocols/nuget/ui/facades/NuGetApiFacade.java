@@ -27,6 +27,7 @@ import io.repsy.os.server.protocols.nuget.shared.storage.NuGetStorageService;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetVersionInfo;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.io.IOException;
 import java.util.Locale;
 import java.util.UUID;
@@ -80,7 +81,7 @@ public class NuGetApiFacade implements ProtocolApiFacade {
             .filter(NuGetVersionInfo::listed)
             .findFirst()
             .or(() -> versions.stream().findFirst())
-            .orElseThrow(() -> new ItemNotFoundException("packageNotFound"));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.PACKAGE_NOT_FOUND));
 
     // The downloads of the listed versions, as the list counts them.
     final long totalDownloads =
@@ -121,7 +122,7 @@ public class NuGetApiFacade implements ProtocolApiFacade {
     return this.nugetPackageService
         .findVersionInfo(repoInfo, packageId, version)
         .map(this::toVersionInfo)
-        .orElseThrow(() -> new ItemNotFoundException("versionNotFound"));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.VERSION_NOT_FOUND));
   }
 
   public BaseUsages deletePackage(final RepoInfo repoInfo, final String packageId) {

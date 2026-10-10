@@ -19,6 +19,7 @@ import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
 import io.repsy.protocols.npm.protocol.handlers.AbstractNpmTokenRevokeProtocolMethodHandler;
 import io.repsy.protocols.npm.shared.auth.services.NpmTokenRevoker;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.util.Locale;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
@@ -47,7 +48,7 @@ public class NpmTokenRevokeProtocolMethodHandler
   /** The message of the refusal, for example why a deploy token needs no logout (RPS-1391). */
   @Override
   protected String forbiddenText(final @Nullable String msgId) {
-    final var id = msgId == null ? "accessNotAllowed" : msgId;
+    final var id = msgId == null ? ProtocolErrorCodes.ACCESS_NOT_ALLOWED : msgId;
 
     return this.messageSource.getMessage(id, null, id, Locale.getDefault());
   }

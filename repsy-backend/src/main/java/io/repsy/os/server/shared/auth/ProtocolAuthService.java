@@ -44,6 +44,7 @@ import io.repsy.os.shared.token.services.PersonalAccessTokenService;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.os.shared.user.services.UserTxService;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.Credentials;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
@@ -61,8 +62,6 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class ProtocolAuthService {
-
-  private static final @NonNull String ACCESS_DENIED = "accessDenied";
 
   protected final @NonNull UserTxService userTxService;
   protected final @NonNull JwtUtils jwtUtils;
@@ -167,7 +166,7 @@ public class ProtocolAuthService {
 
       // An anonymous token has no user either, so its username claim must not be looked up
       // (RPS-986).
-      case ANONYMOUS -> throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      case ANONYMOUS -> throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
 
       case null, default -> this.authorizeJWTRequest(authHeader, permission);
     }
@@ -185,7 +184,7 @@ public class ProtocolAuthService {
     final var registry = this.revokedTokens;
 
     if (registry != null && registry.isRevoked(token)) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
   }
 
@@ -208,7 +207,7 @@ public class ProtocolAuthService {
       final @NonNull String authHeader,
       final @NonNull UUID repoId,
       final @NonNull Permission permission) {
-    throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+    throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
   }
 
   /**
@@ -248,7 +247,7 @@ public class ProtocolAuthService {
   private @NonNull UnAuthorizedException countedUnAuthorized() {
     this.authFailureThrottle.checkAllowed();
     this.authFailureThrottle.recordFailure();
-    return new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+    return new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
   }
 
   /**
@@ -263,7 +262,7 @@ public class ProtocolAuthService {
       final @NonNull Permission permission) {
 
     if (permission != Permission.READ) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
 
     this.jwtUtils.verifyDownloadToken(token, repoId, path);
@@ -278,7 +277,7 @@ public class ProtocolAuthService {
     final var credentials = extractCredentialsFromBasicToken(basicToken);
 
     if (credentials == null) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
 
     if (this.tryAuthorizeWithPat(repoId, credentials.getPassword(), permission)) {
@@ -301,7 +300,7 @@ public class ProtocolAuthService {
       final @Nullable UserInfo userInfo, final @NonNull Permission permission) {
 
     if (userInfo == null) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
 
     this.checkPermission(userInfo, permission);
@@ -325,7 +324,7 @@ public class ProtocolAuthService {
     if (userInfo != null
         && permission == Permission.MANAGE
         && userInfo.getRole() != UserRole.ADMIN) {
-      throw new AccessNotAllowedException(ACCESS_DENIED);
+      throw new AccessNotAllowedException(ProtocolErrorCodes.ACCESS_DENIED);
     }
 
     return this.authorizeUser(userInfo, permission);
@@ -353,7 +352,7 @@ public class ProtocolAuthService {
           .build();
     }
 
-    throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+    throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
   }
 
   /**
@@ -397,7 +396,7 @@ public class ProtocolAuthService {
             .build();
 
     if (!grants(permissionInfo, permission)) {
-      throw new AccessNotAllowedException(ACCESS_DENIED);
+      throw new AccessNotAllowedException(ProtocolErrorCodes.ACCESS_DENIED);
     }
 
     this.touchPersonalAccessToken(token);
@@ -420,13 +419,13 @@ public class ProtocolAuthService {
   public @NonNull UserInfo authenticateUser(final @Nullable String authHeader) {
 
     if (authHeader == null) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
 
     return switch (authHeader) {
       case final String header when isBasicToken(header) -> this.authenticateWithBasic(header);
       case final String header when isBearerToken(header) -> this.authenticateWithBearer(header);
-      default -> throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      default -> throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     };
   }
 
@@ -511,7 +510,7 @@ public class ProtocolAuthService {
       final @NonNull PersonalAccessTokenInfo token, final @NonNull Permission permission) {
 
     if (!TokenScope.permits(token.scopes(), permission)) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
 
     if (permission == Permission.MANAGE) {
@@ -560,7 +559,7 @@ public class ProtocolAuthService {
 
     this.authorizePersonalAccessToken(
         this.findLivePersonalAccessToken(tokenId)
-            .orElseThrow(() -> new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED)),
+            .orElseThrow(() -> new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED)),
         permission);
   }
 
@@ -600,23 +599,23 @@ public class ProtocolAuthService {
 
     // A deploy token never manages, whatever its read-only flag says (RPS-1424).
     if (permission == Permission.MANAGE) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
 
     final var deployTokenInfo = this.deployTokenService.findByRepoIdAndTokenId(repoId, tokenId);
 
     if (deployTokenInfo.isEmpty()) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
 
     final var deployToken = deployTokenInfo.get();
 
     if (deployToken.isExpired()) {
-      throw new UnAuthorizedException("deployTokenExpired");
+      throw new UnAuthorizedException(ProtocolErrorCodes.DEPLOY_TOKEN_EXPIRED);
     }
 
     if (this.isWritePermissionRequired(permission) && deployToken.isReadOnly()) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
 
     this.deployTokenService.updateLastUsedTime(deployToken.getId());
@@ -631,7 +630,7 @@ public class ProtocolAuthService {
       final @NonNull DeployTokenInfo deployTokenInfo, final @NonNull Permission permission) {
 
     if (deployTokenInfo.isExpired()) {
-      throw new UnAuthorizedException("deployTokenExpired");
+      throw new UnAuthorizedException(ProtocolErrorCodes.DEPLOY_TOKEN_EXPIRED);
     }
 
     this.authorizeDeployToken(deployTokenInfo, permission);
@@ -648,11 +647,11 @@ public class ProtocolAuthService {
       final @NonNull DeployTokenInfo deployTokenInfo, final @NonNull Permission permission) {
 
     if (permission == Permission.MANAGE) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
 
     if (this.isWritePermissionRequired(permission) && deployTokenInfo.isReadOnly()) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
   }
 
@@ -707,7 +706,7 @@ public class ProtocolAuthService {
     final var password = credentials.getPassword();
 
     if (username == null || password == null) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
 
     // A personal access token is not a password: it is never hashed against one (see
@@ -751,7 +750,7 @@ public class ProtocolAuthService {
       // Spend the time of a real check, so an unknown username is as slow as a wrong password.
       PasswordHasher.verifyDummy(password);
       this.authFailureThrottle.recordFailure();
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
 
     // A client that sends Basic credentials on every request would otherwise pay one BCrypt check
@@ -759,7 +758,7 @@ public class ProtocolAuthService {
     // before for a wrong password.
     if (!this.verifiedPasswordCache.matches(userInfo, password)) {
       this.authFailureThrottle.recordFailure();
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
   }
 
@@ -795,7 +794,7 @@ public class ProtocolAuthService {
     final var credentials = extractCredentialsFromAuthHeader(authHeader);
 
     if (credentials == null) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
 
     return this.authenticateWithPassword(credentials);
@@ -840,14 +839,14 @@ public class ProtocolAuthService {
         /* All authenticated users have read/write permission */
       }
       case MANAGE -> this.checkManage(userInfo);
-      default -> throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      default -> throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
   }
 
   private void checkManage(final @NonNull UserInfo userInfo) {
 
     if (userInfo.getRole() != UserRole.ADMIN) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
   }
 }

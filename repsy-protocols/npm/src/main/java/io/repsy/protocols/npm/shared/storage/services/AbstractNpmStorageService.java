@@ -26,6 +26,7 @@ import io.repsy.protocols.npm.shared.utils.NpmPackageUtils;
 import io.repsy.protocols.npm.shared.utils.NpmPackumentBuilder;
 import io.repsy.protocols.npm.shared.utils.NpmTarballFacts;
 import io.repsy.protocols.npm.shared.utils.NpmTarballInspector;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -152,7 +153,7 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
     final var versions = (Map<String, Object>) metadata.get(NpmConstants.VERSIONS);
 
     if (!versions.containsKey(versionName)) {
-      throw new BadRequestException("packageVersionNotFound");
+      throw new BadRequestException(ProtocolErrorCodes.PACKAGE_VERSION_NOT_FOUND);
     }
 
     final var distTags = (Map<String, String>) metadata.get(NpmConstants.DIST_TAGS);
@@ -813,7 +814,7 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
 
     return this.storageStrategy
         .get(storagePath, repoName)
-        .orElseThrow(() -> new ItemNotFoundException("itemNotFound"));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.ITEM_NOT_FOUND));
   }
 
   @Override
@@ -841,7 +842,7 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
       return isAbbreviated ? this.createAbbreviatedMetadata(fullMetadata) : fullMetadata;
 
     } catch (final NoSuchFileException _) {
-      throw new ItemNotFoundException("packageNotFound");
+      throw new ItemNotFoundException(ProtocolErrorCodes.PACKAGE_NOT_FOUND);
     }
   }
 
@@ -865,7 +866,10 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
         stored != null
             ? stored
             : this.rebuildIfPackageExists(
-                repoId, repoName, snapshot, new ItemNotFoundException("itemNotFound"));
+                repoId,
+                repoName,
+                snapshot,
+                new ItemNotFoundException(ProtocolErrorCodes.ITEM_NOT_FOUND));
 
     this.prepareForServing(metadata, repoName);
 
@@ -1057,7 +1061,7 @@ public abstract class AbstractNpmStorageService implements NpmStorageService {
 
     return this.storageStrategy
         .get(storagePath, repoName)
-        .orElseThrow(() -> new ItemNotFoundException("itemNotFound"));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.ITEM_NOT_FOUND));
   }
 
   private long calculateFileUsage(final StoragePath storagePath, final String repoName)

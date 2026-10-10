@@ -22,9 +22,9 @@ import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.os.server.protocols.docker.shared.auth.services.DockerAuthenticator;
 import io.repsy.os.server.shared.auth.AuthChallenges;
 import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
-import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
@@ -121,7 +121,7 @@ public class DockerAuthPreProcessor extends ProtocolProcessor {
     final var authHeader = this.authenticator.emulateAuthHeader(request);
 
     if (authHeader == null) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
 
     this.authenticateRequest(authHeader, repoId, properties);
@@ -131,7 +131,7 @@ public class DockerAuthPreProcessor extends ProtocolProcessor {
       final String authHeader, final UUID repoId, final Map<String, Object> properties) {
 
     if (!authHeader.startsWith(AUTH_BEARER)) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
 
     final var permission = (Permission) properties.get(PERMISSION_KEY);

@@ -28,6 +28,7 @@ import io.repsy.protocols.golang.shared.storage.services.GoStorageService;
 import io.repsy.protocols.golang.shared.utils.GoModuleHashCalculator;
 import io.repsy.protocols.golang.shared.utils.GoModuleZipReader;
 import io.repsy.protocols.golang.shared.utils.GoVersionUtils;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.EntryTooLargeException;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
@@ -126,13 +127,13 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
 
     final var inputStream =
         RequestBodies.nonEmpty(requestBody)
-            .orElseThrow(() -> new BadRequestException("goModuleZipEmpty"));
+            .orElseThrow(() -> new BadRequestException(ProtocolErrorCodes.GO_MODULE_ZIP_EMPTY));
     final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     final var path = ProtocolContextUtils.getRelativePath(context).getPath();
     final var modulePath = GoVersionUtils.extractModulePath(path);
 
     if (modulePath == null) {
-      throw new BadRequestException("invalidModulePath");
+      throw new BadRequestException(ProtocolErrorCodes.INVALID_MODULE_PATH);
     }
 
     final var version = GoVersionUtils.extractVersionFromPath(path);
@@ -247,13 +248,13 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
    */
   private static void rejectInvalidIdentifiers(final String decodedPath, final String version) {
     if (decodedPath.length() > GoVersionUtils.MAX_MODULE_PATH_LENGTH) {
-      throw new BadRequestException("modulePathTooLong");
+      throw new BadRequestException(ProtocolErrorCodes.MODULE_PATH_TOO_LONG);
     }
     if (version.length() > GoVersionUtils.MAX_VERSION_LENGTH) {
-      throw new BadRequestException("moduleVersionTooLong");
+      throw new BadRequestException(ProtocolErrorCodes.MODULE_VERSION_TOO_LONG);
     }
     if (!GoVersionUtils.isValidSemver(version)) {
-      throw new BadRequestException("invalidModuleVersion");
+      throw new BadRequestException(ProtocolErrorCodes.INVALID_MODULE_VERSION);
     }
   }
 
@@ -273,7 +274,7 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
       // 404 (or 410) for that, because the go command only tries the next GOPROXY entry after
       // one, and takes an empty 200 as a real answer of "no versions" (RPS-1428). A module whose
       // last version was deleted is the same case: its rows and files are gone with the version.
-      throw new ItemNotFoundException("itemNotFound");
+      throw new ItemNotFoundException(ProtocolErrorCodes.ITEM_NOT_FOUND);
     }
 
     return new ByteArrayResource(fallbackVersions.getBytes(StandardCharsets.UTF_8));
@@ -305,7 +306,7 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
     final var latestVersion =
         this.goModuleService
             .findLatestPublishedVersion(repoInfo, decodedModulePath)
-            .orElseThrow(() -> new ItemNotFoundException("itemNotFound"));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.ITEM_NOT_FOUND));
 
     final var infoPath =
         PATH_SEPARATOR + escapedModulePath + "/@v/" + latestVersion + INFO_EXTENSION;
@@ -405,7 +406,7 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
       return;
     }
     if (!computedHex.equals(expected.toLowerCase(Locale.ROOT))) {
-      throw new BadRequestException("sha256Mismatch");
+      throw new BadRequestException(ProtocolErrorCodes.SHA256_MISMATCH);
     }
   }
 }

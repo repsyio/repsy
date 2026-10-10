@@ -30,12 +30,12 @@ import io.repsy.os.panel.profile.services.ProfileService;
 import io.repsy.os.shared.auth.PanelAuthHelper;
 import io.repsy.os.shared.auth.dtos.PanelTokenClaims;
 import io.repsy.os.shared.auth.utils.JwtUtils;
-import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.mappers.UserMapper;
 import io.repsy.os.shared.user.repositories.UserRepository;
 import io.repsy.os.shared.user.services.UserTxService;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -132,7 +132,7 @@ class ProfileControllerTest {
 
     assertThatThrownBy(() -> this.controller.deleteProfile(AUTH_HEADER))
         .isExactlyInstanceOf(UnAuthorizedException.class)
-        .hasMessage(ErrorConstants.UN_AUTHORIZED);
+        .hasMessage(ProtocolErrorCodes.UN_AUTHORIZED);
     verify(this.userRepository, never()).delete(any());
   }
 }
