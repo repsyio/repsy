@@ -40,11 +40,13 @@ import io.repsy.core.error_handling.exceptions.RetryableException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.multiport.annotations.RestApiPort;
+import io.repsy.os.shared.error_handling.services.ErrorResponseService;
 import io.repsy.protocols.shared.exceptions.TooManyRequestsException;
 import jakarta.persistence.LockTimeoutException;
 import jakarta.persistence.OptimisticLockException;
 import jakarta.persistence.PessimisticLockException;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
@@ -91,38 +93,53 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
- * Drives {@link ErrorHandler} through real Spring MVC argument resolution, so each test shows which
- * exception class MVC throws and which handler answers it. No Docker or application context needed.
+ * Drives {@link PanelProblemDetailAdvice} and {@link ProtocolErrorAdvice} through real Spring MVC
+ * argument resolution, so each test shows which exception class MVC throws and which handler
+ * answers it. No Docker or application context needed.
  */
-class ErrorHandlerTest {
+class ErrorAdviceTest {
 
   private MockMvc mockMvc;
 
   private final ListAppender<ILoggingEvent> logEvents = new ListAppender<>();
-  private final Logger handlerLogger = (Logger) LoggerFactory.getLogger(ErrorHandler.class);
-  private Level originalLevel;
+  private final List<Logger> handlerLoggers =
+      List.of(
+          (Logger) LoggerFactory.getLogger(PanelProblemDetailAdvice.class),
+          (Logger) LoggerFactory.getLogger(ProtocolErrorAdvice.class),
+          (Logger) LoggerFactory.getLogger(ErrorResponseService.class));
+  private final List<Level> originalLevels = new ArrayList<>();
 
   @BeforeEach
   void setUp() {
     final var messageSource = new ResourceBundleMessageSource();
     messageSource.setBasename("messages");
 
+    final var errors = new ErrorResponseService(new RestResponseFactory(messageSource));
+
     this.mockMvc =
         MockMvcBuilders.standaloneSetup(new ThrowingController(), new PanelController())
-            .setControllerAdvice(new ErrorHandler(new RestResponseFactory(messageSource)))
+            .setControllerAdvice(
+                new PanelProblemDetailAdvice(errors), new ProtocolErrorAdvice(errors))
             .build();
 
-    this.originalLevel = this.handlerLogger.getLevel();
-    this.handlerLogger.setLevel(Level.DEBUG);
     this.logEvents.start();
-    this.handlerLogger.addAppender(this.logEvents);
+
+    for (final var logger : this.handlerLoggers) {
+      this.originalLevels.add(logger.getLevel());
+      logger.setLevel(Level.DEBUG);
+      logger.addAppender(this.logEvents);
+    }
   }
 
   @AfterEach
   void releaseLogs() {
-    this.handlerLogger.detachAppender(this.logEvents);
+    for (int i = 0; i < this.handlerLoggers.size(); i++) {
+      this.handlerLoggers.get(i).detachAppender(this.logEvents);
+      this.handlerLoggers.get(i).setLevel(this.originalLevels.get(i));
+    }
+
+    this.originalLevels.clear();
     this.logEvents.stop();
-    this.handlerLogger.setLevel(this.originalLevel);
   }
 
   @Test
@@ -248,20 +265,24 @@ class ErrorHandlerTest {
   @Test
   @DisplayName("does not render 4xx failures of the request when no servlet response is available")
   void clientFailuresWithoutResponse() {
-    final var handler =
-        new ErrorHandler(new RestResponseFactory(new ResourceBundleMessageSource()));
+    final var errors =
+        new ErrorResponseService(new RestResponseFactory(new ResourceBundleMessageSource()));
+    final var panel = new PanelProblemDetailAdvice(errors);
+    final var protocol = new ProtocolErrorAdvice(errors);
     final var request = new MockHttpServletRequest();
 
-    assertThat(handler.handleException(new MaxUploadSizeExceededException(1024), request, null))
+    assertThat(
+            panel.handleMaxUploadSizeExceeded(
+                new MaxUploadSizeExceededException(1024), request, null))
         .isNull();
     assertThat(
-            handler.handleException(
+            panel.handleMediaTypeNotAcceptable(
                 new HttpMediaTypeNotAcceptableException(List.of(MediaType.APPLICATION_JSON)),
                 request,
                 null))
         .isNull();
     assertThat(
-            handler.handleException(
+            panel.handleUnsatisfiedServletRequestParameter(
                 new UnsatisfiedServletRequestParameterException(new String[] {"name"}, Map.of()),
                 request,
                 null))
@@ -394,11 +415,13 @@ class ErrorHandlerTest {
   @Test
   @DisplayName("does not render a constraint violation when no servlet response is available")
   void violationWithoutResponse() {
-    final var handler =
-        new ErrorHandler(new RestResponseFactory(new ResourceBundleMessageSource()));
+    final var errors =
+        new ErrorResponseService(new RestResponseFactory(new ResourceBundleMessageSource()));
+    final var panel = new PanelProblemDetailAdvice(errors);
+    final var protocol = new ProtocolErrorAdvice(errors);
 
     assertThat(
-            handler.handleException(
+            protocol.handleDataIntegrityViolation(
                 new DataIntegrityViolationException("boom", new SQLException("boom", "23505")),
                 new MockHttpServletRequest(),
                 null))
@@ -470,11 +493,13 @@ class ErrorHandlerTest {
   @Test
   @DisplayName("does not render an optimistic-lock failure when no servlet response is available")
   void optimisticLockFailureWithoutResponse() {
-    final var handler =
-        new ErrorHandler(new RestResponseFactory(new ResourceBundleMessageSource()));
+    final var errors =
+        new ErrorResponseService(new RestResponseFactory(new ResourceBundleMessageSource()));
+    final var panel = new PanelProblemDetailAdvice(errors);
+    final var protocol = new ProtocolErrorAdvice(errors);
 
     assertThat(
-            handler.handleOptimisticLockFailure(
+            protocol.handleOptimisticLockFailure(
                 new OptimisticLockingFailureException("stale"), new MockHttpServletRequest(), null))
         .isNull();
   }
@@ -542,15 +567,18 @@ class ErrorHandlerTest {
   @Test
   @DisplayName("does not render a lock failure when no servlet response is available")
   void lockFailuresWithoutResponse() {
-    final var handler =
-        new ErrorHandler(new RestResponseFactory(new ResourceBundleMessageSource()));
+    final var errors =
+        new ErrorResponseService(new RestResponseFactory(new ResourceBundleMessageSource()));
+    final var panel = new PanelProblemDetailAdvice(errors);
+    final var protocol = new ProtocolErrorAdvice(errors);
     final var request = new MockHttpServletRequest();
 
     assertThat(
-            handler.handleLockUnavailable(new CannotAcquireLockException("timeout"), request, null))
+            protocol.handleLockUnavailable(
+                new CannotAcquireLockException("timeout"), request, null))
         .isNull();
     assertThat(
-            handler.handleOptimisticLockFailure(
+            protocol.handleOptimisticLockFailure(
                 new OptimisticLockException("stale"), request, null))
         .isNull();
   }
@@ -595,11 +623,13 @@ class ErrorHandlerTest {
   @Test
   @DisplayName("leaves a 429 to the caller when there is no response to write")
   void tooManyRequestsWithoutResponse() {
-    final var handler =
-        new ErrorHandler(new RestResponseFactory(new ResourceBundleMessageSource()));
+    final var errors =
+        new ErrorResponseService(new RestResponseFactory(new ResourceBundleMessageSource()));
+    final var panel = new PanelProblemDetailAdvice(errors);
+    final var protocol = new ProtocolErrorAdvice(errors);
 
     assertThat(
-            handler.handleException(
+            protocol.handleTooManyRequests(
                 new TooManyRequestsException(1), new MockHttpServletRequest(), null))
         .isNull();
   }
@@ -721,11 +751,13 @@ class ErrorHandlerTest {
   @Test
   @DisplayName("does not render a retryable failure when no servlet response is available")
   void retryableFailureWithoutResponse() {
-    final var handler =
-        new ErrorHandler(new RestResponseFactory(new ResourceBundleMessageSource()));
+    final var errors =
+        new ErrorResponseService(new RestResponseFactory(new ResourceBundleMessageSource()));
+    final var panel = new PanelProblemDetailAdvice(errors);
+    final var protocol = new ProtocolErrorAdvice(errors);
 
     assertThat(
-            handler.handleException(
+            protocol.handleRetryable(
                 new RetryableException("scanExecutorSaturated"),
                 new MockHttpServletRequest(),
                 null))
@@ -736,20 +768,22 @@ class ErrorHandlerTest {
   @DisplayName(
       "logs a debug message that names the exception when no servlet response is available")
   void debugMessagesDescribeTheirException() throws Exception {
-    final var handler =
-        new ErrorHandler(new RestResponseFactory(new ResourceBundleMessageSource()));
+    final var errors =
+        new ErrorResponseService(new RestResponseFactory(new ResourceBundleMessageSource()));
+    final var panel = new PanelProblemDetailAdvice(errors);
+    final var protocol = new ProtocolErrorAdvice(errors);
     final var request = new MockHttpServletRequest();
     final var parameter = new MethodParameter(String.class.getMethod("length"), -1);
 
-    handler.handleException(
+    panel.handleMethodArgumentNotValid(
         new MethodArgumentNotValidException(
             parameter, new BeanPropertyBindingResult(new Object(), "target")),
         request,
         null);
-    handler.handleException(
+    panel.handleMissingServletRequestParameter(
         new MissingServletRequestParameterException("page", "int"), request, null);
-    handler.handleException(new UnAuthorizedException("unAuthorized"), request, null);
-    handler.handleException(
+    protocol.handleUnAuthorized(new UnAuthorizedException("unAuthorized"), request, null);
+    panel.handleNoResourceFound(
         new NoResourceFoundException(HttpMethod.GET, "/missing", "missing"), request, null);
 
     assertThat(this.logEvents.list)

@@ -47,17 +47,17 @@ import org.junit.jupiter.api.Test;
  * bundle has no entry for it, so a missing key never fails anything at runtime (RPS-895, RPS-907).
  * This test scans the main sources of {@code repsy-backend}, {@code libs} and {@code
  * repsy-protocols} instead of driving the endpoints, so it needs no Docker and also sees the msgIds
- * of errors thrown from services and protocol modules, which {@code ErrorHandler} turns into
+ * of errors thrown from services and protocol modules, which {@code ProtocolErrorAdvice} turns into
  * responses.
  *
  * <p>What it recognises: an identifier-like string literal or an {@code UPPER_SNAKE} constant that
  * is the first argument of {@code success}/{@code warning}/{@code error} on the response factory,
  * or of a msgId-carrying exception constructor, plus the {@code ProtocolErrorCodes}/{@code
- * ErrorConstants} constant {@code ErrorHandler} falls back to when an exception carries no message.
- * Ids held in other variables are not seen. A string literal that starts an exception's msgId but
- * is free text or continued by a concatenation, {@code .formatted(} or {@code String.format(}
- * cannot have a bundle entry, so {@link #msgIdsAreFixedIdentifiers()} fails on it (RPS-992,
- * RPS-1127).
+ * ErrorConstants} constant {@code ProtocolErrorAdvice} falls back to when an exception carries no
+ * message. Ids held in other variables are not seen. A string literal that starts an exception's
+ * msgId but is free text or continued by a concatenation, {@code .formatted(} or {@code
+ * String.format(} cannot have a bundle entry, so {@link #msgIdsAreFixedIdentifiers()} fails on it
+ * (RPS-992, RPS-1127).
  *
  * <p>Bundle keys that no code uses are not flagged: most of them are leftovers tracked by RPS-959.
  */
@@ -79,12 +79,13 @@ class MessageKeysTest {
   private static final Pattern RESPONSE_MSG_ID =
       Pattern.compile(
           "(?:\\b(?:resp|responseFactory|restResponseFactory)\\s*\\.\\s*(?:success|warning|error)\\(\\s*"
-              // ErrorHandler.error(request, status, msgId, ...): the panel answers a problem
+              // ErrorResponseService.error(request, status, msgId, ...): the panel answers a
+              // problem
               // document
-              + "|\\bthis\\s*\\.\\s*error\\(\\s*request\\s*,\\s*[\\w.]+\\s*,\\s*)"
+              + "|\\bthis\\s*\\.\\s*(?:errors\\s*\\.\\s*)?error\\(\\s*request\\s*,\\s*[\\w.]+\\s*,\\s*)"
               + LITERAL_OR_CONSTANT);
 
-  /** Exceptions {@code ErrorHandler} renders with the exception message as the msgId. */
+  /** Exceptions {@code ProtocolErrorAdvice} renders with the exception message as the msgId. */
   private static final String MSG_ID_EXCEPTION =
       "\\bnew\\s+(?:ItemNotFound|BadRequest|ItemAlreadyExist|AccessNotAllowed|UnAuthorized"
           + "|ErrorOccurred|SignatureNotVerified|Mfa|DataExportRequest|SubscriptionLimitReached)"
@@ -97,7 +98,7 @@ class MessageKeysTest {
    * The first argument of an exception's msgId that cannot have a bundle entry (RPS-992, RPS-1127):
    * a string literal that is not a bare identifier, or that is continued by a concatenation ({@code
    * +}) or by {@code .formatted(}, or a {@code String.format(} / {@code MessageFormat.format(}
-   * call. {@code ErrorHandler} returns such a msgId as both {@code msgId} and {@code text}.
+   * call. {@code ProtocolErrorAdvice} returns such a msgId as both {@code msgId} and {@code text}.
    */
   private static final Pattern NON_IDENTIFIER_MSG_ID =
       Pattern.compile(
@@ -106,10 +107,10 @@ class MessageKeysTest {
               + "|(?<call>(?:String|MessageFormat)\\s*\\.\\s*format\\s*\\())");
 
   /**
-   * The constant an {@code ErrorHandler} handler falls back to, as in {@code exceptionMessage !=
-   * null ? exceptionMessage : ProtocolErrorCodes.UN_AUTHORIZED}, when the exception carries no
-   * message. It reaches {@code resp.error} through a variable, so {@link #RESPONSE_MSG_ID} misses
-   * it.
+   * The constant an {@code ProtocolErrorAdvice} handler falls back to, as in {@code
+   * exceptionMessage != null ? exceptionMessage : ProtocolErrorCodes.UN_AUTHORIZED}, when the
+   * exception carries no message. It reaches {@code resp.error} through a variable, so {@link
+   * #RESPONSE_MSG_ID} misses it.
    */
   private static final Pattern FALLBACK_MSG_ID =
       Pattern.compile(
@@ -353,9 +354,9 @@ class MessageKeysTest {
         .contains(
             "repoNotFound", // literal in an exception
             "unAuthorized", // ErrorConstants constant in an exception
-            "validationError", // constant in ErrorHandler
-            "movedToPath", // constant passed straight to resp.error in ErrorHandler
-            "unauthorizedRequest", // ErrorHandler fallback when the exception has no message
+            "validationError", // constant in ProtocolErrorAdvice
+            "movedToPath", // constant passed straight to resp.error in ProtocolErrorAdvice
+            "unauthorizedRequest", // ProtocolErrorAdvice fallback when the exception has no message
             "chartNameMissing", // BadRequestException in a protocol module
             "gemNameMissing"); // forwarded through a helper
     assertThat(usedMsgIds).hasSizeGreaterThan(100);

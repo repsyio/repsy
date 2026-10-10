@@ -31,13 +31,13 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
 
 /**
- * Answers the failures of a Cargo web API request that its handler left to {@link ErrorHandler} (a
- * storage outage, a database failure) with Cargo's error body, {@code
+ * Answers the failures of a Cargo web API request that its handler left to {@link
+ * ProtocolErrorAdvice} (a storage outage, a database failure) with Cargo's error body, {@code
  * {"errors":[{"detail":"errorOccurred"}]}}, instead of the RestResponse envelope (RPS-2104). Cargo
  * prints {@code errors[].detail} and nothing else, so the envelope reached the user as an
  * unreadable response.
  *
- * <p>Like {@link OciErrorBodyAdvice}, {@link ErrorHandler} keeps deciding the status and the
+ * <p>Like {@link OciErrorBodyAdvice}, {@link ProtocolErrorAdvice} keeps deciding the status and the
  * headers ({@code Retry-After} on a 503); this advice only rewrites the body, and only on a request
  * the Cargo handler marked with {@link CargoConstants#ERROR_BODY_ATTRIBUTE}. The detail is the
  * message id, the stable code the envelope carried.

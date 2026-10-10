@@ -26,6 +26,7 @@ import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.response.services.RestResponseFactory;
+import io.repsy.os.shared.error_handling.services.ErrorResponseService;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -41,9 +42,9 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * RPS-1039: {@link OciErrorBodyAdvice} rewrites the error {@link ErrorHandler} renders into the OCI
- * distribution body on {@code /v2/} requests only, and leaves status, headers and every other body
- * alone. Runs through real Spring MVC, with no Docker or application context.
+ * RPS-1039: {@link OciErrorBodyAdvice} rewrites the error {@link ProtocolErrorAdvice} renders into
+ * the OCI distribution body on {@code /v2/} requests only, and leaves status, headers and every
+ * other body alone. Runs through real Spring MVC, with no Docker or application context.
  */
 @DisplayName("OciErrorBodyAdvice")
 class OciErrorBodyAdviceTest {
@@ -60,10 +61,14 @@ class OciErrorBodyAdviceTest {
     final var messageSource = new ResourceBundleMessageSource();
     messageSource.setBasename("messages");
 
+    final var errors = new ErrorResponseService(new RestResponseFactory(messageSource));
+
     this.mockMvc =
         MockMvcBuilders.standaloneSetup(new FailingController())
             .setControllerAdvice(
-                new ErrorHandler(new RestResponseFactory(messageSource)), new OciErrorBodyAdvice())
+                new PanelProblemDetailAdvice(errors),
+                new ProtocolErrorAdvice(errors),
+                new OciErrorBodyAdvice())
             .build();
   }
 

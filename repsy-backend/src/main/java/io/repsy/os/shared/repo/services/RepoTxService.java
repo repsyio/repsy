@@ -386,8 +386,8 @@ public class RepoTxService {
    * transaction's commit. {@link #checkIfRepoExists} is a check-then-write and cannot close a race
    * between two callers choosing the same free name: the loser still reaches the {@code
    * ux_repo__name} index, but gets the specific {@code repoExists} 409 instead of falling through
-   * to the generic {@code DataIntegrityViolationException} handling in {@code ErrorHandler} (RPS-
-   * 1134).
+   * to the generic {@code DataIntegrityViolationException} handling in {@code ProtocolErrorAdvice}
+   * (RPS- 1134).
    */
   private void saveOrThrowIfNameTaken(final @NonNull Repo repo) {
     try {

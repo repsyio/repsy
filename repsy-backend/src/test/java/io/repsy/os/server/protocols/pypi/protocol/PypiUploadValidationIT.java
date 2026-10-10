@@ -67,7 +67,7 @@ class PypiUploadValidationIT extends AbstractIT {
   @Qualifier("handlerExceptionResolver")
   private HandlerExceptionResolver handlerExceptionResolver;
 
-  /** The status the panel and protocol {@code ErrorHandler} answers for {@code failure}. */
+  /** The status the panel and protocol error advices answers for {@code failure}. */
   private int statusOf(final Throwable failure) {
     final var response = new MockHttpServletResponse();
     this.handlerExceptionResolver.resolveException(

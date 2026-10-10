@@ -29,11 +29,11 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
 /**
- * What {@link ErrorHandlerConstraintViolationIT} (PostgreSQL) and {@link
- * H2ErrorHandlerConstraintViolationIT} (embedded H2) share: a {@code users} fixture, a way to make
- * the database reject a statement, and the check of what {@link ErrorHandler} answers to the
- * exception that becomes. Both databases must map a violation alike, and running the same
- * assertions against each is what proves it (RPS-1012, RPS-1079).
+ * What {@link ProtocolErrorAdviceConstraintViolationIT} (PostgreSQL) and {@link
+ * H2ProtocolErrorAdviceConstraintViolationIT} (embedded H2) share: a {@code users} fixture, a way
+ * to make the database reject a statement, and the check of what {@link ProtocolErrorAdvice}
+ * answers to the exception that becomes. Both databases must map a violation alike, and running the
+ * same assertions against each is what proves it (RPS-1012, RPS-1079).
  *
  * <p>The {@code users} table is the fixture because it has a {@code varchar(25)} username, a unique
  * username index and a check on the role in both schemas.
@@ -73,13 +73,13 @@ final class ConstraintViolationChecks {
   }
 
   static void expectError(
-      final ErrorHandler errorHandler,
+      final ProtocolErrorAdvice advice,
       final DataIntegrityViolationException violation,
       final HttpStatus expectedStatus,
       final String msgId) {
 
     final var answer =
-        errorHandler.handleException(
+        advice.handleDataIntegrityViolation(
             violation, new MockHttpServletRequest(), new MockHttpServletResponse());
 
     assertThat(answer).isNotNull();
