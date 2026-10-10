@@ -15,6 +15,7 @@
  */
 package io.repsy.protocols.nuget.shared.utils;
 
+import io.repsy.protocols.shared.http.PublicUrls;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.NullMarked;
@@ -22,11 +23,6 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 @UtilityClass
 public final class NuGetUrlBuilder {
-
-  private static final int PORT_HTTPS = 443;
-  private static final int PORT_HTTP = 80;
-  private static final String PROTO_HTTPS = "https";
-  private static final String PROTO_HTTP = "http";
 
   public static String registrationBase(final String baseUrl, final String idLower) {
 
@@ -51,19 +47,6 @@ public final class NuGetUrlBuilder {
 
   public static String buildBaseUrl(final HttpServletRequest request, final String repoName) {
 
-    final var scheme = request.getScheme();
-    final var host = request.getServerName();
-    final var port = request.getServerPort();
-    final var authority = buildAuthority(scheme, host, port);
-
-    return scheme + "://" + authority + "/" + repoName;
-  }
-
-  private static String buildAuthority(final String scheme, final String host, final int port) {
-    final var isDefaultPort =
-        (PROTO_HTTP.equals(scheme) && port == PORT_HTTP)
-            || (PROTO_HTTPS.equals(scheme) && port == PORT_HTTPS);
-
-    return isDefaultPort ? host : host + ":" + port;
+    return PublicUrls.origin(request) + "/" + repoName;
   }
 }

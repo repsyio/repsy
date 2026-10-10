@@ -88,7 +88,8 @@ class MavenHeadIT extends AbstractIT {
     assertThat(head.getHeader(CONTENT_LENGTH)).isEqualTo(get.getHeader(CONTENT_LENGTH));
     assertThat(head.getContentType()).isEqualTo(get.getContentType());
     assertThat(head.getHeader(CONTENT_DISPOSITION)).isEqualTo(get.getHeader(CONTENT_DISPOSITION));
-    assertThat(head.getHeader(CONTENT_DISPOSITION)).isEqualTo("attachment; filename=lib-1.0.jar");
+    assertThat(head.getHeader(CONTENT_DISPOSITION))
+        .isEqualTo("attachment; filename=\"lib-1.0.jar\"");
   }
 
   @Test

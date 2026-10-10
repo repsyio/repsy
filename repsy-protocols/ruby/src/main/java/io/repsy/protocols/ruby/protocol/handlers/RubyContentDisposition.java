@@ -15,11 +15,11 @@
  */
 package io.repsy.protocols.ruby.protocol.handlers;
 
+import io.repsy.protocols.shared.http.ResourceResponses;
 import java.util.Set;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
-import org.springframework.http.ContentDisposition;
 
 /**
  * The {@code Content-Disposition} of the Ruby routes that Spring would otherwise give {@code
@@ -54,14 +54,12 @@ final class RubyContentDisposition {
     if (GEM_PATTERN.matcher(relativePath).matches()
         || GEMSPEC_PATTERN.matcher(relativePath).matches()
         || SPECS_PATHS.contains(relativePath)) {
-      return ContentDisposition.attachment()
-          .filename(relativePath.substring(relativePath.lastIndexOf('/') + 1))
-          .build()
-          .toString();
+      return ResourceResponses.attachment(
+          relativePath.substring(relativePath.lastIndexOf('/') + 1));
     }
 
     if (INFO_PATTERN.matcher(relativePath).matches()) {
-      return ContentDisposition.inline().build().toString();
+      return ResourceResponses.inline();
     }
 
     return null;

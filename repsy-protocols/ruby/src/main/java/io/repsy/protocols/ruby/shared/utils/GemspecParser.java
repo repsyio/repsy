@@ -21,6 +21,7 @@ import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.protocols.ruby.shared.gem.dtos.GemDependency;
 import io.repsy.protocols.ruby.shared.gem.dtos.GemMetadata;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
+import io.repsy.protocols.shared.limits.FieldLimits;
 import io.repsy.protocols.shared.utils.BoundedEntryReader;
 import io.repsy.protocols.shared.utils.EntryTooLargeException;
 import java.io.ByteArrayInputStream;
@@ -181,7 +182,9 @@ public class GemspecParser {
         .platform(platform)
         .description(extractString(spec, "description"))
         .authors(cutAuthors(extractAuthors(spec)))
-        .homepage(dropIfTooLong(extractString(spec, "homepage"), MAX_HOMEPAGE_LENGTH, "homepage"))
+        .homepage(
+            FieldLimits.dropIfTooLong(
+                extractString(spec, "homepage"), MAX_HOMEPAGE_LENGTH, "homepage"))
         .requiredRubyVersion(requiredRubyVersion)
         .runtimeDependencies(deps.stream().filter(d -> RUNTIME_DEP.equals(d.getType())).toList())
         .developmentDependencies(
@@ -237,17 +240,6 @@ public class GemspecParser {
     final var end =
         Character.isHighSurrogate(value.charAt(maxLength - 1)) ? maxLength - 1 : maxLength;
     return value.substring(0, end);
-  }
-
-  @Nullable
-  private static String dropIfTooLong(
-      final @Nullable String value, final int maxLength, final String field) {
-
-    if (isTooLong(value, maxLength)) {
-      log.warn("Skipping {}: longer than {} characters", field, maxLength);
-      return null;
-    }
-    return value;
   }
 
   private static String requireGemField(final @Nullable String value, final String errorKey) {

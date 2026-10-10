@@ -38,6 +38,7 @@ import io.repsy.protocols.docker.shared.utils.DockerPushGuards;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
 import io.repsy.protocols.shared.handlers.HandlerRoute;
+import io.repsy.protocols.shared.http.PublicUrls;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -53,7 +54,6 @@ import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 @NullMarked
 public abstract class AbstractDockerManifestPushProtocolMethodHandler<ID>
@@ -190,10 +190,13 @@ public abstract class AbstractDockerManifestPushProtocolMethodHandler<ID>
 
     final var urlProperties = ProtocolContextUtils.getUrlProperties(context);
 
-    return ServletUriComponentsBuilder.fromCurrentContextPath()
-        .path("/v2/{repoName}/{imageName}/manifests/{digest}")
-        .buildAndExpand(urlProperties.getRepoName(), imageName, digest)
-        .toUriString();
+    return PublicUrls.currentContextRoot()
+        + "/v2/"
+        + urlProperties.getRepoName()
+        + "/"
+        + imageName
+        + "/manifests/"
+        + digest;
   }
 
   /**

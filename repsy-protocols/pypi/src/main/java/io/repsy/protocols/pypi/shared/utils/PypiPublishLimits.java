@@ -18,6 +18,7 @@ package io.repsy.protocols.pypi.shared.utils;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.protocols.pypi.shared.python_package.dtos.PackageUploadForm;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
+import io.repsy.protocols.shared.limits.FieldLimits;
 import java.util.ArrayList;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -150,21 +151,18 @@ public final class PypiPublishLimits {
    * be nulled loses only that one entry.
    */
   public static void dropOverLongFields(final PackageUploadForm uploadForm) {
-    uploadForm.setHome_page(dropIfTooLong(uploadForm.getHome_page(), MAX_HOME_PAGE_LENGTH));
-    uploadForm.setAuthor(dropIfTooLong(uploadForm.getAuthor(), MAX_AUTHOR_LENGTH));
+    uploadForm.setHome_page(
+        FieldLimits.dropIfTooLong(uploadForm.getHome_page(), MAX_HOME_PAGE_LENGTH));
+    uploadForm.setAuthor(FieldLimits.dropIfTooLong(uploadForm.getAuthor(), MAX_AUTHOR_LENGTH));
     uploadForm.setAuthor_email(
-        dropIfTooLong(uploadForm.getAuthor_email(), MAX_AUTHOR_EMAIL_LENGTH));
-    uploadForm.setLicense(dropIfTooLong(uploadForm.getLicense(), MAX_LICENSE_LENGTH));
+        FieldLimits.dropIfTooLong(uploadForm.getAuthor_email(), MAX_AUTHOR_EMAIL_LENGTH));
+    uploadForm.setLicense(FieldLimits.dropIfTooLong(uploadForm.getLicense(), MAX_LICENSE_LENGTH));
     uploadForm.setDescription_content_type(
-        dropIfTooLong(
+        FieldLimits.dropIfTooLong(
             uploadForm.getDescription_content_type(), MAX_DESCRIPTION_CONTENT_TYPE_LENGTH));
 
     dropOverLongClassifiers(uploadForm);
     dropOverLongProjectUrls(uploadForm);
-  }
-
-  private static @Nullable String dropIfTooLong(final @Nullable String value, final int maxLength) {
-    return value != null && value.length() > maxLength ? null : value;
   }
 
   private static void dropOverLongClassifiers(final PackageUploadForm uploadForm) {

@@ -134,7 +134,7 @@ class MavenArtifactMetadataSynthesisIT extends AbstractIT {
     assertThat(response.getStatus()).isEqualTo(200);
     assertThat(response.getContentType()).isEqualTo("application/octet-stream");
     assertThat(response.getHeader(CONTENT_DISPOSITION))
-        .isEqualTo("attachment; filename=maven-metadata.xml");
+        .isEqualTo("attachment; filename=\"maven-metadata.xml\"");
     assertThat(response.getHeader(LAST_MODIFIED)).isNull();
     assertThat(response.getHeader(ETAG)).isNull();
 
@@ -171,7 +171,7 @@ class MavenArtifactMetadataSynthesisIT extends AbstractIT {
         .isEqualTo(DigestUtils.sha512Hex(xml));
     assertThat(sha1.getContentType()).isEqualTo("application/octet-stream");
     assertThat(sha1.getHeader(CONTENT_DISPOSITION))
-        .isEqualTo("attachment; filename=maven-metadata.xml.sha1");
+        .isEqualTo("attachment; filename=\"maven-metadata.xml.sha1\"");
   }
 
   @Test

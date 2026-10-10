@@ -26,6 +26,7 @@ import io.repsy.protocols.docker.shared.layer.dtos.LayerInfo;
 import io.repsy.protocols.docker.shared.layer.services.LayerService;
 import io.repsy.protocols.oci.handlers.AbstractOciUploadFinalizeProtocolMethodHandler;
 import io.repsy.protocols.shared.handlers.HandlerRoute;
+import io.repsy.protocols.shared.http.PublicUrls;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -35,7 +36,6 @@ import lombok.SneakyThrows;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpMethod;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 /**
  * The Docker upload finalize: appends the request body, verifies the digest against the stored
@@ -113,10 +113,13 @@ public abstract class AbstractDockerUploadFinalizeProtocolMethodHandler<ID>
 
     final var urlProperties = ProtocolContextUtils.getUrlProperties(context);
 
-    return ServletUriComponentsBuilder.fromCurrentContextPath()
-        .path("/v2/{repoName}/{imageName}/blobs/{digest}")
-        .buildAndExpand(urlProperties.getRepoName(), imageName, digest)
-        .toUriString();
+    return PublicUrls.currentContextRoot()
+        + "/v2/"
+        + urlProperties.getRepoName()
+        + "/"
+        + imageName
+        + "/blobs/"
+        + digest;
   }
 
   @SneakyThrows

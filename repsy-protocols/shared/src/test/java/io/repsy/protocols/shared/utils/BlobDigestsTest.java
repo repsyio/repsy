@@ -187,4 +187,24 @@ class BlobDigestsTest {
     assertThat(BlobDigests.startsWithDigestPrefix("latest")).isFalse();
     assertThat(BlobDigests.startsWithDigestPrefix("tag-sha256:abc")).isFalse();
   }
+
+  @Test
+  @DisplayName("sha256Hex() of bytes and of a stream is the lowercase hex SHA-256")
+  void sha256Hex() throws IOException {
+    final var expected = SHA256.substring("sha256:".length());
+
+    assertThat(BlobDigests.sha256Hex(CONTENT)).isEqualTo(expected);
+    assertThat(BlobDigests.sha256Hex(stream(CONTENT))).isEqualTo(expected);
+    assertThat(BlobDigests.sha256Hex(new byte[0]))
+        .isEqualTo("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
+  }
+
+  @Test
+  @DisplayName("sha256Hex() streams content larger than its buffer")
+  void sha256HexLargeStream() throws IOException {
+    final var large = new byte[200_000];
+    java.util.Arrays.fill(large, (byte) 'a');
+
+    assertThat(BlobDigests.sha256Hex(stream(large))).isEqualTo(BlobDigests.sha256Hex(large));
+  }
 }

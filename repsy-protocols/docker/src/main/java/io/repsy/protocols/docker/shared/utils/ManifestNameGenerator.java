@@ -15,10 +15,8 @@
  */
 package io.repsy.protocols.docker.shared.utils;
 
+import io.repsy.protocols.shared.utils.BlobDigests;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
 import java.util.Locale;
 import java.util.UUID;
 import lombok.experimental.UtilityClass;
@@ -56,24 +54,13 @@ public final class ManifestNameGenerator {
 
   public static String generate(final UUID repoId, final String imageName, final String reference) {
 
-    try {
-      final var uniqueString = String.format("%s:%s:%s", repoId, imageName, reference);
+    final var uniqueString = String.format("%s:%s:%s", repoId, imageName, reference);
+    final var shortHash =
+        BlobDigests.sha256Hex(uniqueString.getBytes(StandardCharsets.UTF_8))
+            .substring(0, SHORT_HASH_LENGTH);
 
-      final var digest = MessageDigest.getInstance("SHA-256");
-      final var digestHash = digest.digest(uniqueString.getBytes(StandardCharsets.UTF_8));
-
-      final var shortHash = HexFormat.of().formatHex(digestHash).substring(0, SHORT_HASH_LENGTH);
-
-      return String.format(
-          "manifest_%s_%s_%s", shortHash, sanitizeFileName(imageName), sanitizeFileName(reference));
-
-    } catch (final NoSuchAlgorithmException e) {
-      return String.format(
-          "manifest_%s_%s_%s",
-          repoId.toString().substring(0, UUID_LENGTH),
-          sanitizeFileName(imageName),
-          sanitizeFileName(reference));
-    }
+    return String.format(
+        "manifest_%s_%s_%s", shortHash, sanitizeFileName(imageName), sanitizeFileName(reference));
   }
 
   private static String sanitizeFileName(final String input) {

@@ -18,10 +18,8 @@ package io.repsy.protocols.pypi.shared.utils;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.protocols.pypi.shared.python_package.dtos.PackageUploadForm;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
+import io.repsy.protocols.shared.utils.BlobDigests;
 import java.io.IOException;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
 import java.util.regex.Pattern;
@@ -35,8 +33,6 @@ import org.springframework.web.multipart.MultipartFile;
 @NullMarked
 public final class PackageStorageUtils {
   public static final String HASH_ALGORITHM = "sha256";
-
-  private static final int DIGEST_BUFFER_SIZE = 8192;
 
   private static final String NAME_PART = "(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9._-]*[a-zA-Z0-9])";
 
@@ -198,17 +194,7 @@ public final class PackageStorageUtils {
   public static String computeSha256(final MultipartFile file) throws IOException {
 
     try (var in = file.getInputStream()) {
-      final var digest = MessageDigest.getInstance("SHA-256");
-      final var buf = new byte[DIGEST_BUFFER_SIZE];
-      int read;
-
-      while ((read = in.read(buf)) != -1) {
-        digest.update(buf, 0, read);
-      }
-
-      return HexFormat.of().formatHex(digest.digest());
-    } catch (final NoSuchAlgorithmException e) {
-      throw new IllegalStateException("SHA-256 algorithm not available", e);
+      return BlobDigests.sha256Hex(in);
     }
   }
 }
