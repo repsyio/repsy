@@ -20,15 +20,13 @@ import static org.springframework.http.HttpHeaders.WWW_AUTHENTICATE;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.maven.protocol.MavenProtocolProvider;
 import io.repsy.protocols.maven.protocol.facades.contracts.MavenProtocolFacade;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
-import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.List;
-import java.util.Map;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -36,37 +34,17 @@ import org.springframework.http.ResponseEntity;
 
 @NullMarked
 public abstract class AbstractMavenUploadProtocolMethodHandler<ID>
-    implements ProtocolMethodHandler {
-
-  private final PathParser pathParser;
-  private final MavenProtocolFacade<ID> mavenProtocolFacade;
+    extends AbstractFacadeProtocolMethodHandler<MavenProtocolFacade<ID>> {
 
   public AbstractMavenUploadProtocolMethodHandler(
       final PathParser pathParser,
       final MavenProtocolFacade<ID> mavenProtocolFacade,
       final MavenProtocolProvider mavenProtocolProvider) {
-
-    this.mavenProtocolFacade = mavenProtocolFacade;
-    this.pathParser = pathParser;
-
-    mavenProtocolProvider.registerMethodHandler(this);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() { // initContext (hashmap)
-
-    return Map.of("permission", Permission.WRITE, "writeOperation", true, "method", "upload");
-  }
-
-  @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.PUT);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-
-    return this.pathParser;
+    super(
+        HandlerRoute.write(HttpMethod.PUT).method("upload"),
+        pathParser,
+        mavenProtocolFacade,
+        mavenProtocolProvider);
   }
 
   @Override
@@ -78,8 +56,7 @@ public abstract class AbstractMavenUploadProtocolMethodHandler<ID>
 
     try {
 
-      this.mavenProtocolFacade.upload(
-          context, request.getInputStream(), request.getContentLengthLong());
+      this.facade.upload(context, request.getInputStream(), request.getContentLengthLong());
     } catch (final UnAuthorizedException _) {
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
           .header(WWW_AUTHENTICATE, BasicAuthChallenge.REPSY)

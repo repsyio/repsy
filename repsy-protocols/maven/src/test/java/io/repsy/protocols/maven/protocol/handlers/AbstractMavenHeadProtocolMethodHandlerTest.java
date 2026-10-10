@@ -120,7 +120,10 @@ class AbstractMavenHeadProtocolMethodHandlerTest {
 
     verify(this.provider).registerMethodHandler(handler);
     assertThat(handler.getSupportedMethods()).containsExactly(HttpMethod.HEAD);
-    assertThat(handler.getPathParser()).isSameAs(this.pathParser);
+
+    final var request = request("HEAD", "/g/demo/1.0/demo-1.0.jar");
+    when(this.pathParser.parse(request)).thenReturn(java.util.Optional.of(this.context));
+    assertThat(handler.getPathParser().parse(request)).containsSame(this.context);
     assertThat(handler.getProperties())
         .containsEntry("permission", Permission.READ)
         .containsEntry("writeOperation", false)

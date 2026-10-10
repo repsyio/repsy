@@ -23,16 +23,13 @@ import static org.springframework.http.MediaType.APPLICATION_XML;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.nuget.protocol.NuGetProtocolProvider;
 import io.repsy.protocols.nuget.protocol.facades.contracts.NuGetProtocolFacade;
-import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
@@ -42,7 +39,8 @@ import org.springframework.http.ResponseEntity;
 
 @Slf4j
 @NullMarked
-public abstract class AbstractNuGetDownloadProtocolMethodHandler implements ProtocolMethodHandler {
+public abstract class AbstractNuGetDownloadProtocolMethodHandler
+    extends AbstractFacadeProtocolMethodHandler<NuGetProtocolFacade> {
 
   // Each segment is [^/]+ so the three of them cannot trade characters, which keeps the match
   // linear on a long path a client controls.
@@ -50,8 +48,6 @@ public abstract class AbstractNuGetDownloadProtocolMethodHandler implements Prot
   static final Pattern NUSPEC_PATTERN =
       Pattern.compile(".*/v3/package/[^/]+/[^/]+/[^/]+\\.nuspec$");
 
-  private final PathParser basePathParser;
-  private final NuGetProtocolFacade facade;
   private final boolean nupkg;
 
   protected AbstractNuGetDownloadProtocolMethodHandler(
@@ -59,40 +55,8 @@ public abstract class AbstractNuGetDownloadProtocolMethodHandler implements Prot
       final NuGetProtocolFacade facade,
       final NuGetProtocolProvider provider,
       final boolean nupkg) {
-
-    this.basePathParser = basePathParser;
-    this.facade = facade;
+    super(HandlerRoute.read(HttpMethod.GET), basePathParser, facade, provider);
     this.nupkg = nupkg;
-
-    provider.registerMethodHandler(this);
-  }
-
-  @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.GET);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.READ, "writeOperation", false);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return request -> {
-      if (!HttpMethod.GET.name().equals(request.getMethod())) {
-        return Optional.empty();
-      }
-
-      final var path = request.getServletPath();
-      final var pattern = this.nupkg ? NUPKG_PATTERN : NUSPEC_PATTERN;
-
-      if (!pattern.matcher(path).matches()) {
-        return Optional.empty();
-      }
-
-      return this.basePathParser.parse(request);
-    };
   }
 
   /**
@@ -106,6 +70,14 @@ public abstract class AbstractNuGetDownloadProtocolMethodHandler implements Prot
     final var builder = attach ? ContentDisposition.attachment() : ContentDisposition.inline();
 
     return builder.filename(filename).build().toString();
+  }
+
+  @Override
+  protected boolean accepts(final HttpMethod method, final HttpServletRequest request) {
+    return super.accepts(method, request)
+        && (this.nupkg ? NUPKG_PATTERN : NUSPEC_PATTERN)
+            .matcher(request.getServletPath())
+            .matches();
   }
 
   @Override

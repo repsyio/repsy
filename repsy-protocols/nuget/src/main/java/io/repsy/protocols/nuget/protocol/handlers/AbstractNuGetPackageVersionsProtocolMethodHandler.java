@@ -20,15 +20,13 @@ import static org.springframework.http.MediaType.APPLICATION_JSON;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.nuget.protocol.NuGetProtocolProvider;
 import io.repsy.protocols.nuget.protocol.facades.contracts.NuGetProtocolFacade;
-import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
@@ -38,52 +36,21 @@ import org.springframework.http.ResponseEntity;
 @Slf4j
 @NullMarked
 public abstract class AbstractNuGetPackageVersionsProtocolMethodHandler
-    implements ProtocolMethodHandler {
+    extends AbstractFacadeProtocolMethodHandler<NuGetProtocolFacade> {
 
   static final Pattern VERSIONS_PATTERN =
       Pattern.compile("^.*/v3/package/[^/]+/index\\.json$", Pattern.CASE_INSENSITIVE);
-
-  private final PathParser basePathParser;
-  private final NuGetProtocolFacade facade;
 
   public AbstractNuGetPackageVersionsProtocolMethodHandler(
       final PathParser basePathParser,
       final NuGetProtocolFacade facade,
       final NuGetProtocolProvider provider) {
-
-    this.basePathParser = basePathParser;
-    this.facade = facade;
-
-    provider.registerMethodHandler(this);
+    super(HandlerRoute.read(HttpMethod.GET), basePathParser, facade, provider);
   }
 
   @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.GET);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.READ, "writeOperation", false);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return request -> {
-      final var contextOpt = this.basePathParser.parse(request);
-
-      if (contextOpt.isEmpty()) {
-        return Optional.empty();
-      }
-
-      final var relativePath = request.getServletPath();
-
-      if (!VERSIONS_PATTERN.matcher(relativePath).matches()) {
-        return Optional.empty();
-      }
-
-      return contextOpt;
-    };
+  protected boolean accepts(final HttpMethod method, final HttpServletRequest request) {
+    return VERSIONS_PATTERN.matcher(request.getServletPath()).matches();
   }
 
   @Override

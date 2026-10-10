@@ -17,16 +17,13 @@ package io.repsy.protocols.pypi.protocol.handlers;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.pypi.protocol.PypiProtocolProvider;
 import io.repsy.protocols.pypi.protocol.facades.PypiProtocolFacade;
-import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpHeaders;
@@ -37,54 +34,19 @@ import org.springframework.http.ResponseEntity;
 
 @NullMarked
 public abstract class AbstractPypiFileDownloadProtocolMethodHandler<ID>
-    implements ProtocolMethodHandler {
+    extends AbstractFacadeProtocolMethodHandler<PypiProtocolFacade<ID>> {
 
   private static final Pattern DOWNLOAD_PATTERN = Pattern.compile("^/([^/]+)/-/([^/]+)$");
-
-  private final PypiProtocolFacade<ID> pypiProtocolFacade;
-  private final PathParser basePathParser;
 
   public AbstractPypiFileDownloadProtocolMethodHandler(
       final PypiProtocolFacade<ID> pypiProtocolFacade,
       final PathParser basePathParser,
       final PypiProtocolProvider provider) {
-
-    provider.registerMethodHandler(this);
-
-    this.basePathParser = basePathParser;
-    this.pypiProtocolFacade = pypiProtocolFacade;
-  }
-
-  @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.GET);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.READ, "writeOperation", false);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return request -> {
-      if (!HttpMethod.GET.equals(HttpMethod.valueOf(request.getMethod()))) {
-        return Optional.empty();
-      }
-
-      final var parsedPathOpt = this.basePathParser.parse(request);
-      if (parsedPathOpt.isEmpty()) {
-        return Optional.empty();
-      }
-
-      final var relativePath = ProtocolContextUtils.getRelativePath(parsedPathOpt.get());
-
-      if (!DOWNLOAD_PATTERN.matcher(relativePath.getPath()).matches()) {
-        return Optional.empty();
-      }
-
-      return parsedPathOpt;
-    };
+    super(
+        HandlerRoute.read(HttpMethod.GET).path(DOWNLOAD_PATTERN.asMatchPredicate()),
+        basePathParser,
+        pypiProtocolFacade,
+        provider);
   }
 
   @Override
@@ -104,8 +66,7 @@ public abstract class AbstractPypiFileDownloadProtocolMethodHandler<ID>
     final var packageName = matcher.group(1);
     final var fileName = matcher.group(2);
 
-    final var resource =
-        this.pypiProtocolFacade.downloadArchiveFile(context, packageName, fileName);
+    final var resource = this.facade.downloadArchiveFile(context, packageName, fileName);
 
     return ResponseEntity.ok()
         .contentType(MediaType.APPLICATION_OCTET_STREAM)

@@ -17,17 +17,13 @@ package io.repsy.protocols.pypi.protocol.handlers;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.libs.protocol.router.ProtocolProvider;
 import io.repsy.protocols.pypi.protocol.facades.PypiProtocolFacade;
 import io.repsy.protocols.pypi.shared.utils.PypiPackageUtils;
-import io.repsy.protocols.shared.repo.dtos.Permission;
-import io.repsy.protocols.shared.utils.ProtocolContextUtils;
+import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
@@ -36,60 +32,25 @@ import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 @NullMarked
 public abstract class AbstractPypiPackageUploadProtocolMethodHandler<ID>
-    implements ProtocolMethodHandler {
+    extends AbstractFacadeProtocolMethodHandler<PypiProtocolFacade<ID>> {
 
   // Upload endpoint pattern: POST /{owner}/{repo} (root level)
   private static final Pattern UPLOAD_PATTERN = Pattern.compile("^/?$");
-
-  private final PathParser basePathParser;
-  private final PypiProtocolFacade<ID> pypiProtocolFacade;
 
   public AbstractPypiPackageUploadProtocolMethodHandler(
       final PathParser basePathParser,
       final PypiProtocolFacade<ID> pypiProtocolFacade,
       final ProtocolProvider provider) {
-
-    provider.registerMethodHandler(this);
-
-    this.basePathParser = basePathParser;
-    this.pypiProtocolFacade = pypiProtocolFacade;
+    super(
+        HandlerRoute.write(HttpMethod.POST).path(UPLOAD_PATTERN.asMatchPredicate()),
+        basePathParser,
+        pypiProtocolFacade,
+        provider);
   }
 
   @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.POST);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-
-    return Map.of("permission", Permission.WRITE, "writeOperation", true);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return request -> {
-      if (!HttpMethod.POST.equals(HttpMethod.valueOf(request.getMethod()))) {
-        return Optional.empty();
-      }
-
-      if (!(request instanceof MultipartHttpServletRequest)) {
-        return Optional.empty();
-      }
-
-      final var contextOpt = this.basePathParser.parse(request);
-      if (contextOpt.isEmpty()) {
-        return Optional.empty();
-      }
-
-      final var relativePath = ProtocolContextUtils.getRelativePath(contextOpt.get());
-
-      if (!UPLOAD_PATTERN.matcher(relativePath.getPath()).matches()) {
-        return Optional.empty();
-      }
-
-      return contextOpt;
-    };
+  protected boolean accepts(final HttpMethod method, final HttpServletRequest request) {
+    return super.accepts(method, request) && request instanceof MultipartHttpServletRequest;
   }
 
   @Override
@@ -108,7 +69,7 @@ public abstract class AbstractPypiPackageUploadProtocolMethodHandler<ID>
       return ResponseEntity.badRequest().build();
     }
 
-    this.pypiProtocolFacade.uploadPackage(
+    this.facade.uploadPackage(
         context, PypiPackageUtils.parseMultipartUploadRequestParameters(multipartRequest), file);
 
     return ResponseEntity.ok().build();

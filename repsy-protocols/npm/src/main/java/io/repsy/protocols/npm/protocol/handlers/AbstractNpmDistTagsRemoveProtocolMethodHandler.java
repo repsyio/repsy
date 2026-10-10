@@ -17,17 +17,14 @@ package io.repsy.protocols.npm.protocol.handlers;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
 import io.repsy.protocols.npm.protocol.facades.NpmProtocolFacade;
 import io.repsy.protocols.npm.shared.utils.ExtractPath;
-import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -42,53 +39,20 @@ import org.springframework.http.ResponseEntity;
  */
 @NullMarked
 public abstract class AbstractNpmDistTagsRemoveProtocolMethodHandler
-    implements ProtocolMethodHandler {
+    extends AbstractFacadeProtocolMethodHandler<NpmProtocolFacade> {
 
   private static final Pattern DIST_TAGS_REMOVE_PATTERN =
       Pattern.compile("^/-/package/(.+)/dist-tags/([^/]+)$");
-
-  private final PathParser basePathParser;
-  private final NpmProtocolFacade npmProtocolFacade;
 
   public AbstractNpmDistTagsRemoveProtocolMethodHandler(
       @Qualifier("npmPathParser") final PathParser basePathParser,
       final NpmProtocolFacade npmProtocolFacade,
       final NpmProtocolProvider provider) {
-    this.basePathParser = basePathParser;
-    this.npmProtocolFacade = npmProtocolFacade;
-
-    provider.registerMethodHandler(this);
-  }
-
-  @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.DELETE);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.WRITE, "writeOperation", true);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return request -> {
-      if (!HttpMethod.DELETE.equals(HttpMethod.valueOf(request.getMethod()))) {
-        return Optional.empty();
-      }
-
-      final var parsedPathOpt = this.basePathParser.parse(request);
-      if (parsedPathOpt.isEmpty()) {
-        return Optional.empty();
-      }
-
-      final var relativePath = ProtocolContextUtils.getRelativePath(parsedPathOpt.get()).getPath();
-
-      if (!DIST_TAGS_REMOVE_PATTERN.matcher(relativePath).matches()) {
-        return Optional.empty();
-      }
-      return parsedPathOpt;
-    };
+    super(
+        HandlerRoute.write(HttpMethod.DELETE).path(DIST_TAGS_REMOVE_PATTERN.asMatchPredicate()),
+        basePathParser,
+        npmProtocolFacade,
+        provider);
   }
 
   @Override
@@ -110,7 +74,7 @@ public abstract class AbstractNpmDistTagsRemoveProtocolMethodHandler
 
     final var pathVars = ExtractPath.extractPathVars(packagePath);
 
-    this.npmProtocolFacade.deleteDistributionTag(
+    this.facade.deleteDistributionTag(
         context, pathVars.scopeName(), pathVars.packageName(), tagName);
 
     return ResponseEntity.ok()
@@ -119,7 +83,7 @@ public abstract class AbstractNpmDistTagsRemoveProtocolMethodHandler
             NpmDistTagsResponse.of(
                 pathVars.scopeName(),
                 pathVars.packageName(),
-                this.npmProtocolFacade.getMappedDistributionTags(
+                this.facade.getMappedDistributionTags(
                     context, pathVars.scopeName(), pathVars.packageName())));
   }
 }

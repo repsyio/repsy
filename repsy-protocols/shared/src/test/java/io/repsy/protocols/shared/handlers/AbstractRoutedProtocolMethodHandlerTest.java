@@ -80,6 +80,7 @@ class AbstractRoutedProtocolMethodHandlerTest {
             .skipPreProcessor(true)
             .skipHeaderPreProcessor(false)
             .skipUsagePostProcessor(true)
+            .requireAuthentication(true)
             .method("upload");
 
     final var handler = new Handler(route, this.provider);
@@ -95,6 +96,7 @@ class AbstractRoutedProtocolMethodHandlerTest {
                 HandlerPropertyKeys.SKIP_PRE_PROCESSOR, true,
                 HandlerPropertyKeys.SKIP_HEADER_PRE_PROCESSOR, false,
                 HandlerPropertyKeys.SKIP_USAGE_POST_PROCESSOR, true,
+                HandlerPropertyKeys.REQUIRE_AUTHENTICATION, true,
                 HandlerPropertyKeys.METHOD, "upload"));
   }
 

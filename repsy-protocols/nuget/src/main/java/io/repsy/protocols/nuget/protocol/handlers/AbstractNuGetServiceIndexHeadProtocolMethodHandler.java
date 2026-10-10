@@ -17,15 +17,12 @@ package io.repsy.protocols.nuget.protocol.handlers;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.nuget.protocol.NuGetProtocolProvider;
-import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.handlers.AbstractRoutedProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.List;
 import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -39,41 +36,19 @@ import org.springframework.http.ResponseEntity;
  */
 @NullMarked
 public abstract class AbstractNuGetServiceIndexHeadProtocolMethodHandler
-    implements ProtocolMethodHandler {
-
-  private final PathParser basePathParser;
+    extends AbstractRoutedProtocolMethodHandler {
 
   protected AbstractNuGetServiceIndexHeadProtocolMethodHandler(
       final PathParser basePathParser, final NuGetProtocolProvider provider) {
-
-    this.basePathParser = basePathParser;
-
-    provider.registerMethodHandler(this);
+    super(
+        HandlerRoute.read(HttpMethod.HEAD).skipUsagePostProcessor(true).skipPreProcessor(true),
+        basePathParser,
+        provider);
   }
 
   @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.HEAD);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of(
-        "permission", Permission.READ,
-        "writeOperation", false,
-        "skipUsagePostProcessor", true,
-        "skipPreProcessor", true);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return request -> {
-      if (!request.getRequestURI().toLowerCase(Locale.ROOT).endsWith("/v3/index.json")) {
-        return Optional.empty();
-      }
-
-      return this.basePathParser.parse(request);
-    };
+  protected boolean accepts(final HttpMethod method, final HttpServletRequest request) {
+    return request.getRequestURI().toLowerCase(Locale.ROOT).endsWith("/v3/index.json");
   }
 
   @Override

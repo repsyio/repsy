@@ -18,16 +18,14 @@ package io.repsy.protocols.maven.protocol.handlers;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.libs.storage.core.exceptions.RedirectToSlashEndedLocationException;
 import io.repsy.protocols.maven.protocol.MavenProtocolProvider;
 import io.repsy.protocols.maven.protocol.facades.contracts.MavenProtocolFacade;
-import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.net.URI;
-import java.util.List;
-import java.util.Map;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpMethod;
@@ -46,36 +44,18 @@ import org.springframework.http.ResponseEntity;
  * pre-processor. A {@code HEAD} is not a download, so it is not counted as one.
  */
 @NullMarked
-public abstract class AbstractMavenHeadProtocolMethodHandler<ID> implements ProtocolMethodHandler {
-
-  private final PathParser pathParser;
-  private final MavenProtocolFacade<ID> mavenProtocolFacade;
+public abstract class AbstractMavenHeadProtocolMethodHandler<ID>
+    extends AbstractFacadeProtocolMethodHandler<MavenProtocolFacade<ID>> {
 
   public AbstractMavenHeadProtocolMethodHandler(
       final PathParser pathParser,
       final MavenProtocolFacade<ID> mavenProtocolFacade,
       final MavenProtocolProvider provider) {
-
-    provider.registerMethodHandler(this);
-
-    this.pathParser = pathParser;
-    this.mavenProtocolFacade = mavenProtocolFacade;
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of(
-        "permission", Permission.READ, "writeOperation", false, "skipUsagePostProcessor", true);
-  }
-
-  @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.HEAD);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return this.pathParser;
+    super(
+        HandlerRoute.read(HttpMethod.HEAD).skipUsagePostProcessor(true),
+        pathParser,
+        mavenProtocolFacade,
+        provider);
   }
 
   @Override
@@ -89,7 +69,7 @@ public abstract class AbstractMavenHeadProtocolMethodHandler<ID> implements Prot
 
     // lazy for a file (nothing is opened), so asking is cheap; the body is never streamed
     try {
-      resource = this.mavenProtocolFacade.download(context);
+      resource = this.facade.download(context);
     } catch (final RedirectToSlashEndedLocationException _) {
       return ResponseEntity.status(HttpStatus.TEMPORARY_REDIRECT)
           .location(new URI(request.getServletPath() + "/"))

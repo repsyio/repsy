@@ -17,18 +17,15 @@ package io.repsy.protocols.nuget.protocol.handlers;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.nuget.protocol.NuGetProtocolProvider;
 import io.repsy.protocols.nuget.protocol.facades.contracts.NuGetProtocolFacade;
 import io.repsy.protocols.nuget.shared.utils.NuGetBaseUrlResolver;
-import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.List;
 import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
@@ -38,10 +35,8 @@ import org.springframework.http.ResponseEntity;
 @Slf4j
 @NullMarked
 public abstract class AbstractNuGetServiceIndexProtocolMethodHandler
-    implements ProtocolMethodHandler {
+    extends AbstractFacadeProtocolMethodHandler<NuGetProtocolFacade> {
 
-  private final PathParser basePathParser;
-  private final NuGetProtocolFacade facade;
   private final NuGetBaseUrlResolver baseUrlResolver;
 
   public AbstractNuGetServiceIndexProtocolMethodHandler(
@@ -49,43 +44,18 @@ public abstract class AbstractNuGetServiceIndexProtocolMethodHandler
       final NuGetProtocolFacade facade,
       final NuGetProtocolProvider provider,
       final NuGetBaseUrlResolver baseUrlResolver) {
-
-    this.basePathParser = basePathParser;
-    this.facade = facade;
+    super(
+        HandlerRoute.read(HttpMethod.GET).skipPreProcessor(true).skipHeaderPreProcessor(true),
+        basePathParser,
+        facade,
+        provider);
     this.baseUrlResolver = baseUrlResolver;
-
-    provider.registerMethodHandler(this);
   }
 
   @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.GET);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of(
-        "permission", Permission.READ,
-        "writeOperation", false,
-        "skipPreProcessor", true,
-        "skipHeaderPreProcessor", true);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return request -> {
-      final var uri = request.getRequestURI();
-
-      if (!HttpMethod.GET.name().equals(request.getMethod())) {
-        return Optional.empty();
-      }
-
-      if (!uri.toLowerCase(Locale.ROOT).endsWith("/v3/index.json")) {
-        return Optional.empty();
-      }
-
-      return this.basePathParser.parse(request);
-    };
+  protected boolean accepts(final HttpMethod method, final HttpServletRequest request) {
+    return super.accepts(method, request)
+        && request.getRequestURI().toLowerCase(Locale.ROOT).endsWith("/v3/index.json");
   }
 
   @Override

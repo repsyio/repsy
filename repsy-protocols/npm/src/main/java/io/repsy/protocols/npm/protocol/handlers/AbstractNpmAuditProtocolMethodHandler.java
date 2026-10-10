@@ -17,18 +17,17 @@ package io.repsy.protocols.npm.protocol.handlers;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
 import io.repsy.protocols.npm.shared.audit.InvalidAuditRequestException;
 import io.repsy.protocols.npm.shared.audit.NpmAdvisorySource;
 import io.repsy.protocols.npm.shared.audit.NpmAuditRequestReader;
+import io.repsy.protocols.shared.handlers.AbstractRoutedProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
-import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.EntryTooLargeException;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.List;
 import java.util.Map;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpHeaders;
@@ -46,12 +45,12 @@ import tools.jackson.databind.JsonNode;
  * gets a plain JSON error.
  */
 @NullMarked
-public abstract class AbstractNpmAuditProtocolMethodHandler<ID> implements ProtocolMethodHandler {
+public abstract class AbstractNpmAuditProtocolMethodHandler<ID>
+    extends AbstractRoutedProtocolMethodHandler {
 
   /** The largest inflated body an audit request may have. */
   static final long DEFAULT_MAX_AUDIT_BODY_BYTES = 8L * 1024 * 1024;
 
-  private final PathParser pathParser;
   private final NpmAdvisorySource<ID> advisorySource;
 
   protected AbstractNpmAuditProtocolMethodHandler(
@@ -59,10 +58,11 @@ public abstract class AbstractNpmAuditProtocolMethodHandler<ID> implements Proto
       final String relativePathRegex,
       final NpmAdvisorySource<ID> advisorySource,
       final NpmProtocolProvider provider) {
-    this.pathParser = new NpmExactPathParser(basePathParser, HttpMethod.POST, relativePathRegex);
+    super(
+        HandlerRoute.read(HttpMethod.POST).skipUsagePostProcessor(true),
+        new NpmExactPathParser(basePathParser, HttpMethod.POST, relativePathRegex),
+        provider);
     this.advisorySource = advisorySource;
-
-    provider.registerMethodHandler(this);
   }
 
   /** Builds the report of an audit request; {@code body} is its JSON object. */
@@ -76,24 +76,6 @@ public abstract class AbstractNpmAuditProtocolMethodHandler<ID> implements Proto
   /** The largest inflated request body to accept. */
   protected long maxAuditBodyBytes() {
     return DEFAULT_MAX_AUDIT_BODY_BYTES;
-  }
-
-  @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.POST);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of(
-        "permission", Permission.READ,
-        "writeOperation", false,
-        "skipUsagePostProcessor", true);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return this.pathParser;
   }
 
   @Override

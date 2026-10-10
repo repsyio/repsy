@@ -17,17 +17,14 @@ package io.repsy.protocols.npm.protocol.handlers;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
 import io.repsy.protocols.npm.protocol.facades.NpmProtocolFacade;
 import io.repsy.protocols.npm.shared.utils.ExtractPath;
-import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -42,53 +39,21 @@ import org.springframework.http.ResponseEntity;
  * {@code ok} field for a failure (RPS-1362).
  */
 @NullMarked
-public abstract class AbstractNpmDistTagsAddProtocolMethodHandler implements ProtocolMethodHandler {
+public abstract class AbstractNpmDistTagsAddProtocolMethodHandler
+    extends AbstractFacadeProtocolMethodHandler<NpmProtocolFacade> {
 
   private static final Pattern DIST_TAGS_ADD_PATTERN =
       Pattern.compile("^/-/package/(.+)/dist-tags/([^/]+)$");
-
-  private final PathParser basePathParser;
-  private final NpmProtocolFacade npmProtocolFacade;
 
   public AbstractNpmDistTagsAddProtocolMethodHandler(
       @Qualifier("osNpmPathParser") final PathParser basePathParser,
       final NpmProtocolFacade npmProtocolFacade,
       final NpmProtocolProvider provider) {
-    this.basePathParser = basePathParser;
-    this.npmProtocolFacade = npmProtocolFacade;
-
-    provider.registerMethodHandler(this);
-  }
-
-  @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.PUT);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.WRITE, "writeOperation", true);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return request -> {
-      if (!HttpMethod.PUT.equals(HttpMethod.valueOf(request.getMethod()))) {
-        return Optional.empty();
-      }
-
-      final var parsedPathOpt = this.basePathParser.parse(request);
-      if (parsedPathOpt.isEmpty()) {
-        return Optional.empty();
-      }
-
-      final var relativePath = ProtocolContextUtils.getRelativePath(parsedPathOpt.get()).getPath();
-
-      if (!DIST_TAGS_ADD_PATTERN.matcher(relativePath).matches()) {
-        return Optional.empty();
-      }
-      return parsedPathOpt;
-    };
+    super(
+        HandlerRoute.write(HttpMethod.PUT).path(DIST_TAGS_ADD_PATTERN.asMatchPredicate()),
+        basePathParser,
+        npmProtocolFacade,
+        provider);
   }
 
   @Override
@@ -112,7 +77,7 @@ public abstract class AbstractNpmDistTagsAddProtocolMethodHandler implements Pro
     final var pathVars = ExtractPath.extractPathVars(packagePath);
     final var versionName = this.readRequestBody(request);
 
-    this.npmProtocolFacade.addDistributionTag(
+    this.facade.addDistributionTag(
         context, pathVars.scopeName(), pathVars.packageName(), tagName, versionName);
 
     return ResponseEntity.ok()
@@ -121,7 +86,7 @@ public abstract class AbstractNpmDistTagsAddProtocolMethodHandler implements Pro
             NpmDistTagsResponse.of(
                 pathVars.scopeName(),
                 pathVars.packageName(),
-                this.npmProtocolFacade.getMappedDistributionTags(
+                this.facade.getMappedDistributionTags(
                     context, pathVars.scopeName(), pathVars.packageName())));
   }
 

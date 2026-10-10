@@ -21,12 +21,13 @@ import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
 import io.repsy.protocols.npm.protocol.facades.NpmProtocolFacade;
 import io.repsy.protocols.npm.shared.utils.ExtractPath;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
+import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.BoundedEntryReader;
 import io.repsy.protocols.shared.utils.EntryTooLargeException;
@@ -34,9 +35,7 @@ import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import io.repsy.protocols.shared.utils.RequestBodies;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -53,13 +52,11 @@ import tools.jackson.databind.json.JsonMapper;
 
 @NullMarked
 public abstract class AbstractNpmPackagePublishOrDeprecateProtocolMethodHandler
-    implements ProtocolMethodHandler {
+    extends AbstractFacadeProtocolMethodHandler<NpmProtocolFacade> {
 
   private static final Pattern PACKAGE_PATTERN = Pattern.compile("^/(.++)$");
   private static final String REV_MARKER = "/-rev/";
 
-  private final PathParser basePathParser;
-  private final NpmProtocolFacade npmProtocolFacade;
   private final long maxPublishBytes;
 
   /**
@@ -79,12 +76,14 @@ public abstract class AbstractNpmPackagePublishOrDeprecateProtocolMethodHandler
       final NpmProtocolFacade npmProtocolFacade,
       final NpmProtocolProvider provider,
       final long maxPublishBytes) {
-    this.basePathParser = basePathParser;
-    this.npmProtocolFacade = npmProtocolFacade;
+    super(
+        HandlerRoute.write(HttpMethod.PUT)
+            .path(AbstractNpmPackagePublishOrDeprecateProtocolMethodHandler::isPublishOrDeprecate),
+        basePathParser,
+        npmProtocolFacade,
+        provider);
     this.maxPublishBytes = maxPublishBytes;
     this.bodyMapper = boundedBodyMapper(maxPublishBytes);
-
-    provider.registerMethodHandler(this);
   }
 
   private static JsonMapper boundedBodyMapper(final long maxPublishBytes) {
@@ -95,39 +94,6 @@ public abstract class AbstractNpmPackagePublishOrDeprecateProtocolMethodHandler
                     StreamReadConstraints.builder().maxStringLength(maxStringLength).build())
                 .build())
         .build();
-  }
-
-  @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.PUT);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.WRITE, "writeOperation", true);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return request -> {
-      if (!HttpMethod.PUT.equals(HttpMethod.valueOf(request.getMethod()))) {
-        return Optional.empty();
-      }
-
-      final var parsedPathOpt =
-          AbstractNpmPackagePublishOrDeprecateProtocolMethodHandler.this.basePathParser.parse(
-              request);
-      if (parsedPathOpt.isEmpty()) {
-        return Optional.empty();
-      }
-
-      final var relativePath = ProtocolContextUtils.getRelativePath(parsedPathOpt.get()).getPath();
-
-      if (!isPublishOrDeprecate(relativePath)) {
-        return Optional.empty();
-      }
-      return parsedPathOpt;
-    };
   }
 
   /**
@@ -194,7 +160,7 @@ public abstract class AbstractNpmPackagePublishOrDeprecateProtocolMethodHandler
       final @Nullable String scopeName = pathVars.scopeName();
       final String packageName = pathVars.packageName();
 
-      this.npmProtocolFacade.publishOrDeprecate(protocolContext, scopeName, packageName, payload);
+      this.facade.publishOrDeprecate(protocolContext, scopeName, packageName, payload);
 
       return ResponseEntity.ok()
           .contentType(MediaType.APPLICATION_JSON)

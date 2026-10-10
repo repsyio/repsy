@@ -20,20 +20,17 @@ import static org.springframework.http.HttpHeaders.WWW_AUTHENTICATE;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
 import io.repsy.protocols.npm.protocol.facades.NpmProtocolFacade;
 import io.repsy.protocols.npm.shared.utils.ExtractPath;
 import io.repsy.protocols.npm.shared.utils.NpmPackageUtils;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
-import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.List;
-import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -45,60 +42,26 @@ import org.springframework.http.ResponseEntity;
 
 @NullMarked
 public abstract class AbstractNpmPackageMetadataProtocolMethodHandler
-    implements ProtocolMethodHandler {
+    extends AbstractFacadeProtocolMethodHandler<NpmProtocolFacade> {
 
   private static final Pattern METADATA_PATTERN = Pattern.compile("^/(.+?)$");
   private static final MediaType ABBREVIATED_METADATA_TYPE =
       MediaType.parseMediaType("application/vnd.npm.install-v1+json");
 
-  private final PathParser basePathParser;
-  private final NpmProtocolFacade npmProtocolFacade;
-
   public AbstractNpmPackageMetadataProtocolMethodHandler(
       @Qualifier("osNpmPathParser") final PathParser basePathParser,
       final NpmProtocolFacade npmProtocolFacade,
       final NpmProtocolProvider provider) {
-    this.basePathParser = basePathParser;
-    this.npmProtocolFacade = npmProtocolFacade;
-
-    provider.registerMethodHandler(this);
-  }
-
-  @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.GET);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.READ, "writeOperation", false);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return request -> {
-      if (!HttpMethod.GET.equals(HttpMethod.valueOf(request.getMethod()))) {
-        return Optional.empty();
-      }
-
-      final var parsedPathOpt =
-          AbstractNpmPackageMetadataProtocolMethodHandler.this.basePathParser.parse(request);
-      if (parsedPathOpt.isEmpty()) {
-        return Optional.empty();
-      }
-
-      final var relativePath = ProtocolContextUtils.getRelativePath(parsedPathOpt.get()).getPath();
-
-      // Must match metadata pattern and not be download request or dist-tags
-      if (!METADATA_PATTERN.matcher(relativePath).matches()
-          || relativePath.contains("/-/")
-          || // Not download
-          relativePath.contains("dist-tags")) { // Not dist-tags
-        return Optional.empty();
-      }
-
-      return parsedPathOpt;
-    };
+    super(
+        HandlerRoute.read(HttpMethod.GET)
+            .path(
+                path ->
+                    METADATA_PATTERN.matcher(path).matches()
+                        && !path.contains("/-/")
+                        && !path.contains("dist-tags")),
+        basePathParser,
+        npmProtocolFacade,
+        provider);
   }
 
   @Override
@@ -122,7 +85,7 @@ public abstract class AbstractNpmPackageMetadataProtocolMethodHandler
     try {
       final var pathVars = ExtractPath.extractPathVars(packagePath);
       final var metadata =
-          this.npmProtocolFacade.getPackageMetadata(
+          this.facade.getPackageMetadata(
               protocolContext, pathVars.scopeName(), pathVars.packageName(), acceptHeader);
 
       // The abbreviated and the full document share one address, so what a cache may reuse depends

@@ -17,12 +17,11 @@ package io.repsy.protocols.npm.protocol.handlers;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
-import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.handlers.AbstractRoutedProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.List;
 import java.util.Map;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -36,34 +35,16 @@ import org.springframework.http.ResponseEntity;
  * request needs read access to the repository like every other registry read.
  */
 @NullMarked
-public abstract class AbstractNpmPingProtocolMethodHandler implements ProtocolMethodHandler {
-
-  private final PathParser pathParser;
+public abstract class AbstractNpmPingProtocolMethodHandler
+    extends AbstractRoutedProtocolMethodHandler {
 
   public AbstractNpmPingProtocolMethodHandler(
       @Qualifier("npmPathParser") final PathParser basePathParser,
       final NpmProtocolProvider provider) {
-    this.pathParser = new NpmExactPathParser(basePathParser, HttpMethod.GET, "/-/ping");
-
-    provider.registerMethodHandler(this);
-  }
-
-  @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.GET);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of(
-        "permission", Permission.READ,
-        "writeOperation", false,
-        "skipUsagePostProcessor", true);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return this.pathParser;
+    super(
+        HandlerRoute.read(HttpMethod.GET).skipUsagePostProcessor(true),
+        new NpmExactPathParser(basePathParser, HttpMethod.GET, "/-/ping"),
+        provider);
   }
 
   @Override

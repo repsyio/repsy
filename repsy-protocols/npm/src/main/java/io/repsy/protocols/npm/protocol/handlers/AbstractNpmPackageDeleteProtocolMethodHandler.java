@@ -17,17 +17,15 @@ package io.repsy.protocols.npm.protocol.handlers;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
 import io.repsy.protocols.npm.protocol.facades.NpmProtocolFacade;
 import io.repsy.protocols.npm.shared.utils.NpmRevPath;
+import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpMethod;
@@ -42,52 +40,19 @@ import org.springframework.http.ResponseEntity;
  */
 @NullMarked
 public abstract class AbstractNpmPackageDeleteProtocolMethodHandler
-    implements ProtocolMethodHandler {
-
-  private final PathParser basePathParser;
-  private final NpmProtocolFacade npmProtocolFacade;
+    extends AbstractFacadeProtocolMethodHandler<NpmProtocolFacade> {
 
   public AbstractNpmPackageDeleteProtocolMethodHandler(
       @Qualifier("npmPathParser") final PathParser basePathParser,
       final NpmProtocolFacade npmProtocolFacade,
       final NpmProtocolProvider provider) {
-    this.basePathParser = basePathParser;
-    this.npmProtocolFacade = npmProtocolFacade;
-
-    provider.registerMethodHandler(this);
-  }
-
-  @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.DELETE);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.MANAGE, "writeOperation", true);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return request -> {
-      if (!HttpMethod.DELETE.equals(HttpMethod.valueOf(request.getMethod()))) {
-        return Optional.empty();
-      }
-
-      final var parsedPathOpt = this.basePathParser.parse(request);
-      if (parsedPathOpt.isEmpty()) {
-        return Optional.empty();
-      }
-
-      final var relativePath = ProtocolContextUtils.getRelativePath(parsedPathOpt.get()).getPath();
-
-      if (NpmRevPath.parse(relativePath).isEmpty()
-          || relativePath.contains("dist-tags")) { // Not dist-tags delete
-        return Optional.empty();
-      }
-
-      return parsedPathOpt;
-    };
+    super(
+        HandlerRoute.of(Permission.MANAGE, HttpMethod.DELETE)
+            .writeOperation(true)
+            .path(path -> NpmRevPath.parse(path).isPresent() && !path.contains("dist-tags")),
+        basePathParser,
+        npmProtocolFacade,
+        provider);
   }
 
   @Override
@@ -108,11 +73,10 @@ public abstract class AbstractNpmPackageDeleteProtocolMethodHandler
 
     if (revPath.tarballFilename() == null) {
       // Unpublish of the only version, or a delete of the whole package
-      this.npmProtocolFacade.deletePackage(
-          protocolContext, revPath.scopeName(), revPath.packageName());
+      this.facade.deletePackage(protocolContext, revPath.scopeName(), revPath.packageName());
     } else {
       // The last request of an unpublish of one version, after its packument PUT
-      this.npmProtocolFacade.deletePackageTarball(
+      this.facade.deletePackageTarball(
           protocolContext, revPath.scopeName(), revPath.packageName(), revPath.tarballFilename());
     }
 

@@ -60,7 +60,8 @@ public class NpmAuthPreProcessor extends ProtocolProcessor {
       "Bearer realm=\"" + BasicAuthChallenge.REALM + "\", " + CHALLENGE;
 
   private static final String URL_PROPERTIES_KEY = "urlProperties";
-  private static final String REQUIRE_AUTHENTICATION_KEY = "requireAuthentication";
+  private static final String REQUIRE_AUTHENTICATION_KEY =
+      HandlerPropertyKeys.REQUIRE_AUTHENTICATION;
 
   private final NpmAuthenticatorImpl authenticator;
   private final NpmProtocolProvider provider;

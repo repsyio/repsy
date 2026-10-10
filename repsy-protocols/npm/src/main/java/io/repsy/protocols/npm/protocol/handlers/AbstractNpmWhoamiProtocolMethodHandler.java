@@ -21,16 +21,15 @@ import static org.springframework.http.HttpHeaders.WWW_AUTHENTICATE;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
 import io.repsy.protocols.npm.shared.auth.services.NpmIdentityResolver;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
-import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.handlers.AbstractRoutedProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.List;
 import java.util.Map;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -45,43 +44,25 @@ import org.springframework.http.ResponseEntity;
  * to authenticate ({@code requireAuthentication}) and still verifies everything itself.
  */
 @NullMarked
-public abstract class AbstractNpmWhoamiProtocolMethodHandler<ID> implements ProtocolMethodHandler {
+public abstract class AbstractNpmWhoamiProtocolMethodHandler<ID>
+    extends AbstractRoutedProtocolMethodHandler {
 
   private static final String CHALLENGE = BasicAuthChallenge.REPSY;
   private static final String BEARER_CHALLENGE =
       "Bearer realm=\"" + BasicAuthChallenge.REALM + "\", " + CHALLENGE;
   private static final String BEARER_PREFIX = "Bearer ";
 
-  private final PathParser pathParser;
   private final NpmIdentityResolver<ID> identityResolver;
 
   public AbstractNpmWhoamiProtocolMethodHandler(
       @Qualifier("npmPathParser") final PathParser basePathParser,
       final NpmIdentityResolver<ID> identityResolver,
       final NpmProtocolProvider provider) {
-    this.pathParser = new NpmExactPathParser(basePathParser, HttpMethod.GET, "/-/whoami");
+    super(
+        HandlerRoute.read(HttpMethod.GET).requireAuthentication(true).skipUsagePostProcessor(true),
+        new NpmExactPathParser(basePathParser, HttpMethod.GET, "/-/whoami"),
+        provider);
     this.identityResolver = identityResolver;
-
-    provider.registerMethodHandler(this);
-  }
-
-  @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.GET);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of(
-        "permission", Permission.READ,
-        "writeOperation", false,
-        "requireAuthentication", true,
-        "skipUsagePostProcessor", true);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return this.pathParser;
   }
 
   @Override
