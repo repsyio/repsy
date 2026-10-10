@@ -162,6 +162,16 @@ scanner's `POST /advisories` (`VulnerabilityAdvisoryLookup`, RPS-1612) for the n
 client sends and merges the answer with the stored findings; any non-200, timeout or failure of that
 lookup means "no lookup this time" and the audit is answered from the stored findings.
 
+"The latest scan of an artifact version" is stored, not recomputed (RPS-2115, V0036-V0039):
+`vulnerability_scan.superseded_at` is null on the newest scan of a (repo, artifact, version) and
+`completed_superseded_at` on its newest `COMPLETED` scan, and `finding_count` holds the number of
+findings of a `COMPLETED` scan. `VulnerabilityScanTxService` keeps them right in the transaction
+that creates, completes or fails a scan (`VulnerabilityScanRepository#updateSupersededAt` and its
+siblings); the entity maps the markers read-only. A new latest-scan query filters on the
+markers (partial indexes `ix_vulnerability_scan__latest[_completed]`), never on a correlated
+`max(createdAt)` subquery. `VulnerabilityScanLatestQueriesIT` keeps the replaced queries and
+compares them with the current ones.
+
 ### Frontend
 
 `repsy-frontend/` is an Angular app (standalone components, `src/app/{auth,panel,shared}`). Its API
