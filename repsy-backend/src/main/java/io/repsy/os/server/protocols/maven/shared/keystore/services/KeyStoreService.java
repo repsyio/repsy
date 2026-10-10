@@ -24,7 +24,6 @@ import io.repsy.os.generated.model.PgpPublicKeyForm;
 import io.repsy.os.generated.model.PgpPublicKeyItem;
 import io.repsy.os.server.protocols.maven.shared.artifact.mappers.ArtifactMapper;
 import io.repsy.os.server.protocols.maven.shared.keystore.dtos.KeyStoreItem;
-import io.repsy.os.server.protocols.maven.shared.keystore.dtos.PublicKeySources;
 import io.repsy.os.server.protocols.maven.shared.keystore.entities.KeyStore;
 import io.repsy.os.server.protocols.maven.shared.keystore.entities.PgpPublicKey;
 import io.repsy.os.server.protocols.maven.shared.keystore.repositories.AllowedKeyserverRepository;
@@ -33,6 +32,8 @@ import io.repsy.os.server.protocols.maven.shared.keystore.repositories.PgpPublic
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.events.PgpKeySourcesChangedEvent;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.protocols.maven.shared.keystore.dtos.PublicKeySources;
+import io.repsy.protocols.maven.shared.keystore.services.PgpVerifierService;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.util.List;
 import java.util.Locale;

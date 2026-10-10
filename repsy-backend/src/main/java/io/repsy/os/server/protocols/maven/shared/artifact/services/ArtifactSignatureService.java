@@ -24,11 +24,11 @@ import io.repsy.os.server.protocols.maven.shared.artifact.entities.ArtifactVersi
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.VersionSignature;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactVersionRepository;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.VersionSignatureRepository;
-import io.repsy.os.server.protocols.maven.shared.keystore.dtos.PublicKeySources;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreService;
-import io.repsy.os.server.protocols.maven.shared.keystore.services.PgpVerifierService;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.protocols.maven.shared.artifact.dtos.SignatureOutcome;
+import io.repsy.protocols.maven.shared.keystore.dtos.PublicKeySources;
+import io.repsy.protocols.maven.shared.keystore.services.PgpVerifierService;
 import io.repsy.protocols.maven.shared.utils.MavenFileNameUtils;
 import io.repsy.protocols.maven.shared.utils.MavenGavUtils;
 import io.repsy.protocols.maven.shared.utils.SignatureFileUtils;

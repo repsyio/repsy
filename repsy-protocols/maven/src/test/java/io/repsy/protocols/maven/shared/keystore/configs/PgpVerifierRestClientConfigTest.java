@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.protocols.maven.shared.keystore.configs;
+package io.repsy.protocols.maven.shared.keystore.configs;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -35,11 +35,11 @@ import org.springframework.web.client.ResourceAccessException;
 
 /**
  * RPS-1469: a key-server lookup ({@link
- * io.repsy.os.server.protocols.maven.shared.keystore.services.PgpVerifierService}) runs for a key
- * that is not registered, so a slow or unreachable key server must not be able to hang a lookup
- * forever. A real, local HTTP server plays a slow or unreachable key server; the timeouts are the
- * ones {@link PgpVerifierRestClientConfig} actually configures, not a copy of them, so a change of
- * the configured values is caught here too.
+ * io.repsy.protocols.maven.shared.keystore.services.PgpVerifierService}) runs for a key that is not
+ * registered, so a slow or unreachable key server must not be able to hang a lookup forever. A
+ * real, local HTTP server plays a slow or unreachable key server; the timeouts are the ones {@link
+ * PgpVerifierRestClientConfig} actually configures, not a copy of them, so a change of the
+ * configured values is caught here too.
  */
 @DisplayName("PgpVerifierRestClientConfig timeouts (RPS-1469)")
 class PgpVerifierRestClientConfigTest {

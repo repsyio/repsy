@@ -38,6 +38,8 @@ import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.events.PgpKeySourcesChangedEvent;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.protocols.maven.shared.keystore.dtos.PublicKeySources;
+import io.repsy.protocols.maven.shared.keystore.services.PgpVerifierService;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -140,8 +142,7 @@ class KeyStoreServiceTest {
         new ByteArrayResource(pom),
         new ByteArrayResource(
             KEYS.detachedSignature(pom).getBytes(java.nio.charset.StandardCharsets.UTF_8)),
-        new io.repsy.os.server.protocols.maven.shared.keystore.dtos.PublicKeySources(
-            List.of(armored), List.of(), false));
+        new PublicKeySources(List.of(armored), List.of(), false));
     assertThat(this.verifier.parsedRegisteredKeyCount()).isEqualTo(1);
 
     final var id = UUID.randomUUID();

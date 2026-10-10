@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.protocols.maven.shared.keystore;
+package io.repsy.protocols.maven.shared.keystore;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -45,6 +45,9 @@ import org.bouncycastle.openpgp.operator.jcajce.JcaPGPKeyPair;
  * A throw-away RSA key pair for tests that need a real OpenPGP signature without a key server or a
  * {@code gpg} binary: the armored public key a key server would answer with, and detached ASCII
  * armored signatures made with the private key, the way {@code gpg --armor --detach-sign} does.
+ *
+ * <p>A copy of the backend's {@code PgpTestKeys}, which the backend's signature ITs use, until both
+ * move into a shared test-support module (RPS-2067); change the two together.
  *
  * <p>RPS-1202: {@link #withKeyExpirySeconds}, {@link #withRevocation()} and {@link
  * #withRevokedSubkey()} build keys whose {@code armoredPublicKey()} carries the self-signature
