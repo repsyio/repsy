@@ -65,6 +65,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -127,8 +128,12 @@ public class ArtifactDeploymentService extends AbstractArtifactService<UUID> {
     return this.artifactSignatureService.getNonSignedStoragePath(signedStoragePath);
   }
 
-  /** See {@link ArtifactSignatureService#verifySignature}. */
+  /**
+   * See {@link ArtifactSignatureService#verifySignature}. No transaction of its own, as there
+   * (RPS-2173): the class-level read-only one would hold a pooled connection across the parking.
+   */
   @Override
+  @Transactional(propagation = Propagation.SUPPORTS, readOnly = true)
   public SignatureOutcome verifySignature(
       final BaseRepoInfo<UUID> repoInfo,
       final StoragePath signedStoragePath,
