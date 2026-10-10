@@ -56,6 +56,7 @@ public abstract class AbstractHelmOciBlobUploadStatusProtocolMethodHandler<ID>
       final HelmProtocolProvider provider) {
     super(
         HandlerRoute.of(Permission.WRITE, HttpMethod.GET, HttpMethod.HEAD)
+            .writeOperation(true)
             .path(UPLOAD_STATUS_PATTERN.asMatchPredicate()),
         basePathParser,
         helmFacade,

@@ -86,9 +86,10 @@ public class ArtifactPushedEventPostProcessor extends ProtocolProcessor {
       return ProcessorResult.next();
     }
 
+    final var artifactName = context.<String>getProperty(ARTIFACT_NAME);
     final var artifactVersion = context.<String>getProperty(ARTIFACT_VERSION);
 
-    if (isDigestReference(artifactVersion)) {
+    if (!isPushedCoordinate(artifactName, artifactVersion)) {
       return ProcessorResult.next();
     }
 
@@ -103,7 +104,7 @@ public class ArtifactPushedEventPostProcessor extends ProtocolProcessor {
             repoInfo.getType().name(),
             repoInfo.getName(),
             storagePath,
-            context.getProperty(ARTIFACT_NAME),
+            artifactName,
             artifactVersion,
             true,
             false));
@@ -114,6 +115,17 @@ public class ArtifactPushedEventPostProcessor extends ProtocolProcessor {
   private boolean isWriteOperation(
       final @NonNull Map<@NonNull String, @NonNull Object> properties) {
     return (boolean) properties.getOrDefault(HandlerPropertyKeys.WRITE_OPERATION, false);
+  }
+
+  /**
+   * Only a request that resolved an artifact coordinate pushed an artifact: the upload start, chunk
+   * and status routes of an OCI registry are write operations too (so they authenticate) but
+   * publish no coordinate, and {@code ArtifactScanListener} would drop such an event anyway
+   * (RPS-2161). A digest reference is not a pushed version either.
+   */
+  private static boolean isPushedCoordinate(
+      final @Nullable String artifactName, final @Nullable String artifactVersion) {
+    return artifactName != null && artifactVersion != null && !isDigestReference(artifactVersion);
   }
 
   private static boolean isDigestReference(final @Nullable String artifactVersion) {
