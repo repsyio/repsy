@@ -1,0 +1,139 @@
+MAVEN anonymous => 401 | Basic realm="Repsy" |  |
+MAVEN badBasic => 401 | Basic realm="Repsy" | application/json | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"The credentials are missing, invalid or expired, or they do not allow this action."}
+MAVEN badBearer => 401 | Basic realm="Repsy" | application/json | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"The credentials are missing, invalid or expired, or they do not allow this action."}
+MAVEN unknownScheme => 401 | Basic realm="Repsy" | application/json | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"The credentials are missing, invalid or expired, or they do not allow this action."}
+MAVEN rawToken => 401 | Basic realm="Repsy" | application/json | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"The credentials are missing, invalid or expired, or they do not allow this action."}
+MAVEN validBasic => 404 |
+MAVEN validBearer => 404 |
+MAVEN validRawToken => 401 | Basic realm="Repsy" | application/json | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"The credentials are missing, invalid or expired, or they do not allow this action."}
+MAVEN apiKeyHeader => 401 | Basic realm="Repsy" |  |
+MAVEN badApiKeyHeader => 401 | Basic realm="Repsy" |  |
+MAVEN publicRead => 404 |
+MAVEN publicWrite => 401 | Basic realm="Repsy" |  |
+MAVEN publicWriteBadBearer => 401 | Basic realm="Repsy" | application/json | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"The credentials are missing, invalid or expired, or they do not allow this action."}
+MAVEN throttled => 429 |  | application/json | {"msgId":"tooManyRequests","type":"ERROR","data":null,"errorCode":"<uuid>","text":"Too many failed authentication attempts. Please try again later."} | Retry-After
+NPM anonymous => 401 | Basic realm="Repsy" | application/json | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"The credentials are missing, invalid or expired, or they do not allow this action."}
+NPM badBasic => 401 | Basic realm="Repsy" | application/json | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"The credentials are missing, invalid or expired, or they do not allow this action."}
+NPM badBearer => 401 | Bearer realm="Repsy", Basic realm="Repsy" | application/json | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"The credentials are missing, invalid or expired, or they do not allow this action."}
+NPM unknownScheme => 401 | Basic realm="Repsy" | application/json | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"The credentials are missing, invalid or expired, or they do not allow this action."}
+NPM rawToken => 401 | Basic realm="Repsy" | application/json | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"The credentials are missing, invalid or expired, or they do not allow this action."}
+NPM validBasic => 404 |
+NPM validBearer => 404 |
+NPM validRawToken => 401 | Basic realm="Repsy" | application/json | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"The credentials are missing, invalid or expired, or they do not allow this action."}
+NPM apiKeyHeader => 401 | Basic realm="Repsy" | application/json | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"The credentials are missing, invalid or expired, or they do not allow this action."}
+NPM badApiKeyHeader => 401 | Basic realm="Repsy" | application/json | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"The credentials are missing, invalid or expired, or they do not allow this action."}
+NPM publicRead => 404 |
+NPM publicWrite => 401 | Basic realm="Repsy" | application/json | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"The credentials are missing, invalid or expired, or they do not allow this action."}
+NPM publicWriteBadBearer => 401 | Bearer realm="Repsy", Basic realm="Repsy" | application/json | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"The credentials are missing, invalid or expired, or they do not allow this action."}
+NPM throttled => 429 |  | application/json | {"msgId":"tooManyRequests","type":"ERROR","data":null,"errorCode":"<uuid>","text":"Too many failed authentication attempts. Please try again later."} | Retry-After
+CARGO anonymous => 401 | Basic realm="Repsy" |  |
+CARGO badBasic => 401 | Basic realm="Repsy" | application/json | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"The credentials are missing, invalid or expired, or they do not allow this action."}
+CARGO badBearer => 401 | Basic realm="Repsy" | application/json | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"The credentials are missing, invalid or expired, or they do not allow this action."}
+CARGO unknownScheme => 401 | Basic realm="Repsy" | application/json | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"The credentials are missing, invalid or expired, or they do not allow this action."}
+CARGO rawToken => 401 | Basic realm="Repsy" | application/json | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"The credentials are missing, invalid or expired, or they do not allow this action."}
+CARGO validBasic => 404 |
+CARGO validBearer => 404 |
+CARGO validRawToken => 404 |
+CARGO apiKeyHeader => 401 | Basic realm="Repsy" |  |
+CARGO badApiKeyHeader => 401 | Basic realm="Repsy" |  |
+CARGO publicRead => 404 |
+CARGO publicWrite => 401 | Basic realm="Repsy" |  |
+CARGO publicWriteBadBearer => 401 | Basic realm="Repsy" | application/json | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"The credentials are missing, invalid or expired, or they do not allow this action."}
+CARGO throttled => 429 |  | application/json | {"msgId":"tooManyRequests","type":"ERROR","data":null,"errorCode":"<uuid>","text":"Too many failed authentication attempts. Please try again later."} | Retry-After
+NUGET anonymous => 401 | Basic realm="Repsy" |  |
+NUGET badBasic => 401 | Basic realm="Repsy" |  |
+NUGET badBearer => 401 | Basic realm="Repsy" |  |
+NUGET unknownScheme => 401 | Basic realm="Repsy" |  |
+NUGET rawToken => 401 | Basic realm="Repsy" |  |
+NUGET validBasic => 404 |
+NUGET validBearer => 404 |
+NUGET validRawToken => 404 |
+NUGET apiKeyHeader => 404 |
+NUGET badApiKeyHeader => 401 | Basic realm="Repsy" |  |
+NUGET publicRead => 404 |
+NUGET publicWrite => 401 | Basic realm="Repsy" |  |
+NUGET publicWriteBadBearer => 401 | Basic realm="Repsy" |  |
+NUGET throttled => 429 |  | application/json | {"msgId":"tooManyRequests","type":"ERROR","data":null,"errorCode":"<uuid>","text":"Too many failed authentication attempts. Please try again later."} | Retry-After
+PYPI anonymous => 401 | Basic realm="Repsy" | application/json | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"The credentials are missing, invalid or expired, or they do not allow this action."}
+PYPI badBasic => 401 | Basic realm="Repsy" | application/json | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"The credentials are missing, invalid or expired, or they do not allow this action."}
+PYPI badBearer => 401 | Basic realm="Repsy" | application/json | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"The credentials are missing, invalid or expired, or they do not allow this action."}
+PYPI unknownScheme => 401 | Basic realm="Repsy" | application/json | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"The credentials are missing, invalid or expired, or they do not allow this action."}
+PYPI rawToken => 401 | Basic realm="Repsy" | application/json | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"The credentials are missing, invalid or expired, or they do not allow this action."}
+PYPI validBasic => 404 |
+PYPI validBearer => 404 |
+PYPI validRawToken => 401 | Basic realm="Repsy" | application/json | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"The credentials are missing, invalid or expired, or they do not allow this action."}
+PYPI apiKeyHeader => 401 | Basic realm="Repsy" | application/json | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"The credentials are missing, invalid or expired, or they do not allow this action."}
+PYPI badApiKeyHeader => 401 | Basic realm="Repsy" | application/json | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"The credentials are missing, invalid or expired, or they do not allow this action."}
+PYPI publicRead => 404 |
+PYPI throttled => 429 |  | application/json | {"msgId":"tooManyRequests","type":"ERROR","data":null,"errorCode":"<uuid>","text":"Too many failed authentication attempts. Please try again later."} | Retry-After
+RUBY anonymous => 401 | Basic realm="Repsy" |  |
+RUBY badBasic => 401 | Basic realm="Repsy" | application/json | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"The credentials are missing, invalid or expired, or they do not allow this action."}
+RUBY badBearer => 401 | Basic realm="Repsy" | application/json | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"The credentials are missing, invalid or expired, or they do not allow this action."}
+RUBY unknownScheme => 401 | Basic realm="Repsy" | application/json | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"The credentials are missing, invalid or expired, or they do not allow this action."}
+RUBY rawToken => 401 | Basic realm="Repsy" | application/json | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"The credentials are missing, invalid or expired, or they do not allow this action."}
+RUBY validBasic => 200 |
+RUBY validBearer => 200 |
+RUBY validRawToken => 200 |
+RUBY apiKeyHeader => 401 | Basic realm="Repsy" |  |
+RUBY badApiKeyHeader => 401 | Basic realm="Repsy" |  |
+RUBY publicRead => 200 |
+RUBY publicWrite => 401 | Basic realm="Repsy" |  |
+RUBY publicWriteBadBearer => 401 | Basic realm="Repsy" | application/json | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"The credentials are missing, invalid or expired, or they do not allow this action."}
+RUBY throttled => 429 |  | application/json | {"msgId":"tooManyRequests","type":"ERROR","data":null,"errorCode":"<uuid>","text":"Too many failed authentication attempts. Please try again later."} | Retry-After
+GOLANG anonymous => 401 | Basic realm="Repsy" | text/plain | Authentication is required to access this resource.
+GOLANG badBasic => 401 | Basic realm="Repsy" | text/plain | The credentials are missing, invalid or expired, or they do not allow this action.
+GOLANG badBearer => 401 | Basic realm="Repsy" | text/plain | The credentials are missing, invalid or expired, or they do not allow this action.
+GOLANG unknownScheme => 401 | Basic realm="Repsy" | text/plain | The credentials are missing, invalid or expired, or they do not allow this action.
+GOLANG rawToken => 401 | Basic realm="Repsy" | text/plain | The credentials are missing, invalid or expired, or they do not allow this action.
+GOLANG validBasic => 404 |
+GOLANG validBearer => 404 |
+GOLANG validRawToken => 401 | Basic realm="Repsy" | text/plain | The credentials are missing, invalid or expired, or they do not allow this action.
+GOLANG apiKeyHeader => 401 | Basic realm="Repsy" | text/plain | Authentication is required to access this resource.
+GOLANG badApiKeyHeader => 401 | Basic realm="Repsy" | text/plain | Authentication is required to access this resource.
+GOLANG publicRead => 404 |
+GOLANG publicWrite => 401 | Basic realm="Repsy" | text/plain | Authentication is required to access this resource.
+GOLANG publicWriteBadBearer => 401 | Basic realm="Repsy" | text/plain | The credentials are missing, invalid or expired, or they do not allow this action.
+GOLANG throttled => 429 |  | application/json | {"msgId":"tooManyRequests","type":"ERROR","data":null,"errorCode":"<uuid>","text":"Too many failed authentication attempts. Please try again later."} | Retry-After
+HELM anonymous => 401 | Basic realm="Repsy" |  |
+HELM badBasic => 401 | Basic realm="Repsy" | application/json | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"The credentials are missing, invalid or expired, or they do not allow this action."}
+HELM badBearer => 401 | Basic realm="Repsy" | application/json | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"The credentials are missing, invalid or expired, or they do not allow this action."}
+HELM unknownScheme => 401 | Basic realm="Repsy" | application/json | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"The credentials are missing, invalid or expired, or they do not allow this action."}
+HELM rawToken => 401 | Basic realm="Repsy" | application/json | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"The credentials are missing, invalid or expired, or they do not allow this action."}
+HELM validBasic => 200 |
+HELM validBearer => 200 |
+HELM validRawToken => 401 | Basic realm="Repsy" | application/json | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"The credentials are missing, invalid or expired, or they do not allow this action."}
+HELM apiKeyHeader => 401 | Basic realm="Repsy" |  |
+HELM badApiKeyHeader => 401 | Basic realm="Repsy" |  |
+HELM publicRead => 200 |
+HELM publicWrite => 401 | Basic realm="Repsy" |  |
+HELM publicWriteBadBearer => 401 | Basic realm="Repsy" | application/json | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"The credentials are missing, invalid or expired, or they do not allow this action."}
+HELM throttled => 429 |  | application/json | {"msgId":"tooManyRequests","type":"ERROR","data":null,"errorCode":"<uuid>","text":"Too many failed authentication attempts. Please try again later."} | Retry-After
+HELM_OCI anonymous => 401 | Basic realm="Repsy" | application/json | {"errors":[{"code":"UNAUTHORIZED","message":"Authentication is required to access this resource.","detail":"unauthorizedRequest"}]}
+HELM_OCI badBasic => 401 | Basic realm="Repsy" | application/json | {"errors":[{"code":"UNAUTHORIZED","message":"The credentials are missing, invalid or expired, or they do not allow this action.","detail":"unAuthorized"}]}
+HELM_OCI badBearer => 401 | Basic realm="Repsy" | application/json | {"errors":[{"code":"UNAUTHORIZED","message":"The credentials are missing, invalid or expired, or they do not allow this action.","detail":"unAuthorized"}]}
+HELM_OCI unknownScheme => 401 | Basic realm="Repsy" | application/json | {"errors":[{"code":"UNAUTHORIZED","message":"The credentials are missing, invalid or expired, or they do not allow this action.","detail":"unAuthorized"}]}
+HELM_OCI rawToken => 401 | Basic realm="Repsy" | application/json | {"errors":[{"code":"UNAUTHORIZED","message":"The credentials are missing, invalid or expired, or they do not allow this action.","detail":"unAuthorized"}]}
+HELM_OCI validBasic => 404 |
+HELM_OCI validBearer => 404 |
+HELM_OCI validRawToken => 401 | Basic realm="Repsy" | application/json | {"errors":[{"code":"UNAUTHORIZED","message":"The credentials are missing, invalid or expired, or they do not allow this action.","detail":"unAuthorized"}]}
+HELM_OCI apiKeyHeader => 401 | Basic realm="Repsy" | application/json | {"errors":[{"code":"UNAUTHORIZED","message":"Authentication is required to access this resource.","detail":"unauthorizedRequest"}]}
+HELM_OCI badApiKeyHeader => 401 | Basic realm="Repsy" | application/json | {"errors":[{"code":"UNAUTHORIZED","message":"Authentication is required to access this resource.","detail":"unauthorizedRequest"}]}
+HELM_OCI publicRead => 404 |
+HELM_OCI publicWrite => 401 | Basic realm="Repsy" | application/json | {"errors":[{"code":"UNAUTHORIZED","message":"Authentication is required to access this resource.","detail":"unauthorizedRequest"}]}
+HELM_OCI publicWriteBadBearer => 401 | Basic realm="Repsy" | application/json | {"errors":[{"code":"UNAUTHORIZED","message":"The credentials are missing, invalid or expired, or they do not allow this action.","detail":"unAuthorized"}]}
+HELM_OCI throttled => 429 |  | application/json | {"errors":[{"code":"TOOMANYREQUESTS","message":"Too many failed authentication attempts. Please try again later.","detail":"tooManyRequests"}]} | Retry-After
+DOCKER anonymous => 401 | Bearer realm="http://localhost/v2/token",service="repsy",scope="repository:{repo}/app:pull" | application/json | {"errors":[{"code":"UNAUTHORIZED","message":"Authentication is required to access this resource.","detail":"unauthorizedRequest"}]}
+DOCKER badBasic => 401 | Bearer realm="http://localhost/v2/token",service="repsy",scope="repository:{repo}/app:pull" | application/json | {"errors":[{"code":"UNAUTHORIZED","message":"Authentication is required to access this resource.","detail":"unauthorizedRequest"}]}
+DOCKER badBearer => 401 | Bearer realm="http://localhost/v2/token",service="repsy",scope="repository:{repo}/app:pull" | application/json | {"errors":[{"code":"UNAUTHORIZED","message":"The credentials are missing, invalid or expired, or they do not allow this action.","detail":"unAuthorized"}]}
+DOCKER unknownScheme => 401 | Bearer realm="http://localhost/v2/token",service="repsy",scope="repository:{repo}/app:pull" | application/json | {"errors":[{"code":"UNAUTHORIZED","message":"Authentication is required to access this resource.","detail":"unauthorizedRequest"}]}
+DOCKER rawToken => 401 | Bearer realm="http://localhost/v2/token",service="repsy",scope="repository:{repo}/app:pull" | application/json | {"errors":[{"code":"UNAUTHORIZED","message":"Authentication is required to access this resource.","detail":"unauthorizedRequest"}]}
+DOCKER validBasic => 401 | Bearer realm="http://localhost/v2/token",service="repsy",scope="repository:{repo}/app:pull" | application/json | {"errors":[{"code":"UNAUTHORIZED","message":"Authentication is required to access this resource.","detail":"unauthorizedRequest"}]}
+DOCKER validBearer => 404 |
+DOCKER validRawToken => 401 | Bearer realm="http://localhost/v2/token",service="repsy",scope="repository:{repo}/app:pull" | application/json | {"errors":[{"code":"UNAUTHORIZED","message":"Authentication is required to access this resource.","detail":"unauthorizedRequest"}]}
+DOCKER apiKeyHeader => 401 | Bearer realm="http://localhost/v2/token",service="repsy",scope="repository:{repo}/app:pull" | application/json | {"errors":[{"code":"UNAUTHORIZED","message":"Authentication is required to access this resource.","detail":"unauthorizedRequest"}]}
+DOCKER badApiKeyHeader => 401 | Bearer realm="http://localhost/v2/token",service="repsy",scope="repository:{repo}/app:pull" | application/json | {"errors":[{"code":"UNAUTHORIZED","message":"Authentication is required to access this resource.","detail":"unauthorizedRequest"}]}
+DOCKER publicRead => 401 | Bearer realm="http://localhost/v2/token",service="repsy",scope="repository:{repo}/app:pull" | application/json | {"errors":[{"code":"UNAUTHORIZED","message":"Authentication is required to access this resource.","detail":"unauthorizedRequest"}]}
+DOCKER publicWrite => 401 | Bearer realm="http://localhost/v2/token",service="repsy",scope="repository:{repo}/app:pull,push" | application/json | {"errors":[{"code":"UNAUTHORIZED","message":"The credentials are missing, invalid or expired, or they do not allow this action.","detail":"unAuthorized"}]}
+DOCKER publicWriteBadBearer => 401 | Bearer realm="http://localhost/v2/token",service="repsy",scope="repository:{repo}/app:pull,push" | application/json | {"errors":[{"code":"UNAUTHORIZED","message":"The credentials are missing, invalid or expired, or they do not allow this action.","detail":"unAuthorized"}]}
+DOCKER registryToken => 404 |
+DOCKER throttled => 401 | Bearer realm="http://localhost/v2/token",service="repsy",scope="repository:{repo}/app:pull" | application/json | {"errors":[{"code":"UNAUTHORIZED","message":"Authentication is required to access this resource.","detail":"unauthorizedRequest"}]}
