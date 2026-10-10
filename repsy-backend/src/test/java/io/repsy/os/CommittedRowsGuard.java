@@ -158,7 +158,7 @@ public final class CommittedRowsGuard implements BeforeAllCallback, AfterAllCall
    * Blocks until the application's asynchronous startup seeding has committed its default repos.
    *
    * <p>{@code AdminUserInitializer} publishes a {@code UserCreatedEvent} and the {@code @Async}
-   * per-protocol {@code *AuthListener}s then create one default repo per {@link RepoType} (named
+   * {@code DefaultRepoSeedingListener} then creates one default repo per {@link RepoType} (named
    * {@code maven}, {@code npm}, ..., {@code go}, ...) in their own committed transactions. Without
    * this barrier the first class of a JVM would race that seeding, and anything that counts or
    * lists repos would see a different number depending on timing.

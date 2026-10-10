@@ -15,67 +15,17 @@
  */
 package io.repsy.os.server.protocols.npm.protocol.handlers;
 
-import io.repsy.libs.protocol.router.PathParser;
-import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.storage.core.dtos.RelativePath;
-import io.repsy.os.server.core.UrlParserProperties;
-import io.repsy.os.shared.repo.dtos.RepoInfo;
+import io.repsy.os.server.protocols.shared.handlers.AbstractRepoPathParser;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
-import jakarta.servlet.http.HttpServletRequest;
-import java.util.Locale;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
 @Component("osNpmPathParser")
-@RequiredArgsConstructor
 @NullMarked
-public class NpmPathParser implements PathParser {
-  private static final String REPO_NAME = "repoName";
-  private static final String RELATIVE_PATH = "relativePath";
-  private static final String REPO_NAME_REGEX = "(?<repoName>[a-zA-Z0-9_\\-]+)";
-  private static final String RELATIVE_PATH_REGEX = "(?<relativePath>/.*)?";
+public class NpmPathParser extends AbstractRepoPathParser {
 
-  private static final Pattern PATTERN =
-      Pattern.compile("^/" + REPO_NAME_REGEX + RELATIVE_PATH_REGEX);
-
-  private final RepoTxService repoTxService;
-
-  @Override
-  public Optional<ProtocolContext> parse(final HttpServletRequest request) {
-    final var path = request.getServletPath();
-    final var matcher = PATTERN.matcher(path);
-
-    if (!matcher.matches()) {
-      return Optional.empty();
-    }
-
-    final var repoName = matcher.group(REPO_NAME).toLowerCase(Locale.getDefault());
-
-    final var repoInfoOpt = this.repoTxService.findRepoByNameAndType(repoName, RepoType.NPM);
-
-    return repoInfoOpt.flatMap(repoInfo -> this.createProtocolContext(repoInfo, repoName, matcher));
-  }
-
-  private Optional<ProtocolContext> createProtocolContext(
-      final RepoInfo repoInfo, final String repoName, final Matcher matcher) {
-
-    final var context = new ProtocolContext();
-
-    final var urlProperties =
-        UrlParserProperties.builder()
-            .repoName(repoName)
-            .relativePath(new RelativePath(Objects.toString(matcher.group(RELATIVE_PATH), "")))
-            .repoInfo(repoInfo)
-            .build();
-
-    context.addProperty("urlProperties", urlProperties);
-
-    return Optional.of(context);
+  public NpmPathParser(final RepoTxService repoTxService) {
+    super(repoTxService, RepoType.NPM, null, repoPattern(""));
   }
 }

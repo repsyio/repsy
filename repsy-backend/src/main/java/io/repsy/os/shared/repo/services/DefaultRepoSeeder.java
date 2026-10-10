@@ -30,7 +30,7 @@ import org.springframework.stereotype.Service;
  * Creates the default repository of a protocol, and repairs it when an earlier attempt stopped
  * half-way.
  *
- * <p>The default repositories are seeded by the per-protocol {@code *AuthListener}s on every {@code
+ * <p>The default repositories are seeded by the {@code DefaultRepoSeedingListener} on every {@code
  * UserCreatedEvent}, so seeding must be safe to repeat: a repository that already exists is not an
  * error, and one whose row was committed but whose storage directory was never created (the storage
  * call failed after the row's transaction had committed) is completed by the next event instead of

@@ -15,63 +15,35 @@
  */
 package io.repsy.os.server.protocols.helm.protocol.utils;
 
-import io.repsy.libs.protocol.router.PathParser;
-import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
-import io.repsy.os.server.core.UrlParserProperties;
-import io.repsy.os.shared.repo.dtos.RepoInfo;
+import io.repsy.os.server.protocols.shared.handlers.AbstractRepoPathParser;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
-import jakarta.servlet.http.HttpServletRequest;
-import java.util.Locale;
-import java.util.Optional;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
+/** The ChartMuseum API, {@code /api/<repo>/...}; its relative path keeps the {@code /api}. */
 @Component
 @Qualifier("osHelmChartMuseumPathParser")
-@RequiredArgsConstructor
 @NullMarked
-public class HelmChartMuseumPathParser implements PathParser {
+public class HelmChartMuseumPathParser extends AbstractRepoPathParser {
+
+  private static final String SUFFIX_GROUP = "suffix";
 
   private static final Pattern PATTERN =
-      Pattern.compile("^/api/(?<repoName>[a-zA-Z0-9_\\-]+)(?<suffix>/[^\\s#?&${}\\\\]*)?$");
+      Pattern.compile("^/api/" + REPO_NAME_REGEX + "(?<suffix>/[^\\s#?&${}\\\\]*)?$");
 
-  private final RepoTxService repoTxService;
-
-  @Override
-  public Optional<ProtocolContext> parse(final HttpServletRequest request) {
-    final var path = request.getServletPath();
-    final var matcher = PATTERN.matcher(path);
-
-    if (!matcher.matches()) {
-      return Optional.empty();
-    }
-
-    final var repoName = matcher.group("repoName").toLowerCase(Locale.getDefault());
-    final var rawSuffix = matcher.group("suffix");
-    final var relativePath = rawSuffix != null ? "/api" + rawSuffix : "";
-
-    return this.repoTxService
-        .findRepoByNameAndType(repoName, RepoType.HELM)
-        .flatMap(repoInfo -> this.createProtocolContext(repoInfo, repoName, relativePath));
+  public HelmChartMuseumPathParser(final RepoTxService repoTxService) {
+    super(repoTxService, RepoType.HELM, null, PATTERN);
   }
 
-  private Optional<ProtocolContext> createProtocolContext(
-      final RepoInfo repoInfo, final String repoName, final String relativePath) {
+  @Override
+  protected RelativePath relativePath(final Matcher matcher) {
+    final var suffix = matcher.group(SUFFIX_GROUP);
 
-    final var context = new ProtocolContext();
-    final var urlProperties =
-        UrlParserProperties.builder()
-            .repoName(repoName)
-            .relativePath(new RelativePath(relativePath))
-            .repoInfo(repoInfo)
-            .build();
-
-    context.addProperty("urlProperties", urlProperties);
-    return Optional.of(context);
+    return new RelativePath(suffix != null ? "/api" + suffix : "");
   }
 }

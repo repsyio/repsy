@@ -13,19 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.protocols.ruby.protocol.handlers;
+package io.repsy.os.shared.repo.dtos;
 
-import io.repsy.os.server.protocols.shared.handlers.AbstractRepoPathParser;
-import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import java.util.UUID;
+import java.util.function.Consumer;
 import org.jspecify.annotations.NullMarked;
-import org.springframework.stereotype.Component;
 
-@Component("osRubyPathParser")
+/**
+ * The default repository of one protocol: its name, its type and how its storage directory is
+ * created from the storage key.
+ */
 @NullMarked
-public class RubyPathParser extends AbstractRepoPathParser {
-
-  public RubyPathParser(final RepoTxService repoTxService) {
-    super(repoTxService, RepoType.RUBY, null, repoPattern(""));
-  }
-}
+public record DefaultRepoDefinition(String name, RepoType type, Consumer<UUID> storageCreator) {}

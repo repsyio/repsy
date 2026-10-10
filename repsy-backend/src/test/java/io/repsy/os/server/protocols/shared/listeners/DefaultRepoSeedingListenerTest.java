@@ -15,33 +15,31 @@
  */
 package io.repsy.os.server.protocols.shared.listeners;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 import io.repsy.core.events.UserCreatedEvent;
-import io.repsy.os.server.protocols.cargo.shared.listeners.CargoAuthListener;
-import io.repsy.os.server.protocols.docker.shared.listeners.DockerAuthListener;
 import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
-import io.repsy.os.server.protocols.golang.shared.listeners.GoAuthListener;
-import io.repsy.os.server.protocols.golang.shared.storage.services.GoStorageService;
-import io.repsy.os.server.protocols.helm.shared.listeners.HelmAuthListener;
-import io.repsy.os.server.protocols.helm.shared.storage.services.HelmStorageService;
-import io.repsy.os.server.protocols.maven.shared.listeners.MavenAuthListener;
-import io.repsy.os.server.protocols.maven.shared.storage.services.MavenStorageService;
-import io.repsy.os.server.protocols.npm.shared.listeners.NpmAuthListener;
-import io.repsy.os.server.protocols.npm.shared.storage.services.NpmStorageService;
-import io.repsy.os.server.protocols.nuget.shared.listeners.NuGetAuthListener;
-import io.repsy.os.server.protocols.pypi.shared.listeners.PypiAuthListener;
-import io.repsy.os.server.protocols.pypi.shared.storage.services.PypiStorageService;
-import io.repsy.os.server.protocols.ruby.shared.listeners.RubyAuthListener;
-import io.repsy.os.server.protocols.ruby.shared.storage.services.RubyStorageService;
+import io.repsy.os.server.protocols.shared.configs.DefaultRepoDefinitionsConfig;
+import io.repsy.os.shared.repo.dtos.DefaultRepoDefinition;
 import io.repsy.os.shared.repo.services.DefaultRepoSeeder;
 import io.repsy.protocols.cargo.shared.storage.services.CargoStorageService;
+import io.repsy.protocols.golang.shared.storage.services.GoStorageService;
+import io.repsy.protocols.helm.shared.storage.services.HelmStorageService;
+import io.repsy.protocols.maven.shared.storage.services.MavenStorageService;
+import io.repsy.protocols.npm.shared.storage.services.NpmStorageService;
 import io.repsy.protocols.nuget.shared.storage.services.NuGetStorageService;
+import io.repsy.protocols.pypi.shared.storage.services.PypiStorageService;
+import io.repsy.protocols.ruby.shared.storage.services.RubyStorageService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import java.util.List;
 import java.util.UUID;
 import java.util.function.Consumer;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -49,131 +47,102 @@ import org.mockito.ArgumentCaptor;
 /**
  * Pins, per protocol, what a {@code UserCreatedEvent} makes the default-repository seeding do
  * (RPS-2062): the repository name, its {@link RepoType}, and that the storage directory is created
- * through that protocol's storage service. It is the safety net for replacing the per-protocol
- * {@code *AuthListener}s with one listener.
+ * through that protocol's storage service. The definitions come from {@link
+ * DefaultRepoDefinitionsConfig}, as in the application.
  */
 @DisplayName("Default repository seeding per protocol")
 class DefaultRepoSeedingListenerTest {
 
   private static final UUID STORAGE_KEY = UUID.fromString("00000000-0000-0000-0000-0000000000b1");
 
+  private final CargoStorageService cargo = mock(CargoStorageService.class);
+  private final DockerStorageService docker = mock(DockerStorageService.class);
+  private final GoStorageService go = mock(GoStorageService.class);
+  private final HelmStorageService helm = mock(HelmStorageService.class);
+  private final MavenStorageService maven = mock(MavenStorageService.class);
+  private final NpmStorageService npm = mock(NpmStorageService.class);
+  private final NuGetStorageService nuget = mock(NuGetStorageService.class);
+  private final PypiStorageService pypi = mock(PypiStorageService.class);
+  private final RubyStorageService ruby = mock(RubyStorageService.class);
+
+  private DefaultRepoSeeder seeder;
+  private DefaultRepoSeedingListener listener;
+
+  @BeforeEach
+  void setUp() {
+    this.seeder = mock(DefaultRepoSeeder.class);
+    final var config = new DefaultRepoDefinitionsConfig();
+    final List<DefaultRepoDefinition> definitions =
+        List.of(
+            config.cargoDefaultRepo(this.cargo),
+            config.dockerDefaultRepo(this.docker),
+            config.goDefaultRepo(this.go),
+            config.helmDefaultRepo(this.helm),
+            config.mavenDefaultRepo(this.maven),
+            config.npmDefaultRepo(this.npm),
+            config.nugetDefaultRepo(this.nuget),
+            config.pypiDefaultRepo(this.pypi),
+            config.rubyDefaultRepo(this.ruby));
+    this.listener = new DefaultRepoSeedingListener(this.seeder, definitions);
+  }
+
   @SuppressWarnings("unchecked")
-  private static Consumer<UUID> seededCreator(
-      final DefaultRepoSeeder seeder, final String name, final RepoType type) {
+  private Consumer<UUID> seededCreator(final String name, final RepoType type) {
     final ArgumentCaptor<Consumer<UUID>> creator = ArgumentCaptor.forClass(Consumer.class);
-    verify(seeder).seed(eq(name), eq(type), creator.capture());
+    verify(this.seeder).seed(eq(name), eq(type), creator.capture());
     return creator.getValue();
   }
 
-  @Test
-  @DisplayName("Cargo seeds 'cargo' through CargoStorageService")
-  void cargo() {
-    final var seeder = mock(DefaultRepoSeeder.class);
-    final var storage = mock(CargoStorageService.class);
-
-    new CargoAuthListener(seeder, storage).onRegistrationCompleted(event());
-
-    seededCreator(seeder, "cargo", RepoType.CARGO).accept(STORAGE_KEY);
-    verify(storage).createRepo(STORAGE_KEY);
+  private void publish() {
+    this.listener.onUserCreated(new UserCreatedEvent<>(UUID.randomUUID(), "admin"));
   }
 
   @Test
-  @DisplayName("Docker seeds 'docker' through DockerStorageService")
-  void docker() {
-    final var seeder = mock(DefaultRepoSeeder.class);
-    final var storage = mock(DockerStorageService.class);
+  @DisplayName("seeds every protocol once under its name and creates storage through its service")
+  void seedsEveryProtocol() {
+    publish();
 
-    new DockerAuthListener(seeder, storage).onRegistrationCompleted(event());
-
-    seededCreator(seeder, "docker", RepoType.DOCKER).accept(STORAGE_KEY);
-    verify(storage).createRepo(STORAGE_KEY);
+    seededCreator("cargo", RepoType.CARGO).accept(STORAGE_KEY);
+    verify(this.cargo).createRepo(STORAGE_KEY);
+    seededCreator("docker", RepoType.DOCKER).accept(STORAGE_KEY);
+    verify(this.docker).createRepo(STORAGE_KEY);
+    seededCreator("go", RepoType.GOLANG).accept(STORAGE_KEY);
+    verify(this.go).createRepo(STORAGE_KEY);
+    seededCreator("helm", RepoType.HELM).accept(STORAGE_KEY);
+    verify(this.helm).createRepo(STORAGE_KEY);
+    seededCreator("maven", RepoType.MAVEN).accept(STORAGE_KEY);
+    verify(this.maven).createRepo(STORAGE_KEY);
+    seededCreator("npm", RepoType.NPM).accept(STORAGE_KEY);
+    verify(this.npm).createRepo(STORAGE_KEY);
+    seededCreator("nuget", RepoType.NUGET).accept(STORAGE_KEY);
+    verify(this.nuget).createRepo(STORAGE_KEY);
+    seededCreator("pypi", RepoType.PYPI).accept(STORAGE_KEY);
+    verify(this.pypi).createRepo(STORAGE_KEY);
+    seededCreator("ruby", RepoType.RUBY).accept(STORAGE_KEY);
+    verify(this.ruby).createRepo(STORAGE_KEY);
   }
 
   @Test
-  @DisplayName("Go seeds 'go' as GOLANG through GoStorageService")
-  void golang() {
-    final var seeder = mock(DefaultRepoSeeder.class);
-    final var storage = mock(GoStorageService.class);
+  @DisplayName("covers every RepoType exactly once")
+  void coversEveryRepoType() {
+    publish();
 
-    new GoAuthListener(seeder, storage).onRegistrationCompleted(event());
-
-    seededCreator(seeder, "go", RepoType.GOLANG).accept(STORAGE_KEY);
-    verify(storage).createRepo(STORAGE_KEY);
+    final ArgumentCaptor<RepoType> types = ArgumentCaptor.forClass(RepoType.class);
+    verify(this.seeder, org.mockito.Mockito.times(RepoType.values().length))
+        .seed(any(), types.capture(), any());
+    assertThat(types.getAllValues()).containsExactlyInAnyOrder(RepoType.values());
   }
 
   @Test
-  @DisplayName("Helm seeds 'helm' through HelmStorageService")
-  void helm() {
-    final var seeder = mock(DefaultRepoSeeder.class);
-    final var storage = mock(HelmStorageService.class);
+  @DisplayName("a protocol whose seeding fails does not keep the others from being seeded")
+  void oneFailureDoesNotStopTheRest() {
+    doThrow(new IllegalStateException("storage down"))
+        .when(this.seeder)
+        .seed(eq("docker"), eq(RepoType.DOCKER), any());
 
-    new HelmAuthListener(seeder, storage).onRegistrationCompleted(event());
+    publish();
 
-    seededCreator(seeder, "helm", RepoType.HELM).accept(STORAGE_KEY);
-    verify(storage).createRepo(STORAGE_KEY);
-  }
-
-  @Test
-  @DisplayName("Maven seeds 'maven' through MavenStorageService")
-  void maven() {
-    final var seeder = mock(DefaultRepoSeeder.class);
-    final var storage = mock(MavenStorageService.class);
-
-    new MavenAuthListener(seeder, storage).onRegistrationCompleted(event());
-
-    seededCreator(seeder, "maven", RepoType.MAVEN).accept(STORAGE_KEY);
-    verify(storage).createRepo(STORAGE_KEY);
-  }
-
-  @Test
-  @DisplayName("Npm seeds 'npm' through NpmStorageService")
-  void npm() {
-    final var seeder = mock(DefaultRepoSeeder.class);
-    final var storage = mock(NpmStorageService.class);
-
-    new NpmAuthListener(seeder, storage).onRegistrationCompleted(event());
-
-    seededCreator(seeder, "npm", RepoType.NPM).accept(STORAGE_KEY);
-    verify(storage).createRepo(STORAGE_KEY);
-  }
-
-  @Test
-  @DisplayName("NuGet seeds 'nuget' through NuGetStorageService")
-  void nuget() {
-    final var seeder = mock(DefaultRepoSeeder.class);
-    final var storage = mock(NuGetStorageService.class);
-
-    new NuGetAuthListener(seeder, storage).onRegistrationCompleted(event());
-
-    seededCreator(seeder, "nuget", RepoType.NUGET).accept(STORAGE_KEY);
-    verify(storage).createRepo(STORAGE_KEY);
-  }
-
-  @Test
-  @DisplayName("Pypi seeds 'pypi' through PypiStorageService")
-  void pypi() {
-    final var seeder = mock(DefaultRepoSeeder.class);
-    final var storage = mock(PypiStorageService.class);
-
-    new PypiAuthListener(seeder, storage).onRegistrationCompleted(event());
-
-    seededCreator(seeder, "pypi", RepoType.PYPI).accept(STORAGE_KEY);
-    verify(storage).createRepo(STORAGE_KEY);
-  }
-
-  @Test
-  @DisplayName("Ruby seeds 'ruby' through RubyStorageService")
-  void ruby() {
-    final var seeder = mock(DefaultRepoSeeder.class);
-    final var storage = mock(RubyStorageService.class);
-
-    new RubyAuthListener(seeder, storage).onRegistrationCompleted(event());
-
-    seededCreator(seeder, "ruby", RepoType.RUBY).accept(STORAGE_KEY);
-    verify(storage).createRepo(STORAGE_KEY);
-  }
-
-  private static UserCreatedEvent<UUID> event() {
-    return new UserCreatedEvent<>(UUID.randomUUID(), "admin");
+    seededCreator("ruby", RepoType.RUBY);
+    seededCreator("npm", RepoType.NPM);
   }
 }

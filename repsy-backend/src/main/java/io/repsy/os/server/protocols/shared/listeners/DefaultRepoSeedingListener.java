@@ -13,31 +13,45 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.protocols.pypi.shared.listeners;
+package io.repsy.os.server.protocols.shared.listeners;
 
 import io.repsy.core.events.UserCreatedEvent;
-import io.repsy.os.server.protocols.pypi.shared.storage.services.PypiStorageService;
+import io.repsy.os.shared.repo.dtos.DefaultRepoDefinition;
 import io.repsy.os.shared.repo.services.DefaultRepoSeeder;
-import io.repsy.protocols.shared.repo.dtos.RepoType;
+import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 
-@Service
+/**
+ * Seeds the default repository of every protocol when a user is created (RPS-2062). The protocols
+ * are the {@link DefaultRepoDefinition} beans, so adding a protocol is one bean, not one listener.
+ */
+@Slf4j
+@Component
 @RequiredArgsConstructor
 @NullMarked
-public class PypiAuthListener {
-  private static final String PYPI_REPO_NAME = "pypi";
+public class DefaultRepoSeedingListener {
 
   private final DefaultRepoSeeder defaultRepoSeeder;
-  private final PypiStorageService pypiStorageService;
+  private final List<DefaultRepoDefinition> definitions;
 
   @Async
   @EventListener
-  public void onRegistrationCompleted(final UserCreatedEvent<UUID> ignoredEvent) {
-    this.defaultRepoSeeder.seed(PYPI_REPO_NAME, RepoType.PYPI, this.pypiStorageService::createRepo);
+  public void onUserCreated(final UserCreatedEvent<UUID> ignoredEvent) {
+    for (final var definition : this.definitions) {
+      try {
+        this.defaultRepoSeeder.seed(
+            definition.name(), definition.type(), definition.storageCreator());
+      } catch (final RuntimeException e) {
+        // One protocol's failure must not keep the others from being seeded.
+        log.error(
+            "Seeding the default {} repo '{}' failed", definition.type(), definition.name(), e);
+      }
+    }
   }
 }
