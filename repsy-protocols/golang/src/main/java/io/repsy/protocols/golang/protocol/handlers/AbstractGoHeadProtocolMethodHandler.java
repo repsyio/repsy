@@ -18,15 +18,13 @@ package io.repsy.protocols.golang.protocol.handlers;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.golang.protocol.GolangProtocolProvider;
 import io.repsy.protocols.golang.protocol.facades.contracts.GoProtocolFacade;
-import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.List;
-import java.util.Map;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
@@ -42,35 +40,25 @@ import org.springframework.http.ResponseEntity;
  * pre-processor. A {@code HEAD} is not a download, so it is not counted as one.
  */
 @NullMarked
-public abstract class AbstractGoHeadProtocolMethodHandler<ID> implements ProtocolMethodHandler {
-
-  private final PathParser pathParser;
-  private final GoProtocolFacade<ID> goProtocolFacade;
+public abstract class AbstractGoHeadProtocolMethodHandler<ID>
+    extends AbstractFacadeProtocolMethodHandler<GoProtocolFacade<ID>> {
 
   protected AbstractGoHeadProtocolMethodHandler(
       final PathParser pathParser,
       final GoProtocolFacade<ID> goProtocolFacade,
       final GolangProtocolProvider provider) {
 
-    this.pathParser = pathParser;
-    this.goProtocolFacade = goProtocolFacade;
-    provider.registerMethodHandler(this);
+    super(
+        HandlerRoute.read(HttpMethod.HEAD).skipUsagePostProcessor(true),
+        pathParser,
+        goProtocolFacade,
+        provider);
   }
 
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of(
-        "permission", Permission.READ, "writeOperation", false, "skipUsagePostProcessor", true);
-  }
-
-  @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.HEAD);
-  }
-
+  /** The parser the backend passes in decides the whole path, so it is used as it is. */
   @Override
   public PathParser getPathParser() {
-    return this.pathParser;
+    return this.basePathParser();
   }
 
   @Override
@@ -81,7 +69,7 @@ public abstract class AbstractGoHeadProtocolMethodHandler<ID> implements Protoco
       throws IOException {
 
     try {
-      final var resource = this.goProtocolFacade.download(context);
+      final var resource = this.facade.download(context);
 
       if (!resource.exists()) {
         return GoDownloadResponses.notFound().build();

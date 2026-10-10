@@ -106,7 +106,7 @@ public abstract class AbstractPypiProtocolFacade<ID> implements PypiProtocolFaca
     context.addProperty(
         STORAGE_PATH,
         Paths.get(uploadForm.getNormalizedName(), file.getOriginalFilename()).toString());
-    context.addProperty("usages", packageUsage);
+    ProtocolContextUtils.addUsages(context, packageUsage);
   }
 
   @Override

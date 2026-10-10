@@ -19,18 +19,17 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.http.HttpHeaders.WWW_AUTHENTICATE;
 
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
-import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
 import io.repsy.protocols.cargo.protocol.dtos.CargoErrorResponse;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
 import io.repsy.protocols.shared.exceptions.TooManyRequestsException;
+import io.repsy.protocols.shared.handlers.AbstractRoutedProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.jspecify.annotations.NullMarked;
@@ -41,14 +40,20 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 @NullMarked
-public abstract class AbstractCargoMeProtocolMethodHandler implements ProtocolMethodHandler {
+public abstract class AbstractCargoMeProtocolMethodHandler
+    extends AbstractRoutedProtocolMethodHandler {
 
   private final CargoAuthenticator authenticator;
 
   public AbstractCargoMeProtocolMethodHandler(
       final CargoAuthenticator authenticator, final CargoProtocolProvider provider) {
+    super(
+        HandlerRoute.of(Permission.NONE, HttpMethod.GET, HttpMethod.HEAD)
+            .skipHeaderPreProcessor(true)
+            .skipUsagePostProcessor(true)
+            .skipPreProcessor(true),
+        provider);
     this.authenticator = authenticator;
-    provider.registerMethodHandler(this);
   }
 
   protected abstract Optional<ProtocolContext> findProtocolContext(RelativePath relativePath);
@@ -59,34 +64,13 @@ public abstract class AbstractCargoMeProtocolMethodHandler implements ProtocolMe
   }
 
   @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.GET, HttpMethod.HEAD);
+  protected boolean accepts(final HttpMethod method, final HttpServletRequest request) {
+    return super.accepts(method, request) && request.getServletPath().endsWith("/me");
   }
 
   @Override
-  public Map<String, Object> getProperties() {
-    return Map.of(
-        "permission", Permission.NONE,
-        "skipHeaderPreProcessor", true,
-        "skipUsagePostProcessor", true,
-        "skipPreProcessor", true);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return request -> {
-      final var method = HttpMethod.valueOf(request.getMethod());
-
-      if (!HttpMethod.GET.equals(method) && !HttpMethod.HEAD.equals(method)) {
-        return Optional.empty();
-      }
-
-      if (!request.getServletPath().endsWith("/me")) {
-        return Optional.empty();
-      }
-
-      return this.findProtocolContext(new RelativePath("/me"));
-    };
+  protected Optional<ProtocolContext> parse(final HttpServletRequest request) {
+    return this.findProtocolContext(new RelativePath("/me"));
   }
 
   @Override

@@ -24,6 +24,7 @@ import io.repsy.os.server.protocols.pypi.shared.python_package.services.PypiPack
 import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.pypi.protocol.PypiProtocolProvider;
+import io.repsy.protocols.shared.handlers.HandlerPropertyKeys;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -48,7 +49,6 @@ public class PypiSimpleHandlerPreProcessor extends ProtocolProcessor {
   private static final int PRIORITY = 200;
 
   private static final Pattern SIMPLE_PATTERN = Pattern.compile("^/simple(?:/([^/]+))?/?$");
-  private static final String METHOD_KEY = "method";
   private static final String METHOD_NAME = "simple";
 
   private final PypiProtocolProvider provider;
@@ -124,7 +124,8 @@ public class PypiSimpleHandlerPreProcessor extends ProtocolProcessor {
 
   private boolean shouldSkip(final Map<String, Object> properties) {
 
-    final var method = (String) properties.getOrDefault(METHOD_KEY, StringUtils.EMPTY);
+    final var method =
+        (String) properties.getOrDefault(HandlerPropertyKeys.METHOD, StringUtils.EMPTY);
 
     return StringUtils.isEmpty(method) || !method.equals(METHOD_NAME);
   }

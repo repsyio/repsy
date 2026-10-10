@@ -17,12 +17,11 @@ package io.repsy.protocols.cargo.protocol.handlers;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
 import io.repsy.protocols.cargo.protocol.dtos.CargoErrorResponse;
 import io.repsy.protocols.cargo.protocol.facades.contracts.CargoProtocolFacade;
-import io.repsy.protocols.shared.repo.dtos.Permission;
-import io.repsy.protocols.shared.utils.ProtocolContextUtils;
+import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
@@ -40,7 +39,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 @NullMarked
-public abstract class AbstractCargoSearchProtocolMethodHandler implements ProtocolMethodHandler {
+public abstract class AbstractCargoSearchProtocolMethodHandler
+    extends AbstractFacadeProtocolMethodHandler<CargoProtocolFacade> {
 
   private static final int DEFAULT_PER_PAGE = 10;
   private static final int MAX_PER_PAGE = 100;
@@ -58,48 +58,16 @@ public abstract class AbstractCargoSearchProtocolMethodHandler implements Protoc
    */
   private static final Sort SEARCH_ORDER = Sort.by("name");
 
-  private final PathParser basePathParser;
-  private final CargoProtocolFacade facade;
-
   public AbstractCargoSearchProtocolMethodHandler(
       final PathParser basePathParser,
       final CargoProtocolFacade facade,
       final CargoProtocolProvider provider) {
-    this.basePathParser = basePathParser;
-    this.facade = facade;
-    provider.registerMethodHandler(this);
-  }
 
-  @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.GET);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.READ, "writeOperation", false);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return request -> {
-      if (!HttpMethod.GET.name().equals(request.getMethod())) {
-        return Optional.empty();
-      }
-
-      final var parsedPathOpt = this.basePathParser.parse(request);
-      if (parsedPathOpt.isEmpty()) {
-        return Optional.empty();
-      }
-
-      final var relativePath = ProtocolContextUtils.getRelativePath(parsedPathOpt.get()).getPath();
-
-      if (!relativePath.endsWith("/api/v1/crates")) {
-        return Optional.empty();
-      }
-
-      return parsedPathOpt;
-    };
+    super(
+        HandlerRoute.read(HttpMethod.GET).path(path -> path.endsWith("/api/v1/crates")),
+        basePathParser,
+        facade,
+        provider);
   }
 
   @Override

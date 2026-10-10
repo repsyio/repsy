@@ -20,16 +20,14 @@ import static org.springframework.http.HttpHeaders.WWW_AUTHENTICATE;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.golang.protocol.GolangProtocolProvider;
 import io.repsy.protocols.golang.protocol.facades.contracts.GoProtocolFacade;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
-import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.List;
-import java.util.Map;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpMethod;
@@ -38,34 +36,25 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 @NullMarked
-public abstract class AbstractGoUploadProtocolMethodHandler<ID> implements ProtocolMethodHandler {
-
-  private final PathParser pathParser;
-  private final GoProtocolFacade<ID> goProtocolFacade;
+public abstract class AbstractGoUploadProtocolMethodHandler<ID>
+    extends AbstractFacadeProtocolMethodHandler<GoProtocolFacade<ID>> {
 
   public AbstractGoUploadProtocolMethodHandler(
       final PathParser pathParser,
       final GoProtocolFacade<ID> goProtocolFacade,
       final GolangProtocolProvider provider) {
 
-    this.pathParser = pathParser;
-    this.goProtocolFacade = goProtocolFacade;
-    provider.registerMethodHandler(this);
+    super(
+        HandlerRoute.write(HttpMethod.PUT).method("upload"),
+        pathParser,
+        goProtocolFacade,
+        provider);
   }
 
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.WRITE, "writeOperation", true, "method", "upload");
-  }
-
-  @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.PUT);
-  }
-
+  /** The parser the backend passes in decides the whole path, so it is used as it is. */
   @Override
   public PathParser getPathParser() {
-    return this.pathParser;
+    return this.basePathParser();
   }
 
   @Override
@@ -81,8 +70,7 @@ public abstract class AbstractGoUploadProtocolMethodHandler<ID> implements Proto
     }
 
     try {
-      this.goProtocolFacade.upload(
-          context, request.getInputStream(), request.getContentLengthLong());
+      this.facade.upload(context, request.getInputStream(), request.getContentLengthLong());
     } catch (final UnAuthorizedException e) {
       // The go command prints the body of a failed answer only when it is text/plain, and curl or
       // a custom client would see nothing at all with an empty one (RPS-1450, as RPS-1435 did for

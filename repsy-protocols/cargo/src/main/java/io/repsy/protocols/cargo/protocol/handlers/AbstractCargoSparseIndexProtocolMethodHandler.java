@@ -17,17 +17,14 @@ package io.repsy.protocols.cargo.protocol.handlers;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
 import io.repsy.protocols.cargo.protocol.facades.contracts.CargoProtocolFacade;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateIndexEntry;
-import io.repsy.protocols.shared.repo.dtos.Permission;
-import io.repsy.protocols.shared.utils.ProtocolContextUtils;
+import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
@@ -41,7 +38,7 @@ import tools.jackson.databind.ObjectMapper;
 @Slf4j
 @NullMarked
 public abstract class AbstractCargoSparseIndexProtocolMethodHandler
-    implements ProtocolMethodHandler {
+    extends AbstractFacadeProtocolMethodHandler<CargoProtocolFacade> {
 
   private final ObjectMapper objectMapper;
 
@@ -54,59 +51,25 @@ public abstract class AbstractCargoSparseIndexProtocolMethodHandler
 
   static final Pattern EXCLUDED_PATTERN = Pattern.compile("^/(?:api/|config\\.json|me).*");
 
-  private final PathParser basePathParser;
-  private final CargoProtocolFacade facade;
-
   protected AbstractCargoSparseIndexProtocolMethodHandler(
       final PathParser basePathParser,
       final CargoProtocolFacade facade,
       final ObjectMapper objectMapper,
       final CargoProtocolProvider provider) {
 
-    this.basePathParser = basePathParser;
-    this.facade = facade;
+    super(
+        HandlerRoute.read(HttpMethod.GET)
+            .skipPreProcessor(false)
+            .skipHeaderPreProcessor(true)
+            .path(
+                path ->
+                    !EXCLUDED_PATTERN.matcher(path).matches()
+                        && INDEX_PATTERN.matcher(path).matches()),
+        basePathParser,
+        facade,
+        provider);
+
     this.objectMapper = objectMapper;
-    provider.registerMethodHandler(this);
-  }
-
-  @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.GET);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of(
-        "permission", Permission.READ,
-        "writeOperation", false,
-        "skipPreProcessor", false,
-        "skipHeaderPreProcessor", true);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return request -> {
-      if (!HttpMethod.GET.name().equals(request.getMethod())) {
-        return Optional.empty();
-      }
-
-      final var parsedPathOpt = this.basePathParser.parse(request);
-      if (parsedPathOpt.isEmpty()) {
-        return Optional.empty();
-      }
-
-      final var relativePath = ProtocolContextUtils.getRelativePath(parsedPathOpt.get()).getPath();
-
-      if (EXCLUDED_PATTERN.matcher(relativePath).matches()) {
-        return Optional.empty();
-      }
-
-      if (!INDEX_PATTERN.matcher(relativePath).matches()) {
-        return Optional.empty();
-      }
-
-      return parsedPathOpt;
-    };
   }
 
   @Override

@@ -23,6 +23,7 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.server.core.UrlParserProperties;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
+import io.repsy.protocols.shared.handlers.HandlerPropertyKeys;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
@@ -106,6 +107,6 @@ public class UsagePostProcessor extends ProtocolProcessor {
   }
 
   private boolean shouldSkip(final @NonNull Map<@NonNull String, @NonNull Object> properties) {
-    return (boolean) properties.getOrDefault("skipUsagePostProcessor", false);
+    return (boolean) properties.getOrDefault(HandlerPropertyKeys.SKIP_USAGE_POST_PROCESSOR, false);
   }
 }

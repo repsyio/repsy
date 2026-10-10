@@ -259,8 +259,8 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmProtocolFa
     context.addProperty(ARTIFACT_NAME, form.getName());
     context.addProperty(ARTIFACT_VERSION, form.getVersion());
     context.addProperty(STORAGE_PATH, storagePath.getRelativePath().getPath());
-    context.addProperty(
-        "usages", BaseUsages.ofDisk(form.getSize() - (replaced == null ? 0 : replaced.size())));
+    ProtocolContextUtils.addUsages(
+        context, BaseUsages.ofDisk(form.getSize() - (replaced == null ? 0 : replaced.size())));
   }
 
   @Override
@@ -287,7 +287,7 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmProtocolFa
             repoInfo.getName(),
             List.of(new DeletedChart(name, version, chartInfo.digest(), manifests)));
 
-    context.addProperty("usages", BaseUsages.ofDisk(-freed));
+    ProtocolContextUtils.addUsages(context, BaseUsages.ofDisk(-freed));
   }
 
   @Override

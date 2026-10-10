@@ -24,6 +24,7 @@ import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.os.shared.error_handling.utils.OciErrors;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import io.repsy.protocols.docker.protocol.handlers.AbstractDockerRegistryCheckProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerPropertyKeys;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -39,7 +40,6 @@ public class DockerHeaderPreProcessor extends ProtocolProcessor {
 
   private static final int PRIORITY = 50;
   private static final String AUTH_BEARER = "Bearer ";
-  private static final String SKIP_HEADER_PRE_PROCESSOR_KEY = "skipHeaderPreProcessor";
 
   private final DockerProtocolProvider provider;
   private final RestResponseFactory resp;
@@ -87,7 +87,8 @@ public class DockerHeaderPreProcessor extends ProtocolProcessor {
 
   private boolean shouldSkipAuthentication(final Map<String, Object> properties) {
 
-    final var skipPreProcessor = properties.getOrDefault(SKIP_HEADER_PRE_PROCESSOR_KEY, false);
+    final var skipPreProcessor =
+        properties.getOrDefault(HandlerPropertyKeys.SKIP_HEADER_PRE_PROCESSOR, false);
 
     return (boolean) skipPreProcessor;
   }

@@ -17,17 +17,15 @@ package io.repsy.protocols.cargo.protocol.handlers;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
 import io.repsy.protocols.cargo.protocol.dtos.CargoErrorResponse;
+import io.repsy.protocols.shared.handlers.AbstractRoutedProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ForwardedHostUtils;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -45,46 +43,27 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
  * contents or grant any write access. RPS-2109: documented and pinned (keep open on purpose).
  */
 @NullMarked
-public abstract class AbstractCargoConfigProtocolMethodHandler implements ProtocolMethodHandler {
+public abstract class AbstractCargoConfigProtocolMethodHandler
+    extends AbstractRoutedProtocolMethodHandler {
 
   private static final int PORT_HTTP = 80;
   private static final int PORT_HTTPS = 443;
 
-  private final PathParser basePathParser;
-
   public AbstractCargoConfigProtocolMethodHandler(
       final PathParser pathParser, final CargoProtocolProvider provider) {
 
-    this.basePathParser = pathParser;
-
-    provider.registerMethodHandler(this);
+    super(
+        HandlerRoute.of(Permission.READ, HttpMethod.GET)
+            .skipHeaderPreProcessor(true)
+            .skipUsagePostProcessor(true)
+            .skipPreProcessor(true),
+        pathParser,
+        provider);
   }
 
   @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.GET);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of(
-        "permission", Permission.READ,
-        "skipHeaderPreProcessor", true,
-        "skipUsagePostProcessor", true,
-        "skipPreProcessor", true);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return request -> {
-      if (!HttpMethod.GET.name().equals(request.getMethod())) {
-        return Optional.empty();
-      }
-      if (!request.getServletPath().endsWith("/config.json")) {
-        return Optional.empty();
-      }
-      return this.basePathParser.parse(request);
-    };
+  protected boolean accepts(final HttpMethod method, final HttpServletRequest request) {
+    return super.accepts(method, request) && request.getServletPath().endsWith("/config.json");
   }
 
   @Override

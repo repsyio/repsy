@@ -25,6 +25,7 @@ import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
 import io.repsy.os.shared.error_handling.utils.OciErrors;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
+import io.repsy.protocols.shared.handlers.HandlerPropertyKeys;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
@@ -46,8 +47,6 @@ import org.springframework.stereotype.Component;
 public class HelmHeaderPreProcessor extends ProtocolProcessor {
 
   private static final int PRIORITY = 50;
-  private static final String SKIP_HEADER_PRE_PROCESSOR_KEY = "skipHeaderPreProcessor";
-  private static final String PERMISSION_KEY = "permission";
 
   private final HelmProtocolProvider provider;
   private final RestResponseFactory resp;
@@ -89,14 +88,14 @@ public class HelmHeaderPreProcessor extends ProtocolProcessor {
       return true;
     }
 
-    final var permission = (Permission) properties.get(PERMISSION_KEY);
+    final var permission = (Permission) properties.get(HandlerPropertyKeys.PERMISSION);
     final var repoInfo = UrlPropertiesUtils.getRepoInfo(context);
 
     return !repoInfo.isPrivateRepo() && !this.isWritePermission(permission);
   }
 
   private boolean isSkipFlagSet(final Map<String, Object> properties) {
-    return (boolean) properties.getOrDefault(SKIP_HEADER_PRE_PROCESSOR_KEY, false);
+    return (boolean) properties.getOrDefault(HandlerPropertyKeys.SKIP_HEADER_PRE_PROCESSOR, false);
   }
 
   private boolean isWritePermission(final Permission permission) {

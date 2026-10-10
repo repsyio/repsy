@@ -28,6 +28,7 @@ import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
+import io.repsy.protocols.shared.handlers.HandlerPropertyKeys;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
@@ -48,9 +49,6 @@ public class CargoAuthPreProcessor extends ProtocolProcessor {
   private static final int PRIORITY = 100;
   private static final String AUTH_BASIC = "Basic ";
   private static final String AUTH_BEARER = "Bearer ";
-  private static final String SKIP_PRE_PROCESSOR_KEY = "skipPreProcessor";
-  private static final String PERMISSION_KEY = "permission";
-  private static final String WRITE_OPERATION_KEY = "writeOperation";
 
   private final CargoAuthenticator authenticator;
   private final CargoProtocolProvider provider;
@@ -75,7 +73,10 @@ public class CargoAuthPreProcessor extends ProtocolProcessor {
     final var repoInfo = UrlPropertiesUtils.getRepoInfo(context);
 
     if (PreProcessorUtils.shouldSkipAuthentication(
-        SKIP_PRE_PROCESSOR_KEY, WRITE_OPERATION_KEY, repoInfo, properties)) {
+        HandlerPropertyKeys.SKIP_PRE_PROCESSOR,
+        HandlerPropertyKeys.WRITE_OPERATION,
+        repoInfo,
+        properties)) {
       return ProcessorResult.next();
     }
 
@@ -103,7 +104,7 @@ public class CargoAuthPreProcessor extends ProtocolProcessor {
   private void authenticateRequest(
       final String authHeader, final UUID repoId, final Map<String, Object> properties) {
 
-    final var permission = (Permission) properties.get(PERMISSION_KEY);
+    final var permission = (Permission) properties.get(HandlerPropertyKeys.PERMISSION);
 
     switch (authHeader) {
       case final String header when header.startsWith(AUTH_BASIC) ->
