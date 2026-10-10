@@ -22,6 +22,7 @@ import freemarker.template.Configuration;
 import freemarker.template.TemplateException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.web.paging.VersionSortPaging;
+import io.repsy.core.web.utils.LikePatterns;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.generated.model.ReleaseDetail;
 import io.repsy.os.server.protocols.pypi.shared.python_package.dtos.PypiDeletion;
@@ -353,7 +354,7 @@ public class PypiPackageService extends AbstractPypiPackageService<UUID> {
       final UUID repoId, final String name, final Pageable pageable) {
 
     return this.pypiPackageRepository
-        .findAllByRepoIdContainsName(repoId, name, pageable)
+        .findAllByRepoIdContainsName(repoId, LikePatterns.of("%", name, "%"), pageable)
         .map(this.pypiPackageConverter::toPackageListItemDto);
   }
 

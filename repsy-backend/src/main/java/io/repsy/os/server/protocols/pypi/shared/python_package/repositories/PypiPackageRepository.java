@@ -102,7 +102,8 @@ public interface PypiPackageRepository extends JpaRepository<PypiPackage, UUID> 
           from PypiPackage p
           join p.releases r
           join p.repo re
-          where re.id = :repoId and p.latestVersion = r.version and p.name like %:name%""")
+          where re.id = :repoId and p.latestVersion = r.version
+          and lower(p.name) like :pattern escape '\\'""")
   Page<PypiPackageListItem> findAllByRepoIdContainsName(
-      UUID repoId, String name, Pageable pageable);
+      UUID repoId, String pattern, Pageable pageable);
 }

@@ -73,7 +73,8 @@ public interface NpmPackageRepository extends JpaRepository<NpmPackage, UUID> {
       from NpmPackage p
       join p.packageVersions pv
       join p.repo r
-      where r.id = :repoId and p.scope is null and p.latest = pv.version and lower(p.name) like :name escape '\\'""")
+      where r.id = :repoId and p.scope is null and p.latest = pv.version
+      and lower(coalesce(p.scope || '/', '') || p.name) like :name escape '\\'""")
   Page<NpmPackageListItem> findAllByRepoIdAndLatestVersionAndScopeIsNullContainsName(
       UUID repoId, String name, Pageable pageable);
 
@@ -88,7 +89,7 @@ public interface NpmPackageRepository extends JpaRepository<NpmPackage, UUID> {
       join p.packageVersions pv
       join p.repo r
       where r.id = :repoId and p.scope = :scope and p.latest = pv.version
-      and lower(concat(p.scope, '/', p.name)) like :name escape '\\'""")
+      and lower(coalesce(p.scope || '/', '') || p.name) like :name escape '\\'""")
   Page<NpmPackageListItem> findAllByRepoIdAndLatestVersionAndScopeContainsName(
       UUID repoId, String scope, String name, Pageable pageable);
 
@@ -104,8 +105,7 @@ public interface NpmPackageRepository extends JpaRepository<NpmPackage, UUID> {
       join p.repo r
       where r.id = :repoId and p.latest = pv.version
       and (:pattern is null
-        or lower(case when p.scope is null then p.name else concat(p.scope, '/', p.name) end)
-          like :pattern escape '\\')""")
+        or lower(coalesce(p.scope || '/', '') || p.name) like :pattern escape '\\')""")
   Page<NpmPackageListItem> findAllByRepoIdAndLatestVersionContainsScope(
       UUID repoId, @Nullable String pattern, Pageable pageable);
 }

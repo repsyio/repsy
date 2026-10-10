@@ -18,6 +18,7 @@ package io.repsy.os.server.protocols.golang.shared.go_module.services;
 import com.github.f4b6a3.uuid.UuidCreator;
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
+import io.repsy.core.web.utils.LikePatterns;
 import io.repsy.core.web_error.ConstraintViolations;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.generated.model.GoModuleInfo;
@@ -202,7 +203,7 @@ public class GoModuleService extends AbstractGoModuleService<UUID> {
   public Page<io.repsy.os.generated.model.GoModuleListItem> getModulesContainsPath(
       final UUID repoId, final String search, final Pageable pageable) {
     return this.goModuleRepository
-        .findAllByRepoIdContainsModulePath(repoId, search, pageable)
+        .findAllByRepoIdContainsModulePath(repoId, LikePatterns.of("%", search, "%"), pageable)
         .map(this.goModuleMapper::toDto);
   }
 

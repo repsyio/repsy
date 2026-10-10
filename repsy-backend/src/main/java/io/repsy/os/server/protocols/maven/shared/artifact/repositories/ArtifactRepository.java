@@ -35,25 +35,27 @@ public interface ArtifactRepository extends JpaRepository<Artifact, UUID> {
   long countByRepoIdAndGroupName(UUID repoId, String groupName);
 
   /**
-   * The search term is matched against the whole {@code group:artifact} key the list shows, so it
-   * finds a row by its group, its artifact or the pair.
+   * The search pattern (built by {@code LikePatterns}: lower-cased, {@code %} and {@code _}
+   * escaped) is matched against the whole {@code group:artifact} key the list shows, so it finds a
+   * row by its group, its artifact or the pair. The expression is the one of the trigram index
+   * {@code idx_maven_artifact__group_artifact_trgm} (RPS-2117): keep them equal.
    */
   @Query(
       """
           select a from Artifact a
           where a.repo.id = :repoId
-          and concat(a.groupName, ':', a.artifactName) like %:groupName%""")
+          and lower(a.groupName || ':' || a.artifactName) like :pattern escape '\\'""")
   Page<ArtifactListItem> findAllByRepoIdAndContainsGroupName(
-      UUID repoId, String groupName, Pageable pageable);
+      UUID repoId, String pattern, Pageable pageable);
 
   /** Like the group search, the term is matched against the whole {@code group:artifact} key. */
   @Query(
       """
           select a from Artifact a
           where a.repo.id = :repoId and a.groupName = :groupName
-          and concat(a.groupName, ':', a.artifactName) like %:artifactName%""")
+          and lower(a.groupName || ':' || a.artifactName) like :pattern escape '\\'""")
   Page<ArtifactListItem> findAllByRepoIdContainsArtifactName(
-      UUID repoId, String groupName, String artifactName, Pageable pageable);
+      UUID repoId, String groupName, String pattern, Pageable pageable);
 
   List<Artifact> findAllByRepoIdAndGroupName(UUID repoId, String groupName);
 

@@ -1,0 +1,2 @@
+-- RPS-2117: nothing to do on H2. pg_trgm is a PostgreSQL extension; the embedded database searches
+-- with a plain LIKE. The file exists so both dialects share one version history.

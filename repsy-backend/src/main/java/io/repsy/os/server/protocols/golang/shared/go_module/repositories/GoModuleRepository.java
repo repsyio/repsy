@@ -93,8 +93,8 @@ public interface GoModuleRepository extends JpaRepository<GoModule, UUID> {
       select m.id as id, m.modulePath as modulePath, m.createdAt as createdAt
       from GoModule m
       where m.repo.id = :repoId
-        and lower(m.modulePath) like lower(concat('%', :search, '%'))
+        and lower(m.modulePath) like :pattern escape '\\'
       """)
   Page<GoModuleListItem> findAllByRepoIdContainsModulePath(
-      UUID repoId, String search, Pageable pageable);
+      UUID repoId, String pattern, Pageable pageable);
 }

@@ -22,6 +22,7 @@ import static io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType.
 import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
+import io.repsy.core.web.utils.LikePatterns;
 import io.repsy.core.web_error.ConstraintViolations;
 import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
@@ -772,7 +773,7 @@ public class ArtifactService extends AbstractArtifactService<UUID> {
       final UUID repoId, final String groupName, final Pageable pageable) {
 
     return this.artifactRepository
-        .findAllByRepoIdAndContainsGroupName(repoId, groupName, pageable)
+        .findAllByRepoIdAndContainsGroupName(repoId, LikePatterns.of("%", groupName, "%"), pageable)
         .map(this.artifactConverter::toArtifactListItemDto);
   }
 
@@ -783,7 +784,8 @@ public class ArtifactService extends AbstractArtifactService<UUID> {
       final Pageable pageable) {
 
     return this.artifactRepository
-        .findAllByRepoIdContainsArtifactName(repoId, groupName, artifactName, pageable)
+        .findAllByRepoIdContainsArtifactName(
+            repoId, groupName, LikePatterns.of("%", artifactName, "%"), pageable)
         .map(this.artifactConverter::toArtifactListItemDto);
   }
 

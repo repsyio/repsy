@@ -1,0 +1,3 @@
+-- RPS-2117: nothing to do on H2. The trigram GIN indexes of the PostgreSQL V0041 have no H2
+-- equivalent; the embedded database searches with a plain LIKE. The file exists so both dialects
+-- share one version history.
