@@ -13,20 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.protocols.nuget.shared.storage;
+package io.repsy.os.server.protocols.shared.configs;
 
-import io.repsy.protocols.nuget.shared.storage.services.AbstractNuGetStorageService;
+import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import io.repsy.protocols.shared.storage.StorageStrategyRegistry;
-import org.jspecify.annotations.NullMarked;
-import org.springframework.stereotype.Service;
+import java.util.EnumMap;
 
-@Service
-@NullMarked
-public class NuGetStorageService extends AbstractNuGetStorageService {
+/** A registry that serves one strategy for every repo type, for unit tests of a single service. */
+public final class TestStorageRegistries {
+  private TestStorageRegistries() {}
 
-  public NuGetStorageService(final StorageStrategyRegistry storageStrategyRegistry) {
+  public static StorageStrategyRegistry of(final StorageStrategy strategy) {
+    final var all = new EnumMap<RepoType, StorageStrategy>(RepoType.class);
+    for (final var type : RepoType.values()) {
+      all.put(type, strategy);
+    }
 
-    super(storageStrategyRegistry.get(RepoType.NUGET));
+    return new StorageStrategyRegistry(all);
   }
 }

@@ -42,6 +42,7 @@ import io.repsy.os.server.protocols.maven.shared.artifact.repositories.VersionSi
 import io.repsy.os.server.protocols.maven.shared.keystore.dtos.PublicKeySources;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreService;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.PgpVerifierService;
+import io.repsy.os.server.protocols.shared.configs.TestStorageRegistries;
 import io.repsy.os.shared.repo.entities.Repo;
 import java.util.List;
 import java.util.Optional;
@@ -82,7 +83,7 @@ class VersionSignatureServiceTest {
         new VersionSignatureService(
             this.versionSignatureRepository,
             this.artifactVersionRepository,
-            this.storageStrategy,
+            TestStorageRegistries.of(this.storageStrategy),
             this.keyStoreService,
             this.pgpVerifierService);
     this.version.setId(UUID.randomUUID());

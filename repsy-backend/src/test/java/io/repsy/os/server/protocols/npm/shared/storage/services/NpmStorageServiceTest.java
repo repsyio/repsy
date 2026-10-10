@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
 import io.repsy.libs.storage.core.services.StorageStrategy;
+import io.repsy.os.server.protocols.shared.configs.TestStorageRegistries;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -47,7 +48,8 @@ class NpmStorageServiceTest {
   }
 
   private static NpmStorageService serviceWithPublicUrl(final String publicUrl) {
-    return new NpmStorageService(mock(StorageStrategy.class), REPO_PORT, publicUrl);
+    return new NpmStorageService(
+        TestStorageRegistries.of(mock(StorageStrategy.class)), REPO_PORT, publicUrl);
   }
 
   @Test

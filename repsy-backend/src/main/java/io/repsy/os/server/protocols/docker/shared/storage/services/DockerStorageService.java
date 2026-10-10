@@ -15,12 +15,12 @@
  */
 package io.repsy.os.server.protocols.docker.shared.storage.services;
 
-import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.protocols.docker.shared.storage.services.AbstractDockerStorageService;
+import io.repsy.protocols.shared.repo.dtos.RepoType;
+import io.repsy.protocols.shared.storage.StorageStrategyRegistry;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 @Slf4j
@@ -28,8 +28,7 @@ import org.springframework.stereotype.Service;
 @NullMarked
 public class DockerStorageService extends AbstractDockerStorageService<UUID> {
 
-  public DockerStorageService(
-      @Qualifier("osStorageStrategyDocker") final StorageStrategy storageStrategy) {
-    super(storageStrategy);
+  public DockerStorageService(final StorageStrategyRegistry storageStrategyRegistry) {
+    super(storageStrategyRegistry.get(RepoType.DOCKER));
   }
 }

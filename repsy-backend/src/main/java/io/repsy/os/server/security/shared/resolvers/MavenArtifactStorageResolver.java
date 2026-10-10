@@ -25,6 +25,8 @@ import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactR
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactVersionRepository;
 import io.repsy.os.server.security.shared.ArtifactStorageResolver;
 import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
+import io.repsy.protocols.shared.repo.dtos.RepoType;
+import io.repsy.protocols.shared.storage.StorageStrategyRegistry;
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
@@ -40,7 +42,6 @@ import org.apache.maven.index.artifact.M2GavCalculator;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 
@@ -71,10 +72,10 @@ public class MavenArtifactStorageResolver implements ArtifactStorageResolver {
   public MavenArtifactStorageResolver(
       final @NonNull ArtifactRepository artifactRepository,
       final @NonNull ArtifactVersionRepository artifactVersionRepository,
-      final @Qualifier("osStorageStrategyMaven") @NonNull StorageStrategy mavenStorageStrategy) {
+      final StorageStrategyRegistry storageStrategyRegistry) {
     this.artifactRepository = artifactRepository;
     this.artifactVersionRepository = artifactVersionRepository;
-    this.mavenStorageStrategy = mavenStorageStrategy;
+    this.mavenStorageStrategy = storageStrategyRegistry.get(RepoType.MAVEN);
   }
 
   @Override

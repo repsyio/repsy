@@ -16,17 +16,17 @@
 package io.repsy.os.server.security.shared.resolvers;
 
 import io.repsy.libs.storage.core.dtos.StoragePath;
-import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.os.server.security.shared.ArtifactStorageResolver;
 import io.repsy.protocols.npm.shared.storage.services.NpmStorageService;
 import io.repsy.protocols.npm.shared.utils.NpmPackageUtils;
+import io.repsy.protocols.shared.repo.dtos.RepoType;
+import io.repsy.protocols.shared.storage.StorageStrategyRegistry;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.NullMarked;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -38,8 +38,7 @@ public class NpmArtifactStorageResolver implements ArtifactStorageResolver {
 
   private final @NonNull NpmStorageService npmStorageService;
 
-  @Qualifier("osStorageStrategyNpm")
-  private final @NonNull StorageStrategy npmStorageStrategy;
+  private final @NonNull StorageStrategyRegistry storageStrategyRegistry;
 
   @Override
   public @NonNull Optional<String> resolve(
@@ -65,7 +64,8 @@ public class NpmArtifactStorageResolver implements ArtifactStorageResolver {
 
     final var tarballPath = packageBasePath.resolve(tarballFilename).toString();
 
-    return this.npmStorageStrategy
+    return this.storageStrategyRegistry
+        .get(RepoType.NPM)
         .get(StoragePath.of(repoId, tarballPath), repoName)
         .map(resource -> tarballPath);
   }

@@ -55,6 +55,7 @@ import io.repsy.protocols.maven.shared.utils.MavenPublishLimits;
 import io.repsy.protocols.maven.shared.utils.PluginDescriptorReader;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import io.repsy.protocols.shared.storage.StorageStrategyRegistry;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Path;
@@ -72,7 +73,6 @@ import org.apache.maven.model.Model;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.io.Resource;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -115,8 +115,7 @@ public class ArtifactService extends AbstractArtifactService<UUID> {
   private final PendingSignatureService pendingSignatureService;
   private final PendingSignatureRepository pendingSignatureRepository;
 
-  @Qualifier("osStorageStrategyMaven")
-  private final StorageStrategy storageStrategy;
+  private final StorageStrategyRegistry storageStrategyRegistry;
 
   /**
    * Classifies an upload of a file that sits in the Maven layout, {@code
@@ -440,10 +439,10 @@ public class ArtifactService extends AbstractArtifactService<UUID> {
 
     final var repoName = repoInfo.getName();
     final var file =
-        this.storageStrategy.get(StoragePath.of(repoInfo.getStorageKey(), filePath), repoName);
+        this.mavenStorage().get(StoragePath.of(repoInfo.getStorageKey(), filePath), repoName);
     final var signature =
-        this.storageStrategy.get(
-            StoragePath.of(repoInfo.getStorageKey(), filePath + SIGNATURE_SUFFIX), repoName);
+        this.mavenStorage()
+            .get(StoragePath.of(repoInfo.getStorageKey(), filePath + SIGNATURE_SUFFIX), repoName);
 
     if (file.isEmpty() || signature.isEmpty()) {
       return false;
@@ -893,7 +892,7 @@ public class ArtifactService extends AbstractArtifactService<UUID> {
       return;
     }
 
-    final var resourceOpt = this.storageStrategy.get(storagePath, repoInfo.getName());
+    final var resourceOpt = this.mavenStorage().get(storagePath, repoInfo.getName());
 
     if (resourceOpt.isPresent()) {
       throw new AccessNotAllowedException("artifactOverrideIsProhibited");
@@ -921,7 +920,7 @@ public class ArtifactService extends AbstractArtifactService<UUID> {
 
     this.setVersionProperties(
         versionPath,
-        this.storageStrategy.listStorageItems(storagePath),
+        this.mavenStorage().listStorageItems(storagePath),
         pomModel,
         pluginPrefix,
         version);
@@ -1048,7 +1047,7 @@ public class ArtifactService extends AbstractArtifactService<UUID> {
       final Resource signature) {
 
     final var nonSignedStoragePath = this.getNonSignedStoragePath(signedStoragePath);
-    final var storedFile = this.storageStrategy.get(nonSignedStoragePath, repoInfo.getName());
+    final var storedFile = this.mavenStorage().get(nonSignedStoragePath, repoInfo.getName());
 
     if (storedFile.isPresent() && this.isVersionRegistered(repoInfo, nonSignedStoragePath)) {
       this.verifyAgainst(repoInfo, storedFile.get(), signature);
@@ -1101,7 +1100,7 @@ public class ArtifactService extends AbstractArtifactService<UUID> {
 
     this.pendingSignatureService.park(repoInfo.getStorageKey(), filePath, readBytes(signature));
 
-    final var storedFile = this.storageStrategy.get(nonSignedStoragePath, repoInfo.getName());
+    final var storedFile = this.mavenStorage().get(nonSignedStoragePath, repoInfo.getName());
 
     if (storedFile.isEmpty() || !this.isVersionRegistered(repoInfo, nonSignedStoragePath)) {
       return SignatureOutcome.PARKED;
@@ -1313,7 +1312,7 @@ public class ArtifactService extends AbstractArtifactService<UUID> {
     // update artifact version properties
     this.setVersionProperties(
         versionPath,
-        this.storageStrategy.listStorageItems(versionStoragePath),
+        this.mavenStorage().listStorageItems(versionStoragePath),
         pomModel,
         pluginPrefix,
         artifactVersion);
@@ -1363,7 +1362,7 @@ public class ArtifactService extends AbstractArtifactService<UUID> {
         StoragePath.of(
             repoInfo.getStorageKey(), versionDirPath.resolve(METADATA_FILENAME).toString());
 
-    final var resourceOpt = this.storageStrategy.get(versionPath, repoInfo.getName());
+    final var resourceOpt = this.mavenStorage().get(versionPath, repoInfo.getName());
 
     final var metadata =
         resourceOpt.isPresent()
@@ -1436,7 +1435,7 @@ public class ArtifactService extends AbstractArtifactService<UUID> {
   private List<String> fileNamesOf(final StoragePath directory) {
 
     try {
-      return this.storageStrategy.listDirectoryContents(directory).stream()
+      return this.mavenStorage().listDirectoryContents(directory).stream()
           .filter(item -> !item.isDirectory())
           .map(StorageItemInfo::getName)
           .toList();
@@ -1558,8 +1557,8 @@ public class ArtifactService extends AbstractArtifactService<UUID> {
 
     try {
       final var jar =
-          this.storageStrategy.get(
-              StoragePath.of(repoInfo.getStorageKey(), jarPath), repoInfo.getName());
+          this.mavenStorage()
+              .get(StoragePath.of(repoInfo.getStorageKey(), jarPath), repoInfo.getName());
 
       if (jar.isPresent()) {
         try (final var in = jar.get().getInputStream()) {
@@ -1677,5 +1676,9 @@ public class ArtifactService extends AbstractArtifactService<UUID> {
       artifactVersion.setParentArtifactName(pomModel.getParent().getArtifactId());
       artifactVersion.setParentArtifactVersion(pomModel.getParent().getVersion());
     }
+  }
+
+  private StorageStrategy mavenStorage() {
+    return this.storageStrategyRegistry.get(RepoType.MAVEN);
   }
 }

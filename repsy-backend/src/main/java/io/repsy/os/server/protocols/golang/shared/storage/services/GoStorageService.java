@@ -15,12 +15,12 @@
  */
 package io.repsy.os.server.protocols.golang.shared.storage.services;
 
-import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.protocols.golang.shared.storage.services.AbstractGoStorageService;
+import io.repsy.protocols.shared.repo.dtos.RepoType;
+import io.repsy.protocols.shared.storage.StorageStrategyRegistry;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 @Slf4j
@@ -28,9 +28,8 @@ import org.springframework.stereotype.Service;
 @NullMarked
 public class GoStorageService extends AbstractGoStorageService<UUID> {
 
-  public GoStorageService(
-      @Qualifier("osStorageStrategyGolang") final StorageStrategy storageStrategy) {
+  public GoStorageService(final StorageStrategyRegistry storageStrategyRegistry) {
 
-    super(storageStrategy);
+    super(storageStrategyRegistry.get(RepoType.GOLANG));
   }
 }

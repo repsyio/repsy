@@ -29,6 +29,8 @@ import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreServi
 import io.repsy.os.server.protocols.maven.shared.keystore.services.PgpVerifierService;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
+import io.repsy.protocols.shared.repo.dtos.RepoType;
+import io.repsy.protocols.shared.storage.StorageStrategyRegistry;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.HashSet;
@@ -39,7 +41,6 @@ import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -64,8 +65,7 @@ public class VersionSignatureService {
   private final VersionSignatureRepository versionSignatureRepository;
   private final ArtifactVersionRepository artifactVersionRepository;
 
-  @Qualifier("osStorageStrategyMaven")
-  private final StorageStrategy storageStrategy;
+  private final StorageStrategyRegistry storageStrategyRegistry;
 
   private final KeyStoreService keyStoreService;
   private final PgpVerifierService pgpVerifierService;
@@ -303,7 +303,7 @@ public class VersionSignatureService {
     }
 
     final var items =
-        this.storageStrategy.listStorageItems(StoragePath.of(repo.getId(), versionPath));
+        this.mavenStorage().listStorageItems(StoragePath.of(repo.getId(), versionPath));
     final var poms =
         ArtifactUtils.versionDirFileNames(versionPath, items).stream()
             .filter(ArtifactUtils::isPomFile)
@@ -362,10 +362,10 @@ public class VersionSignatureService {
 
     final var filePath = versionPath + "/" + fileName;
     final var signature =
-        this.storageStrategy.get(
-            StoragePath.of(repo.getId(), filePath + SIGNATURE_SUFFIX), repo.getName());
+        this.mavenStorage()
+            .get(StoragePath.of(repo.getId(), filePath + SIGNATURE_SUFFIX), repo.getName());
     final var file =
-        this.storageStrategy.get(StoragePath.of(repo.getId(), filePath), repo.getName());
+        this.mavenStorage().get(StoragePath.of(repo.getId(), filePath), repo.getName());
 
     if (signature.isEmpty() || file.isEmpty()) {
       return StoredOutcome.NOTHING_STORED;
@@ -396,8 +396,7 @@ public class VersionSignatureService {
 
   private List<String> filesToSign(final UUID storageKey, final String versionPath) {
 
-    final var items =
-        this.storageStrategy.listStorageItems(StoragePath.of(storageKey, versionPath));
+    final var items = this.mavenStorage().listStorageItems(StoragePath.of(storageKey, versionPath));
 
     return ArtifactUtils.filesToSign(
         versionPath, ArtifactUtils.versionDirFileNames(versionPath, items));
@@ -416,5 +415,9 @@ public class VersionSignatureService {
   static boolean isSigned(final Collection<String> filesToSign, final Collection<String> verified) {
 
     return !filesToSign.isEmpty() && verified.containsAll(filesToSign);
+  }
+
+  private StorageStrategy mavenStorage() {
+    return this.storageStrategyRegistry.get(RepoType.MAVEN);
   }
 }

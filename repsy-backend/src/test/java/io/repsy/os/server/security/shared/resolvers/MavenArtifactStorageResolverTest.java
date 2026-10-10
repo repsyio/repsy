@@ -32,6 +32,7 @@ import io.repsy.os.server.protocols.maven.shared.artifact.entities.Artifact;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.ArtifactVersion;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactRepository;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactVersionRepository;
+import io.repsy.os.server.protocols.shared.configs.TestStorageRegistries;
 import java.util.Arrays;
 import java.util.Optional;
 import java.util.UUID;
@@ -76,7 +77,9 @@ class MavenArtifactStorageResolverTest {
 
   private MavenArtifactStorageResolver resolver() {
     return new MavenArtifactStorageResolver(
-        this.artifactRepository, this.artifactVersionRepository, this.storageStrategy);
+        this.artifactRepository,
+        this.artifactVersionRepository,
+        TestStorageRegistries.of(this.storageStrategy));
   }
 
   private void stubVersionDir(final String... names) {

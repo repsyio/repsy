@@ -43,6 +43,7 @@ import io.repsy.os.server.protocols.maven.shared.keystore.dtos.PublicKeySources;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreService;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.MavenPgpCaps;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.PgpVerifierService;
+import io.repsy.os.server.protocols.shared.configs.TestStorageRegistries;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
@@ -117,7 +118,7 @@ class PendingSignatureServiceTest {
             this.pgpVerifierService,
             this.keyStoreService,
             this.usageUpdateService,
-            this.storageStrategy,
+            TestStorageRegistries.of(this.storageStrategy),
             this.transactionManager,
             this.caps);
     this.version.setId(UUID.randomUUID());

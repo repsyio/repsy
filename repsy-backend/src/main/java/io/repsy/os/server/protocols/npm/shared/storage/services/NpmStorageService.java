@@ -15,13 +15,13 @@
  */
 package io.repsy.os.server.protocols.npm.shared.storage.services;
 
-import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.os.server.shared.utils.RequestBaseUrlUtils;
 import io.repsy.protocols.npm.shared.storage.services.AbstractNpmStorageService;
+import io.repsy.protocols.shared.repo.dtos.RepoType;
+import io.repsy.protocols.shared.storage.StorageStrategyRegistry;
 import jakarta.servlet.http.HttpServletRequest;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -35,11 +35,11 @@ public class NpmStorageService extends AbstractNpmStorageService {
   private final @Nullable String publicUrl;
 
   public NpmStorageService(
-      @Qualifier("osStorageStrategyNpm") final StorageStrategy storageStrategy,
+      final StorageStrategyRegistry storageStrategyRegistry,
       @Value("${server.port:9090}") final int repoPort,
       @Value("${repsy.npm.public-url:}") final String publicUrl) {
 
-    super(storageStrategy);
+    super(storageStrategyRegistry.get(RepoType.NPM));
 
     this.repoPort = repoPort;
     this.publicUrl = publicUrl.isBlank() ? null : publicUrl.strip().replaceAll("/+$", "");

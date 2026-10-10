@@ -16,16 +16,16 @@
 package io.repsy.os.server.security.shared.resolvers;
 
 import io.repsy.libs.storage.core.dtos.StoragePath;
-import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.os.server.security.shared.ArtifactStorageResolver;
 import io.repsy.protocols.nuget.shared.storage.services.NuGetStorageService;
+import io.repsy.protocols.shared.repo.dtos.RepoType;
+import io.repsy.protocols.shared.storage.StorageStrategyRegistry;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.NullMarked;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -37,8 +37,7 @@ public class NuGetArtifactStorageResolver implements ArtifactStorageResolver {
 
   private final @NonNull NuGetStorageService nuGetStorageService;
 
-  @Qualifier("osStorageStrategyNuGet")
-  private final @NonNull StorageStrategy nuGetStorageStrategy;
+  private final @NonNull StorageStrategyRegistry storageStrategyRegistry;
 
   @Override
   public @NonNull Optional<String> resolve(
@@ -50,7 +49,8 @@ public class NuGetArtifactStorageResolver implements ArtifactStorageResolver {
     final var nupkgPath =
         this.nuGetStorageService.getNupkgRelativePath(artifactName, artifactVersion);
 
-    return this.nuGetStorageStrategy
+    return this.storageStrategyRegistry
+        .get(RepoType.NUGET)
         .get(StoragePath.of(repoId, nupkgPath), repoName)
         .map(resource -> nupkgPath);
   }
