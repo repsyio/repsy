@@ -30,6 +30,8 @@ import org.bouncycastle.bcpg.HashAlgorithmTags;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.openpgp.PGPException;
 import org.bouncycastle.openpgp.PGPKeyPair;
+import org.bouncycastle.openpgp.PGPLiteralData;
+import org.bouncycastle.openpgp.PGPLiteralDataGenerator;
 import org.bouncycastle.openpgp.PGPPublicKey;
 import org.bouncycastle.openpgp.PGPPublicKeyRing;
 import org.bouncycastle.openpgp.PGPSignature;
@@ -149,6 +151,21 @@ public final class PgpTestKeys {
   }
 
   /**
+   * A fresh two-key ring: this key as the primary, plus a subkey bound to it by a {@code
+   * SUBKEY_BINDING} signature issued by the primary's private key, the way {@code gpg --edit-key
+   * addkey} would produce. The returned {@code PgpTestKeys} signs with the subkey, so {@link
+   * #keyId()} and {@link #detachedSignature} refer to it, and {@link #armoredPublicKey()} encodes
+   * the whole ring, primary key first (with whatever revocation or expiry this primary carries).
+   */
+  public PgpTestKeys withSigningSubkey() {
+
+    final var sub = newSubkeyPair();
+
+    return new PgpTestKeys(
+        new PGPKeyPair(this.bind(sub), sub.getPrivateKey()), this.keyPair.getPublicKey());
+  }
+
+  /**
    * A fresh two-key ring: this key as the primary, plus a subkey that carries both a binding
    * signature and a {@code SUBKEY_REVOCATION} signature, both issued by the primary's private key,
    * the way {@code gpg --edit-key revkey} would produce. The returned {@code PgpTestKeys} signs
@@ -159,20 +176,8 @@ public final class PgpTestKeys {
 
     try {
       final var primary = this.keyPair;
-      // A freshly generated PGPKeyPair is a master-type key packet; asSubkey() is what actually
-      // turns it into a subkey packet, which is what makes PGPPublicKey.isMasterKey() false and
-      // lets addCertification(...) accept a SUBKEY_REVOCATION signature on it below.
-      final var sub = newRsaKeyPair(new Date()).asSubkey(new JcaKeyFingerprintCalculator());
-
-      final var bindingGenerator =
-          new PGPSignatureGenerator(
-              new JcaPGPContentSignerBuilder(PGPPublicKey.RSA_GENERAL, HashAlgorithmTags.SHA256)
-                  .setProvider(BouncyCastleProvider.PROVIDER_NAME),
-              primary.getPublicKey());
-      bindingGenerator.init(PGPSignature.SUBKEY_BINDING, primary.getPrivateKey());
-      final var binding =
-          bindingGenerator.generateCertification(primary.getPublicKey(), sub.getPublicKey());
-      final var boundSub = PGPPublicKey.addCertification(sub.getPublicKey(), binding);
+      final var sub = newSubkeyPair();
+      final var boundSub = this.bind(sub);
 
       final var revocationGenerator =
           new PGPSignatureGenerator(
@@ -188,6 +193,38 @@ public final class PgpTestKeys {
           new PGPKeyPair(revokedSub, sub.getPrivateKey()), primary.getPublicKey());
     } catch (final PGPException e) {
       throw new IllegalStateException("cannot generate a revoked test subkey", e);
+    }
+  }
+
+  private static PGPKeyPair newSubkeyPair() {
+
+    try {
+      // A freshly generated PGPKeyPair is a master-type key packet; asSubkey() is what actually
+      // turns it into a subkey packet, which is what makes PGPPublicKey.isMasterKey() false and
+      // lets addCertification(...) accept a SUBKEY_REVOCATION signature on it.
+      return newRsaKeyPair(new Date()).asSubkey(new JcaKeyFingerprintCalculator());
+    } catch (final PGPException e) {
+      throw new IllegalStateException("cannot generate a test subkey", e);
+    }
+  }
+
+  /** {@code sub}'s public key with a {@code SUBKEY_BINDING} signature by this (primary) key. */
+  private PGPPublicKey bind(final PGPKeyPair sub) {
+
+    try {
+      final var primary = this.keyPair;
+      final var bindingGenerator =
+          new PGPSignatureGenerator(
+              new JcaPGPContentSignerBuilder(PGPPublicKey.RSA_GENERAL, HashAlgorithmTags.SHA256)
+                  .setProvider(BouncyCastleProvider.PROVIDER_NAME),
+              primary.getPublicKey());
+      bindingGenerator.init(PGPSignature.SUBKEY_BINDING, primary.getPrivateKey());
+      final var binding =
+          bindingGenerator.generateCertification(primary.getPublicKey(), sub.getPublicKey());
+
+      return PGPPublicKey.addCertification(sub.getPublicKey(), binding);
+    } catch (final PGPException e) {
+      throw new IllegalStateException("cannot bind a test subkey", e);
     }
   }
 
@@ -229,19 +266,22 @@ public final class PgpTestKeys {
    * date a signature after a key's expiry window without actually waiting for it).
    */
   public String detachedSignature(final byte[] data, final Date creationTime) {
+    return this.detachedSignature(data, creationTime, HashAlgorithmTags.SHA256);
+  }
+
+  /**
+   * An ASCII armored detached signature of exactly these bytes, dated {@code new Date()}, made with
+   * the digest {@code hashAlgorithm} (a {@link HashAlgorithmTags} value, such as {@code SHA1}).
+   */
+  public String detachedSignature(final byte[] data, final int hashAlgorithm) {
+    return this.detachedSignature(data, new Date(), hashAlgorithm);
+  }
+
+  private String detachedSignature(
+      final byte[] data, final Date creationTime, final int hashAlgorithm) {
 
     try {
-      final var generator =
-          new PGPSignatureGenerator(
-              new JcaPGPContentSignerBuilder(PGPPublicKey.RSA_GENERAL, HashAlgorithmTags.SHA256)
-                  .setProvider(BouncyCastleProvider.PROVIDER_NAME),
-              this.keyPair.getPublicKey());
-      generator.init(PGPSignature.BINARY_DOCUMENT, this.keyPair.getPrivateKey());
-
-      final var subpackets = new PGPSignatureSubpacketGenerator();
-      subpackets.setSignatureCreationTime(false, creationTime);
-      generator.setHashedSubpackets(subpackets.generate());
-
+      final var generator = this.signatureGenerator(creationTime, hashAlgorithm);
       generator.update(data);
 
       final var bytes = new ByteArrayOutputStream();
@@ -256,5 +296,90 @@ public final class PgpTestKeys {
     } catch (final IOException e) {
       throw new UncheckedIOException(e);
     }
+  }
+
+  /**
+   * An ASCII armored inline-signed message of these bytes, the way {@code gpg --armor --sign}
+   * (without {@code --detach-sign}) writes it: a one-pass signature packet, a literal data packet
+   * holding {@code data}, then the signature packet.
+   */
+  public String inlineSignedMessage(final byte[] data) {
+
+    try {
+      final var generator = this.signatureGenerator(new Date(), HashAlgorithmTags.SHA256);
+      final var bytes = new ByteArrayOutputStream();
+
+      try (final var armored = new ArmoredOutputStream(bytes)) {
+        final var packets = new BCPGOutputStream(armored);
+        generator.generateOnePassVersion(false).encode(packets);
+
+        final var literal = new PGPLiteralDataGenerator();
+        try (final var literalOut =
+            literal.open(packets, PGPLiteralData.BINARY, "", data.length, new Date())) {
+          literalOut.write(data);
+        }
+
+        generator.update(data);
+        generator.generate().encode(packets);
+      }
+
+      return bytes.toString(StandardCharsets.UTF_8);
+    } catch (final PGPException e) {
+      throw new IllegalStateException("cannot sign the test data", e);
+    } catch (final IOException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
+
+  /**
+   * A cleartext-signed message of this text, the way {@code gpg --clearsign} writes it: the text
+   * under a {@code BEGIN PGP SIGNED MESSAGE} header, then an armored text-mode signature.
+   */
+  public String clearSignedMessage(final String text) {
+
+    try {
+      final var generator =
+          new PGPSignatureGenerator(
+              new JcaPGPContentSignerBuilder(PGPPublicKey.RSA_GENERAL, HashAlgorithmTags.SHA256)
+                  .setProvider(BouncyCastleProvider.PROVIDER_NAME),
+              this.keyPair.getPublicKey());
+      generator.init(PGPSignature.CANONICAL_TEXT_DOCUMENT, this.keyPair.getPrivateKey());
+
+      final var textBytes = text.getBytes(StandardCharsets.UTF_8);
+      generator.update(textBytes);
+
+      final var bytes = new ByteArrayOutputStream();
+
+      try (final var armored = new ArmoredOutputStream(bytes)) {
+        armored.beginClearText(HashAlgorithmTags.SHA256);
+        armored.write(textBytes);
+        armored.write('\n');
+        armored.endClearText();
+        generator.generate().encode(new BCPGOutputStream(armored));
+      }
+
+      return bytes.toString(StandardCharsets.UTF_8);
+    } catch (final PGPException e) {
+      throw new IllegalStateException("cannot sign the test text", e);
+    } catch (final IOException e) {
+      throw new UncheckedIOException(e);
+    }
+  }
+
+  private PGPSignatureGenerator signatureGenerator(final Date creationTime, final int hashAlgorithm)
+      throws PGPException {
+
+    final var generator =
+        new PGPSignatureGenerator(
+            new JcaPGPContentSignerBuilder(PGPPublicKey.RSA_GENERAL, hashAlgorithm)
+                .setProvider(BouncyCastleProvider.PROVIDER_NAME),
+            this.keyPair.getPublicKey());
+    generator.init(PGPSignature.BINARY_DOCUMENT, this.keyPair.getPrivateKey());
+
+    final var subpackets = new PGPSignatureSubpacketGenerator();
+    subpackets.setSignatureCreationTime(false, creationTime);
+    generator.setHashedSubpackets(subpackets.generate());
+
+    return generator;
   }
 }

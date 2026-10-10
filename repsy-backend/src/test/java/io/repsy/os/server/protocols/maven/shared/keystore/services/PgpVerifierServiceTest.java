@@ -39,6 +39,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 import org.bouncycastle.bcpg.ArmoredOutputStream;
 import org.bouncycastle.bcpg.CompressionAlgorithmTags;
+import org.bouncycastle.bcpg.HashAlgorithmTags;
 import org.bouncycastle.openpgp.PGPCompressedDataGenerator;
 import org.bouncycastle.openpgp.PGPException;
 import org.bouncycastle.openpgp.PGPPublicKeyRing;
@@ -900,5 +901,210 @@ class PgpVerifierServiceTest {
             "-----BEGIN PGP PUBLIC KEY BLOCK-----\n\nnot a key", keys.armoredPublicKey()));
 
     assertThat(service.parsedRegisteredKeyCount()).isEqualTo(1);
+  }
+
+  // RPS-2067: the rest of the verification outcome matrix, pinned on the backend class before it
+  // moves into repsy-protocols/maven. Where an outcome is today's behaviour rather than a policy
+  // (no weak-digest policy, an inline-signed message accepted), the test says so.
+
+  @Test
+  @DisplayName("accepts a signature made by a bound subkey, looked up by the subkey's id")
+  void acceptsASignatureMadeWithASubkey() {
+    final var subkey = PgpTestKeys.generate().withSigningSubkey();
+    final var signature = resource(subkey.detachedSignature(POM));
+
+    assertThatCode(
+            () ->
+                this.serviceAnswering(uri -> notFound())
+                    .verify(
+                        new ByteArrayResource(POM),
+                        signature,
+                        registeredKeys(subkey.armoredPublicKey())))
+        .doesNotThrowAnyException();
+
+    assertThat(this.serviceAnswering(uri -> notFound()).readSignerKeyId(signature))
+        .isEqualTo("%016X".formatted(subkey.keyId()));
+  }
+
+  @Test
+  @DisplayName("accepts a subkey signature whose ring came from a key server")
+  void acceptsASubkeySignatureFromAKeyServerRing() {
+    final var subkey = PgpTestKeys.generate().withSigningSubkey();
+    final var signature = resource(subkey.detachedSignature(POM));
+
+    assertThatCode(
+            () ->
+                this.serviceAnswering(uri -> keyBlockResponse(subkey.armoredPublicKey()))
+                    .verify(new ByteArrayResource(POM), signature, noRegisteredKeys()))
+        .doesNotThrowAnyException();
+  }
+
+  @Test
+  @DisplayName("refuses a signature made by a fine subkey whose primary key is revoked")
+  void refusesASubkeySignatureWhenThePrimaryKeyIsRevoked() {
+    final var subkey = PgpTestKeys.generate().withRevocation().withSigningSubkey();
+    final var signature = resource(subkey.detachedSignature(POM));
+
+    assertThatThrownBy(
+            () ->
+                this.serviceAnswering(uri -> notFound())
+                    .verify(
+                        new ByteArrayResource(POM),
+                        signature,
+                        registeredKeys(subkey.armoredPublicKey())))
+        .isInstanceOf(SignatureNotVerifiedException.class)
+        .hasMessage(NOT_VERIFIED);
+  }
+
+  @Test
+  @DisplayName("answers artifactSigningKeyNotFound for a signature by a key nobody has")
+  void answersKeyNotFoundForASignatureByAnUnknownKey() {
+    final var stranger = PgpTestKeys.generate();
+    final var signature = resource(stranger.detachedSignature(POM));
+
+    assertThatThrownBy(
+            () ->
+                this.serviceAnswering(uri -> keyResponse())
+                    .verify(
+                        new ByteArrayResource(POM),
+                        signature,
+                        registeredKeys(keys.armoredPublicKey())))
+        .isInstanceOf(ItemNotFoundException.class)
+        .hasMessage("artifactSigningKeyNotFound");
+
+    // Every key server answered a block, but with another key: the two defaults were both asked.
+    assertThat(this.asked).hasSize(2);
+  }
+
+  @Test
+  @DisplayName("refuses a signature dated before its key was created when the key has an expiry")
+  void refusesASignatureDatedBeforeAnExpiringKeysCreation() {
+    final var expiring = PgpTestKeys.generate().withKeyExpirySeconds(3_600);
+    final var beforeCreation = new Date(System.currentTimeMillis() - 3_600_000);
+    final var signature = resource(expiring.detachedSignature(POM, beforeCreation));
+
+    assertThatThrownBy(
+            () ->
+                this.serviceAnswering(uri -> notFound())
+                    .verify(
+                        new ByteArrayResource(POM),
+                        signature,
+                        registeredKeys(expiring.armoredPublicKey())))
+        .isInstanceOf(SignatureNotVerifiedException.class)
+        .hasMessage(NOT_VERIFIED);
+  }
+
+  @Test
+  @DisplayName("accepts a signature dated before its key's creation when the key never expires")
+  void acceptsABackdatedSignatureOfAKeyWithoutExpiry() {
+    // Today's behaviour: the creation-time window is only checked for a key with an expiry.
+    final var beforeCreation = new Date(System.currentTimeMillis() - 3_600_000);
+    final var signature = resource(keys.detachedSignature(POM, beforeCreation));
+
+    assertThatCode(
+            () ->
+                this.serviceAnswering(uri -> notFound())
+                    .verify(
+                        new ByteArrayResource(POM),
+                        signature,
+                        registeredKeys(keys.armoredPublicKey())))
+        .doesNotThrowAnyException();
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {HashAlgorithmTags.SHA1, HashAlgorithmTags.MD5, HashAlgorithmTags.SHA512})
+  @DisplayName("has no digest policy: a SHA-1, MD5 or SHA-512 signature verifies like SHA-256")
+  void hasNoWeakDigestPolicy(final int hashAlgorithm) {
+    // Today's behaviour, not a decision: BouncyCastle verifies any digest it implements, and the
+    // service does not refuse weak ones.
+    final var signature = resource(keys.detachedSignature(POM, hashAlgorithm));
+
+    assertThatCode(
+            () ->
+                this.serviceAnswering(uri -> notFound())
+                    .verify(
+                        new ByteArrayResource(POM),
+                        signature,
+                        registeredKeys(keys.armoredPublicKey())))
+        .doesNotThrowAnyException();
+  }
+
+  @Test
+  @DisplayName("a weak-digest signature over other bytes is still refused")
+  void refusesAWeakDigestSignatureOfOtherBytes() {
+    final var signature = resource(keys.detachedSignature(OTHER_POM, HashAlgorithmTags.SHA1));
+
+    assertThatThrownBy(
+            () ->
+                this.serviceAnswering(uri -> notFound())
+                    .verify(
+                        new ByteArrayResource(POM),
+                        signature,
+                        registeredKeys(keys.armoredPublicKey())))
+        .isInstanceOf(SignatureNotVerifiedException.class)
+        .hasMessage(NOT_VERIFIED);
+  }
+
+  @Test
+  @DisplayName(
+      "accepts an inline-signed message (gpg --sign) whose literal data is the stored file")
+  void acceptsAnInlineSignedMessageOfTheSameBytes() {
+    // Today's behaviour, not a decision: the signature packet after the literal data is taken and
+    // checked against the stored file, so it verifies like the detached signature of those bytes.
+    final var signature = resource(keys.inlineSignedMessage(POM));
+
+    assertThatCode(
+            () ->
+                this.serviceAnswering(uri -> notFound())
+                    .verify(
+                        new ByteArrayResource(POM),
+                        signature,
+                        registeredKeys(keys.armoredPublicKey())))
+        .doesNotThrowAnyException();
+  }
+
+  @Test
+  @DisplayName("refuses an inline-signed message of other bytes")
+  void refusesAnInlineSignedMessageOfOtherBytes() {
+    final var signature = resource(keys.inlineSignedMessage(OTHER_POM));
+
+    assertThatThrownBy(
+            () ->
+                this.serviceAnswering(uri -> notFound())
+                    .verify(
+                        new ByteArrayResource(POM),
+                        signature,
+                        registeredKeys(keys.armoredPublicKey())))
+        .isInstanceOf(SignatureNotVerifiedException.class)
+        .hasMessage(NOT_VERIFIED);
+  }
+
+  @Test
+  @DisplayName("refuses a cleartext-signed message (gpg --clearsign), even of the stored text")
+  void refusesAClearSignedMessageOfTheStoredText() {
+    final var text = new String(POM, UTF_8);
+    final var signature = resource(keys.clearSignedMessage(text));
+
+    assertThatThrownBy(
+            () ->
+                this.serviceAnswering(uri -> notFound())
+                    .verify(
+                        new ByteArrayResource(POM),
+                        signature,
+                        registeredKeys(keys.armoredPublicKey())))
+        .isInstanceOf(SignatureNotVerifiedException.class)
+        .hasMessage(NOT_VERIFIED);
+  }
+
+  @Test
+  @DisplayName("with no key sources at all (null) the default key servers are asked")
+  void nullSourcesAskTheDefaultKeyServers() {
+    final var signature = resource(keys.detachedSignature(POM));
+
+    assertThatCode(
+            () -> this.serviceWithTheKey().verify(new ByteArrayResource(POM), signature, null))
+        .doesNotThrowAnyException();
+
+    assertThat(this.asked).hasSize(1);
   }
 }
