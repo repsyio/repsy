@@ -28,9 +28,17 @@ import java.util.UUID;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.DynamicUpdate;
 
+/**
+ * {@code @DynamicUpdate} keeps an UPDATE to the columns that changed. Without it a full-row save
+ * (for example a settings change) also writes the {@code disk_usage} read at load time, which loses
+ * a usage increment that committed in between (RPS-2116). The counter is changed only by the single
+ * guarded UPDATE of {@code RepoRepository}, never by a setter and save.
+ */
 @Data
 @Entity
+@DynamicUpdate
 @Table(name = "repo")
 @NoArgsConstructor
 public class Repo {
