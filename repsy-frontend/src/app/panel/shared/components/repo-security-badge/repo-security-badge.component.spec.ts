@@ -18,8 +18,8 @@ import { By } from '@angular/platform-browser';
 import { of } from 'rxjs';
 
 import { Severity } from '../../../../../generated/api';
-import { SecurityService } from '../../../pages/security/service/security.service';
-import { SecurityScanSupportService } from '../../service/security-scan-support.service';
+import { SecurityService } from '../../../pages/security/services/security.service';
+import { SecurityScanSupportService } from '../../services/security-scan-support.service';
 import { RepoSecurityModalComponent } from '../repo-security-modal/repo-security-modal.component';
 import { RepoSecurityBadgeComponent } from './repo-security-badge.component';
 

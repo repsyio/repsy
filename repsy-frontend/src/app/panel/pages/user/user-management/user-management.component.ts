@@ -22,7 +22,7 @@ import moment from 'moment';
 import { catchError, EMPTY, filter, finalize, map, Subject, Subscription, switchMap, timer } from 'rxjs';
 
 import { PagedModelUserResponse, UserResponse } from '../../../../../generated/api';
-import { AuthService } from '../../../../auth/pages/service/auth.service';
+import { AuthService } from '../../../../auth/pages/services/auth.service';
 import { DropdownComponent } from '../../../shared/components/dropdown/dropdown.component';
 import { EmptyListComponent } from '../../../shared/components/empty-list/empty-list.component';
 import { DangerModalService } from '../../../shared/components/modals/danger-modal/danger-modal.service';
@@ -33,13 +33,13 @@ import { PaginationComponent } from '../../../shared/components/pagination/pagin
 import { SearchboxComponent } from '../../../shared/components/searchbox/searchbox.component';
 import { ToastService } from '../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../shared/components/tooltip/tooltip.component';
-import { restoreListFocus } from '../../../shared/util/list-focus-restore.util';
+import { restoreListFocus } from '../../../shared/utils/list-focus-restore.utils';
 import {
   readListPageParam,
   readListQueryParam,
   updateListQueryParams,
-} from '../../../shared/util/list-query-params.util';
-import { UserService } from '../service/user.service';
+} from '../../../shared/utils/list-query-params.utils';
+import { UserService } from '../services/user.service';
 
 /** How long the search box must be idle before the typed text is sent to the server. */
 export const USER_SEARCH_DEBOUNCE_MS = 250;

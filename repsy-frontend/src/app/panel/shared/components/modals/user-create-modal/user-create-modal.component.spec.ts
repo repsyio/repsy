@@ -21,7 +21,7 @@ import { config, of, Subject, throwError } from 'rxjs';
 import { UserResponse } from '../../../../../../generated/api';
 import { PASSWORD_MESSAGES, USERNAME_MESSAGES } from '../../../../../shared/validators/credentials.validators';
 import { renderComponent } from '../../../../pages/repository/testing/render-spec-helpers';
-import { UserService } from '../../../../pages/user/service/user.service';
+import { UserService } from '../../../../pages/user/services/user.service';
 import { ToastService } from '../../toast/toast.service';
 import { UserCreateModalComponent } from './user-create-modal.component';
 

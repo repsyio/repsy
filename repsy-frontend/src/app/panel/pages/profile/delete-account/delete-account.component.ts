@@ -18,10 +18,10 @@ import { Component } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 
-import { AuthService } from '../../../../auth/pages/service/auth.service';
+import { AuthService } from '../../../../auth/pages/services/auth.service';
 import { DangerModalService } from '../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../shared/components/toast/toast.service';
-import { ProfileService } from '../service/profile.service';
+import { ProfileService } from '../services/profile.service';
 
 @Component({
   selector: 'app-delete-account',

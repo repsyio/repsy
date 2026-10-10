@@ -16,8 +16,8 @@
 import { DefaultUrlSerializer, NavigationEnd, Router } from '@angular/router';
 import { Subject } from 'rxjs';
 
-import { BreadcrumbSecurityLinkService } from '../../../shared/service/breadcrumb-security-link.service';
-import { RepoRouteSlug } from '../../../shared/util/repo-api-type';
+import { BreadcrumbSecurityLinkService } from '../../../shared/services/breadcrumb-security-link.service';
+import { RepoRouteSlug } from '../../../shared/utils/repo-api-type';
 import { RepoContext, RepoLookupService } from '../repo-entry/repo-lookup.service';
 import { RepositoryBreadcrumbComponent } from './repository-breadcrumb.component';
 

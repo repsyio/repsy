@@ -18,7 +18,7 @@ import { CommonModule } from '@angular/common';
 import { Component, Input } from '@angular/core';
 
 import { ScanStatus } from '../../../../../generated/api';
-import { hasRescanFailed, recentScanNote } from '../../util/rescan-status.util';
+import { hasRescanFailed, recentScanNote } from '../../utils/rescan-status.utils';
 
 /** Flags a recent scan whose newest scan is pending, running or failed. Renders nothing otherwise. */
 @Component({

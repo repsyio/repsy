@@ -18,12 +18,12 @@ import { AbstractControl, FormBuilder } from '@angular/forms';
 import { Router } from '@angular/router';
 
 import { LoginComponent } from '../../auth/pages/login/login.component';
-import { AuthService } from '../../auth/pages/service/auth.service';
+import { AuthService } from '../../auth/pages/services/auth.service';
 import { AccountInfoComponent } from '../../panel/pages/profile/account-info/account-info.component';
-import { ProfileService } from '../../panel/pages/profile/service/profile.service';
+import { ProfileService } from '../../panel/pages/profile/services/profile.service';
 import { RepoInfoComponent } from '../../panel/pages/repository/repo-settings/repo-info/repo-info.component';
 import { renderComponent } from '../../panel/pages/repository/testing/render-spec-helpers';
-import { UserService } from '../../panel/pages/user/service/user.service';
+import { UserService } from '../../panel/pages/user/services/user.service';
 import { DangerModalService } from '../../panel/shared/components/modals/danger-modal/danger-modal.service';
 import { DeployTokenCreateModalComponent } from '../../panel/shared/components/modals/deploy-token-create-modal/deploy-token-create-modal.component';
 import { RepositoryCreateModalComponent } from '../../panel/shared/components/modals/repository-create-modal/repository-create-modal.component';

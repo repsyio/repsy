@@ -18,7 +18,7 @@ import { NgClass } from '@angular/common';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 
 import { AccessTokenCreated } from '../../../../../../generated/api';
-import { idFactory } from '../../../../../shared/util/unique-id';
+import { idFactory } from '../../../../../shared/utils/unique-id';
 import { DialogDirective } from '../../../directives/dialog.directive';
 import { CopyClipboardComponent } from '../../copy-clipboard/copy-clipboard.component';
 

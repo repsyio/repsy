@@ -21,7 +21,7 @@ import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 
 import { LoginInfo } from '../../../../../generated/api';
-import { idFactory } from '../../../../shared/util/unique-id';
+import { idFactory } from '../../../../shared/utils/unique-id';
 import {
   PASSWORD_MESSAGES,
   PASSWORD_MISMATCH_MESSAGE,
@@ -31,7 +31,7 @@ import {
 } from '../../../../shared/validators/credentials.validators';
 import { DangerModalService } from '../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../shared/components/toast/toast.service';
-import { ProfileService } from '../service/profile.service';
+import { ProfileService } from '../services/profile.service';
 import { PasswordForm, PasswordFormInputElement } from './password-form';
 
 @Component({

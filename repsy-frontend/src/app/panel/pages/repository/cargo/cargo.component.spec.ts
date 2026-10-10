@@ -16,7 +16,7 @@
 
 import { describeProtocolShell } from '../testing/protocol-shell-spec-helpers';
 import { CargoComponent } from './cargo.component';
-import { CargoService } from './service/cargo.service';
+import { CargoService } from './services/cargo.service';
 
 describeProtocolShell({
   component: CargoComponent,

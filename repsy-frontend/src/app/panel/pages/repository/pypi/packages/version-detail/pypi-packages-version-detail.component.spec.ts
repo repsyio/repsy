@@ -25,10 +25,10 @@ import { ReleaseDetail, RepoPermissionInfo } from '../../../../../../../generate
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { BreadcrumbSecurityLinkService } from '../../../../../shared/service/breadcrumb-security-link.service';
-import { VERSION_PROBE_SORT } from '../../../../../shared/util/version-delete-landing.util';
+import { BreadcrumbSecurityLinkService } from '../../../../../shared/services/breadcrumb-security-link.service';
+import { VERSION_PROBE_SORT } from '../../../../../shared/utils/version-delete-landing.utils';
 import { RepoLookupService } from '../../../repo-entry/repo-lookup.service';
-import { PypiService } from '../../service/pypi.service';
+import { PypiService } from '../../services/pypi.service';
 import { PypiPackagesVersionDetailComponent } from './pypi-packages-version-detail.component';
 
 @Component({ selector: 'app-security-scan-section', standalone: true, template: '' })

@@ -18,7 +18,7 @@ import { CommonModule, DOCUMENT } from '@angular/common';
 import { ChangeDetectorRef, Component, inject, NgZone, OnDestroy, OnInit, ViewEncapsulation } from '@angular/core';
 import { RouterModule, RouterOutlet } from '@angular/router';
 
-import { AuthService } from '../../../auth/pages/service/auth.service';
+import { AuthService } from '../../../auth/pages/services/auth.service';
 import { FooterComponent } from '../../../shared/components/footer/footer.component';
 import { PanelHeaderComponent } from '../../../shared/components/panel-header/panel-header.component';
 import { SidebarComponent } from '../components/sidebar/sidebar.component';

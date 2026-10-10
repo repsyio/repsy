@@ -21,10 +21,10 @@ import { environment } from '../../../../../../../environments/environment';
 import { HelmChartDetail, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { ByteFormatter } from '../../../../../shared/util/byte-formatter';
-import { VERSION_PROBE_SORT } from '../../../../../shared/util/version-delete-landing.util';
+import { ByteFormatter } from '../../../../../shared/utils/byte-formatter';
+import { VERSION_PROBE_SORT } from '../../../../../shared/utils/version-delete-landing.utils';
 import { permission } from '../../../testing/protocol-service-spec-helpers';
-import { HelmService } from '../../service/helm.service';
+import { HelmService } from '../../services/helm.service';
 import { HelmChartsVersionDetailComponent } from './helm-charts-version-detail.component';
 
 const REPO = 'helm-repo';

@@ -16,7 +16,7 @@
 
 import { afterNextRender, DestroyRef, Directive, ElementRef, HostListener, inject, input, output } from '@angular/core';
 
-import { uniqueId } from '../../../shared/util/unique-id';
+import { uniqueId } from '../../../shared/utils/unique-id';
 
 const TABBABLE =
   'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), ' +

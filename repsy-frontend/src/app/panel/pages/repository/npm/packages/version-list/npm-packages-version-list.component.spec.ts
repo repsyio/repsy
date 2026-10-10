@@ -22,7 +22,7 @@ import { BehaviorSubject, of, throwError } from 'rxjs';
 import { RepoPermissionInfo } from '../../../../../../../generated/api';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { SecurityService } from '../../../../security/service/security.service';
+import { SecurityService } from '../../../../security/services/security.service';
 import { permission } from '../../../testing/protocol-service-spec-helpers';
 import { renderComponent } from '../../../testing/render-spec-helpers';
 import {
@@ -33,7 +33,7 @@ import {
   pageOf,
   REPO_NAME,
 } from '../../../testing/repo-list-spec-helpers';
-import { NpmService } from '../../service/npm.service';
+import { NpmService } from '../../services/npm.service';
 import { NpmPackagesVersionListComponent } from './npm-packages-version-list.component';
 
 describe('NpmPackagesVersionListComponent', () => {

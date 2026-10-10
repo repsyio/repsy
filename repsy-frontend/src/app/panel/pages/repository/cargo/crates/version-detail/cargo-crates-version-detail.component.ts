@@ -40,9 +40,9 @@ import {
   landAfterVersionDelete,
   VERSION_PROBE_SIZE,
   VERSION_PROBE_SORT,
-} from '../../../../../shared/util/version-delete-landing.util';
-import { versionLoadError } from '../../../../../shared/util/version-load-error.util';
-import { CargoService } from '../../service/cargo.service';
+} from '../../../../../shared/utils/version-delete-landing.utils';
+import { versionLoadError } from '../../../../../shared/utils/version-load-error.utils';
+import { CargoService } from '../../services/cargo.service';
 
 @Component({
   selector: 'app-cargo-crates-version-detail',

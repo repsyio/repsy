@@ -20,13 +20,13 @@ import moment from 'moment';
 import { BehaviorSubject, of, throwError } from 'rxjs';
 
 import { RepoPermissionInfo } from '../../../../../../../generated/api';
-import { AuthService } from '../../../../../../auth/pages/service/auth.service';
+import { AuthService } from '../../../../../../auth/pages/services/auth.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { permission } from '../../../testing/protocol-service-spec-helpers';
 import { renderComponent } from '../../../testing/render-spec-helpers';
 import { describeRepoListBehavior, ListFixture, pageOf, REPO_NAME } from '../../../testing/repo-list-spec-helpers';
 import { getRepoDomain } from '../../docker-repo-util';
-import { DockerService } from '../../service/docker.service';
+import { DockerService } from '../../services/docker.service';
 import { DockerImagesManifestListComponent } from './docker-images-manifest-list.component';
 
 describe('DockerImagesManifestListComponent', () => {

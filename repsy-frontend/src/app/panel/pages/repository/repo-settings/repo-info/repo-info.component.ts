@@ -20,7 +20,7 @@ import { Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs/operators';
 
 import { RepoPermissionInfo, ReposApi, RepoUpdateForm } from '../../../../../../generated/api';
-import { idFactory } from '../../../../../shared/util/unique-id';
+import { idFactory } from '../../../../../shared/utils/unique-id';
 import {
   DESCRIPTION_MAX_LENGTH,
   DESCRIPTION_MAX_MESSAGE,
@@ -28,7 +28,7 @@ import {
 } from '../../../../../shared/validators/description.validators';
 import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
-import { reservedRepoNameValidator } from '../../../../shared/util/reserved-repo-names';
+import { reservedRepoNameValidator } from '../../../../shared/utils/reserved-repo-names';
 
 @Component({
   selector: 'app-repo-info',

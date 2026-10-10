@@ -31,7 +31,7 @@ import { ReactiveFormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 
 import { SplashService } from '../../../shared/components/splash/splash.service';
-import { AuthService } from '../../pages/service/auth.service';
+import { AuthService } from '../../pages/services/auth.service';
 
 @Component({
   selector: 'app-auth-redirect',
@@ -73,10 +73,8 @@ export class AuthRedirectComponent implements OnInit {
 
   private async lazyLoadComponent(isAuthenticated: boolean): Promise<void> {
     const loaded: Type<unknown> = isAuthenticated
-      ? await import('../../../../../src/app/panel/pages/dashboard/dashboard.component').then(
-          (m) => m.DashboardComponent,
-        )
-      : await import('../../../../../src/app/auth/pages/login/login.component').then((m) => m.LoginComponent);
+      ? await import('../../../panel/pages/dashboard/dashboard.component').then((m) => m.DashboardComponent)
+      : await import('../../pages/login/login.component').then((m) => m.LoginComponent);
 
     // The route changed while the chunk loaded, or the session changed again: a newer call renders that state.
     if (this.destroyed || isAuthenticated !== this.isAuthenticated) {

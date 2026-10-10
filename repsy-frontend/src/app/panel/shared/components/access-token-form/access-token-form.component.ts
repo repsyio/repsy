@@ -20,7 +20,7 @@ import moment from 'moment';
 import { finalize } from 'rxjs/operators';
 
 import { AccessTokenCreated, AccessTokenForm, AccessTokensApi, AccessTokenScope } from '../../../../../generated/api';
-import { idFactory } from '../../../../shared/util/unique-id';
+import { idFactory } from '../../../../shared/utils/unique-id';
 import { MAX_ACCESS_TOKEN_NAME_LENGTH } from '../../../pages/settings/access-tokens/access-token-limits';
 import { SELECTABLE_SCOPES } from '../../../pages/settings/access-tokens/access-token-scopes';
 import { ToastService } from '../toast/toast.service';

@@ -24,16 +24,16 @@ import { finalize } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { LoginForm } from '../../../../generated/api';
 import { ToastService } from '../../../panel/shared/components/toast/toast.service';
-import { problemDetail } from '../../../shared/error-handler/problem.util';
-import { idFactory } from '../../../shared/util/unique-id';
+import { problemDetail } from '../../../shared/error-handler/problem.utils';
+import { idFactory } from '../../../shared/utils/unique-id';
 import {
   LOGIN_PASSWORD_MESSAGES,
   LOGIN_USERNAME_MESSAGES,
   loginPasswordValidators,
   loginUsernameValidators,
 } from '../../../shared/validators/credentials.validators';
-import { RETURN_URL_PARAM, safeReturnUrl } from '../../util/return-url';
-import { AuthService } from '../service/auth.service';
+import { RETURN_URL_PARAM, safeReturnUrl } from '../../utils/return-url';
+import { AuthService } from '../services/auth.service';
 
 @Component({
   selector: 'app-login',

@@ -24,8 +24,8 @@ import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
 
 import { RepoPermissionInfo, VersionSecuritySummary } from '../../../../../generated/api';
 import { DangerModalService } from '../../../shared/components/modals/danger-modal/danger-modal.service';
-import { PagedData } from '../../../shared/dto/paged-data';
-import { Sort } from '../../../shared/dto/sort';
+import { PagedData } from '../../../shared/dtos/paged-data';
+import { Sort } from '../../../shared/dtos/sort';
 import { permission } from './protocol-service-spec-helpers';
 
 /** The members every list component exposes; the concrete components are structurally assignable to it. */

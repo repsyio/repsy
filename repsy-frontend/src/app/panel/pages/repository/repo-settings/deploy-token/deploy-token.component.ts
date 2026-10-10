@@ -37,8 +37,8 @@ import { DeployTokenInfoModalComponent } from '../../../../shared/components/mod
 import { PaginationComponent } from '../../../../shared/components/pagination/pagination.component';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../shared/components/tooltip/tooltip.component';
-import { PagedData } from '../../../../shared/dto/paged-data';
-import { RepoType } from '../../../../shared/dto/repo/repo-type';
+import { PagedData } from '../../../../shared/dtos/paged-data';
+import { RepoType } from '../../../../shared/dtos/repo/repo-type';
 import { CargoConfigComponent } from '../../cargo/config/cargo-config.component';
 import { DockerConfigComponent } from '../../docker/config/docker-config.component';
 import { GoConfigComponent } from '../../go/config/go-config.component';
@@ -48,7 +48,7 @@ import { NpmConfigComponent } from '../../npm/config/npm-config.component';
 import { NuGetConfigComponent } from '../../nuget/config/nuget-config.component';
 import { PypiConfigComponent } from '../../pypi/config/pypi-config.component';
 import { RubyConfigComponent } from '../../ruby/config/ruby-config.component';
-import { TokenCreateInfo } from './dto/token-create-info';
+import { TokenCreateInfo } from './dtos/token-create-info';
 
 @Component({
   selector: 'app-deploy-token',

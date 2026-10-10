@@ -16,7 +16,7 @@
 
 import { describeProtocolShell } from '../testing/protocol-shell-spec-helpers';
 import { HelmComponent } from './helm.component';
-import { HelmService } from './service/helm.service';
+import { HelmService } from './services/helm.service';
 
 describeProtocolShell({
   component: HelmComponent,

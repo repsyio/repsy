@@ -20,12 +20,12 @@ import { Router } from '@angular/router';
 import { BehaviorSubject, of, throwError } from 'rxjs';
 
 import { RepoPermissionInfo } from '../../../../../generated/api';
-import { AuthService } from '../../../../auth/pages/service/auth.service';
+import { AuthService } from '../../../../auth/pages/services/auth.service';
 import { RepositoryBreadcrumbComponent } from '../breadcrumb/repository-breadcrumb.component';
 import { RepoContext, RepoLookupService } from '../repo-entry/repo-lookup.service';
 import { permission } from '../testing/protocol-service-spec-helpers';
 import { MavenComponent } from './maven.component';
-import { MavenService } from './service/maven.service';
+import { MavenService } from './services/maven.service';
 
 @Component({ selector: 'app-repository-breadcrumb', standalone: true, template: '' })
 class BreadcrumbStubComponent {}

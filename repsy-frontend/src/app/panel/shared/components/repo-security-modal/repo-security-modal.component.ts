@@ -21,11 +21,11 @@ import { finalize } from 'rxjs/operators';
 
 import { RecentScannedVersion, RepoSecurityDetail } from '../../../../../generated/api';
 import { SpinnerComponent } from '../../../../shared/components/spinner/spinner.component';
-import { SecurityService } from '../../../pages/security/service/security.service';
+import { SecurityService } from '../../../pages/security/services/security.service';
 import { DialogDirective } from '../../directives/dialog.directive';
 import { PortalToBodyDirective } from '../../directives/portal-to-body.directive';
-import { toApiRepoType } from '../../util/repo-api-type';
-import { ArtifactDetailRoute, buildArtifactDetailRoute } from '../../util/security-detail-route.util';
+import { toApiRepoType } from '../../utils/repo-api-type';
+import { ArtifactDetailRoute, buildArtifactDetailRoute } from '../../utils/security-detail-route.utils';
 import { RescanNoteComponent } from '../rescan-note/rescan-note.component';
 import { SeverityBadgeComponent } from '../severity-badge/severity-badge.component';
 import { SeverityBreakdownComponent } from '../severity-breakdown/severity-breakdown.component';

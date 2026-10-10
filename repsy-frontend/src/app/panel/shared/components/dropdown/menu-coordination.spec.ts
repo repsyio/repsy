@@ -17,7 +17,7 @@
 import { Component } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { Sort } from '../../dto/sort';
+import { Sort } from '../../dtos/sort';
 import { SelectorComponent } from '../selector/selector.component';
 import { SortSelectorComponent } from '../sort-selector/sort-selector.component';
 import { DropdownComponent } from './dropdown.component';

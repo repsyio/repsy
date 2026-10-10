@@ -28,7 +28,7 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import hljs from 'highlight.js';
 import { Marked } from 'marked';
 
-import { copyToClipboard } from '../../util/clipboard.util';
+import { copyToClipboard } from '../../utils/clipboard.utils';
 
 /** Elements that fetch or embed remote content. They have no place in a panel-rendered README. */
 const REMOVED_ELEMENTS = 'source, video, audio, track, link, object, embed, iframe, area, noscript';

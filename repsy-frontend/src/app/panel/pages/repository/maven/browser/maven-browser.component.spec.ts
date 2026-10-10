@@ -20,10 +20,10 @@ import { BehaviorSubject, NEVER, Observable, of, Subject, throwError } from 'rxj
 import { environment } from '../../../../../../environments/environment';
 import { RepoPermissionInfo } from '../../../../../../generated/api';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
-import { ByteFormatter } from '../../../../shared/util/byte-formatter';
+import { ByteFormatter } from '../../../../shared/utils/byte-formatter';
 import { permission } from '../../testing/protocol-service-spec-helpers';
-import { FsItemInfo } from '../dto/fs-item-info';
-import { MavenService } from '../service/maven.service';
+import { FsItemInfo } from '../dtos/fs-item-info';
+import { MavenService } from '../services/maven.service';
 import { MavenBrowserComponent } from './maven-browser.component';
 
 const REPO = 'maven-repo';

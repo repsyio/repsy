@@ -17,7 +17,7 @@
 import { Component, EventEmitter, forwardRef, Input, Output } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 
-import { uniqueId } from '../../../../shared/util/unique-id';
+import { uniqueId } from '../../../../shared/utils/unique-id';
 
 /**
  * A switch that works both ways: with `[checked]`/`(checkedChange)`, and as a form control

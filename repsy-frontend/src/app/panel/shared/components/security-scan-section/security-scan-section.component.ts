@@ -31,10 +31,10 @@ import {
   VulnerabilityScanInfo,
 } from '../../../../../generated/api';
 import { SpinnerComponent } from '../../../../shared/components/spinner/spinner.component';
-import { SecurityScanSupportService } from '../../service/security-scan-support.service';
-import { pollUntilTerminal } from '../../util/poll-until-terminal.util';
-import { scanStatusLabel } from '../../util/scan-status-label.util';
-import { splitScopedArtifactName } from '../../util/scoped-artifact.util';
+import { SecurityScanSupportService } from '../../services/security-scan-support.service';
+import { pollUntilTerminal } from '../../utils/poll-until-terminal.utils';
+import { scanStatusLabel } from '../../utils/scan-status-label.utils';
+import { splitScopedArtifactName } from '../../utils/scoped-artifact.utils';
 import { PaginationComponent } from '../pagination/pagination.component';
 import { RescanNoteComponent } from '../rescan-note/rescan-note.component';
 import { ScanFailureReasonComponent } from '../scan-failure-reason/scan-failure-reason.component';

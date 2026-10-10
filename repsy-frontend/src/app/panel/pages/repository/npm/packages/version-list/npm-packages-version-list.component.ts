@@ -30,7 +30,7 @@ import {
   VersionSecuritySummary,
 } from '../../../../../../../generated/api';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
-import { problemDetail } from '../../../../../../shared/error-handler/problem.util';
+import { problemDetail } from '../../../../../../shared/error-handler/problem.utils';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
 import { EmptyListComponent } from '../../../../../shared/components/empty-list/empty-list.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
@@ -40,18 +40,18 @@ import { SortSelectorComponent } from '../../../../../shared/components/sort-sel
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { VersionSecurityBadgeComponent } from '../../../../../shared/components/version-security-badge/version-security-badge.component';
-import { PagedData } from '../../../../../shared/dto/paged-data';
-import { Sort, VERSION_PRECEDENCE_SORT } from '../../../../../shared/dto/sort';
-import { restoreListFocus } from '../../../../../shared/util/list-focus-restore.util';
-import { emptiesList, pageAfterDelete } from '../../../../../shared/util/list-page-after-delete.util';
+import { PagedData } from '../../../../../shared/dtos/paged-data';
+import { Sort, VERSION_PRECEDENCE_SORT } from '../../../../../shared/dtos/sort';
+import { restoreListFocus } from '../../../../../shared/utils/list-focus-restore.utils';
+import { emptiesList, pageAfterDelete } from '../../../../../shared/utils/list-page-after-delete.utils';
 import {
   readListPageParam,
   readListQueryParam,
   updateListQueryParams,
-} from '../../../../../shared/util/list-query-params.util';
-import { SecurityService } from '../../../../security/service/security.service';
+} from '../../../../../shared/utils/list-query-params.utils';
+import { SecurityService } from '../../../../security/services/security.service';
 import { NpmConfigComponent } from '../../config/npm-config.component';
-import { NpmService } from '../../service/npm.service';
+import { NpmService } from '../../services/npm.service';
 
 @Component({
   selector: 'app-npm-packages-version-list',

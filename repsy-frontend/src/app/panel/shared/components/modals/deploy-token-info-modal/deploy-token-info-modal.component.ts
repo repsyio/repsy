@@ -18,8 +18,8 @@ import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 
-import { idFactory } from '../../../../../shared/util/unique-id';
-import { TokenCreateInfo } from '../../../../pages/repository/repo-settings/deploy-token/dto/token-create-info';
+import { idFactory } from '../../../../../shared/utils/unique-id';
+import { TokenCreateInfo } from '../../../../pages/repository/repo-settings/deploy-token/dtos/token-create-info';
 import { DialogDirective } from '../../../directives/dialog.directive';
 import { CopyClipboardComponent } from '../../copy-clipboard/copy-clipboard.component';
 

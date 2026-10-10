@@ -27,7 +27,7 @@ import {
   RepoPermissionInfo,
   VersionSecuritySummary,
 } from '../../../../../../../generated/api';
-import { AuthService } from '../../../../../../auth/pages/service/auth.service';
+import { AuthService } from '../../../../../../auth/pages/services/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
 import { EmptyListComponent } from '../../../../../shared/components/empty-list/empty-list.component';
@@ -38,13 +38,13 @@ import { SortSelectorComponent } from '../../../../../shared/components/sort-sel
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
 import { VersionSecurityBadgeComponent } from '../../../../../shared/components/version-security-badge/version-security-badge.component';
-import { PagedData } from '../../../../../shared/dto/paged-data';
-import { Sort } from '../../../../../shared/dto/sort';
-import { emptiesList, pageAfterDelete } from '../../../../../shared/util/list-page-after-delete.util';
-import { SecurityService } from '../../../../security/service/security.service';
+import { PagedData } from '../../../../../shared/dtos/paged-data';
+import { Sort } from '../../../../../shared/dtos/sort';
+import { emptiesList, pageAfterDelete } from '../../../../../shared/utils/list-page-after-delete.utils';
+import { SecurityService } from '../../../../security/services/security.service';
 import { MavenConfigComponent } from '../../config/maven-config.component';
-import { MavenService } from '../../service/maven.service';
-import { showVersionDeleteDialog } from '../../util/version-delete-warning.util';
+import { MavenService } from '../../services/maven.service';
+import { showVersionDeleteDialog } from '../../utils/version-delete-warning.utils';
 
 @Component({
   selector: 'app-maven-artifacts-version-list',

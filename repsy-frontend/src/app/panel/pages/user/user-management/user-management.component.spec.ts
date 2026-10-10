@@ -20,10 +20,10 @@ import moment from 'moment';
 import { NEVER, of, Subject, throwError } from 'rxjs';
 
 import { PagedModelUserResponse, UserResponse } from '../../../../../generated/api';
-import { AuthService } from '../../../../auth/pages/service/auth.service';
+import { AuthService } from '../../../../auth/pages/services/auth.service';
 import { DangerModalService } from '../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../shared/components/toast/toast.service';
-import { UserService } from '../service/user.service';
+import { UserService } from '../services/user.service';
 import { USER_SEARCH_DEBOUNCE_MS, UserManagementComponent } from './user-management.component';
 
 function user(id: string, role: 'ADMIN' | 'USER' = 'USER'): UserResponse {

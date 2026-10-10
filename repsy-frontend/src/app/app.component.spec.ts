@@ -19,7 +19,7 @@ import { Router } from '@angular/router';
 import { Subject } from 'rxjs';
 
 import { AppComponent } from './app.component';
-import { AuthService } from './auth/pages/service/auth.service';
+import { AuthService } from './auth/pages/services/auth.service';
 
 describe('AppComponent', () => {
   let sessionEndedElsewhere$: Subject<void>;

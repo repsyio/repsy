@@ -22,9 +22,9 @@ import { RepoListInfo, ReposApi, RepoSecuritySummary, RepoType as ApiRepoType } 
 import { DangerModalService } from '../../shared/components/modals/danger-modal/danger-modal.service';
 import { RepositoryCreateModalComponent } from '../../shared/components/modals/repository-create-modal/repository-create-modal.component';
 import { ToastService } from '../../shared/components/toast/toast.service';
-import { RepoType } from '../../shared/dto/repo/repo-type';
-import { ProfileService } from '../profile/service/profile.service';
-import { SecurityService } from '../security/service/security.service';
+import { RepoType } from '../../shared/dtos/repo/repo-type';
+import { ProfileService } from '../profile/services/profile.service';
+import { SecurityService } from '../security/services/security.service';
 import { REPO_LIST_SORT, RepositoryComponent, SEARCH_DEBOUNCE_MS } from './repository.component';
 
 const SCANNING: Record<string, RepoSecuritySummary> = {

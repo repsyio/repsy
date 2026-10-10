@@ -21,7 +21,7 @@ import { Observable, Subscription } from 'rxjs';
 import { filter } from 'rxjs/operators';
 
 import { SecurityDetailsLinkComponent } from '../../../shared/components/security-details-link/security-details-link.component';
-import { BreadcrumbSecurityLinkService } from '../../../shared/service/breadcrumb-security-link.service';
+import { BreadcrumbSecurityLinkService } from '../../../shared/services/breadcrumb-security-link.service';
 import { RepoLookupService } from '../repo-entry/repo-lookup.service';
 
 @Component({

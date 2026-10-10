@@ -24,8 +24,8 @@ import { NuGetVersionInfo, NuGetVersionListItem, RepoPermissionInfo } from '../.
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { PagedData } from '../../../../../shared/dto/paged-data';
-import { NuGetService } from '../../service/nuget.service';
+import { PagedData } from '../../../../../shared/dtos/paged-data';
+import { NuGetService } from '../../services/nuget.service';
 import { NuGetPackagesVersionDetailComponent } from './nuget-packages-version-detail.component';
 
 @Component({ selector: 'app-security-scan-section', standalone: true, template: '' })

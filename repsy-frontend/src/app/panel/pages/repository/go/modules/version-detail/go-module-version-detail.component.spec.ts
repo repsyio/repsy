@@ -22,7 +22,7 @@ import { GoModuleInfo, GoModuleVersionListItem, RepoPermissionInfo } from '../..
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { permission } from '../../../testing/protocol-service-spec-helpers';
-import { GoService } from '../../service/go.service';
+import { GoService } from '../../services/go.service';
 import { GoModuleVersionDetailComponent } from './go-module-version-detail.component';
 
 const REPO = 'go-repo';

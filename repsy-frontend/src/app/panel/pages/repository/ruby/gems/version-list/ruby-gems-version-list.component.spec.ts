@@ -19,10 +19,10 @@ import moment from 'moment';
 import { BehaviorSubject, of, throwError } from 'rxjs';
 
 import { GemVersionListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
-import { AuthService } from '../../../../../../auth/pages/service/auth.service';
+import { AuthService } from '../../../../../../auth/pages/services/auth.service';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { SecurityService } from '../../../../security/service/security.service';
+import { SecurityService } from '../../../../security/services/security.service';
 import { permission } from '../../../testing/protocol-service-spec-helpers';
 import {
   describeLastVersionDelete,
@@ -32,7 +32,7 @@ import {
   pageOf,
   REPO_NAME,
 } from '../../../testing/repo-list-spec-helpers';
-import { RubyService } from '../../service/ruby.service';
+import { RubyService } from '../../services/ruby.service';
 import { RubyGemsVersionListComponent } from './ruby-gems-version-list.component';
 
 const VERSION = { version: '7.1.0', platform: 'ruby' } as GemVersionListItem;

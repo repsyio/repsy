@@ -21,9 +21,9 @@ import { environment } from '../../../../../../../environments/environment';
 import { GemVersionInfo, RepoPermissionInfo } from '../../../../../../../generated/api';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { VERSION_PROBE_SORT } from '../../../../../shared/util/version-delete-landing.util';
+import { VERSION_PROBE_SORT } from '../../../../../shared/utils/version-delete-landing.utils';
 import { permission } from '../../../testing/protocol-service-spec-helpers';
-import { RubyService } from '../../service/ruby.service';
+import { RubyService } from '../../services/ruby.service';
 import { RubyGemsVersionDetailComponent } from './ruby-gems-version-detail.component';
 
 const REPO = 'ruby-repo';

@@ -20,7 +20,7 @@ import { FormBuilder } from '@angular/forms';
 import { config, of, Subject, throwError } from 'rxjs';
 
 import { UserResponse } from '../../../../../../generated/api';
-import { UserService } from '../../../../pages/user/service/user.service';
+import { UserService } from '../../../../pages/user/services/user.service';
 import { ToastService } from '../../toast/toast.service';
 import { UserEditModalComponent } from './user-edit-modal.component';
 

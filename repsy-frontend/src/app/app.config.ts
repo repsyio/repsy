@@ -25,7 +25,7 @@ import { environment } from '../environments/environment';
 import { BASE_PATH } from '../generated/api';
 import { routes } from './app.routes';
 import { AppGlobalErrorHandler } from './shared/error-handler/app-global-error-handler';
-import { provideAppHttpClient } from './shared/interceptor/app-http.providers';
+import { provideAppHttpClient } from './shared/interceptors/app-http-providers';
 
 export const appConfig: ApplicationConfig = {
   providers: [

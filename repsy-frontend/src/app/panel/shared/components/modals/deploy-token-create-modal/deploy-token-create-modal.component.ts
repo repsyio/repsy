@@ -21,14 +21,14 @@ import moment, { Moment } from 'moment';
 import { finalize } from 'rxjs/operators';
 
 import { DeployTokenForm, DeployTokensApi } from '../../../../../../generated/api';
-import { idFactory } from '../../../../../shared/util/unique-id';
+import { idFactory } from '../../../../../shared/utils/unique-id';
 import { USERNAME_MESSAGES, usernameValidators } from '../../../../../shared/validators/credentials.validators';
 import {
   DESCRIPTION_MAX_LENGTH,
   DESCRIPTION_MAX_MESSAGE,
   descriptionValidators,
 } from '../../../../../shared/validators/description.validators';
-import { TokenCreateInfo } from '../../../../pages/repository/repo-settings/deploy-token/dto/token-create-info';
+import { TokenCreateInfo } from '../../../../pages/repository/repo-settings/deploy-token/dtos/token-create-info';
 import { DialogDirective } from '../../../directives/dialog.directive';
 import { RadioGroupComponent, RadioOption } from '../../radio-group/radio-group.component';
 import { ToastService } from '../../toast/toast.service';

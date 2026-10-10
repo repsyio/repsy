@@ -35,16 +35,16 @@ import { CopyClipboardComponent } from '../../../../../shared/components/copy-cl
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { BreadcrumbSecurityLinkService } from '../../../../../shared/service/breadcrumb-security-link.service';
+import { BreadcrumbSecurityLinkService } from '../../../../../shared/services/breadcrumb-security-link.service';
 import {
   deleteVersionAndCheckLast$,
   landAfterVersionDelete,
   VERSION_PROBE_SIZE,
-} from '../../../../../shared/util/version-delete-landing.util';
-import { versionLoadError } from '../../../../../shared/util/version-load-error.util';
+} from '../../../../../shared/utils/version-delete-landing.utils';
+import { versionLoadError } from '../../../../../shared/utils/version-load-error.utils';
 import { RepoLookupService } from '../../../repo-entry/repo-lookup.service';
-import { MAVEN_VERSION_PROBE_SORT, MavenService } from '../../service/maven.service';
-import { showVersionDeleteDialog } from '../../util/version-delete-warning.util';
+import { MAVEN_VERSION_PROBE_SORT, MavenService } from '../../services/maven.service';
+import { showVersionDeleteDialog } from '../../utils/version-delete-warning.utils';
 
 /** What the licenses and developers lines show when the POM declares none. */
 const NO_VALUE = '-';

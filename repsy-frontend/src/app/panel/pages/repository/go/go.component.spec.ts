@@ -16,7 +16,7 @@
 
 import { describeProtocolShell } from '../testing/protocol-shell-spec-helpers';
 import { GoComponent } from './go.component';
-import { GoService } from './service/go.service';
+import { GoService } from './services/go.service';
 
 describeProtocolShell({
   component: GoComponent,

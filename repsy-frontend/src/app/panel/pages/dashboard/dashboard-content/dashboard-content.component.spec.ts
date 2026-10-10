@@ -17,8 +17,8 @@ import { ChangeDetectorRef } from '@angular/core';
 import { of, Subject, throwError } from 'rxjs';
 
 import { ProfileInfo, RepoListInfo, ReposApi, RepoType } from '../../../../../generated/api';
-import { ProfileService } from '../../profile/service/profile.service';
-import { UsageService } from '../service/usage.service';
+import { ProfileService } from '../../profile/services/profile.service';
+import { UsageService } from '../services/usage.service';
 import { DashboardContentComponent, RECENT_REPOSITORY_COUNT } from './dashboard-content.component';
 
 const ALL_TYPES = [

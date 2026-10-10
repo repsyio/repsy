@@ -19,11 +19,11 @@ import { RouterModule } from '@angular/router';
 
 import { RepoListInfo, ReposApi, RepoType, TotalUsageInfo } from '../../../../../generated/api';
 import { RepositoryCreateModalComponent } from '../../../shared/components/modals/repository-create-modal/repository-create-modal.component';
-import { ProfileService } from '../../profile/service/profile.service';
+import { ProfileService } from '../../profile/services/profile.service';
 import { RecentActivityComponent } from '../recent-activity/recent-activity.component';
 import { RepositoryCardComponent } from '../repository-card/repository-card.component';
 import { SecurityOverviewCardComponent } from '../security-overview-card/security-overview-card.component';
-import { UsageService } from '../service/usage.service';
+import { UsageService } from '../services/usage.service';
 import { TotalDiskComponent } from '../total-disk/total-disk.component';
 import { WelcomeCardComponent } from '../welcome-card/welcome-card.component';
 

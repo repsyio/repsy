@@ -24,7 +24,7 @@ import {
   rescanCountsTitle,
   rescanTitle,
   unscannedCountsTitle,
-} from '../../util/rescan-status.util';
+} from '../../utils/rescan-status.utils';
 
 const SEVERITY_CLASSES: Record<string, string> = {
   [Severity.Critical]: 'border-error-600 bg-error-900 text-error-400',

@@ -21,16 +21,16 @@ import { Router } from '@angular/router';
 import { finalize } from 'rxjs/operators';
 
 import { RepoCreateForm, RepoListInfo, ReposApi } from '../../../../../../generated/api';
-import { idFactory } from '../../../../../shared/util/unique-id';
+import { idFactory } from '../../../../../shared/utils/unique-id';
 import {
   DESCRIPTION_MAX_LENGTH,
   DESCRIPTION_MAX_MESSAGE,
   descriptionValidators,
 } from '../../../../../shared/validators/description.validators';
 import { DialogDirective } from '../../../directives/dialog.directive';
-import { RepoType } from '../../../dto/repo/repo-type';
-import { toApiRepoType } from '../../../util/repo-api-type';
-import { reservedRepoNameValidator } from '../../../util/reserved-repo-names';
+import { RepoType } from '../../../dtos/repo/repo-type';
+import { toApiRepoType } from '../../../utils/repo-api-type';
+import { reservedRepoNameValidator } from '../../../utils/reserved-repo-names';
 import { SelectorComponent } from '../../selector/selector.component';
 import { ToastService } from '../../toast/toast.service';
 import { ToggleComponent } from '../../toggle/toggle.component';

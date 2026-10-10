@@ -24,7 +24,7 @@ import { filter, finalize, switchMap } from 'rxjs/operators';
 import { RepoPermissionInfo, ReposApi, RepoSettingsInfo } from '../../../../../generated/api';
 import { SpinnerComponent } from '../../../../shared/components/spinner/spinner.component';
 import { ToastService } from '../../../shared/components/toast/toast.service';
-import { RepoType } from '../../../shared/dto/repo/repo-type';
+import { RepoType } from '../../../shared/dtos/repo/repo-type';
 import { RepoLookupService } from '../repo-entry/repo-lookup.service';
 import { CleanupPolicyComponent } from './cleanup-policy/cleanup-policy.component';
 import { DeleteOrphanLayersComponent } from './delete-orphan-layers/delete-orphan-layers.component';

@@ -21,8 +21,8 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { firstValueFrom, NEVER, Observable, of, throwError } from 'rxjs';
 
 import { PageMetadata, RepoPermissionInfo } from '../../../../../generated/api';
-import { PagedData } from '../../../shared/dto/paged-data';
-import { Sort } from '../../../shared/dto/sort';
+import { PagedData } from '../../../shared/dtos/paged-data';
+import { Sort } from '../../../shared/dtos/sort';
 
 export const REPO = 'acme-repo';
 export const SORT: Sort = { name: 'Name', column: 'name', type: 'DESC' };

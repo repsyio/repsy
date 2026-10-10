@@ -18,9 +18,9 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { of } from 'rxjs';
 
-import { AuthService } from '../../../auth/pages/service/auth.service';
+import { AuthService } from '../../../auth/pages/services/auth.service';
 import { SplashService } from '../../../shared/components/splash/splash.service';
-import { ProfileService } from '../../pages/profile/service/profile.service';
+import { ProfileService } from '../../pages/profile/services/profile.service';
 import { PanelLayoutComponent } from './panel-layout.component';
 
 @Component({ standalone: true, template: '' })

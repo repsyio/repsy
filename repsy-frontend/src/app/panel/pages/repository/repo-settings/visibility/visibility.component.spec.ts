@@ -19,7 +19,7 @@ import { of, Subject, throwError } from 'rxjs';
 
 import { ReposApi } from '../../../../../../generated/api';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
-import { RepoType } from '../../../../shared/dto/repo/repo-type';
+import { RepoType } from '../../../../shared/dtos/repo/repo-type';
 import { renderComponent } from '../../testing/render-spec-helpers';
 import { generalParentForm, lastSentForm, releaseAwareParentForm } from '../testing/repo-settings-spec-helpers';
 import { VisibilityComponent } from './visibility.component';

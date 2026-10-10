@@ -20,7 +20,7 @@ import { RouterLink } from '@angular/router';
 import moment from 'moment';
 
 import { RepoListInfo, RepoType } from '../../../../../generated/api';
-import { ByteFormatter } from '../../../shared/util/byte-formatter';
+import { ByteFormatter } from '../../../shared/utils/byte-formatter';
 
 @Component({
   selector: 'app-recent-activity',

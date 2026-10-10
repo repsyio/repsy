@@ -18,8 +18,8 @@ import { Component, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router, RouterOutlet } from '@angular/router';
 
-import { AuthService } from './auth/pages/service/auth.service';
-import { loginUrlReturningTo } from './auth/util/return-url';
+import { AuthService } from './auth/pages/services/auth.service';
+import { loginUrlReturningTo } from './auth/utils/return-url';
 import { DangerModalComponent } from './panel/shared/components/modals/danger-modal/danger-modal.component';
 import { ToastComponent } from './panel/shared/components/toast/toast.component';
 import { SplashComponent } from './shared/components/splash/splash.component';

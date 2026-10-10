@@ -23,10 +23,10 @@ import { ScanOverview, ScanStatus, SecurityScansApi } from '../../../../../gener
 import { SpinnerComponent } from '../../../../shared/components/spinner/spinner.component';
 import { DialogDirective } from '../../directives/dialog.directive';
 import { PortalToBodyDirective } from '../../directives/portal-to-body.directive';
-import { toApiRepoType } from '../../util/repo-api-type';
-import { recentScanNote } from '../../util/rescan-status.util';
-import { splitScopedArtifactName } from '../../util/scoped-artifact.util';
-import { buildArtifactDetailRoute } from '../../util/security-detail-route.util';
+import { toApiRepoType } from '../../utils/repo-api-type';
+import { recentScanNote } from '../../utils/rescan-status.utils';
+import { splitScopedArtifactName } from '../../utils/scoped-artifact.utils';
+import { buildArtifactDetailRoute } from '../../utils/security-detail-route.utils';
 import { RescanNoteComponent } from '../rescan-note/rescan-note.component';
 import { ScanFailureReasonComponent } from '../scan-failure-reason/scan-failure-reason.component';
 import { SeverityBreakdownComponent } from '../severity-breakdown/severity-breakdown.component';

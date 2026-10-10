@@ -21,7 +21,7 @@ import { ReactiveFormsModule } from '@angular/forms';
 import { finalize } from 'rxjs';
 
 import { UserCreateForm } from '../../../../../../generated/api';
-import { idFactory } from '../../../../../shared/util/unique-id';
+import { idFactory } from '../../../../../shared/utils/unique-id';
 import {
   PASSWORD_MESSAGES,
   PASSWORD_MISMATCH_MESSAGE,
@@ -29,7 +29,7 @@ import {
   USERNAME_MESSAGES,
   usernameValidators,
 } from '../../../../../shared/validators/credentials.validators';
-import { UserService } from '../../../../pages/user/service/user.service';
+import { UserService } from '../../../../pages/user/services/user.service';
 import { DialogDirective } from '../../../directives/dialog.directive';
 import { ToastService } from '../../toast/toast.service';
 import { ToggleComponent } from '../../toggle/toggle.component';

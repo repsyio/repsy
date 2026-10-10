@@ -21,7 +21,7 @@ import { RouterLink } from '@angular/router';
 import { ReposApi, RepoSettingsForm } from '../../../../../../generated/api';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { ToggleComponent } from '../../../../shared/components/toggle/toggle.component';
-import { RepoType } from '../../../../shared/dto/repo/repo-type';
+import { RepoType } from '../../../../shared/dtos/repo/repo-type';
 import { saveRepoSetting } from '../save-repo-setting';
 
 @Component({

@@ -18,9 +18,9 @@ import { Route, Routes } from '@angular/router';
 
 import { routes } from './app.routes';
 import { AuthRedirectComponent } from './auth/components/redirect/auth-redirect.component';
-import { adminGuard } from './auth/guard/admin.guard';
-import { AuthGuard } from './auth/guard/auth.guard';
-import { AuthRedirectGuard } from './auth/guard/auth-redirect.guard';
+import { adminGuard } from './auth/guards/admin.guard';
+import { AuthGuard } from './auth/guards/auth.guard';
+import { AuthRedirectGuard } from './auth/guards/auth-redirect.guard';
 import { LoginComponent } from './auth/pages/login/login.component';
 import { CliAuthComponent } from './panel/pages/cli-auth/cli-auth.component';
 import { NotFoundComponent } from './panel/pages/not-found/not-found.component';

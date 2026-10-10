@@ -20,7 +20,7 @@ import { finalize } from 'rxjs';
 
 import { Severity } from '../../../../../generated/api';
 import { SpinnerComponent } from '../../../../shared/components/spinner/spinner.component';
-import { SecurityService } from '../../security/service/security.service';
+import { SecurityService } from '../../security/services/security.service';
 
 @Component({
   selector: 'app-security-overview-card',

@@ -32,7 +32,7 @@ import {
   pageOf,
   REPO_NAME,
 } from '../../../testing/repo-list-spec-helpers';
-import { NpmService } from '../../service/npm.service';
+import { NpmService } from '../../services/npm.service';
 import { NpmPackagesScopeFilterComponent } from './npm-packages-scope-filter.component';
 
 const PACKAGE = { name: 'ui', scope: 'acme' } as NpmPackageListItem;

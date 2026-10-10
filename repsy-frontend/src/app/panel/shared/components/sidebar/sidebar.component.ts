@@ -20,8 +20,8 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterModule } from '@angular/router';
 import { filter } from 'rxjs';
 
-import { AuthService } from '../../../../auth/pages/service/auth.service';
-import { ProfileService } from '../../../pages/profile/service/profile.service';
+import { AuthService } from '../../../../auth/pages/services/auth.service';
+import { ProfileService } from '../../../pages/profile/services/profile.service';
 import { DialogDirective } from '../../directives/dialog.directive';
 
 @Component({

@@ -34,14 +34,18 @@ import { SearchboxComponent } from '../../shared/components/searchbox/searchbox.
 import { SelectorComponent } from '../../shared/components/selector/selector.component';
 import { ToastService } from '../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../shared/components/tooltip/tooltip.component';
-import { RepoListItem } from '../../shared/dto/repo/repo-list-item';
-import { RepoType } from '../../shared/dto/repo/repo-type';
-import { ByteFormatter } from '../../shared/util/byte-formatter';
-import { restoreListFocus } from '../../shared/util/list-focus-restore.util';
-import { readListPageParam, readListQueryParam, updateListQueryParams } from '../../shared/util/list-query-params.util';
-import { toApiRepoType, toRouteSlug } from '../../shared/util/repo-api-type';
-import { ProfileService } from '../profile/service/profile.service';
-import { SecurityService } from '../security/service/security.service';
+import { RepoListItem } from '../../shared/dtos/repo/repo-list-item';
+import { RepoType } from '../../shared/dtos/repo/repo-type';
+import { ByteFormatter } from '../../shared/utils/byte-formatter';
+import { restoreListFocus } from '../../shared/utils/list-focus-restore.utils';
+import {
+  readListPageParam,
+  readListQueryParam,
+  updateListQueryParams,
+} from '../../shared/utils/list-query-params.utils';
+import { toApiRepoType, toRouteSlug } from '../../shared/utils/repo-api-type';
+import { ProfileService } from '../profile/services/profile.service';
+import { SecurityService } from '../security/services/security.service';
 
 /** The list is sorted like the server sorts by default: the newest repository first. */
 export const REPO_LIST_SORT = 'createdAt,desc';

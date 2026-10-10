@@ -25,7 +25,7 @@ import {
 } from '../../../../../../generated/api';
 import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
-import { ByteFormatter } from '../../../../shared/util/byte-formatter';
+import { ByteFormatter } from '../../../../shared/utils/byte-formatter';
 
 @Component({
   selector: 'app-delete-untagged-manifests',

@@ -26,11 +26,11 @@ import {
   VulnerabilityScanInfo,
 } from '../../../../generated/api';
 import { ToastService } from '../../shared/components/toast/toast.service';
-import { SecurityScanSupportService } from '../../shared/service/security-scan-support.service';
-import { legacyNavigationUrl } from '../../shared/util/security-detail-route.testing';
-import { buildArtifactDetailRoute } from '../../shared/util/security-detail-route.util';
+import { SecurityScanSupportService } from '../../shared/services/security-scan-support.service';
+import { buildArtifactDetailRoute } from '../../shared/utils/security-detail-route.utils';
+import { legacyNavigationUrl } from '../../shared/utils/security-detail-route-spec-helpers';
 import { SecurityComponent } from './security.component';
-import { SecurityService } from './service/security.service';
+import { SecurityService } from './services/security.service';
 
 describe('SecurityComponent', () => {
   let securityService: jasmine.SpyObj<SecurityService>;

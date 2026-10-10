@@ -20,10 +20,10 @@ import moment from 'moment';
 import { BehaviorSubject, of } from 'rxjs';
 
 import { NuGetPackageInfo, NuGetVersionListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
-import { AuthService } from '../../../../../../auth/pages/service/auth.service';
+import { AuthService } from '../../../../../../auth/pages/services/auth.service';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { SecurityService } from '../../../../security/service/security.service';
+import { SecurityService } from '../../../../security/services/security.service';
 import { permission } from '../../../testing/protocol-service-spec-helpers';
 import { renderComponent, testIds } from '../../../testing/render-spec-helpers';
 import {
@@ -34,7 +34,7 @@ import {
   pageOf,
   REPO_NAME,
 } from '../../../testing/repo-list-spec-helpers';
-import { NuGetService } from '../../service/nuget.service';
+import { NuGetService } from '../../services/nuget.service';
 import { NuGetPackagesVersionListComponent } from './nuget-packages-version-list.component';
 
 const PACKAGE = { packageId: 'Acme.Lib' } as NuGetPackageInfo;

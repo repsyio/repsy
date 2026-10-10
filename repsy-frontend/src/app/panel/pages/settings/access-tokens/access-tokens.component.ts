@@ -21,14 +21,14 @@ import { concat, Observable, of } from 'rxjs';
 import { catchError, finalize, map, switchMap, tap, toArray } from 'rxjs/operators';
 
 import { AccessTokenCreated, AccessTokenListItem, AccessTokensApi } from '../../../../../generated/api';
-import { SILENT_ERROR } from '../../../../shared/interceptor/error-handler.interceptor';
+import { SILENT_ERROR } from '../../../../shared/interceptors/error-handler.interceptor';
 import { EmptyListComponent } from '../../../shared/components/empty-list/empty-list.component';
 import { AccessTokenCreateModalComponent } from '../../../shared/components/modals/access-token-create-modal/access-token-create-modal.component';
 import { AccessTokenInfoModalComponent } from '../../../shared/components/modals/access-token-info-modal/access-token-info-modal.component';
 import { DangerModalService } from '../../../shared/components/modals/danger-modal/danger-modal.service';
 import { PaginationComponent } from '../../../shared/components/pagination/pagination.component';
 import { ToastService } from '../../../shared/components/toast/toast.service';
-import { PagedData } from '../../../shared/dto/paged-data';
+import { PagedData } from '../../../shared/dtos/paged-data';
 import { countLive, isExpired, MAX_LIVE_ACCESS_TOKENS } from './access-token-limits';
 
 @Component({

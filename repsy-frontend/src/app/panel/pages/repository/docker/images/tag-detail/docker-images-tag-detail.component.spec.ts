@@ -20,11 +20,11 @@ import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
 import { RepoPermissionInfo, TagDetail } from '../../../../../../../generated/api';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { BreadcrumbSecurityLinkService } from '../../../../../shared/service/breadcrumb-security-link.service';
+import { BreadcrumbSecurityLinkService } from '../../../../../shared/services/breadcrumb-security-link.service';
 import { RepoLookupService } from '../../../repo-entry/repo-lookup.service';
 import { permission } from '../../../testing/protocol-service-spec-helpers';
 import { getRepoDomain } from '../../docker-repo-util';
-import { DockerService } from '../../service/docker.service';
+import { DockerService } from '../../services/docker.service';
 import { DockerImagesTagDetailComponent } from './docker-images-tag-detail.component';
 
 const REPO = 'docker-repo';

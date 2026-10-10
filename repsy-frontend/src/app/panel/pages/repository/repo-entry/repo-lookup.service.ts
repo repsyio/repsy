@@ -19,8 +19,8 @@ import { Injectable } from '@angular/core';
 import { BehaviorSubject, finalize, map, Observable, of, share, tap } from 'rxjs';
 
 import { ReposApi } from '../../../../../generated/api';
-import { SILENT_ERROR } from '../../../../shared/interceptor/error-handler.interceptor';
-import { RepoRouteSlug, toRouteSlug } from '../../../shared/util/repo-api-type';
+import { SILENT_ERROR } from '../../../../shared/interceptors/error-handler.interceptor';
+import { RepoRouteSlug, toRouteSlug } from '../../../shared/utils/repo-api-type';
 
 export interface RepoContext {
   repoName: string;

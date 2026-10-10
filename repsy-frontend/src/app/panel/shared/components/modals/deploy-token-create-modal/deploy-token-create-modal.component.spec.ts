@@ -18,7 +18,7 @@ import { FormBuilder } from '@angular/forms';
 import { of, Subject, throwError } from 'rxjs';
 
 import { DeployTokensApi } from '../../../../../../generated/api';
-import { TokenCreateInfo } from '../../../../pages/repository/repo-settings/deploy-token/dto/token-create-info';
+import { TokenCreateInfo } from '../../../../pages/repository/repo-settings/deploy-token/dtos/token-create-info';
 import { ToastService } from '../../toast/toast.service';
 import { DeployTokenCreateModalComponent } from './deploy-token-create-modal.component';
 

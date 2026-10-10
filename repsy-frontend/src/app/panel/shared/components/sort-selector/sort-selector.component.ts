@@ -18,7 +18,7 @@ import { CommonModule } from '@angular/common';
 import { Component, ElementRef, EventEmitter, HostListener, Input, OnInit, Output } from '@angular/core';
 
 import { OutSideClickDirective } from '../../../../shared/components/outside-click-directive';
-import { Sort } from '../../dto/sort';
+import { Sort } from '../../dtos/sort';
 
 @Component({
   selector: 'app-sort-selector',

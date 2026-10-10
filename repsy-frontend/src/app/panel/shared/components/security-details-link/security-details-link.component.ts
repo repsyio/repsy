@@ -19,7 +19,7 @@ import { Component, Input, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Observable } from 'rxjs';
 
-import { SecurityScanSupportService } from '../../service/security-scan-support.service';
+import { SecurityScanSupportService } from '../../services/security-scan-support.service';
 
 @Component({
   selector: 'app-security-details-link',

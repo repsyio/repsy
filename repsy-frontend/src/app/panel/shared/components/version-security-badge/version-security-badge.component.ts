@@ -19,8 +19,8 @@ import { Component, Input, OnInit } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { ScanStatus, Severity } from '../../../../../generated/api';
-import { SecurityScanSupportService } from '../../service/security-scan-support.service';
-import { hasRescanFailed, isRescanInProgress } from '../../util/rescan-status.util';
+import { SecurityScanSupportService } from '../../services/security-scan-support.service';
+import { hasRescanFailed, isRescanInProgress } from '../../utils/rescan-status.utils';
 import { SeverityBadgeComponent } from '../severity-badge/severity-badge.component';
 import { VersionSecurityModalComponent } from '../version-security-modal/version-security-modal.component';
 

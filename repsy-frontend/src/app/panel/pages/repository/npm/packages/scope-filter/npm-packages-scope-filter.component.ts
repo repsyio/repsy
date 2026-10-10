@@ -32,17 +32,17 @@ import { SearchboxComponent } from '../../../../../shared/components/searchbox/s
 import { SortSelectorComponent } from '../../../../../shared/components/sort-selector/sort-selector.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
-import { PagedData } from '../../../../../shared/dto/paged-data';
-import { Sort } from '../../../../../shared/dto/sort';
-import { restoreListFocus } from '../../../../../shared/util/list-focus-restore.util';
-import { emptiesList, pageAfterDelete } from '../../../../../shared/util/list-page-after-delete.util';
+import { PagedData } from '../../../../../shared/dtos/paged-data';
+import { Sort } from '../../../../../shared/dtos/sort';
+import { restoreListFocus } from '../../../../../shared/utils/list-focus-restore.utils';
+import { emptiesList, pageAfterDelete } from '../../../../../shared/utils/list-page-after-delete.utils';
 import {
   readListPageParam,
   readListQueryParam,
   updateListQueryParams,
-} from '../../../../../shared/util/list-query-params.util';
+} from '../../../../../shared/utils/list-query-params.utils';
 import { NpmConfigComponent } from '../../config/npm-config.component';
-import { NpmService } from '../../service/npm.service';
+import { NpmService } from '../../services/npm.service';
 
 @Component({
   selector: 'app-npm-packages-scope-filter',

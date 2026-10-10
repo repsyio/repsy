@@ -35,9 +35,9 @@ import { SearchboxComponent } from '../../shared/components/searchbox/searchbox.
 import { SelectorComponent } from '../../shared/components/selector/selector.component';
 import { SeverityBadgeComponent } from '../../shared/components/severity-badge/severity-badge.component';
 import { ToastService } from '../../shared/components/toast/toast.service';
-import { SecurityScanSupportService } from '../../shared/service/security-scan-support.service';
-import { ArtifactDetailRoute, buildArtifactDetailRoute } from '../../shared/util/security-detail-route.util';
-import { SecurityService } from './service/security.service';
+import { SecurityScanSupportService } from '../../shared/services/security-scan-support.service';
+import { ArtifactDetailRoute, buildArtifactDetailRoute } from '../../shared/utils/security-detail-route.utils';
+import { SecurityService } from './services/security.service';
 
 Chart.register(...registerables);
 

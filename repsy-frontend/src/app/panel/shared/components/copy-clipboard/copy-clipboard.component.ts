@@ -16,7 +16,7 @@
 
 import { Component, Input } from '@angular/core';
 
-import { copyToClipboard } from '../../util/clipboard.util';
+import { copyToClipboard } from '../../utils/clipboard.utils';
 
 @Component({
   selector: 'app-copy-clipboard',

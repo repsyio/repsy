@@ -18,7 +18,7 @@ import { NgOptimizedImage, ViewportScroller } from '@angular/common';
 import { Component, ElementRef, EventEmitter, HostListener, Input, Output, viewChild } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 
-import { AuthService } from '../../../auth/pages/service/auth.service';
+import { AuthService } from '../../../auth/pages/services/auth.service';
 import { ProfileAvatarComponent } from '../../../panel/shared/components/avatar/profile-avatar.component';
 import { DividerComponent } from '../divider/divider.component';
 

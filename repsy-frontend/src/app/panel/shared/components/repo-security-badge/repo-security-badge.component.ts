@@ -19,7 +19,7 @@ import { Component, Input, OnInit } from '@angular/core';
 import { Observable } from 'rxjs';
 
 import { Severity } from '../../../../../generated/api';
-import { SecurityScanSupportService } from '../../service/security-scan-support.service';
+import { SecurityScanSupportService } from '../../services/security-scan-support.service';
 import { RepoSecurityModalComponent } from '../repo-security-modal/repo-security-modal.component';
 import { SeverityBadgeComponent } from '../severity-badge/severity-badge.component';
 

@@ -27,8 +27,8 @@ import { CrateInfo, CrateVersionInfo, RepoPermissionInfo } from '../../../../../
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { VERSION_PROBE_SORT } from '../../../../../shared/util/version-delete-landing.util';
-import { CargoService } from '../../service/cargo.service';
+import { VERSION_PROBE_SORT } from '../../../../../shared/utils/version-delete-landing.utils';
+import { CargoService } from '../../services/cargo.service';
 import { CargoCratesVersionDetailComponent } from './cargo-crates-version-detail.component';
 
 @Component({ selector: 'app-security-scan-section', standalone: true, template: '' })

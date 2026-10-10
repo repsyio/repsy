@@ -16,7 +16,7 @@
 
 import { Component, Input } from '@angular/core';
 
-import { scanFailureReason } from '../../util/scan-failure-reason.util';
+import { scanFailureReason } from '../../utils/scan-failure-reason.utils';
 
 /** Why a scan failed: the backend's sanitised, length-limited message. Renders nothing without one. */
 @Component({

@@ -18,9 +18,9 @@ import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 
-import { idFactory } from '../../../../../shared/util/unique-id';
+import { idFactory } from '../../../../../shared/utils/unique-id';
 import { DialogDirective } from '../../../directives/dialog.directive';
-import { copyToClipboard } from '../../../util/clipboard.util';
+import { copyToClipboard } from '../../../utils/clipboard.utils';
 import { ToastService } from '../../toast/toast.service';
 
 @Component({

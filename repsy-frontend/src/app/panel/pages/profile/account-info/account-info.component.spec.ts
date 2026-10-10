@@ -22,7 +22,7 @@ import { LoginInfo } from '../../../../../generated/api';
 import { DangerModalService } from '../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../shared/components/toast/toast.service';
 import { renderComponent } from '../../repository/testing/render-spec-helpers';
-import { ProfileService } from '../service/profile.service';
+import { ProfileService } from '../services/profile.service';
 import { AccountInfoComponent } from './account-info.component';
 
 const LOGIN_INFO: LoginInfo = { username: 'alice', token: 'access', refreshToken: 'refresh' };

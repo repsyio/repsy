@@ -21,7 +21,7 @@ import { provideRouter } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
 
 import { SplashService } from '../../../shared/components/splash/splash.service';
-import { AuthService } from '../../pages/service/auth.service';
+import { AuthService } from '../../pages/services/auth.service';
 import { AuthRedirectComponent } from './auth-redirect.component';
 
 // RPS-1278: "/" renders the login form in place, so a login changes no route; the component has to

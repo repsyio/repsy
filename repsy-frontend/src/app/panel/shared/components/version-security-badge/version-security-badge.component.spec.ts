@@ -17,7 +17,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { of } from 'rxjs';
 
 import { ScanStatus, Severity } from '../../../../../generated/api';
-import { SecurityScanSupportService } from '../../service/security-scan-support.service';
+import { SecurityScanSupportService } from '../../services/security-scan-support.service';
 import { VersionSecurityBadgeComponent } from './version-security-badge.component';
 
 describe('VersionSecurityBadgeComponent', () => {

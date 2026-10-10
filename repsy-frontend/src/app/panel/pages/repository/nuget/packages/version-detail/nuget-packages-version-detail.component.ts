@@ -33,14 +33,14 @@ import { MarkdownComponent } from '../../../../../shared/components/markdown/mar
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
-import { Sort } from '../../../../../shared/dto/sort';
+import { Sort } from '../../../../../shared/dtos/sort';
 import {
   isLastVersion,
   landAfterVersionDelete,
   VERSION_PROBE_SIZE,
-} from '../../../../../shared/util/version-delete-landing.util';
-import { versionLoadError } from '../../../../../shared/util/version-load-error.util';
-import { NuGetService } from '../../service/nuget.service';
+} from '../../../../../shared/utils/version-delete-landing.utils';
+import { versionLoadError } from '../../../../../shared/utils/version-load-error.utils';
+import { NuGetService } from '../../services/nuget.service';
 
 /** The sort of the probe above: any valid one will do, the probe only counts. */
 const PROBE_SORT: Sort = { name: 'Newest', column: 'publishedAt', type: 'DESC' };

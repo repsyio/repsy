@@ -18,11 +18,11 @@ import moment from 'moment';
 import { BehaviorSubject, of, throwError } from 'rxjs';
 
 import { ArtifactListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
-import { AuthService } from '../../../../../../auth/pages/service/auth.service';
+import { AuthService } from '../../../../../../auth/pages/services/auth.service';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { describeRepoListBehavior, ListFixture, pageOf } from '../../../testing/repo-list-spec-helpers';
-import { MavenService } from '../../service/maven.service';
+import { MavenService } from '../../services/maven.service';
 import { MavenArtifactsGroupListComponent } from './maven-artifacts-group-list.component';
 
 const ITEM_UNDER_TEST = { groupName: 'org.acme', artifactName: 'lib' } as ArtifactListItem;

@@ -22,7 +22,7 @@ import { Router } from '@angular/router';
 import { of, Subject, throwError } from 'rxjs';
 
 import { ReposApi, RepoType as ApiRepoType } from '../../../../../../generated/api';
-import { RepoType } from '../../../dto/repo/repo-type';
+import { RepoType } from '../../../dtos/repo/repo-type';
 import { ToastService } from '../../toast/toast.service';
 import { RepositoryCreateModalComponent } from './repository-create-modal.component';
 

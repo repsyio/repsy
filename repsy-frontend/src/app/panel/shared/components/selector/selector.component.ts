@@ -18,7 +18,7 @@ import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, HostListener, Input, OnInit, Output } from '@angular/core';
 
 import { OutSideClickDirective } from '../../../../shared/components/outside-click-directive';
-import { uniqueId } from '../../../../shared/util/unique-id';
+import { uniqueId } from '../../../../shared/utils/unique-id';
 
 @Component({
   selector: 'app-selector',
