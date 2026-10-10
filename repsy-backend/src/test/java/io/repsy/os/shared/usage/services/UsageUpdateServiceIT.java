@@ -27,11 +27,13 @@ import io.repsy.os.AbstractIntegrationTest;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import jakarta.persistence.EntityManagerFactory;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.IntStream;
+import org.hibernate.SessionFactory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -65,6 +67,7 @@ class UsageUpdateServiceIT extends AbstractIntegrationTest {
   private static final Duration QUIET_PERIOD = Duration.ofSeconds(1);
 
   @Autowired private UsageUpdateService usageUpdateService;
+  @Autowired private EntityManagerFactory entityManagerFactory;
 
   private final List<UUID> createdRepoIds = new ArrayList<>();
   private final ListAppender<ILoggingEvent> logEvents = new ListAppender<>();
@@ -215,5 +218,47 @@ class UsageUpdateServiceIT extends AbstractIntegrationTest {
     this.submit(repo.getId(), -4);
 
     this.assertErrorsStayAt(List.of());
+  }
+
+  @Test
+  @DisplayName("sums concurrent increments and refunds exactly, with no clamp and no error")
+  void concurrentMixedUpdatesSumExactly() {
+    final var repo = this.commitRepo();
+    this.submitAndAwait(repo.getId(), 100, 100);
+
+    IntStream.range(0, 200).parallel().forEach(i -> this.submit(repo.getId(), i % 2 == 0 ? 3 : -1));
+
+    // 100 x +3 and 100 x -1.
+    await()
+        .atMost(ASYNC_TIMEOUT)
+        .untilAsserted(() -> assertThat(this.diskUsageOf(repo.getId())).isEqualTo(100 + 300 - 100));
+    this.assertErrorsStayAt(List.of());
+  }
+
+  @Test
+  @DisplayName("an update that fits is one statement, with no locked read of the row")
+  void fittingUpdateIsOneStatement() {
+    final var repo = this.commitRepo();
+    final var statistics = this.entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+    statistics.setStatisticsEnabled(true);
+    statistics.clear();
+
+    this.submit(repo.getId(), 7);
+
+    // Polled with JdbcTemplate, which Hibernate's statistics do not count.
+    await()
+        .atMost(ASYNC_TIMEOUT)
+        .untilAsserted(
+            () ->
+                assertThat(
+                        this.jdbcTemplate.queryForObject(
+                            "select disk_usage from repo where id = ?", Long.class, repo.getId()))
+                    .isEqualTo(7L));
+
+    final var prepared = statistics.getPrepareStatementCount();
+    statistics.setStatisticsEnabled(false);
+
+    // Before RPS-2113: SELECT ... FOR UPDATE, then UPDATE.
+    assertThat(prepared).isEqualTo(1);
   }
 }

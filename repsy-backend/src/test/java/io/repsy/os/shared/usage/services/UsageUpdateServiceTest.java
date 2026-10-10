@@ -78,11 +78,35 @@ class UsageUpdateServiceTest {
   }
 
   @Test
+  @DisplayName("applies a diff that fits in one statement, without locking the row first")
+  void appliesFittingDiffInOneStatement() {
+    when(this.repoTxService.tryAddDiskUsage(REPO_ID, -5)).thenReturn(true);
+
+    this.updateUsage(-5);
+
+    verify(this.repoTxService, never()).findDiskUsageForUpdate(REPO_ID);
+    verify(this.repoTxService, never()).updateDiskUsage(eq(REPO_ID), anyLong());
+    assertThat(this.errorCount()).isZero();
+  }
+
+  @Test
+  @DisplayName("skips a non-negative diff for a missing repo without the locked read")
+  void skipsMissingRepoOnNonNegativeDiff() {
+    when(this.repoTxService.tryAddDiskUsage(REPO_ID, 10)).thenReturn(false);
+
+    this.updateUsage(10);
+
+    verify(this.repoTxService, never()).findDiskUsageForUpdate(REPO_ID);
+    verify(this.repoTxService, never()).updateDiskUsage(eq(REPO_ID), anyLong());
+    assertThat(this.errorCount()).isZero();
+  }
+
+  @Test
   @DisplayName("skips the update without an error when the repo no longer exists")
   void skipsMissingRepo() {
     when(this.repoTxService.findDiskUsageForUpdate(REPO_ID)).thenReturn(Optional.empty());
 
-    this.updateUsage(10);
+    this.updateUsage(-10);
 
     verify(this.repoTxService, never()).updateDiskUsage(eq(REPO_ID), anyLong());
     assertThat(this.errorCount()).isZero();

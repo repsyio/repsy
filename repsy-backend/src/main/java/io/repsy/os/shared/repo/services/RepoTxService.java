@@ -318,6 +318,17 @@ public class RepoTxService {
   }
 
   /**
+   * Adds {@code diskUsageDiff} to the repo's disk usage in a single statement, unless the usage
+   * would drop below zero.
+   *
+   * @return whether the diff was applied, {@code false} when the repo no longer exists or the diff
+   *     does not fit
+   */
+  public boolean tryAddDiskUsage(final @NonNull UUID repoId, final long diskUsageDiff) {
+    return this.repoRepository.addDiskUsageUnlessNegative(repoId, diskUsageDiff) > 0;
+  }
+
+  /**
    * Reads the repo's disk usage and locks its row until the surrounding transaction ends.
    *
    * @return the usage, empty when the repo no longer exists

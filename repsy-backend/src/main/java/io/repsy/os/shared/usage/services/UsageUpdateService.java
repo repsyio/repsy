@@ -41,6 +41,11 @@ public class UsageUpdateService {
   /**
    * Adds the diff to the repo's disk usage, never taking it below zero.
    *
+   * <p>The common case is one {@code UPDATE ... WHERE disk_usage + diff >= 0}, which takes the row
+   * lock for the length of that statement only (RPS-2113). A diff that does not fit, or a repo that
+   * no longer exists, updates no row; only a negative diff can be the first, so it falls back to
+   * the locked read that tells the two apart, clamps and logs the drift.
+   *
    * <p>The usage can only go negative when the accounting has drifted (a delete recorded twice, or
    * a size computed larger than what was added). {@code ch_repo__disk_usage} rejects a negative
    * value, which would fail the whole update and lose the diff, so the diff is clamped to what is
@@ -48,6 +53,21 @@ public class UsageUpdateService {
    * update cannot change the usage between the read and the write.
    */
   private void updateRepoUsage(final @NonNull UUID repoId, final long diskUsageDiff) {
+    if (this.repoTxService.tryAddDiskUsage(repoId, diskUsageDiff)) {
+      return;
+    }
+
+    if (diskUsageDiff >= 0) {
+      // A non-negative diff always fits, so the repo is the thing that is missing.
+      log.debug(
+          "Repo {} no longer exists, skipping disk usage update of {}", repoId, diskUsageDiff);
+      return;
+    }
+
+    this.clampRepoUsage(repoId, diskUsageDiff);
+  }
+
+  private void clampRepoUsage(final @NonNull UUID repoId, final long diskUsageDiff) {
     final var currentDiskUsage = this.repoTxService.findDiskUsageForUpdate(repoId);
 
     if (currentDiskUsage.isEmpty()) {
