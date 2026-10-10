@@ -15,40 +15,29 @@
  */
 package io.repsy.protocols.helm.protocol.handlers.oci;
 
-import static io.repsy.protocols.helm.shared.utils.HelmOciHttpValues.DOCKER_CONTENT_DIGEST;
-import static io.repsy.protocols.helm.shared.utils.HelmOciHttpValues.DOCKER_UPLOAD_UUID;
-import static org.springframework.http.HttpHeaders.LOCATION;
-
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
 import io.repsy.protocols.helm.protocol.facades.HelmProtocolFacade;
 import io.repsy.protocols.helm.shared.constants.HelmConstants;
+import io.repsy.protocols.oci.handlers.AbstractOciUploadFinalizeProtocolMethodHandler;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
-import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
 import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.BlobDigests;
-import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.util.UUID;
-import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 /** Handles PUT /v2/{repo}/{name}/blobs/uploads/{uuid}?digest= — finalizes a blob upload. */
 @NullMarked
 public abstract class AbstractHelmOciBlobUploadFinalizeProtocolMethodHandler<ID>
-    extends AbstractFacadeProtocolMethodHandler<HelmProtocolFacade<ID>> {
-
-  private static final Pattern UPLOAD_FINALIZE_PATTERN =
-      Pattern.compile("^/([^/]+)/blobs/uploads/([0-9a-fA-F-]{36})/?$");
+    extends AbstractOciUploadFinalizeProtocolMethodHandler<HelmProtocolFacade<ID>> {
 
   private static final String DEFAULT_BLOB_MEDIA_TYPE = "application/octet-stream";
 
@@ -59,8 +48,7 @@ public abstract class AbstractHelmOciBlobUploadFinalizeProtocolMethodHandler<ID>
     super(
         HandlerRoute.of(Permission.WRITE, HttpMethod.PUT)
             .skipHeaderPreProcessor(true)
-            .writeOperation(true)
-            .path(UPLOAD_FINALIZE_PATTERN.asMatchPredicate()),
+            .writeOperation(true),
         basePathParser,
         helmFacade,
         provider);
@@ -80,26 +68,18 @@ public abstract class AbstractHelmOciBlobUploadFinalizeProtocolMethodHandler<ID>
   }
 
   @Override
-  public ResponseEntity<Object> handle(
+  protected String reportedUploadId(final String uploadId) {
+    return UUID.fromString(uploadId).toString();
+  }
+
+  @Override
+  protected String finalizeUpload(
       final ProtocolContext context,
       final HttpServletRequest request,
-      final HttpServletResponse response)
-      throws Exception {
-
-    final var relativePath = ProtocolContextUtils.getRelativePath(context).getPath();
-    final var matcher = UPLOAD_FINALIZE_PATTERN.matcher(relativePath);
-
-    if (!matcher.matches()) {
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
-
-    final var uploadId = UUID.fromString(matcher.group(2));
-    final var digest = request.getParameter("digest");
-    final var mediaType = request.getContentType();
-
-    if (digest == null) {
-      throw new BadRequestException(ProtocolErrorCodes.DIGEST_MISSING);
-    }
+      final String name,
+      final String uploadId,
+      final String digest)
+      throws IOException {
 
     // helm_oci_blob.digest holds "sha256:" and 64 hex characters, but BlobDigests also admits a
     // sha512 one, which is 135 characters and would fail the row insert after the blob was stored.
@@ -107,29 +87,31 @@ public abstract class AbstractHelmOciBlobUploadFinalizeProtocolMethodHandler<ID>
       throw new BadRequestException(ProtocolErrorCodes.BLOB_DIGEST_UNSUPPORTED);
     }
 
-    final var contentLength = request.getContentLengthLong();
-    final var blobInfo =
-        this.facade.finalizeBlob(
+    return this.facade
+        .finalizeBlob(
             context,
-            uploadId,
+            UUID.fromString(uploadId),
             digest,
-            blobMediaType(mediaType),
+            blobMediaType(request.getContentType()),
             request.getInputStream(),
-            contentLength);
+            request.getContentLengthLong())
+        .digest();
+  }
+
+  @Override
+  protected String blobLocation(
+      final ProtocolContext context,
+      final HttpServletRequest request,
+      final String name,
+      final String digest) {
 
     // Derive base blob path from request URI: strip "/uploads/{uuid}" → ".../blobs/{digest}"
     final var requestPath = request.getRequestURI();
     final var blobsBasePath = requestPath.substring(0, requestPath.lastIndexOf("/uploads/"));
-    final var location =
-        ServletUriComponentsBuilder.fromCurrentContextPath()
-            .path(blobsBasePath + "/" + blobInfo.digest())
-            .build()
-            .toUriString();
 
-    return ResponseEntity.status(HttpStatus.CREATED)
-        .header(DOCKER_CONTENT_DIGEST, blobInfo.digest())
-        .header(DOCKER_UPLOAD_UUID, uploadId.toString())
-        .header(LOCATION, location)
-        .build();
+    return ServletUriComponentsBuilder.fromCurrentContextPath()
+        .path(blobsBasePath + "/" + digest)
+        .build()
+        .toUriString();
   }
 }

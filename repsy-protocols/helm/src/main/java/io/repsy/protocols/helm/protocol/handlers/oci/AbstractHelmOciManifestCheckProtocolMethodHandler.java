@@ -15,75 +15,49 @@
  */
 package io.repsy.protocols.helm.protocol.handlers.oci;
 
-import static io.repsy.protocols.helm.shared.utils.HelmOciHttpValues.DOCKER_CONTENT_DIGEST;
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.springframework.http.HttpHeaders.CONTENT_LENGTH;
-import static org.springframework.http.HttpHeaders.CONTENT_TYPE;
-
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
 import io.repsy.protocols.helm.protocol.facades.HelmProtocolFacade;
-import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.oci.dtos.OciManifestInfo;
+import io.repsy.protocols.oci.handlers.AbstractOciManifestCheckProtocolMethodHandler;
 import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
-import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import java.util.regex.Pattern;
+import java.util.Optional;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 
-/** Handles HEAD /v2/{repo}/{name}/manifests/{reference} — checks if a manifest exists. */
+/**
+ * Handles HEAD /v2/{repo}/{name}/manifests/{reference} — checks if a manifest exists; a missing one
+ * is a bare 404.
+ */
 @NullMarked
 public abstract class AbstractHelmOciManifestCheckProtocolMethodHandler<ID>
-    extends AbstractFacadeProtocolMethodHandler<HelmProtocolFacade<ID>> {
-
-  private static final Pattern MANIFEST_CHECK_PATTERN =
-      Pattern.compile("^/([^/]+)/manifests/(.+)$");
+    extends AbstractOciManifestCheckProtocolMethodHandler<HelmProtocolFacade<ID>> {
 
   public AbstractHelmOciManifestCheckProtocolMethodHandler(
       final PathParser basePathParser,
       final HelmProtocolFacade<ID> helmFacade,
       final HelmProtocolProvider provider) {
     super(
-        HandlerRoute.of(Permission.READ, HttpMethod.HEAD)
-            .writeOperation(false)
-            .path(MANIFEST_CHECK_PATTERN.asMatchPredicate()),
+        HandlerRoute.of(Permission.READ, HttpMethod.HEAD).writeOperation(false),
         basePathParser,
         helmFacade,
         provider);
   }
 
   @Override
-  public ResponseEntity<Object> handle(
+  protected Optional<OciManifestInfo> findManifest(
       final ProtocolContext context,
       final HttpServletRequest request,
-      final HttpServletResponse response) {
+      final String name,
+      final String reference) {
 
-    final var relativePath = ProtocolContextUtils.getRelativePath(context).getPath();
-    final var matcher = MANIFEST_CHECK_PATTERN.matcher(relativePath);
-
-    if (!matcher.matches()) {
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
-
-    final var name = matcher.group(1);
-    final var reference = matcher.group(2);
-    final var manifestOpt = this.facade.checkManifest(context, name, reference);
-
-    if (manifestOpt.isEmpty()) {
-      return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-    }
-
-    final var manifest = manifestOpt.get();
-
-    return ResponseEntity.ok()
-        .header(CONTENT_TYPE, manifest.mediaType())
-        .header(CONTENT_LENGTH, String.valueOf(manifest.content().getBytes(UTF_8).length))
-        .header(DOCKER_CONTENT_DIGEST, manifest.digest())
-        .build();
+    return this.facade
+        .checkManifest(context, name, reference)
+        .map(
+            manifest ->
+                new OciManifestInfo(manifest.mediaType(), manifest.content(), manifest.digest()));
   }
 }

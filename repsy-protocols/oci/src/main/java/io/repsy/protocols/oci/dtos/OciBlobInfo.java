@@ -13,16 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.protocols.docker.shared.utils;
+package io.repsy.protocols.oci.dtos;
 
-import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.NullMarked;
 
-@UtilityClass
+/** What a blob check answers about a stored blob. */
 @NullMarked
-public final class DockerProtocolHttpValues {
-
-  public static final String DOCKER_UPLOAD_UUID = "Docker-Upload-UUID";
-  public static final String RANGE = "Range";
-  public static final String DOCKER_CONTENT_DIGEST = "Docker-Content-Digest";
-}
+public record OciBlobInfo(long size, String mediaType) {}

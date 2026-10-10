@@ -15,67 +15,46 @@
  */
 package io.repsy.protocols.docker.protocol.handlers;
 
-import static io.repsy.protocols.docker.shared.utils.DockerProtocolHttpValues.DOCKER_CONTENT_DIGEST;
 import static io.repsy.protocols.docker.shared.utils.MediaTypes.DOCKER_CONFIG_JSON;
-import static org.springframework.http.HttpHeaders.CONTENT_TYPE;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import io.repsy.protocols.docker.protocol.facades.DockerProtocolFacade;
-import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.oci.handlers.AbstractOciBlobPullProtocolMethodHandler;
+import io.repsy.protocols.oci.utils.OciPathUtils;
 import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.BlobDigests;
-import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import java.util.regex.Pattern;
+import java.io.IOException;
 import org.jspecify.annotations.NullMarked;
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 
+/** The OCI blob pull of a Docker layer, served as {@code DOCKER_CONFIG_JSON}. */
 @NullMarked
 public abstract class AbstractDockerLayerPullProtocolMethodHandler<ID>
-    extends AbstractFacadeProtocolMethodHandler<DockerProtocolFacade<ID>> {
-
-  private static final Pattern LAYER_DOWNLOAD_PATTERN =
-      Pattern.compile("^/([^/]+)/blobs/(" + BlobDigests.DIGEST_REGEX + ")/?$");
+    extends AbstractOciBlobPullProtocolMethodHandler<DockerProtocolFacade<ID>> {
 
   public AbstractDockerLayerPullProtocolMethodHandler(
       final PathParser basePathParser,
       final DockerProtocolFacade<ID> dockerFacade,
       final DockerProtocolProvider provider) {
     super(
-        HandlerRoute.of(Permission.READ, HttpMethod.GET)
-            .path(LAYER_DOWNLOAD_PATTERN.asMatchPredicate()),
+        HandlerRoute.of(Permission.READ, HttpMethod.GET),
+        OciPathUtils.blob(BlobDigests.DIGEST_REGEX),
+        DOCKER_CONFIG_JSON,
         basePathParser,
         dockerFacade,
         provider);
   }
 
   @Override
-  public ResponseEntity<Object> handle(
-      final ProtocolContext context,
-      final HttpServletRequest request,
-      final HttpServletResponse response)
-      throws Exception {
+  protected Resource getBlob(
+      final ProtocolContext context, final HttpServletRequest request, final String digest)
+      throws IOException {
 
-    final var relativePath = ProtocolContextUtils.getRelativePath(context);
-    final var matcher = LAYER_DOWNLOAD_PATTERN.matcher(relativePath.getPath());
-
-    if (!matcher.matches()) {
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
-
-    final var digest = matcher.group(2);
-
-    final var resource = this.facade.getLayer(context, digest, request.getServletPath());
-
-    return ResponseEntity.ok()
-        .header(CONTENT_TYPE, DOCKER_CONFIG_JSON)
-        .header(DOCKER_CONTENT_DIGEST, digest)
-        .body(resource);
+    return this.facade.getLayer(context, digest, request.getServletPath());
   }
 }

@@ -15,7 +15,7 @@
  */
 package io.repsy.protocols.helm.protocol.handlers.oci;
 
-import static io.repsy.protocols.helm.shared.utils.HelmOciHttpValues.DOCKER_CONTENT_DIGEST;
+import static io.repsy.protocols.oci.constants.OciConstants.DOCKER_CONTENT_DIGEST;
 import static org.springframework.http.HttpHeaders.CONTENT_TYPE;
 import static org.springframework.http.HttpHeaders.LOCATION;
 

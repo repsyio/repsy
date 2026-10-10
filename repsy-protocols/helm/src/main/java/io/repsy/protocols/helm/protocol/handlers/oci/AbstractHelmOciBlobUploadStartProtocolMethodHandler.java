@@ -15,31 +15,25 @@
  */
 package io.repsy.protocols.helm.protocol.handlers.oci;
 
-import static io.repsy.protocols.helm.shared.utils.HelmOciHttpValues.DOCKER_UPLOAD_UUID;
-import static org.springframework.http.HttpHeaders.LOCATION;
-
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
 import io.repsy.protocols.helm.protocol.facades.HelmProtocolFacade;
-import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.oci.handlers.AbstractOciUploadStartProtocolMethodHandler;
 import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
-import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import java.util.regex.Pattern;
+import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 /** Handles POST /v2/{repo}/{name}/blobs/uploads/ — starts a blob upload session. */
 @NullMarked
 public abstract class AbstractHelmOciBlobUploadStartProtocolMethodHandler<ID>
-    extends AbstractFacadeProtocolMethodHandler<HelmProtocolFacade<ID>> {
+    extends AbstractOciUploadStartProtocolMethodHandler {
 
-  private static final Pattern UPLOAD_START_PATTERN = Pattern.compile("^/([^/]+)/blobs/uploads/?$");
+  protected final HelmProtocolFacade<ID> facade;
 
   public AbstractHelmOciBlobUploadStartProtocolMethodHandler(
       final PathParser basePathParser,
@@ -48,39 +42,25 @@ public abstract class AbstractHelmOciBlobUploadStartProtocolMethodHandler<ID>
     super(
         HandlerRoute.of(Permission.WRITE, HttpMethod.POST)
             .skipHeaderPreProcessor(true)
-            .writeOperation(true)
-            .path(UPLOAD_START_PATTERN.asMatchPredicate()),
+            .writeOperation(true),
         basePathParser,
-        helmFacade,
         provider);
+    this.facade = helmFacade;
   }
 
   @Override
-  public ResponseEntity<Object> handle(
-      final ProtocolContext context,
-      final HttpServletRequest request,
-      final HttpServletResponse response) {
+  protected UUID startUpload(final ProtocolContext context, final HttpServletRequest request) {
+    return this.facade.startBlobUpload(context);
+  }
 
-    final var relativePath = ProtocolContextUtils.getRelativePath(context).getPath();
-    final var matcher = UPLOAD_START_PATTERN.matcher(relativePath);
-
-    if (!matcher.matches()) {
-      return ResponseEntity.internalServerError().build();
-    }
-
-    final var uploadId = this.facade.startBlobUpload(context);
-
+  @Override
+  protected String uploadLocation(final HttpServletRequest request, final UUID uploadId) {
     final var requestPath = stripTrailingSlashes(request.getRequestURI());
-    final var location =
-        ServletUriComponentsBuilder.fromCurrentContextPath()
-            .path(requestPath + "/" + uploadId)
-            .build()
-            .toUriString();
 
-    return ResponseEntity.accepted()
-        .header(LOCATION, location)
-        .header(DOCKER_UPLOAD_UUID, uploadId.toString())
-        .build();
+    return ServletUriComponentsBuilder.fromCurrentContextPath()
+        .path(requestPath + "/" + uploadId)
+        .build()
+        .toUriString();
   }
 
   /** Drops the slashes at the end of the path, a loop instead of a regex so it stays linear. */
