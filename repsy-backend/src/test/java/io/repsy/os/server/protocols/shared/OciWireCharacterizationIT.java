@@ -26,7 +26,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.helm.HelmChartFixtures;
+import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
+import io.repsy.os.shared.user.entities.User;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -36,6 +38,7 @@ import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.regex.Pattern;
 import java.util.zip.GZIPOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
@@ -45,6 +48,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.transaction.TestTransaction;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -134,6 +138,61 @@ class OciWireCharacterizationIT extends AbstractIT {
       final RepoType type, final byte[] config, final String configType, final String layerType)
       throws Exception {
 
+    final var knownRepoIds = this.repoRepository.findAll().stream().map(Repo::getId).toList();
+    final var knownUserIds = this.userRepository.findAll().stream().map(User::getId).toList();
+
+    try {
+      return this.run(type, config, configType, layerType);
+    } finally {
+      this.deleteCommittedRows(knownRepoIds, knownUserIds);
+    }
+  }
+
+  /**
+   * The rows the script committed (see {@link #commitUploads}) are deleted here: the test
+   * transaction's rollback does not take them back. The repo delete cascades to its layers,
+   * manifests and images.
+   */
+  private void deleteCommittedRows(final List<UUID> knownRepoIds, final List<UUID> knownUserIds) {
+
+    if (TestTransaction.isActive()) {
+      TestTransaction.end();
+    }
+
+    this.repoRepository.findAll().stream()
+        .map(Repo::getId)
+        .filter(id -> !knownRepoIds.contains(id))
+        .forEach(id -> this.jdbcTemplate.update("delete from repo where id = ?", id));
+    this.deleteCommittedUsers(
+        this.userRepository.findAll().stream()
+            .map(User::getId)
+            .filter(id -> !knownUserIds.contains(id))
+            .toList());
+
+    // The test framework ends the transaction after the method: give it one to roll back.
+    TestTransaction.start();
+  }
+
+  /**
+   * Commits the repos, the users and the uploaded blobs, then opens a new test transaction.
+   *
+   * <p>{@code DockerProtocolTxFacade.getLayer} runs {@code NOT_SUPPORTED}: it suspends the test
+   * transaction, reads on its own connection and so cannot see a layer row this test has not
+   * committed, which answered the blob pull 404 {@code layerNotFound} while the blob check, which
+   * runs inside the transaction, answered 200 (RPS-2165). A real registry commits the layer when
+   * the upload is finalized; this is the same for the harness.
+   */
+  private void commitUploads() {
+    this.entityManager.flush();
+    TestTransaction.flagForCommit();
+    TestTransaction.end();
+    TestTransaction.start();
+  }
+
+  private String run(
+      final RepoType type, final byte[] config, final String configType, final String layerType)
+      throws Exception {
+
     final var repo = this.seedRepo(type, uniqueRepoName(type.name().toLowerCase()));
     final var other = this.seedRepo(type, uniqueRepoName(type.name().toLowerCase()));
     final var wire = new Wire(repo.getName(), other.getName(), this.adminProtocolBearerToken());
@@ -216,6 +275,10 @@ class OciWireCharacterizationIT extends AbstractIT {
             .param("mount", chunkedDigest)
             .param("from", repo.getName() + "/" + NAME));
 
+    if (type == RepoType.DOCKER) {
+      // Helm OCI has no NOT_SUPPORTED read; its script also leaves the transaction rollback-only.
+      this.commitUploads();
+    }
     wire.call("blob check", head(base + "/blobs/" + chunkedDigest));
     wire.call("blob pull", get(base + "/blobs/" + chunkedDigest));
     wire.call("blob check of the layer", head(base + "/blobs/" + layerDigest));
