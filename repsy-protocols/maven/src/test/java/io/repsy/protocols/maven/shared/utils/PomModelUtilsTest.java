@@ -1,0 +1,293 @@
+/*
+ * Copyright 2026 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.repsy.protocols.maven.shared.utils;
+
+import static java.nio.charset.StandardCharsets.UTF_8;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+
+import io.repsy.core.error_handling.exceptions.BadRequestException;
+import io.repsy.libs.storage.core.dtos.StoragePath;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Objects;
+import java.util.UUID;
+import org.apache.maven.model.Model;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.InputStreamResource;
+
+@DisplayName("PomModelUtils")
+class PomModelUtilsTest {
+
+  private static final String VALID_POM =
+      """
+      <project>
+        <modelVersion>4.0.0</modelVersion>
+        <groupId>com.example</groupId>
+        <artifactId>lib</artifactId>
+        <version>1.0</version>
+      </project>
+      """;
+
+  private static final String POM_PATH_OF_ACME_LIB = "com/acme/lib/1.0/lib-1.0.pom";
+
+  /** A POM with the given elements in place of the coordinates, like a client would send it. */
+  private static Model pomWith(final String elements) {
+    final var pom =
+        "<project xmlns=\"http://maven.apache.org/POM/4.0.0\"><modelVersion>4.0.0</modelVersion>"
+            + elements
+            + "</project>";
+
+    return Objects.requireNonNull(
+        PomModelUtils.readModel(new ByteArrayInputStream(pom.getBytes(UTF_8))));
+  }
+
+  private static String parentOf(final String groupId) {
+    return "<parent><groupId>"
+        + groupId
+        + "</groupId><artifactId>par</artifactId><version>1</version></parent>";
+  }
+
+  @ParameterizedTest(name = "{0} is run by the prefix {1}")
+  @CsvSource({
+    "hello-maven-plugin, hello",
+    "spring-boot-maven-plugin, spring-boot",
+    "maven-clean-plugin, clean",
+    "maven-plugin-plugin, plugin",
+    "maven-plugin-report-plugin, plugin-report",
+    "maven-maven-plugin, maven",
+    "a-maven-plugin, a",
+    "gmavenplus-plugin, gplus",
+    "jooq-codegen-maven, jooq-codegen",
+    "pitest-maven, pitest",
+    "maven-plugin, ''",
+    "maven-x-maven-plugin, maven-x"
+  })
+  @DisplayName("derives the prefix from the artifactId the way maven-plugin-plugin 3.x does")
+  void derivesThePluginPrefixFromTheArtifactId(final String artifactId, final String prefix) {
+    assertThat(PomModelUtils.getPrefixFromArtifactId(artifactId)).isEqualTo(prefix);
+  }
+
+  @Test
+  @DisplayName("reads a well-formed POM")
+  void readsAWellFormedPom() {
+    final var model = PomModelUtils.readModel(new ByteArrayResource(VALID_POM.getBytes(UTF_8)));
+
+    assertThat(model).isNotNull();
+    assertThat(model.getGroupId()).isEqualTo("com.example");
+    assertThat(model.getArtifactId()).isEqualTo("lib");
+    assertThat(model.getVersion()).isEqualTo("1.0");
+  }
+
+  @Test
+  @DisplayName("answers a malformed POM with a fixed msgId that does not echo the file")
+  void malformedPomYieldsFixedMessageId() {
+    final var secret = "do-not-reflect-this-marker";
+    final var malformed = "<project><modelVersion>4.0.0</modelVersion><!-- " + secret + " -->";
+
+    assertThatThrownBy(
+            () -> PomModelUtils.readModel(new ByteArrayResource(malformed.getBytes(UTF_8))))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("malformedPomFile")
+        .satisfies(e -> assertThat(e.toString()).doesNotContain(secret));
+  }
+
+  @Test
+  @DisplayName("answers an unreadable POM with the same fixed msgId")
+  void unreadablePomYieldsFixedMessageId() {
+    final var unreadable =
+        new InputStreamResource(
+            new InputStream() {
+              @Override
+              public int read() throws IOException {
+                throw new IOException("disk failure with /secret/path");
+              }
+            });
+
+    assertThatThrownBy(() -> PomModelUtils.readModel(unreadable))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("malformedPomFile");
+  }
+
+  @Test
+  @DisplayName("reads a well-formed POM from a stream and leaves the stream open")
+  void readsAWellFormedPomFromAStream() {
+    final var closed = new boolean[1];
+    final var stream =
+        new ByteArrayInputStream(VALID_POM.getBytes(UTF_8)) {
+          @Override
+          public void close() throws IOException {
+            closed[0] = true;
+            super.close();
+          }
+        };
+
+    final var model = PomModelUtils.readModel(stream);
+
+    assertThat(model).isNotNull();
+    assertThat(model.getArtifactId()).isEqualTo("lib");
+    assertThat(closed[0]).isFalse();
+  }
+
+  @Test
+  @DisplayName("answers a malformed POM read from a stream with the fixed msgId")
+  void malformedPomStreamYieldsFixedMessageId() {
+    final var malformed = new ByteArrayInputStream("<project><groupId>".getBytes(UTF_8));
+
+    assertThatThrownBy(() -> PomModelUtils.readModel(malformed))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("malformedPomFile");
+  }
+
+  @ParameterizedTest(name = "{0} is parsed as a POM: {1}")
+  @CsvSource({
+    "com/example/lib/1.0/lib-1.0.pom, true",
+    "com/example/lib/1.0/LIB-1.0.POM, true",
+    "com/example/lib/1.0/lib-1.0.pom.asc, false",
+    "com/example/lib/1.0/lib-1.0.pom.sha1, false",
+    "com/example/lib/1.0/lib-1.0.pom.md5, false",
+    "com/example/lib/1.0/lib-1.0.jar, false",
+    "com/example/lib/maven-metadata.xml, false",
+    "com/acme/bar.pom.utils/1.0/bar.pom.utils-1.0.jar, false",
+    "com/acme/bar.pom.utils/1.0/bar.pom.utils-1.0.jar.asc, false",
+    "com/acme/bar.pom.utils/1.0/bar.pom.utils-1.0.jar.sha1, false",
+    "com/acme/bar.pom.utils/1.0/bar.pom.utils-1.0.pom, true",
+    "com/acme/bar.pom.utils/1.0/bar.pom.utils-1.0.pom.asc, false",
+    "com/acme/bar.pom.utils/1.0/bar.pom.utils-1.0.pom.sha1, false",
+    "com/acme/bar.pom.utils/maven-metadata.xml, false",
+    "com/acme/bar.pom.utils/maven-metadata.xml.asc, false",
+    "com/acme/x.pom/1.0/x.pom-1.0.jar, false",
+    "com/acme/x.pom/1.0/x.pom-1.0.pom, true",
+    "com/acme/lib/1.0.pom/lib-1.0.pom.jar, false",
+    "com/acme/lib/1.0-SNAPSHOT/lib-1.0-20260921.101010-1.pom, true",
+    "com/acme/lib/1.0-SNAPSHOT/lib-1.0-SNAPSHOT.pom, true",
+    "x, false"
+  })
+  @DisplayName(
+      "tells the POMs the artifact service parses from the files stored beside them, by the file"
+          + " name alone (RPS-1196)")
+  void recognisesThePomsToParse(final String path, final boolean expected) {
+    final var storagePath = StoragePath.of(UUID.randomUUID(), path);
+
+    assertThat(PomModelUtils.isPomToParse(storagePath)).isEqualTo(expected);
+  }
+
+  @Test
+  @DisplayName("answers a binary POM body with the same fixed msgId (RPS-1196)")
+  void binaryBodyYieldsFixedMessageId() {
+    final var binary = new byte[] {'P', 'K', 3, 4, 0, 0};
+
+    assertThatThrownBy(() -> PomModelUtils.readModel(new ByteArrayInputStream(binary)))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("malformedPomFile");
+  }
+
+  @Test
+  @DisplayName("declares the groupId of the POM, else the one of its parent, else none")
+  void declaredGroupIdFallsBackToTheParent() {
+    assertThat(
+            PomModelUtils.declaredGroupId(
+                pomWith("<groupId>com.acme</groupId>" + parentOf("org.parent"))))
+        .isEqualTo("com.acme");
+    assertThat(PomModelUtils.declaredGroupId(pomWith(parentOf("org.parent"))))
+        .isEqualTo("org.parent");
+    assertThat(PomModelUtils.declaredGroupId(pomWith("<artifactId>lib</artifactId>"))).isNull();
+  }
+
+  @ParameterizedTest(name = "a POM of {0} under com/acme is refused")
+  @ValueSource(
+      strings = {
+        "<groupId>org.other</groupId><artifactId>lib</artifactId><version>1.0</version>",
+        "<groupId>com.Acme</groupId><artifactId>lib</artifactId><version>1.0</version>",
+        "<groupId>${g}</groupId><artifactId>lib</artifactId><version>1.0</version>",
+        "<groupId></groupId><artifactId>lib</artifactId><version>1.0</version>",
+        "<parent><groupId>org.other</groupId><artifactId>par</artifactId><version>1</version>"
+            + "</parent><artifactId>lib</artifactId><version>1.0</version>",
+        "<groupId>org.other</groupId>"
+            + "<parent><groupId>com.acme</groupId>"
+            + "<artifactId>par</artifactId><version>1</version></parent>"
+            + "<artifactId>lib</artifactId><version>1.0</version>"
+      })
+  @DisplayName(
+      "refuses a POM whose groupId is not the one of its path, with a fixed msgId (RPS-1193)")
+  void refusesAPomWhoseGroupIdIsNotItsPaths(final String elements) {
+    final var model = pomWith(elements);
+
+    assertThatThrownBy(() -> PomModelUtils.checkPomGroupIdMatchesPath(model, POM_PATH_OF_ACME_LIB))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("pomGroupIdMismatch");
+  }
+
+  @ParameterizedTest(name = "{0}")
+  @CsvSource(
+      delimiter = '|',
+      value = {
+        "com/acme/lib/1.0/lib-1.0.pom | <groupId>com.acme</groupId><artifactId>lib</artifactId>"
+            + "<version>1.0</version>",
+        "com/acme/lib/1.0/lib-1.0.pom | <parent><groupId>com.acme</groupId><artifactId>par</artifactId>"
+            + "<version>1</version></parent><artifactId>lib</artifactId><version>1.0</version>",
+        "com/acme/lib/1.0/lib-1.0.pom | <artifactId>lib</artifactId><version>1.0</version>",
+        "com/acme/lib/1.0-SNAPSHOT/lib-1.0-20260921.101010-1.pom |"
+            + " <groupId>com.acme</groupId><artifactId>lib</artifactId>"
+            + "<version>1.0-SNAPSHOT</version>",
+        "com/acme/lib/1.0/lib-1.0.pom | <groupId>com.acme</groupId><artifactId>lib</artifactId>"
+            + "<version>${revision}</version>",
+        "com/acme/lib/1.0/lib-1.0.pom | <groupId>com.acme</groupId><artifactId>other</artifactId>"
+            + "<version>1.0</version>",
+        "com/acme/lib/1.0/lib-1.0.pom | <groupId>com.acme</groupId><artifactId>lib</artifactId>"
+            + "<version>1.0</version><packaging>pom</packaging>",
+        "com/acme/lib/1.0/lib-1.0.pom | <groupId>com.acme</groupId><artifactId>lib</artifactId>"
+            + "<version>1.0</version><packaging>maven-plugin</packaging>",
+        "com/acme/lib/1.0/lib-1.0.pom | <groupId>com.acme</groupId><artifactId>lib</artifactId>"
+            + "<version>1.0</version><distributionManagement><relocation><groupId>com.new</groupId>"
+            + "</relocation></distributionManagement>",
+        "com/acme/sub/lib/1.0/lib-1.0.pom | <groupId>com.acme.sub</groupId>"
+            + "<artifactId>lib</artifactId><version>1.0</version>"
+      })
+  @DisplayName("accepts the POMs real clients send, whatever their artifactId and version")
+  void acceptsThePomsRealClientsSend(final String path, final String elements) {
+    PomModelUtils.checkPomGroupIdMatchesPath(pomWith(elements), path);
+  }
+
+  @Test
+  @DisplayName("does not check a POM that has no model or a path that has no GAV")
+  void skipsThePathCheckWhenThePathHasNoGav() {
+    final var mismatching =
+        pomWith("<groupId>org.other</groupId><artifactId>lib</artifactId><version>1.0</version>");
+
+    PomModelUtils.checkPomGroupIdMatchesPath(mismatching, "io/stray.pom");
+    PomModelUtils.checkPomGroupIdMatchesPath(mismatching, "com/acme/lib/1.0/other-1.0.pom");
+    PomModelUtils.checkPomGroupIdMatchesPath(null, POM_PATH_OF_ACME_LIB);
+  }
+
+  @Test
+  @DisplayName("tells a maven-plugin packaging POM, any case, from any other packaging")
+  void artifactIsPluginByItsPackaging() {
+    final var plugin = new Model();
+    plugin.setPackaging("Maven-Plugin");
+    final var jar = new Model();
+    jar.setPackaging("jar");
+
+    assertThat(PomModelUtils.artifactIsPlugin(plugin)).isTrue();
+    assertThat(PomModelUtils.artifactIsPlugin(jar)).isFalse();
+  }
+}

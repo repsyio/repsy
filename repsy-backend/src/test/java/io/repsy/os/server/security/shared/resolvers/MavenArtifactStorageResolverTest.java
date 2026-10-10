@@ -45,10 +45,10 @@ import org.springframework.core.io.ByteArrayResource;
 
 /**
  * The stored snapshot metadata is only a hint for finding the build a scan is about. A corrupt one
- * must not surface as the {@code 400} that {@code ArtifactUtils.readMetadata} answers an upload
- * with (RPS-1180), and a snapshot that has no usable metadata (sbt, Ivy) resolves to the newest
- * main file stored in its version directory (RPS-1420). So does a snapshot whose metadata names a
- * build that is not stored (RPS-1447).
+ * must not surface as the {@code 400} that {@code MavenMetadataUtils.readMetadata} answers an
+ * upload with (RPS-1180), and a snapshot that has no usable metadata (sbt, Ivy) resolves to the
+ * newest main file stored in its version directory (RPS-1420). So does a snapshot whose metadata
+ * names a build that is not stored (RPS-1447).
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("MavenArtifactStorageResolver snapshots (RPS-1180, RPS-1420, RPS-1447)")

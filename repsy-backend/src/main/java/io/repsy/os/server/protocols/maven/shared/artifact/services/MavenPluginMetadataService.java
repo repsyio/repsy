@@ -22,9 +22,10 @@ import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactR
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactVersionRepository;
 import io.repsy.protocols.maven.shared.artifact.dtos.PluginPrefixChange;
 import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredPlugin;
-import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
+import io.repsy.protocols.maven.shared.utils.MavenGavUtils;
 import io.repsy.protocols.maven.shared.utils.MavenPublishLimits;
 import io.repsy.protocols.maven.shared.utils.PluginDescriptorReader;
+import io.repsy.protocols.maven.shared.utils.PomModelUtils;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import io.repsy.protocols.shared.storage.StorageStrategyRegistry;
@@ -103,7 +104,7 @@ public class MavenPluginMetadataService {
   private @Nullable ArtifactVersion findPluginVersionWithPrefix(
       final UUID repoId, final StoragePath jarPath) {
 
-    final var gav = ArtifactUtils.convertPathToGav(jarPath.getRelativePath().getPath());
+    final var gav = MavenGavUtils.convertPathToGav(jarPath.getRelativePath().getPath());
 
     if (gav == null) {
       return null;
@@ -174,7 +175,7 @@ public class MavenPluginMetadataService {
       final Gav gav,
       final @Nullable Model pomModel) {
 
-    if (pomModel == null || !ArtifactUtils.artifactIsPlugin(pomModel)) {
+    if (pomModel == null || !PomModelUtils.artifactIsPlugin(pomModel)) {
       return null;
     }
 
@@ -209,7 +210,7 @@ public class MavenPluginMetadataService {
   private static @Nullable String derivedPluginPrefix(final Model pomModel) {
 
     return MavenPublishLimits.dropIfTooLong(
-        ArtifactUtils.getPrefixFromArtifactId(pomModel.getArtifactId()),
+        PomModelUtils.getPrefixFromArtifactId(pomModel.getArtifactId()),
         MavenPublishLimits.MAX_PREFIX_LENGTH);
   }
 

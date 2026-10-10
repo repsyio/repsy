@@ -42,8 +42,13 @@ import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredPlugin;
 import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredVersion;
 import io.repsy.protocols.maven.shared.artifact.dtos.SignatureOutcome;
 import io.repsy.protocols.maven.shared.artifact.services.contracts.AbstractArtifactService;
-import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
+import io.repsy.protocols.maven.shared.utils.MavenFileNameUtils;
+import io.repsy.protocols.maven.shared.utils.MavenGavUtils;
+import io.repsy.protocols.maven.shared.utils.MavenMetadataUtils;
 import io.repsy.protocols.maven.shared.utils.MavenPublishLimits;
+import io.repsy.protocols.maven.shared.utils.PomModelUtils;
+import io.repsy.protocols.maven.shared.utils.SignatureFileUtils;
+import io.repsy.protocols.maven.shared.utils.SnapshotNameUtils;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -169,7 +174,7 @@ public class ArtifactDeploymentService extends AbstractArtifactService<UUID> {
   public ArtifactVersionType getVersionType(
       final BaseRepoInfo<UUID> repoInfo, final StoragePath storagePath) {
 
-    final var gav = ArtifactUtils.getGavByFile(storagePath);
+    final var gav = MavenGavUtils.getGavByFile(storagePath);
 
     if (gav == null) {
       log.info(
@@ -206,24 +211,25 @@ public class ArtifactDeploymentService extends AbstractArtifactService<UUID> {
     final var fileName = relativePath.getFileName();
 
     if (holdsNoXml(fileName)) {
-      return ArtifactUtils.isSnapshotVersionDirectoryFile(relativePath.getPath()) ? SNAPSHOT : null;
+      return MavenGavUtils.isSnapshotVersionDirectoryFile(relativePath.getPath()) ? SNAPSHOT : null;
     }
 
-    final var metadata = ArtifactUtils.readMetadata(content);
+    final var metadata = MavenMetadataUtils.readMetadata(content);
 
-    if (ArtifactUtils.isVersionLevelMetadata(metadata)) {
-      return ArtifactUtils.isSnapshot(metadata.getVersion()) ? SNAPSHOT : RELEASE;
+    if (MavenMetadataUtils.isVersionLevelMetadata(metadata)) {
+      return SnapshotNameUtils.isSnapshot(metadata.getVersion()) ? SNAPSHOT : RELEASE;
     }
 
     // Artifact-level and group-level metadata index versions of both kinds. The files of the
     // version they describe were judged by their own GAV, so no rule applies to them.
-    return ArtifactUtils.isPluginMetadata(metadata) ? PLUGIN : null;
+    return MavenMetadataUtils.isPluginMetadata(metadata) ? PLUGIN : null;
   }
 
   /** A metadata checksum holds a hash and a metadata signature armored text: neither is XML. */
   private static boolean holdsNoXml(final String fileName) {
 
-    return ArtifactUtils.isChecksumFile(fileName) || ArtifactUtils.isMetadataSignature(fileName);
+    return MavenFileNameUtils.isChecksumFile(fileName)
+        || SignatureFileUtils.isMetadataSignature(fileName);
   }
 
   /**
@@ -249,7 +255,7 @@ public class ArtifactDeploymentService extends AbstractArtifactService<UUID> {
       final @Nullable ArtifactVersionType versionType,
       final StoragePath storagePath) {
 
-    final var gav = ArtifactUtils.getGavByFile(storagePath);
+    final var gav = MavenGavUtils.getGavByFile(storagePath);
 
     if (gav != null) {
       this.checkAllowOverride(repoInfo, gav, storagePath);
@@ -262,11 +268,11 @@ public class ArtifactDeploymentService extends AbstractArtifactService<UUID> {
    * Registers a stored POM, or records a verified signature and updates whether the version is
    * signed. Neither is decided from the whole path any more: a file is told to be a POM (or the
    * signature of one) by its file name's {@code .pom} (or {@code .pom.asc}) suffix alone, the same
-   * rule {@link ArtifactUtils#isPomToParse} and {@link ArtifactUtils#isPomSignature} apply before
-   * the file is stored. Before, an artifactId or directory that merely contained {@code .pom} (for
-   * example {@code bar.pom.utils}) made every one of its files, checksums and signatures look like
-   * a POM or a POM signature, so a jar answered {@code malformedPomFile} and a stored {@code
-   * maven-metadata.xml} failed the same way right after being written (RPS-1196).
+   * rule {@link PomModelUtils#isPomToParse} and {@link SignatureFileUtils#isPomSignature} apply
+   * before the file is stored. Before, an artifactId or directory that merely contained {@code
+   * .pom} (for example {@code bar.pom.utils}) made every one of its files, checksums and signatures
+   * look like a POM or a POM signature, so a jar answered {@code malformedPomFile} and a stored
+   * {@code maven-metadata.xml} failed the same way right after being written (RPS-1196).
    *
    * <p>On a repo that verifies every signature (RPS-1188) a stored artifact {@code .asc} is a
    * verified signature too, and a stored signable file (a POM included, once it is registered)
@@ -282,7 +288,7 @@ public class ArtifactDeploymentService extends AbstractArtifactService<UUID> {
     // Cannot create artifact for signed files. The signature itself was verified before it was
     // stored (see verifySignature), so here it only records that and marks the version signed. It
     // is looked up by the repo's storage key, so it does not need the repo row.
-    if (ArtifactUtils.isSignatureToVerify(
+    if (SignatureFileUtils.isSignatureToVerify(
         storagePath, repoInfo.isPgpVerifyAllSignaturesEnabled())) {
       this.artifactSignatureService.processSignedFile(repoInfo, storagePath);
       return;
@@ -291,7 +297,7 @@ public class ArtifactDeploymentService extends AbstractArtifactService<UUID> {
     // A jar, a classifier file, a checksum or a metadata file registers nothing. Nothing below is
     // loaded for them, so a normal `mvn deploy` does not pay a repo query per file (RPS-1179). A
     // repo that verifies every signature does look at a signable one, see refreshSignedForFile.
-    if (!ArtifactUtils.isPomToParse(storagePath)) {
+    if (!PomModelUtils.isPomToParse(storagePath)) {
       this.artifactSignatureService.refreshSignedForFile(repoInfo, storagePath);
       return;
     }
@@ -301,8 +307,8 @@ public class ArtifactDeploymentService extends AbstractArtifactService<UUID> {
             .findByNameAndType(repoInfo.getName(), RepoType.MAVEN)
             .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.REPO_NOT_FOUND));
 
-    final var gav = ArtifactUtils.convertPathToGav(storagePath.getRelativePath().getPath());
-    final var pomModel = ArtifactUtils.readModel(resource);
+    final var gav = MavenGavUtils.convertPathToGav(storagePath.getRelativePath().getPath());
+    final var pomModel = PomModelUtils.readModel(resource);
 
     if (this.checkExtractedInfos(pomModel, gav, storagePath, repo)) {
       assert gav != null;
@@ -440,7 +446,7 @@ public class ArtifactDeploymentService extends AbstractArtifactService<UUID> {
 
     // A non-unique snapshot is redeployed under its literal name by design (sbt, Ivy): it is not
     // an override. An existing timestamped build and a release are still immutable (RPS-1328).
-    if (ArtifactUtils.isNonUniqueSnapshotFile(gav)) {
+    if (MavenGavUtils.isNonUniqueSnapshotFile(gav)) {
       return;
     }
 
@@ -470,7 +476,7 @@ public class ArtifactDeploymentService extends AbstractArtifactService<UUID> {
 
     // A file name is only looked at by its own name, never a substring of it: an artifactId that
     // happens to contain the literal "maven-metadata.xml" must not skip this check (RPS-1177).
-    if (ArtifactUtils.isMetadataFamilyFile(storageFileName)) {
+    if (MavenFileNameUtils.isMetadataFamilyFile(storageFileName)) {
       return;
     }
 
@@ -634,7 +640,7 @@ public class ArtifactDeploymentService extends AbstractArtifactService<UUID> {
 
     // The upload refuses such a POM before it is stored (RPS-1193). This stays as a logged skip for
     // a POM stored before that, or reached by another path: it must still not be registered.
-    final var declared = ArtifactUtils.declaredGroupId(pomModel);
+    final var declared = PomModelUtils.declaredGroupId(pomModel);
 
     if (declared != null && !declared.equals(gav.getGroupId())) {
       log.warn(
@@ -744,7 +750,7 @@ public class ArtifactDeploymentService extends AbstractArtifactService<UUID> {
     artifact.setName(pomModel.getName());
     artifact.setPackaging(pomModel.getPackaging());
 
-    if (ArtifactUtils.artifactIsPlugin(pomModel)) {
+    if (PomModelUtils.artifactIsPlugin(pomModel)) {
       artifact.setPrefix(pluginPrefix);
       artifact.setPlugin(true);
     }
@@ -777,9 +783,9 @@ public class ArtifactDeploymentService extends AbstractArtifactService<UUID> {
     var hasDocuments = false;
 
     for (final var relativePath : this.filesOfVersionDir(versionPath, itemsInVersionDir)) {
-      hasSources = hasSources || ArtifactUtils.isClassifierJar(relativePath, SOURCES_CLASSIFIER);
+      hasSources = hasSources || MavenGavUtils.isClassifierJar(relativePath, SOURCES_CLASSIFIER);
       hasDocuments =
-          hasDocuments || ArtifactUtils.isClassifierJar(relativePath, JAVADOC_CLASSIFIER);
+          hasDocuments || MavenGavUtils.isClassifierJar(relativePath, JAVADOC_CLASSIFIER);
     }
 
     artifactVersion.setHasSources(hasSources);
@@ -798,7 +804,7 @@ public class ArtifactDeploymentService extends AbstractArtifactService<UUID> {
   private List<String> filesOfVersionDir(
       final String versionPath, final List<StorageItemInfo> itemsInVersionDir) {
 
-    return ArtifactUtils.versionDirFileNames(versionPath, itemsInVersionDir).stream()
+    return SnapshotNameUtils.versionDirFileNames(versionPath, itemsInVersionDir).stream()
         .map(name -> versionPath + "/" + name)
         .toList();
   }
@@ -818,7 +824,7 @@ public class ArtifactDeploymentService extends AbstractArtifactService<UUID> {
     artifactVersion.setHasModules(
         pomModel.getModules() != null && !pomModel.getModules().isEmpty());
 
-    if (ArtifactUtils.artifactIsPlugin(pomModel)) {
+    if (PomModelUtils.artifactIsPlugin(pomModel)) {
       artifactVersion.setPrefix(pluginPrefix);
     }
 

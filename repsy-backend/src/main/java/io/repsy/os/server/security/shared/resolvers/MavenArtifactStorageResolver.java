@@ -24,7 +24,8 @@ import io.repsy.os.server.protocols.maven.shared.artifact.entities.ArtifactVersi
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactRepository;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactVersionRepository;
 import io.repsy.os.server.security.shared.ArtifactStorageResolver;
-import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
+import io.repsy.protocols.maven.shared.utils.MavenMetadataUtils;
+import io.repsy.protocols.maven.shared.utils.SnapshotNameUtils;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import io.repsy.protocols.shared.storage.StorageStrategyRegistry;
 import java.io.IOException;
@@ -96,7 +97,7 @@ public class MavenArtifactStorageResolver implements ArtifactStorageResolver {
     final var packaging = this.findPackaging(repoId, groupId, artifactId, artifactVersion);
     final var extension = resolveExtension(packaging);
 
-    if (ArtifactUtils.isSnapshot(artifactVersion)) {
+    if (SnapshotNameUtils.isSnapshot(artifactVersion)) {
       return this.resolveSnapshot(
           repoId, repoName, groupId, artifactId, artifactVersion, extension);
     }
@@ -204,7 +205,7 @@ public class MavenArtifactStorageResolver implements ArtifactStorageResolver {
    * names no build (RPS-1420): sbt and Ivy deploy a snapshot under its literal name and upload no
    * {@code maven-metadata.xml}, and so does a version whose metadata cannot be read. It is also the
    * answer when the metadata names a build whose file is not stored (RPS-1447). The rule is the one
-   * the panel uses for the POM, see {@link ArtifactUtils#newestSnapshotMainFileName}.
+   * the panel uses for the POM, see {@link SnapshotNameUtils#newestSnapshotMainFileName}.
    */
   private Optional<String> findStoredSnapshotFile(
       final UUID repoId,
@@ -231,7 +232,8 @@ public class MavenArtifactStorageResolver implements ArtifactStorageResolver {
     }
 
     final var fileName =
-        ArtifactUtils.newestSnapshotMainFileName(artifactId, artifactVersion, extension, fileNames);
+        SnapshotNameUtils.newestSnapshotMainFileName(
+            artifactId, artifactVersion, extension, fileNames);
 
     if (fileName == null) {
       return Optional.empty();
@@ -246,7 +248,7 @@ public class MavenArtifactStorageResolver implements ArtifactStorageResolver {
 
   private static @Nullable Metadata readMetadataQuietly(final @NonNull Resource resource) {
     try (final var inputStream = resource.getInputStream()) {
-      return ArtifactUtils.readMetadata(inputStream.readAllBytes());
+      return MavenMetadataUtils.readMetadata(inputStream.readAllBytes());
     } catch (final IOException | BadRequestException exception) {
       // readMetadata refuses unparsable content with the unchecked BadRequestException
       // (malformedMetadataFile), which is not an IOException: it has to be caught here too, or a

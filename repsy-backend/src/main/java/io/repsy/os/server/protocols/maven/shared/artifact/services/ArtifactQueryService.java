@@ -36,7 +36,8 @@ import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
 import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredVersion;
 import io.repsy.protocols.maven.shared.artifact.services.VersionComparator;
-import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
+import io.repsy.protocols.maven.shared.utils.MavenMetadataUtils;
+import io.repsy.protocols.maven.shared.utils.SnapshotNameUtils;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -403,7 +404,7 @@ public class ArtifactQueryService {
    * it is unusable (no {@code <versioning>}, no {@code pom}, or content that cannot be parsed at
    * all, RPS-1421), the newest POM stored in the version directory is used (RPS-1370): sbt and Ivy
    * deploy a snapshot under its literal name and upload no metadata at all. A literal POM counts as
-   * older than a timestamped one, see {@link ArtifactUtils#newestSnapshotPomName}. Unparsable
+   * older than a timestamped one, see {@link SnapshotNameUtils#newestSnapshotPomName}. Unparsable
    * metadata is treated like absent metadata here, on this read only: an upload of it still answers
    * 400 {@code malformedMetadataFile}.
    */
@@ -437,7 +438,7 @@ public class ArtifactQueryService {
     }
 
     final var storedPomName =
-        ArtifactUtils.newestSnapshotPomName(
+        SnapshotNameUtils.newestSnapshotPomName(
             artifactName,
             versionName,
             this.fileNamesOf(StoragePath.of(repoInfo.getStorageKey(), versionDirPath.toString())));
@@ -454,15 +455,15 @@ public class ArtifactQueryService {
 
   /**
    * The parsed version-level metadata, or {@code null} when it cannot be parsed: {@link
-   * ArtifactUtils#readMetadata} refuses it with the unchecked {@link BadRequestException}, which
-   * would answer the panel's version detail with a 400 although the POM is in the directory
+   * MavenMetadataUtils#readMetadata} refuses it with the unchecked {@link BadRequestException},
+   * which would answer the panel's version detail with a 400 although the POM is in the directory
    * (RPS-1421).
    */
   private static @Nullable Metadata readSnapshotMetadataQuietly(
       final Resource metadataResource, final StoragePath metadataPath) throws IOException {
 
     try {
-      return ArtifactUtils.readMetadata(metadataResource.getContentAsByteArray());
+      return MavenMetadataUtils.readMetadata(metadataResource.getContentAsByteArray());
     } catch (final BadRequestException e) {
       log.warn(
           "Ignoring the unparsable snapshot metadata at {}, the stored POM is used instead: {}",

@@ -28,9 +28,12 @@ import io.repsy.protocols.maven.shared.artifact.dtos.SignatureOutcome;
 import io.repsy.protocols.maven.shared.artifact.services.contracts.ArtifactService;
 import io.repsy.protocols.maven.shared.storage.services.MavenStorageService;
 import io.repsy.protocols.maven.shared.utils.ArtifactMetadataSynthesizer;
-import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
+import io.repsy.protocols.maven.shared.utils.MavenFileNameUtils;
+import io.repsy.protocols.maven.shared.utils.MavenGavUtils;
 import io.repsy.protocols.maven.shared.utils.MavenPublishLimits;
 import io.repsy.protocols.maven.shared.utils.MavenUploadLimits;
+import io.repsy.protocols.maven.shared.utils.PomModelUtils;
+import io.repsy.protocols.maven.shared.utils.SignatureFileUtils;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.BoundedEntryReader;
@@ -239,7 +242,7 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
     final var fileName = storagePath.getRelativePath().getFileName();
     final @Nullable ArtifactVersionType versionType;
 
-    if (ArtifactUtils.isFileSuitableForGavExtraction(fileName)) {
+    if (MavenGavUtils.isFileSuitableForGavExtraction(fileName)) {
       versionType = this.artifactService.getVersionType(repoInfo, storagePath);
     } else {
       content = readBoundedMetadata(inputStream, contentLength);
@@ -267,7 +270,7 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
 
     this.register(context, repoInfo, storagePath, stored, newRegisteredFile);
 
-    final var gav = ArtifactUtils.getGavByFile(storagePath);
+    final var gav = MavenGavUtils.getGavByFile(storagePath);
 
     if (gav != null && isScannableArtifact(gav, fileName)) {
       context.addProperty(ARTIFACT_NAME, gav.getGroupId() + ":" + gav.getArtifactId());
@@ -291,10 +294,10 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
 
     final var verifyAll = repoInfo.isPgpVerifyAllSignaturesEnabled();
 
-    return (ArtifactUtils.isPomToParse(storagePath)
-            || ArtifactUtils.isSignatureToVerify(storagePath, verifyAll)
+    return (PomModelUtils.isPomToParse(storagePath)
+            || SignatureFileUtils.isSignatureToVerify(storagePath, verifyAll)
             || (verifyAll
-                && ArtifactUtils.isSignableFile(storagePath.getRelativePath().getFileName())))
+                && SignatureFileUtils.isSignableFile(storagePath.getRelativePath().getFileName())))
         && !this.mavenStorageService.exists(storagePath, repoInfo.getName());
   }
 
@@ -346,7 +349,7 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
 
     final var usage = stored.usage();
 
-    if (ArtifactUtils.isPomToParse(storagePath)) {
+    if (PomModelUtils.isPomToParse(storagePath)) {
       final var reconciled =
           this.reconcileStoredMetadata(repoInfo, storagePath)
               + (stored.plugin() ? this.reconcileStoredGroupMetadata(repoInfo, storagePath) : 0L);
@@ -354,7 +357,7 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
       return BaseUsages.ofDisk(usage.getDiskUsage() + reconciled);
     }
 
-    if (ArtifactUtils.isMainJar(storagePath)) {
+    if (MavenGavUtils.isMainJar(storagePath)) {
       return BaseUsages.ofDisk(
           usage.getDiskUsage() + this.refreshPluginPrefix(repoInfo, storagePath));
     }
@@ -380,7 +383,7 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
         storagePath,
         "the corrected plugin prefix of",
         () -> {
-          final var gav = ArtifactUtils.getGavByFile(storagePath);
+          final var gav = MavenGavUtils.getGavByFile(storagePath);
 
           if (gav == null) {
             return 0L;
@@ -424,7 +427,7 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
         storagePath,
         "the version of",
         () -> {
-          final var gav = ArtifactUtils.getGavByFile(storagePath);
+          final var gav = MavenGavUtils.getGavByFile(storagePath);
 
           if (gav == null) {
             return 0L;
@@ -471,7 +474,7 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
         storagePath,
         "the plugins of",
         () -> {
-          final var gav = ArtifactUtils.getGavByFile(storagePath);
+          final var gav = MavenGavUtils.getGavByFile(storagePath);
 
           if (gav == null) {
             return 0L;
@@ -559,7 +562,7 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
           false);
     }
 
-    if (ArtifactUtils.isPomToParse(storagePath)) {
+    if (PomModelUtils.isPomToParse(storagePath)) {
       return this.writeValidatedPom(repoName, storagePath, inputStream);
     }
 
@@ -587,16 +590,16 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
       final @Nullable Model model;
 
       try (final var pomStream = pom.openStream()) {
-        model = ArtifactUtils.readModel(pomStream);
+        model = PomModelUtils.readModel(pomStream);
       }
 
-      ArtifactUtils.checkPomGroupIdMatchesPath(model, storagePath.getRelativePath().getPath());
+      PomModelUtils.checkPomGroupIdMatchesPath(model, storagePath.getRelativePath().getPath());
       MavenPublishLimits.checkPackaging(model);
 
       try (final var pomStream = pom.openStream()) {
         return new Stored(
             this.mavenStorageService.writeInputStreamToPath(storagePath, pomStream, repoName),
-            ArtifactUtils.artifactIsPlugin(model));
+            PomModelUtils.artifactIsPlugin(model));
       }
     } catch (final EntryTooLargeException e) {
       throw new BadRequestException(ProtocolErrorCodes.POM_FILE_TOO_LARGE);
@@ -642,7 +645,7 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
       final StoragePath storagePath) {
 
     return content == null
-        && ArtifactUtils.isSignatureToVerify(
+        && SignatureFileUtils.isSignatureToVerify(
             storagePath, repoInfo.isPgpVerifyAllSignaturesEnabled());
   }
 
@@ -654,7 +657,7 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
     final var extension = gav.getExtension();
 
     return extension != null
-        && !ArtifactUtils.isChecksumFile(fileName)
+        && !MavenFileNameUtils.isChecksumFile(fileName)
         && gav.getClassifier() == null
         && SCANNABLE_EXTENSIONS.contains(extension);
   }

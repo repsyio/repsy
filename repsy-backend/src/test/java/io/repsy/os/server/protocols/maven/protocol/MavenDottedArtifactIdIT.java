@@ -50,7 +50,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * {@code ArtifactUtils.isPomToParse} and {@code isPomSignature}, and {@code
+ * {@code PomModelUtils.isPomToParse} and {@code isPomSignature}, and {@code
  * ArtifactDeploymentService.createOrUpdateArtifact}, used to test for {@code .pom} as a substring
  * of the whole relative path rather than the file name's suffix. An artifactId (or a directory)
  * that merely contains {@code .pom} (for example {@code bar.pom.utils}, or a directory named {@code

@@ -292,7 +292,7 @@ class MavenChecksumRulesIT extends AbstractIT {
    * Known, accepted gap (RPS-1195): a release version-level {@code maven-metadata.xml} checksum
    * carries no {@code &lt;version&gt;} (its body is a hash) and its directory does not end with
    * {@code SNAPSHOT}, so {@link
-   * io.repsy.protocols.maven.shared.utils.ArtifactUtils#isSnapshotVersionDirectoryFile} cannot tell
+   * io.repsy.protocols.maven.shared.utils.MavenGavUtils#isSnapshotVersionDirectoryFile} cannot tell
    * it from an artifact-level checksum of an artifact literally named {@code 1.0}. It is accepted
    * rather than fixed: telling the two apart would need reading the stored base {@code
    * maven-metadata.xml} back from storage and parsing it for every checksum, which is a storage
