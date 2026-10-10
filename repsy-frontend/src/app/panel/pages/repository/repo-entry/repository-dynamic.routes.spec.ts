@@ -22,8 +22,8 @@ import { CargoComponent } from '../cargo/cargo.component';
 import { CARGO_ROUTES } from '../cargo/cargo.routes';
 import { DockerComponent } from '../docker/docker.component';
 import { DOCKER_ROUTES } from '../docker/docker.routes';
-import { GolangComponent } from '../golang/golang.component';
-import { GOLANG_ROUTES } from '../golang/golang.routes';
+import { GoComponent } from '../go/go.component';
+import { GO_ROUTES } from '../go/go.routes';
 import { HelmComponent } from '../helm/helm.component';
 import { HELM_ROUTES } from '../helm/helm.routes';
 import { MavenComponent } from '../maven/maven.component';
@@ -46,7 +46,7 @@ const ENTRIES: { type: RepoType; routes: Routes; component: Type<unknown> }[] = 
   { type: 'pypi', routes: PYPI_ROUTES, component: PypiComponent },
   { type: 'docker', routes: DOCKER_ROUTES, component: DockerComponent },
   { type: 'cargo', routes: CARGO_ROUTES, component: CargoComponent },
-  { type: 'golang', routes: GOLANG_ROUTES, component: GolangComponent },
+  { type: 'golang', routes: GO_ROUTES, component: GoComponent },
   { type: 'helm', routes: HELM_ROUTES, component: HelmComponent },
   { type: 'nuget', routes: NUGET_ROUTES, component: NugetComponent },
   { type: 'ruby', routes: RUBY_ROUTES, component: RubyComponent },

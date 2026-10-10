@@ -625,7 +625,7 @@ Old springdoc tag to new tag. Several old tags may map to one new tag (one area,
 | `docker-cleanup-policy-controller` | `docker-cleanup-policy` |
 | `docker-image-controller` | `docker-images` |
 | `docker-repo-cleanup-controller` | `docker-repo-cleanup` |
-| `golang-module-controller` | `golang-modules` |
+| `golang-module-controller` | `go-modules` |
 | `helm-chart-controller` | `helm-charts` |
 | `key-store-controller` | `maven-key-stores` |
 | `maven-artifact-controller` | `maven-artifacts` |
@@ -660,7 +660,7 @@ Old springdoc tag to new tag. Several old tags may map to one new tag (one area,
 | `docker-image-controller` | `docker-images` |
 | `docker-repo-cleanup-controller` | `docker-repo-cleanup` |
 | `email-bulletin-controller` | `email-bulletins` |
-| `golang-module-controller` | `golang-modules` |
+| `golang-module-controller` | `go-modules` |
 | `health-controller` | `logs` |
 | `helm-chart-controller` | `helm-charts` |
 | `key-store-controller` | `maven-key-stores` |

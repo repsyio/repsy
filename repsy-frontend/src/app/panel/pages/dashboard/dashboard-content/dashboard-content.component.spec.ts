@@ -99,7 +99,7 @@ describe('DashboardContentComponent', () => {
       PYPI: component.pypiRepoCount,
       DOCKER: component.dockerRepoCount,
       CARGO: component.cargoRepoCount,
-      GOLANG: component.golangRepoCount,
+      GOLANG: component.goRepoCount,
       HELM: component.helmRepoCount,
       NUGET: component.nugetRepoCount,
       RUBY: component.rubyRepoCount,

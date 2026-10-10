@@ -15,35 +15,35 @@
 
 import { describeRouteTree } from '../../../../shared/testing/route-spec-helpers';
 import { RepositorySettingsComponent } from '../repo-settings/repository-settings.component';
-import { GolangComponent } from './golang.component';
-import { GOLANG_ROUTES } from './golang.routes';
-import { GolangModulesListComponent } from './modules/list/golang-modules-list.component';
-import { GolangModuleVersionDetailComponent } from './modules/version-detail/golang-module-version-detail.component';
-import { GolangModuleVersionListComponent } from './modules/version-list/golang-module-version-list.component';
+import { GoComponent } from './go.component';
+import { GO_ROUTES } from './go.routes';
+import { GoModulesListComponent } from './modules/list/go-modules-list.component';
+import { GoModuleVersionDetailComponent } from './modules/version-detail/go-module-version-detail.component';
+import { GoModuleVersionListComponent } from './modules/version-list/go-module-version-list.component';
 
-describe('GOLANG_ROUTES', () => {
+describe('GO_ROUTES', () => {
   describeRouteTree(
-    () => GOLANG_ROUTES,
+    () => GO_ROUTES,
     [
-      { path: '', component: GolangComponent },
-      { path: '', component: GolangModulesListComponent, title: 'repsy | Golang Modules', full: true },
+      { path: '', component: GoComponent },
+      { path: '', component: GoModulesListComponent, title: 'repsy | Go Modules', full: true },
       { path: 'modules' },
       {
         path: 'modules',
-        component: GolangModuleVersionListComponent,
-        title: 'repsy | Golang Module Versions',
+        component: GoModuleVersionListComponent,
+        title: 'repsy | Go Module Versions',
         full: true,
       },
       {
         path: 'modules/version',
-        component: GolangModuleVersionDetailComponent,
-        title: 'repsy | Golang Module Version Detail',
+        component: GoModuleVersionDetailComponent,
+        title: 'repsy | Go Module Version Detail',
         full: true,
       },
       {
         path: 'settings',
         component: RepositorySettingsComponent,
-        title: 'repsy | Golang Repository Settings',
+        title: 'repsy | Go Repository Settings',
         full: true,
       },
     ],

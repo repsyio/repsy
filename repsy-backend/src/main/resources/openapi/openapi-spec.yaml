@@ -2655,7 +2655,7 @@ paths:
   "/api/go/modules/{repoName}":
     get:
       tags:
-        - golang-modules
+        - go-modules
       operationId: listGolangModules
       description: >-
         Sortable by `id`, `modulePath`, `createdAt` (`property,direction`). The default is `id,desc`.
@@ -2693,7 +2693,7 @@ paths:
       summary: List or search Go modules in a repository
     delete:
       tags:
-        - golang-modules
+        - go-modules
       operationId: deleteGolangModule
       parameters:
         - name: modulePath
@@ -2729,7 +2729,7 @@ paths:
   "/api/go/modules/{repoName}/versions":
     get:
       tags:
-        - golang-modules
+        - go-modules
       operationId: listGolangModuleVersions
       description: >-
         Sortable by `id`, `version`, `createdAt` (`property,direction`). The default is `id,desc`.
@@ -2771,7 +2771,7 @@ paths:
       summary: List versions of a Go module
     delete:
       tags:
-        - golang-modules
+        - go-modules
       operationId: deleteGolangModuleVersion
       parameters:
         - name: modulePath
@@ -2812,7 +2812,7 @@ paths:
   "/api/go/modules/{repoName}/info":
     get:
       tags:
-        - golang-modules
+        - go-modules
       operationId: getGolangModuleInfo
       parameters:
         - name: modulePath

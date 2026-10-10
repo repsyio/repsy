@@ -17,21 +17,21 @@
 import { Routes } from '@angular/router';
 
 import { RepositorySettingsComponent } from '../repo-settings/repository-settings.component';
-import { GolangComponent } from './golang.component';
-import { GolangModulesListComponent } from './modules/list/golang-modules-list.component';
-import { GolangModuleVersionDetailComponent } from './modules/version-detail/golang-module-version-detail.component';
-import { GolangModuleVersionListComponent } from './modules/version-list/golang-module-version-list.component';
+import { GoComponent } from './go.component';
+import { GoModulesListComponent } from './modules/list/go-modules-list.component';
+import { GoModuleVersionDetailComponent } from './modules/version-detail/go-module-version-detail.component';
+import { GoModuleVersionListComponent } from './modules/version-list/go-module-version-list.component';
 
-export const GOLANG_ROUTES: Routes = [
+export const GO_ROUTES: Routes = [
   {
     path: '',
-    component: GolangComponent,
+    component: GoComponent,
     children: [
       {
         path: '',
         pathMatch: 'full',
-        component: GolangModulesListComponent,
-        title: 'repsy | Golang Modules',
+        component: GoModulesListComponent,
+        title: 'repsy | Go Modules',
       },
       {
         path: 'modules',
@@ -39,14 +39,14 @@ export const GOLANG_ROUTES: Routes = [
           {
             path: '',
             pathMatch: 'full',
-            component: GolangModuleVersionListComponent,
-            title: 'repsy | Golang Module Versions',
+            component: GoModuleVersionListComponent,
+            title: 'repsy | Go Module Versions',
           },
           {
             path: 'version',
             pathMatch: 'full',
-            component: GolangModuleVersionDetailComponent,
-            title: 'repsy | Golang Module Version Detail',
+            component: GoModuleVersionDetailComponent,
+            title: 'repsy | Go Module Version Detail',
           },
         ],
       },
@@ -54,7 +54,7 @@ export const GOLANG_ROUTES: Routes = [
         path: 'settings',
         pathMatch: 'full',
         component: RepositorySettingsComponent,
-        title: 'repsy | Golang Repository Settings',
+        title: 'repsy | Go Repository Settings',
       },
     ],
   },

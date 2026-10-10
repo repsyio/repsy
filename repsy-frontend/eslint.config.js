@@ -48,6 +48,20 @@ export default tseslint.config(
           custom: { regex: FORBIDDEN_IDENTIFIER_PARTS, match: false },
         },
       ],
+      // RPS-2124: `Golang` is `Go`. The declaration forms are an error; the wire values (`type=golang`,
+      // `RepoType.GOLANG`, generated operation ids such as `listGolangModules`) are references, not declarations.
+      "no-restricted-syntax": [
+        "error",
+        ...[
+          "ClassDeclaration[id.name=/[Gg]olang/]",
+          "FunctionDeclaration[id.name=/[Gg]olang/]",
+          "VariableDeclarator[id.name=/[Gg]olang/]",
+          "TSInterfaceDeclaration[id.name=/[Gg]olang/]",
+          "TSTypeAliasDeclaration[id.name=/[Gg]olang/]",
+          "MethodDefinition[key.name=/[Gg]olang/]",
+          "PropertyDefinition[key.name=/[Gg]olang/]",
+        ].map((selector) => ({ selector, message: "Write Golang as Go (RPS-2124)." })),
+      ],
       "check-file/filename-naming-convention": [
         "warn",
         { "**/*.ts": "KEBAB_CASE" },
