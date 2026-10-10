@@ -20,19 +20,17 @@ import static org.springframework.http.HttpHeaders.WWW_AUTHENTICATE;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
 import io.repsy.protocols.npm.shared.auth.dtos.LoginRequest;
 import io.repsy.protocols.npm.shared.auth.dtos.NpmLoginResponse;
 import io.repsy.protocols.npm.shared.auth.services.NpmAuthenticator;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
+import io.repsy.protocols.shared.handlers.AbstractRoutedProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -42,11 +40,11 @@ import org.springframework.http.ResponseEntity;
 import tools.jackson.databind.ObjectMapper;
 
 @NullMarked
-public abstract class AbstractNpmLoginProtocolMethodHandler<ID> implements ProtocolMethodHandler {
+public abstract class AbstractNpmLoginProtocolMethodHandler<ID>
+    extends AbstractRoutedProtocolMethodHandler {
 
   private static final Pattern LOGIN_PATTERN = Pattern.compile("^/-/user/.*");
 
-  private final PathParser basePathParser;
   private final NpmAuthenticator<ID> authenticator;
   private final ObjectMapper objectMapper;
 
@@ -55,47 +53,15 @@ public abstract class AbstractNpmLoginProtocolMethodHandler<ID> implements Proto
       final NpmAuthenticator<ID> authenticator,
       final ObjectMapper objectMapper,
       final NpmProtocolProvider provider) {
-
-    this.basePathParser = basePathParser;
+    super(
+        HandlerRoute.of(Permission.NONE, HttpMethod.PUT)
+            .writeOperation(false)
+            .skipPreProcessor(true)
+            .path(LOGIN_PATTERN.asMatchPredicate()),
+        basePathParser,
+        provider);
     this.authenticator = authenticator;
     this.objectMapper = objectMapper;
-
-    provider.registerMethodHandler(this);
-  }
-
-  @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.PUT);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of(
-        "permission", Permission.NONE,
-        "writeOperation", false,
-        "skipPreProcessor", true);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return request -> {
-      if (!HttpMethod.PUT.equals(HttpMethod.valueOf(request.getMethod()))) {
-        return Optional.empty();
-      }
-
-      final var parsedPathOpt = this.basePathParser.parse(request);
-      if (parsedPathOpt.isEmpty()) {
-        return Optional.empty();
-      }
-
-      final var relativePath = ProtocolContextUtils.getRelativePath(parsedPathOpt.get()).getPath();
-
-      if (!LOGIN_PATTERN.matcher(relativePath).matches()) {
-        return Optional.empty();
-      }
-
-      return parsedPathOpt;
-    };
   }
 
   @Override

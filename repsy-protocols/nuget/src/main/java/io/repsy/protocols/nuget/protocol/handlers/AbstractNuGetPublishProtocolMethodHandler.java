@@ -17,20 +17,17 @@ package io.repsy.protocols.nuget.protocol.handlers;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.libs.storage.core.exceptions.StorageUnavailableException;
 import io.repsy.protocols.nuget.protocol.NuGetProtocolProvider;
 import io.repsy.protocols.nuget.protocol.dtos.NuGetErrorResponse;
 import io.repsy.protocols.nuget.protocol.facades.contracts.NuGetProtocolFacade;
-import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.Part;
 import java.util.Collection;
-import java.util.List;
 import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
@@ -40,47 +37,26 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Slf4j
 @NullMarked
-public abstract class AbstractNuGetPublishProtocolMethodHandler implements ProtocolMethodHandler {
-
-  private final PathParser basePathParser;
-  private final NuGetProtocolFacade facade;
+public abstract class AbstractNuGetPublishProtocolMethodHandler
+    extends AbstractFacadeProtocolMethodHandler<NuGetProtocolFacade> {
 
   public AbstractNuGetPublishProtocolMethodHandler(
       final PathParser basePathParser,
       final NuGetProtocolFacade facade,
       final NuGetProtocolProvider provider) {
-
-    this.basePathParser = basePathParser;
-    this.facade = facade;
-
-    provider.registerMethodHandler(this);
+    super(HandlerRoute.write(HttpMethod.PUT), basePathParser, facade, provider);
   }
 
   @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.PUT);
-  }
+  protected boolean accepts(final HttpMethod method, final HttpServletRequest request) {
+    if (!super.accepts(method, request)) {
+      return false;
+    }
 
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.WRITE, "writeOperation", true);
-  }
+    final var path = request.getServletPath();
+    final var normalizedPath = path.endsWith("/") ? path.substring(0, path.length() - 1) : path;
 
-  @Override
-  public PathParser getPathParser() {
-    return request -> {
-      if (!HttpMethod.PUT.name().equals(request.getMethod())) {
-        return Optional.empty();
-      }
-
-      final var path = request.getServletPath();
-      final var normalizedPath = path.endsWith("/") ? path.substring(0, path.length() - 1) : path;
-      if (!normalizedPath.endsWith("/v3/package")) {
-        return Optional.empty();
-      }
-
-      return this.basePathParser.parse(request);
-    };
+    return normalizedPath.endsWith("/v3/package");
   }
 
   /**

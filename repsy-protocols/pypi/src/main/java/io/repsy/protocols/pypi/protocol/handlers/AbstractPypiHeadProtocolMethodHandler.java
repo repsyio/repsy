@@ -18,17 +18,15 @@ package io.repsy.protocols.pypi.protocol.handlers;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.pypi.protocol.PypiProtocolProvider;
 import io.repsy.protocols.pypi.protocol.facades.PypiProtocolFacade;
-import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.net.URI;
-import java.util.List;
-import java.util.Map;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -63,43 +61,25 @@ import org.springframework.http.ResponseEntity;
  * the raw name: {@code HEAD} should mean the same thing a client's follow-up {@code GET} would.
  */
 @NullMarked
-public abstract class AbstractPypiHeadProtocolMethodHandler<ID> implements ProtocolMethodHandler {
+public abstract class AbstractPypiHeadProtocolMethodHandler<ID>
+    extends AbstractFacadeProtocolMethodHandler<PypiProtocolFacade<ID>> {
 
   private static final Pattern SIMPLE_PATTERN = Pattern.compile("^/simple(?:/([^/]+))?/?$");
   private static final Pattern DOWNLOAD_PATTERN = Pattern.compile("^/([^/]+)/-/([^/]+)$");
-
-  private final PathParser pathParser;
-  private final PypiProtocolFacade<ID> facade;
 
   protected AbstractPypiHeadProtocolMethodHandler(
       final PathParser pathParser,
       final PypiProtocolFacade<ID> facade,
       final PypiProtocolProvider provider) {
-
-    provider.registerMethodHandler(this);
-
-    this.pathParser = pathParser;
-    this.facade = facade;
+    super(
+        HandlerRoute.read(HttpMethod.HEAD).skipUsagePostProcessor(true),
+        pathParser,
+        facade,
+        provider);
   }
 
   protected abstract @Nullable URI getNormalizedUri(
       HttpServletRequest request, @Nullable String packageName);
-
-  @Override
-  public PathParser getPathParser() {
-    return this.pathParser;
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of(
-        "permission", Permission.READ, "writeOperation", false, "skipUsagePostProcessor", true);
-  }
-
-  @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.HEAD);
-  }
 
   @Override
   public ResponseEntity<Object> handle(

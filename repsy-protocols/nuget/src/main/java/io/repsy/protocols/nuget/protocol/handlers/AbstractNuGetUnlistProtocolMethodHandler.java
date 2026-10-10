@@ -21,16 +21,13 @@ import static org.springframework.http.HttpStatus.NOT_FOUND;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.nuget.protocol.NuGetProtocolProvider;
 import io.repsy.protocols.nuget.protocol.dtos.NuGetErrorResponse;
 import io.repsy.protocols.nuget.protocol.facades.contracts.NuGetProtocolFacade;
-import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
@@ -39,50 +36,23 @@ import org.springframework.http.ResponseEntity;
 
 @Slf4j
 @NullMarked
-public abstract class AbstractNuGetUnlistProtocolMethodHandler implements ProtocolMethodHandler {
+public abstract class AbstractNuGetUnlistProtocolMethodHandler
+    extends AbstractFacadeProtocolMethodHandler<NuGetProtocolFacade> {
 
   private static final Pattern UNLIST_PATTERN =
       Pattern.compile("^.*/v3/package/[^/]+/[^/]+$", Pattern.CASE_INSENSITIVE);
-
-  private final PathParser basePathParser;
-  private final NuGetProtocolFacade facade;
 
   protected AbstractNuGetUnlistProtocolMethodHandler(
       final PathParser basePathParser,
       final NuGetProtocolFacade facade,
       final NuGetProtocolProvider provider) {
-
-    this.basePathParser = basePathParser;
-    this.facade = facade;
-
-    provider.registerMethodHandler(this);
+    super(HandlerRoute.write(HttpMethod.DELETE), basePathParser, facade, provider);
   }
 
   @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.DELETE);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.WRITE, "writeOperation", true);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return request -> {
-      if (!HttpMethod.DELETE.name().equals(request.getMethod())) {
-        return Optional.empty();
-      }
-
-      final var path = request.getServletPath();
-
-      if (!UNLIST_PATTERN.matcher(path).matches()) {
-        return Optional.empty();
-      }
-
-      return this.basePathParser.parse(request);
-    };
+  protected boolean accepts(final HttpMethod method, final HttpServletRequest request) {
+    return super.accepts(method, request)
+        && UNLIST_PATTERN.matcher(request.getServletPath()).matches();
   }
 
   @Override

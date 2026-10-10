@@ -22,17 +22,16 @@ import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
 import io.repsy.protocols.npm.shared.auth.services.NpmTokenRevoker;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
-import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.handlers.AbstractRoutedProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -56,7 +55,7 @@ import org.springframework.http.ResponseEntity;
  */
 @NullMarked
 public abstract class AbstractNpmTokenRevokeProtocolMethodHandler<ID>
-    implements ProtocolMethodHandler {
+    extends AbstractRoutedProtocolMethodHandler {
 
   private static final String CHALLENGE = BasicAuthChallenge.REPSY;
   private static final String BEARER_CHALLENGE =
@@ -65,36 +64,19 @@ public abstract class AbstractNpmTokenRevokeProtocolMethodHandler<ID>
   private static final String TOKEN_PATH_REGEX = "/-/user/token/[^/]+";
   private static final String TOKEN_PATH_PREFIX = "/-/user/token/";
 
-  private final PathParser pathParser;
   private final NpmTokenRevoker<ID> tokenRevoker;
 
   public AbstractNpmTokenRevokeProtocolMethodHandler(
       @Qualifier("npmPathParser") final PathParser basePathParser,
       final NpmTokenRevoker<ID> tokenRevoker,
       final NpmProtocolProvider provider) {
-    this.pathParser = new NpmExactPathParser(basePathParser, HttpMethod.DELETE, TOKEN_PATH_REGEX);
+    super(
+        HandlerRoute.read(HttpMethod.DELETE)
+            .requireAuthentication(true)
+            .skipUsagePostProcessor(true),
+        new NpmExactPathParser(basePathParser, HttpMethod.DELETE, TOKEN_PATH_REGEX),
+        provider);
     this.tokenRevoker = tokenRevoker;
-
-    provider.registerMethodHandler(this);
-  }
-
-  @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.DELETE);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of(
-        "permission", Permission.READ,
-        "writeOperation", false,
-        "requireAuthentication", true,
-        "skipUsagePostProcessor", true);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return this.pathParser;
   }
 
   @Override

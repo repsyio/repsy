@@ -249,11 +249,15 @@ class AbstractPypiHeadProtocolMethodHandlerTest {
   }
 
   @Test
-  @DisplayName("uses the injected path parser as its own, and registers with the provider")
+  @DisplayName("delegates to the injected path parser, and registers with the provider")
   void usesInjectedPathParser() throws Exception {
     final var handler = this.handler();
 
-    assertThat(handler.getPathParser()).isSameAs(this.pathParser);
+    final var request = new org.springframework.mock.web.MockHttpServletRequest("HEAD", "/simple/");
+    final var context = new io.repsy.libs.protocol.router.ProtocolContext();
+    org.mockito.Mockito.when(this.pathParser.parse(request))
+        .thenReturn(java.util.Optional.of(context));
+    assertThat(handler.getPathParser().parse(request)).containsSame(context);
     verify(this.provider).registerMethodHandler(handler);
   }
 }

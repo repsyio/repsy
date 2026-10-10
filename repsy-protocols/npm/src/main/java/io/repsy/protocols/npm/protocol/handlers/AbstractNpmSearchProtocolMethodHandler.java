@@ -17,16 +17,14 @@ package io.repsy.protocols.npm.protocol.handlers;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
 import io.repsy.protocols.npm.shared.search.NpmSearchQuery;
 import io.repsy.protocols.npm.shared.search.NpmSearchService;
-import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.handlers.AbstractRoutedProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.List;
-import java.util.Map;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpMethod;
@@ -39,37 +37,20 @@ import org.springframework.http.ResponseEntity;
  * {@code from} that is no whole number of 0 or more is answered with 400 (RPS-1344).
  */
 @NullMarked
-public abstract class AbstractNpmSearchProtocolMethodHandler<ID> implements ProtocolMethodHandler {
+public abstract class AbstractNpmSearchProtocolMethodHandler<ID>
+    extends AbstractRoutedProtocolMethodHandler {
 
-  private final PathParser pathParser;
   private final NpmSearchService<ID> searchService;
 
   public AbstractNpmSearchProtocolMethodHandler(
       @Qualifier("npmPathParser") final PathParser basePathParser,
       final NpmSearchService<ID> searchService,
       final NpmProtocolProvider provider) {
-    this.pathParser = new NpmExactPathParser(basePathParser, HttpMethod.GET, "/-/v1/search");
+    super(
+        HandlerRoute.read(HttpMethod.GET).skipUsagePostProcessor(true),
+        new NpmExactPathParser(basePathParser, HttpMethod.GET, "/-/v1/search"),
+        provider);
     this.searchService = searchService;
-
-    provider.registerMethodHandler(this);
-  }
-
-  @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.GET);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of(
-        "permission", Permission.READ,
-        "writeOperation", false,
-        "skipUsagePostProcessor", true);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return this.pathParser;
   }
 
   @Override

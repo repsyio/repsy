@@ -20,18 +20,17 @@ import static org.springframework.http.HttpHeaders.WWW_AUTHENTICATE;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
 import io.repsy.protocols.npm.protocol.facades.NpmProtocolFacade;
 import io.repsy.protocols.npm.shared.utils.NpmRevPath;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
+import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpMethod;
@@ -50,10 +49,8 @@ import tools.jackson.databind.ObjectMapper;
  */
 @NullMarked
 public abstract class AbstractNpmPackageUnpublishProtocolMethodHandler
-    implements ProtocolMethodHandler {
+    extends AbstractFacadeProtocolMethodHandler<NpmProtocolFacade> {
 
-  private final PathParser basePathParser;
-  private final NpmProtocolFacade npmProtocolFacade;
   private final ObjectMapper objectMapper;
 
   public AbstractNpmPackageUnpublishProtocolMethodHandler(
@@ -61,44 +58,16 @@ public abstract class AbstractNpmPackageUnpublishProtocolMethodHandler
       final NpmProtocolFacade npmProtocolFacade,
       final ObjectMapper objectMapper,
       final NpmProtocolProvider provider) {
-    this.basePathParser = basePathParser;
-    this.npmProtocolFacade = npmProtocolFacade;
+    super(
+        HandlerRoute.of(Permission.MANAGE, HttpMethod.PUT)
+            .writeOperation(true)
+            .path(
+                path ->
+                    NpmRevPath.parse(path).filter(p -> p.tarballFilename() == null).isPresent()),
+        basePathParser,
+        npmProtocolFacade,
+        provider);
     this.objectMapper = objectMapper;
-
-    provider.registerMethodHandler(this);
-  }
-
-  @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.PUT);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.MANAGE, "writeOperation", true);
-  }
-
-  /** Matches only {@code /<package>/-rev/<rev>}, never a tarball's {@code -rev} path. */
-  @Override
-  public PathParser getPathParser() {
-    return request -> {
-      if (!HttpMethod.PUT.equals(HttpMethod.valueOf(request.getMethod()))) {
-        return Optional.empty();
-      }
-
-      final var parsedPathOpt = this.basePathParser.parse(request);
-      if (parsedPathOpt.isEmpty()) {
-        return Optional.empty();
-      }
-
-      final var relativePath = ProtocolContextUtils.getRelativePath(parsedPathOpt.get()).getPath();
-
-      return NpmRevPath.parse(relativePath)
-              .filter(path -> path.tarballFilename() == null)
-              .isPresent()
-          ? parsedPathOpt
-          : Optional.empty();
-    };
   }
 
   @Override
@@ -124,7 +93,7 @@ public abstract class AbstractNpmPackageUnpublishProtocolMethodHandler
           this.objectMapper.readValue(
               request.getInputStream(), new TypeReference<Map<String, Object>>() {});
 
-      this.npmProtocolFacade.unPublishPackageVersion(
+      this.facade.unPublishPackageVersion(
           protocolContext, revPath.scopeName(), revPath.packageName(), payload);
 
       return ResponseEntity.ok()

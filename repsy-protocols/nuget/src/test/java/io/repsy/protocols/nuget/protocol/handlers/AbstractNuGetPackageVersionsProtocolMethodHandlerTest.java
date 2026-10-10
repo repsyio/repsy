@@ -17,6 +17,7 @@ package io.repsy.protocols.nuget.protocol.handlers;
 
 import static io.repsy.protocols.nuget.NuGetTestContexts.context;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -104,7 +105,8 @@ class AbstractNuGetPackageVersionsProtocolMethodHandlerTest {
   void pathParserMatchesEndpoint(final String path, final boolean matches) {
     final var request = request(path);
     final var ctx = context(path);
-    when(this.basePathParser.parse(request)).thenReturn(Optional.of(ctx));
+    // The path is tested before the base parser is asked, so it is not asked for other paths.
+    lenient().when(this.basePathParser.parse(request)).thenReturn(Optional.of(ctx));
 
     final var result = this.handler.getPathParser().parse(request);
 

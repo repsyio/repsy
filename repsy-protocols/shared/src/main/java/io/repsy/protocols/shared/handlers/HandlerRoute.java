@@ -78,6 +78,10 @@ public record HandlerRoute(
     return this.with(HandlerPropertyKeys.SKIP_USAGE_POST_PROCESSOR, value);
   }
 
+  public HandlerRoute requireAuthentication(final boolean value) {
+    return this.with(HandlerPropertyKeys.REQUIRE_AUTHENTICATION, value);
+  }
+
   public HandlerRoute method(final String value) {
     return this.with(HandlerPropertyKeys.METHOD, value);
   }

@@ -19,18 +19,15 @@ import static org.springframework.http.MediaType.APPLICATION_JSON;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.nuget.protocol.NuGetProtocolProvider;
 import io.repsy.protocols.nuget.protocol.facades.contracts.NuGetProtocolFacade;
 import io.repsy.protocols.nuget.shared.utils.NuGetBaseUrlResolver;
 import io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils;
-import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
@@ -38,10 +35,9 @@ import org.springframework.http.ResponseEntity;
 
 @Slf4j
 @NullMarked
-public abstract class AbstractNuGetSearchProtocolMethodHandler implements ProtocolMethodHandler {
+public abstract class AbstractNuGetSearchProtocolMethodHandler
+    extends AbstractFacadeProtocolMethodHandler<NuGetProtocolFacade> {
 
-  private final PathParser basePathParser;
-  private final NuGetProtocolFacade facade;
   private final NuGetBaseUrlResolver baseUrlResolver;
 
   public AbstractNuGetSearchProtocolMethodHandler(
@@ -49,38 +45,13 @@ public abstract class AbstractNuGetSearchProtocolMethodHandler implements Protoc
       final NuGetProtocolFacade facade,
       final NuGetProtocolProvider provider,
       final NuGetBaseUrlResolver baseUrlResolver) {
-
-    this.basePathParser = basePathParser;
-    this.facade = facade;
+    super(HandlerRoute.read(HttpMethod.GET), basePathParser, facade, provider);
     this.baseUrlResolver = baseUrlResolver;
-
-    provider.registerMethodHandler(this);
   }
 
   @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.GET);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.READ, "writeOperation", false);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return request -> {
-      if (!HttpMethod.GET.name().equals(request.getMethod())) {
-        return Optional.empty();
-      }
-
-      final var path = request.getServletPath();
-      if (!path.contains("/v3/search")) {
-        return Optional.empty();
-      }
-
-      return this.basePathParser.parse(request);
-    };
+  protected boolean accepts(final HttpMethod method, final HttpServletRequest request) {
+    return super.accepts(method, request) && request.getServletPath().contains("/v3/search");
   }
 
   @Override

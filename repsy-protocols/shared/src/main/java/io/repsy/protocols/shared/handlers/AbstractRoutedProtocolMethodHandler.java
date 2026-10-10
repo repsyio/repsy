@@ -42,6 +42,7 @@ public abstract class AbstractRoutedProtocolMethodHandler implements ProtocolMet
 
   private final HandlerRoute route;
   private final PathParser basePathParser;
+  private final PathParser pathParser = this::route;
 
   /**
    * For a handler that builds its context itself and so overrides {@link #parse}; the base parser
@@ -74,24 +75,25 @@ public abstract class AbstractRoutedProtocolMethodHandler implements ProtocolMet
 
   @Override
   public PathParser getPathParser() {
-    return request -> {
-      final var method = HttpMethod.valueOf(request.getMethod());
+    return this.pathParser;
+  }
 
-      if (!this.accepts(method, request)) {
-        return Optional.empty();
-      }
+  private Optional<ProtocolContext> route(final HttpServletRequest request) {
+    final var method = HttpMethod.valueOf(request.getMethod());
 
-      final var parsed = this.parse(request);
-      final var path = this.route.path();
+    if (!this.accepts(method, request)) {
+      return Optional.empty();
+    }
 
-      if (parsed.isEmpty() || path == null) {
-        return parsed;
-      }
+    final var parsed = this.parse(request);
 
-      final var relativePath = ProtocolContextUtils.getRelativePath(parsed.get()).getPath();
+    if (parsed.isEmpty() || this.route.path() == null) {
+      return parsed;
+    }
 
-      return this.matches(method, relativePath) ? parsed : Optional.empty();
-    };
+    final var relativePath = ProtocolContextUtils.getRelativePath(parsed.get()).getPath();
+
+    return this.matches(method, relativePath) ? parsed : Optional.empty();
   }
 
   /** The parser the protocol builds its contexts with. */

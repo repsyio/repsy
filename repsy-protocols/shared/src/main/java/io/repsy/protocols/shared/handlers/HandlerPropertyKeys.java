@@ -41,6 +41,9 @@ public final class HandlerPropertyKeys {
   /** {@code true} when the request must not be counted by the usage post-processor. */
   public static final String SKIP_USAGE_POST_PROCESSOR = "skipUsagePostProcessor";
 
+  /** {@code true} when the request must carry credentials even on a public repository. */
+  public static final String REQUIRE_AUTHENTICATION = "requireAuthentication";
+
   /** The protocol operation a handler names for itself (for example Go {@code download}). */
   public static final String METHOD = "method";
 }
