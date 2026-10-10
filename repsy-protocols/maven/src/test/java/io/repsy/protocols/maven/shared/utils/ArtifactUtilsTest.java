@@ -962,6 +962,89 @@ class ArtifactUtilsTest {
         .containsExactly("lib-1.0.jar", "lib-1.0.jar");
   }
 
+  @ParameterizedTest(name = "{0} is a snapshot version: {1}")
+  @CsvSource({
+    "1.0-SNAPSHOT, true",
+    "SNAPSHOT, true",
+    "1.0-20260921.101010-1, true",
+    "1.0, false",
+    "1.0-snapshot, true"
+  })
+  @DisplayName("tells a snapshot version like Maven does: the suffix, any case, or a timestamped build")
+  void recognisesASnapshotVersion(final String version, final boolean expected) {
+    assertThat(ArtifactUtils.isSnapshot(version)).isEqualTo(expected);
+  }
+
+  @ParameterizedTest(name = "{0} is a POM file: {1}")
+  @CsvSource({
+    "lib-1.0.pom, true",
+    "lib-1.0.POM, true",
+    "lib-1.0.pom.asc, false",
+    "lib-1.0.pom.sha1, false",
+    "lib-1.0.jar, false",
+    "pom, false"
+  })
+  @DisplayName("tells a POM by its file name alone, any case (RPS-1196)")
+  void recognisesAPomFile(final String fileName, final boolean expected) {
+    assertThat(ArtifactUtils.isPomFile(fileName)).isEqualTo(expected);
+  }
+
+  @ParameterizedTest(name = "{0} is suitable for GAV extraction: {1}")
+  @CsvSource({
+    "lib-1.0.jar, true",
+    "lib-1.0.pom, true",
+    "maven-metadata.xml, false",
+    "maven-metadata.xml.sha1, false",
+    "MAVEN-METADATA.XML.asc, false"
+  })
+  @DisplayName("the metadata family is classified by content, any other file by its path")
+  void tellsFilesWhoseGavComesFromTheirPath(final String fileName, final boolean expected) {
+    assertThat(ArtifactUtils.isFileSuitableForGavExtraction(fileName)).isEqualTo(expected);
+  }
+
+  @Test
+  @DisplayName("tells a maven-plugin packaging POM, any case, from any other packaging")
+  void artifactIsPluginByItsPackaging() {
+    final var plugin = new Model();
+    plugin.setPackaging("Maven-Plugin");
+    final var jar = new Model();
+    jar.setPackaging("jar");
+
+    assertThat(ArtifactUtils.artifactIsPlugin(plugin)).isTrue();
+    assertThat(ArtifactUtils.artifactIsPlugin(jar)).isFalse();
+  }
+
+  @Test
+  @DisplayName("sorts the versions and takes latest as the highest, release as the highest release")
+  void setsReleaseAndLatestFromTheSortedVersions() throws Exception {
+    final var metadata =
+        metadata(
+            "<metadata><versioning><versions><version>2.0-SNAPSHOT</version>"
+                + "<version>1.0</version><version>1.10</version><version>1.2</version>"
+                + "</versions></versioning></metadata>");
+
+    ArtifactUtils.setReleaseAndLatest(metadata);
+
+    assertThat(metadata.getVersioning().getVersions())
+        .containsExactly("1.0", "1.2", "1.10", "2.0-SNAPSHOT");
+    assertThat(metadata.getVersioning().getLatest()).isEqualTo("2.0-SNAPSHOT");
+    assertThat(metadata.getVersioning().getRelease()).isEqualTo("1.10");
+  }
+
+  @Test
+  @DisplayName("leaves metadata without versioning or versions alone")
+  void setReleaseAndLatestIgnoresMetadataWithoutVersions() throws Exception {
+    final var none = metadata("<metadata/>");
+    final var empty = metadata("<metadata><versioning/></metadata>");
+
+    ArtifactUtils.setReleaseAndLatest(none);
+    ArtifactUtils.setReleaseAndLatest(empty);
+
+    assertThat(none.getVersioning()).isNull();
+    assertThat(empty.getVersioning().getLatest()).isNull();
+    assertThat(empty.getVersioning().getRelease()).isNull();
+  }
+
   private static StorageItemInfo item(
       final String name, final String path, final boolean directory) {
     return StorageItemInfo.builder().name(name).path(path).directory(directory).build();
