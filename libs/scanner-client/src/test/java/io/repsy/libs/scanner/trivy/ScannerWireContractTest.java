@@ -54,8 +54,8 @@ class ScannerWireContractTest {
         """
         {"dbUpdatedAt":"2026-01-02T03:04:05Z","scannerVersion":"0.66.0","findings":[
           {"cveId":"CVE-1","severity":"HIGH","packageName":"lodash","packageVersion":"4.17.20",
-           "fixedVersion":"4.17.21","description":"d","referenceUrl":"https://x",
-           "fixStatus":"FIXED","cvssScore":7.5,"cvssVector":"AV:N"}]}
+            "fixedVersion":"4.17.21","description":"d","referenceUrl":"https://x",
+            "fixStatus":"FIXED","cvssScore":7.5,"cvssVector":"AV:N"}]}
         """;
 
     final var response = MAPPER.readValue(json, AdvisoryLookupResponse.class);
