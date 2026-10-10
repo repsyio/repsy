@@ -136,7 +136,7 @@ public class NuGetPackageService extends AbstractNuGetPackageService<UUID> {
     // The flat-container version list is documented in ascending version order; the repository
     // keeps returning rows newest-published-first, so the ordering is fixed up here (RPS-1130).
     return this.packageVersionRepository
-        .findByNugetPackageIdAndIsListedTrueOrderByPublishedAtDescVersionAsc(pkg.getId())
+        .findByNugetPackageIdAndListedTrueOrderByPublishedAtDescVersionAsc(pkg.getId())
         .stream()
         .map(v -> v.getVersion().toLowerCase(Locale.ROOT))
         .sorted(NuGetPackageUtils.VERSION_COMPARATOR)
@@ -150,7 +150,7 @@ public class NuGetPackageService extends AbstractNuGetPackageService<UUID> {
     final var pkg = this.findPackage(repoInfo.getId(), packageId);
 
     return this.packageVersionRepository
-        .findByNugetPackageIdAndIsListedTrueOrderByPublishedAtDescVersionAsc(pkg.getId())
+        .findByNugetPackageIdAndListedTrueOrderByPublishedAtDescVersionAsc(pkg.getId())
         .stream()
         .map(v -> this.converter.toVersionInfo(v, packageId))
         .toList();
@@ -544,7 +544,7 @@ public class NuGetPackageService extends AbstractNuGetPackageService<UUID> {
 
     final var allVersions =
         this.packageVersionRepository
-            .findByNugetPackageIdAndIsListedTrueOrderByPublishedAtDescVersionAsc(pkg.getId());
+            .findByNugetPackageIdAndListedTrueOrderByPublishedAtDescVersionAsc(pkg.getId());
 
     return this.converter.toSearchResult(pkg, prerelease, semVer2, allVersions);
   }
