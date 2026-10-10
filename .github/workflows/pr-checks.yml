@@ -15,9 +15,6 @@ concurrency:
 jobs:
   pre-checks:
     name: Editorconfig check - All
-    # RPS-2155: temporarily disabled while the backlog is cleaned. A skipped job still satisfies the
-    # required check of the same name. Remove this `if: false` to re-enable it.
-    if: false
     runs-on: hetzner-sm
     timeout-minutes: 10
     steps:
