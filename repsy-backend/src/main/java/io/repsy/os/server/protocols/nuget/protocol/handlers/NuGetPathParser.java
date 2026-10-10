@@ -15,81 +15,40 @@
  */
 package io.repsy.os.server.protocols.nuget.protocol.handlers;
 
-import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
-import io.repsy.os.server.core.UrlParserProperties;
+import io.repsy.os.server.protocols.shared.handlers.AbstractRepoPathParser;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
-import jakarta.servlet.http.HttpServletRequest;
-import java.util.Locale;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
-@Slf4j
 @Component("osNuGetPathParser")
-@RequiredArgsConstructor
 @NullMarked
-public class NuGetPathParser implements PathParser {
+public class NuGetPathParser extends AbstractRepoPathParser {
 
-  private static final String REPO_NAME = "repoName";
-  private static final String RELATIVE_PATH = "relativePath";
-
-  private static final String REPO_NAME_REGEX = "(?<repoName>(?!v3(/|$))[a-zA-Z0-9_\\-]+)";
-
-  private static final String RELATIVE_PATH_REGEX = "(?<relativePath>/.*)?";
-
+  /** {@code v3} is the service index, so it is never a repository name. */
   private static final Pattern NORMAL_PATTERN =
-      Pattern.compile("^/" + REPO_NAME_REGEX + RELATIVE_PATH_REGEX);
+      Pattern.compile("^/(?<repoName>(?!v3(/|$))[a-zA-Z0-9_\\-]+)" + RELATIVE_PATH_REGEX);
 
   private static final Pattern REGISTRY_LEVEL_PATTERN = Pattern.compile("^/v3/index\\.json$");
 
-  private final RepoTxService repoTxService;
-
-  @Override
-  public Optional<ProtocolContext> parse(final HttpServletRequest request) {
-    final String path = request.getServletPath();
-
-    if (REGISTRY_LEVEL_PATTERN.matcher(path).matches()) {
-      final var context = new ProtocolContext();
-      context.addProperty("relativePath", new RelativePath(path));
-      return Optional.of(context);
-    }
-
-    final Matcher matcher = NORMAL_PATTERN.matcher(path);
-    if (!matcher.matches()) {
-      return Optional.empty();
-    }
-
-    final String repoName = matcher.group(REPO_NAME).toLowerCase(Locale.getDefault());
-
-    return this.repoTxService
-        .findRepoByNameAndType(repoName, RepoType.NUGET)
-        .flatMap(repoInfo -> this.createProtocolContext(repoInfo, repoName, matcher));
+  public NuGetPathParser(final RepoTxService repoTxService) {
+    super(repoTxService, RepoType.NUGET, REGISTRY_LEVEL_PATTERN, NORMAL_PATTERN);
   }
 
-  private Optional<ProtocolContext> createProtocolContext(
-      final RepoInfo repoInfo, final String repoName, final Matcher matcher) {
-
+  /** The service index carries only its path, no {@code urlProperties}. */
+  @Override
+  protected ProtocolContext registryLevelContext(final String path) {
     final var context = new ProtocolContext();
+    context.addProperty("relativePath", new RelativePath(path));
+    return context;
+  }
 
-    final var urlProperties =
-        UrlParserProperties.builder()
-            .repoName(repoName)
-            .relativePath(new RelativePath(Objects.toString(matcher.group(RELATIVE_PATH), "")))
-            .repoInfo(repoInfo)
-            .build();
-
-    context.addProperty("urlProperties", urlProperties);
+  @Override
+  protected void customize(final ProtocolContext context, final RepoInfo repoInfo) {
     context.addProperty("repoInfo", repoInfo);
-
-    return Optional.of(context);
   }
 }

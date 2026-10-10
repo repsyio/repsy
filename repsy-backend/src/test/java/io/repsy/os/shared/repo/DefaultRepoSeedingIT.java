@@ -60,7 +60,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * Pins what the {@code @Async} per-protocol {@code *AuthListener}s do when a {@code
+ * Pins what the {@code @Async} {@code DefaultRepoSeedingListener} does when a {@code
  * UserCreatedEvent} is published: one default repository per {@link RepoType}, private, without
  * usage and with its storage directory created, and a repeated event changing none of that, failing
  * no listener, and repairing a repository whose storage directory is missing (RPS-1070).
