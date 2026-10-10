@@ -42,26 +42,15 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 
-@DisplayName("AbstractGoHeadProtocolMethodHandler answers a HEAD like its GET (RPS-1465)")
-class AbstractGoHeadProtocolMethodHandlerTest {
+@DisplayName("The Go download handler answers a HEAD like its GET (RPS-1465, RPS-2059)")
+class GoDownloadHeadTest {
 
   private static final String MOD = "/example.com/mod/@v/";
 
   private final GoProtocolFacade<UUID> facade = mock();
   private final GolangProtocolProvider provider = mock();
   private final PathParser pathParser = mock();
-  private AbstractGoHeadProtocolMethodHandler<UUID> handler;
   private AbstractGoDownloadProtocolMethodHandler<UUID> get;
-
-  static class TestHead extends AbstractGoHeadProtocolMethodHandler<UUID> {
-
-    TestHead(
-        final PathParser parser,
-        final GoProtocolFacade<UUID> facade,
-        final GolangProtocolProvider provider) {
-      super(parser, facade, provider);
-    }
-  }
 
   static class TestGet extends AbstractGoDownloadProtocolMethodHandler<UUID> {
 
@@ -75,7 +64,6 @@ class AbstractGoHeadProtocolMethodHandlerTest {
 
   @BeforeEach
   void setUp() {
-    this.handler = new TestHead(this.pathParser, this.facade, this.provider);
     this.get = new TestGet(this.pathParser, this.facade, this.provider);
   }
 
@@ -95,10 +83,11 @@ class AbstractGoHeadProtocolMethodHandlerTest {
   @Test
   @DisplayName("registers itself, supports only HEAD, needs READ and is not a billed download")
   void metadata() {
-    verify(this.provider).registerMethodHandler(this.handler);
-    assertThat(this.handler.getSupportedMethods()).containsExactly(HttpMethod.HEAD);
-    assertThat(this.handler.getPathParser()).isSameAs(this.pathParser);
-    assertThat(this.handler.getProperties())
+    verify(this.provider).registerMethodHandler(this.get);
+    assertThat(this.get.getSupportedMethods()).containsExactly(HttpMethod.GET);
+    assertThat(this.get.answersHead()).isTrue();
+    assertThat(this.get.getPathParser()).isSameAs(this.pathParser);
+    assertThat(this.get.getHeadProperties())
         .containsEntry("permission", Permission.READ)
         .containsEntry("writeOperation", false)
         .containsEntry("skipUsagePostProcessor", true);
@@ -117,7 +106,7 @@ class AbstractGoHeadProtocolMethodHandlerTest {
     final var context = context(MOD + file);
     when(this.facade.download(context)).thenReturn(new ByteArrayResource(new byte[] {1, 2, 3, 4}));
 
-    final var head = this.handler.handle(context, null, null);
+    final var head = this.get.handleHead(context, null, null);
     final var get = this.get.handle(context, null, null);
 
     assertThat(head.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -137,7 +126,7 @@ class AbstractGoHeadProtocolMethodHandlerTest {
     final var context = context(MOD + file);
     when(this.facade.download(context)).thenThrow(new ItemNotFoundException("itemNotFound"));
 
-    final var head = this.handler.handle(context, null, null);
+    final var head = this.get.handleHead(context, null, null);
     final var get = this.get.handle(context, null, null);
 
     assertThat(head.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
@@ -160,7 +149,7 @@ class AbstractGoHeadProtocolMethodHandlerTest {
               }
             });
 
-    final var head = this.handler.handle(context, null, null);
+    final var head = this.get.handleHead(context, null, null);
 
     assertThat(head.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
   }

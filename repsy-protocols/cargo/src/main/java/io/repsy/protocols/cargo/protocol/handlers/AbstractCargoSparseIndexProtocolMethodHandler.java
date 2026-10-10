@@ -64,7 +64,8 @@ public abstract class AbstractCargoSparseIndexProtocolMethodHandler
             .path(
                 path ->
                     !EXCLUDED_PATTERN.matcher(path).matches()
-                        && INDEX_PATTERN.matcher(path).matches()),
+                        && INDEX_PATTERN.matcher(path).matches())
+            .head(),
         basePathParser,
         facade,
         provider);
@@ -109,5 +110,27 @@ public abstract class AbstractCargoSparseIndexProtocolMethodHandler
       }
     }
     return sb.toString();
+  }
+
+  /** 200 {@code text/plain} when the crate has index entries, else 404; no body. */
+  @Override
+  public ResponseEntity<Object> handleHead(
+      final ProtocolContext context,
+      final HttpServletRequest request,
+      final HttpServletResponse response) {
+
+    try {
+      if (this.facade.getIndexEntries(context).isEmpty()) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+      }
+
+      return ResponseEntity.ok()
+          .header(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN_VALUE)
+          .build();
+    } catch (final Exception e) {
+      log.debug(
+          "Cargo sparse index HEAD failed for {}: {}", request.getServletPath(), e.getMessage());
+      return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+    }
   }
 }

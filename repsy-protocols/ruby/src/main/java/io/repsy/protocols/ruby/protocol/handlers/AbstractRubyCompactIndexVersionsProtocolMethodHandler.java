@@ -40,7 +40,7 @@ public abstract class AbstractRubyCompactIndexVersionsProtocolMethodHandler
       final RubyProtocolProvider provider) {
 
     super(
-        HandlerRoute.read(HttpMethod.GET).path(VERSIONS_PATH::equals),
+        HandlerRoute.read(HttpMethod.GET).path(VERSIONS_PATH::equals).head(),
         basePathParser,
         facade,
         provider);
@@ -53,5 +53,15 @@ public abstract class AbstractRubyCompactIndexVersionsProtocolMethodHandler
       final HttpServletResponse response) {
     final var body = this.facade.getVersionsIndex(context);
     return ResponseEntity.ok().contentType(MediaType.TEXT_PLAIN).body(body);
+  }
+
+  /** The headers of the {@code GET}; the index always exists and is not built. */
+  @Override
+  public ResponseEntity<Object> handleHead(
+      final ProtocolContext context,
+      final HttpServletRequest request,
+      final HttpServletResponse response) {
+
+    return ResponseEntity.ok().contentType(MediaType.TEXT_PLAIN).build();
   }
 }

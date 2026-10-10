@@ -56,7 +56,7 @@ public abstract class AbstractNuGetRegistrationProtocolMethodHandler
       final NuGetProtocolProvider provider,
       final NuGetBaseUrlResolver baseUrlResolver,
       final boolean index) {
-    super(HandlerRoute.read(HttpMethod.GET), basePathParser, facade, provider);
+    super(HandlerRoute.read(HttpMethod.GET).head(), basePathParser, facade, provider);
     this.baseUrlResolver = baseUrlResolver;
     this.index = index;
   }
@@ -91,6 +91,29 @@ public abstract class AbstractNuGetRegistrationProtocolMethodHandler
     } catch (final Exception e) {
       log.error("NuGet registration failed: ", e);
       return ResponseEntity.internalServerError().build();
+    }
+  }
+
+  /** Resolves what the {@code GET} would answer, so that a missing package is a 404. */
+  @Override
+  public ResponseEntity<Object> handleHead(
+      final ProtocolContext context,
+      final HttpServletRequest request,
+      final HttpServletResponse response) {
+    try {
+      final var repoName = ProtocolContextUtils.<Object>getRepoInfo(context).getName();
+      final var baseUrl = this.baseUrlResolver.baseUrl(request, repoName);
+
+      if (this.index) {
+        this.facade.getRegistrationIndex(context, baseUrl);
+      } else {
+        this.facade.getRegistrationLeaf(context, baseUrl);
+      }
+
+      return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).build();
+    } catch (final ItemNotFoundException | IllegalArgumentException e) {
+      log.debug("NuGet HEAD not found: {}", e.getMessage());
+      return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
     }
   }
 }

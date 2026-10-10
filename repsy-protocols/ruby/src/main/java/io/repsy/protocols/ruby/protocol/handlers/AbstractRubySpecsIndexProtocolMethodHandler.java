@@ -52,7 +52,7 @@ public abstract class AbstractRubySpecsIndexProtocolMethodHandler
       final RubyProtocolProvider provider) {
 
     super(
-        HandlerRoute.read(HttpMethod.GET).path(SPECS_PATHS::contains),
+        HandlerRoute.read(HttpMethod.GET).path(SPECS_PATHS::contains).head(),
         basePathParser,
         facade,
         provider);
@@ -94,5 +94,22 @@ public abstract class AbstractRubySpecsIndexProtocolMethodHandler
     } catch (final IOException e) {
       throw new UncheckedIOException(e);
     }
+  }
+
+  /** The headers of the {@code GET}; the index always exists and is not built. */
+  @Override
+  public ResponseEntity<Object> handleHead(
+      final ProtocolContext context,
+      final HttpServletRequest request,
+      final HttpServletResponse response) {
+
+    final var relativePath = ProtocolContextUtils.getRelativePath(context).getPath();
+
+    return ResponseEntity.ok()
+        .contentType(MediaType.APPLICATION_OCTET_STREAM)
+        .header(
+            HttpHeaders.CONTENT_DISPOSITION,
+            Objects.requireNonNull(RubyContentDisposition.forPath(relativePath)))
+        .build();
   }
 }

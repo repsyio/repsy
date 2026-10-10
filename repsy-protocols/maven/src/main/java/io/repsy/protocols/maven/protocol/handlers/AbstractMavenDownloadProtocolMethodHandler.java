@@ -41,7 +41,7 @@ public abstract class AbstractMavenDownloadProtocolMethodHandler<ID>
       final MavenProtocolFacade<ID> mavenProtocolFacade,
       final MavenProtocolProvider provider) {
     super(
-        HandlerRoute.read(HttpMethod.GET).method("download"),
+        HandlerRoute.read(HttpMethod.GET).method("download").head(),
         pathParser,
         mavenProtocolFacade,
         provider);
@@ -67,5 +67,31 @@ public abstract class AbstractMavenDownloadProtocolMethodHandler<ID>
     }
 
     return MavenResourceResponses.ok(resource).body(resource);
+  }
+
+  /**
+   * The status and headers of the {@code GET}, with the real file's length. The resource is lazy
+   * for a file (nothing is opened), so asking is cheap; the body is never streamed.
+   */
+  @Override
+  public ResponseEntity<Object> handleHead(
+      final ProtocolContext context,
+      final HttpServletRequest request,
+      final HttpServletResponse response)
+      throws Exception {
+
+    final Resource resource;
+
+    try {
+      resource = this.facade.download(context);
+    } catch (final RedirectToSlashEndedLocationException _) {
+      return ResponseEntity.status(HttpStatus.TEMPORARY_REDIRECT)
+          .location(new URI(request.getServletPath() + "/"))
+          .build();
+    } catch (final ItemNotFoundException _) {
+      return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+    }
+
+    return MavenResourceResponses.ok(resource).contentLength(resource.contentLength()).build();
   }
 }

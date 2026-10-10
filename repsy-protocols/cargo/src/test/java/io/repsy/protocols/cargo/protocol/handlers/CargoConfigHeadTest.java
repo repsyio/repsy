@@ -22,6 +22,8 @@ import static org.mockito.Mockito.when;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
+import io.repsy.protocols.shared.repo.dtos.Permission;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -35,13 +37,13 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("AbstractCargoConfigHeadProtocolMethodHandler (RPS-1465)")
-class AbstractCargoConfigHeadProtocolMethodHandlerTest {
+@DisplayName("The HEAD of the Cargo config handler (RPS-1465, RPS-2059)")
+class CargoConfigHeadTest {
 
   @Mock private PathParser basePathParser;
   @Mock private CargoProtocolProvider provider;
 
-  static class TestHandler extends AbstractCargoConfigHeadProtocolMethodHandler {
+  static class TestHandler extends AbstractCargoConfigProtocolMethodHandler {
 
     TestHandler(final PathParser p, final CargoProtocolProvider pr) {
       super(p, pr);
@@ -54,10 +56,17 @@ class AbstractCargoConfigHeadProtocolMethodHandlerTest {
     final var handler = new TestHandler(basePathParser, provider);
 
     verify(provider).registerMethodHandler(handler);
-    assertThat(handler.getSupportedMethods()).containsExactly(HttpMethod.HEAD);
-    assertThat(handler.getProperties())
-        .containsEntry("skipPreProcessor", true)
-        .containsEntry("skipUsagePostProcessor", true);
+    assertThat(handler.getSupportedMethods()).containsExactly(HttpMethod.GET);
+    assertThat(handler.answersHead()).isTrue();
+    assertThat(handler.getHeadProperties())
+        .isEqualTo(
+            Map.of(
+                "permission",
+                Permission.READ,
+                "skipPreProcessor",
+                true,
+                "skipUsagePostProcessor",
+                true));
   }
 
   @Test
@@ -81,7 +90,7 @@ class AbstractCargoConfigHeadProtocolMethodHandlerTest {
   void answers() {
     final var response =
         new TestHandler(basePathParser, provider)
-            .handle(
+            .handleHead(
                 context("/config.json"),
                 new MockHttpServletRequest("HEAD", "/cargo/config.json"),
                 new MockHttpServletResponse());

@@ -15,6 +15,7 @@
  */
 package io.repsy.protocols.cargo.protocol.handlers;
 
+import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
@@ -24,6 +25,7 @@ import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
@@ -49,7 +51,7 @@ public abstract class AbstractCargoDownloadProtocolMethodHandler
       final CargoProtocolProvider provider) {
 
     super(
-        HandlerRoute.read(HttpMethod.GET).path(DOWNLOAD_PATTERN.asMatchPredicate()),
+        HandlerRoute.read(HttpMethod.GET).path(DOWNLOAD_PATTERN.asMatchPredicate()).head(),
         basePathParser,
         facade,
         provider);
@@ -97,5 +99,32 @@ public abstract class AbstractCargoDownloadProtocolMethodHandler
         .filename(matcher.group(1) + "-" + matcher.group(2) + ".crate")
         .build()
         .toString();
+  }
+
+  /** The status and headers of the {@code GET}; the crate is only measured, never streamed. */
+  @Override
+  public ResponseEntity<Object> handleHead(
+      final ProtocolContext context,
+      final HttpServletRequest request,
+      final HttpServletResponse response) {
+
+    try {
+      final var resource = this.facade.getCrate(context);
+      final var ok =
+          ResponseEntity.ok()
+              .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_OCTET_STREAM_VALUE)
+              .contentLength(resource.contentLength());
+      final var contentDisposition =
+          contentDisposition(ProtocolContextUtils.getRelativePath(context).getPath());
+
+      if (contentDisposition != null) {
+        ok.header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition);
+      }
+
+      return ok.build();
+    } catch (final ItemNotFoundException | IOException e) {
+      log.debug("Cargo HEAD of a crate failed: {}", e.getMessage());
+      return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+    }
   }
 }

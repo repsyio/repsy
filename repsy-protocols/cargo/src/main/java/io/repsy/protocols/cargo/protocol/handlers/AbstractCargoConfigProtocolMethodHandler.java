@@ -56,7 +56,11 @@ public abstract class AbstractCargoConfigProtocolMethodHandler
         HandlerRoute.of(Permission.READ, HttpMethod.GET)
             .skipHeaderPreProcessor(true)
             .skipUsagePostProcessor(true)
-            .skipPreProcessor(true),
+            .skipPreProcessor(true)
+            .head(
+                HandlerRoute.of(Permission.READ, HttpMethod.HEAD)
+                    .skipUsagePostProcessor(true)
+                    .skipPreProcessor(true)),
         pathParser,
         provider);
   }
@@ -149,5 +153,17 @@ public abstract class AbstractCargoConfigProtocolMethodHandler
     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
         .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
         .body(CargoErrorResponse.of(detail));
+  }
+
+  /** The headers of the config, without the body (and without a repo-dependent lookup). */
+  @Override
+  public ResponseEntity<Object> handleHead(
+      final ProtocolContext context,
+      final HttpServletRequest request,
+      final HttpServletResponse response) {
+
+    return ResponseEntity.ok()
+        .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+        .build();
   }
 }

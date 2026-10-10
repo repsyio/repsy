@@ -50,6 +50,7 @@ public class ProtocolRouterController {
 
   private final Map<HttpMethod, List<SpecifiedProtocolMethodHandler>> methodHandlersMap =
       new HashMap<>();
+  private final List<SpecifiedProtocolMethodHandler> headFallbackHandlers = new ArrayList<>();
   private final Map<String, ProtocolProvider> providerMap = new HashMap<>();
 
   public ProtocolRouterController(
@@ -73,44 +74,84 @@ public class ProtocolRouterController {
       return staticContentResponseOptional.get();
     }
 
-    final var handlers = this.handlersFor(request);
+    final var own = this.firstAnswer(this.handlersFor(request), false, request, response);
 
-    for (final var specifiedHandler : handlers) {
-      final var handler = specifiedHandler.protocolMethodHandler();
-      final var context = handler.getPathParser().parse(request);
+    if (own.isPresent()) {
+      return own.get();
+    }
 
-      if (context.isEmpty()) {
-        continue;
+    if (HttpMethod.HEAD.name().equals(request.getMethod())) {
+      final var fallback = this.firstAnswer(this.headFallbackHandlers, true, request, response);
+
+      if (fallback.isPresent()) {
+        return fallback.get();
       }
-
-      final var provider =
-          Objects.requireNonNull(
-              this.providerMap.get(specifiedHandler.protocolType()),
-              "No provider registered for the protocol type");
-      final var properties = handler.getProperties();
-
-      final var preProcessorResult =
-          provider.preProcess(context.get(), request, response, properties);
-
-      if (!preProcessorResult.isEmpty()) {
-        return preProcessorResult.getResult();
-      }
-
-      final var result =
-          this.handleAndSettleOnFailure(
-              handler, provider, context.get(), request, response, properties);
-
-      final var postProcessorResult =
-          provider.postProcess(context.get(), request, response, properties);
-
-      if (!postProcessorResult.isEmpty()) {
-        return postProcessorResult.getResult();
-      }
-
-      return result;
     }
 
     throw new ItemNotFoundException("unknownPath");
+  }
+
+  private Optional<ResponseEntity<Object>> firstAnswer(
+      final List<SpecifiedProtocolMethodHandler> handlers,
+      final boolean head,
+      final HttpServletRequest request,
+      final HttpServletResponse response)
+      throws Exception {
+
+    for (final var specifiedHandler : handlers) {
+      final var answer = this.dispatch(specifiedHandler, head, request, response);
+
+      if (answer.isPresent()) {
+        return answer;
+      }
+    }
+
+    return Optional.empty();
+  }
+
+  /**
+   * Parses the request with the handler and, when the handler owns it, runs the processors around
+   * the handler (or around its {@code HEAD} answer when {@code head}).
+   */
+  private Optional<ResponseEntity<Object>> dispatch(
+      final SpecifiedProtocolMethodHandler specifiedHandler,
+      final boolean head,
+      final HttpServletRequest request,
+      final HttpServletResponse response)
+      throws Exception {
+
+    final var handler = specifiedHandler.protocolMethodHandler();
+    final var context = handler.getPathParser().parse(request);
+
+    if (context.isEmpty()) {
+      return Optional.empty();
+    }
+
+    final var provider =
+        Objects.requireNonNull(
+            this.providerMap.get(specifiedHandler.protocolType()),
+            "No provider registered for the protocol type");
+    final var properties = head ? handler.getHeadProperties() : handler.getProperties();
+
+    final var preProcessorResult =
+        provider.preProcess(context.get(), request, response, properties);
+
+    if (!preProcessorResult.isEmpty()) {
+      return Optional.of(preProcessorResult.getResult());
+    }
+
+    final var result =
+        this.handleAndSettleOnFailure(
+            handler, head, provider, context.get(), request, response, properties);
+
+    final var postProcessorResult =
+        provider.postProcess(context.get(), request, response, properties);
+
+    if (!postProcessorResult.isEmpty()) {
+      return Optional.of(postProcessorResult.getResult());
+    }
+
+    return Optional.of(result);
   }
 
   /**
@@ -121,7 +162,14 @@ public class ProtocolRouterController {
   private List<SpecifiedProtocolMethodHandler> handlersFor(final HttpServletRequest request)
       throws HttpRequestMethodNotSupportedException {
 
-    final var handlers = this.methodHandlersMap.get(HttpMethod.valueOf(request.getMethod()));
+    final var method = HttpMethod.valueOf(request.getMethod());
+    final var handlers = this.methodHandlersMap.get(method);
+
+    if (handlers == null
+        && HttpMethod.HEAD.equals(method)
+        && !this.headFallbackHandlers.isEmpty()) {
+      return List.of();
+    }
 
     if (handlers == null) {
       final var allowed =
@@ -141,6 +189,7 @@ public class ProtocolRouterController {
    */
   private ResponseEntity<Object> handleAndSettleOnFailure(
       final ProtocolMethodHandler handler,
+      final boolean head,
       final ProtocolProvider provider,
       final ProtocolContext context,
       final HttpServletRequest request,
@@ -149,7 +198,9 @@ public class ProtocolRouterController {
       throws Exception {
 
     try {
-      return handler.handle(context, request, response);
+      return head
+          ? handler.handleHead(context, request, response)
+          : handler.handle(context, request, response);
     } catch (final Exception e) {
       provider.postProcessFailure(context, request, response, properties);
       throw e;
@@ -162,6 +213,14 @@ public class ProtocolRouterController {
       this.methodHandlersMap
           .computeIfAbsent(entry.getKey(), _ -> new ArrayList<>())
           .addAll(entry.getValue());
+    }
+
+    final var getHandlers = provider.getMethodHandlersMap().get(HttpMethod.GET);
+
+    if (getHandlers != null) {
+      getHandlers.stream()
+          .filter(specified -> specified.protocolMethodHandler().answersHead())
+          .forEach(this.headFallbackHandlers::add);
     }
   }
 

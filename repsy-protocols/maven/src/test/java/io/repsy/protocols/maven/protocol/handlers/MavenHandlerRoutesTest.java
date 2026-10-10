@@ -113,18 +113,17 @@ class MavenHandlerRoutesTest {
     assertThat(parse(download, "GET", "/repo/com/acme/app/1.0/app-1.0.jar")).isPresent();
     assertThat(parse(download, "GET", "/repo/")).isPresent();
 
-    final var head = handler(AbstractMavenHeadProtocolMethodHandler.class, BASE, FACADE, PROVIDER);
-    assertRoute(
-        head,
-        List.of(HttpMethod.HEAD),
-        Map.of(
-            "permission",
-            Permission.READ,
-            "writeOperation",
-            false,
-            "skipUsagePostProcessor",
-            true));
-    assertThat(parse(head, "HEAD", "/repo/com/acme/app/1.0/app-1.0.jar")).isPresent();
+    assertThat(download.answersHead()).isTrue();
+    assertThat(download.getHeadProperties())
+        .isEqualTo(
+            Map.of(
+                "permission",
+                Permission.READ,
+                "writeOperation",
+                false,
+                "skipUsagePostProcessor",
+                true));
+    assertThat(parse(download, "HEAD", "/repo/com/acme/app/1.0/app-1.0.jar")).isPresent();
 
     final var upload =
         handler(AbstractMavenUploadProtocolMethodHandler.class, BASE, FACADE, PROVIDER);

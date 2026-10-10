@@ -24,6 +24,7 @@ import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
 import io.repsy.protocols.shared.handlers.HandlerRoute;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
@@ -38,7 +39,7 @@ public abstract class AbstractGoDownloadProtocolMethodHandler<ID>
       final GolangProtocolProvider provider) {
 
     super(
-        HandlerRoute.read(HttpMethod.GET).method("download"),
+        HandlerRoute.read(HttpMethod.GET).method("download").head(),
         pathParser,
         goProtocolFacade,
         provider);
@@ -71,5 +72,26 @@ public abstract class AbstractGoDownloadProtocolMethodHandler<ID>
 
   private static ResponseEntity<Object> notFound(final ProtocolContext context) {
     return GoDownloadResponses.notFound().body(GoDownloadResponses.notFoundText(context));
+  }
+
+  /** The status and headers of the {@code GET} (and a bare 404), with the file's length. */
+  @Override
+  public ResponseEntity<Object> handleHead(
+      final ProtocolContext context,
+      final HttpServletRequest request,
+      final HttpServletResponse response)
+      throws IOException {
+
+    try {
+      final var resource = this.facade.download(context);
+
+      if (!resource.exists()) {
+        return GoDownloadResponses.notFound().build();
+      }
+
+      return GoDownloadResponses.ok(context).contentLength(resource.contentLength()).build();
+    } catch (final ItemNotFoundException _) {
+      return GoDownloadResponses.notFound().build();
+    }
   }
 }

@@ -22,6 +22,9 @@ import static org.mockito.Mockito.when;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.protocols.nuget.protocol.NuGetProtocolProvider;
+import io.repsy.protocols.nuget.protocol.facades.contracts.NuGetProtocolFacade;
+import io.repsy.protocols.shared.repo.dtos.Permission;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -35,16 +38,18 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("AbstractNuGetServiceIndexHeadProtocolMethodHandler (RPS-1465)")
-class AbstractNuGetServiceIndexHeadProtocolMethodHandlerTest {
+@DisplayName("The HEAD of the NuGet service index handler (RPS-1465, RPS-2059)")
+class NuGetServiceIndexHeadTest {
 
   @Mock private PathParser basePathParser;
   @Mock private NuGetProtocolProvider provider;
 
-  static class TestHandler extends AbstractNuGetServiceIndexHeadProtocolMethodHandler {
+  @Mock private NuGetProtocolFacade facade;
 
-    TestHandler(final PathParser p, final NuGetProtocolProvider pr) {
-      super(p, pr);
+  static class TestHandler extends AbstractNuGetServiceIndexProtocolMethodHandler {
+
+    TestHandler(final PathParser p, final NuGetProtocolFacade f, final NuGetProtocolProvider pr) {
+      super(p, f, pr, (request, repoName) -> "http://host/" + repoName);
     }
   }
 
@@ -57,19 +62,28 @@ class AbstractNuGetServiceIndexHeadProtocolMethodHandlerTest {
   @Test
   @DisplayName("registers itself, supports only HEAD and needs no credentials like the GET")
   void metadata() {
-    final var handler = new TestHandler(this.basePathParser, this.provider);
+    final var handler = new TestHandler(this.basePathParser, this.facade, this.provider);
 
     verify(this.provider).registerMethodHandler(handler);
-    assertThat(handler.getSupportedMethods()).containsExactly(HttpMethod.HEAD);
-    assertThat(handler.getProperties())
-        .containsEntry("skipPreProcessor", true)
-        .containsEntry("skipUsagePostProcessor", true);
+    assertThat(handler.getSupportedMethods()).containsExactly(HttpMethod.GET);
+    assertThat(handler.answersHead()).isTrue();
+    assertThat(handler.getHeadProperties())
+        .isEqualTo(
+            Map.of(
+                "permission",
+                Permission.READ,
+                "writeOperation",
+                false,
+                "skipPreProcessor",
+                true,
+                "skipUsagePostProcessor",
+                true));
   }
 
   @Test
   @DisplayName("path parser: only /v3/index.json goes through the base parser")
   void pathParser() {
-    final var handler = new TestHandler(this.basePathParser, this.provider);
+    final var handler = new TestHandler(this.basePathParser, this.facade, this.provider);
     final var request = request("/nuget/v3/index.json");
     final var ctx = context("/v3/index.json");
     when(this.basePathParser.parse(request)).thenReturn(Optional.of(ctx));
@@ -82,8 +96,8 @@ class AbstractNuGetServiceIndexHeadProtocolMethodHandlerTest {
   @DisplayName("answers 200 application/json without a body")
   void answers() {
     final var response =
-        new TestHandler(this.basePathParser, this.provider)
-            .handle(
+        new TestHandler(this.basePathParser, this.facade, this.provider)
+            .handleHead(
                 context("/v3/index.json"),
                 request("/nuget/v3/index.json"),
                 new MockHttpServletResponse());

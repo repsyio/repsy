@@ -30,9 +30,14 @@ import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.protocols.pypi.protocol.PypiProtocolProvider;
 import io.repsy.protocols.pypi.protocol.facades.PypiProtocolFacade;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
+import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.net.URI;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
@@ -45,12 +50,13 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("AbstractPypiHeadProtocolMethodHandler")
-class AbstractPypiHeadProtocolMethodHandlerTest {
+@DisplayName("The HEAD of the PyPI simple and file download handlers (RPS-2059)")
+class PypiHeadFallbackTest {
 
   private static final UUID REPO_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
   private static final String REPO_NAME = "pypi";
@@ -59,11 +65,11 @@ class AbstractPypiHeadProtocolMethodHandlerTest {
   @Mock private PypiProtocolFacade<UUID> facade;
   @Mock private PypiProtocolProvider provider;
 
-  private static class TestHandler extends AbstractPypiHeadProtocolMethodHandler<UUID> {
+  private static class TestSimple extends AbstractPypiSimpleProtocolMethodHandler<UUID> {
 
     private final @Nullable URI normalizedUri;
 
-    TestHandler(
+    TestSimple(
         final PathParser pathParser,
         final PypiProtocolFacade<UUID> facade,
         final PypiProtocolProvider provider,
@@ -79,12 +85,48 @@ class AbstractPypiHeadProtocolMethodHandlerTest {
     }
   }
 
+  private static class TestDownload extends AbstractPypiFileDownloadProtocolMethodHandler<UUID> {
+
+    TestDownload(
+        final PathParser pathParser,
+        final PypiProtocolFacade<UUID> facade,
+        final PypiProtocolProvider provider) {
+      super(facade, pathParser, provider);
+    }
+  }
+
+  /** Picks the handler the route predicates would pick, then asks it for the HEAD. */
+  private static final class TestHandler {
+
+    private final TestSimple simple;
+    private final TestDownload download;
+
+    TestHandler(final TestSimple simple, final TestDownload download) {
+      this.simple = simple;
+      this.download = download;
+    }
+
+    ResponseEntity<Object> handle(
+        final ProtocolContext context,
+        final HttpServletRequest request,
+        final HttpServletResponse response)
+        throws Exception {
+      final var path = ProtocolContextUtils.getRelativePath(context).getPath();
+
+      return path.startsWith("/simple")
+          ? this.simple.handleHead(context, request, response)
+          : this.download.handleHead(context, request, response);
+    }
+  }
+
   private TestHandler handler() {
     return this.handler(null);
   }
 
   private TestHandler handler(final @Nullable URI normalizedUri) {
-    return new TestHandler(this.pathParser, this.facade, this.provider, normalizedUri);
+    return new TestHandler(
+        new TestSimple(this.pathParser, this.facade, this.provider, normalizedUri),
+        new TestDownload(this.pathParser, this.facade, this.provider));
   }
 
   private static ProtocolContext contextFor(final String relativePath) {
@@ -226,38 +268,32 @@ class AbstractPypiHeadProtocolMethodHandlerTest {
   }
 
   @Test
-  @DisplayName("an unrecognized path answers 404 without touching the facade")
-  void unknownPathAnswers404() throws Exception {
-    final var response =
-        this.handler()
-            .handle(
-                contextFor("/this/path/never/existed"),
-                new MockHttpServletRequest(),
-                new MockHttpServletResponse());
+  @DisplayName("both answer HEAD, need READ and do not bill a download")
+  void answersHeadWithoutBilling() {
+    final var simple = new TestSimple(this.pathParser, this.facade, this.provider, null);
+    final var download = new TestDownload(this.pathParser, this.facade, this.provider);
 
-    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-    verifyNoInteractions(this.facade);
+    assertThat(simple.answersHead()).isTrue();
+    assertThat(download.answersHead()).isTrue();
+    assertThat(simple.getHeadProperties())
+        .isEqualTo(
+            Map.of(
+                "permission", Permission.READ,
+                "writeOperation", false,
+                "skipUsagePostProcessor", true));
+    assertThat(download.getHeadProperties()).isEqualTo(simple.getHeadProperties());
   }
 
   @Test
-  @DisplayName("supports only HEAD, and does not bill a download")
-  void supportsOnlyHead() throws Exception {
-    final var handler = this.handler();
+  @DisplayName("the simple handler parses a HEAD like its GET, the other paths are not its own")
+  void parsesHead() {
+    final var simple = new TestSimple(this.pathParser, this.facade, this.provider, null);
+    final var request = new MockHttpServletRequest("HEAD", "/simple/");
+    final var context = contextFor("/simple/");
+    when(this.pathParser.parse(request)).thenReturn(Optional.of(context));
 
-    assertThat(handler.getSupportedMethods()).containsExactly(HttpMethod.HEAD);
-    assertThat(handler.getProperties()).containsEntry("skipUsagePostProcessor", true);
-  }
-
-  @Test
-  @DisplayName("delegates to the injected path parser, and registers with the provider")
-  void usesInjectedPathParser() throws Exception {
-    final var handler = this.handler();
-
-    final var request = new org.springframework.mock.web.MockHttpServletRequest("HEAD", "/simple/");
-    final var context = new io.repsy.libs.protocol.router.ProtocolContext();
-    org.mockito.Mockito.when(this.pathParser.parse(request))
-        .thenReturn(java.util.Optional.of(context));
-    assertThat(handler.getPathParser().parse(request)).containsSame(context);
-    verify(this.provider).registerMethodHandler(handler);
+    assertThat(simple.getPathParser().parse(request)).containsSame(context);
+    assertThat(simple.getSupportedMethods()).containsExactly(HttpMethod.GET);
+    verify(this.provider).registerMethodHandler(simple);
   }
 }

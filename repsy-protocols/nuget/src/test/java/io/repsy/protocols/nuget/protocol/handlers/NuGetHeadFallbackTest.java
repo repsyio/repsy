@@ -19,17 +19,21 @@ import static io.repsy.protocols.nuget.NuGetTestContexts.context;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.PathParser;
+import io.repsy.libs.protocol.router.ProtocolContext;
+import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.nuget.protocol.NuGetProtocolProvider;
 import io.repsy.protocols.nuget.protocol.facades.contracts.NuGetProtocolFacade;
 import io.repsy.protocols.nuget.shared.utils.NuGetBaseUrlResolver;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -47,8 +51,9 @@ import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("AbstractNuGetHeadProtocolMethodHandler (RPS-1465)")
-class AbstractNuGetHeadProtocolMethodHandlerTest {
+@DisplayName(
+    "The HEAD of the NuGet download, versions and registration handlers (RPS-1465, RPS-2059)")
+class NuGetHeadFallbackTest {
 
   private static final String BASE = "/nuget/v3/";
   private static final String NUPKG_PATH =
@@ -66,19 +71,57 @@ class AbstractNuGetHeadProtocolMethodHandlerTest {
 
   private final NuGetBaseUrlResolver resolver = (request, repoName) -> "http://host/" + repoName;
 
-  static class TestHandler extends AbstractNuGetHeadProtocolMethodHandler {
+  static class TestDownload extends AbstractNuGetDownloadProtocolMethodHandler {
 
-    TestHandler(
+    TestDownload(
         final PathParser p,
         final NuGetProtocolFacade f,
         final NuGetProtocolProvider pr,
-        final NuGetBaseUrlResolver r) {
-      super(p, f, pr, r);
+        final boolean nupkg) {
+      super(p, f, pr, nupkg);
     }
   }
 
-  private AbstractNuGetHeadProtocolMethodHandler handler() {
-    return new TestHandler(this.basePathParser, this.facade, this.provider, this.resolver);
+  static class TestVersions extends AbstractNuGetPackageVersionsProtocolMethodHandler {
+
+    TestVersions(final PathParser p, final NuGetProtocolFacade f, final NuGetProtocolProvider pr) {
+      super(p, f, pr);
+    }
+  }
+
+  static class TestRegistration extends AbstractNuGetRegistrationProtocolMethodHandler {
+
+    TestRegistration(
+        final PathParser p,
+        final NuGetProtocolFacade f,
+        final NuGetProtocolProvider pr,
+        final NuGetBaseUrlResolver r,
+        final boolean index) {
+      super(p, f, pr, r, index);
+    }
+  }
+
+  /** The handlers the router asks for a HEAD, in the order they were registered. */
+  private List<ProtocolMethodHandler> handlers() {
+    return List.of(
+        new TestDownload(this.basePathParser, this.facade, this.provider, true),
+        new TestDownload(this.basePathParser, this.facade, this.provider, false),
+        new TestVersions(this.basePathParser, this.facade, this.provider),
+        new TestRegistration(this.basePathParser, this.facade, this.provider, this.resolver, true),
+        new TestRegistration(
+            this.basePathParser, this.facade, this.provider, this.resolver, false));
+  }
+
+  private Optional<ProtocolContext> parse(final MockHttpServletRequest request) {
+    for (final var handler : this.handlers()) {
+      final var parsed = handler.getPathParser().parse(request);
+
+      if (parsed.isPresent()) {
+        return parsed;
+      }
+    }
+
+    return Optional.empty();
   }
 
   private static MockHttpServletRequest request(final String path) {
@@ -88,24 +131,32 @@ class AbstractNuGetHeadProtocolMethodHandlerTest {
   }
 
   private org.springframework.http.ResponseEntity<Object> head(final String path) throws Exception {
-    return this.handler()
-        .handle(
-            context("/v3/" + path.substring(BASE.length())),
-            request(path),
-            new MockHttpServletResponse());
+    final var ctx = context("/v3/" + path.substring(BASE.length()));
+    final var request = request(path);
+    lenient().when(this.basePathParser.parse(request)).thenReturn(Optional.of(ctx));
+
+    for (final var handler : this.handlers()) {
+      if (handler.getPathParser().parse(request).isPresent()) {
+        return handler.handleHead(ctx, request, new MockHttpServletResponse());
+      }
+    }
+
+    throw new AssertionError("no handler answers HEAD " + path);
   }
 
   @Test
-  @DisplayName("registers itself, supports only HEAD, needs READ and is not a billed download")
+  @DisplayName("they answer HEAD, need READ and are not a billed download")
   void metadata() {
-    final var handler = this.handler();
-
-    verify(this.provider).registerMethodHandler(handler);
-    assertThat(handler.getSupportedMethods()).containsExactly(HttpMethod.HEAD);
-    assertThat(handler.getProperties())
-        .containsEntry("permission", Permission.READ)
-        .containsEntry("writeOperation", false)
-        .containsEntry("skipUsagePostProcessor", true);
+    for (final var handler : this.handlers()) {
+      assertThat(handler.getSupportedMethods()).containsExactly(HttpMethod.GET);
+      assertThat(handler.answersHead()).isTrue();
+      assertThat(handler.getHeadProperties())
+          .isEqualTo(
+              Map.of(
+                  "permission", Permission.READ,
+                  "writeOperation", false,
+                  "skipUsagePostProcessor", true));
+    }
   }
 
   @ParameterizedTest
@@ -123,7 +174,7 @@ class AbstractNuGetHeadProtocolMethodHandlerTest {
     final var ctx = context(path);
     when(this.basePathParser.parse(request)).thenReturn(Optional.of(ctx));
 
-    assertThat(this.handler().getPathParser().parse(request)).containsSame(ctx);
+    assertThat(this.parse(request)).containsSame(ctx);
   }
 
   @ParameterizedTest
@@ -136,7 +187,7 @@ class AbstractNuGetHeadProtocolMethodHandlerTest {
       })
   @DisplayName("path parser: leaves the other routes alone")
   void pathParserRejects(final String path) {
-    assertThat(this.handler().getPathParser().parse(request(path))).isEmpty();
+    assertThat(this.parse(request(path))).isEmpty();
   }
 
   @Test
