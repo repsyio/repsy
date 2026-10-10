@@ -777,6 +777,11 @@ Old springdoc tag to new tag. Several old tags may map to one new tag (one area,
   existing row), so a push that fails leaves no image behind; what the tags and untagged manifests reach
   is one recursive walk over the index edges, in `UntaggedManifestFinder` and in the recursive CTEs of
   `ImageRepository` and `LayerRepository`, and they must agree (`DockerUntaggedManifestCleanupIT`).
+- The image list's `updatedAt` and `tagCount` are stored (RPS-2120, V0042-V0043):
+  `docker_image.last_tag_at` and `tag_count`, mapped read-only on `Image`, are recomputed from the tags
+  by `ImageRepository#refreshTagStats` inside `ImageTxService#refreshImageSize`, which every tag write
+  path calls (push, tag delete, manifest delete, cleanup policy). A new path that adds or removes tags
+  must call it; the list query never recounts tags.
 - Hibernate does not validate the entity mappings (`ddl-auto: none`), so
   `EntitySchemaAnnotationIT` and `H2EntitySchemaAnnotationIT` compare every entity of the
   metamodel with `information_schema` (`EntityColumnSchemaChecks`). A new entity or column is
