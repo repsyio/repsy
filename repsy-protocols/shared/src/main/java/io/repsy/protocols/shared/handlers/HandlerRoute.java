@@ -83,8 +83,8 @@ public record HandlerRoute(
   }
 
   /** The same route that only accepts the relative paths {@code path} accepts. */
-  public HandlerRoute path(final Predicate<String> path) {
-    return new HandlerRoute(this.methods, this.properties, path);
+  public HandlerRoute path(final Predicate<String> relativePathTest) {
+    return new HandlerRoute(this.methods, this.properties, relativePathTest);
   }
 
   private HandlerRoute with(final String key, final Object value) {
