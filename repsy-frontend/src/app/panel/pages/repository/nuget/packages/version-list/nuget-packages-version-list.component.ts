@@ -44,8 +44,8 @@ import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort, VERSION_PRECEDENCE_SORT } from '../../../../../shared/dto/sort';
 import { pageAfterDelete } from '../../../../../shared/util/list-page-after-delete.util';
 import { SecurityService } from '../../../../security/service/security.service';
-import { NugetConfigComponent } from '../../config/nuget-config.component';
-import { NugetService } from '../../service/nuget.service';
+import { NuGetConfigComponent } from '../../config/nuget-config.component';
+import { NuGetService } from '../../service/nuget.service';
 
 @Component({
   selector: 'app-nuget-packages-version-list',
@@ -60,13 +60,13 @@ import { NugetService } from '../../service/nuget.service';
     DropdownComponent,
     EmptyListComponent,
     TooltipComponent,
-    NugetConfigComponent,
+    NuGetConfigComponent,
     NgOptimizedImage,
     VersionSecurityBadgeComponent,
   ],
   templateUrl: './nuget-packages-version-list.component.html',
 })
-export class NugetPackagesVersionListComponent implements OnDestroy {
+export class NuGetPackagesVersionListComponent implements OnDestroy {
   public loading = true;
   public showConfig = false;
   public pageNum = 0;
@@ -93,7 +93,7 @@ export class NugetPackagesVersionListComponent implements OnDestroy {
   constructor(
     private readonly route: ActivatedRoute,
     private readonly authService: AuthService,
-    private readonly nugetService: NugetService,
+    private readonly nugetService: NuGetService,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
     private readonly router: Router,

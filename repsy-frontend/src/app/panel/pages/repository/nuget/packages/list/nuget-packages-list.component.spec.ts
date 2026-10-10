@@ -27,8 +27,8 @@ import { ToastService } from '../../../../../shared/components/toast/toast.servi
 import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
 import { SecurityService } from '../../../../security/service/security.service';
-import { NugetService } from '../../service/nuget.service';
-import { NugetPackagesListComponent } from './nuget-packages-list.component';
+import { NuGetService } from '../../service/nuget.service';
+import { NuGetPackagesListComponent } from './nuget-packages-list.component';
 
 const REPO = 'nuget-repo';
 
@@ -55,9 +55,9 @@ function repo(canManage: boolean): RepoPermissionInfo {
   return { repoName: REPO, canRead: true, canWrite: canManage, canManage, private: false };
 }
 
-describe('NugetPackagesListComponent', () => {
-  let component: NugetPackagesListComponent;
-  let nugetService: jasmine.SpyObj<NugetService>;
+describe('NuGetPackagesListComponent', () => {
+  let component: NuGetPackagesListComponent;
+  let nugetService: jasmine.SpyObj<NuGetService>;
   let securityService: jasmine.SpyObj<SecurityService>;
   let toastService: jasmine.SpyObj<ToastService>;
   let dangerModalService: DangerModalService;
@@ -65,7 +65,7 @@ describe('NugetPackagesListComponent', () => {
 
   beforeEach(() => {
     repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
-    nugetService = jasmine.createSpyObj<NugetService>('NugetService', ['fetchRepositoryPackages', 'deletePackage'], {
+    nugetService = jasmine.createSpyObj<NuGetService>('NuGetService', ['fetchRepositoryPackages', 'deletePackage'], {
       repoChanges,
     });
     securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['watchArtifactSecuritySummary']);
@@ -76,7 +76,7 @@ describe('NugetPackagesListComponent', () => {
     nugetService.deletePackage.and.resolveTo(undefined);
     securityService.watchArtifactSecuritySummary.and.returnValue(of(SECURITY_SUMMARY));
 
-    component = new NugetPackagesListComponent(
+    component = new NuGetPackagesListComponent(
       { username: 'alice' } as AuthService,
       nugetService,
       toastService,

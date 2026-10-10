@@ -41,7 +41,7 @@ import { Sort } from '../../../../shared/dto/sort';
 @Injectable({
   providedIn: 'root',
 })
-export class NugetService {
+export class NuGetService {
   public readonly repoChanges: Observable<RepoPermissionInfo>;
 
   private readonly repoSubject = new BehaviorSubject<RepoPermissionInfo>(null);

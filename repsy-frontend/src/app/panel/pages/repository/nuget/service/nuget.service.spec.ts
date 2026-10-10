@@ -35,7 +35,7 @@ import {
   selectRepo,
   SORT,
 } from '../../testing/protocol-service-spec-helpers';
-import { NugetService } from './nuget.service';
+import { NuGetService } from './nuget.service';
 
 /** The generated methods are overloaded on `observe`, which `and.returnValue` cannot resolve. */
 function asSpy(method: unknown): jasmine.Spy {
@@ -46,11 +46,11 @@ const PACKAGE = 'Acme.Lib';
 const VERSION = '1.2.3';
 const TOKEN = 'token-1';
 
-describe('NugetService', () => {
+describe('NuGetService', () => {
   let repoApi: jasmine.SpyObj<ReposApi>;
   let tokenApi: jasmine.SpyObj<DeployTokensApi>;
   let nugetApi: jasmine.SpyObj<NugetPackagesApi>;
-  let service: NugetService;
+  let service: NuGetService;
 
   beforeEach(() => {
     repoApi = jasmine.createSpyObj<ReposApi>('ReposApi', [
@@ -82,7 +82,7 @@ describe('NugetService', () => {
         { provide: NugetPackagesApi, useValue: nugetApi },
       ],
     });
-    service = TestBed.inject(NugetService);
+    service = TestBed.inject(NuGetService);
   });
 
   describeRepoSelection({
@@ -142,7 +142,7 @@ describe('NugetService', () => {
   });
 
   describe('package calls', () => {
-    const paged: PagedCase<NugetService>[] = [
+    const paged: PagedCase<NuGetService>[] = [
       {
         name: 'fetchRepositoryPackages',
         invoke: (s, query) => from(s.fetchRepositoryPackages(query, SORT, PAGE_INDEX, PAGE_SIZE)),
@@ -162,7 +162,7 @@ describe('NugetService', () => {
 
     const info = { packageId: PACKAGE };
     const versionInfo = { packageId: PACKAGE, version: VERSION };
-    const calls: CallCase<NugetService>[] = [
+    const calls: CallCase<NuGetService>[] = [
       {
         name: 'fetchPackage',
         invoke: (s) => from(s.fetchPackage(PACKAGE)),
@@ -210,7 +210,7 @@ describe('NugetService', () => {
     const tokenPage = { content: [{ id: TOKEN }], page: { number: 1, size: 5, totalElements: 6, totalPages: 2 } };
     const tokenInfo = { token: 'secret' };
 
-    const calls: CallCase<NugetService>[] = [
+    const calls: CallCase<NuGetService>[] = [
       {
         name: 'fetchRepositoryUsage',
         invoke: (s) => from(s.fetchRepositoryUsage()),

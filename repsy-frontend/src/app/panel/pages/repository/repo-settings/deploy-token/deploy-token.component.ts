@@ -45,7 +45,7 @@ import { GoConfigComponent } from '../../go/config/go-config.component';
 import { HelmConfigComponent } from '../../helm/config/helm-config.component';
 import { MavenConfigComponent } from '../../maven/config/maven-config.component';
 import { NpmConfigComponent } from '../../npm/config/npm-config.component';
-import { NugetConfigComponent } from '../../nuget/config/nuget-config.component';
+import { NuGetConfigComponent } from '../../nuget/config/nuget-config.component';
 import { PypiConfigComponent } from '../../pypi/config/pypi-config.component';
 import { RubyConfigComponent } from '../../ruby/config/ruby-config.component';
 import { TokenCreateInfo } from './dto/token-create-info';
@@ -67,7 +67,7 @@ import { TokenCreateInfo } from './dto/token-create-info';
     HelmConfigComponent,
     NgClass,
     MavenConfigComponent,
-    NugetConfigComponent,
+    NuGetConfigComponent,
     PypiConfigComponent,
     NpmConfigComponent,
     RubyConfigComponent,

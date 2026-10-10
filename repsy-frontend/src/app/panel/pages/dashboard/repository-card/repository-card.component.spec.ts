@@ -37,7 +37,7 @@ describe('RepositoryCardComponent', () => {
     ['routeCargo', () => component.routeCargo(), 'cargo'],
     ['routeGo', () => component.routeGo(), 'golang'],
     ['routeHelm', () => component.routeHelm(), 'helm'],
-    ['routeNuget', () => component.routeNuget(), 'nuget'],
+    ['routeNuGet', () => component.routeNuGet(), 'nuget'],
     ['routeRuby', () => component.routeRuby(), 'ruby'],
   ];
 

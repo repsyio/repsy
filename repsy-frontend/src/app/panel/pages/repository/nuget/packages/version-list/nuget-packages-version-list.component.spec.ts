@@ -34,16 +34,16 @@ import {
   pageOf,
   REPO_NAME,
 } from '../../../testing/repo-list-spec-helpers';
-import { NugetService } from '../../service/nuget.service';
-import { NugetPackagesVersionListComponent } from './nuget-packages-version-list.component';
+import { NuGetService } from '../../service/nuget.service';
+import { NuGetPackagesVersionListComponent } from './nuget-packages-version-list.component';
 
 const PACKAGE = { packageId: 'Acme.Lib' } as NuGetPackageInfo;
 const VERSION = { version: '1.0.0' } as NuGetVersionListItem;
 
-describe('NugetPackagesVersionListComponent', () => {
-  let component: NugetPackagesVersionListComponent;
+describe('NuGetPackagesVersionListComponent', () => {
+  let component: NuGetPackagesVersionListComponent;
   let route: ActivatedRoute;
-  let nugetService: jasmine.SpyObj<NugetService>;
+  let nugetService: jasmine.SpyObj<NuGetService>;
   let securityService: jasmine.SpyObj<SecurityService>;
   let toastService: jasmine.SpyObj<ToastService>;
   let router: jasmine.SpyObj<Router>;
@@ -52,8 +52,8 @@ describe('NugetPackagesVersionListComponent', () => {
 
   function build(): ListFixture {
     repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
-    nugetService = jasmine.createSpyObj<NugetService>(
-      'NugetService',
+    nugetService = jasmine.createSpyObj<NuGetService>(
+      'NuGetService',
       ['fetchPackage', 'fetchPackageVersions', 'deletePackage', 'deletePackageVersion'],
       { repoChanges },
     );
@@ -64,7 +64,7 @@ describe('NugetPackagesVersionListComponent', () => {
     router = jasmine.createSpyObj<Router>('Router', ['navigate']);
     dangerModalService = new DangerModalService();
     route = { snapshot: { paramMap: convertToParamMap({ packageName: 'Acme.Lib' }) } } as ActivatedRoute;
-    component = new NugetPackagesVersionListComponent(
+    component = new NuGetPackagesVersionListComponent(
       route,
       { username: 'alice' } as AuthService,
       nugetService,
@@ -172,9 +172,9 @@ describe('NugetPackagesVersionListComponent', () => {
   });
 });
 
-describe('NugetPackagesVersionListComponent template', () => {
+describe('NuGetPackagesVersionListComponent template', () => {
   async function render(canManage: boolean): Promise<HTMLElement> {
-    const nugetService = jasmine.createSpyObj<NugetService>('NugetService', ['fetchPackage', 'fetchPackageVersions'], {
+    const nugetService = jasmine.createSpyObj<NuGetService>('NuGetService', ['fetchPackage', 'fetchPackageVersions'], {
       repoChanges: new BehaviorSubject<RepoPermissionInfo | null>(permission(REPO_NAME, { canManage })),
     });
     nugetService.fetchPackage.and.resolveTo(PACKAGE);
@@ -190,10 +190,10 @@ describe('NugetPackagesVersionListComponent template', () => {
     const securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['watchVersionSecuritySummary']);
     securityService.watchVersionSecuritySummary.and.returnValue(of({}));
 
-    const { el } = await renderComponent(NugetPackagesVersionListComponent, [
+    const { el } = await renderComponent(NuGetPackagesVersionListComponent, [
       { provide: ActivatedRoute, useValue: { snapshot: { paramMap: convertToParamMap({ packageName: 'Acme.Lib' }) } } },
       { provide: AuthService, useValue: { username: 'alice' } },
-      { provide: NugetService, useValue: nugetService },
+      { provide: NuGetService, useValue: nugetService },
       { provide: SecurityService, useValue: securityService },
     ]);
     return el;

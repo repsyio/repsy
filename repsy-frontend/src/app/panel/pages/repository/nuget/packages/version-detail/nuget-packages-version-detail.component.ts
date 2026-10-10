@@ -40,7 +40,7 @@ import {
   VERSION_PROBE_SIZE,
 } from '../../../../../shared/util/version-delete-landing.util';
 import { versionLoadError } from '../../../../../shared/util/version-load-error.util';
-import { NugetService } from '../../service/nuget.service';
+import { NuGetService } from '../../service/nuget.service';
 
 /** The sort of the probe above: any valid one will do, the probe only counts. */
 const PROBE_SORT: Sort = { name: 'Newest', column: 'publishedAt', type: 'DESC' };
@@ -59,7 +59,7 @@ const PROBE_SORT: Sort = { name: 'Newest', column: 'publishedAt', type: 'DESC' }
   ],
   templateUrl: './nuget-packages-version-detail.component.html',
 })
-export class NugetPackagesVersionDetailComponent implements OnDestroy {
+export class NuGetPackagesVersionDetailComponent implements OnDestroy {
   public readonly securityRepoType = RepoType.Nuget;
   public loading = true;
   public error: string;
@@ -76,7 +76,7 @@ export class NugetPackagesVersionDetailComponent implements OnDestroy {
 
   constructor(
     private readonly route: ActivatedRoute,
-    private readonly nugetService: NugetService,
+    private readonly nugetService: NuGetService,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
     private readonly router: Router,
