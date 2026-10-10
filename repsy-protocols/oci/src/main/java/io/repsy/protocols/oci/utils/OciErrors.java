@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.shared.error_handling.utils;
+package io.repsy.protocols.oci.utils;
 
 import io.repsy.core.response.dtos.RestResponse;
 import io.repsy.core.response.services.RestResponseFactory;
-import io.repsy.os.shared.error_handling.dtos.OciErrorCode;
-import io.repsy.os.shared.error_handling.dtos.OciErrorResponse;
+import io.repsy.protocols.oci.dtos.OciErrorCode;
+import io.repsy.protocols.oci.dtos.OciErrorResponse;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Map;

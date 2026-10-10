@@ -24,6 +24,9 @@ import io.repsy.os.server.security.scanner.dtos.AdvisoryLookupResult;
 import io.repsy.os.server.security.scanner.dtos.ScannerFinding;
 import io.repsy.protocols.npm.shared.audit.AbstractNpmAdvisorySource;
 import io.repsy.protocols.npm.shared.audit.NpmAdvisory;
+import io.repsy.protocols.npm.shared.audit.NpmAdvisoryMapper;
+import io.repsy.protocols.npm.shared.audit.NpmSeverity;
+import io.repsy.protocols.npm.shared.audit.NpmVulnerabilityFinding;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -74,7 +77,7 @@ public class NpmAdvisorySource extends AbstractNpmAdvisorySource<UUID> {
         this.scanService.findKnownVulnerabilities(repoInfo.getStorageKey(), versionsByName);
     final var looked = this.lookup(versionsByName);
 
-    return NpmAdvisoryMapper.toAdvisories(merge(stored, looked), versionsByName);
+    return NpmAdvisoryMapper.toAdvisories(toFindings(merge(stored, looked)), versionsByName);
   }
 
   private List<KnownVulnerabilityRow> lookup(final Map<String, Set<String>> versionsByName) {
@@ -98,6 +101,37 @@ public class NpmAdvisorySource extends AbstractNpmAdvisorySource<UUID> {
         .filter(finding -> finding.fixStatus() != FixStatus.NOT_AFFECTED)
         .<KnownVulnerabilityRow>map(finding -> new LookupRow(finding, completedAt))
         .toList();
+  }
+
+  /** The rows as the findings the protocol library's advisory mapper reads. */
+  static List<NpmVulnerabilityFinding> toFindings(final List<KnownVulnerabilityRow> rows) {
+    return rows.stream()
+        .map(
+            row ->
+                new NpmVulnerabilityFinding(
+                    row.getCveId(),
+                    toNpmSeverity(row.getSeverity()),
+                    row.getPackageName(),
+                    row.getPackageVersion(),
+                    row.getFixedVersion(),
+                    row.getDescription(),
+                    row.getReferenceUrl(),
+                    row.getCvssScore(),
+                    row.getCvssVector(),
+                    row.getCompletedAt(),
+                    row.getScannerName()))
+        .toList();
+  }
+
+  /** The maps of severities: Trivy's {@code MEDIUM} is npm's {@code moderate}. */
+  static NpmSeverity toNpmSeverity(final @Nullable Severity severity) {
+    return switch (severity) {
+      case CRITICAL -> NpmSeverity.CRITICAL;
+      case HIGH -> NpmSeverity.HIGH;
+      case MEDIUM -> NpmSeverity.MODERATE;
+      case LOW, UNKNOWN -> NpmSeverity.LOW;
+      case null, default -> throw new IllegalArgumentException("unknown severity " + severity);
+    };
   }
 
   /** The stored findings and those of the lookup that no stored finding says already. */

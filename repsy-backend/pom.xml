@@ -90,6 +90,12 @@
 
         <dependency>
             <groupId>io.repsy.protocols</groupId>
+            <artifactId>oci</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>io.repsy.protocols</groupId>
             <artifactId>docker</artifactId>
             <version>${project.version}</version>
         </dependency>

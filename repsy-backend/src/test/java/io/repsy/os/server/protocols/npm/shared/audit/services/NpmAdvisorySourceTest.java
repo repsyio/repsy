@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.npm.shared.audit.services;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -29,6 +30,7 @@ import io.repsy.os.server.security.scan.services.VulnerabilityScanTxService;
 import io.repsy.os.server.security.scanner.VulnerabilityAdvisoryLookup;
 import io.repsy.os.server.security.scanner.dtos.AdvisoryLookupResult;
 import io.repsy.os.server.security.scanner.dtos.ScannerFinding;
+import io.repsy.protocols.npm.shared.audit.NpmSeverity;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.time.Instant;
 import java.util.List;
@@ -38,6 +40,8 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 @DisplayName("NpmAdvisorySource")
 class NpmAdvisorySourceTest {
@@ -217,5 +221,19 @@ class NpmAdvisorySourceTest {
     when(this.lookup.lookupNpm(requested)).thenThrow(new IllegalStateException("scanner is down"));
 
     assertThat(this.source.findAdvisories(repo, requested)).hasSize(1);
+  }
+
+  @ParameterizedTest
+  @CsvSource({"CRITICAL, CRITICAL", "HIGH, HIGH", "MEDIUM, MODERATE", "LOW, LOW", "UNKNOWN, LOW"})
+  @DisplayName("maps Trivy severities to npm severities, and an unknown one to low, never info")
+  void severities(final Severity trivy, final NpmSeverity npm) {
+    assertThat(NpmAdvisorySource.toNpmSeverity(trivy)).isEqualTo(npm);
+  }
+
+  @Test
+  @DisplayName("refuses a missing severity")
+  void missingSeverity() {
+    assertThatThrownBy(() -> NpmAdvisorySource.toNpmSeverity(null))
+        .isInstanceOf(IllegalArgumentException.class);
   }
 }
