@@ -39,7 +39,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * RPS-1152: a user deleted between the password/refresh-token check and the moment the new refresh
  * token is written used to surface as a raw foreign-key violation (23503), mapped by {@code
- * ErrorHandler} to a 500, instead of the clean 401 every other "user is gone" path answers.
+ * ProtocolErrorAdvice} to a 500, instead of the clean 401 every other "user is gone" path answers.
  *
  * <p>{@code AuthUserService.login} and {@code refreshToken} now take a {@code PESSIMISTIC_READ}
  * lock on the user row ({@code UserTxService.lockUserExists}, RPS-1152) right before {@code

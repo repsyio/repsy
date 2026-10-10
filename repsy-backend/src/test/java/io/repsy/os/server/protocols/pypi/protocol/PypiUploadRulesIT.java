@@ -64,7 +64,8 @@ import org.springframework.web.client.RestClient;
  *       there is no 403 case for an upload;
  *   <li>a second upload of an existing file with {@code allowOverride} off: <b>403</b> {@code
  *       fileAlreadyExists} (the ticket expected 409, but the {@code AccessNotAllowedException}
- *       behind it maps to 403 in {@code ErrorHandler}); the stored bytes stay the first ones;
+ *       behind it maps to 403 in {@code ProtocolErrorAdvice}); the stored bytes stay the first
+ *       ones;
  *   <li>a file part over {@code MULTIPART_MAX_FILE_SIZE}: 413 {@code payloadTooLarge}.
  * </ul>
  *

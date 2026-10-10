@@ -34,8 +34,8 @@ public final class AuthChallenges {
 
   /**
    * Returns the exception to throw for a rejected credential: the same message, with the challenge
-   * in its headers so that {@code ErrorHandler} writes it to the 401. An exception that already
-   * carries a challenge of its own is returned as it is.
+   * in its headers so that {@code ProtocolErrorAdvice} writes it to the 401. An exception that
+   * already carries a challenge of its own is returned as it is.
    *
    * @param exception The authentication failure
    * @param challenge The {@code WWW-Authenticate} header value of the protocol

@@ -1433,8 +1433,8 @@ class UserControllerIT extends AbstractIT {
 
     /**
      * A path nothing maps falls through to the static-resource handler and fails with the servlet
-     * {@code NoResourceFoundException}, which {@code ErrorHandler} answers with 404 {@code
-     * itemNotFound}.
+     * {@code NoResourceFoundException}, which {@code PanelProblemDetailAdvice} answers with 404
+     * {@code itemNotFound}.
      */
     @Test
     @DisplayName("answers 404 itemNotFound for a route nothing maps")

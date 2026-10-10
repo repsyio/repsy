@@ -93,17 +93,17 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <p>The failure is the {@link StorageUnavailableException} that the storage strategy throws when
  * it cannot create, write or move an object, thrown by the storage service call that writes the
- * artifact. Since RPS-2104 {@code ErrorHandler} answers it 503 with {@code Retry-After: 1} and the
- * message id {@code errorOccurred} on every format, in the body shape of the format's own route.
- * For each format the test asserts the status, the body shape and the header the client gets, that
- * the request left no row and no file behind (compared with what existed before the request: the
- * Docker manifest push keeps the blobs it was given) and that no usage was reported.
+ * artifact. Since RPS-2104 {@code ProtocolErrorAdvice} answers it 503 with {@code Retry-After: 1}
+ * and the message id {@code errorOccurred} on every format, in the body shape of the format's own
+ * route. For each format the test asserts the status, the body shape and the header the client
+ * gets, that the request left no row and no file behind (compared with what existed before the
+ * request: the Docker manifest push keeps the blobs it was given) and that no usage was reported.
  *
  * <p>The table (status 503 and {@code Retry-After: 1} on every row):
  *
  * <pre>
  * Maven, npm, PyPI, Ruby, Go, Helm classic, NuGet: RestResponse body msgId=errorOccurred (NuGet
- *                                                  leaves the outage to ErrorHandler instead of
+ *                                                  leaves the outage to ProtocolErrorAdvice instead of
  *                                                  its own "Publish failed")
  * Cargo:                                           {"errors":[{"detail":"errorOccurred"}]}, the
  *                                                  shape cargo prints (CargoErrorBodyAdvice)
