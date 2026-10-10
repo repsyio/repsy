@@ -84,7 +84,7 @@ public class ProtocolErrorAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Access not allowed", ex);
+      log.debug("Access not allowed: {}", exceptionToString(ex, request));
 
       return null;
     }
@@ -107,7 +107,7 @@ public class ProtocolErrorAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Invalid storage path", ex);
+      log.debug("Invalid storage path: {}", exceptionToString(ex, request));
       return null;
     }
 
@@ -130,7 +130,7 @@ public class ProtocolErrorAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Bad request", ex);
+      log.debug("Bad request: {}", exceptionToString(ex, request));
 
       return null;
     }
@@ -153,7 +153,7 @@ public class ProtocolErrorAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.warn("PGP Verification Exception", ex);
+      log.warn("PGP Verification Exception: {}", exceptionToString(ex, request));
 
       return null;
     }
@@ -178,7 +178,7 @@ public class ProtocolErrorAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("An error occurred", ex);
+      log.debug("An error occurred: {}", exceptionToString(ex, request));
 
       return null;
     }
@@ -203,7 +203,7 @@ public class ProtocolErrorAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Redirect to path", ex);
+      log.debug("Redirect to path: {}", exceptionToString(ex, request));
 
       return null;
     }
@@ -228,7 +228,7 @@ public class ProtocolErrorAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Item not found", ex);
+      log.debug("Item not found: {}", exceptionToString(ex, request));
 
       return null;
     }
@@ -251,7 +251,7 @@ public class ProtocolErrorAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Unauthorized request", ex);
+      log.debug("Unauthorized request: {}", exceptionToString(ex, request));
 
       return null;
     }
@@ -317,7 +317,7 @@ public class ProtocolErrorAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Too many requests", ex);
+      log.debug("Too many requests: {}", exceptionToString(ex, request));
       return null;
     }
 
@@ -338,7 +338,7 @@ public class ProtocolErrorAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Item already exists", ex);
+      log.debug("Item already exists: {}", exceptionToString(ex, request));
       return null;
     }
 
@@ -384,7 +384,7 @@ public class ProtocolErrorAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Data integrity violation", ex);
+      log.debug("Data integrity violation: {}", exceptionToString(ex, request));
       return null;
     }
 
@@ -446,7 +446,7 @@ public class ProtocolErrorAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Optimistic lock failure", ex);
+      log.debug("Optimistic lock failure: {}", exceptionToString(ex, request));
       return null;
     }
 
@@ -499,7 +499,7 @@ public class ProtocolErrorAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Database lock unavailable", ex);
+      log.debug("Database lock unavailable: {}", exceptionToString(ex, request));
       return null;
     }
 
@@ -531,7 +531,7 @@ public class ProtocolErrorAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Storage unavailable", ex);
+      log.debug("Storage unavailable: {}", exceptionToString(ex, request));
       return null;
     }
 
@@ -557,7 +557,7 @@ public class ProtocolErrorAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Retryable request failure", ex);
+      log.debug("Retryable request failure: {}", exceptionToString(ex, request));
       return null;
     }
 

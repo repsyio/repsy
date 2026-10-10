@@ -82,7 +82,7 @@ public abstract class AbstractNuGetSearchProtocolMethodHandler
 
       return ResponseEntity.ok().contentType(APPLICATION_JSON).body(results);
     } catch (final IllegalArgumentException e) {
-      log.debug("NuGet search: invalid paging parameter: {}", e.getMessage());
+      log.debug("NuGet search: invalid paging parameter ({})", e.getClass().getName());
       return ResponseEntity.badRequest().build();
     }
   }

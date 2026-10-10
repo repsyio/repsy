@@ -94,7 +94,7 @@ public class PanelProblemDetailAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Missing request value", ex);
+      log.debug("Missing request value: {}", exceptionToString(ex, request));
       return null;
     }
 
@@ -114,7 +114,7 @@ public class PanelProblemDetailAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Conversion failed", ex);
+      log.debug("Conversion failed: {}", exceptionToString(ex, request));
 
       return null;
     }
@@ -135,7 +135,7 @@ public class PanelProblemDetailAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Method argument type mismatch", ex);
+      log.debug("Method argument type mismatch: {}", exceptionToString(ex, request));
 
       return null;
     }
@@ -166,7 +166,7 @@ public class PanelProblemDetailAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Method validation failed", ex);
+      log.debug("Method validation failed: {}", exceptionToString(ex, request));
 
       return null;
     }
@@ -203,7 +203,7 @@ public class PanelProblemDetailAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Invalid paging parameter", ex);
+      log.debug("Invalid paging parameter: {}", exceptionToString(ex, request));
       return null;
     }
 
@@ -226,7 +226,7 @@ public class PanelProblemDetailAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Malformed body request", ex);
+      log.debug("Malformed body request: {}", exceptionToString(ex, request));
 
       return null;
     }
@@ -254,7 +254,7 @@ public class PanelProblemDetailAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("HTTP method not supported", ex);
+      log.debug("HTTP method not supported: {}", exceptionToString(ex, request));
 
       return null;
     }
@@ -276,7 +276,7 @@ public class PanelProblemDetailAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Resource not found", ex);
+      log.debug("Resource not found: {}", exceptionToString(ex, request));
 
       return null;
     }
@@ -295,7 +295,7 @@ public class PanelProblemDetailAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Method argument not valid", ex);
+      log.debug("Method argument not valid: {}", exceptionToString(ex, request));
 
       return null;
     }
@@ -320,7 +320,7 @@ public class PanelProblemDetailAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Missing request parameter", ex);
+      log.debug("Missing request parameter: {}", exceptionToString(ex, request));
 
       return null;
     }
@@ -351,7 +351,7 @@ public class PanelProblemDetailAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Media type not supported", ex);
+      log.debug("Media type not supported: {}", exceptionToString(ex, request));
 
       return null;
     }
@@ -383,7 +383,7 @@ public class PanelProblemDetailAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Media type not acceptable", ex);
+      log.debug("Media type not acceptable: {}", exceptionToString(ex, request));
 
       return null;
     }
@@ -412,7 +412,7 @@ public class PanelProblemDetailAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Upload too large", ex);
+      log.debug("Upload too large: {}", exceptionToString(ex, request));
 
       return null;
     }
@@ -440,7 +440,7 @@ public class PanelProblemDetailAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Request parameter condition not satisfied", ex);
+      log.debug("Request parameter condition not satisfied: {}", exceptionToString(ex, request));
 
       return null;
     }
@@ -465,7 +465,7 @@ public class PanelProblemDetailAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Invalid request", ex);
+      log.debug("Invalid request: {}", exceptionToString(ex, request));
 
       return null;
     }
@@ -490,7 +490,7 @@ public class PanelProblemDetailAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("MFA Exception", ex);
+      log.debug("MFA Exception: {}", exceptionToString(ex, request));
       return null;
     }
 
@@ -521,7 +521,7 @@ public class PanelProblemDetailAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Request Header resolution failed", ex);
+      log.debug("Request Header resolution failed: {}", exceptionToString(ex, request));
       return null;
     }
 

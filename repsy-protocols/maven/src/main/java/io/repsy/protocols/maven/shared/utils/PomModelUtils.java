@@ -69,7 +69,7 @@ public class PomModelUtils {
     try (final var inputStream = pomResource.getInputStream()) {
       return readModel(inputStream);
     } catch (final IOException e) {
-      log.warn("Malformed or unreadable POM file received: {}", e.getMessage());
+      log.warn("Malformed or unreadable POM file received ({})", e.getClass().getName());
       throw new BadRequestException(ProtocolErrorCodes.MALFORMED_POM_FILE);
     }
   }
@@ -88,7 +88,7 @@ public class PomModelUtils {
     try {
       return reader.read(new InputStreamReader(pomStream, UTF_8));
     } catch (final IOException | XmlPullParserException e) {
-      log.warn("Malformed or unreadable POM file received: {}", e.getMessage());
+      log.warn("Malformed or unreadable POM file received ({})", e.getClass().getName());
       throw new BadRequestException(ProtocolErrorCodes.MALFORMED_POM_FILE);
     }
   }

@@ -248,4 +248,27 @@ class AbstractNuGetSearchProtocolMethodHandlerTest {
     assertThatThrownBy(() -> this.handler.handle(ctx, request(null), new MockHttpServletResponse()))
         .isInstanceOf(IllegalStateException.class);
   }
+
+  @Test
+  @DisplayName("does not log the value of an invalid paging parameter (RPS-2174)")
+  void invalidPagingValueIsNotLogged() {
+    final var ctx = context(SEARCH_PATH);
+
+    final var originalLevel = this.logger.getLevel();
+    this.logger.setLevel(Level.DEBUG);
+
+    final org.springframework.http.ResponseEntity<?> response;
+    try {
+      response =
+          this.handler.handle(
+              ctx, request("skip=s3cr3t-token-value"), new MockHttpServletResponse());
+    } finally {
+      this.logger.setLevel(originalLevel);
+    }
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    assertThat(this.logs.list).isNotEmpty();
+    assertThat(this.logs.list)
+        .noneMatch(event -> event.getFormattedMessage().contains("s3cr3t-token-value"));
+  }
 }

@@ -320,15 +320,20 @@ public class ErrorResponseService {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("An exception occurred", ex);
+      log.debug("An exception occurred: {}", exceptionToString(ex, request));
       return null;
     }
 
     if (ex instanceof @NonNull final HttpClientErrorException exception) {
-      log.error(exception.getResponseBodyAsString());
-    }
-
-    if (!NOT_LOGGED_EXCEPTIONS.contains(ex.getClass().getName())) {
+      // Neither the upstream body nor the exception message is logged: both can echo values of the
+      // request (the message of this exception type carries the body).
+      log.error(
+          "Upstream call failed with HTTP {} ({}) while serving {} {}",
+          exception.getStatusCode().value(),
+          exception.getClass().getName(),
+          request.getMethod(),
+          request.getRequestURI());
+    } else if (!NOT_LOGGED_EXCEPTIONS.contains(ex.getClass().getName())) {
       log.error(exceptionToString(ex, request));
     }
 

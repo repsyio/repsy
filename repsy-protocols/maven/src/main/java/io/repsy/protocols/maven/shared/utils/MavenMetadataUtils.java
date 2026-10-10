@@ -44,7 +44,7 @@ public class MavenMetadataUtils {
     try {
       return reader.read(new ByteArrayInputStream(content), false);
     } catch (final IOException | XmlPullParserException e) {
-      log.warn("Malformed or incomplete maven-metadata.xml received: {}", e.getMessage());
+      log.warn("Malformed or incomplete maven-metadata.xml received ({})", e.getClass().getName());
       throw new BadRequestException(ProtocolErrorCodes.MALFORMED_METADATA_FILE);
     }
   }

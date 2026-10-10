@@ -19,6 +19,9 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import java.io.ByteArrayInputStream;
@@ -32,6 +35,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.InputStreamResource;
 
@@ -289,5 +293,29 @@ class PomModelUtilsTest {
 
     assertThat(PomModelUtils.artifactIsPlugin(plugin)).isTrue();
     assertThat(PomModelUtils.artifactIsPlugin(jar)).isFalse();
+  }
+
+  @Test
+  @DisplayName("does not log the content of a malformed POM (RPS-2174)")
+  void malformedPomDoesNotLogTheContent() {
+    final var logs = new ListAppender<ILoggingEvent>();
+    final var logger = (Logger) LoggerFactory.getLogger(PomModelUtils.class);
+    logs.start();
+    logger.addAppender(logs);
+
+    try {
+      assertThatThrownBy(
+              () ->
+                  PomModelUtils.readModel(
+                      new ByteArrayInputStream(
+                          "<project><s3cr3t-token-value></project>".getBytes(UTF_8))))
+          .isInstanceOf(BadRequestException.class);
+    } finally {
+      logger.detachAppender(logs);
+    }
+
+    assertThat(logs.list).isNotEmpty();
+    assertThat(logs.list)
+        .noneMatch(event -> event.getFormattedMessage().contains("s3cr3t-token-value"));
   }
 }

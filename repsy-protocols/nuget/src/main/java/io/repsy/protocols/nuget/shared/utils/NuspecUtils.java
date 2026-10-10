@@ -94,7 +94,7 @@ public final class NuspecUtils {
         return matcher.group(1).trim();
       }
     } catch (final Exception e) {
-      log.debug("Failed to extract {} from nuspec", tagName, e);
+      log.debug("Failed to extract {} from nuspec ({})", tagName, e.getClass().getName());
     }
     return null;
   }
@@ -112,7 +112,7 @@ public final class NuspecUtils {
     try {
       return metadataChildText(parseNuspec(nuspecXml), tagName);
     } catch (final Exception e) {
-      log.debug("Failed to extract {} from nuspec", tagName, e);
+      log.debug("Failed to extract {} from nuspec ({})", tagName, e.getClass().getName());
       return null;
     }
   }
@@ -210,7 +210,9 @@ public final class NuspecUtils {
       final var text = repository.getTextContent().strip();
       return text.isEmpty() ? null : text;
     } catch (final Exception e) {
-      log.debug("Failed to parse nuspec, falling back to the plain-text repository form", e);
+      log.debug(
+          "Failed to parse nuspec ({}), falling back to the plain-text repository form",
+          e.getClass().getName());
       return extractXmlTag(nuspecXml, "repository");
     }
   }
