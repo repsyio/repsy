@@ -20,7 +20,7 @@ import static io.repsy.os.server.protocols.helm.HelmChartFixtures.OCI_LAYER_TYPE
 import static io.repsy.os.server.protocols.helm.HelmChartFixtures.OCI_MANIFEST_TYPE;
 import static io.repsy.os.server.protocols.helm.HelmChartFixtures.chart;
 import static io.repsy.os.server.protocols.helm.HelmChartFixtures.digest;
-import static io.repsy.protocols.helm.shared.utils.HelmOciHttpValues.DOCKER_CONTENT_DIGEST;
+import static io.repsy.protocols.oci.constants.OciConstants.DOCKER_CONTENT_DIGEST;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;

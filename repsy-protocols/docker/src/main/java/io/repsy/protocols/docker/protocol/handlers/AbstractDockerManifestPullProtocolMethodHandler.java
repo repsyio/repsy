@@ -15,13 +15,10 @@
  */
 package io.repsy.protocols.docker.protocol.handlers;
 
-import static io.repsy.protocols.docker.shared.utils.DockerProtocolHttpValues.DOCKER_CONTENT_DIGEST;
 import static io.repsy.protocols.docker.shared.utils.MediaTypes.DOCKER_MANIFEST_LIST;
 import static io.repsy.protocols.docker.shared.utils.MediaTypes.DOCKER_MANIFEST_SCHEMA2;
 import static io.repsy.protocols.docker.shared.utils.MediaTypes.OCI_IMAGE_INDEX;
 import static io.repsy.protocols.docker.shared.utils.MediaTypes.OCI_MANIFEST_SCHEMA1;
-import static org.springframework.http.HttpHeaders.CONTENT_LENGTH;
-import static org.springframework.http.HttpHeaders.CONTENT_TYPE;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
@@ -29,26 +26,23 @@ import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import io.repsy.protocols.docker.protocol.facades.DockerProtocolFacade;
 import io.repsy.protocols.docker.shared.utils.AcceptHeaderParser;
 import io.repsy.protocols.docker.shared.utils.MediaTypes;
-import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.oci.dtos.OciManifestInfo;
+import io.repsy.protocols.oci.handlers.AbstractOciManifestPullProtocolMethodHandler;
 import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
-import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.HttpMediaTypeNotAcceptableException;
 
+/**
+ * The Docker manifest pull: negotiates the {@code Accept} header first, so a client that accepts no
+ * manifest type this registry serves gets a 406 before the manifest is read.
+ */
 @NullMarked
 public abstract class AbstractDockerManifestPullProtocolMethodHandler<ID>
-    extends AbstractFacadeProtocolMethodHandler<DockerProtocolFacade<ID>> {
-
-  private static final Pattern MANIFEST_PULL_PATTERN = Pattern.compile("^/([^/]+)/manifests/(.+)$");
+    extends AbstractOciManifestPullProtocolMethodHandler<DockerProtocolFacade<ID>> {
 
   private static final List<String> DEFAULT_DOCKER_ACCEPT_TYPES =
       List.of(DOCKER_MANIFEST_SCHEMA2, DOCKER_MANIFEST_LIST, OCI_MANIFEST_SCHEMA1, OCI_IMAGE_INDEX);
@@ -57,51 +51,31 @@ public abstract class AbstractDockerManifestPullProtocolMethodHandler<ID>
       final PathParser basePathParser,
       final DockerProtocolFacade<ID> dockerFacade,
       final DockerProtocolProvider provider) {
-    super(
-        HandlerRoute.of(Permission.READ, HttpMethod.GET)
-            .path(MANIFEST_PULL_PATTERN.asMatchPredicate()),
-        basePathParser,
-        dockerFacade,
-        provider);
+    super(HandlerRoute.of(Permission.READ, HttpMethod.GET), basePathParser, dockerFacade, provider);
   }
 
   @Override
-  public ResponseEntity<Object> handle(
-      final ProtocolContext context,
-      final HttpServletRequest request,
-      final HttpServletResponse response)
-      throws Exception {
-
-    final var relativePath = ProtocolContextUtils.getRelativePath(context);
-
-    final var matcher = MANIFEST_PULL_PATTERN.matcher(relativePath.getPath());
-
-    if (!matcher.matches()) {
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
-
-    final var imageName = matcher.group(1);
-    final var reference = matcher.group(2);
+  protected void checkAcceptable(final HttpServletRequest request)
+      throws HttpMediaTypeNotAcceptableException {
 
     final var acceptHeaders =
         AcceptHeaderParser.parse(request.getHeader("Accept"), DEFAULT_DOCKER_ACCEPT_TYPES);
 
-    final var preferredMediaType = MediaTypes.getPreferredMediaType(acceptHeaders);
-
-    if (preferredMediaType == null) {
+    if (MediaTypes.getPreferredMediaType(acceptHeaders) == null) {
       throw new HttpMediaTypeNotAcceptableException(
           "The Accept header names no manifest media type this repository serves.");
     }
+  }
 
-    final var manifest =
-        this.facade.getManifest(context, reference, imageName, request.getServletPath());
+  @Override
+  protected OciManifestInfo getManifest(
+      final ProtocolContext context,
+      final HttpServletRequest request,
+      final String name,
+      final String reference)
+      throws Exception {
 
-    final var contentLength = manifest.body().getBytes(StandardCharsets.UTF_8).length;
-
-    return ResponseEntity.ok()
-        .header(CONTENT_TYPE, manifest.mediaType())
-        .header(CONTENT_LENGTH, String.valueOf(contentLength))
-        .header(DOCKER_CONTENT_DIGEST, manifest.digest())
-        .body(manifest.body());
+    return DockerManifests.toOci(
+        this.facade.getManifest(context, reference, name, request.getServletPath()));
   }
 }

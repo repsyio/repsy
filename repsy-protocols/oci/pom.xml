@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.repsy.protocols</groupId>
+    <artifactId>repsy-protocols</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <!--
+    The OCI distribution wire both Docker and Helm OCI serve (RPS-2058): the blob upload session,
+    blob and manifest reads, the Content-Range parser and the OCI headers. It imports no protocol
+    module; docker and helm depend on it and keep only what is theirs (manifest push semantics,
+    tag listing, tokens).
+  -->
+  <artifactId>oci</artifactId>
+
+  <dependencies>
+    <dependency>
+      <groupId>io.repsy.protocols</groupId>
+      <artifactId>shared</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+</project>

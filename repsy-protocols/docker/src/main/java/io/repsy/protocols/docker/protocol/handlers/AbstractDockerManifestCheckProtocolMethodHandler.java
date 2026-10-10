@@ -15,71 +15,45 @@
  */
 package io.repsy.protocols.docker.protocol.handlers;
 
-import static io.repsy.protocols.docker.shared.utils.DockerProtocolHttpValues.DOCKER_CONTENT_DIGEST;
-import static java.nio.charset.StandardCharsets.UTF_8;
-import static org.springframework.http.HttpHeaders.CONTENT_LENGTH;
-import static org.springframework.http.HttpHeaders.CONTENT_TYPE;
-
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import io.repsy.protocols.docker.protocol.facades.DockerProtocolFacade;
-import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.oci.dtos.OciManifestInfo;
+import io.repsy.protocols.oci.handlers.AbstractOciManifestCheckProtocolMethodHandler;
 import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
-import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import java.util.regex.Pattern;
+import java.util.Optional;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 
+/**
+ * The Docker manifest check: a missing image or manifest is the facade's exception, so the 404
+ * carries the OCI error body.
+ */
 @NullMarked
 public abstract class AbstractDockerManifestCheckProtocolMethodHandler<ID>
-    extends AbstractFacadeProtocolMethodHandler<DockerProtocolFacade<ID>> {
-
-  private static final Pattern MANIFEST_CHECK_PATTERN =
-      Pattern.compile("^/([^/]+)/manifests/(.+)$");
+    extends AbstractOciManifestCheckProtocolMethodHandler<DockerProtocolFacade<ID>> {
 
   public AbstractDockerManifestCheckProtocolMethodHandler(
       final PathParser basePathParser,
       final DockerProtocolFacade<ID> dockerFacade,
       final DockerProtocolProvider provider) {
     super(
-        HandlerRoute.of(Permission.READ, HttpMethod.HEAD)
-            .path(MANIFEST_CHECK_PATTERN.asMatchPredicate()),
-        basePathParser,
-        dockerFacade,
-        provider);
+        HandlerRoute.of(Permission.READ, HttpMethod.HEAD), basePathParser, dockerFacade, provider);
   }
 
   @Override
-  public ResponseEntity<Object> handle(
+  protected Optional<OciManifestInfo> findManifest(
       final ProtocolContext context,
       final HttpServletRequest request,
-      final HttpServletResponse response)
+      final String name,
+      final String reference)
       throws Exception {
 
-    final var relativePath = ProtocolContextUtils.getRelativePath(context).getPath();
-
-    final var matcher = MANIFEST_CHECK_PATTERN.matcher(relativePath);
-
-    if (!matcher.matches()) {
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
-
-    final var imageName = matcher.group(1);
-    final var reference = matcher.group(2);
-
-    final var manifest =
-        this.facade.getManifest(context, reference, imageName, request.getServletPath());
-
-    return ResponseEntity.ok()
-        .header(CONTENT_TYPE, manifest.mediaType())
-        .header(CONTENT_LENGTH, String.valueOf(manifest.body().getBytes(UTF_8).length))
-        .header(DOCKER_CONTENT_DIGEST, manifest.digest())
-        .build();
+    return Optional.of(
+        DockerManifests.toOci(
+            this.facade.getManifest(context, reference, name, request.getServletPath())));
   }
 }

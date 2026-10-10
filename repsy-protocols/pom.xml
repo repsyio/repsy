@@ -43,6 +43,7 @@
     <module>golang</module>
     <module>nuget</module>
     <module>shared</module>
+    <module>oci</module>
     <module>helm</module>
     <module>ruby</module>
   </modules>

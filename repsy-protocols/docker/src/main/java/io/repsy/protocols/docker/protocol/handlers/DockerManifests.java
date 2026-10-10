@@ -13,17 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.protocols.helm.shared.utils;
+package io.repsy.protocols.docker.protocol.handlers;
 
+import io.repsy.protocols.docker.shared.tag.dtos.ManifestDetails;
+import io.repsy.protocols.oci.dtos.OciManifestInfo;
 import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.NullMarked;
 
 @UtilityClass
 @NullMarked
-public final class HelmOciHttpValues {
+final class DockerManifests {
 
-  public static final String DOCKER_UPLOAD_UUID = "Docker-Upload-UUID";
-  public static final String RANGE = "Range";
-  public static final String DOCKER_CONTENT_DIGEST = "Docker-Content-Digest";
-  public static final String OCI_CONTENT_TYPE = "application/vnd.oci.image.manifest.v1+json";
+  static OciManifestInfo toOci(final ManifestDetails manifest) {
+    return new OciManifestInfo(manifest.mediaType(), manifest.body(), manifest.digest());
+  }
 }

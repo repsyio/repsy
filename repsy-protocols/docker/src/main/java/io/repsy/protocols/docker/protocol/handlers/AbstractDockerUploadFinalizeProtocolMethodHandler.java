@@ -15,45 +15,38 @@
  */
 package io.repsy.protocols.docker.protocol.handlers;
 
-import static io.repsy.protocols.docker.shared.utils.DockerProtocolHttpValues.DOCKER_CONTENT_DIGEST;
-import static io.repsy.protocols.docker.shared.utils.DockerProtocolHttpValues.DOCKER_UPLOAD_UUID;
 import static io.repsy.protocols.docker.shared.utils.MediaTypes.DOCKER_LAYER;
-import static org.springframework.http.HttpHeaders.LOCATION;
 
-import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import io.repsy.protocols.docker.protocol.facades.DockerProtocolFacade;
 import io.repsy.protocols.docker.shared.layer.dtos.LayerForm;
 import io.repsy.protocols.docker.shared.layer.dtos.LayerInfo;
 import io.repsy.protocols.docker.shared.layer.services.LayerService;
-import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
-import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.oci.handlers.AbstractOciUploadFinalizeProtocolMethodHandler;
 import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.util.UUID;
-import java.util.regex.Pattern;
 import lombok.SneakyThrows;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
+/**
+ * The Docker upload finalize: appends the request body, verifies the digest against the stored
+ * bytes and records the layer (retrying a concurrent first insert).
+ */
 @NullMarked
 public abstract class AbstractDockerUploadFinalizeProtocolMethodHandler<ID>
-    extends AbstractFacadeProtocolMethodHandler<DockerProtocolFacade<ID>> {
-
-  private static final Pattern UPLOAD_FINALIZE_PATTERN =
-      Pattern.compile("^/([^/]+)/blobs/uploads/([0-9a-fA-F-]{36})/?$");
+    extends AbstractOciUploadFinalizeProtocolMethodHandler<DockerProtocolFacade<ID>> {
 
   private static final int RETRY_COUNT = 3;
+
   private static final long WAIT_RETRY = 100;
 
   private final LayerService<ID> layerService;
@@ -64,9 +57,7 @@ public abstract class AbstractDockerUploadFinalizeProtocolMethodHandler<ID>
       final LayerService<ID> layerService,
       final DockerProtocolProvider provider) {
     super(
-        HandlerRoute.of(Permission.WRITE, HttpMethod.PUT)
-            .skipHeaderPreProcessor(true)
-            .path(UPLOAD_FINALIZE_PATTERN.asMatchPredicate()),
+        HandlerRoute.of(Permission.WRITE, HttpMethod.PUT).skipHeaderPreProcessor(true),
         basePathParser,
         dockerFacade,
         provider);
@@ -74,58 +65,47 @@ public abstract class AbstractDockerUploadFinalizeProtocolMethodHandler<ID>
   }
 
   @Override
-  public ResponseEntity<Object> handle(
+  protected String finalizeUpload(
       final ProtocolContext context,
       final HttpServletRequest request,
-      final HttpServletResponse response)
-      throws Exception {
+      final String name,
+      final String uploadId,
+      final String digest)
+      throws IOException {
 
-    final var relativePath = ProtocolContextUtils.getRelativePath(context).getPath();
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-    final var matcher = UPLOAD_FINALIZE_PATTERN.matcher(relativePath);
-
-    if (!matcher.matches()) {
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
-
-    final var imageName = matcher.group(1);
-    final var sessionId = matcher.group(2);
-    final var digest = request.getParameter("digest");
-
-    if (digest == null) {
-      throw new BadRequestException(ProtocolErrorCodes.DIGEST_MISSING);
-    }
-
-    final var uploadPath = new RelativePath("/blobs/" + sessionId);
+    final var uploadPath = DockerUploadPaths.of(uploadId);
 
     if (request.getContentLength() > 0) {
       this.facade.uploadLayerChunk(
           context, uploadPath, request.getInputStream(), request.getContentLengthLong());
     }
 
-    // The upload is only a blob once it is known to hold what the client claims: check it before
-    // the layer row that names the digest is created.
     this.facade.verifyLayerDigest(context, uploadPath, digest);
 
     final var layerForm =
         LayerForm.builder()
-            .imageName(imageName)
+            .imageName(name)
             .digest(digest)
             .mediaType(DOCKER_LAYER)
-            .uuid(UUID.fromString(sessionId))
+            .uuid(UUID.fromString(uploadId))
             .build();
 
     final var layerInfo = this.findOrCreateLayer(repoInfo.getId(), layerForm, 1);
 
     this.facade.finalizeLayerUpload(context, uploadPath, layerInfo);
 
-    final var location = this.getServletURILocation(context, imageName, digest);
+    return digest;
+  }
 
-    return ResponseEntity.status(HttpStatus.CREATED)
-        .header(DOCKER_CONTENT_DIGEST, digest)
-        .header(DOCKER_UPLOAD_UUID, sessionId)
-        .header(LOCATION, location)
-        .build();
+  @Override
+  protected String blobLocation(
+      final ProtocolContext context,
+      final HttpServletRequest request,
+      final String name,
+      final String digest) {
+
+    return this.getServletURILocation(context, name, digest);
   }
 
   protected String getServletURILocation(
@@ -142,13 +122,16 @@ public abstract class AbstractDockerUploadFinalizeProtocolMethodHandler<ID>
   @SneakyThrows
   private LayerInfo findOrCreateLayer(
       final ID repoId, final LayerForm layerForm, final int counter) {
+
     try {
       return this.layerService.getOrCreate(layerForm, repoId);
     } catch (final DataIntegrityViolationException e) {
       if (counter == RETRY_COUNT) {
         throw e;
       }
+
       Thread.sleep(WAIT_RETRY * counter);
+
       return this.findOrCreateLayer(repoId, layerForm, counter + 1);
     }
   }

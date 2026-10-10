@@ -15,27 +15,17 @@
  */
 package io.repsy.protocols.docker.protocol.handlers;
 
-import static io.repsy.protocols.docker.shared.utils.DockerProtocolHttpValues.DOCKER_UPLOAD_UUID;
-import static io.repsy.protocols.docker.shared.utils.DockerProtocolHttpValues.RANGE;
-import static org.springframework.http.HttpHeaders.LOCATION;
-
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import io.repsy.protocols.docker.protocol.facades.DockerProtocolFacade;
-import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.oci.handlers.AbstractOciUploadStatusProtocolMethodHandler;
 import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
-import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import java.util.regex.Pattern;
+import java.io.IOException;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 /**
  * Handles {@code GET}/{@code HEAD} {@code /v2/{name}/blobs/uploads/{uuid}} — how a client resumes
@@ -45,65 +35,41 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
  */
 @NullMarked
 public abstract class AbstractDockerUploadStatusProtocolMethodHandler<ID>
-    extends AbstractFacadeProtocolMethodHandler<DockerProtocolFacade<ID>> {
-
-  private static final Pattern UPLOAD_STATUS_PATTERN =
-      Pattern.compile("^/([^/]+)/blobs/uploads/([0-9a-fA-F-]{36})/?$");
+    extends AbstractOciUploadStatusProtocolMethodHandler<DockerProtocolFacade<ID>> {
 
   public AbstractDockerUploadStatusProtocolMethodHandler(
       final PathParser basePathParser,
       final DockerProtocolFacade<ID> dockerFacade,
       final DockerProtocolProvider provider) {
     super(
-        HandlerRoute.of(Permission.WRITE, HttpMethod.GET, HttpMethod.HEAD)
-            .path(UPLOAD_STATUS_PATTERN.asMatchPredicate()),
+        HandlerRoute.of(Permission.WRITE, HttpMethod.GET, HttpMethod.HEAD),
         basePathParser,
         dockerFacade,
         provider);
   }
 
   @Override
-  public ResponseEntity<Object> handle(
-      final ProtocolContext context,
-      final HttpServletRequest request,
-      final HttpServletResponse response)
-      throws Exception {
-
-    final var urlProperties = ProtocolContextUtils.getUrlProperties(context);
-    final var relativePath = urlProperties.getRelativePath().getPath();
-
-    final var matcher = UPLOAD_STATUS_PATTERN.matcher(relativePath);
-
-    if (!matcher.matches()) {
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
-
-    final var imageName = matcher.group(1);
-    final var sessionId = matcher.group(2);
-
-    final var uploadPath = new RelativePath("/blobs/" + sessionId);
+  protected long uploadSize(final ProtocolContext context, final String name, final String uploadId)
+      throws IOException {
 
     // Throws ItemNotFoundException when no such upload session exists, which ErrorHandler turns
     // into the 404 BLOB_UPLOAD_UNKNOWN the OCI distribution spec asks for.
-    final var uploadSize = this.facade.getUploadSize(context, uploadPath);
+    return this.facade.getUploadSize(context, DockerUploadPaths.of(uploadId));
+  }
 
-    final var location = this.getServletURILocation(context, imageName, sessionId);
+  @Override
+  protected String uploadLocation(
+      final ProtocolContext context,
+      final HttpServletRequest request,
+      final String name,
+      final String uploadId) {
 
-    return ResponseEntity.noContent()
-        .header(LOCATION, location)
-        .header(RANGE, "0-" + Math.max(uploadSize - 1, 0))
-        .header(DOCKER_UPLOAD_UUID, sessionId)
-        .build();
+    return this.getServletURILocation(context, name, uploadId);
   }
 
   protected String getServletURILocation(
       final ProtocolContext context, final String imageName, final String sessionId) {
 
-    final var urlProperties = ProtocolContextUtils.getUrlProperties(context);
-
-    return ServletUriComponentsBuilder.fromCurrentContextPath()
-        .path("/v2/{repoName}/{imageName}/blobs/uploads/{sessionId}")
-        .buildAndExpand(urlProperties.getRepoName(), imageName, sessionId)
-        .toUriString();
+    return DockerUploadPaths.sessionLocation(context, imageName, sessionId);
   }
 }

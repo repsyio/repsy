@@ -15,9 +15,9 @@
  */
 package io.repsy.protocols.docker.protocol.handlers;
 
-import static io.repsy.protocols.docker.shared.utils.DockerProtocolHttpValues.DOCKER_CONTENT_DIGEST;
 import static io.repsy.protocols.docker.shared.utils.MediaTypes.DOCKER_MANIFEST_LIST;
 import static io.repsy.protocols.docker.shared.utils.MediaTypes.OCI_IMAGE_INDEX;
+import static io.repsy.protocols.oci.constants.OciConstants.DOCKER_CONTENT_DIGEST;
 import static org.springframework.http.HttpHeaders.CONTENT_TYPE;
 import static org.springframework.http.HttpHeaders.LOCATION;
 

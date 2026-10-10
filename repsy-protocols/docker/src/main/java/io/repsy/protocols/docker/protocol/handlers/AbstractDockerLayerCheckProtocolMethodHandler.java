@@ -15,77 +15,44 @@
  */
 package io.repsy.protocols.docker.protocol.handlers;
 
-import static io.repsy.protocols.docker.shared.utils.DockerProtocolHttpValues.DOCKER_CONTENT_DIGEST;
-import static org.springframework.http.HttpHeaders.CONTENT_LENGTH;
-import static org.springframework.http.HttpHeaders.CONTENT_TYPE;
-
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import io.repsy.protocols.docker.shared.layer.services.LayerService;
-import io.repsy.protocols.shared.handlers.AbstractRoutedProtocolMethodHandler;
+import io.repsy.protocols.oci.dtos.OciBlobInfo;
+import io.repsy.protocols.oci.handlers.AbstractOciBlobCheckProtocolMethodHandler;
+import io.repsy.protocols.oci.utils.OciPathUtils;
 import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.BlobDigests;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import java.util.regex.Pattern;
+import java.util.Optional;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 
+/** The OCI blob check of a Docker layer, any supported digest algorithm. */
 @NullMarked
 public abstract class AbstractDockerLayerCheckProtocolMethodHandler<ID>
-    extends AbstractRoutedProtocolMethodHandler {
-
-  private static final Pattern LAYER_CHECK_PATTERN =
-      Pattern.compile("^/([^/]+)/blobs/(" + BlobDigests.DIGEST_REGEX + ")/?$");
-
-  private final LayerService<ID> layerService;
+    extends AbstractOciBlobCheckProtocolMethodHandler<LayerService<ID>> {
 
   public AbstractDockerLayerCheckProtocolMethodHandler(
       final PathParser basePathParser,
       final LayerService<ID> layerTxService,
       final DockerProtocolProvider provider) {
     super(
-        HandlerRoute.of(Permission.READ, HttpMethod.HEAD)
-            .path(LAYER_CHECK_PATTERN.asMatchPredicate()),
+        HandlerRoute.of(Permission.READ, HttpMethod.HEAD),
+        OciPathUtils.blob(BlobDigests.DIGEST_REGEX),
         basePathParser,
+        layerTxService,
         provider);
-    this.layerService = layerTxService;
   }
 
   @Override
-  public ResponseEntity<Object> handle(
-      final ProtocolContext context,
-      final HttpServletRequest request,
-      final HttpServletResponse response) {
-
+  protected Optional<OciBlobInfo> findBlob(final ProtocolContext context, final String digest) {
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-    final var relativePath = ProtocolContextUtils.getRelativePath(context).getPath();
 
-    final var matcher = LAYER_CHECK_PATTERN.matcher(relativePath);
-
-    if (!matcher.matches()) {
-      return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-    }
-
-    final var digest = matcher.group(2);
-
-    final var layerOpt = this.layerService.findLayerInfoByRepoIdAndDigest(repoInfo.getId(), digest);
-
-    if (layerOpt.isEmpty()) {
-      return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-    }
-
-    final var layerInfo = layerOpt.get();
-
-    return ResponseEntity.ok()
-        .header(CONTENT_LENGTH, String.valueOf(layerInfo.getSize()))
-        .header(CONTENT_TYPE, layerInfo.getMediaType())
-        .header(DOCKER_CONTENT_DIGEST, digest)
-        .build();
+    return this.facade
+        .findLayerInfoByRepoIdAndDigest(repoInfo.getId(), digest)
+        .map(layer -> new OciBlobInfo(layer.getSize(), layer.getMediaType()));
   }
 }

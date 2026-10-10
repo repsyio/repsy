@@ -15,51 +15,41 @@
  */
 package io.repsy.protocols.docker.protocol.handlers;
 
-import static io.repsy.protocols.docker.shared.utils.DockerProtocolHttpValues.DOCKER_UPLOAD_UUID;
-import static org.springframework.http.HttpHeaders.LOCATION;
-
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
+import io.repsy.protocols.oci.handlers.AbstractOciUploadStartProtocolMethodHandler;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
-import io.repsy.protocols.shared.handlers.AbstractRoutedProtocolMethodHandler;
 import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.BlobDigests;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import java.util.UUID;
-import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
+/**
+ * The Docker upload start: honours the {@code digest-algorithm} hint (RPS-1594) and keeps no state
+ * for a session until its first byte arrives.
+ */
 @NullMarked
 public abstract class AbstractDockerUploadStartProtocolMethodHandler
-    extends AbstractRoutedProtocolMethodHandler {
+    extends AbstractOciUploadStartProtocolMethodHandler {
 
-  /** The OCI distribution spec's hint (end-4c) of the algorithm the blob's digest will use. */
   private static final String DIGEST_ALGORITHM_PARAMETER = "digest-algorithm";
-
-  private static final Pattern UPLOAD_START_PATTERN = Pattern.compile("^/([^/]+)/blobs/uploads/?$");
 
   public AbstractDockerUploadStartProtocolMethodHandler(
       final PathParser basePathParser, final DockerProtocolProvider provider) {
     super(
-        HandlerRoute.of(Permission.WRITE, HttpMethod.POST)
-            .skipHeaderPreProcessor(true)
-            .path(UPLOAD_START_PATTERN.asMatchPredicate()),
+        HandlerRoute.of(Permission.WRITE, HttpMethod.POST).skipHeaderPreProcessor(true),
         basePathParser,
         provider);
   }
 
   @Override
-  public ResponseEntity<Object> handle(
-      final ProtocolContext context,
-      final HttpServletRequest request,
-      final HttpServletResponse response) {
+  protected UUID startUpload(final ProtocolContext context, final HttpServletRequest request) {
 
     // The registry keeps no state for a session until its first byte arrives, and the algorithm of
     // the blob is the one of the digest the finalizing PUT names, which is verified against the
@@ -71,20 +61,15 @@ public abstract class AbstractDockerUploadStartProtocolMethodHandler
       throw new BadRequestException(ProtocolErrorCodes.DOCKER_DIGEST_ALGORITHM_UNSUPPORTED);
     }
 
-    // Minted once: the Location a client PATCHes/PUTs against and the Docker-Upload-UUID it may
-    // read back must name the same session (RPS-1241), and getUuid() is a fresh id on every call.
-    final var sessionId = this.getUuid();
+    return this.getUuid();
+  }
 
-    final var location =
-        ServletUriComponentsBuilder.fromCurrentRequestUri()
-            .path("/{sessionId}")
-            .buildAndExpand(sessionId)
-            .toUriString();
-
-    return ResponseEntity.accepted()
-        .header(LOCATION, location)
-        .header(DOCKER_UPLOAD_UUID, sessionId.toString())
-        .build();
+  @Override
+  protected String uploadLocation(final HttpServletRequest request, final UUID uploadId) {
+    return ServletUriComponentsBuilder.fromCurrentRequestUri()
+        .path("/{sessionId}")
+        .buildAndExpand(uploadId)
+        .toUriString();
   }
 
   protected UUID getUuid() {
