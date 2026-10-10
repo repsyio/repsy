@@ -22,8 +22,8 @@ import io.repsy.os.server.protocols.shared.aop.resolvers.RepoInfoResolver;
 import io.repsy.os.server.protocols.shared.aop.resolvers.RepoPermissionInfoResolver;
 import java.util.List;
 import org.jspecify.annotations.NullMarked;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
@@ -32,18 +32,23 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Configuration
 public class ProtocolEndpointDispatcher implements WebMvcConfigurer {
 
-  private final RepoInfoResolver repoInfoResolver;
-  private final AuthServiceResolver authServiceResolver;
-  private final ApiFacadeResolver apiFacadeResolver;
-  private final RepoPermissionInfoResolver permissionInfoResolver;
-  private final ProtocolAuthInterceptor authInterceptor;
+  private final ObjectProvider<RepoInfoResolver> repoInfoResolver;
+  private final ObjectProvider<AuthServiceResolver> authServiceResolver;
+  private final ObjectProvider<ApiFacadeResolver> apiFacadeResolver;
+  private final ObjectProvider<RepoPermissionInfoResolver> permissionInfoResolver;
+  private final ObjectProvider<ProtocolAuthInterceptor> authInterceptor;
 
+  // The providers are resolved in addArgumentResolvers and addInterceptors, not here. The MVC
+  // infrastructure injects every WebMvcConfigurer while it creates mvcConversionService, and the
+  // resolvers lead to services (PypiPackageService and others) that inject that same
+  // ConversionService, so constructor injection is a bean cycle. Both callbacks run later, when
+  // the request mapping beans are built from the finished conversion service.
   public ProtocolEndpointDispatcher(
-      @Lazy final RepoInfoResolver repoInfoResolver,
-      @Lazy final AuthServiceResolver authServiceResolver,
-      @Lazy final ApiFacadeResolver apiFacadeResolver,
-      @Lazy final RepoPermissionInfoResolver permissionInfoResolver,
-      @Lazy final ProtocolAuthInterceptor authInterceptor) {
+      final ObjectProvider<RepoInfoResolver> repoInfoResolver,
+      final ObjectProvider<AuthServiceResolver> authServiceResolver,
+      final ObjectProvider<ApiFacadeResolver> apiFacadeResolver,
+      final ObjectProvider<RepoPermissionInfoResolver> permissionInfoResolver,
+      final ObjectProvider<ProtocolAuthInterceptor> authInterceptor) {
 
     this.repoInfoResolver = repoInfoResolver;
     this.authServiceResolver = authServiceResolver;
@@ -55,10 +60,10 @@ public class ProtocolEndpointDispatcher implements WebMvcConfigurer {
   @Override
   public void addArgumentResolvers(final List<HandlerMethodArgumentResolver> resolvers) {
 
-    resolvers.add(this.repoInfoResolver);
-    resolvers.add(this.permissionInfoResolver);
-    resolvers.add(this.authServiceResolver);
-    resolvers.add(this.apiFacadeResolver);
+    resolvers.add(this.repoInfoResolver.getObject());
+    resolvers.add(this.permissionInfoResolver.getObject());
+    resolvers.add(this.authServiceResolver.getObject());
+    resolvers.add(this.apiFacadeResolver.getObject());
   }
 
   @Override
@@ -68,6 +73,6 @@ public class ProtocolEndpointDispatcher implements WebMvcConfigurer {
     // for a handler without @RepoOperation, and a list forgot /api/mvn/groups/** (RPS-1558), which
     // left a @RepoOperation route without its authorization. RepoOperationRoutesStatusIT keeps
     // every @RepoOperation route under /api/.
-    registry.addInterceptor(this.authInterceptor).addPathPatterns("/api/**");
+    registry.addInterceptor(this.authInterceptor.getObject()).addPathPatterns("/api/**");
   }
 }

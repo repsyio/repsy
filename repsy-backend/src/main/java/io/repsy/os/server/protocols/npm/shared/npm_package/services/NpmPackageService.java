@@ -156,6 +156,9 @@ public class NpmPackageService extends AbstractNpmPackageService<UUID> {
     // failing on the unique index: on PostgreSQL a failed statement aborts the transaction, which
     // also holds the file write. The statement waits for that publish to finish, and then finds
     // the committed package.
+    // No advisory lock is taken here, unlike in Repsy Cloud (RPS-2068): the unique index of the
+    // package treats a missing scope as '' on PostgreSQL, so it is a reliable guard, and a lock
+    // function would not exist on the embedded H2.
     final var inserted =
         this.npmPackageRepository.insertIfAbsent(
             UuidCreator.getTimeOrderedEpoch(),
