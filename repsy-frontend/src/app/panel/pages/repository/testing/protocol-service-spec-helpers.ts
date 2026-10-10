@@ -66,20 +66,18 @@ export function httpError(status = 500): HttpErrorResponse {
   return new HttpErrorResponse({ status, statusText: 'error', error: { detail: 'boom' } });
 }
 
-/** The two names a protocol service uses for "load and activate a repository" (`selectRepository` on PyPI). */
+/** A protocol service that loads and activates a repository through `fetchRepoPermission`. */
 export interface RepoSelecting {
   readonly repoChanges: Observable<RepoPermissionInfo>;
-  getRepository?(repoName: string): Observable<RepoPermissionInfo>;
-  selectRepository?(repoName: string): Observable<RepoPermissionInfo>;
+  fetchRepoPermission(repoName: string): Observable<RepoPermissionInfo>;
 }
 
 function select(service: RepoSelecting, repoName: string): Observable<RepoPermissionInfo> {
-  const method = service.getRepository ?? service.selectRepository;
-  return method.call(service, repoName);
+  return service.fetchRepoPermission(repoName);
 }
 
 /**
- * Drives `getRepository`/`selectRepository` to completion against `getPermission`, so the calls that follow see
+ * Drives `fetchRepoPermission` to completion against `getPermission`, so the calls that follow see
  * `repoName` as the active repository.
  */
 export function selectRepo(

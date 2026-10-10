@@ -61,7 +61,7 @@ export class NuGetComponent implements OnInit, OnDestroy {
   private loadRepository(repoName: string): void {
     this.loading = true;
 
-    this.nugetService.selectRepository(repoName).subscribe({
+    this.nugetService.fetchRepoPermission(repoName).subscribe({
       next: (repo: RepoPermissionInfo) => {
         if (repo.private && !this.isAuthenticated) {
           this.router.navigate(['/not-found'], {

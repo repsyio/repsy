@@ -48,7 +48,7 @@ export class GoService {
     return this.repoSubject.getValue()?.repoName ?? '';
   }
 
-  getRepository(repoName: string): Observable<RepoPermissionInfo> {
+  fetchRepoPermission(repoName: string): Observable<RepoPermissionInfo> {
     this.resetActiveRepoIfChanged(repoName);
 
     return this.reposApi.getRepoPermissions(repoName).pipe(tap((info) => this.repoSubject.next(info)));

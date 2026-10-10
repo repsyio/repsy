@@ -152,7 +152,7 @@ export class MavenArtifactsVersionListComponent implements OnDestroy {
   public deleteVersion(version: ArtifactVersionListItem) {
     const versionCount = this.versions.length;
 
-    this.mavenService.getVersionDeleteWarning(this.groupName, this.artifactName).subscribe((warning) => {
+    this.mavenService.fetchVersionDeleteWarning(this.groupName, this.artifactName).subscribe((warning) => {
       showVersionDeleteDialog(this.dangerModalService, warning, () => this.confirmDeleteVersion(version, versionCount));
     });
   }

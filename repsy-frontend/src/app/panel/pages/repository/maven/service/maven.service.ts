@@ -58,7 +58,7 @@ export class MavenService {
     return this.repoSubject.getValue()?.repoName ?? '';
   }
 
-  public getRepository(repoName: string): Observable<RepoPermissionInfo> {
+  public fetchRepoPermission(repoName: string): Observable<RepoPermissionInfo> {
     this.resetActiveRepoIfChanged(repoName);
 
     return this.reposApi.getRepoPermissions(repoName).pipe(tap((info) => this.repoSubject.next(info)));
@@ -76,7 +76,7 @@ export class MavenService {
     return this.reposApi.updateRepoSettings(this.repoName, form).pipe(map(() => undefined));
   }
 
-  public getPathContent(path: string): Observable<FsItemInfo[]> {
+  public fetchPathContent(path: string): Observable<FsItemInfo[]> {
     return this.reposApi.getPathContent(path, this.repoName).pipe(map((r) => r as unknown as FsItemInfo[]));
   }
 
@@ -137,7 +137,7 @@ export class MavenService {
   }
 
   /** What deleting the group removes: how many artifacts and versions it holds. */
-  public getGroupSummary(groupName: string): Observable<MavenGroupSummary> {
+  public fetchGroupSummary(groupName: string): Observable<MavenGroupSummary> {
     return this.mavenGroupsApi.getMavenGroupSummary(groupName, this.repoName);
   }
 
@@ -147,7 +147,7 @@ export class MavenService {
    * `null` when only the version goes. Read from the versions probe and the group summary; a probe that
    * fails asks for nothing more than the plain confirmation.
    */
-  public getVersionDeleteWarning(groupName: string, artifactName: string): Observable<string | null> {
+  public fetchVersionDeleteWarning(groupName: string, artifactName: string): Observable<string | null> {
     return this.searchArtifactVersions(
       groupName,
       artifactName,
@@ -156,7 +156,7 @@ export class MavenService {
       0,
       VERSION_PROBE_SIZE,
     ).pipe(
-      switchMap((probe) => (isLastVersion(probe) ? this.getGroupSummary(groupName) : of(null))),
+      switchMap((probe) => (isLastVersion(probe) ? this.fetchGroupSummary(groupName) : of(null))),
       map((summary) =>
         summary && summary.artifactCount === 1 ? lastVersionOfGroupWarning(groupName, artifactName) : null,
       ),

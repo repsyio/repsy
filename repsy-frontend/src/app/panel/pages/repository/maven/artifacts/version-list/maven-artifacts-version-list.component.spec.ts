@@ -49,10 +49,10 @@ describe('MavenArtifactsVersionListComponent', () => {
     repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
     mavenService = jasmine.createSpyObj<MavenService>(
       'MavenService',
-      ['searchArtifactVersions', 'deleteVersion', 'getVersionDeleteWarning'],
+      ['searchArtifactVersions', 'deleteVersion', 'fetchVersionDeleteWarning'],
       { repoChanges },
     );
-    mavenService.getVersionDeleteWarning.and.returnValue(of(null));
+    mavenService.fetchVersionDeleteWarning.and.returnValue(of(null));
     securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['watchVersionSecuritySummary']);
     securityService.watchVersionSecuritySummary.and.returnValue(of({}));
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
@@ -125,12 +125,12 @@ describe('MavenArtifactsVersionListComponent', () => {
     beforeEach(() => build());
 
     it('names the artifact and the group that go too, and deletes nothing before the confirmation', () => {
-      mavenService.getVersionDeleteWarning.and.returnValue(of('the artifact and the group are removed too'));
+      mavenService.fetchVersionDeleteWarning.and.returnValue(of('the artifact and the group are removed too'));
       component.versions = [VERSION];
 
       component.deleteVersion(VERSION);
 
-      expect(mavenService.getVersionDeleteWarning).toHaveBeenCalledOnceWith('org.acme', 'lib');
+      expect(mavenService.fetchVersionDeleteWarning).toHaveBeenCalledOnceWith('org.acme', 'lib');
       expect(dangerModalService.modal).toEqual({
         title: 'Delete Version',
         action: 'Delete',

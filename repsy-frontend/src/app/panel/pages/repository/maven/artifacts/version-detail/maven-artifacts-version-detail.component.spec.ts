@@ -73,13 +73,13 @@ describe('MavenArtifactsVersionDetailComponent', () => {
     currentRepo = { repoName: REPO, repoType: 'maven' };
     mavenService = jasmine.createSpyObj<MavenService>(
       'MavenService',
-      ['fetchArtifactVersion', 'deleteVersion', 'getVersionDeleteWarning', 'searchArtifactVersions'],
+      ['fetchArtifactVersion', 'deleteVersion', 'fetchVersionDeleteWarning', 'searchArtifactVersions'],
       {
         repoChanges,
       },
     );
     mavenService.fetchArtifactVersion.and.returnValue(of(VERSION));
-    mavenService.getVersionDeleteWarning.and.returnValue(of(null));
+    mavenService.fetchVersionDeleteWarning.and.returnValue(of(null));
     mavenService.searchArtifactVersions.and.returnValue(of(versionsProbe(2)));
     mavenService.deleteVersion.and.returnValue(of(undefined));
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
@@ -226,11 +226,11 @@ describe('MavenArtifactsVersionDetailComponent', () => {
 
     // RPS-1348: the last version of a group's only artifact takes the artifact and the group with it.
     it('names the artifact and the group that go too when the version is the last of the only artifact', () => {
-      mavenService.getVersionDeleteWarning.and.returnValue(of('the artifact and the group are removed too'));
+      mavenService.fetchVersionDeleteWarning.and.returnValue(of('the artifact and the group are removed too'));
 
       component.deleteVersion();
 
-      expect(mavenService.getVersionDeleteWarning).toHaveBeenCalledOnceWith('org.acme', 'lib');
+      expect(mavenService.fetchVersionDeleteWarning).toHaveBeenCalledOnceWith('org.acme', 'lib');
       expect(dangerModalService.modal).toEqual({
         title: 'Delete Version',
         action: 'Delete',

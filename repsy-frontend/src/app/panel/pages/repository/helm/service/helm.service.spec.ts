@@ -62,7 +62,7 @@ describe('HelmService', () => {
   describeRepoSelection({
     service: () => service,
     getPermission: () => repoApi.getRepoPermissions,
-    probe: (s) => s.getChart(CHART),
+    probe: (s) => s.fetchChart(CHART),
     probeApi: () => helmApi.getHelmChart,
     probeRepoArg: 0,
     resetsOnChange: true,
@@ -95,16 +95,16 @@ describe('HelmService', () => {
     // Unlike the other services, the Helm client takes the repository name first.
     const calls: CallCase<HelmService>[] = [
       {
-        name: 'getChart',
-        invoke: (s) => s.getChart(CHART),
+        name: 'fetchChart',
+        invoke: (s) => s.fetchChart(CHART),
         api: () => helmApi.getHelmChart,
         args: [REPO, CHART],
         response: summary,
         expected: summary,
       },
       {
-        name: 'getChartDetail',
-        invoke: (s) => s.getChartDetail(CHART, VERSION),
+        name: 'fetchChartDetail',
+        invoke: (s) => s.fetchChartDetail(CHART, VERSION),
         api: () => helmApi.getHelmChartDetail,
         args: [REPO, CHART, VERSION],
         response: detail,
@@ -129,16 +129,16 @@ describe('HelmService', () => {
         notCalled: () => [helmApi.deleteAllHelmChartVersions],
       },
       {
-        name: 'getOciTags',
-        invoke: (s) => s.getOciTags(CHART),
+        name: 'fetchOciTags',
+        invoke: (s) => s.fetchOciTags(CHART),
         api: () => helmApi.getHelmChartOciTags,
         args: [REPO, CHART],
         response: tags,
         expected: tags,
       },
       {
-        name: 'getOciTags without tag data',
-        invoke: (s) => s.getOciTags(CHART),
+        name: 'fetchOciTags without tag data',
+        invoke: (s) => s.fetchOciTags(CHART),
         api: () => helmApi.getHelmChartOciTags,
         args: [REPO, CHART],
         response: undefined,

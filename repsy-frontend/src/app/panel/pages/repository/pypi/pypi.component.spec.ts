@@ -22,6 +22,6 @@ describeProtocolShell({
   component: PypiComponent,
   repoType: 'pypi',
   service: PypiService,
-  loadMethod: 'selectRepository',
+  loadMethod: 'fetchRepoPermission',
   permissionsField: 'permissions',
 });

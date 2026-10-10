@@ -58,7 +58,7 @@ export class NuGetService {
     return this.repoSubject.getValue()?.repoName ?? '';
   }
 
-  public selectRepository(repoName: string): Observable<RepoPermissionInfo> {
+  public fetchRepoPermission(repoName: string): Observable<RepoPermissionInfo> {
     this.resetActiveRepoIfChanged(repoName);
 
     return this.reposApi.getRepoPermissions(repoName).pipe(tap((info) => this.repoSubject.next(info)));
@@ -147,7 +147,7 @@ export class NuGetService {
     await firstValueFrom(this.nugetPackagesApi.deleteNugetVersion(packageId, version, this.repoName));
   }
 
-  public async getDeployTokens(pageNumber: number, pageSize: number): Promise<PagedData<DeployTokenInfoListItem>> {
+  public async fetchDeployTokens(pageNumber: number, pageSize: number): Promise<PagedData<DeployTokenInfoListItem>> {
     const response = await firstValueFrom(this.deployTokensApi.listDeployTokens(this.repoName, pageNumber, pageSize));
     return this.toPagedData(response);
   }

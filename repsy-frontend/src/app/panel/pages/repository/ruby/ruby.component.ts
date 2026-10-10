@@ -62,7 +62,7 @@ export class RubyComponent implements OnInit, OnDestroy {
   private loadPermissions(repoName: string): void {
     this.loading = true;
 
-    this.rubyService.getRepository(repoName).subscribe({
+    this.rubyService.fetchRepoPermission(repoName).subscribe({
       next: (permissions: RepoPermissionInfo) => {
         if (permissions.private && !this.isAuthenticated) {
           this.router.navigate(['/not-found'], { replaceUrl: true });

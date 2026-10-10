@@ -40,8 +40,8 @@ export interface ProtocolShellSpec<S> {
   repoType: RepoRouteSlug;
   /** The protocol service class the shell loads the permissions through. */
   service: Type<S>;
-  /** The service method that requests the permissions (`selectRepository` on NuGet and PyPI). */
-  loadMethod: 'getRepository' | 'selectRepository';
+  /** The service method that requests the permissions (`fetchRepoPermission` in every protocol service). */
+  loadMethod: 'fetchRepoPermission';
   /** The shell property that holds the loaded permissions. */
   permissionsField: 'permissions' | 'activeRepo' | 'activeRegistry';
 }

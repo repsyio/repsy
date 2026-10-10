@@ -215,7 +215,7 @@ export class MavenBrowserComponent implements OnDestroy {
     this.searchText = '';
 
     this.mavenService
-      .getPathContent(this.directoryStack[this.directoryStack.length - 1].path)
+      .fetchPathContent(this.directoryStack[this.directoryStack.length - 1].path)
       .pipe(
         finalize(() => {
           this.loading = false;

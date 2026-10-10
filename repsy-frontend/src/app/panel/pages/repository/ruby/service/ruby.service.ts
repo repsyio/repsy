@@ -47,7 +47,7 @@ export class RubyService {
     return this.repoSubject.getValue()?.repoName ?? '';
   }
 
-  public getRepository(repoName: string): Observable<RepoPermissionInfo> {
+  public fetchRepoPermission(repoName: string): Observable<RepoPermissionInfo> {
     this.resetActiveRepoIfChanged(repoName);
 
     return this.reposApi.getRepoPermissions(repoName).pipe(tap((info) => this.repoSubject.next(info)));
