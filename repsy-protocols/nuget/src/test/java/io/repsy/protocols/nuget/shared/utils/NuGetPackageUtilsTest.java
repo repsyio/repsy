@@ -901,6 +901,213 @@ class NuGetPackageUtilsTest {
     }
   }
 
+  @Nested
+  @DisplayName("the request parameters, the stream copy and the repo gate")
+  class RequestAndPublishHelpers {
+
+    @Test
+    @DisplayName("parseNonNegativeParam falls back to the default for an absent value")
+    void absentParamIsTheDefault() {
+      assertThat(NuGetPackageUtils.parseNonNegativeParam(null, 20, "take")).isEqualTo(20);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"0, 0", "7, 7", "2147483647, 2147483647"})
+    @DisplayName("parseNonNegativeParam reads a non-negative integer")
+    void readsNonNegativeInteger(final String value, final int expected) {
+      assertThat(NuGetPackageUtils.parseNonNegativeParam(value, 20, "take")).isEqualTo(expected);
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"abc", "1.5", "", " 1", "2147483648", "99999999999"})
+    @DisplayName("parseNonNegativeParam names the parameter for a value that is not an int")
+    void rejectsNonInteger(final String value) {
+      assertThatThrownBy(() -> NuGetPackageUtils.parseNonNegativeParam(value, 20, "skip"))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage("'skip' is not a valid integer: " + value);
+    }
+
+    @Test
+    @DisplayName("parseNonNegativeParam rejects a negative value")
+    void rejectsNegative() {
+      assertThatThrownBy(() -> NuGetPackageUtils.parseNonNegativeParam("-1", 20, "take"))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage("'take' must not be negative: -1");
+    }
+
+    @Test
+    @DisplayName("the search page size is clamped to 1000")
+    void searchTakeLimit() {
+      assertThat(NuGetPackageUtils.MAX_SEARCH_TAKE).isEqualTo(1000);
+    }
+
+    @Test
+    @DisplayName("copyStreamToFile writes the stream and replaces an existing file")
+    void copiesAndReplaces() throws IOException {
+      final var target = NuGetPackageUtilsTest.this.tempDir.resolve("copy.nupkg");
+      Files.writeString(target, "old content that is longer");
+
+      NuGetPackageUtils.copyStreamToFile(
+          new java.io.ByteArrayInputStream("new".getBytes(StandardCharsets.UTF_8)), target);
+
+      assertThat(Files.readString(target)).isEqualTo("new");
+    }
+
+    @Test
+    @DisplayName("copyStreamToFile refuses an empty stream")
+    void refusesEmptyStream() {
+      final var target = NuGetPackageUtilsTest.this.tempDir.resolve("empty.nupkg");
+
+      assertThatThrownBy(
+              () ->
+                  NuGetPackageUtils.copyStreamToFile(
+                      new java.io.ByteArrayInputStream(new byte[0]), target))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage("NuGet package stream is empty.");
+    }
+
+    private static io.repsy.protocols.shared.repo.dtos.BaseRepoInfo<java.util.UUID> repo(
+        final Boolean snapshots, final Boolean releases) {
+      return io.repsy.protocols.shared.repo.dtos.BaseRepoInfo.<java.util.UUID>builder()
+          .name("nuget")
+          .snapshots(snapshots)
+          .releases(releases)
+          .build();
+    }
+
+    @Test
+    @DisplayName("checkVersionAllowance refuses a pre-release when snapshots are off")
+    void refusesPrereleaseWhenSnapshotsOff() {
+      assertThatThrownBy(
+              () -> NuGetPackageUtils.checkVersionAllowance("1.0.0-beta", repo(false, true)))
+          .isInstanceOfSatisfying(
+              ResponseStatusException.class,
+              e -> {
+                assertThat(e.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+                assertThat(e.getReason())
+                    .isEqualTo("Pre-release packages are not allowed in this repository.");
+              });
+    }
+
+    @Test
+    @DisplayName("checkVersionAllowance refuses a release when releases are off")
+    void refusesReleaseWhenReleasesOff() {
+      assertThatThrownBy(() -> NuGetPackageUtils.checkVersionAllowance("1.0.0", repo(true, false)))
+          .isInstanceOfSatisfying(
+              ResponseStatusException.class,
+              e -> {
+                assertThat(e.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+                assertThat(e.getReason())
+                    .isEqualTo("Release packages are not allowed in this repository.");
+              });
+    }
+
+    @Test
+    @DisplayName("checkVersionAllowance lets a version through unless its kind is switched off")
+    void allowsOtherwise() {
+      NuGetPackageUtils.checkVersionAllowance("1.0.0-beta", repo(true, false));
+      NuGetPackageUtils.checkVersionAllowance("1.0.0", repo(false, true));
+      NuGetPackageUtils.checkVersionAllowance("1.0.0-beta", repo(null, null));
+      NuGetPackageUtils.checkVersionAllowance("1.0.0", repo(null, null));
+    }
+  }
+
+  @Nested
+  @DisplayName("registration pages")
+  class RegistrationPages {
+
+    private List<io.repsy.protocols.nuget.shared.dtos.NuGetRegistrationLeafItem> leaves(
+        final int count) {
+      return java.util.stream.IntStream.range(0, count)
+          .mapToObj(i -> leafItem("1.0." + i))
+          .toList();
+    }
+
+    @Test
+    @DisplayName("up to 64 leaves are one page that keeps the index url")
+    void onePageKeepsIndexUrl() {
+      final var pages =
+          NuGetPackageUtils.buildRegistrationPages(this.leaves(64), "https://x/a/index.json");
+
+      assertThat(pages)
+          .singleElement()
+          .satisfies(
+              page -> {
+                assertThat(page.id()).isEqualTo("https://x/a/index.json");
+                assertThat(page.type()).isEqualTo("catalog:CatalogPage");
+                assertThat(page.count()).isEqualTo(64);
+                assertThat(page.items()).hasSize(64);
+                assertThat(page.lower()).isEqualTo("1.0.0");
+                assertThat(page.upper()).isEqualTo("1.0.63");
+              });
+    }
+
+    @Test
+    @DisplayName("no leaves is one empty page with blank bounds")
+    void emptyIsOnePage() {
+      final var pages =
+          NuGetPackageUtils.buildRegistrationPages(List.of(), "https://x/a/index.json");
+
+      assertThat(pages)
+          .singleElement()
+          .satisfies(
+              page -> {
+                assertThat(page.count()).isZero();
+                assertThat(page.lower()).isEmpty();
+                assertThat(page.upper()).isEmpty();
+              });
+    }
+
+    @Test
+    @DisplayName("more than 64 leaves are split into pages of 64 with numbered page urls")
+    void splitsIntoPagesOf64() {
+      final var pages =
+          NuGetPackageUtils.buildRegistrationPages(this.leaves(130), "https://x/a/index.json");
+
+      assertThat(pages)
+          .extracting(page -> page.id())
+          .containsExactly(
+              "https://x/a/page/0.json", "https://x/a/page/1.json", "https://x/a/page/2.json");
+      assertThat(pages).extracting(page -> page.count()).containsExactly(64, 64, 2);
+      assertThat(pages)
+          .extracting(page -> page.lower())
+          .containsExactly("1.0.0", "1.0.64", "1.0.128");
+      assertThat(pages)
+          .extracting(page -> page.upper())
+          .containsExactly("1.0.63", "1.0.127", "1.0.129");
+    }
+
+    @Test
+    @DisplayName("the JSON-LD context and the json suffix are the ones the clients expect")
+    void contextAndSuffix() {
+      assertThat(NuGetPackageUtils.FORMAT_JSON).isEqualTo(".json");
+      assertThat(NuGetPackageUtils.NUGET_CONTEXT)
+          .containsEntry("@vocab", "http://schema.nuget.org/schema#")
+          .containsEntry("comment", "http://www.w3.org/2000/01/rdf-schema#comment")
+          .hasSize(2);
+    }
+  }
+
+  @Nested
+  @DisplayName("extractXmlTag")
+  class ExtractXmlTag {
+
+    @Test
+    @DisplayName("reads the first occurrence, trimmed, even from a document that is not XML")
+    void readsFirstTrimmed() {
+      assertThat(NuGetPackageUtils.extractXmlTag("<a> x </a><a>y</a>", "a")).isEqualTo("x");
+      assertThat(NuGetPackageUtils.extractXmlTag("<<readme> README.md </readme>", "readme"))
+          .isEqualTo("README.md");
+    }
+
+    @Test
+    @DisplayName("is null for a missing or empty tag")
+    void nullWhenAbsent() {
+      assertThat(NuGetPackageUtils.extractXmlTag("<b>x</b>", "a")).isNull();
+      assertThat(NuGetPackageUtils.extractXmlTag("<a></a>", "a")).isNull();
+    }
+  }
+
   private static NuGetRegistrationLeafItem leafItem(final String version) {
     final var entry =
         new NuGetCatalogEntry(

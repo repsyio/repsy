@@ -517,4 +517,294 @@ class CrateUtilsTest {
       assertThat(this.sorted(pageable, false)).isEqualTo(this.sorted(pageable, true));
     }
   }
+
+  private static io.repsy.libs.protocol.router.ProtocolContext context(final String relativePath) {
+    final var repoInfo =
+        io.repsy.protocols.shared.repo.dtos.BaseRepoInfo.<java.util.UUID>builder()
+            .id(java.util.UUID.randomUUID())
+            .storageKey(java.util.UUID.randomUUID())
+            .name("cargo")
+            .build();
+    final var urlProps =
+        io.repsy.protocols.shared.utils.BaseUrlParserProperties
+            .<java.util.UUID, io.repsy.protocols.shared.repo.dtos.BaseRepoInfo<java.util.UUID>>
+                builder()
+            .repoName("cargo")
+            .relativePath(new io.repsy.libs.storage.core.dtos.RelativePath(relativePath))
+            .repoInfo(repoInfo)
+            .build();
+    final var ctx = new io.repsy.libs.protocol.router.ProtocolContext();
+    ctx.addProperty("urlProperties", urlProps);
+    return ctx;
+  }
+
+  @Nested
+  @DisplayName("request paths")
+  class RequestPaths {
+
+    @Test
+    @DisplayName("extractCrateNameAndVersion normalizes the crate name and keeps the version")
+    void nameAndVersion() {
+      final var pair =
+          CrateUtils.extractCrateNameAndVersion(
+              context("/api/v1/crates/Serde-Json/1.0.0-Beta.1/download"));
+
+      assertThat(pair.getFirst()).isEqualTo("serde_json");
+      assertThat(pair.getSecond()).isEqualTo("1.0.0-Beta.1");
+    }
+
+    @Test
+    @DisplayName("extractLastSegment returns the last path segment")
+    void lastSegment() {
+      assertThat(CrateUtils.extractLastSegment(context("/api/v1/crates/Serde-Json/1.0.0/yank")))
+          .isEqualTo("yank");
+    }
+  }
+
+  @Nested
+  @DisplayName("validatePublishRequest() rules besides the column limits")
+  class PublishValidation {
+
+    private CratePublishRequest request(
+        final @Nullable String name,
+        final @Nullable String vers,
+        final @Nullable List<String> keywords) {
+
+      return new CratePublishRequest(
+          name, vers, null, null, null, null, null, null, null, null, null, keywords, null, null,
+          null, null, null, null, null, null);
+    }
+
+    @Test
+    @DisplayName("accepts a plain crate")
+    void accepts() {
+      assertThatCode(
+              () ->
+                  CrateUtils.validatePublishRequest(
+                      this.request("serde_json-2", "1.0.0-alpha.1+build", List.of("a", "b"))))
+          .doesNotThrowAnyException();
+    }
+
+    @ParameterizedTest
+    @CsvSource(
+        delimiter = '|',
+        value = {
+          "|crate name cannot be empty",
+          "' '|crate name cannot be empty",
+          "-bad|crate name `-bad` must start with an alphanumeric character and contain only"
+              + " alphanumerics, `-`, or `_`",
+          "bad name|crate name `bad name` must start with an alphanumeric character and contain"
+              + " only alphanumerics, `-`, or `_`",
+        })
+    @DisplayName("refuses a name that is blank or has characters Cargo does not allow")
+    void refusesName(final @Nullable String name, final String message) {
+      assertThatThrownBy(() -> CrateUtils.validatePublishRequest(this.request(name, "1.0.0", null)))
+          .isInstanceOf(IllegalArgumentException.class)
+          .hasMessage(message);
+    }
+
+    @Test
+    @DisplayName("refuses a name longer than 64 characters")
+    void refusesLongName() {
+      final var name = "a".repeat(65);
+
+      assertThatThrownBy(() -> CrateUtils.validatePublishRequest(this.request(name, "1.0.0", null)))
+          .hasMessage("crate name `%s` must be at most 64 characters".formatted(name));
+    }
+
+    @Test
+    @DisplayName("refuses a blank version and one that is not semver")
+    void refusesVersion() {
+      assertThatThrownBy(() -> CrateUtils.validatePublishRequest(this.request("a", " ", null)))
+          .hasMessage("version cannot be empty");
+      assertThatThrownBy(() -> CrateUtils.validatePublishRequest(this.request("a", "1.x", null)))
+          .hasMessage("version `1.x` is not a valid semver format (expected MAJOR.MINOR.PATCH)");
+    }
+
+    @Test
+    @DisplayName("refuses more than five keywords and a keyword over 20 characters")
+    void refusesKeywords() {
+      final var six = List.of("a", "b", "c", "d", "e", "f");
+
+      assertThatThrownBy(() -> CrateUtils.validatePublishRequest(this.request("a", "1.0.0", six)))
+          .hasMessage("a crate may have at most 5 keywords, got 6");
+      assertThatThrownBy(
+              () ->
+                  CrateUtils.validatePublishRequest(
+                      this.request("a", "1.0.0", List.of("k".repeat(21)))))
+          .hasMessage("keyword `%s` must be at most 20 characters".formatted("k".repeat(21)));
+    }
+  }
+
+  @Nested
+  @DisplayName("the index line and the publish request")
+  class IndexAndPublishRequest {
+
+    private final tools.jackson.databind.ObjectMapper mapper =
+        new tools.jackson.databind.ObjectMapper();
+
+    private CratePublishRequest request(final @Nullable Map<String, List<String>> features2) {
+      final var plain =
+          new io.repsy.protocols.cargo.shared.crate.dtos.CratePublishDep(
+              "serde", "^1", List.of("derive"), true, false, "cfg(unix)", "dev", null, null);
+      final var renamed =
+          new io.repsy.protocols.cargo.shared.crate.dtos.CratePublishDep(
+              "real-name", "=2", List.of(), false, true, null, "normal", "https://r", "alias");
+
+      return new CratePublishRequest(
+          "demo",
+          "1.2.3",
+          true,
+          List.of(plain, renamed),
+          Map.of("f", List.of("serde")),
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          null,
+          "demo-sys",
+          "1.70",
+          "abc123",
+          features2);
+    }
+
+    @Test
+    @DisplayName("getIndexJsonLine maps deps, renames and the index version")
+    void indexLine() {
+      final var json =
+          this.mapper.readTree(CrateUtils.getIndexJsonLine(this.request(null), this.mapper));
+
+      assertThat(json.get("name").asString()).isEqualTo("demo");
+      assertThat(json.get("vers").asString()).isEqualTo("1.2.3");
+      assertThat(json.get("cksum").asString()).isEqualTo("abc123");
+      assertThat(json.get("yanked").asBoolean()).isFalse();
+      assertThat(json.get("v").asInt()).isEqualTo(1);
+      assertThat(json.get("links").asString()).isEqualTo("demo-sys");
+      assertThat(json.get("rust_version").asString()).isEqualTo("1.70");
+      assertThat(json.has("features2")).isFalse();
+      assertThat(json.get("features").get("f").get(0).asString()).isEqualTo("serde");
+
+      final var plain = json.get("deps").get(0);
+      assertThat(plain.get("name").asString()).isEqualTo("serde");
+      assertThat(plain.get("req").asString()).isEqualTo("^1");
+      assertThat(plain.get("optional").asBoolean()).isTrue();
+      assertThat(plain.get("default_features").asBoolean()).isFalse();
+      assertThat(plain.get("target").asString()).isEqualTo("cfg(unix)");
+      assertThat(plain.get("kind").asString()).isEqualTo("dev");
+      assertThat(plain.has("package")).isFalse();
+
+      final var renamed = json.get("deps").get(1);
+      assertThat(renamed.get("name").asString()).isEqualTo("alias");
+      assertThat(renamed.get("package").asString()).isEqualTo("real-name");
+      assertThat(renamed.get("registry").asString()).isEqualTo("https://r");
+    }
+
+    @Test
+    @DisplayName("getIndexJsonLine is version 2 when features2 is present, with empty defaults")
+    void indexLineVersion2() {
+      final var withFeatures2 = this.request(Map.of("g", List.of("dep:x")));
+      final var json =
+          this.mapper.readTree(CrateUtils.getIndexJsonLine(withFeatures2, this.mapper));
+
+      assertThat(json.get("v").asInt()).isEqualTo(2);
+      assertThat(json.get("features2").get("g").get(0).asString()).isEqualTo("dep:x");
+
+      final var bare =
+          new CratePublishRequest(
+              "demo", "1.0.0", null, null, null, null, null, null, null, null, null, null, null,
+              null, null, null, null, null, "c", null);
+      final var bareJson = this.mapper.readTree(CrateUtils.getIndexJsonLine(bare, this.mapper));
+      assertThat(bareJson.get("deps")).isEmpty();
+      assertThat(bareJson.get("features")).isEmpty();
+    }
+
+    @Test
+    @DisplayName("createCratePublishRequestWithChecksum sets the checksum and lib flag only")
+    void withChecksum() {
+      final var original = this.request(null);
+
+      final var copy =
+          CrateUtils.createCratePublishRequestWithChecksum(original, "deadbeef", false);
+
+      assertThat(copy.cksum()).isEqualTo("deadbeef");
+      assertThat(copy.hasLib()).isFalse();
+      assertThat(copy)
+          .usingRecursiveComparison()
+          .ignoringFields("cksum", "hasLib")
+          .isEqualTo(original);
+    }
+
+    private byte[] body(final byte[] lengthField, final String json) {
+      final var out = new ByteArrayOutputStream();
+      out.writeBytes(lengthField);
+      out.writeBytes(json.getBytes(StandardCharsets.UTF_8));
+      return out.toByteArray();
+    }
+
+    private byte[] u32(final long value) {
+      return java.nio.ByteBuffer.allocate(4)
+          .order(java.nio.ByteOrder.LITTLE_ENDIAN)
+          .putInt((int) value)
+          .array();
+    }
+
+    @Test
+    @DisplayName("getPublishRequest reads a little-endian length and that many bytes of JSON")
+    void readsPublishRequest() throws IOException {
+      final var json = "{\"name\":\"demo\",\"vers\":\"1.0.0\",\"unknown\":1}";
+      final var in =
+          new ByteArrayInputStream(this.body(this.u32(json.length()), json + "TRAILING"));
+
+      final var request = CrateUtils.getPublishRequest(in, this.mapper);
+
+      assertThat(request.name()).isEqualTo("demo");
+      assertThat(request.vers()).isEqualTo("1.0.0");
+      assertThat(in.readAllBytes()).isEqualTo("TRAILING".getBytes(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    @DisplayName("getPublishRequest refuses an empty, oversized, short or truncated body")
+    void refusesBadPublishBodies() {
+      assertThatThrownBy(
+              () ->
+                  CrateUtils.getPublishRequest(new ByteArrayInputStream(this.u32(0)), this.mapper))
+          .hasMessage("the crate's metadata JSON is empty");
+      assertThatThrownBy(
+              () ->
+                  CrateUtils.getPublishRequest(
+                      new ByteArrayInputStream(this.u32(5L * 1024 * 1024 + 1)), this.mapper))
+          .hasMessage("the crate's metadata JSON must be at most 5 MiB");
+      assertThatThrownBy(
+              () ->
+                  CrateUtils.getPublishRequest(
+                      new ByteArrayInputStream(this.body(this.u32(50), "{}")), this.mapper))
+          .hasMessage("the crate's metadata JSON is shorter than declared");
+      assertThatThrownBy(
+              () ->
+                  CrateUtils.getPublishRequest(
+                      new ByteArrayInputStream(new byte[] {1, 0}), this.mapper))
+          .hasMessage("the publish body ends before a length field is complete");
+    }
+
+    @Test
+    @DisplayName("readCrateLength reads an unsigned little-endian u32")
+    void readsCrateLength() throws IOException {
+      assertThat(CrateUtils.readCrateLength(new ByteArrayInputStream(new byte[] {4, 3, 2, 1})))
+          .isEqualTo(0x01020304L);
+      assertThat(
+              CrateUtils.readCrateLength(
+                  new ByteArrayInputStream(
+                      new byte[] {(byte) 0xff, (byte) 0xff, (byte) 0xff, (byte) 0xff})))
+          .isEqualTo(4294967295L);
+      assertThatThrownBy(
+              () -> CrateUtils.readCrateLength(new ByteArrayInputStream(new byte[] {1, 2, 3})))
+          .isInstanceOf(IllegalArgumentException.class);
+    }
+  }
 }
