@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.shared.auth;
+package io.repsy.protocols.shared.auth;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Ticker;
@@ -28,9 +28,11 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.HexFormat;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -82,31 +84,50 @@ public class AuthFailureThrottle {
    * one is refused at the price of a hash lookup. Refused attempts therefore count, and past this
    * multiple of the limit the exemption closes too.
    */
-  static final int SATURATION_FACTOR = 10;
+  public static final int SATURATION_FACTOR = 10;
 
   /** Counted in {@link AuthThrottleMode#OBSERVE} for a client that {@code enforce} would refuse. */
   static final String WOULD_BLOCK_METRIC = "repsy.auth.throttle_would_block";
 
   private final @Nullable Cache<String, Window> windows;
   private final @NonNull AuthThrottleMode mode;
-  private final @NonNull MeterRegistry meterRegistry;
+  private final @NonNull Supplier<@Nullable MeterRegistry> meterRegistry;
   private final @NonNull Ticker ticker;
   private final long maxFailures;
   private final long saturationLimit;
   private final long windowNanos;
 
+  /**
+   * The registry is optional: without Micrometer the {@link AuthThrottleMode#OBSERVE} counter is
+   * skipped and the warning in the log remains.
+   */
   @Autowired
+  public AuthFailureThrottle(
+      final @NonNull AuthThrottleProperties properties,
+      final @NonNull ObjectProvider<MeterRegistry> meterRegistry) {
+
+    this(properties, meterRegistry::getIfAvailable, Ticker.systemTicker());
+  }
+
   public AuthFailureThrottle(
       final @NonNull AuthThrottleProperties properties,
       final @NonNull MeterRegistry meterRegistry) {
 
-    this(properties, meterRegistry, Ticker.systemTicker());
+    this(properties, () -> meterRegistry, Ticker.systemTicker());
   }
 
   @VisibleForTesting
   AuthFailureThrottle(
       final @NonNull AuthThrottleProperties properties,
       final @NonNull MeterRegistry meterRegistry,
+      final @NonNull Ticker ticker) {
+
+    this(properties, () -> meterRegistry, ticker);
+  }
+
+  private AuthFailureThrottle(
+      final @NonNull AuthThrottleProperties properties,
+      final @NonNull Supplier<@Nullable MeterRegistry> meterRegistry,
       final @NonNull Ticker ticker) {
 
     this.ticker = ticker;
@@ -158,7 +179,12 @@ public class AuthFailureThrottle {
               + " failed password checks; letting it through",
           client,
           this.maxFailures);
-      this.meterRegistry.counter(WOULD_BLOCK_METRIC, "network", client).increment();
+      final var registry = this.meterRegistry.get();
+
+      if (registry != null) {
+        registry.counter(WOULD_BLOCK_METRIC, "network", client).increment();
+      }
+
       return;
     }
 
@@ -233,7 +259,7 @@ public class AuthFailureThrottle {
   }
 
   @VisibleForTesting
-  long now() {
+  public long now() {
 
     return this.ticker.read();
   }

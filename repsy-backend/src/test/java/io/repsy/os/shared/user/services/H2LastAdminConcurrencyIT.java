@@ -23,10 +23,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import io.repsy.os.H2IntegrationTest;
 import io.repsy.os.generated.model.UserUpdateForm;
-import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.os.shared.user.repositories.UserRepository;
+import io.repsy.protocols.shared.auth.PasswordHasher;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;

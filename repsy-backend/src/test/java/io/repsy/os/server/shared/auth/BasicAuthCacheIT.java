@@ -23,6 +23,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.user.entities.UserRole;
+import io.repsy.protocols.shared.auth.VerifiedPasswordCache;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;

@@ -37,7 +37,6 @@ public final class ErrorConstants {
   public static final String INVALID_AUTH_TYPE = "invalidAuthType";
   public static final String INVALID_CREDENTIALS = "invalidCredentials";
   public static final String NOT_AN_ACCESS_TOKEN = "notAnAccessToken";
-  public static final String PASSWORD_TOO_LONG = "passwordTooLong";
   public static final String PGP_SETTINGS_UNSUPPORTED = "pgpSettingsUnsupported";
   public static final String REFRESH_TOKEN_EXPIRED = "refreshTokenExpired";
   public static final String RELEASES_SNAPSHOTS_UNSUPPORTED = "releasesSnapshotsUnsupported";

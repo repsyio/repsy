@@ -27,7 +27,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import io.repsy.os.AbstractIT;
 import io.repsy.os.server.shared.token.entities.RepoDeployToken;
 import io.repsy.os.server.shared.token.repositories.RepoDeployTokenRepository;
-import io.repsy.os.server.shared.token.utils.DeployTokenHash;
 import io.repsy.os.server.shared.token.utils.TokenUsernameGenerator;
 import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.repo.entities.Repo;
@@ -35,6 +34,7 @@ import io.repsy.os.shared.token.utils.TokenFactory;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import io.repsy.protocols.shared.token.DeployTokenHash;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.LinkedHashMap;

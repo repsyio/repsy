@@ -22,9 +22,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.jayway.jsonpath.JsonPath;
 import io.repsy.os.AbstractIT;
-import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
+import io.repsy.protocols.shared.auth.PasswordHasher;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;

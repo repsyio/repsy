@@ -42,7 +42,6 @@ class ErrorConstantsTest {
           "invalidAuthType",
           "invalidCredentials",
           "notAnAccessToken",
-          "passwordTooLong",
           "pgpSettingsUnsupported",
           "refreshTokenExpired",
           "releasesSnapshotsUnsupported",

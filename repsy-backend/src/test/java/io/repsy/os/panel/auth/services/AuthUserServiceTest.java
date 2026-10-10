@@ -19,14 +19,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
-import io.repsy.os.server.shared.auth.AuthFailureThrottle;
-import io.repsy.os.server.shared.auth.AuthThrottleProperties;
 import io.repsy.os.shared.auth.dtos.RefreshTokenClaims;
 import io.repsy.os.shared.auth.services.LoginInfoFactory;
 import io.repsy.os.shared.auth.services.RefreshTokenService;
 import io.repsy.os.shared.user.mappers.UserMapper;
 import io.repsy.os.shared.user.repositories.UserRepository;
 import io.repsy.os.shared.user.services.UserTxService;
+import io.repsy.protocols.shared.auth.AuthFailureThrottle;
+import io.repsy.protocols.shared.auth.AuthThrottleProperties;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.time.Instant;
 import java.util.UUID;

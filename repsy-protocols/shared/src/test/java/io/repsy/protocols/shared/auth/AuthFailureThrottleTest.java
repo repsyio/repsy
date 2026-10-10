@@ -13,16 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.shared.auth;
+package io.repsy.protocols.shared.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.google.common.base.Ticker;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.repsy.protocols.shared.exceptions.TooManyRequestsException;
 import java.time.Duration;
@@ -38,6 +40,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.context.properties.bind.Binder;
 import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -433,6 +436,24 @@ class AuthFailureThrottleTest {
 
       assertThat(counter).isNotNull();
       assertThat(counter.count()).isGreaterThanOrEqualTo(1.0);
+    }
+
+    @Test
+    @DisplayName("works without a meter registry: the client is let through and only logged")
+    @SuppressWarnings("unchecked")
+    void worksWithoutAMeterRegistry() {
+      final var noRegistry = (ObjectProvider<MeterRegistry>) mock(ObjectProvider.class);
+      final var withoutMetrics =
+          new AuthFailureThrottle(
+              AuthThrottleProperties.observing(MAX_FAILURES, WINDOW_SECONDS, 100), noRegistry);
+
+      requestFrom(CLIENT);
+
+      for (var i = 0; i < MAX_FAILURES; i++) {
+        withoutMetrics.recordFailure();
+      }
+
+      assertThatCode(withoutMetrics::checkAllowed).doesNotThrowAnyException();
     }
   }
 

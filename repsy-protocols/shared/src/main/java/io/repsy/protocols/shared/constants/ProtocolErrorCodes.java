@@ -187,6 +187,7 @@ public final class ProtocolErrorCodes {
   public static final String PACKAGE_VERSION_NOT_FOUND = "packageVersionNotFound";
   public static final String PACKAGE_VERSION_TOO_LONG = "packageVersionTooLong";
   public static final String PAGINATION_NUMBER_INVALID = "paginationNumberInvalid";
+  public static final String PASSWORD_TOO_LONG = "passwordTooLong";
   public static final String PAYLOAD_TOO_LARGE = "payloadTooLarge";
   public static final String PENDING_SIGNATURE_BYTES_LIMIT_REACHED =
       "pendingSignatureBytesLimitReached";

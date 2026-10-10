@@ -150,6 +150,7 @@ packageVersionAlreadyExists
 packageVersionNotFound
 packageVersionTooLong
 paginationNumberInvalid
+passwordTooLong
 payloadTooLarge
 pendingSignatureBytesLimitReached
 pendingSignatureLimitReached

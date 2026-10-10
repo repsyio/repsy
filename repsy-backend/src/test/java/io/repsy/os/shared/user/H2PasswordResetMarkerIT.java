@@ -19,9 +19,9 @@ import static io.repsy.os.shared.user.AdminPasswordResetChecks.loggedMarkerPassw
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.repsy.os.H2IntegrationTest;
-import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.user.repositories.UserRepository;
 import io.repsy.os.shared.user.services.UserTxService;
+import io.repsy.protocols.shared.auth.PasswordHasher;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.io.IOException;

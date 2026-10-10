@@ -19,12 +19,12 @@ import static io.repsy.os.shared.auth.utils.AuthUtils.extractCredentialsFromBasi
 import static io.repsy.os.shared.auth.utils.AuthUtils.removeBasicPrefix;
 
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
-import io.repsy.os.server.shared.auth.AuthFailureThrottle;
 import io.repsy.os.server.shared.auth.ProtocolAuthService;
-import io.repsy.os.server.shared.auth.VerifiedPasswordCache;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.user.services.UserTxService;
+import io.repsy.protocols.shared.auth.AuthFailureThrottle;
+import io.repsy.protocols.shared.auth.VerifiedPasswordCache;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.util.UUID;

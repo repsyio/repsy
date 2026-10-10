@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.shared.auth;
+package io.repsy.protocols.shared.auth;
 
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import java.util.HashMap;

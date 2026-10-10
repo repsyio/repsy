@@ -22,12 +22,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
-import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.token.dtos.TokenScope;
 import io.repsy.os.shared.token.utils.TokenFactory;
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
+import io.repsy.protocols.shared.auth.AuthFailureThrottle;
+import io.repsy.protocols.shared.auth.AuthThrottleProperties;
+import io.repsy.protocols.shared.auth.PasswordHasher;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

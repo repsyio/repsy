@@ -17,7 +17,7 @@ package io.repsy.os.shared.token.utils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.repsy.os.server.shared.token.utils.DeployTokenHash;
+import io.repsy.protocols.shared.token.DeployTokenHash;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
