@@ -66,7 +66,10 @@ public interface NuGetPackageVersionRepository extends JpaRepository<NuGetPackag
   /**
    * The versions of the package whose version matches {@code pattern}, a lower-cased {@code LIKE}
    * pattern that escapes its wildcards with a backslash. The match runs before paging, so it spans
-   * every page.
+   * every page. Pass {@link Pageable#unpaged()} for every match: a {@code version} sort (RPS-1688)
+   * is not a database {@code ORDER BY}, the column sorts as a string there, so {@code 10.0.0} would
+   * sit above {@code 9.0.0}. The service sorts the whole set with {@code
+   * NuGetVersionUtils.VERSION_COMPARATOR} and slices the requested page from it instead.
    */
   @Query(
       """
@@ -76,22 +79,6 @@ public interface NuGetPackageVersionRepository extends JpaRepository<NuGetPackag
       """)
   Page<NuGetPackageVersion> searchByNugetPackageId(
       @Param("packageId") UUID packageId, @Param("pattern") String pattern, Pageable pageable);
-
-  /**
-   * Every version {@link #searchByNugetPackageId(UUID, String, Pageable)} would page through,
-   * unpaged. A {@code version} sort (RPS-1688) is not a database {@code ORDER BY}: the column sorts
-   * as a string there, so {@code 10.0.0} would sit above {@code 9.0.0}. The service sorts this
-   * whole set with {@code NuGetVersionUtils.VERSION_COMPARATOR} and slices the requested page from
-   * it instead.
-   */
-  @Query(
-      """
-      select v from NuGetPackageVersion v
-      where v.nugetPackage.id = :packageId
-        and lower(v.version) like :pattern escape '\\'
-      """)
-  List<NuGetPackageVersion> searchByNugetPackageId(
-      @Param("packageId") UUID packageId, @Param("pattern") String pattern);
 
   boolean existsByNugetPackageId(UUID packageId);
 }

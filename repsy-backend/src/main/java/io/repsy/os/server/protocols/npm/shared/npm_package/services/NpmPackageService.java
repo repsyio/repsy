@@ -618,8 +618,10 @@ public class NpmPackageService extends AbstractNpmPackageService<UUID> {
 
     if (versionOrder != null) {
       final var versions =
-          this.packageVersionRepository.findAllByNpmPackageIdContainsVersion(
-              npmPackage.getId(), LikePatterns.of("%", version, "%"));
+          this.packageVersionRepository
+              .findAllByNpmPackageIdContainsVersion(
+                  npmPackage.getId(), LikePatterns.of("%", version, "%"), Pageable.unpaged())
+              .getContent();
 
       return VersionSortPaging.sortAndPage(
           versions.stream().map(this.npmPackageConverter::toPackageVersionListItemDto).toList(),

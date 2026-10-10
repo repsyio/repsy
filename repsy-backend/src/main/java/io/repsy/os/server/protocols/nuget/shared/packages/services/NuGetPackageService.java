@@ -207,8 +207,10 @@ public class NuGetPackageService extends AbstractNuGetPackageService<UUID> {
 
     if (versionOrder != null) {
       final var versions =
-          this.packageVersionRepository.searchByNugetPackageId(
-              pkg.getId(), LikePatterns.of("%", query, "%"));
+          this.packageVersionRepository
+              .searchByNugetPackageId(
+                  pkg.getId(), LikePatterns.of("%", query, "%"), Pageable.unpaged())
+              .getContent();
 
       return VersionSortPaging.sortAndPage(
           versions.stream().map(v -> this.converter.toVersionInfo(v, packageId)).toList(),

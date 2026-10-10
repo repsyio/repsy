@@ -289,7 +289,9 @@ public class PypiPackageService extends AbstractPypiPackageService<UUID> {
 
     if (versionOrder != null) {
       final var releases =
-          this.releaseRepository.findAllReleaseListItemsByPypiPackageId(pythonPypiPackage.getId());
+          this.releaseRepository
+              .findAllByPypiPackageId(pythonPypiPackage.getId(), Pageable.unpaged())
+              .getContent();
 
       return this.sortAndPageReleases(releases, pageable, versionOrder);
     }
@@ -312,8 +314,10 @@ public class PypiPackageService extends AbstractPypiPackageService<UUID> {
 
     if (versionOrder != null) {
       final var releases =
-          this.releaseRepository.findAllByPypiPackageIdContainsName(
-              pythonPypiPackage.getId(), version);
+          this.releaseRepository
+              .findAllByPypiPackageIdContainsName(
+                  pythonPypiPackage.getId(), version, Pageable.unpaged())
+              .getContent();
 
       return this.sortAndPageReleases(releases, pageable, versionOrder);
     }

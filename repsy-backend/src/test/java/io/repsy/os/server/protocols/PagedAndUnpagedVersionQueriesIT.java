@@ -82,13 +82,13 @@ class PagedAndUnpagedVersionQueriesIT extends AbstractIT {
 
   /** The unpaged read and a paged read of the same query agree on content and sorted order. */
   private static <T> void assertAgree(
-      final List<T> unpaged,
       final Function<Pageable, Page<T>> paged,
       final Function<T, String> key,
       final String sortProperty,
       final int expected) {
 
-    final var unpagedKeys = unpaged.stream().map(key).sorted().toList();
+    final var unpagedKeys =
+        paged.apply(Pageable.unpaged()).getContent().stream().map(key).sorted().toList();
     assertThat(unpagedKeys).hasSize(expected);
 
     final var whole = paged.apply(PageRequest.of(0, 100, Sort.by(sortProperty)));
@@ -143,14 +143,12 @@ class PagedAndUnpagedVersionQueriesIT extends AbstractIT {
     final UUID id = pkg.getId();
 
     assertAgree(
-        this.releaseRepository.findAllReleaseListItemsByPypiPackageId(id),
         pageable -> this.releaseRepository.findAllByPypiPackageId(id, pageable),
         item -> item.getVersion(),
         "version",
         VERSIONS.size());
 
     assertAgree(
-        this.releaseRepository.findAllByPypiPackageIdContainsName(id, FILTER),
         pageable -> this.releaseRepository.findAllByPypiPackageIdContainsName(id, FILTER, pageable),
         item -> item.getVersion(),
         "version",
@@ -184,8 +182,6 @@ class PagedAndUnpagedVersionQueriesIT extends AbstractIT {
     final var repoId = repo.getId();
 
     assertAgree(
-        this.artifactVersionRepository.findAllByRepoIdAndGroupNameAndArtifactName(
-            repoId, "com.acme", "lib"),
         pageable ->
             this.artifactVersionRepository.findAllByRepoIdAndGroupNameAndArtifactName(
                 repoId, "com.acme", "lib", pageable),
@@ -194,9 +190,6 @@ class PagedAndUnpagedVersionQueriesIT extends AbstractIT {
         VERSIONS.size());
 
     assertAgree(
-        this.artifactVersionRepository
-            .findAllByRepoIdAndGroupNameAndArtifactNameContainsVersionName(
-                repoId, "com.acme", "lib", FILTER),
         pageable ->
             this.artifactVersionRepository
                 .findAllByRepoIdAndGroupNameAndArtifactNameContainsVersionName(
@@ -228,7 +221,6 @@ class PagedAndUnpagedVersionQueriesIT extends AbstractIT {
     final var id = saved.getId();
 
     assertAgree(
-        this.packageVersionRepository.findAllByNpmPackageIdContainsVersion(id, LIKE),
         pageable ->
             this.packageVersionRepository.findAllByNpmPackageIdContainsVersion(id, LIKE, pageable),
         item -> item.getVersion(),
@@ -260,7 +252,6 @@ class PagedAndUnpagedVersionQueriesIT extends AbstractIT {
     final var id = saved.getId();
 
     assertAgree(
-        this.nugetPackageVersionRepository.searchByNugetPackageId(id, LIKE),
         pageable -> this.nugetPackageVersionRepository.searchByNugetPackageId(id, LIKE, pageable),
         item -> item.getVersion(),
         "version",
@@ -292,14 +283,12 @@ class PagedAndUnpagedVersionQueriesIT extends AbstractIT {
     final var id = saved.getId();
 
     assertAgree(
-        this.rubyGemVersionRepository.findAllByGemId(id, null),
         pageable -> this.rubyGemVersionRepository.findAllByGemId(id, null, pageable),
         item -> item.getVersion(),
         "version",
         VERSIONS.size());
 
     assertAgree(
-        this.rubyGemVersionRepository.findAllByGemId(id, LIKE),
         pageable -> this.rubyGemVersionRepository.findAllByGemId(id, LIKE, pageable),
         item -> item.getVersion(),
         "version",
