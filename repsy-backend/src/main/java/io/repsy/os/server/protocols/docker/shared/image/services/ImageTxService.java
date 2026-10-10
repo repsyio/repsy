@@ -92,8 +92,9 @@ public class ImageTxService implements ImageService<UUID> {
    * Recomputes the size and the digest the panel lists the image with, after a manifest was pushed
    * or a tag or a manifest was deleted: the size is that of the layers the tagged manifests reach,
    * the digest is the one of the manifest the most recently moved tag points at, and none once no
-   * tag is left. Runs in the caller's transaction, so the numbers never disagree with the rows that
-   * changed.
+   * tag is left. It also recomputes the stored tag statistics of the image ({@code last_tag_at},
+   * {@code tag_count}, RPS-2120). Runs in the caller's transaction, so the numbers never disagree
+   * with the rows that changed.
    */
   @Override
   @Transactional
@@ -118,6 +119,11 @@ public class ImageTxService implements ImageService<UUID> {
 
     this.imageRepository.updateImageSizeAndDigest(
         repoId, imageId, digest, totalSize, Instant.now());
+
+    // After the update above, which holds the image row's lock until the transaction ends: every
+    // transaction that changed the image's tags before this one has committed, so the count sees
+    // them (RPS-2120).
+    this.imageRepository.refreshTagStats(imageId);
   }
 
   /**

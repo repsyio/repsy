@@ -41,7 +41,11 @@ public interface ImageRepository extends JpaRepository<Image, UUID> {
 
   Optional<Image> findByRepoIdAndName(UUID repoId, String name);
 
-  /** The columns of an image as the panel lists it, from {@code Image i join i.repo re}. */
+  /**
+   * The columns of an image as the panel lists it, from {@code Image i join i.repo re}. {@code
+   * updatedAt} and {@code tagCount} are stored columns ({@link #refreshTagStats}, RPS-2120), so
+   * sorting a repo's images by {@code updatedAt} no longer runs a subquery per image.
+   */
   String LIST_ITEM_SELECT =
       """
 
@@ -50,17 +54,9 @@ public interface ImageRepository extends JpaRepository<Image, UUID> {
               i.name as name,
               i.size as size,
               i.digest as digest,
-              (
-                select max(t.createdAt)
-                from Tag t
-                where t.image = i
-              ) as updatedAt,
+              i.lastTagAt as updatedAt,
               i.lastUpdatedAt as lastUpdatedAt,
-              (
-                select count(t2)
-                from Tag t2
-                where t2.image = i
-              ) as tagCount
+              cast(i.tagCount as long) as tagCount
             from Image i
               join i.repo re
           """;
@@ -138,6 +134,23 @@ public interface ImageRepository extends JpaRepository<Image, UUID> {
       """)
   void updateImageSizeAndDigest(
       UUID repoId, UUID imageId, @Nullable String digest, long size, Instant now);
+
+  /**
+   * Recomputes {@code last_tag_at} and {@code tag_count} of the image from its tags (RPS-2120). The
+   * statement runs after the image row's lock is taken by {@link #updateImageSizeAndDigest} in the
+   * same transaction, so it is a statement of its own with a fresh snapshot: a concurrent
+   * transaction that changed the image's tags has committed (it held the row lock) and is counted.
+   * The tags changed by the calling transaction are flushed first.
+   */
+  @Modifying(flushAutomatically = true)
+  @Query(
+      """
+        update Image i set
+          i.lastTagAt = (select max(t.createdAt) from Tag t where t.image = i),
+          i.tagCount = (select count(t2) from Tag t2 where t2.image = i)
+        where i.id = :imageId
+      """)
+  void refreshTagStats(UUID imageId);
 
   /**
    * What each of the images stores only for manifests that no tag reaches, computed the way "Delete

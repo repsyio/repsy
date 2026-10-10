@@ -70,6 +70,15 @@ public class Image {
   @Column(name = "digest")
   private String digest;
 
+  // RPS-2120 (V0042): the newest created_at of the image's tags, null without tags. Only
+  // ImageRepository#refreshTagStats writes it, so a save of the entity never overwrites it.
+  @Column(name = "last_tag_at", insertable = false, updatable = false)
+  private Instant lastTagAt;
+
+  // RPS-2120 (V0042): the number of the image's tags. Written like lastTagAt.
+  @Column(name = "tag_count", nullable = false, insertable = false, updatable = false)
+  private int tagCount;
+
   @Column(name = "created_at")
   @CreationTimestamp
   private Instant createdAt;
