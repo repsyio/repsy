@@ -16,6 +16,7 @@
 package io.repsy.protocols.shared.handlers;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
@@ -98,6 +99,59 @@ class AbstractRoutedProtocolMethodHandlerTest {
                 HandlerPropertyKeys.SKIP_USAGE_POST_PROCESSOR, true,
                 HandlerPropertyKeys.REQUIRE_AUTHENTICATION, true,
                 HandlerPropertyKeys.METHOD, "upload"));
+  }
+
+  @Test
+  @DisplayName("without additional properties getProperties is the route's own map")
+  void noAdditionalProperties() {
+    final var route = HandlerRoute.write(HttpMethod.PUT);
+
+    assertThat(new Handler(route, this.provider).getProperties()).isSameAs(route.properties());
+  }
+
+  @Test
+  @DisplayName("additional properties are added to the route's and replace a key both set")
+  void additionalProperties() {
+    final var route =
+        HandlerRoute.of(Permission.MANAGE, HttpMethod.DELETE)
+            .writeOperation(true)
+            .skipHeaderPreProcessor(true);
+    final var handler =
+        new Handler(route, this.provider) {
+          private Permission permission = Permission.READ;
+
+          @Override
+          protected Map<String, Object> additionalProperties() {
+            return Map.of(
+                HandlerPropertyKeys.PERMISSION,
+                this.permission,
+                HandlerPropertyKeys.METHOD,
+                "chartDelete");
+          }
+        };
+
+    assertThat(handler.getProperties())
+        .isEqualTo(
+            Map.of(
+                HandlerPropertyKeys.PERMISSION,
+                Permission.READ,
+                HandlerPropertyKeys.WRITE_OPERATION,
+                true,
+                HandlerPropertyKeys.SKIP_HEADER_PRE_PROCESSOR,
+                true,
+                HandlerPropertyKeys.METHOD,
+                "chartDelete"));
+    assertThatThrownBy(() -> handler.getProperties().put("x", "y"))
+        .isInstanceOf(UnsupportedOperationException.class);
+
+    handler.permission = Permission.WRITE;
+
+    assertThat(handler.getProperties())
+        .containsEntry(HandlerPropertyKeys.PERMISSION, Permission.WRITE);
+    assertThat(handler.getSupportedMethods()).containsExactly(HttpMethod.DELETE);
+    assertThat(route.properties())
+        .containsEntry(HandlerPropertyKeys.PERMISSION, Permission.MANAGE)
+        .doesNotContainKey(HandlerPropertyKeys.METHOD);
   }
 
   @Test
