@@ -17,7 +17,7 @@ package io.repsy.os.server.protocols.helm.shared.oci.services;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.helm.shared.chart.services.HelmChartService;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartForm;
@@ -35,7 +35,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * deleting the row leaked the object.
  */
 @DisplayName("Helm OCI manifest content is stored inline (RPS-1392)")
-class HelmOciManifestContentColumnIT extends AbstractIntegrationTest {
+class HelmOciManifestContentColumnIT extends AbstractIT {
 
   private static final String CONTENT =
       "{\"schemaVersion\":2,\"mediaType\":\"application/vnd.oci.image.manifest.v1+json\"}";

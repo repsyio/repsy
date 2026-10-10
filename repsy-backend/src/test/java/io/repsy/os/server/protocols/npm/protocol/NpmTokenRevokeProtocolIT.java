@@ -23,7 +23,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.shared.token.entities.RepoDeployToken;
 import io.repsy.os.server.shared.token.repositories.RepoDeployTokenRepository;
 import io.repsy.os.server.shared.token.utils.DeployTokenHash;
@@ -55,7 +55,7 @@ import tools.jackson.databind.ObjectMapper;
  * logout and is refused after it.
  */
 @DisplayName("npm wire protocol DELETE /-/user/token/{token}")
-class NpmTokenRevokeProtocolIT extends AbstractIntegrationTest {
+class NpmTokenRevokeProtocolIT extends AbstractIT {
 
   private static final String LOGIN = "/{repo}/-/user/org.couchdb.user:{name}";
   private static final String TOKEN = "/{repo}/-/user/token/{token}";

@@ -26,7 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.shared.token.entities.RepoDeployToken;
 import io.repsy.os.server.shared.token.repositories.RepoDeployTokenRepository;
 import io.repsy.os.server.shared.token.utils.DeployTokenHash;
@@ -69,7 +69,7 @@ import tools.jackson.databind.ObjectMapper;
  * (404 for a package that does not exist) for an accepted one.
  */
 @DisplayName("A protocol JWT ends when the token version of its user moves on")
-class ProtocolJwtTokenVersionIT extends AbstractIntegrationTest {
+class ProtocolJwtTokenVersionIT extends AbstractIT {
 
   private static final String NEW_PASSWORD = "NewPassword2@";
   private static final String NPM_LOGIN = "/{repo}/-/user/org.couchdb.user:{name}";

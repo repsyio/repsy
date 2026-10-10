@@ -31,7 +31,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.jayway.jsonpath.JsonPath;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
@@ -91,7 +91,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @Import(ProtocolRepoDeleteUsageIT.GatedExecutorConfig.class)
 @DisplayName("ProtocolRepoController DELETE /api/repos/{repoName} usage bookkeeping")
-class ProtocolRepoDeleteUsageIT extends AbstractIntegrationTest {
+class ProtocolRepoDeleteUsageIT extends AbstractIT {
 
   /**
    * The default {@code @Async} executor for this class: runs every task on a new thread, except

@@ -21,7 +21,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 import com.auth0.jwt.JWT;
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.server.shared.auth.AbstractPatIntegrationTest;
+import io.repsy.os.server.shared.auth.AbstractPatIT;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.token.dtos.TokenScope;
 import io.repsy.os.shared.token.utils.TokenFactory;
@@ -40,7 +40,7 @@ import org.junit.jupiter.api.Test;
  * authenticating does not pass.
  */
 @DisplayName("Cargo with a personal access token")
-class CargoPatAuthIT extends AbstractPatIntegrationTest {
+class CargoPatAuthIT extends AbstractPatIT {
 
   private static final String CRATE = "/{repo}/so/me/some-crate";
   private static final String ME = "/{repo}/me";

@@ -21,7 +21,7 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.token.repositories.PersonalAccessTokenRepository;
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
@@ -48,7 +48,7 @@ import org.springframework.test.web.servlet.ResultActions;
  * PersonalAccessTokenServiceTest}, which runs on a fixed clock.
  */
 @DisplayName("PersonalAccessToken expiration date")
-class PatExpiryValidationIT extends AbstractIntegrationTest {
+class PatExpiryValidationIT extends AbstractIT {
 
   private static final String BASE = "/api/profile/access-tokens";
   private static final String IN_PAST_TEXT =

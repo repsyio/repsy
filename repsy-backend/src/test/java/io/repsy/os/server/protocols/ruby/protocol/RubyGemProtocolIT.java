@@ -27,7 +27,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.protocols.ruby.shared.utils.GemspecParser;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -59,7 +59,7 @@ import org.springframework.test.web.servlet.request.AbstractMockHttpServletReque
  * matches any handler and ends in {@code 404 unknownPath} even though the route is registered.
  */
 @DisplayName("Ruby protocol /{repo}/api/v1/gems")
-class RubyGemProtocolIT extends AbstractIntegrationTest {
+class RubyGemProtocolIT extends AbstractIT {
 
   private ResultActions protocol(final AbstractMockHttpServletRequestBuilder<?> request)
       throws Exception {

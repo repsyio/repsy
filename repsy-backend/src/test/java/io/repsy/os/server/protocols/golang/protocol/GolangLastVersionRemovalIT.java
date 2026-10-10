@@ -28,7 +28,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.events.ArtifactVersionDeletedEvent;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.golang.shared.storage.services.GoStorageService;
 import io.repsy.os.server.protocols.golang.ui.facades.GoApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
@@ -92,7 +92,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @RecordApplicationEvents
 @DisplayName("Deleting the last Go module version removes the module (RPS-1288)")
-class GolangLastVersionRemovalIT extends AbstractIntegrationTest {
+class GolangLastVersionRemovalIT extends AbstractIT {
 
   private static final int STRESS_ROUNDS = 25;
 

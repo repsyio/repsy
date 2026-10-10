@@ -17,7 +17,7 @@ package io.repsy.os.config.async;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -49,7 +49,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
  * own. They never touch the database.
  */
 @DisplayName("Default @Async executor")
-class AsyncTaskExecutorIT extends AbstractIntegrationTest {
+class AsyncTaskExecutorIT extends AbstractIT {
 
   private static final long TIMEOUT_SECONDS = 10;
 

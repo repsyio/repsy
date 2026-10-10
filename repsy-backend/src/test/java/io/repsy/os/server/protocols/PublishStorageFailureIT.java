@@ -31,7 +31,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import io.repsy.libs.storage.core.exceptions.StorageUnavailableException;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.cargo.shared.crate.storage.CargoStorageService;
 import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
 import io.repsy.os.server.protocols.golang.shared.storage.services.GoStorageService;
@@ -123,7 +123,7 @@ import tools.jackson.databind.ObjectMapper;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("Publish when storage fails (RPS-2093)")
-class PublishStorageFailureIT extends AbstractIntegrationTest {
+class PublishStorageFailureIT extends AbstractIT {
 
   private static final ObjectMapper MAPPER = new ObjectMapper();
   private static final String OCI_MANIFEST = "application/vnd.oci.image.manifest.v1+json";

@@ -24,7 +24,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageRepository;
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageVersionRepository;
 import io.repsy.os.server.protocols.nuget.shared.storage.NuGetStorageService;
@@ -83,7 +83,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("NuGet push keeps storage and the database in agreement (RPS-999)")
-class NuGetPublishStorageConsistencyIT extends AbstractIntegrationTest {
+class NuGetPublishStorageConsistencyIT extends AbstractIT {
 
   private static final String PUSH_PATH = "/{repo}/v3/package";
 

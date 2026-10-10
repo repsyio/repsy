@@ -22,7 +22,7 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.npm.shared.storage.services.NpmStorageService;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
@@ -79,7 +79,7 @@ import tools.jackson.databind.ObjectMapper;
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @ExtendWith(OutputCaptureExtension.class)
 @DisplayName("npm dist-tags keep storage and the database in agreement (RPS-1272)")
-class NpmDistTagStorageConsistencyIT extends AbstractIntegrationTest {
+class NpmDistTagStorageConsistencyIT extends AbstractIT {
 
   /** A tag the database refuses to insert through {@link #rejectTagInsertsAtTheDatabase()}. */
   private static final String REJECTED_TAG = "reject-me";

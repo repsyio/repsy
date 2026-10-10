@@ -26,7 +26,7 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.core.UrlParserProperties;
 import io.repsy.os.server.protocols.npm.protocol.facades.NpmProtocolFacade;
 import io.repsy.os.server.protocols.npm.shared.storage.services.NpmStorageService;
@@ -94,7 +94,7 @@ import tools.jackson.databind.ObjectMapper;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("npm deletes and deprecations keep storage and the database in agreement (RPS-1280)")
-class NpmDeleteStorageConsistencyIT extends AbstractIntegrationTest {
+class NpmDeleteStorageConsistencyIT extends AbstractIT {
 
   /** A version the database refuses to delete through {@link #refuseVersionDeletes()}. */
   private static final String UNDELETABLE_VERSION = "1.9.9";

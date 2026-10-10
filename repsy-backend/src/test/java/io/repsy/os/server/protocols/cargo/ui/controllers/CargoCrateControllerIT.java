@@ -27,7 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.PagingAssertions;
 import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoCrateIndexRepository;
 import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoCrateMetaRepository;
@@ -58,7 +58,7 @@ import org.springframework.test.web.servlet.ResultActions;
 
 /** Full-stack integration coverage for the Cargo crate-management API. */
 @DisplayName("CargoCrateController /api/cargo/crates/*")
-class CargoCrateControllerIT extends AbstractIntegrationTest {
+class CargoCrateControllerIT extends AbstractIT {
 
   @Autowired private CargoCrateService crateService;
   @Autowired private CargoCrateIndexRepository crateIndexRepository;

@@ -15,7 +15,7 @@
  */
 package io.repsy.os.server.shared.multipart;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.RepsyApplication;
 import io.repsy.os.server.protocols.helm.shared.storage.services.HelmStorageService;
 import io.repsy.os.shared.repo.services.RepoTxService;
@@ -66,7 +66,7 @@ import org.springframework.web.client.RestClient;
 @SpringBootTest(
     classes = RepsyApplication.class,
     webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT)
-abstract class AbstractMultipartLimitIT extends AbstractIntegrationTest {
+abstract class AbstractMultipartLimitIT extends AbstractIT {
 
   /** Seed of the noise in the archive, so a run always uploads the same bytes. */
   private static final long SEED = 1049L;

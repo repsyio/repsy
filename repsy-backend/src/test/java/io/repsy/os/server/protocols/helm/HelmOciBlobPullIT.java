@@ -25,7 +25,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -46,7 +46,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * too (asserted below, as today's behaviour).
  */
 @DisplayName("Helm OCI blob GET by digest (RPS-2090)")
-class HelmOciBlobPullIT extends AbstractIntegrationTest {
+class HelmOciBlobPullIT extends AbstractIT {
 
   private static final String CHART = "payments";
   private static final String OTHER_CHART = "invoices";

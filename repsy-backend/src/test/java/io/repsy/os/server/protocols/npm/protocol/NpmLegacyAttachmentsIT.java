@@ -20,7 +20,7 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.user.entities.UserRole;
@@ -46,7 +46,7 @@ import tools.jackson.databind.ObjectMapper;
  * packument says about its versions, and the tarballs, stay as they were.
  */
 @DisplayName("npm packuments stored with the publish's attachments (RPS-1390)")
-class NpmLegacyAttachmentsIT extends AbstractIntegrationTest {
+class NpmLegacyAttachmentsIT extends AbstractIT {
 
   private static final String DIST_TAG = "/{repo}/-/package/{name}/dist-tags/{tag}";
   private static final String PACKAGE = "left-pad";

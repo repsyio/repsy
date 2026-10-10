@@ -26,7 +26,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.ruby.shared.storage.services.RubyStorageService;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
@@ -74,7 +74,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("Ruby push keeps storage and the database in agreement (RPS-1060)")
-class RubyPublishStorageConsistencyIT extends AbstractIntegrationTest {
+class RubyPublishStorageConsistencyIT extends AbstractIT {
 
   /** A description the database refuses through {@link #rejectDescriptionAtTheDatabase()}. */
   private static final String REJECTED_DESCRIPTION = "reject-me";

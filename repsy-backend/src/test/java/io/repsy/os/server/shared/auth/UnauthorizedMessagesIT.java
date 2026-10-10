@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.shared.token.entities.RepoDeployToken;
 import io.repsy.os.server.shared.token.repositories.RepoDeployTokenRepository;
 import io.repsy.os.server.shared.token.utils.DeployTokenHash;
@@ -52,7 +52,7 @@ import org.springframework.test.web.servlet.request.AbstractMockHttpServletReque
  * would tell a caller whether an account exists.
  */
 @DisplayName("401 messages of the Docker token endpoint and Go (RPS-1435)")
-class UnauthorizedMessagesIT extends AbstractIntegrationTest {
+class UnauthorizedMessagesIT extends AbstractIT {
 
   private static final String GENERIC =
       "The credentials are missing, invalid or expired, or they do not allow this action.";

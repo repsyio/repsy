@@ -27,7 +27,7 @@ import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
 import io.repsy.os.server.protocols.docker.ui.facades.DockerApiFacade;
 import io.repsy.os.shared.repo.entities.Repo;
@@ -55,7 +55,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 @DisplayName("The blobs of the orphan layers are deleted only after the row deletion commits")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-class DockerOrphanLayerAfterCommitIT extends AbstractIntegrationTest {
+class DockerOrphanLayerAfterCommitIT extends AbstractIT {
 
   private static final String IMAGE = "app";
   private static final String LAYER = "orphan-layer";

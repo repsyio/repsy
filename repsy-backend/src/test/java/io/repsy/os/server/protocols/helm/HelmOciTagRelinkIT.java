@@ -29,7 +29,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -51,7 +51,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * tag down with it even though it now belonged to a version that still exists.
  */
 @DisplayName("Helm OCI tag re-link on override (RPS-1111)")
-class HelmOciTagRelinkIT extends AbstractIntegrationTest {
+class HelmOciTagRelinkIT extends AbstractIT {
 
   private static final String CHART = "payments";
   private static final String OCTET_STREAM = "application/octet-stream";

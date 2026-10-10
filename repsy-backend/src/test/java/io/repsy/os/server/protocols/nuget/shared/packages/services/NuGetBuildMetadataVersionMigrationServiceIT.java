@@ -17,7 +17,7 @@ package io.repsy.os.server.protocols.nuget.shared.packages.services;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackage;
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackageVersion;
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageRepository;
@@ -46,7 +46,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * canonical version are moved to the canonical version, row, scans and files.
  */
 @DisplayName("NuGet build metadata version migration (RPS-1059)")
-class NuGetBuildMetadataVersionMigrationServiceIT extends AbstractIntegrationTest {
+class NuGetBuildMetadataVersionMigrationServiceIT extends AbstractIT {
 
   private static final String PACKAGE_ID = "some.package";
   private static final Instant NOW = Instant.now().truncatedTo(ChronoUnit.MILLIS);

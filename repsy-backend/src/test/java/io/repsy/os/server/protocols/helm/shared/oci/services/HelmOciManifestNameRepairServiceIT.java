@@ -17,7 +17,7 @@ package io.repsy.os.server.protocols.helm.shared.oci.services;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.helm.shared.chart.services.HelmChartService;
 import io.repsy.os.server.protocols.helm.shared.oci.repositories.HelmOciManifestMismatch;
 import io.repsy.os.server.protocols.helm.shared.oci.repositories.HelmOciManifestRepository;
@@ -45,7 +45,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * chart carries the {@code Chart.yaml} name.
  */
 @DisplayName("Helm OCI manifest name repair (RPS-1038)")
-class HelmOciManifestNameRepairServiceIT extends AbstractIntegrationTest {
+class HelmOciManifestNameRepairServiceIT extends AbstractIT {
 
   @MockitoBean private UsageUpdateService usageUpdateService;
 

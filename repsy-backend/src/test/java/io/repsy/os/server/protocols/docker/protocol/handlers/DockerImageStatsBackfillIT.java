@@ -20,7 +20,7 @@ import static io.repsy.os.server.protocols.docker.protocol.handlers.DockerWire.i
 import static io.repsy.os.server.protocols.docker.protocol.handlers.DockerWire.sha256;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.docker.shared.image.entities.Image;
 import io.repsy.os.server.protocols.docker.shared.image.repositories.ImageRepository;
 import io.repsy.os.server.protocols.docker.shared.image.services.DockerImageStatsBackfillService;
@@ -43,7 +43,7 @@ import org.springframework.web.context.WebApplicationContext;
  * size and digest.
  */
 @DisplayName("Docker image stats backfill (RPS-1563)")
-class DockerImageStatsBackfillIT extends AbstractIntegrationTest {
+class DockerImageStatsBackfillIT extends AbstractIT {
 
   private static final String IMAGE = "app";
 

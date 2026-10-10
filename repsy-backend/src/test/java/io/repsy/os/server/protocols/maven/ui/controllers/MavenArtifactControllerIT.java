@@ -27,7 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.PagingAssertions;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.Artifact;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.ArtifactVersion;
@@ -64,7 +64,7 @@ import org.springframework.test.web.servlet.ResultActions;
 
 /** End-to-end coverage for the Maven artifact-management API. */
 @DisplayName("MavenArtifactController /api/mvn/artifacts/*")
-class MavenArtifactControllerIT extends AbstractIntegrationTest {
+class MavenArtifactControllerIT extends AbstractIT {
 
   private static final String GROUP = "com.example.app";
   private static final String ARTIFACT = "demo";

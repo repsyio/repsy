@@ -21,7 +21,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.awaitility.Awaitility.await;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.generated.model.UserUpdateForm;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.user.dtos.UserInfo;
@@ -60,7 +60,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("concurrent user updates")
-class UserConcurrentUpdateIT extends AbstractIntegrationTest {
+class UserConcurrentUpdateIT extends AbstractIT {
 
   private static final int TIMEOUT_SECONDS = 15;
 

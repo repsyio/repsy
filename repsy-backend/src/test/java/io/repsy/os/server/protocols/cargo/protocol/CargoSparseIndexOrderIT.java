@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -47,7 +47,7 @@ import org.springframework.test.web.servlet.request.AbstractMockHttpServletReque
  * moves it, which flipped {@code 1.0.0, 2.0.0} to {@code 2.0.0, 1.0.0}.
  */
 @DisplayName("Cargo sparse index lists versions in publish order")
-class CargoSparseIndexOrderIT extends AbstractIntegrationTest {
+class CargoSparseIndexOrderIT extends AbstractIT {
 
   private static final String CRATE = "order_crate";
   private static final String PUBLISH = "/{repo}/api/v1/crates/new";

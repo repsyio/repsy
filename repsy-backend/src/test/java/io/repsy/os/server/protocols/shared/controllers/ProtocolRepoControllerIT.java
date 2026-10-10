@@ -29,7 +29,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.user.entities.UserRole;
@@ -62,8 +62,8 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 /**
  * Full-stack integration tests for {@code /api/repos/*} ({@code ProtocolRepoController}), running
  * against the real Spring context, MVC dispatch, the {@code ProtocolAuthInterceptor}, a
- * containerized PostgreSQL database and a temporary storage directory. See {@link
- * AbstractIntegrationTest} for the shared setup.
+ * containerized PostgreSQL database and a temporary storage directory. See {@link AbstractIT} for
+ * the shared setup.
  *
  * <p>The repository collection ({@code GET /api/repos}, {@code GET /api/repos/counts} and {@code
  * POST /api/repos}) is {@code RepoCollectionController}, tested in {@code
@@ -87,7 +87,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
  * goes with its row. {@code ProtocolRepoDeleteUsageIT} covers the delete with the real service.
  */
 @DisplayName("ProtocolRepoController /api/repos/*")
-class ProtocolRepoControllerIT extends AbstractIntegrationTest {
+class ProtocolRepoControllerIT extends AbstractIT {
 
   private static final String VALIDATION_TEXT = "Incoming data couldn't be validated.";
   private static final String REPO_NOT_FOUND_TEXT = "Repository not found";

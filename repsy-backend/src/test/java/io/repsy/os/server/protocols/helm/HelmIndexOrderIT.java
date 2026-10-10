@@ -22,7 +22,7 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -42,7 +42,7 @@ import org.yaml.snakeyaml.Yaml;
  * index} writes it.
  */
 @DisplayName("Helm index.yaml lists charts by name and versions highest first (RPS-1614)")
-class HelmIndexOrderIT extends AbstractIntegrationTest {
+class HelmIndexOrderIT extends AbstractIT {
 
   /** {@code @Async}, so it cannot see this class's uncommitted rows. */
   @MockitoBean private UsageUpdateService usageUpdateService;

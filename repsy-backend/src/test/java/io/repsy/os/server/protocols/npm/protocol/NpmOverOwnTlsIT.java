@@ -17,7 +17,7 @@ package io.repsy.os.server.protocols.npm.protocol;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.RepsyApplication;
 import io.repsy.os.server.protocols.npm.shared.storage.services.NpmStorageService;
 import io.repsy.os.shared.repo.services.RepoTxService;
@@ -79,7 +79,7 @@ import tools.jackson.databind.ObjectMapper;
 @SpringBootTest(
     classes = RepsyApplication.class,
     webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT)
-class NpmOverOwnTlsIT extends AbstractIntegrationTest {
+class NpmOverOwnTlsIT extends AbstractIT {
 
   private static final String STORE_PASSWORD = "changeit";
   private static final String KEY_ALIAS = "repsy";

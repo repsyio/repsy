@@ -37,7 +37,7 @@ import org.springframework.http.HttpStatus;
  * every verb, and a path nothing maps is still 404.
  */
 @DisplayName("Panel API wrong verb answers 405")
-class PanelMethodNotAllowedIT extends AbstractIntegrationTest {
+class PanelMethodNotAllowedIT extends AbstractIT {
 
   private static final String USAGE_PATH = "/api/usage";
 

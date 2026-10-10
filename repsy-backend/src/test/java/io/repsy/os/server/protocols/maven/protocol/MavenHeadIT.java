@@ -28,7 +28,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.IOException;
@@ -45,7 +45,7 @@ import org.springframework.test.web.servlet.request.AbstractMockHttpServletReque
  * they publish it, refused the first publish of every release.
  */
 @DisplayName("Maven HEAD mirrors GET")
-class MavenHeadIT extends AbstractIntegrationTest {
+class MavenHeadIT extends AbstractIT {
 
   private static final String JAR = "com/example/lib/1.0/lib-1.0.jar";
   private static final String JAR_CONTENT = "jar-bytes-of-some-length";

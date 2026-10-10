@@ -17,7 +17,7 @@ package io.repsy.os.server.security.scan.services;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.security.scan.dtos.FixStatus;
 import io.repsy.os.server.security.scan.dtos.KnownVulnerabilityRow;
 import io.repsy.os.server.security.scan.dtos.ScanStatus;
@@ -42,7 +42,7 @@ import org.springframework.beans.factory.annotation.Autowired;
  * every scanned version of a common package, and the lookup by package has an index.
  */
 @DisplayName("Findings of the requested package versions (npm audit lookup)")
-class KnownVulnerabilitiesIT extends AbstractIntegrationTest {
+class KnownVulnerabilitiesIT extends AbstractIT {
 
   private static final String INDEX = "ix_vulnerability_finding__package_name_package_version";
   private static final String LODASH = "lodash";

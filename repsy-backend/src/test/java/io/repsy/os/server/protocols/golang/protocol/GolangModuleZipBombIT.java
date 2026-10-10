@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.protocols.golang.shared.utils.GoModuleHashCalculator;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.ByteArrayOutputStream;
@@ -50,7 +50,7 @@ import org.junit.jupiter.api.Test;
  * past 500 MiB is not practical to run as part of this suite.
  */
 @DisplayName("Go module zip entry-count limit (RPS-1118)")
-class GolangModuleZipBombIT extends AbstractIntegrationTest {
+class GolangModuleZipBombIT extends AbstractIT {
 
   private static final String MODULE = "example.com/zipbomb";
   private static final String VERSION = "v1.0.0";

@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.Artifact;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.ArtifactVersion;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactRepository;
@@ -70,7 +70,7 @@ import org.springframework.beans.factory.annotation.Value;
  * metadata rewrite.
  */
 @DisplayName("Maven artifact deletion safety (RPS-1190, RPS-1197, RPS-1349, RPS-1573)")
-class MavenArtifactDeletionSafetyIT extends AbstractIntegrationTest {
+class MavenArtifactDeletionSafetyIT extends AbstractIT {
 
   @Autowired private RepoTxService repoTxService;
   @Autowired private MavenApiFacade mavenApiFacade;

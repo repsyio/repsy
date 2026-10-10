@@ -21,7 +21,7 @@ import static org.springframework.http.HttpHeaders.WWW_AUTHENTICATE;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
@@ -39,7 +39,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
  * announces a Bearer realm that points to its token endpoint.
  */
 @DisplayName("Protocol 401 answers carry the challenge of the protocol")
-class ProtocolAuthChallengeIT extends AbstractIntegrationTest {
+class ProtocolAuthChallengeIT extends AbstractIT {
 
   private static final String REPOSITORY_REALM = "Basic realm=\"Repsy\"";
   private static final String NPM_REALM = "Basic realm=\"Repsy\"";

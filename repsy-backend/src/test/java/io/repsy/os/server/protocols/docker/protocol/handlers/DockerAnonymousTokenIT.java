@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.auth.dtos.AuthenticationType;
 import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.auth.utils.TokenRealm;
@@ -45,7 +45,7 @@ import org.junit.jupiter.api.Test;
  * refused at the endpoint itself, before any token exists.
  */
 @DisplayName("Docker anonymous token")
-class DockerAnonymousTokenIT extends AbstractIntegrationTest {
+class DockerAnonymousTokenIT extends AbstractIT {
 
   private static final String IMAGE = "app";
 

@@ -23,7 +23,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -50,7 +50,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
  * scheme and host come from the request itself and the forwarded port headers are read raw.
  */
 @DisplayName("Docker registry ping /v2/ (RPS-2090)")
-class DockerRegistryCheckIT extends AbstractIntegrationTest {
+class DockerRegistryCheckIT extends AbstractIT {
 
   private static final String SERVICE = "service=\"repsy\"";
   private static final String API_VERSION_HEADER = "Docker-Distribution-API-Version";

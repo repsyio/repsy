@@ -20,7 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.maven.shared.storage.services.MavenStorageService;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
@@ -62,7 +62,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("Maven metadata classification follows the version-level file (RPS-1176, RPS-1185)")
-class MavenMetadataUploadIT extends AbstractIntegrationTest {
+class MavenMetadataUploadIT extends AbstractIT {
 
   private static final String LIB_DIR = "com/acme/lib/";
   private static final String SNAPSHOT_DIR = LIB_DIR + "1.0-SNAPSHOT/";

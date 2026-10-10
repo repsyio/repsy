@@ -24,7 +24,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.shared.token.entities.RepoDeployToken;
 import io.repsy.os.server.shared.token.repositories.RepoDeployTokenRepository;
 import io.repsy.os.server.shared.token.utils.DeployTokenHash;
@@ -53,7 +53,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * challenge and the chart stays; an admin deletes it.
  */
 @DisplayName("Helm classic chart delete needs MANAGE (RPS-1424)")
-class HelmChartDeletePermissionIT extends AbstractIntegrationTest {
+class HelmChartDeletePermissionIT extends AbstractIT {
 
   private static final String CHART = "payments";
   private static final String VERSION = "1.0.0";

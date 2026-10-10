@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.core.UrlParserProperties;
 import io.repsy.os.server.protocols.pypi.protocol.facades.PypiProtocolFacade;
 import io.repsy.os.server.protocols.pypi.ui.facades.PypiApiFacade;
@@ -56,7 +56,7 @@ import org.springframework.test.web.servlet.request.AbstractMockHttpServletReque
  * goes through the real protocol router via {@link #protocol}.
  */
 @DisplayName("PyPI wire protocol read routes (RPS-1221/RPS-1226)")
-class PypiWireReadIT extends AbstractIntegrationTest {
+class PypiWireReadIT extends AbstractIT {
 
   @Autowired private RepoTxService repoTxService;
   @Autowired private PypiApiFacade pypiApiFacade;

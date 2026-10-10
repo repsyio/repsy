@@ -25,7 +25,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.generated.model.UserUpdateForm;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.UserRole;
@@ -67,7 +67,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("last admin guards under concurrent requests (RPS-1101)")
-class LastAdminConcurrencyIT extends AbstractIntegrationTest {
+class LastAdminConcurrencyIT extends AbstractIT {
 
   private static final int ROUNDS = 8;
   private static final String CANNOT_DEMOTE = "cannotDemoteLastAdminUser";

@@ -24,7 +24,7 @@ import static org.springframework.http.HttpHeaders.LAST_MODIFIED;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.Artifact;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.ArtifactVersion;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactRepository;
@@ -54,7 +54,7 @@ import org.springframework.test.web.servlet.request.AbstractMockHttpServletReque
  * joins the transaction that is rolled back afterwards.
  */
 @DisplayName("Maven artifact-level metadata is generated when none is stored (RPS-1369)")
-class MavenArtifactMetadataSynthesisIT extends AbstractIntegrationTest {
+class MavenArtifactMetadataSynthesisIT extends AbstractIT {
 
   private static final String GROUP = "com.acme";
   private static final String GROUP_PATH = "com/acme";

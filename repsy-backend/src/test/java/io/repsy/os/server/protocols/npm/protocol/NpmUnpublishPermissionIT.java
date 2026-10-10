@@ -23,7 +23,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.NpmPackageRepository;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageVersionRepository;
 import io.repsy.os.server.shared.token.entities.RepoDeployToken;
@@ -64,7 +64,7 @@ import tools.jackson.databind.ObjectMapper;
  * rolled-back transaction, like {@link NpmUnpublishProtocolIT}.
  */
 @DisplayName("npm unpublish needs MANAGE, deprecate and dist-tag stay WRITE (RPS-1424)")
-class NpmUnpublishPermissionIT extends AbstractIntegrationTest {
+class NpmUnpublishPermissionIT extends AbstractIT {
 
   private static final String PACKAGE = "perm-package";
   private static final String PACKUMENT = "/{repo}/" + PACKAGE;

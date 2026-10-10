@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.shared.token.entities.RepoDeployToken;
 import io.repsy.os.server.shared.token.repositories.RepoDeployTokenRepository;
 import io.repsy.os.server.shared.token.utils.DeployTokenHash;
@@ -46,7 +46,7 @@ import org.springframework.http.MediaType;
  * token may not.
  */
 @DisplayName("Ruby yank permission (RPS-1317)")
-class RubyYankPermissionIT extends AbstractIntegrationTest {
+class RubyYankPermissionIT extends AbstractIT {
 
   @Autowired private RepoDeployTokenRepository deployTokenRepository;
 

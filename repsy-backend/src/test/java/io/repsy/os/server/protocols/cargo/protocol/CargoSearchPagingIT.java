@@ -21,7 +21,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -48,7 +48,7 @@ import org.springframework.test.web.servlet.request.AbstractMockHttpServletReque
  * answers in heap order, which is publish order here) fails the order assertions.
  */
 @DisplayName("Cargo search pages in a stable order")
-class CargoSearchPagingIT extends AbstractIntegrationTest {
+class CargoSearchPagingIT extends AbstractIT {
 
   private static final String PUBLISH = "/{repo}/api/v1/crates/new";
   private static final String SEARCH = "/{repo}/api/v1/crates";

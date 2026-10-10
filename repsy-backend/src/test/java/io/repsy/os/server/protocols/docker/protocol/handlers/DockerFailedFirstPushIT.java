@@ -22,7 +22,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.docker.shared.image.services.ImageTxService;
 import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
 import io.repsy.os.server.protocols.docker.shared.tag.services.ManifestTxService;
@@ -66,7 +66,7 @@ import org.springframework.web.context.WebApplicationContext;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("A failed Docker manifest push leaves no image without a manifest (RPS-1350)")
-class DockerFailedFirstPushIT extends AbstractIntegrationTest {
+class DockerFailedFirstPushIT extends AbstractIT {
 
   private static final String IMAGE = "app";
   private static final long TIMEOUT_SECONDS = 60;

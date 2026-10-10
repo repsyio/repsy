@@ -21,7 +21,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.HeapOrder;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
@@ -50,7 +50,7 @@ import tools.jackson.databind.ObjectMapper;
  * package.json}.
  */
 @DisplayName("npm lists of tags, keywords and maintainers are ordered (RPS-1614)")
-class NpmListOrderIT extends AbstractIntegrationTest {
+class NpmListOrderIT extends AbstractIT {
 
   private static final String PACKAGE = "order-pkg";
   private static final String DIST_TAG = "/{repo}/-/package/{name}/dist-tags/{tag}";

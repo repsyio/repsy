@@ -25,7 +25,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.docker.shared.image.services.ImageTxService;
 import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
 import io.repsy.os.server.protocols.docker.shared.tag.services.ManifestTxService;
@@ -71,7 +71,7 @@ import org.springframework.web.context.WebApplicationContext;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("Push and delete of the last manifest of an image (RPS-1288)")
-class DockerImageDeleteRaceIT extends AbstractIntegrationTest {
+class DockerImageDeleteRaceIT extends AbstractIT {
 
   private static final String IMAGE = "app";
   private static final long TIMEOUT_SECONDS = 60;

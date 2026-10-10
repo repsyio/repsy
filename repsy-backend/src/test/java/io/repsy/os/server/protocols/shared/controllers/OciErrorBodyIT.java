@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.nio.charset.StandardCharsets;
@@ -43,7 +43,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
  * they reject.
  */
 @DisplayName("OCI distribution error bodies")
-class OciErrorBodyIT extends AbstractIntegrationTest {
+class OciErrorBodyIT extends AbstractIT {
 
   private static final String IMAGE = "app";
   private static final String UNKNOWN_DIGEST = "sha256:" + "b".repeat(64);

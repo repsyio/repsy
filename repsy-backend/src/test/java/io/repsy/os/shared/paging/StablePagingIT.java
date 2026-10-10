@@ -21,7 +21,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.cargo.shared.crate.entities.CargoCrate;
 import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoCrateRepository;
 import io.repsy.os.server.protocols.golang.shared.go_module.entities.GoModule;
@@ -70,7 +70,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
  * left the tied rows to the database.
  */
 @DisplayName("Paged lists break sort ties by id (RPS-1298)")
-class StablePagingIT extends AbstractIntegrationTest {
+class StablePagingIT extends AbstractIT {
 
   private static final int ROWS = 60;
   private static final int PAGE_SIZE = 5;

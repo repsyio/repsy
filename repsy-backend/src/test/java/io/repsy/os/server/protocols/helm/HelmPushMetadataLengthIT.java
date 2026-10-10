@@ -31,7 +31,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.protocols.helm.shared.constants.HelmConstants;
@@ -66,7 +66,7 @@ import org.springframework.test.web.servlet.ResultActions;
  * transaction.
  */
 @DisplayName("Helm push holds chart and OCI metadata to its columns (RPS-1072)")
-class HelmPushMetadataLengthIT extends AbstractIntegrationTest {
+class HelmPushMetadataLengthIT extends AbstractIT {
 
   private static final String CHART = "payments";
   private static final String OCTET_STREAM = "application/octet-stream";

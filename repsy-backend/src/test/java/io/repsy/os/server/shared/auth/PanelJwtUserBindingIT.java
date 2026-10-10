@@ -20,7 +20,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -43,7 +43,7 @@ import org.springframework.test.web.servlet.ResultActions;
  * there for up to 30 minutes after a password change, and a reused username inherited it.
  */
 @DisplayName("A panel access token ends with the credentials it was issued for (RPS-1604)")
-class PanelJwtUserBindingIT extends AbstractIntegrationTest {
+class PanelJwtUserBindingIT extends AbstractIT {
 
   private static final String NEW_PASSWORD = "NewPassword2@";
 

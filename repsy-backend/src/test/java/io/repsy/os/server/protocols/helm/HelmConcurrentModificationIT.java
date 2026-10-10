@@ -35,7 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.helm.shared.chart.repositories.HelmChartRepository;
 import io.repsy.os.server.protocols.helm.shared.chart.repositories.HelmChartVersionRepository;
 import io.repsy.os.server.protocols.helm.shared.oci.repositories.HelmOciBlobRepository;
@@ -127,7 +127,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 // connection pool open on the one PostgreSQL that all ITs share: a small pool keeps the total
 // under its max_connections. A request and the bump of its row hold two connections at once.
 @TestPropertySource(properties = "spring.datasource.hikari.maximum-pool-size=6")
-class HelmConcurrentModificationIT extends AbstractIntegrationTest {
+class HelmConcurrentModificationIT extends AbstractIT {
 
   private static final String OCTET_STREAM = "application/octet-stream";
   private static final long TIMEOUT_SECONDS = 30;

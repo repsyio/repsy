@@ -25,7 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.core.UrlParserProperties;
 import io.repsy.os.server.protocols.pypi.protocol.facades.PypiProtocolFacade;
 import io.repsy.os.server.protocols.pypi.ui.facades.PypiApiFacade;
@@ -62,7 +62,7 @@ import org.springframework.web.util.UriUtils;
  * pattern {@code PypiWireReadIT} uses, and every read goes through the real protocol router.
  */
 @DisplayName("PyPI local versions are separate releases (RPS-1662)")
-class PypiLocalVersionIT extends AbstractIntegrationTest {
+class PypiLocalVersionIT extends AbstractIT {
 
   @Autowired private RepoTxService repoTxService;
   @Autowired private PypiApiFacade pypiApiFacade;

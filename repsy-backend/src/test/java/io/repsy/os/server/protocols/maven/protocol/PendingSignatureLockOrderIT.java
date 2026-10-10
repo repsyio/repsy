@@ -23,7 +23,7 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.maven.shared.artifact.services.PendingSignatureService;
 import io.repsy.os.server.protocols.maven.shared.artifact.services.VersionSignatureService;
 import io.repsy.os.server.protocols.maven.shared.keystore.PgpTestKeys;
@@ -81,7 +81,7 @@ import tools.jackson.databind.ObjectMapper;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("Lock order of the pending signatures and the version row (RPS-1352)")
-class PendingSignatureLockOrderIT extends AbstractIntegrationTest {
+class PendingSignatureLockOrderIT extends AbstractIT {
 
   private static final PgpTestKeys KEYS = PgpTestKeys.generate();
   private static final long TIMEOUT_SECONDS = 60;

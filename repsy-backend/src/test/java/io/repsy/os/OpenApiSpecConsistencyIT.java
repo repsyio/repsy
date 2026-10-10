@@ -84,7 +84,7 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
  * listed finding is gone (remove the entry then).
  */
 @DisplayName("OpenAPI spec and panel controllers")
-class OpenApiSpecConsistencyIT extends AbstractIntegrationTest {
+class OpenApiSpecConsistencyIT extends AbstractIT {
 
   private static final String SPEC_RESOURCE = "openapi/openapi-spec.yaml";
 

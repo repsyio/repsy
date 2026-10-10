@@ -24,7 +24,7 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.helm.shared.storage.services.HelmStorageService;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
@@ -61,7 +61,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("Helm chart delete keeps its rows when the storage fails (RPS-1086)")
-class HelmDeleteStorageFailureIT extends AbstractIntegrationTest {
+class HelmDeleteStorageFailureIT extends AbstractIT {
 
   private static final String CHART = "payments";
   private static final String VERSION = "1.0.0";

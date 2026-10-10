@@ -22,7 +22,7 @@ import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.core.UrlParserProperties;
 import io.repsy.os.server.protocols.pypi.protocol.facades.PypiProtocolFacade;
 import io.repsy.os.server.protocols.pypi.ui.facades.PypiApiFacade;
@@ -48,7 +48,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * the client-sent value verbatim -- and a mismatching client digest is rejected outright.
  */
 @DisplayName("PyPI upload sha256 digest is server-computed and verified (RPS-1225)")
-class PypiUploadDigestIT extends AbstractIntegrationTest {
+class PypiUploadDigestIT extends AbstractIT {
 
   private static final Pattern SHA256_FRAGMENT = Pattern.compile("#sha256=([0-9a-f]{64})");
 

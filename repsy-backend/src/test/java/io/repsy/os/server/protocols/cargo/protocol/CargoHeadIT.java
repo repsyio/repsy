@@ -21,7 +21,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.ByteArrayOutputStream;
@@ -43,7 +43,7 @@ import org.springframework.mock.web.MockHttpServletResponse;
  * /{repo}/<prefix>/<name>}, {@code HEAD /api/v1/crates/{name}/{version}/download}.
  */
 @DisplayName("Cargo HEAD routes (RPS-2089)")
-class CargoHeadIT extends AbstractIntegrationTest {
+class CargoHeadIT extends AbstractIT {
 
   private static final String PUBLISH_PATH = "/{repo}/api/v1/crates/new";
   private static final String CRATE_NAME = "test-crate";

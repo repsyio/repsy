@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.user.entities.UserRole;
@@ -43,7 +43,7 @@ import tools.jackson.databind.ObjectMapper;
  * although the tag was set. The add and the remove answer JSON now.
  */
 @DisplayName("npm wire protocol dist-tag answers")
-class NpmDistTagResponseIT extends AbstractIntegrationTest {
+class NpmDistTagResponseIT extends AbstractIT {
 
   private static final String DIST_TAG = "/{repo}/-/package/{name}/dist-tags/{tag}";
   private static final String DIST_TAGS = "/{repo}/-/package/{name}/dist-tags";

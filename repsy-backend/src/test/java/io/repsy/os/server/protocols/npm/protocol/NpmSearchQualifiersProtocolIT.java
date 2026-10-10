@@ -21,7 +21,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.security.scan.dtos.FixStatus;
 import io.repsy.os.server.security.scan.dtos.ScanStatus;
 import io.repsy.os.server.security.scan.dtos.Severity;
@@ -52,7 +52,7 @@ import tools.jackson.databind.ObjectMapper;
  * published over the wire, so what is searched is what the real publish flow stored.
  */
 @DisplayName("npm wire protocol GET /-/v1/search qualifiers and paging")
-class NpmSearchQualifiersProtocolIT extends AbstractIntegrationTest {
+class NpmSearchQualifiersProtocolIT extends AbstractIT {
 
   private static final String SEARCH = "/{repo}/-/v1/search";
 

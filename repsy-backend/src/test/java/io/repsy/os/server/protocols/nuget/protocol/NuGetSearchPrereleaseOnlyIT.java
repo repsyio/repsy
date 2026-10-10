@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackage;
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackageVersion;
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageRepository;
@@ -42,7 +42,7 @@ import org.springframework.test.web.servlet.ResultActions;
  * {@code totalHits}.
  */
 @DisplayName("NuGet wire protocol search of pre-release-only packages")
-class NuGetSearchPrereleaseOnlyIT extends AbstractIntegrationTest {
+class NuGetSearchPrereleaseOnlyIT extends AbstractIT {
 
   private static final String SEARCH_PATH = "/{repo}/v3/search";
   private static final String AUTOCOMPLETE_PATH = "/{repo}/v3/autocomplete";

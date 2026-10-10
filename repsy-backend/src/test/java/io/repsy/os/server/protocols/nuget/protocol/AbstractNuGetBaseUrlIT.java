@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackage;
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackageVersion;
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageRepository;
@@ -42,7 +42,7 @@ import org.springframework.test.web.servlet.ResultActions;
  * request always comes from {@code internal.example:9090}, an address a client behind a reverse
  * proxy cannot reach.
  */
-abstract class AbstractNuGetBaseUrlIT extends AbstractIntegrationTest {
+abstract class AbstractNuGetBaseUrlIT extends AbstractIT {
 
   private static final String PACKAGE_ID = "Base.Url.Package";
   private static final String PACKAGE_ID_LOWER = "base.url.package";

@@ -30,7 +30,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -56,7 +56,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * is what would catch that ordering violation.
  */
 @DisplayName("Helm classic download serves an OCI-only chart (RPS-1217)")
-class HelmOciClassicDownloadIT extends AbstractIntegrationTest {
+class HelmOciClassicDownloadIT extends AbstractIT {
 
   private static final String CHART = "payments";
   private static final String OCTET_STREAM = "application/octet-stream";

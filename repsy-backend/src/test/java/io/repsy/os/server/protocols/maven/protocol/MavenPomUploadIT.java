@@ -20,7 +20,7 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -36,7 +36,7 @@ import org.springframework.test.web.servlet.MvcResult;
  * well, with the fixed {@code pomGroupIdMismatch} id.
  */
 @DisplayName("Maven POM upload")
-class MavenPomUploadIT extends AbstractIntegrationTest {
+class MavenPomUploadIT extends AbstractIT {
 
   private static final String POM_PATH = "com/example/lib/1.0/lib-1.0.pom";
   private static final String MARKER = "reflected-marker-8f3a1c";

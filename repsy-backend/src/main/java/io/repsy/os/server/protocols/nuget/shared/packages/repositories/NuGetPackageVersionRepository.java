@@ -60,7 +60,7 @@ public interface NuGetPackageVersionRepository extends JpaRepository<NuGetPackag
 
   List<NuGetPackageVersion> findByNugetPackageIdOrderByPublishedAtDescVersionAsc(UUID packageId);
 
-  List<NuGetPackageVersion> findByNugetPackageIdAndIsListedTrueOrderByPublishedAtDescVersionAsc(
+  List<NuGetPackageVersion> findByNugetPackageIdAndListedTrueOrderByPublishedAtDescVersionAsc(
       UUID packageId);
 
   /**

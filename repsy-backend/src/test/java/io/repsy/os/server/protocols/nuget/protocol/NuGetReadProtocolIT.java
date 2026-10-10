@@ -22,7 +22,7 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.nuget.shared.packages.services.NuGetPackageService;
 import io.repsy.os.server.protocols.nuget.shared.storage.NuGetStorageService;
 import io.repsy.os.shared.repo.entities.Repo;
@@ -50,7 +50,7 @@ import org.springframework.test.web.servlet.request.AbstractMockHttpServletReque
  */
 @DisplayName("NuGet wire protocol read endpoints")
 @ExtendWith(OutputCaptureExtension.class)
-class NuGetReadProtocolIT extends AbstractIntegrationTest {
+class NuGetReadProtocolIT extends AbstractIT {
 
   private static final String PACKAGE_ID = "repsy.missing";
   private static final String VERSIONS_PATH = "/{repo}/v3/package/{id}/index.json";

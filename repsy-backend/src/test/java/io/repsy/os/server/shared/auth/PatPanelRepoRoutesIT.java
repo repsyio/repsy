@@ -52,7 +52,7 @@ import org.springframework.test.web.servlet.request.AbstractMockHttpServletReque
  * there with {@code 401}, whatever its scopes and its owner's role.
  */
 @DisplayName("Panel routes and personal access tokens")
-class PatPanelRepoRoutesIT extends AbstractPatIntegrationTest {
+class PatPanelRepoRoutesIT extends AbstractPatIT {
 
   private User user;
   private User admin;
