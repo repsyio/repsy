@@ -18,7 +18,7 @@
 # resolver/installer (`bundle install`); the publish side (`gem push`) is the same toolchain. This
 # Dockerfile copies the interpreter/stdlib in from the official image the same "copy the toolchain,
 # not the whole image" approach as cargo.Dockerfile's Rust toolchain / nuget.Dockerfile's .NET SDK /
-# pypi.Dockerfile's CPython / golang.Dockerfile's Go toolchain. The final image must stay
+# pypi.Dockerfile's CPython / go.Dockerfile's Go toolchain. The final image must stay
 # `node:24-bookworm-slim` (the harness itself needs Node). A named build stage (not the final
 # image), only used below as a `COPY --from` source -- a normal build-time reference, not a Docker
 # Compose sibling-service dependency (see maven.Dockerfile's/nuget.Dockerfile's headers for why that

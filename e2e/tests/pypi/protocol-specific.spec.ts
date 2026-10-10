@@ -63,7 +63,7 @@
  *    prompt (well under this suite's own timeout), no hang, no retry storm, a clean client-side
  *    refusal. Not a Repsy bug: the server already served the archive correctly (PS-1's own
  *    project-page/download assertions prove that); every OTHER real client in this harness ships its
- *    own toolchain deliberately (`helm.Dockerfile`'s Helm binary, `golang.Dockerfile`'s Go toolchain,
+ *    own toolchain deliberately (`helm.Dockerfile`'s Helm binary, `go.Dockerfile`'s Go toolchain,
  *    `ruby.Dockerfile`'s RubyGems) and pip's PEP 517 build backend was never part of
  *    `pypi.Dockerfile`'s own toolchain either -- this is simply what a real `pip` does against a
  *    source-only, no-`setup.py` archive, live-confirmed rather than assumed, matching H20's own "if

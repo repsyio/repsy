@@ -34,13 +34,13 @@ import { repoRoute } from '../../routes.js';
  *  - A version that does not exist renders `pkg-error` with "Version '<v>' not found".
  *  - Go has no Package Override setting.
  */
-export const golangDescriptor: ProtocolDescriptor = {
-  protocol: 'golang',
+export const goDescriptor: ProtocolDescriptor = {
+  protocol: 'go',
   label: 'Go',
   levels: {
     list: {
       path: (repo) => repoRoute(repo),
-      rowKey: (t) => need(t, 'golang').name,
+      rowKey: (t) => need(t, 'go').name,
       search: { placeholder: 'module', term: (t) => t.name },
       sort: NEWEST_OLDEST,
       pagination: true,
@@ -52,8 +52,8 @@ export const golangDescriptor: ProtocolDescriptor = {
     },
     versions: {
       path: (repo, t) =>
-        `${repoRoute(repo, 'modules')}?modulePath=${encodeURIComponent(need(t, 'golang').name)}`,
-      rowKey: (t) => need(t, 'golang').version,
+        `${repoRoute(repo, 'modules')}?modulePath=${encodeURIComponent(need(t, 'go').name)}`,
+      rowKey: (t) => need(t, 'go').version,
       search: { placeholder: 'version', term: (t) => t.version },
       sort: NEWEST_OLDEST,
       pagination: true,
@@ -65,11 +65,11 @@ export const golangDescriptor: ProtocolDescriptor = {
     },
     detail: {
       path: (repo, t) => {
-        const { name, version } = need(t, 'golang');
+        const { name, version } = need(t, 'go');
         return `${repoRoute(repo, 'modules', 'version')}?modulePath=${encodeURIComponent(name)}&version=${encodeURIComponent(version)}`;
       },
       installContains: (repo, t) => [
-        `/${repoPath(repo)},off go get ${need(t, 'golang').name}@${need(t, 'golang').version}`,
+        `/${repoPath(repo)},off go get ${need(t, 'go').name}@${need(t, 'go').version}`,
       ],
       repoUrlIn: 'install',
       installTextElement: 'span',

@@ -30,7 +30,7 @@
 import type { RepoType } from '../api/panel-api.js';
 import { seedCargo } from './packages/cargo.js';
 import { type DockerSeedOptions, seedDocker } from './packages/docker.js';
-import { seedGolang } from './packages/golang.js';
+import { seedGo } from './packages/go.js';
 import { seedHelm } from './packages/helm.js';
 import { type MavenSeedOptions, seedMaven } from './packages/maven.js';
 import { seedNpm } from './packages/npm.js';
@@ -40,7 +40,7 @@ import { seedRuby } from './packages/ruby.js';
 import type { SeededRepo } from './seeder.js';
 
 export type PackageProtocol =
-  'maven' | 'npm' | 'docker' | 'pypi' | 'cargo' | 'nuget' | 'helm' | 'golang' | 'ruby';
+  'maven' | 'npm' | 'docker' | 'pypi' | 'cargo' | 'nuget' | 'helm' | 'go' | 'ruby';
 
 export const PACKAGE_PROTOCOLS: readonly PackageProtocol[] = [
   'maven',
@@ -50,7 +50,7 @@ export const PACKAGE_PROTOCOLS: readonly PackageProtocol[] = [
   'cargo',
   'nuget',
   'helm',
-  'golang',
+  'go',
   'ruby',
 ];
 
@@ -59,7 +59,7 @@ export interface PackageRef {
   /**
    * The package identity exactly as the panel keys its list rows: maven `group:artifact`, npm
    * `@scope/name` or `name`, docker the image name, pypi/cargo/gem/chart the name, nuget the package
-   * id, golang the module path.
+   * id, go the module path.
    */
   name: string;
   /** The version (docker: the tag). */
@@ -116,7 +116,7 @@ export const SEEDERS: Record<PackageProtocol, PackageSeeder> = {
   cargo: seedCargo,
   nuget: seedNuget,
   helm: seedHelm,
-  golang: seedGolang,
+  go: seedGo,
   ruby: seedRuby,
 };
 

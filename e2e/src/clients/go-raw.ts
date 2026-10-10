@@ -15,7 +15,7 @@
 ///
 
 /**
- * Raw HTTP helpers for the Go module proxy protocol, next to the real-client adapter (`golang.ts`),
+ * Raw HTTP helpers for the Go module proxy protocol, next to the real-client adapter (`go.ts`),
  * built on `raw-http.ts`, the Go analogue of `nuget-raw.ts`/`cargo-raw.ts`. Every wire fact below was
  * read from the server source (`repsy-protocols/golang/**`, `repsy-backend/.../protocols/golang/**`)
  * and then confirmed live against a running instance (see `README.md`'s "Go runner" section for the
@@ -29,7 +29,7 @@
  *    `Content-Sha256` is an optional request header, lower-cased before comparison, checked against
  *    the WHOLE request body (confirmed live/R3). Success: `200`, empty body (never `201`, confirmed
  *    live) -- there is deliberately no re-PUT/re-probe pattern here the way pypi's/nuget's adapters
- *    use: a real `curl -T` already exposes the raw HTTP status via `-w '%{http_code}'`, so `golang.ts`
+ *    use: a real `curl -T` already exposes the raw HTTP status via `-w '%{http_code}'`, so `go.ts`
  *    needs no companion raw request the way a client that hides the status behind its own exit code
  *    does.
  *  - Upload pipeline order (`AbstractGoProtocolFacade.upload`): `extractModulePath` (needs `/@v/` at
@@ -89,7 +89,7 @@
  *    RPS-1465), with the `Content-Length` of the file, and the same plain-text `404` for a file that
  *    does not exist. It was a `404` for EVERY path, an existing `.info` included (H17, R15), because
  *    no `ProtocolMethodHandler` listed `HttpMethod.HEAD`, so the router had nothing to dispatch to.
- *  - Auth (`GolangAuthPreProcessor`, priority 100): skipped only for a public-repo READ. Otherwise a
+ *  - Auth (`GoAuthPreProcessor`, priority 100): skipped only for a public-repo READ. Otherwise a
  *    missing/unparseable `Authorization` is a `401` + `WWW-Authenticate: Basic realm="Repsy"` with
  *    a `text/plain` message (RPS-1435: the `go` command prints a body only when it is `text/plain`,
  *    and it used to be empty, so the client showed a bare `401`; a rejected credential gets the same
@@ -101,7 +101,7 @@
  *    supported Go client ever sends), no token exchange.
  *  - `releases`/`snapshots`/`allowOverride` are never read by any Go code (grep-confirmed: no
  *    `allowOverride|isReleases|isSnapshots` hit under either Go package) -- `catalog.ts` never adds
- *    `golang` to the maven/nuget-only `releases`/`snapshots` scenarios, same as docker/helm/pypi.
+ *    `go` to the maven/nuget-only `releases`/`snapshots` scenarios, same as docker/helm/pypi.
  */
 import { createHash, randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
@@ -136,7 +136,7 @@ export {
 };
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-/** Exported so `golang.ts` can render the (publish-unrelated) consumer templates from the same
+/** Exported so `go.ts` can render the (publish-unrelated) consumer templates from the same
  *  directory without re-deriving the path. */
 export const TEMPLATES_DIR = path.resolve(__dirname, '../packages/golang');
 
@@ -162,7 +162,7 @@ export function packageName(runId: string, scenario: Scenario): string {
  *  leading `v`, which is ALL Go's own semver grammar (`v(\d+)\.(\d+)\.(\d+)(-...)?(\+...)?`) and
  *  Repsy's upload path require (confirmed live/H16: accepted by both, and `@latest` picks it when it
  *  is the sole version of a module). `versionType` is ignored: Go has no release/snapshot repo-setting
- *  distinction (`golang.ts`'s `adapter.version`). */
+ *  distinction (`go.ts`'s `adapter.version`). */
 export function goVersion(): string {
   return `v${boundedSemverVersion()}`;
 }
@@ -192,7 +192,7 @@ export function zipRelPath(modulePath: string, version: string): string {
 }
 
 /** The URL a real `curl -T` publish is given (`.zip` suffix, matching the panel's OWN documented
- *  incantation, `golang-config.component.ts`) -- `uploadRelPath(..., { suffix: '' })`/`'.mod'`/
+ *  incantation, `go-config.component.ts`) -- `uploadRelPath(..., { suffix: '' })`/`'.mod'`/
  *  `'.info'` exercise R2/G6 (the backend README's own suffix-less spelling, and the "any suffix means
  *  zip" quirk) from `registry-rules.spec.ts`. */
 export function uploadRelPath(
@@ -233,7 +233,7 @@ export function dirhashHash1(entries: readonly { name: string; content: Buffer }
 }
 
 /** Renders `go.template.mod` for `modulePath` alone (no marker involved) -- shared by `buildModuleZip`
- *  and by `golang.ts`'s `afterSuccessfulRoundTrip`, which needs the EXACT expected `go.mod` text
+ *  and by `go.ts`'s `afterSuccessfulRoundTrip`, which needs the EXACT expected `go.mod` text
  *  without holding on to the `BuiltGoModule` a scenario's own (possibly refused) publish produced. */
 export async function renderGoModText(
   modulePath: string,
@@ -278,7 +278,7 @@ export interface BuiltGoModule {
 }
 
 /** Hand-builds a Go module zip with `fflate.zipSync` (never `go mod`/`go build` -- there is no
- *  official Go publisher at all, see this story's own constraints and `golang.ts`'s file header):
+ *  official Go publisher at all, see this story's own constraints and `go.ts`'s file header):
  *  `go.mod` (rendered from `go.template.mod`), `hello.go` (`hello.template.go`, a `Marker` constant)
  *  and a plain-text `e2e-marker.txt` carrying the same marker, every entry prefixed
  *  `<modulePath>@<version>/` with NO directory entries (confirmed live/H12/H1). */
@@ -411,7 +411,7 @@ export async function rawPut(
   return toGoResponse(res);
 }
 
-/** Raw `PUT` of a built module zip, exactly what a real `curl -T` publish sends (`golang.ts`'s file
+/** Raw `PUT` of a built module zip, exactly what a real `curl -T` publish sends (`go.ts`'s file
  *  header): `opts.contentSha256` defaults to the CORRECT sha256 of `built.bytes` when omitted (pass an
  *  explicit wrong/absent value to exercise R3). */
 export async function rawUpload(

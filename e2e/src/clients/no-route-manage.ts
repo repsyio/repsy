@@ -34,7 +34,7 @@ import { bindPrepared, type ManageOperation } from '../scenarios/manage-catalog.
 import type { MaterializedCredential } from '../scenarios/world.js';
 import { repoUrl } from '../repo-url.js';
 import { adminCredential, authHeader, sha256Hex } from './raw-http.js';
-import * as go from './golang-raw.js';
+import * as go from './go-raw.js';
 import * as maven from './maven-raw.js';
 import * as pypi from './pypi-raw.js';
 
@@ -111,7 +111,7 @@ function pypiDeleteFile(): ManageOperation {
 /** Go: the module zip of a version (`<module>/@v/<version>.zip`). */
 function goDeleteZip(): ManageOperation {
   return fileOperation({
-    protocol: 'golang',
+    protocol: 'go',
     id: 'delete-zip',
     what: 'a module zip',
     async seed(repoName, runId) {
@@ -151,5 +151,5 @@ function mavenDeleteJar(): ManageOperation {
 }
 
 export const PYPI_MANAGE_OPERATIONS: readonly ManageOperation[] = [pypiDeleteFile()];
-export const GOLANG_MANAGE_OPERATIONS: readonly ManageOperation[] = [goDeleteZip()];
+export const GO_MANAGE_OPERATIONS: readonly ManageOperation[] = [goDeleteZip()];
 export const MAVEN_MANAGE_OPERATIONS: readonly ManageOperation[] = [mavenDeleteJar()];

@@ -16,7 +16,7 @@
 
 /**
  * Raw HTTP helpers for the Ruby gem (RubyGems/Bundler) protocol, next to the real-client adapter
- * (`ruby.ts`), built on `raw-http.ts`, the Ruby analogue of `pypi-raw.ts`/`golang-raw.ts`. Every wire
+ * (`ruby.ts`), built on `raw-http.ts`, the Ruby analogue of `pypi-raw.ts`/`go-raw.ts`. Every wire
  * fact below was read from the server source (`repsy-protocols/ruby/**`,
  * `repsy-backend/.../protocols/ruby/**`) and then confirmed live against a running instance (see
  * `README.md`'s "Ruby runner" section for the raw evidence and every H/RB-number these tests
@@ -54,7 +54,7 @@
  *    (checksum/metadata/deps replaced); an existing version that is EITHER yanked OR
  *    `allowOverride:false` is refused with **`409 gemVersionAlreadyExists`** (`ErrorHandler` maps
  *    `ItemAlreadyExistException` to `CONFLICT`) -- confirmed live, a REAL, genuine conflict outcome
- *    (like nuget/helm/golang), not maven's 403.
+ *    (like nuget/helm/go), not maven's 403.
  *  - `GET /<repo>/gems/<file>.gem`: `permission: READ`, `application/octet-stream`; a gem is
  *    resolved by filename against the DB, longest-name-first (RPS-1236, fixed), and a yanked
  *    version's file stays servable (RPS-1238, fixed) -- any other resolution failure is a bodyless
@@ -112,7 +112,7 @@
  *  - Auth (`RubyAuthPreProcessor`, priority 100): skipped only for a public-repo READ. A
  *    missing/unparseable `Authorization` is a bodyless `401` + `WWW-Authenticate: Basic
  *    realm="Repsy"`. `normalizeAuthHeader` Bearer-prefixes any value that does not
- *    already start with `Basic `/`Bearer ` (the cargo/golang trick): `RubyAuthenticator` is a bare
+ *    already start with `Basic `/`Bearer ` (the cargo/go trick): `RubyAuthenticator` is a bare
  *    `ProtocolAuthService` with no overrides, so `handleBearerAuth` tries a raw deploy-token secret
  *    first, `handleBasicAuth` tries the PASSWORD as a deploy token first then falls back to
  *    username/password -- a read-only deploy token on a WRITE is the same flat `401` every other
@@ -120,7 +120,7 @@
  *    exchange.
  *  - `releases`/`snapshots` repo settings are never read by any Ruby code (grep-confirmed: no
  *    `isReleases|isSnapshots` hit under either Ruby package) -- `catalog.ts` never adds `ruby` to the
- *    maven/nuget-only `releases`/`snapshots` scenarios, same as docker/helm/pypi/golang.
+ *    maven/nuget-only `releases`/`snapshots` scenarios, same as docker/helm/pypi/go.
  */
 import { createHash } from 'node:crypto';
 import fs from 'node:fs/promises';
@@ -431,7 +431,7 @@ export function apiKeyFor(credential: MaterializedCredential): string | undefine
 
 /** `Authorization` header value exactly as a real `gem push`/raw probe would send it, in one of
  *  three spellings -- for `registry-rules.spec.ts`'s Authorization-spelling pins (mirrors
- *  golang/cargo's own "how does an unprefixed token get treated" tests). `'api-key'` is what
+ *  go/cargo's own "how does an unprefixed token get treated" tests). `'api-key'` is what
  *  `apiKeyFor` produces (the real client's own behaviour); `'basic'`/`'bearer'` force a spelling a
  *  raw probe can still send even when it differs from what a real client would choose for that
  *  credential kind. */

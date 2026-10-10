@@ -28,12 +28,12 @@ import {
   rawGet,
   rawPut,
   uploadRelPath,
-} from '../../src/clients/golang-raw.js';
+} from '../../src/clients/go-raw.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 
 const FORM = 'application/x-www-form-urlencoded';
 
-test.describe('golang empty upload body (raw HTTP)', () => {
+test.describe('go empty upload body (raw HTTP)', () => {
   for (const contentType of [undefined, 'application/zip', FORM]) {
     test(
       `an empty module zip (Content-Type ${contentType ?? 'none'}) answers 400 goModuleZipEmpty and stores nothing (RPS-1466)`,

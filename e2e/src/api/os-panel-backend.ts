@@ -571,7 +571,7 @@ export class OsPanelBackend implements PanelBackend {
    * listDeployTokensPage}: the generated client is not worth wiring in for a single query-param
    * endpoint no other part of this harness needs.
    */
-  async deleteGolangModuleVersion(
+  async deleteGoModuleVersion(
     repoName: string,
     modulePath: string,
     version: string,
@@ -586,7 +586,7 @@ export class OsPanelBackend implements PanelBackend {
     });
     if (!res.ok) {
       throw new PanelHttpError(
-        `deleteGolangModuleVersion failed with status ${res.status}`,
+        `deleteGoModuleVersion failed with status ${res.status}`,
         res.status,
         {
           method: 'DELETE',
@@ -600,7 +600,7 @@ export class OsPanelBackend implements PanelBackend {
    * Deletes one Ruby gem version (`DELETE /api/ruby/gems/{repoName}/{packageName}/versions/
    * {version}?platform=`, step 4e/RPS-294 R5/R16) -- a real panel-API delete, distinct from a
    * protocol-level `gem yank`. Called directly with `fetch`, like {@link
-   * deleteGolangModuleVersion}: the generated client is not worth wiring in for a single endpoint no
+   * deleteGoModuleVersion}: the generated client is not worth wiring in for a single endpoint no
    * other part of this harness needs.
    */
   async deleteRubyGemVersion(
@@ -648,7 +648,7 @@ export class OsPanelBackend implements PanelBackend {
   /**
    * Deletes a Docker tag (`DELETE /api/docker/images/{repoName}/{imageName}/tags/{tagName}`,
    * RPS-1216): only the tag pointer goes, its manifest stays stored, untagged. Called directly with
-   * `fetch`, like {@link deleteGolangModuleVersion}.
+   * `fetch`, like {@link deleteGoModuleVersion}.
    */
   async deleteDockerTag(repoName: string, imageName: string, tagName: string): Promise<void> {
     const url = new URL(

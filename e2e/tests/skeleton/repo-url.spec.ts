@@ -24,7 +24,7 @@ import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
 
 import { pushRuby } from '../../src/clients/oversize.js';
-import { goProxyUrlFor } from '../../src/clients/golang-tls-shim.js';
+import { goProxyUrlFor } from '../../src/clients/go-tls-shim.js';
 import { writeNpmrc } from '../../src/clients/npm-family/config.js';
 import { imageRef, pushScope, rawStartUploadWithToken } from '../../src/clients/docker-raw.js';
 import { env } from '../../src/env.js';

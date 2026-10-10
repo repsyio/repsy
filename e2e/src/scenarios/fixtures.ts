@@ -61,7 +61,7 @@ const REPO_TYPE_BY_PROTOCOL: Record<string, RepoType> = {
   docker: RepoType.DOCKER,
   cargo: RepoType.CARGO,
   nuget: RepoType.NUGET,
-  golang: RepoType.GOLANG,
+  go: RepoType.GOLANG,
   helm: RepoType.HELM,
   // The classic (ChartMuseum-protocol) Helm adapter (step 4b): a SEPARATE protocol key so the
   // shared catalog is run once per Helm mode (`helm.ts`/`helm-classic.ts`'s file headers), but the

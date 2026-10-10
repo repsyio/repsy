@@ -55,7 +55,7 @@ const REPO_TYPE: Record<PackageProtocol, RepoType> = {
   cargo: RepoType.CARGO,
   nuget: RepoType.NUGET,
   helm: RepoType.HELM,
-  golang: RepoType.GOLANG,
+  go: RepoType.GOLANG,
   ruby: RepoType.RUBY,
 };
 

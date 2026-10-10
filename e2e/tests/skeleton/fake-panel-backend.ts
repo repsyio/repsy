@@ -180,8 +180,8 @@ export class FakePanelBackend implements PanelBackend {
   async deletePypiVersion(): Promise<void> {
     return unsupported('deletePypiVersion');
   }
-  async deleteGolangModuleVersion(): Promise<void> {
-    return unsupported('deleteGolangModuleVersion');
+  async deleteGoModuleVersion(): Promise<void> {
+    return unsupported('deleteGoModuleVersion');
   }
   async deleteRubyGemVersion(): Promise<void> {
     return unsupported('deleteRubyGemVersion');

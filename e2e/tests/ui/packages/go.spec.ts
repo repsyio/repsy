@@ -13,8 +13,8 @@
 /// See the License for the specific language governing permissions and
 
 /**
- * Go package pages (RPS-1257): the shared scenarios PKG-golang-01..06 (`registerPackageScenarios`) and
- * PKG-golang-07, the Go-only routes. A module path has slashes, so the versions and detail pages carry
+ * Go package pages (RPS-1257): the shared scenarios PKG-go-01..06 (`registerPackageScenarios`) and
+ * PKG-go-07, the Go-only routes. A module path has slashes, so the versions and detail pages carry
  * it as a QUERY parameter (`/:repo/modules?modulePath=` and `/:repo/modules/version?modulePath=&version=`)
  * and the breadcrumb shows the module path. Modules are published with the raw `curl -T` request and a
  * zip built in code (never `go`).
@@ -32,12 +32,12 @@ import {
 import { DESCRIPTORS, protocolPages, type VersionsPage } from '../../../src/ui/pages/protocol.js';
 import { Breadcrumb } from '../nav/breadcrumb.js';
 
-const golang = DESCRIPTORS.golang;
+const go = DESCRIPTORS.go;
 
-registerPackageScenarios(golang);
+registerPackageScenarios(go);
 
 test.describe('Go module routes', { tag: '@packages' }, () => {
-  test('PKG-golang-07 module list -> versions -> detail through the query parameters', async ({
+  test('PKG-go-07 module list -> versions -> detail through the query parameters', async ({
     adminPage,
     seeder,
     seedVersions,
@@ -45,7 +45,7 @@ test.describe('Go module routes', { tag: '@packages' }, () => {
     const repo = await seeder.createRepo(RepoType.GOLANG);
     const [one, two] = await seedVersions(repo, ['v1.0.0', 'v1.1.0']);
     const modulePath = one.name;
-    const pages = protocolPages(adminPage, golang, repo.name);
+    const pages = protocolPages(adminPage, go, repo.name);
 
     const list = pages.list();
     await list.goto();
@@ -79,7 +79,7 @@ test.describe('Go module routes', { tag: '@packages' }, () => {
     await new Breadcrumb(adminPage).expectCrumbs(['Repositories', repo.name, modulePath, 'v1.1.0']);
   });
 
-  test('PKG-golang-07 the detail page loads straight from its query parameters', async ({
+  test('PKG-go-07 the detail page loads straight from its query parameters', async ({
     adminPage,
     seeder,
     seedPackage,
@@ -87,7 +87,7 @@ test.describe('Go module routes', { tag: '@packages' }, () => {
     const repo = await seeder.createRepo(RepoType.GOLANG);
     const mod = await seedPackage(repo);
     // A fresh navigation to the deep link, not a click through: nothing is carried over.
-    const detail = protocolPages(adminPage, golang, repo.name).detail(mod);
+    const detail = protocolPages(adminPage, go, repo.name).detail(mod);
     await adminPage.goto(detail.path());
     await detail.expectLoaded();
     await expect(detail.name).toHaveText(mod.name);
@@ -97,14 +97,14 @@ test.describe('Go module routes', { tag: '@packages' }, () => {
     await expect(detail.byId('pkg-detail-metadata')).toContainText('Go Version:');
   });
 
-  test('PKG-golang-07 the GOPROXY endpoints of a version are its .info, .mod and .zip', async ({
+  test('PKG-go-07 the GOPROXY endpoints of a version are its .info, .mod and .zip', async ({
     adminPage,
     seeder,
     seedPackage,
   }) => {
     const repo = await seeder.createRepo(RepoType.GOLANG);
     const mod = await seedPackage(repo);
-    const detail = protocolPages(adminPage, golang, repo.name).detail(mod);
+    const detail = protocolPages(adminPage, go, repo.name).detail(mod);
     await detail.goto();
     const base = repoUrl(repo.name, `${mod.name}/@v/${mod.version}`);
     for (const suffix of ['.info', '.mod', '.zip']) {
@@ -113,7 +113,7 @@ test.describe('Go module routes', { tag: '@packages' }, () => {
     await expect(detail.snippet('go-env')).toContainText(`GOPROXY="${repoUrl(repo.name)},off"`);
   });
 
-  test('PKG-golang-07 a version that does not exist says so on its detail page', async ({
+  test('PKG-go-07 a version that does not exist says so on its detail page', async ({
     adminPage,
     seeder,
     seedPackage,
@@ -121,14 +121,14 @@ test.describe('Go module routes', { tag: '@packages' }, () => {
     const repo = await seeder.createRepo(RepoType.GOLANG);
     const mod = await seedPackage(repo);
     const missing = { ...mod, version: 'v9.9.9' };
-    const detail = protocolPages(adminPage, golang, repo.name).detail(missing);
+    const detail = protocolPages(adminPage, go, repo.name).detail(missing);
     await detail.goto();
     await expect(detail.error).toBeVisible();
     await expect(detail.errorMessage).toHaveText("Version 'v9.9.9' not found");
     await expect(detail.root).toHaveCount(0);
   });
 
-  test('PKG-golang-07 the detail route without its query parameters goes back to the module list', async ({
+  test('PKG-go-07 the detail route without its query parameters goes back to the module list', async ({
     adminPage,
     seeder,
     seedPackage,
@@ -137,11 +137,11 @@ test.describe('Go module routes', { tag: '@packages' }, () => {
     const mod = await seedPackage(repo);
     await adminPage.goto(repoRoute(repo.name, 'modules', 'version'));
     await expect(adminPage).toHaveURL(new RegExp(`/${repo.name}$`));
-    await protocolPages(adminPage, golang, repo.name).list().expectLoaded();
-    await protocolPages(adminPage, golang, repo.name).list().expectRow(mod);
+    await protocolPages(adminPage, go, repo.name).list().expectLoaded();
+    await protocolPages(adminPage, go, repo.name).list().expectRow(mod);
   });
 
-  test('PKG-golang-07 a module path with slashes is found by the search and keeps its whole path', async ({
+  test('PKG-go-07 a module path with slashes is found by the search and keeps its whole path', async ({
     adminPage,
     seeder,
     seedPackage,
@@ -151,7 +151,7 @@ test.describe('Go module routes', { tag: '@packages' }, () => {
       name: `e2e.repsy.test/e2e-${seeder.runId}-org/team/service`,
     });
     const other = await seedPackage(repo, { index: 2 });
-    const list = protocolPages(adminPage, golang, repo.name).list();
+    const list = protocolPages(adminPage, go, repo.name).list();
     await list.goto();
     await list.search('team/service');
     await list.expectRow(nested);
@@ -164,7 +164,7 @@ test.describe('Go module routes', { tag: '@packages' }, () => {
 
   // RPS-1340: "the last version" was read off the current page, so deleting the only row left on page 2
   // was taken for the end of the module and the page went back to the module list.
-  test('PKG-golang-07 deleting the only version left on page 2 stays on the versions page (RPS-1340)', async ({
+  test('PKG-go-07 deleting the only version left on page 2 stays on the versions page (RPS-1340)', async ({
     adminPage,
     seeder,
     seedVersions,
@@ -175,7 +175,7 @@ test.describe('Go module routes', { tag: '@packages' }, () => {
       Array.from({ length: 11 }, (_, i) => `v1.0.${i}`),
     );
     const oldest = seeded[0];
-    const versions = protocolPages(adminPage, golang, repo.name).versions(oldest);
+    const versions = protocolPages(adminPage, go, repo.name).versions(oldest);
     await versions.goto();
     await expect(versions.rows()).toHaveCount(10);
     await versions.expectNoRow(oldest);
@@ -198,7 +198,7 @@ test.describe('Go module routes', { tag: '@packages' }, () => {
 
   // RPS-1302: the page loaded its permissions twice, so the versions of an unknown module were asked
   // for twice and the same "Module not found." toasted twice.
-  test('PKG-golang-07 the versions page of an unknown module shows its error once (RPS-1302)', async ({
+  test('PKG-go-07 the versions page of an unknown module shows its error once (RPS-1302)', async ({
     adminPage,
     seeder,
     pageErrors,
@@ -208,7 +208,7 @@ test.describe('Go module routes', { tag: '@packages' }, () => {
       'by design: the test opens an unknown module and asserts the error toast',
     );
     const repo = await seeder.createRepo(RepoType.GOLANG);
-    const versions = protocolPages(adminPage, golang, repo.name).versions({
+    const versions = protocolPages(adminPage, go, repo.name).versions({
       name: `e2e.repsy.test/e2e-${seeder.runId}-none`,
       version: 'v1.0.0',
     });
@@ -231,14 +231,14 @@ test.describe('Go module routes', { tag: '@packages' }, () => {
 
   // RPS-1262 (3): `<app-pagination>` used to sit after the versions page's `@if/@else`, so it also
   // rendered under the empty state and, for a module with no versions, printed "1 NaN".
-  test('PKG-golang-07 the empty versions page of an unknown module shows no pager (RPS-1262)', async ({
+  test('PKG-go-07 the empty versions page of an unknown module shows no pager (RPS-1262)', async ({
     adminPage,
     seeder,
     pageErrors,
   }) => {
     pageErrors.allowToast('Module not found.', 'by design: the test opens an unknown module');
     const repo = await seeder.createRepo(RepoType.GOLANG);
-    const versions = protocolPages(adminPage, golang, repo.name).versions({
+    const versions = protocolPages(adminPage, go, repo.name).versions({
       name: `e2e.repsy.test/e2e-${seeder.runId}-none`,
       version: 'v1.0.0',
     });

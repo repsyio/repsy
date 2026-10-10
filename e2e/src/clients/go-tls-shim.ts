@@ -15,7 +15,7 @@
 ///
 
 /**
- * An in-process TLS terminator for a credentialed real `go` invocation, next to `golang.ts`. Exists
+ * An in-process TLS terminator for a credentialed real `go` invocation, next to `go.ts`. Exists
  * because of one decisive fact read from `cmd/go/internal/web/http.go`'s `get()` and confirmed live:
  *
  *  - For an explicit `http://` `GOPROXY` URL, `net/http`'s own `send()` still sets `Authorization:
@@ -40,7 +40,7 @@
  * bound to `127.0.0.1:0` (an ephemeral port, so parallel Playwright workers never collide, confirmed
  * live/H15), forwarding every request verbatim to `env.repoBaseUrl` and copying the response back
  * unchanged. `server.unref()` so a worker process exits normally without an explicit shutdown. The
- * certificate/key are generated ONCE, at `golang.Dockerfile` build time, with Go's own
+ * certificate/key are generated ONCE, at `go.Dockerfile` build time, with Go's own
  * `crypto/tls/generate_cert.go` (confirmed live: `go run .../generate_cert.go --host
  * localhost,127.0.0.1 ...` produces a leaf `SSL_CERT_FILE` alone is enough to trust) -- never at test
  * time, and never checked in (throwaway, test-only, world-readable by design).
@@ -75,8 +75,8 @@ function startShim(): Promise<Shim> {
     if (!certPath || !keyPath) {
       reject(
         new Error(
-          'golang-tls-shim: REPSY_E2E_TLS_CERT/REPSY_E2E_TLS_KEY are not set -- only the golang ' +
-            'runner image (runners/golang.Dockerfile) generates and exports them.',
+          'go-tls-shim: REPSY_E2E_TLS_CERT/REPSY_E2E_TLS_KEY are not set -- only the go ' +
+            'runner image (runners/go.Dockerfile) generates and exports them.',
         ),
       );
       return;
@@ -154,7 +154,7 @@ function withCredentials(base: string, credential: MaterializedCredential): stri
 }
 
 /**
- * The `GOPROXY` value (sans the `,off` fallback, which `goEnv` in `golang.ts` appends) for a `go`
+ * The `GOPROXY` value (sans the `,off` fallback, which `goEnv` in `go.ts` appends) for a `go`
  * invocation authenticating as `credential` against `repoName`: routed through the shim only when
  * `needsTlsShim` says so, straight at `env.repoBaseUrl` otherwise (with credentials embedded directly
  * when `env.repoBaseUrl` is itself already `https://`, e.g. a remote target). Returns the shim's

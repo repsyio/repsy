@@ -16,11 +16,11 @@
 
 /**
  * The Go module proxy's registry rules, pinned at the protocol level with raw HTTP PUTs/GETs (no
- * `curl`/`go` client), the golang analogue of `tests/pypi/registry-rules.spec.ts`/
+ * `curl`/`go` client), the go analogue of `tests/pypi/registry-rules.spec.ts`/
  * `tests/nuget/registry-rules.spec.ts`. Every status/detail here was read from
  * `AbstractGoProtocolFacade`/`GoVersionUtils`/`GoModFileValidator`/`GoModuleZipReader`/
- * `GoModuleService`/`GolangAuthPreProcessor` first and then confirmed against a running instance
- * (see `golang-raw.ts`'s file header and `README.md`'s "Go runner" section for the raw evidence and
+ * `GoModuleService`/`GoAuthPreProcessor` first and then confirmed against a running instance
+ * (see `go-raw.ts`'s file header and `README.md`'s "Go runner" section for the raw evidence and
  * every H/G number these tests reference).
  *
  * Two backend bugs were found and confirmed live while building this suite; both are fixed
@@ -39,7 +39,7 @@
  * behaviour instead of `test.fail()`-ing the collision.
  */
 import { RepoType } from '../../src/api/panel-api.js';
-import { golangAdapter } from '../../src/clients/golang.js';
+import { goAdapter } from '../../src/clients/go.js';
 import { expectHeadMirrorsGet } from '../../src/clients/head-parity.js';
 import {
   adminCredential,
@@ -63,7 +63,7 @@ import {
   uploadUrl,
   zipRelPath,
   type GoRawResponse,
-} from '../../src/clients/golang-raw.js';
+} from '../../src/clients/go-raw.js';
 import { repoUrl } from '../../src/repo-url.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 import type { Seeder } from '../../src/seed/seeder.js';
@@ -73,7 +73,7 @@ interface Layout {
   modulePath: string;
 }
 
-/** A fresh golang repo (permissive defaults) and a run-unique module path for it. */
+/** A fresh go repo (permissive defaults) and a run-unique module path for it. */
 async function newRepo(seeder: Seeder, label: string): Promise<Layout> {
   const repo = await seeder.createRepo(RepoType.GOLANG, { privateRepo: true });
   return { repoName: repo.name, modulePath: `${MODULE_DOMAIN}/e2e-${seeder.runId}-${label}` };
@@ -86,7 +86,7 @@ function expectMsgId(res: GoRawResponse, status: number, msgId: string | undefin
   }
 }
 
-test.describe('golang registry rules (raw HTTP)', () => {
+test.describe('go registry rules (raw HTTP)', () => {
   test(
     'a read-only deploy token publish is refused with a flat 401 (not 403), and the same token ' +
       'can still read @v/list (R1)',
@@ -579,7 +579,7 @@ test.describe('golang registry rules (raw HTTP)', () => {
       const original = await buildModuleZip({ modulePath: layout.modulePath, version: 'v0.0.1' });
       expectMsgId(await rawUpload(layout.repoName, admin, original), 200, undefined);
 
-      await panelApi.deleteGolangModuleVersion(layout.repoName, layout.modulePath, 'v0.0.1');
+      await panelApi.deleteGoModuleVersion(layout.repoName, layout.modulePath, 'v0.0.1');
 
       const afterDeleteRes = await rawGet(
         layout.repoName,
@@ -619,7 +619,7 @@ test.describe('golang registry rules (raw HTTP)', () => {
       }
 
       // A version is left: the module stays, and serves what is left.
-      await panelApi.deleteGolangModuleVersion(layout.repoName, layout.modulePath, 'v0.0.1');
+      await panelApi.deleteGoModuleVersion(layout.repoName, layout.modulePath, 'v0.0.1');
       const oneLeft = await rawGet(layout.repoName, admin, list);
       expect(oneLeft.status).toBe(200);
       expect(parseVersionList(oneLeft.body)).toEqual(['v0.0.2']);
@@ -629,7 +629,7 @@ test.describe('golang registry rules (raw HTTP)', () => {
 
       // The last one goes: the module goes with it. The wire answers as it does for a module that
       // never existed: no list and no latest version, both 404 (RPS-1428).
-      await panelApi.deleteGolangModuleVersion(layout.repoName, layout.modulePath, 'v0.0.2');
+      await panelApi.deleteGoModuleVersion(layout.repoName, layout.modulePath, 'v0.0.2');
       const goneList = await rawGet(layout.repoName, admin, list);
       expect(goneList.status, 'a module without versions has no @v/list').toBe(404);
       expect((await rawGet(layout.repoName, admin, latest)).status).toBe(404);
@@ -637,7 +637,7 @@ test.describe('golang registry rules (raw HTTP)', () => {
         (await rawGet(layout.repoName, admin, infoRelPath(layout.modulePath, 'v0.0.2'))).status,
       ).toBe(404);
       await expect(
-        panelApi.deleteGolangModuleVersion(layout.repoName, layout.modulePath, 'v0.0.2'),
+        panelApi.deleteGoModuleVersion(layout.repoName, layout.modulePath, 'v0.0.2'),
         'the module is gone, so a second delete finds nothing',
       ).rejects.toMatchObject({ status: 404 });
 
@@ -734,7 +734,7 @@ test.describe('golang registry rules (raw HTTP)', () => {
       expect(name.startsWith(`${MODULE_DOMAIN}/`)).toBe(true);
       expect(listRelPath(name)).toBe(`${name}/@v/list`);
       expect(modRelPath(name, 'v0.0.1')).toBe(`${name}/@v/v0.0.1.mod`);
-      expect(golangAdapter.protocol).toBe('golang');
+      expect(goAdapter.protocol).toBe('go');
     },
   );
 });

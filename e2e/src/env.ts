@@ -63,7 +63,7 @@ const RUN_ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
 /**
  * A short random id, lowercase alphanumeric only so it satisfies both the repo-name pattern
  * (`^[a-zA-Z0-9_][a-zA-Z0-9_\-]*$`) and the stricter username pattern (`^[a-z0-9_\-]+$`), and short
- * enough that `e2e-<runid>-<proto>-<n>` (the longest protocol name, "golang", is 6 chars) stays
+ * enough that `e2e-<runid>-<proto>-<n>` (the longest protocol name, "go", is 6 chars) stays
  * within the repo name's 25-char limit.
  */
 function randomRunId(length = 6): string {

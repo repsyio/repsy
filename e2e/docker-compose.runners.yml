@@ -309,11 +309,11 @@ services:
       - ./test-results:/app/test-results
       - ./playwright-report:/app/playwright-report
 
-  golang:
+  go:
     <<: *runner-common
     build:
       context: .
-      dockerfile: runners/golang.Dockerfile
+      dockerfile: runners/go.Dockerfile
       args:
         GO_VERSION: '1.27.1'
         # Manifest-list digest of golang:<GO_VERSION>-bookworm, the one the docker runner builds skopeo with (RPS-1597).
@@ -324,7 +324,7 @@ services:
       # No shared/named cache volume, same reasoning as npm's/cargo's/nuget's/docker's/helm's/pypi's:
       # this harness's module zip is dependency-free and hand-built (never `go build`/`go mod`), so
       # `go mod download` never fetches a third-party dependency to cache. No daemon/socket either --
-      # `curl`/`go` are pure HTTP clients (clients/golang.ts's file header).
+      # `curl`/`go` are pure HTTP clients (clients/go.ts's file header).
       - ../repsy-backend/src/main/resources/openapi:/repsy-backend/src/main/resources/openapi:ro
       - ./src:/app/src
       - ./tests:/app/tests:ro
@@ -344,7 +344,7 @@ services:
       <<: *runner-environment
     volumes:
       # No shared/named cache volume, same reasoning as npm's/cargo's/nuget's/docker's/helm's/pypi's/
-      # golang's: this harness's gem is dependency-free and hand-built (never `gem build`), so
+      # go's: this harness's gem is dependency-free and hand-built (never `gem build`), so
       # `bundle install`/`gem push` never fetch a third-party dependency to cache.
       - ../repsy-backend/src/main/resources/openapi:/repsy-backend/src/main/resources/openapi:ro
       - ./src:/app/src
@@ -374,7 +374,7 @@ services:
         CRANE_IMAGE_DIGEST: 'sha256:1f968817b95790bed063f71175aa6b8ff879fa17064020415f3e18bb6e6a36e1'
         # The upgrade-path and persistence legs (RPS-1719/RPS-1720) also publish a Helm chart and a Go
         # module with the real clients: the same helm binary as the helm service's and the same Go
-        # toolchain as the golang service's. Keep these equal to theirs (runners/bump-pins.sh fails when
+        # toolchain as the go service's. Keep these equal to theirs (runners/bump-pins.sh fails when
         # a value differs between the services that repeat it).
         HELM_VERSION: 'v4.3.0'
         HELM_SHA256_AMD64: '86584a54def73570558f66f5111cc53dfed56689637ae32c1201205d494f54fb'

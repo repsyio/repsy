@@ -193,28 +193,28 @@ const CASES: readonly IdentityCase[] = [
   // Go ------------------------------------------------------------------------------------------
   {
     id: 'go-capitals',
-    protocol: 'golang',
+    protocol: 'go',
     about: 'a module path with capital letters',
     name: 'e2e.repsy.test/Foo/BarBaz',
     version: 'v1.2.3',
   },
   {
     id: 'go-incompatible',
-    protocol: 'golang',
+    protocol: 'go',
     about: 'a +incompatible version',
     name: 'e2e.repsy.test/e2e-incompat/lib',
     version: 'v2.0.0+incompatible',
   },
   {
     id: 'go-pseudo',
-    protocol: 'golang',
+    protocol: 'go',
     about: 'a pseudo-version',
     name: 'e2e.repsy.test/e2e-pseudo/lib',
     version: 'v0.0.0-20240101000000-abcdef123456',
   },
   {
     id: 'go-unicode',
-    protocol: 'golang',
+    protocol: 'go',
     about: 'a module path with non-ASCII letters (Go allows them in a path element)',
     name: 'e2e.repsy.test/e2e-üñí/módulo',
     version: 'v1.0.0',
@@ -289,7 +289,7 @@ test.describe('Package identities of the real world', { tag: '@packages' }, () =
       await seedPackage(repo, {
         ...identity.options,
         name: identity.name,
-        version: identity.protocol === 'golang' ? 'v9.9.9' : '9.9.9',
+        version: identity.protocol === 'go' ? 'v9.9.9' : '9.9.9',
       });
 
       // What the panel shows: the published identity unless the case records a normalisation.

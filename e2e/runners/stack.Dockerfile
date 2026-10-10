@@ -28,9 +28,9 @@
 # Go module against the previous release and pull them again with the real `helm`/`go` clients, so this
 # runner needs both -- the same static `helm` binary as helm.Dockerfile (no `cm-push` plugin: only the OCI
 # adapter is used here, never the ChartMuseum one) and the same Go toolchain (copied in, not run as a
-# daemon) plus the build-time TLS shim certificate as golang.Dockerfile (a credentialed `go` invocation
-# refuses a plain-http GOPROXY, see clients/golang-tls-shim.ts's file header). Keep these pins equal to the
-# helm/golang services' in docker-compose.runners.yml (runners/bump-pins.sh fails when they differ). This
+# daemon) plus the build-time TLS shim certificate as go.Dockerfile (a credentialed `go` invocation
+# refuses a plain-http GOPROXY, see clients/go-tls-shim.ts's file header). Keep these pins equal to the
+# helm/go services' in docker-compose.runners.yml (runners/bump-pins.sh fails when they differ). This
 # grows the image by roughly the size of the Go toolchain plus the helm binary (~250 MB).
 ARG DOCKER_CLI_VERSION=29.8.1
 # crane, copied the way docker.Dockerfile does it (a named stage, only a `COPY --from` source).
@@ -148,14 +148,14 @@ COPY --from=helm-tools /usr/local/bin/helm /usr/local/bin/helm
 RUN chmod a+rx /usr/local/bin/helm
 
 # go (RPS-1720): the toolchain copied from the go-toolchain stage above, the same "copy the toolchain,
-# not the whole image" approach as golang.Dockerfile's.
+# not the whole image" approach as go.Dockerfile's.
 COPY --from=go-toolchain /usr/local/go /usr/local/go
 ENV PATH="/usr/local/go/bin:${PATH}" GOTOOLCHAIN=local
 RUN chmod -R a+rX /usr/local/go
 
-# The TLS shim's certificate/key (RPS-1720), generated ONCE at build time exactly as golang.Dockerfile
+# The TLS shim's certificate/key (RPS-1720), generated ONCE at build time exactly as go.Dockerfile
 # does (see there): a credentialed `go` invocation against this harness's plain-http stack needs an
-# `https://` endpoint in front of it, and `clients/golang-tls-shim.ts` refuses to start without these two
+# `https://` endpoint in front of it, and `clients/go-tls-shim.ts` refuses to start without these two
 # files. World-readable on purpose: a throwaway, test-only key that signs nothing outside this
 # container's own loopback interface.
 RUN mkdir -p /opt/e2e-tls && cd /opt/e2e-tls \

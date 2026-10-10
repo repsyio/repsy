@@ -19,7 +19,7 @@
  * Go has NO official publisher at all: `repsy-protocols/golang/README.md`'s "Uploading a Module"
  * section is explicit that Repsy is a push registry whose only documented publisher is a single
  * `curl -T` ("Repsy does not run `go mod` commands. You build the zip locally and upload it with a
- * single `curl`"), and the panel's own `golang-config.component.ts` teaches the identical incantation.
+ * single `curl`"), and the panel's own `go-config.component.ts` teaches the identical incantation.
  * So `publish`/`seedPublish` drive the REAL `curl` binary (the maven/npm/nuget "hide the status behind
  * an exit code" pattern does not even apply: `curl -w '%{http_code}'` reports the raw HTTP status
  * directly, confirmed live -- `--fail-with-body` still writes the response body to `-o` and prints the
@@ -27,7 +27,7 @@
  * pypi's/nuget's/cargo's `publish()` needs one). `resolve` drives the REAL `go` toolchain (`go mod
  * download -json`), the consume side every ecosystem in this harness gets.
  *
- * Every module zip is hand-built (`golang-raw.ts`'s `buildModuleZip`, `fflate` -- never `go build`/
+ * Every module zip is hand-built (`go-raw.ts`'s `buildModuleZip`, `fflate` -- never `go build`/
  * `go mod`), with a fresh random marker packed into `hello.go`/`e2e-marker.txt`, so two publishes of
  * one coordinate never share content; `AdapterResult.contentSha256` is the sha256 of the WHOLE zip
  * file (`go mod download`'s cache renames the proxy response into place byte-for-byte after checking
@@ -41,7 +41,7 @@
  * call already IS the real, final attempt -- there is nothing left to probe afterwards.
  *
  * Credential mapping: a `MaterializedCredential`'s `username`/`password` are passed to `curl -u`
- * verbatim, and to `go`'s `GOPROXY` URL userinfo (through `golang-tls-shim.ts`'s `goProxyUrlFor`,
+ * verbatim, and to `go`'s `GOPROXY` URL userinfo (through `go-tls-shim.ts`'s `goProxyUrlFor`,
  * which also decides whether a credentialed consume needs the TLS shim at all -- see that file's
  * header for H3/H4). A token credential's actual generated username (never the panel docs' friendly
  * literal `token`) is used throughout: `ProtocolAuthService.handleBasicAuth` tries the PASSWORD as a
@@ -57,7 +57,7 @@ import mustache from 'mustache';
 import type { AdapterResult, ProtocolAdapter } from '../scenarios/adapter.js';
 import { outcomeForStatus } from '../scenarios/types.js';
 import type { SeedResult, World } from '../scenarios/world.js';
-import { goProxyUrlFor } from './golang-tls-shim.js';
+import { goProxyUrlFor } from './go-tls-shim.js';
 import {
   adminCredential,
   type BuiltGoModule,
@@ -76,7 +76,7 @@ import {
   TEMPLATES_DIR,
   uploadUrl,
   zipRelPath,
-} from './golang-raw.js';
+} from './go-raw.js';
 import { clientEnv } from './client-env.js';
 import { isolatedWorkDir, run } from './exec.js';
 
@@ -91,7 +91,7 @@ const CONSUME_TIMEOUT_MS = 120_000;
  *  the TLS shim for a credentialed plain-http one). `,off` as the fallback (never `,direct`), matching
  *  the panel's own documented incantation, so a module this harness did not itself publish fails
  *  loudly instead of Go attempting real VCS discovery for `e2e.repsy.test` (which never resolves,
- *  `golang-raw.ts`'s `MODULE_DOMAIN` doc comment). */
+ *  `go-raw.ts`'s `MODULE_DOMAIN` doc comment). */
 async function goEnv(
   home: string,
   credential: World['credential'],
@@ -189,7 +189,7 @@ async function publishWithClient(world: World, label: string): Promise<PublishRu
 }
 
 export async function publish(world: World): Promise<AdapterResult> {
-  const published = await publishWithClient(world, `golang-publish-${world.scenario.id}`);
+  const published = await publishWithClient(world, `go-publish-${world.scenario.id}`);
   return {
     outcome: outcomeForStatus(published.httpStatus),
     httpStatus: published.httpStatus,
@@ -205,10 +205,10 @@ export async function publish(world: World): Promise<AdapterResult> {
  * `seedPublish`.
  */
 export async function seedPublish(world: World): Promise<SeedResult> {
-  const published = await publishWithClient(world, `golang-seed-${world.scenario.id}`);
+  const published = await publishWithClient(world, `go-seed-${world.scenario.id}`);
   if (published.exitCode !== 0 || published.httpStatus !== 200) {
     throw new Error(
-      `golang adapter: pre-publish for scenario "${world.scenario.id}" failed unexpectedly ` +
+      `go adapter: pre-publish for scenario "${world.scenario.id}" failed unexpectedly ` +
         `(curl exit ${published.exitCode}, http ${published.httpStatus}); its "consume: ok" ` +
         'expectation depends on this module actually existing.',
     );
@@ -224,7 +224,7 @@ interface GoModDownloadJson {
 }
 
 export async function resolve(world: World): Promise<AdapterResult> {
-  const { home, work } = await isolatedWorkDir(`golang-con-${world.scenario.id}`);
+  const { home, work } = await isolatedWorkDir(`go-con-${world.scenario.id}`);
   const { packageName: modulePath, version } = world.consumeTarget;
 
   const secrets = world.credential.password ? [world.credential.password] : [];
@@ -234,7 +234,7 @@ export async function resolve(world: World): Promise<AdapterResult> {
     env,
     timeoutMs: CONSUME_TIMEOUT_MS,
     redact: secrets,
-    label: `golang-consume-${world.scenario.id}`,
+    label: `go-consume-${world.scenario.id}`,
   });
 
   let contentSha256: string | undefined;
@@ -268,12 +268,12 @@ export async function resolve(world: World): Promise<AdapterResult> {
 /** `@v/list`'s own body hash plus every listed version's `.info`/`.mod`/`.zip` content hash, for
  *  `ProtocolAdapter.fingerprint`/`expectNothingStored`. Scoped to the one module a scenario's publish
  *  targets, exactly like `CargoFingerprint`/`PypiFingerprint`. */
-export interface GolangFingerprint {
+export interface GoFingerprint {
   listSha256: string;
   files: Record<string, string>;
 }
 
-async function fingerprint(world: World): Promise<GolangFingerprint> {
+async function fingerprint(world: World): Promise<GoFingerprint> {
   const admin = adminCredential();
   const modulePath = world.publishTarget.packageName;
 
@@ -298,7 +298,7 @@ async function fingerprint(world: World): Promise<GolangFingerprint> {
   return { listSha256, files };
 }
 
-async function expectNothingStored(world: World, before: GolangFingerprint): Promise<void> {
+async function expectNothingStored(world: World, before: GoFingerprint): Promise<void> {
   const after = await fingerprint(world);
   expect(after, 'a refused publish must leave the module exactly as it was').toEqual(before);
 
@@ -378,7 +378,7 @@ async function afterSuccessfulRoundTrip(
 
 /** Renders the tiny consumer module (`consumer-go.template.mod`/`consumer-main.template.go`) that
  *  imports `modulePath` and prints its `Marker` -- used only by the dedicated real-client
- *  go-get-and-build test in `tests/golang/publish-consume.spec.ts` (H6), never by the catalog loop. */
+ *  go-get-and-build test in `tests/go/publish-consume.spec.ts` (H6), never by the catalog loop. */
 export async function renderConsumerProject(work: string, modulePath: string): Promise<void> {
   const goModTemplate = await fs.readFile(
     path.join(TEMPLATES_DIR, 'consumer-go.template.mod'),
@@ -398,8 +398,8 @@ export async function renderConsumerProject(work: string, modulePath: string): P
 
 export { goEnv };
 
-export const golangAdapter: ProtocolAdapter<GolangFingerprint> = {
-  protocol: 'golang',
+export const goAdapter: ProtocolAdapter<GoFingerprint> = {
+  protocol: 'go',
   client: { name: 'curl/go', publishVerb: 'upload (curl -T)', consumeVerb: 'go mod download' },
 
   packageName: (runId, scenario) => rawPackageName(runId, scenario),

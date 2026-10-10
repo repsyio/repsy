@@ -17,7 +17,7 @@
 /**
  * The scenario-driven ruby suite (step 4e, RPS-294 -- the LAST protocol adapter of step 4):
  * `registerPublishConsumeLoop(rubyAdapter)` wires the whole shared catalog into ruby, exactly like
- * `tests/pypi/publish-consume.spec.ts`/`tests/golang/publish-consume.spec.ts` do for their
+ * `tests/pypi/publish-consume.spec.ts`/`tests/go/publish-consume.spec.ts` do for their
  * protocols. Plus dedicated hand-built-`World`/raw-toolchain tests the catalog loop itself cannot
  * exercise (every H/RB-number below was confirmed live before this file was written -- see
  * `README.md`'s "Ruby runner" section for the raw evidence):
