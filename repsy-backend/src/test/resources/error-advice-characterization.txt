@@ -1,0 +1,261 @@
+AccessNotAllowed [PANEL] -> 403 | {Content-Type=[application/problem+json]} | {"detail":"accessNotAllowed","instance":"/probe","status":403,"title":"Forbidden","code":"accessNotAllowed","traceId":"<uuid>"}
+AccessNotAllowed [PANEL_PORT] -> 403 | {Content-Type=[application/problem+json]} | {"detail":"accessNotAllowed","instance":"/probe","status":403,"title":"Forbidden","code":"accessNotAllowed","traceId":"<uuid>"}
+AccessNotAllowed [PROTOCOL] -> 403 | {Content-Type=[application/json]} | {"msgId":"accessNotAllowed","type":"ERROR","data":"accessNotAllowed","errorCode":"<uuid>","text":"accessNotAllowed"}
+AccessNotAllowed [OCI] -> 403 | {Content-Type=[application/json]} | {"errors":[{"code":"DENIED","message":"accessNotAllowed","detail":"accessNotAllowed"}]}
+AccessNotAllowed [CARGO] -> 403 | {Content-Type=[application/json]} | {"errors":[{"detail":"accessNotAllowed"}]}
+AccessNotAllowedCustom [PANEL] -> 403 | {Content-Type=[application/problem+json]} | {"detail":"customForbidden","instance":"/probe","status":403,"title":"Forbidden","code":"customForbidden","traceId":"<uuid>"}
+AccessNotAllowedCustom [PANEL_PORT] -> 403 | {Content-Type=[application/problem+json]} | {"detail":"customForbidden","instance":"/probe","status":403,"title":"Forbidden","code":"customForbidden","traceId":"<uuid>"}
+AccessNotAllowedCustom [PROTOCOL] -> 403 | {Content-Type=[application/json]} | {"msgId":"customForbidden","type":"ERROR","data":"customForbidden","errorCode":"<uuid>","text":"customForbidden"}
+AccessNotAllowedCustom [OCI] -> 403 | {Content-Type=[application/json]} | {"errors":[{"code":"DENIED","message":"customForbidden","detail":"customForbidden"}]}
+AccessNotAllowedCustom [CARGO] -> 403 | {Content-Type=[application/json]} | {"errors":[{"detail":"customForbidden"}]}
+AccessNotAllowedNoMessage [PANEL] -> 403 | {Content-Type=[application/problem+json]} | {"detail":"accessNotAllowed","instance":"/probe","status":403,"title":"Forbidden","code":"accessNotAllowed","traceId":"<uuid>"}
+AccessNotAllowedNoMessage [PANEL_PORT] -> 403 | {Content-Type=[application/problem+json]} | {"detail":"accessNotAllowed","instance":"/probe","status":403,"title":"Forbidden","code":"accessNotAllowed","traceId":"<uuid>"}
+AccessNotAllowedNoMessage [PROTOCOL] -> 403 | {Content-Type=[application/json]} | {"msgId":"accessNotAllowed","type":"ERROR","data":null,"errorCode":"<uuid>","text":"accessNotAllowed"}
+AccessNotAllowedNoMessage [OCI] -> 403 | {Content-Type=[application/json]} | {"errors":[{"code":"DENIED","message":"accessNotAllowed","detail":"accessNotAllowed"}]}
+AccessNotAllowedNoMessage [CARGO] -> 403 | {Content-Type=[application/json]} | {"errors":[{"detail":"accessNotAllowed"}]}
+BadRequest [PANEL] -> 400 | {Content-Type=[application/problem+json]} | {"detail":"badRequest","instance":"/probe","status":400,"title":"Bad Request","code":"badRequest","traceId":"<uuid>"}
+BadRequest [PANEL_PORT] -> 400 | {Content-Type=[application/problem+json]} | {"detail":"badRequest","instance":"/probe","status":400,"title":"Bad Request","code":"badRequest","traceId":"<uuid>"}
+BadRequest [PROTOCOL] -> 400 | {Content-Type=[application/json]} | {"msgId":"badRequest","type":"ERROR","data":"badRequest","errorCode":"<uuid>","text":"badRequest"}
+BadRequest [OCI] -> 400 | {Content-Type=[application/json]} | {"errors":[{"code":"MANIFEST_INVALID","message":"badRequest","detail":"badRequest"}]}
+BadRequest [CARGO] -> 400 | {Content-Type=[application/json]} | {"errors":[{"detail":"badRequest"}]}
+BadRequestNoMessage [PANEL] -> 400 | {Content-Type=[application/problem+json]} | {"detail":"badRequest","instance":"/probe","status":400,"title":"Bad Request","code":"badRequest","traceId":"<uuid>"}
+BadRequestNoMessage [PANEL_PORT] -> 400 | {Content-Type=[application/problem+json]} | {"detail":"badRequest","instance":"/probe","status":400,"title":"Bad Request","code":"badRequest","traceId":"<uuid>"}
+BadRequestNoMessage [PROTOCOL] -> 400 | {Content-Type=[application/json]} | {"msgId":"badRequest","type":"ERROR","data":null,"errorCode":"<uuid>","text":"badRequest"}
+BadRequestNoMessage [OCI] -> 400 | {Content-Type=[application/json]} | {"errors":[{"code":"MANIFEST_INVALID","message":"badRequest","detail":"badRequest"}]}
+BadRequestNoMessage [CARGO] -> 400 | {Content-Type=[application/json]} | {"errors":[{"detail":"badRequest"}]}
+ConstraintViolation [PANEL] -> 400 | {Content-Type=[application/problem+json]} | {"detail":"validationError","instance":"/probe","status":400,"title":"Bad Request","code":"validationError","errors":[{"field":"name","code":"NotBlank","message":"must not be blank"}],"traceId":"<uuid>"}
+ConstraintViolation [PANEL_PORT] -> 400 | {Content-Type=[application/problem+json]} | {"detail":"validationError","instance":"/probe","status":400,"title":"Bad Request","code":"validationError","errors":[{"field":"name","code":"NotBlank","message":"must not be blank"}],"traceId":"<uuid>"}
+ConstraintViolation [PROTOCOL] -> 400 | {Content-Type=[application/json]} | {"msgId":"validationError","type":"ERROR","data":"invalid","errorCode":"<uuid>","text":"validationError"}
+ConstraintViolation [OCI] -> 400 | {Content-Type=[application/json]} | {"errors":[{"code":"MANIFEST_INVALID","message":"validationError","detail":"invalid"}]}
+ConstraintViolation [CARGO] -> 400 | {Content-Type=[application/json]} | {"errors":[{"detail":"validationError"}]}
+ConversionFailed [PANEL] -> 400 | {Content-Type=[application/problem+json]} | {"detail":"validationError","instance":"/probe","status":400,"title":"Bad Request","code":"validationError","traceId":"<uuid>"}
+ConversionFailed [PANEL_PORT] -> 400 | {Content-Type=[application/problem+json]} | {"detail":"validationError","instance":"/probe","status":400,"title":"Bad Request","code":"validationError","traceId":"<uuid>"}
+ConversionFailed [PROTOCOL] -> 400 | {Content-Type=[application/json]} | {"msgId":"validationError","type":"ERROR","data":"Failed to convert from type [java.lang.String] to type [java.lang.Integer] for value [x]","errorCode":"<uuid>","text":"validationError"}
+ConversionFailed [OCI] -> 400 | {Content-Type=[application/json]} | {"errors":[{"code":"MANIFEST_INVALID","message":"validationError","detail":"Failed to convert from type [java.lang.String] to type [java.lang.Integer] for value [x]"}]}
+ConversionFailed [CARGO] -> 400 | {Content-Type=[application/json]} | {"errors":[{"detail":"validationError"}]}
+ErrorOccurred [PANEL] -> 500 | {Content-Type=[application/problem+json]} | {"detail":"errorOccurred","instance":"/probe","status":500,"title":"Internal Server Error","code":"errorOccurred","traceId":"<uuid>"}
+ErrorOccurred [PANEL_PORT] -> 500 | {Content-Type=[application/problem+json]} | {"detail":"errorOccurred","instance":"/probe","status":500,"title":"Internal Server Error","code":"errorOccurred","traceId":"<uuid>"}
+ErrorOccurred [PROTOCOL] -> 500 | {Content-Type=[application/json]} | {"msgId":"errorOccurred","type":"ERROR","data":"errorOccurred","errorCode":"<uuid>","text":"errorOccurred"}
+ErrorOccurred [OCI] -> 500 | {Content-Type=[application/json]} | {"errors":[{"code":"UNKNOWN","message":"errorOccurred","detail":"errorOccurred"}]}
+ErrorOccurred [CARGO] -> 500 | {Content-Type=[application/json]} | {"errors":[{"detail":"errorOccurred"}]}
+ForeignKeyViolation [PANEL] -> 500 | {Content-Type=[application/problem+json]} | {"detail":"errorOccurred","instance":"/probe","status":500,"title":"Internal Server Error","code":"errorOccurred","traceId":"<uuid>"}
+ForeignKeyViolation [PANEL_PORT] -> 500 | {Content-Type=[application/problem+json]} | {"detail":"errorOccurred","instance":"/probe","status":500,"title":"Internal Server Error","code":"errorOccurred","traceId":"<uuid>"}
+ForeignKeyViolation [PROTOCOL] -> 500 | {Content-Type=[application/json]} | {"msgId":"errorOccurred","type":"ERROR","data":null,"errorCode":"<uuid>","text":"errorOccurred"}
+ForeignKeyViolation [OCI] -> 500 | {Content-Type=[application/json]} | {"errors":[{"code":"UNKNOWN","message":"errorOccurred","detail":"errorOccurred"}]}
+ForeignKeyViolation [CARGO] -> 500 | {Content-Type=[application/json]} | {"errors":[{"detail":"errorOccurred"}]}
+HandlerMethodValidation [PANEL] -> 400 | {Content-Type=[application/problem+json]} | {"detail":"validationError","instance":"/probe","status":400,"title":"Bad Request","code":"validationError","errors":[{"field":"parameter","code":"Min","message":"must be >= 1"}],"traceId":"<uuid>"}
+HandlerMethodValidation [PANEL_PORT] -> 400 | {Content-Type=[application/problem+json]} | {"detail":"validationError","instance":"/probe","status":400,"title":"Bad Request","code":"validationError","errors":[{"field":"parameter","code":"Min","message":"must be >= 1"}],"traceId":"<uuid>"}
+HandlerMethodValidation [PROTOCOL] -> 400 | {Content-Type=[application/json]} | {"msgId":"validationError","type":"ERROR","data":"parameter","errorCode":"<uuid>","text":"validationError"}
+HandlerMethodValidation [OCI] -> 400 | {Content-Type=[application/json]} | {"errors":[{"code":"MANIFEST_INVALID","message":"validationError","detail":"parameter"}]}
+HandlerMethodValidation [CARGO] -> 400 | {Content-Type=[application/json]} | {"errors":[{"detail":"validationError"}]}
+HttpClientErrorFallback [PANEL] -> 500 | {Content-Type=[application/problem+json]} | {"detail":"errorOccurred","instance":"/probe","status":500,"title":"Internal Server Error","code":"errorOccurred","traceId":"<uuid>"}
+HttpClientErrorFallback [PANEL_PORT] -> 500 | {Content-Type=[application/problem+json]} | {"detail":"errorOccurred","instance":"/probe","status":500,"title":"Internal Server Error","code":"errorOccurred","traceId":"<uuid>"}
+HttpClientErrorFallback [PROTOCOL] -> 500 | {Content-Type=[application/json]} | {"msgId":"errorOccurred","type":"ERROR","data":null,"errorCode":"<uuid>","text":"errorOccurred"}
+HttpClientErrorFallback [OCI] -> 500 | {Content-Type=[application/json]} | {"errors":[{"code":"UNKNOWN","message":"errorOccurred","detail":"errorOccurred"}]}
+HttpClientErrorFallback [CARGO] -> 500 | {Content-Type=[application/json]} | {"errors":[{"detail":"errorOccurred"}]}
+HttpMediaTypeNotAcceptable [PANEL] -> 406 | {Accept=[application/json], Content-Type=[application/problem+json]} | {"detail":"notAcceptable","instance":"/probe","status":406,"title":"Not Acceptable","code":"notAcceptable","traceId":"<uuid>"}
+HttpMediaTypeNotAcceptable [PANEL_PORT] -> 406 | {Accept=[application/json], Content-Type=[application/problem+json]} | {"detail":"notAcceptable","instance":"/probe","status":406,"title":"Not Acceptable","code":"notAcceptable","traceId":"<uuid>"}
+HttpMediaTypeNotAcceptable [PROTOCOL] -> 406 | {Accept=[application/json], Content-Type=[application/json]} | {"msgId":"notAcceptable","type":"ERROR","data":null,"errorCode":"<uuid>","text":"notAcceptable"}
+HttpMediaTypeNotAcceptable [OCI] -> 406 | {Accept=[application/json], Content-Type=[application/json]} | {"errors":[{"code":"UNSUPPORTED","message":"notAcceptable","detail":"notAcceptable"}]}
+HttpMediaTypeNotAcceptable [CARGO] -> 406 | {Accept=[application/json], Content-Type=[application/json]} | {"errors":[{"detail":"notAcceptable"}]}
+HttpMediaTypeNotSupported [PANEL] -> 415 | {Accept=[application/json], Content-Type=[application/problem+json]} | {"detail":"unsupportedMediaType","instance":"/probe","status":415,"title":"Unsupported Media Type","code":"unsupportedMediaType","traceId":"<uuid>"}
+HttpMediaTypeNotSupported [PANEL_PORT] -> 415 | {Accept=[application/json], Content-Type=[application/problem+json]} | {"detail":"unsupportedMediaType","instance":"/probe","status":415,"title":"Unsupported Media Type","code":"unsupportedMediaType","traceId":"<uuid>"}
+HttpMediaTypeNotSupported [PROTOCOL] -> 415 | {Accept=[application/json], Content-Type=[application/json]} | {"msgId":"unsupportedMediaType","type":"ERROR","data":null,"errorCode":"<uuid>","text":"unsupportedMediaType"}
+HttpMediaTypeNotSupported [OCI] -> 415 | {Accept=[application/json], Content-Type=[application/json]} | {"errors":[{"code":"UNSUPPORTED","message":"unsupportedMediaType","detail":"unsupportedMediaType"}]}
+HttpMediaTypeNotSupported [CARGO] -> 415 | {Accept=[application/json], Content-Type=[application/json]} | {"errors":[{"detail":"unsupportedMediaType"}]}
+HttpMessageNotReadable [PANEL] -> 400 | {Content-Type=[application/problem+json]} | {"detail":"validationError","instance":"/probe","status":400,"title":"Bad Request","code":"validationError","traceId":"<uuid>"}
+HttpMessageNotReadable [PANEL_PORT] -> 400 | {Content-Type=[application/problem+json]} | {"detail":"validationError","instance":"/probe","status":400,"title":"Bad Request","code":"validationError","traceId":"<uuid>"}
+HttpMessageNotReadable [PROTOCOL] -> 400 | {Content-Type=[application/json]} | {"msgId":"validationError","type":"ERROR","data":null,"errorCode":"<uuid>","text":"validationError"}
+HttpMessageNotReadable [OCI] -> 400 | {Content-Type=[application/json]} | {"errors":[{"code":"MANIFEST_INVALID","message":"validationError","detail":"validationError"}]}
+HttpMessageNotReadable [CARGO] -> 400 | {Content-Type=[application/json]} | {"errors":[{"detail":"validationError"}]}
+HttpRequestMethodNotSupported [PANEL] -> 405 | {Allow=[GET, POST], Content-Type=[application/problem+json]} | {"detail":"methodNotSupported","instance":"/probe","status":405,"title":"Method Not Allowed","code":"methodNotSupported","traceId":"<uuid>"}
+HttpRequestMethodNotSupported [PANEL_PORT] -> 405 | {Allow=[GET, POST], Content-Type=[application/problem+json]} | {"detail":"methodNotSupported","instance":"/probe","status":405,"title":"Method Not Allowed","code":"methodNotSupported","traceId":"<uuid>"}
+HttpRequestMethodNotSupported [PROTOCOL] -> 405 | {Allow=[GET, POST], Content-Type=[application/json]} | {"msgId":"methodNotSupported","type":"ERROR","data":null,"errorCode":"<uuid>","text":"methodNotSupported"}
+HttpRequestMethodNotSupported [OCI] -> 405 | {Allow=[GET, POST], Content-Type=[application/json]} | {"errors":[{"code":"UNSUPPORTED","message":"methodNotSupported","detail":"methodNotSupported"}]}
+HttpRequestMethodNotSupported [CARGO] -> 405 | {Allow=[GET, POST], Content-Type=[application/json]} | {"errors":[{"detail":"methodNotSupported"}]}
+InvalidPagingParameter [PANEL] -> 400 | {Content-Type=[application/problem+json]} | {"detail":"validationError","instance":"/probe","status":400,"title":"Bad Request","code":"validationError","errors":[{"field":"page","code":"validationError","message":"validationError"},{"field":"size","code":"validationError","message":"validationError"}],"traceId":"<uuid>"}
+InvalidPagingParameter [PANEL_PORT] -> 400 | {Content-Type=[application/problem+json]} | {"detail":"validationError","instance":"/probe","status":400,"title":"Bad Request","code":"validationError","errors":[{"field":"page","code":"validationError","message":"validationError"},{"field":"size","code":"validationError","message":"validationError"}],"traceId":"<uuid>"}
+InvalidPagingParameter [PROTOCOL] -> 400 | {Content-Type=[application/json]} | {"msgId":"validationError","type":"ERROR","data":"page,size","errorCode":"<uuid>","text":"validationError"}
+InvalidPagingParameter [OCI] -> 400 | {Content-Type=[application/json]} | {"errors":[{"code":"MANIFEST_INVALID","message":"validationError","detail":"page,size"}]}
+InvalidPagingParameter [CARGO] -> 400 | {Content-Type=[application/json]} | {"errors":[{"detail":"validationError"}]}
+InvalidStoragePath [PANEL] -> 400 | {Content-Type=[application/problem+json]} | {"detail":"invalidStoragePath","instance":"/probe","status":400,"title":"Bad Request","code":"invalidStoragePath","traceId":"<uuid>"}
+InvalidStoragePath [PANEL_PORT] -> 400 | {Content-Type=[application/problem+json]} | {"detail":"invalidStoragePath","instance":"/probe","status":400,"title":"Bad Request","code":"invalidStoragePath","traceId":"<uuid>"}
+InvalidStoragePath [PROTOCOL] -> 400 | {Content-Type=[application/json]} | {"msgId":"invalidStoragePath","type":"ERROR","data":"bad/../path","errorCode":"<uuid>","text":"invalidStoragePath"}
+InvalidStoragePath [OCI] -> 400 | {Content-Type=[application/json]} | {"errors":[{"code":"MANIFEST_INVALID","message":"invalidStoragePath","detail":"bad/../path"}]}
+InvalidStoragePath [CARGO] -> 400 | {Content-Type=[application/json]} | {"errors":[{"detail":"invalidStoragePath"}]}
+ItemAlreadyExist [PANEL] -> 409 | {Content-Type=[application/problem+json]} | {"detail":"itemAlreadyExists","instance":"/probe","status":409,"title":"Conflict","code":"itemAlreadyExists","traceId":"<uuid>"}
+ItemAlreadyExist [PANEL_PORT] -> 409 | {Content-Type=[application/problem+json]} | {"detail":"itemAlreadyExists","instance":"/probe","status":409,"title":"Conflict","code":"itemAlreadyExists","traceId":"<uuid>"}
+ItemAlreadyExist [PROTOCOL] -> 409 | {Content-Type=[application/json]} | {"msgId":"itemAlreadyExists","type":"ERROR","data":"itemAlreadyExists","errorCode":"<uuid>","text":"itemAlreadyExists"}
+ItemAlreadyExist [OCI] -> 409 | {Content-Type=[application/json]} | {"errors":[{"code":"DENIED","message":"itemAlreadyExists","detail":"itemAlreadyExists"}]}
+ItemAlreadyExist [CARGO] -> 409 | {Content-Type=[application/json]} | {"errors":[{"detail":"itemAlreadyExists"}]}
+ItemAlreadyExistNoMessage [PANEL] -> 409 | {Content-Type=[application/problem+json]} | {"detail":"itemAlreadyExists","instance":"/probe","status":409,"title":"Conflict","code":"itemAlreadyExists","traceId":"<uuid>"}
+ItemAlreadyExistNoMessage [PANEL_PORT] -> 409 | {Content-Type=[application/problem+json]} | {"detail":"itemAlreadyExists","instance":"/probe","status":409,"title":"Conflict","code":"itemAlreadyExists","traceId":"<uuid>"}
+ItemAlreadyExistNoMessage [PROTOCOL] -> 409 | {Content-Type=[application/json]} | {"msgId":"itemAlreadyExists","type":"ERROR","data":null,"errorCode":"<uuid>","text":"itemAlreadyExists"}
+ItemAlreadyExistNoMessage [OCI] -> 409 | {Content-Type=[application/json]} | {"errors":[{"code":"DENIED","message":"itemAlreadyExists","detail":"itemAlreadyExists"}]}
+ItemAlreadyExistNoMessage [CARGO] -> 409 | {Content-Type=[application/json]} | {"errors":[{"detail":"itemAlreadyExists"}]}
+ItemNotFound [PANEL] -> 404 | {Content-Type=[application/problem+json]} | {"detail":"itemNotFound","instance":"/probe","status":404,"title":"Not Found","code":"itemNotFound","traceId":"<uuid>"}
+ItemNotFound [PANEL_PORT] -> 404 | {Content-Type=[application/problem+json]} | {"detail":"itemNotFound","instance":"/probe","status":404,"title":"Not Found","code":"itemNotFound","traceId":"<uuid>"}
+ItemNotFound [PROTOCOL] -> 404 | {Content-Type=[application/json]} | {"msgId":"itemNotFound","type":"ERROR","data":"itemNotFound","errorCode":"<uuid>","text":"itemNotFound"}
+ItemNotFound [OCI] -> 404 | {Content-Type=[application/json]} | {"errors":[{"code":"MANIFEST_UNKNOWN","message":"itemNotFound","detail":"itemNotFound"}]}
+ItemNotFound [CARGO] -> 404 | {Content-Type=[application/json]} | {"errors":[{"detail":"itemNotFound"}]}
+ItemNotFoundNoMessage [PANEL] -> 404 | {Content-Type=[application/problem+json]} | {"detail":"itemNotFound","instance":"/probe","status":404,"title":"Not Found","code":"itemNotFound","traceId":"<uuid>"}
+ItemNotFoundNoMessage [PANEL_PORT] -> 404 | {Content-Type=[application/problem+json]} | {"detail":"itemNotFound","instance":"/probe","status":404,"title":"Not Found","code":"itemNotFound","traceId":"<uuid>"}
+ItemNotFoundNoMessage [PROTOCOL] -> 404 | {Content-Type=[application/json]} | {"msgId":"itemNotFound","type":"ERROR","data":null,"errorCode":"<uuid>","text":"itemNotFound"}
+ItemNotFoundNoMessage [OCI] -> 404 | {Content-Type=[application/json]} | {"errors":[{"code":"MANIFEST_UNKNOWN","message":"itemNotFound","detail":"itemNotFound"}]}
+ItemNotFoundNoMessage [CARGO] -> 404 | {Content-Type=[application/json]} | {"errors":[{"detail":"itemNotFound"}]}
+LockTimeout [PANEL] -> 503 | {Content-Type=[application/problem+json], Retry-After=[1]} | {"detail":"resourceBusy","instance":"/probe","status":503,"title":"Service Unavailable","code":"resourceBusy","traceId":"<uuid>"}
+LockTimeout [PANEL_PORT] -> 503 | {Content-Type=[application/problem+json], Retry-After=[1]} | {"detail":"resourceBusy","instance":"/probe","status":503,"title":"Service Unavailable","code":"resourceBusy","traceId":"<uuid>"}
+LockTimeout [PROTOCOL] -> 503 | {Content-Type=[application/json], Retry-After=[1]} | {"msgId":"resourceBusy","type":"ERROR","data":null,"errorCode":"<uuid>","text":"resourceBusy"}
+LockTimeout [OCI] -> 503 | {Content-Type=[application/json], Retry-After=[1]} | {"errors":[{"code":"UNKNOWN","message":"resourceBusy","detail":"resourceBusy"}]}
+LockTimeout [CARGO] -> 503 | {Content-Type=[application/json], Retry-After=[1]} | {"errors":[{"detail":"resourceBusy"}]}
+MaxUploadSizeExceeded [PANEL] -> 413 | {Content-Type=[application/problem+json]} | {"detail":"payloadTooLarge","instance":"/probe","status":413,"title":"Content Too Large","code":"payloadTooLarge","traceId":"<uuid>"}
+MaxUploadSizeExceeded [PANEL_PORT] -> 413 | {Content-Type=[application/problem+json]} | {"detail":"payloadTooLarge","instance":"/probe","status":413,"title":"Content Too Large","code":"payloadTooLarge","traceId":"<uuid>"}
+MaxUploadSizeExceeded [PROTOCOL] -> 413 | {Content-Type=[application/json]} | {"msgId":"payloadTooLarge","type":"ERROR","data":null,"errorCode":"<uuid>","text":"payloadTooLarge"}
+MaxUploadSizeExceeded [OCI] -> 413 | {Content-Type=[application/json]} | {"errors":[{"code":"SIZE_INVALID","message":"payloadTooLarge","detail":"payloadTooLarge"}]}
+MaxUploadSizeExceeded [CARGO] -> 413 | {Content-Type=[application/json]} | {"errors":[{"detail":"payloadTooLarge"}]}
+MethodArgumentNotValid [PANEL] -> 400 | {Content-Type=[application/problem+json]} | {"detail":"validationError","instance":"/probe","status":400,"title":"Bad Request","code":"validationError","errors":[{"field":"name","code":"NotBlank","message":"must not be blank"}],"traceId":"<uuid>"}
+MethodArgumentNotValid [PANEL_PORT] -> 400 | {Content-Type=[application/problem+json]} | {"detail":"validationError","instance":"/probe","status":400,"title":"Bad Request","code":"validationError","errors":[{"field":"name","code":"NotBlank","message":"must not be blank"}],"traceId":"<uuid>"}
+MethodArgumentNotValid [PROTOCOL] -> 400 | {Content-Type=[application/json]} | {"msgId":"validationError","type":"ERROR","data":null,"errorCode":"<uuid>","text":"validationError"}
+MethodArgumentNotValid [OCI] -> 400 | {Content-Type=[application/json]} | {"errors":[{"code":"MANIFEST_INVALID","message":"validationError","detail":"validationError"}]}
+MethodArgumentNotValid [CARGO] -> 400 | {Content-Type=[application/json]} | {"errors":[{"detail":"validationError"}]}
+MethodArgumentTypeMismatch [PANEL] -> 400 | {Content-Type=[application/problem+json]} | {"detail":"validationError","instance":"/probe","status":400,"title":"Bad Request","code":"validationError","errors":[{"field":"type","code":"validationError","message":"validationError"}],"traceId":"<uuid>"}
+MethodArgumentTypeMismatch [PANEL_PORT] -> 400 | {Content-Type=[application/problem+json]} | {"detail":"validationError","instance":"/probe","status":400,"title":"Bad Request","code":"validationError","errors":[{"field":"type","code":"validationError","message":"validationError"}],"traceId":"<uuid>"}
+MethodArgumentTypeMismatch [PROTOCOL] -> 400 | {Content-Type=[application/json]} | {"msgId":"validationError","type":"ERROR","data":"type","errorCode":"<uuid>","text":"validationError"}
+MethodArgumentTypeMismatch [OCI] -> 400 | {Content-Type=[application/json]} | {"errors":[{"code":"MANIFEST_INVALID","message":"validationError","detail":"type"}]}
+MethodArgumentTypeMismatch [CARGO] -> 400 | {Content-Type=[application/json]} | {"errors":[{"detail":"validationError"}]}
+Mfa [PANEL] -> 400 | {Content-Type=[application/problem+json]} | {"detail":"mfaRequired","instance":"/probe","status":400,"title":"Bad Request","code":"mfaRequired","traceId":"<uuid>"}
+Mfa [PANEL_PORT] -> 400 | {Content-Type=[application/problem+json]} | {"detail":"mfaRequired","instance":"/probe","status":400,"title":"Bad Request","code":"mfaRequired","traceId":"<uuid>"}
+Mfa [PROTOCOL] -> 400 | {Content-Type=[application/json]} | {"msgId":"mfaRequired","type":"ERROR","data":"mfaRequired","errorCode":"<uuid>","text":"mfaRequired"}
+Mfa [OCI] -> 400 | {Content-Type=[application/json]} | {"errors":[{"code":"MANIFEST_INVALID","message":"mfaRequired","detail":"mfaRequired"}]}
+Mfa [CARGO] -> 400 | {Content-Type=[application/json]} | {"errors":[{"detail":"mfaRequired"}]}
+MfaNoMessage [PANEL] -> 400 | {Content-Type=[application/problem+json]} | {"detail":"mfaException","instance":"/probe","status":400,"title":"Bad Request","code":"mfaException","traceId":"<uuid>"}
+MfaNoMessage [PANEL_PORT] -> 400 | {Content-Type=[application/problem+json]} | {"detail":"mfaException","instance":"/probe","status":400,"title":"Bad Request","code":"mfaException","traceId":"<uuid>"}
+MfaNoMessage [PROTOCOL] -> 400 | {Content-Type=[application/json]} | {"msgId":"mfaException","type":"ERROR","data":null,"errorCode":"<uuid>","text":"mfaException"}
+MfaNoMessage [OCI] -> 400 | {Content-Type=[application/json]} | {"errors":[{"code":"MANIFEST_INVALID","message":"mfaException","detail":"mfaException"}]}
+MfaNoMessage [CARGO] -> 400 | {Content-Type=[application/json]} | {"errors":[{"detail":"mfaException"}]}
+MissingMatrixVariable [PANEL] -> 400 | {Content-Type=[application/problem+json]} | {"detail":"badRequest","instance":"/probe","status":400,"title":"Bad Request","code":"badRequest","traceId":"<uuid>"}
+MissingMatrixVariable [PANEL_PORT] -> 400 | {Content-Type=[application/problem+json]} | {"detail":"badRequest","instance":"/probe","status":400,"title":"Bad Request","code":"badRequest","traceId":"<uuid>"}
+MissingMatrixVariable [PROTOCOL] -> 400 | {Content-Type=[application/json]} | {"msgId":"badRequest","type":"ERROR","data":"Required matrix variable 'm' for method parameter type String is not present","errorCode":"<uuid>","text":"badRequest"}
+MissingMatrixVariable [OCI] -> 400 | {Content-Type=[application/json]} | {"errors":[{"code":"MANIFEST_INVALID","message":"badRequest","detail":"Required matrix variable 'm' for method parameter type String is not present"}]}
+MissingMatrixVariable [CARGO] -> 400 | {Content-Type=[application/json]} | {"errors":[{"detail":"badRequest"}]}
+MissingRequestCookie [PANEL] -> 400 | {Content-Type=[application/problem+json]} | {"detail":"badRequest","instance":"/probe","status":400,"title":"Bad Request","code":"badRequest","traceId":"<uuid>"}
+MissingRequestCookie [PANEL_PORT] -> 400 | {Content-Type=[application/problem+json]} | {"detail":"badRequest","instance":"/probe","status":400,"title":"Bad Request","code":"badRequest","traceId":"<uuid>"}
+MissingRequestCookie [PROTOCOL] -> 400 | {Content-Type=[application/json]} | {"msgId":"badRequest","type":"ERROR","data":"Required cookie 'sid' for method parameter type String is not present","errorCode":"<uuid>","text":"badRequest"}
+MissingRequestCookie [OCI] -> 400 | {Content-Type=[application/json]} | {"errors":[{"code":"MANIFEST_INVALID","message":"badRequest","detail":"Required cookie 'sid' for method parameter type String is not present"}]}
+MissingRequestCookie [CARGO] -> 400 | {Content-Type=[application/json]} | {"errors":[{"detail":"badRequest"}]}
+MissingRequestHeaderAuthorization [PANEL] -> 401 | {Content-Type=[application/problem+json], WWW-Authenticate=[Bearer]} | {"detail":"missingRequestHeader","instance":"/probe","status":401,"title":"Unauthorized","code":"missingRequestHeader","errors":[{"field":"Authorization","code":"missingRequestHeader","message":"missingRequestHeader"}],"traceId":"<uuid>"}
+MissingRequestHeaderAuthorization [PANEL_PORT] -> 401 | {Content-Type=[application/problem+json], WWW-Authenticate=[Bearer]} | {"detail":"missingRequestHeader","instance":"/probe","status":401,"title":"Unauthorized","code":"missingRequestHeader","errors":[{"field":"Authorization","code":"missingRequestHeader","message":"missingRequestHeader"}],"traceId":"<uuid>"}
+MissingRequestHeaderAuthorization [PROTOCOL] -> 401 | {Content-Type=[application/json]} | {"msgId":"missingRequestHeader","type":"ERROR","data":"Authorization","errorCode":"<uuid>","text":"missingRequestHeader"}
+MissingRequestHeaderAuthorization [OCI] -> 401 | {Content-Type=[application/json]} | {"errors":[{"code":"UNAUTHORIZED","message":"missingRequestHeader","detail":"Authorization"}]}
+MissingRequestHeaderAuthorization [CARGO] -> 401 | {Content-Type=[application/json]} | {"errors":[{"detail":"missingRequestHeader"}]}
+MissingRequestHeaderOther [PANEL] -> 400 | {Content-Type=[application/problem+json]} | {"detail":"missingRequestHeader","instance":"/probe","status":400,"title":"Bad Request","code":"missingRequestHeader","errors":[{"field":"X-Probe","code":"missingRequestHeader","message":"missingRequestHeader"}],"traceId":"<uuid>"}
+MissingRequestHeaderOther [PANEL_PORT] -> 400 | {Content-Type=[application/problem+json]} | {"detail":"missingRequestHeader","instance":"/probe","status":400,"title":"Bad Request","code":"missingRequestHeader","errors":[{"field":"X-Probe","code":"missingRequestHeader","message":"missingRequestHeader"}],"traceId":"<uuid>"}
+MissingRequestHeaderOther [PROTOCOL] -> 400 | {Content-Type=[application/json]} | {"msgId":"missingRequestHeader","type":"ERROR","data":"X-Probe","errorCode":"<uuid>","text":"missingRequestHeader"}
+MissingRequestHeaderOther [OCI] -> 400 | {Content-Type=[application/json]} | {"errors":[{"code":"MANIFEST_INVALID","message":"missingRequestHeader","detail":"X-Probe"}]}
+MissingRequestHeaderOther [CARGO] -> 400 | {Content-Type=[application/json]} | {"errors":[{"detail":"missingRequestHeader"}]}
+MissingServletRequestParameter [PANEL] -> 400 | {Content-Type=[application/problem+json]} | {"detail":"validationError","instance":"/probe","status":400,"title":"Bad Request","code":"validationError","errors":[{"field":"q","code":"validationError","message":"validationError"}],"traceId":"<uuid>"}
+MissingServletRequestParameter [PANEL_PORT] -> 400 | {Content-Type=[application/problem+json]} | {"detail":"validationError","instance":"/probe","status":400,"title":"Bad Request","code":"validationError","errors":[{"field":"q","code":"validationError","message":"validationError"}],"traceId":"<uuid>"}
+MissingServletRequestParameter [PROTOCOL] -> 400 | {Content-Type=[application/json]} | {"msgId":"validationError","type":"ERROR","data":"q","errorCode":"<uuid>","text":"validationError"}
+MissingServletRequestParameter [OCI] -> 400 | {Content-Type=[application/json]} | {"errors":[{"code":"MANIFEST_INVALID","message":"validationError","detail":"q"}]}
+MissingServletRequestParameter [CARGO] -> 400 | {Content-Type=[application/json]} | {"errors":[{"detail":"validationError"}]}
+MissingServletRequestPart [PANEL] -> 400 | {Content-Type=[application/problem+json]} | {"detail":"badRequest","instance":"/probe","status":400,"title":"Bad Request","code":"badRequest","traceId":"<uuid>"}
+MissingServletRequestPart [PANEL_PORT] -> 400 | {Content-Type=[application/problem+json]} | {"detail":"badRequest","instance":"/probe","status":400,"title":"Bad Request","code":"badRequest","traceId":"<uuid>"}
+MissingServletRequestPart [PROTOCOL] -> 400 | {Content-Type=[application/json]} | {"msgId":"badRequest","type":"ERROR","data":"Required part 'file' is not present.","errorCode":"<uuid>","text":"badRequest"}
+MissingServletRequestPart [OCI] -> 400 | {Content-Type=[application/json]} | {"errors":[{"code":"MANIFEST_INVALID","message":"badRequest","detail":"Required part 'file' is not present."}]}
+MissingServletRequestPart [CARGO] -> 400 | {Content-Type=[application/json]} | {"errors":[{"detail":"badRequest"}]}
+NoResourceFound [PANEL] -> 404 | {Content-Type=[application/problem+json]} | {"detail":"itemNotFound","instance":"/probe","status":404,"title":"Not Found","code":"itemNotFound","traceId":"<uuid>"}
+NoResourceFound [PANEL_PORT] -> 404 | {Content-Type=[application/problem+json]} | {"detail":"itemNotFound","instance":"/probe","status":404,"title":"Not Found","code":"itemNotFound","traceId":"<uuid>"}
+NoResourceFound [PROTOCOL] -> 404 | {Content-Type=[application/json]} | {"msgId":"itemNotFound","type":"ERROR","data":null,"errorCode":"<uuid>","text":"itemNotFound"}
+NoResourceFound [OCI] -> 404 | {Content-Type=[application/json]} | {"errors":[{"code":"MANIFEST_UNKNOWN","message":"itemNotFound","detail":"itemNotFound"}]}
+NoResourceFound [CARGO] -> 404 | {Content-Type=[application/json]} | {"errors":[{"detail":"itemNotFound"}]}
+OptimisticLock [PANEL] -> 409 | {Content-Type=[application/problem+json]} | {"detail":"concurrentModification","instance":"/probe","status":409,"title":"Conflict","code":"concurrentModification","traceId":"<uuid>"}
+OptimisticLock [PANEL_PORT] -> 409 | {Content-Type=[application/problem+json]} | {"detail":"concurrentModification","instance":"/probe","status":409,"title":"Conflict","code":"concurrentModification","traceId":"<uuid>"}
+OptimisticLock [PROTOCOL] -> 503 | {Content-Type=[application/json], Retry-After=[1]} | {"msgId":"concurrentModification","type":"ERROR","data":null,"errorCode":"<uuid>","text":"concurrentModification"}
+OptimisticLock [OCI] -> 503 | {Content-Type=[application/json], Retry-After=[1]} | {"errors":[{"code":"UNKNOWN","message":"concurrentModification","detail":"concurrentModification"}]}
+OptimisticLock [CARGO] -> 503 | {Content-Type=[application/json], Retry-After=[1]} | {"errors":[{"detail":"concurrentModification"}]}
+OptimisticLockingFailure [PANEL] -> 409 | {Content-Type=[application/problem+json]} | {"detail":"concurrentModification","instance":"/probe","status":409,"title":"Conflict","code":"concurrentModification","traceId":"<uuid>"}
+OptimisticLockingFailure [PANEL_PORT] -> 409 | {Content-Type=[application/problem+json]} | {"detail":"concurrentModification","instance":"/probe","status":409,"title":"Conflict","code":"concurrentModification","traceId":"<uuid>"}
+OptimisticLockingFailure [PROTOCOL] -> 503 | {Content-Type=[application/json], Retry-After=[1]} | {"msgId":"concurrentModification","type":"ERROR","data":null,"errorCode":"<uuid>","text":"concurrentModification"}
+OptimisticLockingFailure [OCI] -> 503 | {Content-Type=[application/json], Retry-After=[1]} | {"errors":[{"code":"UNKNOWN","message":"concurrentModification","detail":"concurrentModification"}]}
+OptimisticLockingFailure [CARGO] -> 503 | {Content-Type=[application/json], Retry-After=[1]} | {"errors":[{"detail":"concurrentModification"}]}
+PessimisticLock [PANEL] -> 503 | {Content-Type=[application/problem+json], Retry-After=[1]} | {"detail":"resourceBusy","instance":"/probe","status":503,"title":"Service Unavailable","code":"resourceBusy","traceId":"<uuid>"}
+PessimisticLock [PANEL_PORT] -> 503 | {Content-Type=[application/problem+json], Retry-After=[1]} | {"detail":"resourceBusy","instance":"/probe","status":503,"title":"Service Unavailable","code":"resourceBusy","traceId":"<uuid>"}
+PessimisticLock [PROTOCOL] -> 503 | {Content-Type=[application/json], Retry-After=[1]} | {"msgId":"resourceBusy","type":"ERROR","data":null,"errorCode":"<uuid>","text":"resourceBusy"}
+PessimisticLock [OCI] -> 503 | {Content-Type=[application/json], Retry-After=[1]} | {"errors":[{"code":"UNKNOWN","message":"resourceBusy","detail":"resourceBusy"}]}
+PessimisticLock [CARGO] -> 503 | {Content-Type=[application/json], Retry-After=[1]} | {"errors":[{"detail":"resourceBusy"}]}
+PessimisticLockingFailure [PANEL] -> 503 | {Content-Type=[application/problem+json], Retry-After=[1]} | {"detail":"resourceBusy","instance":"/probe","status":503,"title":"Service Unavailable","code":"resourceBusy","traceId":"<uuid>"}
+PessimisticLockingFailure [PANEL_PORT] -> 503 | {Content-Type=[application/problem+json], Retry-After=[1]} | {"detail":"resourceBusy","instance":"/probe","status":503,"title":"Service Unavailable","code":"resourceBusy","traceId":"<uuid>"}
+PessimisticLockingFailure [PROTOCOL] -> 503 | {Content-Type=[application/json], Retry-After=[1]} | {"msgId":"resourceBusy","type":"ERROR","data":null,"errorCode":"<uuid>","text":"resourceBusy"}
+PessimisticLockingFailure [OCI] -> 503 | {Content-Type=[application/json], Retry-After=[1]} | {"errors":[{"code":"UNKNOWN","message":"resourceBusy","detail":"resourceBusy"}]}
+PessimisticLockingFailure [CARGO] -> 503 | {Content-Type=[application/json], Retry-After=[1]} | {"errors":[{"detail":"resourceBusy"}]}
+RedirectToPath [PANEL] -> 301 | {Content-Type=[application/problem+json], Location=[/redirected]} | {"detail":"movedToPath","instance":"/probe","status":301,"title":"Moved Permanently","code":"movedToPath","traceId":"<uuid>"}
+RedirectToPath [PANEL_PORT] -> 301 | {Content-Type=[application/problem+json], Location=[/redirected]} | {"detail":"movedToPath","instance":"/probe","status":301,"title":"Moved Permanently","code":"movedToPath","traceId":"<uuid>"}
+RedirectToPath [PROTOCOL] -> 301 | {Content-Type=[application/json], Location=[/redirected]} | {"msgId":"movedToPath","type":"ERROR","data":null,"errorCode":"<uuid>","text":"movedToPath"}
+RedirectToPath [OCI] -> 301 | {Content-Type=[application/json], Location=[/redirected]} | {"errors":[{"code":"UNSUPPORTED","message":"movedToPath","detail":"movedToPath"}]}
+RedirectToPath [CARGO] -> 301 | {Content-Type=[application/json], Location=[/redirected]} | {"errors":[{"detail":"movedToPath"}]}
+Retryable [PANEL] -> 503 | {Content-Type=[application/problem+json], Retry-After=[1]} | {"detail":"scanExecutorSaturated","instance":"/probe","status":503,"title":"Service Unavailable","code":"scanExecutorSaturated","traceId":"<uuid>"}
+Retryable [PANEL_PORT] -> 503 | {Content-Type=[application/problem+json], Retry-After=[1]} | {"detail":"scanExecutorSaturated","instance":"/probe","status":503,"title":"Service Unavailable","code":"scanExecutorSaturated","traceId":"<uuid>"}
+Retryable [PROTOCOL] -> 503 | {Content-Type=[application/json], Retry-After=[1]} | {"msgId":"scanExecutorSaturated","type":"ERROR","data":"scanExecutorSaturated","errorCode":"<uuid>","text":"scanExecutorSaturated"}
+Retryable [OCI] -> 503 | {Content-Type=[application/json], Retry-After=[1]} | {"errors":[{"code":"UNKNOWN","message":"scanExecutorSaturated","detail":"scanExecutorSaturated"}]}
+Retryable [CARGO] -> 503 | {Content-Type=[application/json], Retry-After=[1]} | {"errors":[{"detail":"scanExecutorSaturated"}]}
+RuntimeFallback [PANEL] -> 500 | {Content-Type=[application/problem+json]} | {"detail":"errorOccurred","instance":"/probe","status":500,"title":"Internal Server Error","code":"errorOccurred","traceId":"<uuid>"}
+RuntimeFallback [PANEL_PORT] -> 500 | {Content-Type=[application/problem+json]} | {"detail":"errorOccurred","instance":"/probe","status":500,"title":"Internal Server Error","code":"errorOccurred","traceId":"<uuid>"}
+RuntimeFallback [PROTOCOL] -> 500 | {Content-Type=[application/json]} | {"msgId":"errorOccurred","type":"ERROR","data":null,"errorCode":"<uuid>","text":"errorOccurred"}
+RuntimeFallback [OCI] -> 500 | {Content-Type=[application/json]} | {"errors":[{"code":"UNKNOWN","message":"errorOccurred","detail":"errorOccurred"}]}
+RuntimeFallback [CARGO] -> 500 | {Content-Type=[application/json]} | {"errors":[{"detail":"errorOccurred"}]}
+SignatureNotVerified [PANEL] -> 422 | {Content-Type=[application/problem+json]} | {"detail":"pgpFailed","instance":"/probe","status":422,"title":"Unprocessable Content","code":"pgpFailed","traceId":"<uuid>"}
+SignatureNotVerified [PANEL_PORT] -> 422 | {Content-Type=[application/problem+json]} | {"detail":"pgpFailed","instance":"/probe","status":422,"title":"Unprocessable Content","code":"pgpFailed","traceId":"<uuid>"}
+SignatureNotVerified [PROTOCOL] -> 422 | {Content-Type=[application/json]} | {"msgId":"pgpFailed","type":"ERROR","data":"pgpFailed","errorCode":"<uuid>","text":"pgpFailed"}
+SignatureNotVerified [OCI] -> 422 | {Content-Type=[application/json]} | {"errors":[{"code":"UNSUPPORTED","message":"pgpFailed","detail":"pgpFailed"}]}
+SignatureNotVerified [CARGO] -> 422 | {Content-Type=[application/json]} | {"errors":[{"detail":"pgpFailed"}]}
+SignatureNotVerifiedNoMessage [PANEL] -> 422 | {Content-Type=[application/problem+json]} | {"detail":"artifactSignatureNotVerified","instance":"/probe","status":422,"title":"Unprocessable Content","code":"artifactSignatureNotVerified","traceId":"<uuid>"}
+SignatureNotVerifiedNoMessage [PANEL_PORT] -> 422 | {Content-Type=[application/problem+json]} | {"detail":"artifactSignatureNotVerified","instance":"/probe","status":422,"title":"Unprocessable Content","code":"artifactSignatureNotVerified","traceId":"<uuid>"}
+SignatureNotVerifiedNoMessage [PROTOCOL] -> 422 | {Content-Type=[application/json]} | {"msgId":"artifactSignatureNotVerified","type":"ERROR","data":null,"errorCode":"<uuid>","text":"artifactSignatureNotVerified"}
+SignatureNotVerifiedNoMessage [OCI] -> 422 | {Content-Type=[application/json]} | {"errors":[{"code":"UNSUPPORTED","message":"artifactSignatureNotVerified","detail":"artifactSignatureNotVerified"}]}
+SignatureNotVerifiedNoMessage [CARGO] -> 422 | {Content-Type=[application/json]} | {"errors":[{"detail":"artifactSignatureNotVerified"}]}
+StorageUnavailable [PANEL] -> 503 | {Content-Type=[application/problem+json], Retry-After=[1]} | {"detail":"errorOccurred","instance":"/probe","status":503,"title":"Service Unavailable","code":"errorOccurred","traceId":"<uuid>"}
+StorageUnavailable [PANEL_PORT] -> 503 | {Content-Type=[application/problem+json], Retry-After=[1]} | {"detail":"errorOccurred","instance":"/probe","status":503,"title":"Service Unavailable","code":"errorOccurred","traceId":"<uuid>"}
+StorageUnavailable [PROTOCOL] -> 503 | {Content-Type=[application/json], Retry-After=[1]} | {"msgId":"errorOccurred","type":"ERROR","data":null,"errorCode":"<uuid>","text":"errorOccurred"}
+StorageUnavailable [OCI] -> 503 | {Content-Type=[application/json], Retry-After=[1]} | {"errors":[{"code":"UNKNOWN","message":"errorOccurred","detail":"errorOccurred"}]}
+StorageUnavailable [CARGO] -> 503 | {Content-Type=[application/json], Retry-After=[1]} | {"errors":[{"detail":"errorOccurred"}]}
+TooManyRequests [PANEL] -> 429 | {Content-Type=[application/problem+json], Retry-After=[30]} | {"detail":"tooManyRequests","instance":"/probe","status":429,"title":"Too Many Requests","code":"tooManyRequests","traceId":"<uuid>"}
+TooManyRequests [PANEL_PORT] -> 429 | {Content-Type=[application/problem+json], Retry-After=[30]} | {"detail":"tooManyRequests","instance":"/probe","status":429,"title":"Too Many Requests","code":"tooManyRequests","traceId":"<uuid>"}
+TooManyRequests [PROTOCOL] -> 429 | {Content-Type=[application/json], Retry-After=[30]} | {"msgId":"tooManyRequests","type":"ERROR","data":null,"errorCode":"<uuid>","text":"tooManyRequests"}
+TooManyRequests [OCI] -> 429 | {Content-Type=[application/json], Retry-After=[30]} | {"errors":[{"code":"TOOMANYREQUESTS","message":"tooManyRequests","detail":"tooManyRequests"}]}
+TooManyRequests [CARGO] -> 429 | {Content-Type=[application/json], Retry-After=[30]} | {"errors":[{"detail":"tooManyRequests"}]}
+UnAuthorized [PANEL] -> 401 | {Content-Type=[application/problem+json], WWW-Authenticate=[Bearer]} | {"detail":"loginRequired","instance":"/probe","status":401,"title":"Unauthorized","code":"loginRequired","traceId":"<uuid>"}
+UnAuthorized [PANEL_PORT] -> 401 | {Content-Type=[application/problem+json], WWW-Authenticate=[Bearer]} | {"detail":"loginRequired","instance":"/probe","status":401,"title":"Unauthorized","code":"loginRequired","traceId":"<uuid>"}
+UnAuthorized [PROTOCOL] -> 401 | {Content-Type=[application/json]} | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"unAuthorized"}
+UnAuthorized [OCI] -> 401 | {Content-Type=[application/json]} | {"errors":[{"code":"UNAUTHORIZED","message":"unAuthorized","detail":"unAuthorized"}]}
+UnAuthorized [CARGO] -> 401 | {Content-Type=[application/json]} | {"errors":[{"detail":"unAuthorized"}]}
+UnAuthorizedCustom [PANEL] -> 401 | {Content-Type=[application/problem+json], WWW-Authenticate=[Bearer]} | {"detail":"tokenExpired","instance":"/probe","status":401,"title":"Unauthorized","code":"tokenExpired","traceId":"<uuid>"}
+UnAuthorizedCustom [PANEL_PORT] -> 401 | {Content-Type=[application/problem+json], WWW-Authenticate=[Bearer]} | {"detail":"tokenExpired","instance":"/probe","status":401,"title":"Unauthorized","code":"tokenExpired","traceId":"<uuid>"}
+UnAuthorizedCustom [PROTOCOL] -> 401 | {Content-Type=[application/json]} | {"msgId":"tokenExpired","type":"ERROR","data":"tokenExpired","errorCode":"<uuid>","text":"tokenExpired"}
+UnAuthorizedCustom [OCI] -> 401 | {Content-Type=[application/json]} | {"errors":[{"code":"UNAUTHORIZED","message":"tokenExpired","detail":"tokenExpired"}]}
+UnAuthorizedCustom [CARGO] -> 401 | {Content-Type=[application/json]} | {"errors":[{"detail":"tokenExpired"}]}
+UnAuthorizedNoMessage [PANEL] -> 401 | {Content-Type=[application/problem+json], WWW-Authenticate=[Bearer]} | {"detail":"unauthorizedRequest","instance":"/probe","status":401,"title":"Unauthorized","code":"unauthorizedRequest","traceId":"<uuid>"}
+UnAuthorizedNoMessage [PANEL_PORT] -> 401 | {Content-Type=[application/problem+json], WWW-Authenticate=[Bearer]} | {"detail":"unauthorizedRequest","instance":"/probe","status":401,"title":"Unauthorized","code":"unauthorizedRequest","traceId":"<uuid>"}
+UnAuthorizedNoMessage [PROTOCOL] -> 401 | {Content-Type=[application/json]} | {"msgId":"unauthorizedRequest","type":"ERROR","data":null,"errorCode":"<uuid>","text":"unauthorizedRequest"}
+UnAuthorizedNoMessage [OCI] -> 401 | {Content-Type=[application/json]} | {"errors":[{"code":"UNAUTHORIZED","message":"unauthorizedRequest","detail":"unauthorizedRequest"}]}
+UnAuthorizedNoMessage [CARGO] -> 401 | {Content-Type=[application/json]} | {"errors":[{"detail":"unauthorizedRequest"}]}
+UnAuthorizedWithHeaders [PANEL] -> 401 | {Content-Type=[application/problem+json], WWW-Authenticate=[Basic realm="repsy"]} | {"detail":"loginRequired","instance":"/probe","status":401,"title":"Unauthorized","code":"loginRequired","traceId":"<uuid>"}
+UnAuthorizedWithHeaders [PANEL_PORT] -> 401 | {Content-Type=[application/problem+json], WWW-Authenticate=[Basic realm="repsy"]} | {"detail":"loginRequired","instance":"/probe","status":401,"title":"Unauthorized","code":"loginRequired","traceId":"<uuid>"}
+UnAuthorizedWithHeaders [PROTOCOL] -> 401 | {Content-Type=[application/json], WWW-Authenticate=[Basic realm="repsy"]} | {"msgId":"unAuthorized","type":"ERROR","data":"unAuthorized","errorCode":"<uuid>","text":"unAuthorized"}
+UnAuthorizedWithHeaders [OCI] -> 401 | {Content-Type=[application/json], WWW-Authenticate=[Basic realm="repsy"]} | {"errors":[{"code":"UNAUTHORIZED","message":"unAuthorized","detail":"unAuthorized"}]}
+UnAuthorizedWithHeaders [CARGO] -> 401 | {Content-Type=[application/json], WWW-Authenticate=[Basic realm="repsy"]} | {"errors":[{"detail":"unAuthorized"}]}
+UnsatisfiedServletRequestParameter [PANEL] -> 400 | {Content-Type=[application/problem+json]} | {"detail":"badRequest","instance":"/probe","status":400,"title":"Bad Request","code":"badRequest","traceId":"<uuid>"}
+UnsatisfiedServletRequestParameter [PANEL_PORT] -> 400 | {Content-Type=[application/problem+json]} | {"detail":"badRequest","instance":"/probe","status":400,"title":"Bad Request","code":"badRequest","traceId":"<uuid>"}
+UnsatisfiedServletRequestParameter [PROTOCOL] -> 400 | {Content-Type=[application/json]} | {"msgId":"badRequest","type":"ERROR","data":null,"errorCode":"<uuid>","text":"badRequest"}
+UnsatisfiedServletRequestParameter [OCI] -> 400 | {Content-Type=[application/json]} | {"errors":[{"code":"MANIFEST_INVALID","message":"badRequest","detail":"badRequest"}]}
+UnsatisfiedServletRequestParameter [CARGO] -> 400 | {Content-Type=[application/json]} | {"errors":[{"detail":"badRequest"}]}
+Validation [PANEL] -> 400 | {Content-Type=[application/problem+json]} | {"detail":"validationError","instance":"/probe","status":400,"title":"Bad Request","code":"validationError","errors":[{"field":"invalid","code":"validationError","message":"validationError"}],"traceId":"<uuid>"}
+Validation [PANEL_PORT] -> 400 | {Content-Type=[application/problem+json]} | {"detail":"validationError","instance":"/probe","status":400,"title":"Bad Request","code":"validationError","errors":[{"field":"invalid","code":"validationError","message":"validationError"}],"traceId":"<uuid>"}
+Validation [PROTOCOL] -> 400 | {Content-Type=[application/json]} | {"msgId":"validationError","type":"ERROR","data":"invalid","errorCode":"<uuid>","text":"validationError"}
+Validation [OCI] -> 400 | {Content-Type=[application/json]} | {"errors":[{"code":"MANIFEST_INVALID","message":"validationError","detail":"invalid"}]}
+Validation [CARGO] -> 400 | {Content-Type=[application/json]} | {"errors":[{"detail":"validationError"}]}
+ValueTooLong [PANEL] -> 400 | {Content-Type=[application/problem+json]} | {"detail":"validationError","instance":"/probe","status":400,"title":"Bad Request","code":"validationError","traceId":"<uuid>"}
+ValueTooLong [PANEL_PORT] -> 400 | {Content-Type=[application/problem+json]} | {"detail":"validationError","instance":"/probe","status":400,"title":"Bad Request","code":"validationError","traceId":"<uuid>"}
+ValueTooLong [PROTOCOL] -> 400 | {Content-Type=[application/json]} | {"msgId":"validationError","type":"ERROR","data":null,"errorCode":"<uuid>","text":"validationError"}
+ValueTooLong [OCI] -> 400 | {Content-Type=[application/json]} | {"errors":[{"code":"MANIFEST_INVALID","message":"validationError","detail":"validationError"}]}
+ValueTooLong [CARGO] -> 400 | {Content-Type=[application/json]} | {"errors":[{"detail":"validationError"}]}
+StorageUnavailable [CARGO] -> 503 | {Content-Type=[application/json], Retry-After=[1]} | {"errors":[{"detail":"errorOccurred"}]}
