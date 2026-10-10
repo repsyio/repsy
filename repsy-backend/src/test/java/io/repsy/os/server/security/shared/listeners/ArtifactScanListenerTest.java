@@ -36,13 +36,13 @@ import ch.qos.logback.core.read.ListAppender;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.RetryableException;
 import io.repsy.core.events.ArtifactPushedEvent;
+import io.repsy.libs.scanner.VulnerabilityScanner;
+import io.repsy.libs.scanner.VulnerabilityScannerRegistry;
+import io.repsy.libs.scanner.dtos.ScanRequest;
+import io.repsy.libs.scanner.trivy.TrivyScannerClientProperties;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.os.server.security.scan.entities.VulnerabilityScan;
 import io.repsy.os.server.security.scan.services.VulnerabilityScanTxService;
-import io.repsy.os.server.security.scanner.VulnerabilityScanner;
-import io.repsy.os.server.security.scanner.VulnerabilityScannerRegistry;
-import io.repsy.os.server.security.scanner.dtos.ScanRequest;
-import io.repsy.os.server.security.scanner.trivy.TrivyScannerClientProperties;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import java.net.ConnectException;
@@ -96,7 +96,16 @@ class ArtifactScanListenerTest {
 
   private static final Instant NOW = Instant.parse("2026-09-26T10:00:00Z");
   private static final TrivyScannerClientProperties PROPERTIES =
-      new TrivyScannerClientProperties("http://scanner", "key", 10, 3000, 330, 3, 15, 60);
+      new TrivyScannerClientProperties(
+          "http://scanner",
+          "key",
+          10,
+          3000,
+          330,
+          3,
+          15,
+          60,
+          TrivyScannerClientProperties.DEFAULT_SUPPORTED_REPO_TYPES);
 
   private ArtifactScanListener listener;
   private Logger listenerLogger;
@@ -520,7 +529,16 @@ class ArtifactScanListenerTest {
             this.repoTxService,
             this.dockerScanTokenIssuer,
             this.taskScheduler,
-            new TrivyScannerClientProperties("http://scanner", "key", 10, 3000, 330, 1, 15, 60),
+            new TrivyScannerClientProperties(
+                "http://scanner",
+                "key",
+                10,
+                3000,
+                330,
+                1,
+                15,
+                60,
+                TrivyScannerClientProperties.DEFAULT_SUPPORTED_REPO_TYPES),
             this.scanTaskExecutor,
             Map.<String, StorageStrategy>of());
     this.givenDockerScanIsQueued();

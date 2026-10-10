@@ -17,15 +17,15 @@ package io.repsy.os.server.security.scan.services;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.repsy.libs.scanner.dtos.FixStatus;
+import io.repsy.libs.scanner.dtos.ScanOutcome;
+import io.repsy.libs.scanner.dtos.ScannerFinding;
+import io.repsy.libs.scanner.dtos.Severity;
 import io.repsy.os.AbstractIT;
-import io.repsy.os.server.security.scan.dtos.FixStatus;
 import io.repsy.os.server.security.scan.dtos.ScanStatus;
-import io.repsy.os.server.security.scan.dtos.Severity;
 import io.repsy.os.server.security.scan.entities.VulnerabilityScan;
 import io.repsy.os.server.security.scan.repositories.VulnerabilityFindingRepository;
 import io.repsy.os.server.security.scan.repositories.VulnerabilityScanRepository;
-import io.repsy.os.server.security.scanner.dtos.ScanOutcome;
-import io.repsy.os.server.security.scanner.dtos.ScannerFinding;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;

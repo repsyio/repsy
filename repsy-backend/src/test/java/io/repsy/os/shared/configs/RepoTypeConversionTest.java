@@ -18,9 +18,9 @@ package io.repsy.os.shared.configs;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.repsy.libs.scanner.dtos.Severity;
 import io.repsy.os.generated.model.RepoCreateForm;
 import io.repsy.os.server.security.scan.dtos.ScanStatus;
-import io.repsy.os.server.security.scan.dtos.Severity;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import org.junit.jupiter.api.DisplayName;

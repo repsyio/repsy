@@ -21,10 +21,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import com.jayway.jsonpath.JsonPath;
+import io.repsy.libs.scanner.dtos.FixStatus;
+import io.repsy.libs.scanner.dtos.Severity;
 import io.repsy.os.AbstractIT;
-import io.repsy.os.server.security.scan.dtos.FixStatus;
 import io.repsy.os.server.security.scan.dtos.ScanStatus;
-import io.repsy.os.server.security.scan.dtos.Severity;
 import io.repsy.os.server.security.scan.entities.VulnerabilityFinding;
 import io.repsy.os.server.security.scan.entities.VulnerabilityScan;
 import io.repsy.os.server.security.scan.repositories.VulnerabilityFindingRepository;

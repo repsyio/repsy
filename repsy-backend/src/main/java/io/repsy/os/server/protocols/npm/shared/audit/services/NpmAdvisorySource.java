@@ -15,13 +15,13 @@
  */
 package io.repsy.os.server.protocols.npm.shared.audit.services;
 
-import io.repsy.os.server.security.scan.dtos.FixStatus;
+import io.repsy.libs.scanner.VulnerabilityAdvisoryLookup;
+import io.repsy.libs.scanner.dtos.AdvisoryLookupResult;
+import io.repsy.libs.scanner.dtos.FixStatus;
+import io.repsy.libs.scanner.dtos.ScannerFinding;
+import io.repsy.libs.scanner.dtos.Severity;
 import io.repsy.os.server.security.scan.dtos.KnownVulnerabilityRow;
-import io.repsy.os.server.security.scan.dtos.Severity;
 import io.repsy.os.server.security.scan.services.VulnerabilityScanTxService;
-import io.repsy.os.server.security.scanner.VulnerabilityAdvisoryLookup;
-import io.repsy.os.server.security.scanner.dtos.AdvisoryLookupResult;
-import io.repsy.os.server.security.scanner.dtos.ScannerFinding;
 import io.repsy.protocols.npm.shared.audit.AbstractNpmAdvisorySource;
 import io.repsy.protocols.npm.shared.audit.NpmAdvisory;
 import io.repsy.protocols.npm.shared.audit.NpmAdvisoryMapper;

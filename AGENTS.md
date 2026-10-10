@@ -14,7 +14,7 @@ installation, configuration and usage.
 | --- | --- |
 | `core/` | Git submodule ([`repsy-core`](https://github.com/repsyio/repsy-core)): shared parent POM, BOM and libraries. It is the Maven parent of the root `pom.xml` |
 | `repsy-backend/` | Spring Boot application (`io.repsy.os`): `panel/` (web UI API, e.g. `profile`, `auth`), `server/` (repository serving), `spa/`, `config/` |
-| `libs/` | Shared libraries: `protocol-router`, `multiport`, `storage` |
+| `libs/` | Shared libraries: `protocol-router`, `multiport`, `storage`, `scanner-client` |
 | `repsy-protocols/` | One module per package format, plus `shared` |
 | `repsy-frontend/` | Angular app (pnpm) |
 | `repsy-scanner-trivy/` | Optional standalone vulnerability-scanner service; not part of the root Maven reactor |
@@ -109,7 +109,9 @@ is one container plus, optionally, PostgreSQL (embedded H2 is the default) and t
 - **`libs/`** has no Repsy domain knowledge: `protocol-router` (the routing above), `multiport`
   (several Tomcat connectors and per-port controller mapping), `storage`
   (`storage-gateway` defines `StorageStrategy`, a path-based API where deletes are soft and
-  recoverable until the trash is cleared; `storage-gateway-fs` is the filesystem implementation).
+  recoverable until the trash is cleared; `storage-gateway-fs` is the filesystem implementation),
+  `scanner-client` (`io.repsy.libs.scanner`: the `VulnerabilityScanner` and
+  `VulnerabilityAdvisoryLookup` SPI, the scan DTOs and the Trivy HTTP client; RPS-2065).
 - **`repsy-protocols/<format>`** (`maven`, `npm`, `pypi`, `docker`, `cargo`, `golang`, `helm`,
   `nuget`, `ruby`) holds the format's wire-protocol logic that does not depend on Repsy's database:
   the `ProtocolProvider`, abstract handlers and facades, contracts (interfaces) the backend must
@@ -152,7 +154,9 @@ an OPEN `shared` home or an event rather than a direct dependency on another mod
 ### Vulnerability scanning
 
 Optional and off by default (`SECURITY_SCANNER=disabled`). `server/security/` defines
-`VulnerabilityScanner` with a no-op and a Trivy implementation. After a publish,
+`VulnerabilityScanner` with a no-op and a Trivy implementation (the SPI, the DTOs and the Trivy
+client are in `libs/scanner-client`; the backend keeps the no-op scanner, which records the outcome
+through `VulnerabilityScanTxService`). After a publish,
 `ArtifactScanListener` (an `@EventListener` that runs the scan on the `scanTaskExecutor` pool)
 resolves the artifact's files
 through the format's `ArtifactStorageResolver`, sends them to `repsy-scanner-trivy` (a separate
@@ -343,9 +347,12 @@ them in both repositories together.
   classes.
 - One simple class name per concept. When two formats need the same word, prefix the format
   (`NpmPackageUtils`, `PypiPackageListItem`). The library/backend pair above is the only allowed repeat.
-- Scanner classes copied between `repsy-scanner-trivy` and the backend are named after their side; the wire
-  records keep their names, because the HTTP and JSON contract is pinned by `e2e/src/stubs/scanner/contract.ts`.
-  There is no shared scanner module.
+- The backend side of the scanner contract lives once, in `libs/scanner-client` (`io.repsy.libs.scanner`,
+  RPS-2065); OS and Cloud both consume it, so the Trivy client is not copied between the products. The
+  wire records keep their names and shape, because the HTTP and JSON contract is pinned by
+  `e2e/src/stubs/scanner/contract.ts` and `ScannerWireContractTest`. `repsy-scanner-trivy` is built from its
+  own directory (standalone parent, no core submodule), so it still holds its server-side copy of the wire
+  records; name a class there after its side and keep it in step with the library's records.
 
 ### Methods and fields
 

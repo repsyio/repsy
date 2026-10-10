@@ -25,16 +25,16 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
+import io.repsy.libs.scanner.dtos.ScanOutcome;
+import io.repsy.libs.scanner.trivy.ScanJobNotFoundException;
+import io.repsy.libs.scanner.trivy.ScanJobStatus;
+import io.repsy.libs.scanner.trivy.ScanJobStatusResponse;
+import io.repsy.libs.scanner.trivy.TrivyScannerClientProperties;
+import io.repsy.libs.scanner.trivy.TrivyScannerStatusClient;
 import io.repsy.os.server.security.scan.dtos.ScanStatus;
 import io.repsy.os.server.security.scan.entities.VulnerabilityScan;
 import io.repsy.os.server.security.scan.repositories.VulnerabilityScanRepository;
 import io.repsy.os.server.security.scan.services.VulnerabilityScanTxService;
-import io.repsy.os.server.security.scanner.dtos.ScanOutcome;
-import io.repsy.os.server.security.scanner.trivy.ScanJobNotFoundException;
-import io.repsy.os.server.security.scanner.trivy.ScanJobStatus;
-import io.repsy.os.server.security.scanner.trivy.ScanJobStatusResponse;
-import io.repsy.os.server.security.scanner.trivy.TrivyScannerClientProperties;
-import io.repsy.os.server.security.scanner.trivy.TrivyScannerStatusClient;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -62,7 +62,15 @@ class TrivyScanStatusPollerTest {
             this.txService,
             this.statusClient,
             new TrivyScannerClientProperties(
-                "http://scanner", "key", 5, 3000, MAX_SCAN_DURATION_SECONDS, 3, 15, 60));
+                "http://scanner",
+                "key",
+                5,
+                3000,
+                MAX_SCAN_DURATION_SECONDS,
+                3,
+                15,
+                60,
+                TrivyScannerClientProperties.DEFAULT_SUPPORTED_REPO_TYPES));
   }
 
   @Test

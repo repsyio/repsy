@@ -15,6 +15,8 @@
  */
 package io.repsy.os.server.security.scan.dtos;
 
+import io.repsy.libs.scanner.dtos.Severity;
+
 public interface SeverityCount {
   Severity getSeverity();
 

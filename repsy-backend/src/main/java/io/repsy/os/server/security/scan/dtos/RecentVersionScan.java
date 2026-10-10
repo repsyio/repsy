@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.security.scan.dtos;
 
+import io.repsy.libs.scanner.dtos.Severity;
 import java.time.Instant;
 
 public interface RecentVersionScan {
