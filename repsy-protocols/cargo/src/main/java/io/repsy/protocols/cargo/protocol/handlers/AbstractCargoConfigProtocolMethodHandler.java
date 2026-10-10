@@ -18,7 +18,7 @@ package io.repsy.protocols.cargo.protocol.handlers;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
-import io.repsy.protocols.cargo.protocol.dtos.CargoErrorResponse;
+import io.repsy.protocols.cargo.shared.constants.CargoConstants;
 import io.repsy.protocols.shared.handlers.AbstractRoutedProtocolMethodHandler;
 import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.http.PublicUrls;
@@ -29,7 +29,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
@@ -72,20 +71,19 @@ public abstract class AbstractCargoConfigProtocolMethodHandler
       final HttpServletRequest request,
       final HttpServletResponse response) {
 
-    try {
-      final var path = request.getServletPath();
-      final var basePath = path.substring(0, path.lastIndexOf("/config.json"));
-      final var baseUrl = this.resolveBaseUrl(request, basePath);
+    // A failure is not caught here: ProtocolErrorAdvice picks the status and, because of this
+    // mark, CargoErrorBodyAdvice writes Cargo's error body (RPS-2060).
+    request.setAttribute(CargoConstants.ERROR_BODY_ATTRIBUTE, true);
 
-      final var jsonConfig = this.getJsonConfig(context, baseUrl);
+    final var path = request.getServletPath();
+    final var basePath = path.substring(0, path.lastIndexOf("/config.json"));
+    final var baseUrl = this.resolveBaseUrl(request, basePath);
 
-      return ResponseEntity.ok()
-          .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-          .body(jsonConfig);
+    final var jsonConfig = this.getJsonConfig(context, baseUrl);
 
-    } catch (final Exception e) {
-      return this.buildCargoErrorResponse(e.getMessage());
-    }
+    return ResponseEntity.ok()
+        .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+        .body(jsonConfig);
   }
 
   /**
@@ -123,13 +121,6 @@ public abstract class AbstractCargoConfigProtocolMethodHandler
 
   private boolean isAuthRequired(final ProtocolContext context) {
     return ProtocolContextUtils.getRepoInfo(context).isPrivateRepo();
-  }
-
-  private ResponseEntity<Object> buildCargoErrorResponse(final String detail) {
-
-    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-        .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-        .body(CargoErrorResponse.of(detail));
   }
 
   /** The headers of the config, without the body (and without a repo-dependent lookup). */

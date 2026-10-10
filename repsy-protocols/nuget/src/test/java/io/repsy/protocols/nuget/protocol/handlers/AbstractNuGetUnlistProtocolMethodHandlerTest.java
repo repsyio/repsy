@@ -17,6 +17,7 @@ package io.repsy.protocols.nuget.protocol.handlers;
 
 import static io.repsy.protocols.nuget.NuGetTestContexts.context;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -25,8 +26,8 @@ import static org.mockito.Mockito.when;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.protocols.nuget.protocol.NuGetProtocolProvider;
-import io.repsy.protocols.nuget.protocol.dtos.NuGetErrorResponse;
 import io.repsy.protocols.nuget.protocol.facades.contracts.NuGetProtocolFacade;
+import io.repsy.protocols.shared.dtos.ProtocolErrorBody;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.io.IOException;
 import java.util.Optional;
@@ -137,19 +138,17 @@ class AbstractNuGetUnlistProtocolMethodHandlerTest {
         handler.handle(ctx, new MockHttpServletRequest(), new MockHttpServletResponse());
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-    assertThat(response.getBody()).isEqualTo(NuGetErrorResponse.of("packageNotFound"));
+    assertThat(response.getBody()).isEqualTo(ProtocolErrorBody.withMessage("packageNotFound"));
   }
 
   @Test
-  @DisplayName("handle() maps any other failure to 500 without leaking the cause")
+  @DisplayName("handle() lets any other failure propagate to the error advice")
   void handlesUnexpectedFailure() throws IOException {
     final var ctx = context(PATH);
     doThrow(new IllegalStateException("db down")).when(facade).unlistVersion(ctx);
 
-    final var response =
-        handler.handle(ctx, new MockHttpServletRequest(), new MockHttpServletResponse());
-
-    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
-    assertThat(response.getBody()).isEqualTo(NuGetErrorResponse.of("Unlist failed"));
+    assertThatThrownBy(
+            () -> handler.handle(ctx, new MockHttpServletRequest(), new MockHttpServletResponse()))
+        .isInstanceOf(IllegalStateException.class);
   }
 }

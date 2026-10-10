@@ -25,9 +25,10 @@
  *    one before matching, `AbstractNuGetPublishProtocolMethodHandler.getPathParser` L69-83). Body:
  *    `multipart/form-data` whose part is named `package` (case-insensitive) or, failing that, the
  *    first part (L113-129). Success: `201 Created`, empty body. Every exception the handler's own
- *    `catch` sees becomes a Repsy-shaped `{"errors":[{"message":"<msg>"}]}` (`NuGetErrorResponse.of`),
- *    at `400` (`IllegalArgumentException`), the exception's own status (a `ResponseStatusException` --
- *    `409` for an override refusal, `422` for a releases/snapshots refusal) or `500` otherwise.
+ *    `catch` sees becomes a Repsy-shaped `{"errors":[{"message":"<msg>"}]}` (`ProtocolErrorBody.withMessage`),
+ *    at `400` (`IllegalArgumentException`) or the exception's own status (a `ResponseStatusException`
+ *    -- `409` for an override refusal, `422` for a releases/snapshots refusal). Any other failure is
+ *    left to `ProtocolErrorAdvice` (500, or 503 with `Retry-After` when storage is down; RPS-2060).
  *  - Override rule (`AbstractNuGetProtocolFacade.publish` L100-124): `checkVersionAllowance` runs
  *    FIRST (a releases/snapshots refusal is `422`, even for a version that already exists -- a
  *    redeploy under `releases:false`/`snapshots:false` is `422`, never `409`), then, only when
@@ -46,7 +47,8 @@
  *    `notFound()`).
  *  - Download: `GET /<repoName>/v3/package/<idLower>/<verLower>/<idLower>.<verLower>.nupkg` (and the
  *    `.nuspec` sibling), `permission: READ`, `application/octet-stream`/`application/xml`; `404` on
- *    `ItemNotFoundException`, `500` otherwise (`AbstractNuGetDownloadProtocolMethodHandler`).
+ *    `ItemNotFoundException`, otherwise left to `ProtocolErrorAdvice` (500, or 503 when storage is down;
+ *    `AbstractNuGetDownloadProtocolMethodHandler`).
  *  - Registration index: `GET /<repoName>/v3/registration/<idLower>/index.json`, `permission: READ`;
  *    `404` on `ItemNotFoundException`/`IllegalArgumentException`
  *    (`AbstractNuGetRegistrationProtocolMethodHandler`). Shape: `{ items: [ { items: [ { catalogEntry:
@@ -649,7 +651,7 @@ export function parseRegistrationIndex(body: Buffer): RegistrationLeaf[] {
   return leaves;
 }
 
-/** `{"errors":[{"message":"..."}]}` -- `NuGetErrorResponse.of`. `undefined` when not that shape. */
+/** `{"errors":[{"message":"..."}]}` -- `ProtocolErrorBody.withMessage`. `undefined` when not that shape. */
 export function nugetErrorMessage(body: Buffer): string | undefined {
   try {
     const parsed = JSON.parse(body.toString('utf8')) as { errors?: { message?: unknown }[] };

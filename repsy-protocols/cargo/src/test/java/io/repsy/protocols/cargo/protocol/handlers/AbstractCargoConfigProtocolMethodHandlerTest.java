@@ -17,6 +17,7 @@ package io.repsy.protocols.cargo.protocol.handlers;
 
 import static io.repsy.protocols.cargo.protocol.handlers.CargoHandlerTestSupport.context;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -24,7 +25,7 @@ import static org.mockito.Mockito.when;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
-import io.repsy.protocols.cargo.protocol.dtos.CargoErrorResponse;
+import io.repsy.protocols.cargo.shared.constants.CargoConstants;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
@@ -164,15 +165,13 @@ class AbstractCargoConfigProtocolMethodHandlerTest {
     }
 
     @Test
-    @DisplayName("returns 500 with a cargo error body when the config cannot be built")
+    @DisplayName("lets a failure propagate to the error advice, marked for the cargo error body")
     void errorResponse() {
-      final var result =
-          handler.handle(new ProtocolContext(), request, new MockHttpServletResponse());
+      final var response = new MockHttpServletResponse();
 
-      assertThat(result.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
-      assertThat(result.getHeaders().getFirst(HttpHeaders.CONTENT_TYPE))
-          .isEqualTo(MediaType.APPLICATION_JSON_VALUE);
-      assertThat(result.getBody()).isInstanceOf(CargoErrorResponse.class);
+      assertThatThrownBy(() -> handler.handle(new ProtocolContext(), request, response))
+          .isInstanceOf(NullPointerException.class);
+      assertThat(request.getAttribute(CargoConstants.ERROR_BODY_ATTRIBUTE)).isEqualTo(true);
     }
 
     /**

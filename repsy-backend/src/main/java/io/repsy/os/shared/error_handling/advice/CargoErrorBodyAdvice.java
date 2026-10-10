@@ -17,8 +17,8 @@ package io.repsy.os.shared.error_handling.advice;
 
 import io.repsy.core.response.dtos.ResponseType;
 import io.repsy.core.response.dtos.RestResponse;
-import io.repsy.protocols.cargo.protocol.dtos.CargoErrorResponse;
 import io.repsy.protocols.cargo.shared.constants.CargoConstants;
+import io.repsy.protocols.shared.dtos.ProtocolErrorBody;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.MethodParameter;
@@ -71,6 +71,6 @@ public class CargoErrorBodyAdvice implements ResponseBodyAdvice<Object> {
       return body;
     }
 
-    return CargoErrorResponse.of(envelope.getMsgId());
+    return ProtocolErrorBody.withDetail(envelope.getMsgId());
   }
 }

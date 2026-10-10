@@ -27,8 +27,8 @@ import static org.mockito.Mockito.verify;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.storage.core.exceptions.StorageUnavailableException;
 import io.repsy.protocols.nuget.protocol.NuGetProtocolProvider;
-import io.repsy.protocols.nuget.protocol.dtos.NuGetErrorResponse;
 import io.repsy.protocols.nuget.protocol.facades.contracts.NuGetProtocolFacade;
+import io.repsy.protocols.shared.dtos.ProtocolErrorBody;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -85,7 +85,7 @@ class AbstractNuGetPublishProtocolMethodHandlerTest {
   @NullSource
   @ValueSource(strings = {"application/json", "application/octet-stream"})
   @DisplayName("rejects a request that is not multipart/form-data with 400")
-  void rejectsNonMultipartRequest(final String contentType) throws IOException {
+  void rejectsNonMultipartRequest(final String contentType) throws Exception {
     final var request = multipartRequest(contentType);
     request.addPart(nupkgPart());
 
@@ -94,25 +94,26 @@ class AbstractNuGetPublishProtocolMethodHandlerTest {
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     assertThat(response.getBody())
-        .isEqualTo(NuGetErrorResponse.of("Content-Type must be multipart/form-data"));
+        .isEqualTo(ProtocolErrorBody.withMessage("Content-Type must be multipart/form-data"));
     verify(facade, never()).publish(any(), any());
   }
 
   @Test
   @DisplayName("rejects a multipart request without parts with 400")
-  void rejectsMissingParts() throws IOException {
+  void rejectsMissingParts() throws Exception {
     final var response =
         handler.handle(
             context("/v3/package"), multipartRequest(MULTIPART), new MockHttpServletResponse());
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-    assertThat(response.getBody()).isEqualTo(NuGetErrorResponse.of("Missing package content."));
+    assertThat(response.getBody())
+        .isEqualTo(ProtocolErrorBody.withMessage("Missing package content."));
     verify(facade, never()).publish(any(), any());
   }
 
   @Test
   @DisplayName("accepts the content type in any case and publishes the package part with 201")
-  void publishesPackage() throws IOException {
+  void publishesPackage() throws Exception {
     final var ctx = context("/v3/package");
     final var request = multipartRequest(MULTIPART);
     request.addPart(nupkgPart());
@@ -125,7 +126,7 @@ class AbstractNuGetPublishProtocolMethodHandlerTest {
 
   @Test
   @DisplayName("maps a ResponseStatusException from the facade to its own status")
-  void mapsConflict() throws IOException {
+  void mapsConflict() throws Exception {
     final var ctx = context("/v3/package");
     final var request = multipartRequest(MULTIPART);
     request.addPart(nupkgPart());
@@ -137,12 +138,13 @@ class AbstractNuGetPublishProtocolMethodHandlerTest {
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
     assertThat(response.getBody())
-        .isEqualTo(NuGetErrorResponse.of("Version 1.0.0 already exists."));
+        .isEqualTo(ProtocolErrorBody.withMessage("Version 1.0.0 already exists."));
   }
 
   @Test
-  @DisplayName("maps any other failure to 500 without leaking the cause")
-  void mapsUnexpectedFailure() throws IOException {
+  @DisplayName(
+      "lets any other failure propagate to the error advice (500, or 503 when storage is down)")
+  void unexpectedFailurePropagates() throws Exception {
     final var ctx = context("/v3/package");
     final var request = multipartRequest(MULTIPART);
     request.addPart(nupkgPart());
@@ -150,15 +152,14 @@ class AbstractNuGetPublishProtocolMethodHandlerTest {
         .when(facade)
         .publish(eq(ctx), any(InputStream.class));
 
-    final var response = handler.handle(ctx, request, new MockHttpServletResponse());
-
-    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
-    assertThat(response.getBody()).isEqualTo(NuGetErrorResponse.of("Publish failed"));
+    assertThatThrownBy(() -> handler.handle(ctx, request, new MockHttpServletResponse()))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("db down");
   }
 
   @Test
   @DisplayName("leaves a storage outage to the error handler (RPS-2104)")
-  void rethrowsStorageUnavailable() throws IOException {
+  void rethrowsStorageUnavailable() throws Exception {
     final var ctx = context("/v3/package");
     final var request = multipartRequest(MULTIPART);
     request.addPart(nupkgPart());

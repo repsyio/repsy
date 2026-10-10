@@ -104,9 +104,6 @@ public abstract class AbstractNuGetDownloadProtocolMethodHandler
     } catch (final ItemNotFoundException e) {
       log.debug("NuGet download not found: {}", e.getMessage());
       return ResponseEntity.notFound().build();
-    } catch (final Exception e) {
-      log.error("NuGet download failed", e);
-      return ResponseEntity.internalServerError().build();
     }
   }
 

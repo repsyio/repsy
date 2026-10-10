@@ -22,8 +22,8 @@ import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
-import io.repsy.protocols.cargo.protocol.dtos.CargoErrorResponse;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
+import io.repsy.protocols.shared.dtos.ProtocolErrorBody;
 import io.repsy.protocols.shared.exceptions.TooManyRequestsException;
 import io.repsy.protocols.shared.handlers.AbstractRoutedProtocolMethodHandler;
 import io.repsy.protocols.shared.handlers.HandlerRoute;
@@ -101,7 +101,7 @@ public abstract class AbstractCargoMeProtocolMethodHandler
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
           .header(WWW_AUTHENTICATE, BasicAuthChallenge.REPSY)
           .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-          .body(CargoErrorResponse.of(e.getMessage()));
+          .body(ProtocolErrorBody.withDetail(e.getMessage()));
     }
   }
 }

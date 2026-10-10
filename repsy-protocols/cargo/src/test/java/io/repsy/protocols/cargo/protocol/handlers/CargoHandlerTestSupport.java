@@ -17,7 +17,7 @@ package io.repsy.protocols.cargo.protocol.handlers;
 
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
-import io.repsy.protocols.cargo.protocol.dtos.CargoErrorResponse;
+import io.repsy.protocols.shared.dtos.ProtocolErrorBody;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
 import java.util.UUID;
@@ -55,6 +55,6 @@ final class CargoHandlerTestSupport {
   }
 
   static String errorDetail(final ResponseEntity<Object> response) {
-    return ((CargoErrorResponse) response.getBody()).errors().getFirst().detail();
+    return ((ProtocolErrorBody) response.getBody()).errors().getFirst().get("detail");
   }
 }

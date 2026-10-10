@@ -17,6 +17,7 @@ package io.repsy.protocols.nuget.protocol.handlers;
 
 import static io.repsy.protocols.nuget.NuGetTestContexts.context;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -208,15 +209,16 @@ class AbstractNuGetDownloadProtocolMethodHandlerTest {
     }
 
     @Test
-    @DisplayName("answers 500 for any other failure instead of pretending the package is missing")
+    @DisplayName("lets any other failure propagate instead of pretending the package is missing")
     void unexpectedFailure() {
       final var ctx = context(NUPKG_PATH);
       when(facade.downloadNuPackage(ctx)).thenThrow(new IllegalStateException("storage down"));
 
-      final var response =
-          handler(true).handle(ctx, new MockHttpServletRequest(), new MockHttpServletResponse());
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+      assertThatThrownBy(
+              () ->
+                  handler(true)
+                      .handle(ctx, new MockHttpServletRequest(), new MockHttpServletResponse()))
+          .isInstanceOf(IllegalStateException.class);
     }
   }
 
@@ -265,15 +267,16 @@ class AbstractNuGetDownloadProtocolMethodHandlerTest {
     }
 
     @Test
-    @DisplayName("answers 500 for any other failure instead of pretending the package is missing")
+    @DisplayName("lets any other failure propagate instead of pretending the package is missing")
     void unexpectedFailure() {
       final var ctx = context(NUSPEC_PATH);
       when(facade.downloadNuspec(ctx)).thenThrow(new IllegalStateException("storage down"));
 
-      final var response =
-          handler(false).handle(ctx, new MockHttpServletRequest(), new MockHttpServletResponse());
-
-      assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+      assertThatThrownBy(
+              () ->
+                  handler(false)
+                      .handle(ctx, new MockHttpServletRequest(), new MockHttpServletResponse()))
+          .isInstanceOf(IllegalStateException.class);
     }
   }
 }

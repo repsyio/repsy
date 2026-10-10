@@ -19,6 +19,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
@@ -26,6 +28,7 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.Optional;
 import java.util.UUID;
@@ -128,6 +131,34 @@ class AbstractRubyStorageServiceTest {
                     .getGem(repoId, "gems", "demo", "1.0.0", "ruby"))
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessageContaining("gemNotFound");
+  }
+
+  @Test
+  @DisplayName("deleteGem() deletes the gem file and returns its usage")
+  void deletesGem() throws IOException {
+    final var repoId = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    when(this.storageStrategy.getFileUsage(any(), eq("gems"))).thenReturn(42L);
+
+    final var freed =
+        new TestService(this.storageStrategy).deleteGem(repoId, "gems", "rack", "2.2.8", "ruby");
+
+    assertThat(freed).isEqualTo(42L);
+    verify(this.storageStrategy).delete(any());
+  }
+
+  @Test
+  @DisplayName("deleteGem() answers a failing usage lookup as gemNotFound and deletes nothing")
+  void deleteGemFailureIsGemNotFound() throws IOException {
+    final var repoId = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    when(this.storageStrategy.getFileUsage(any(), eq("gems"))).thenThrow(new IOException("disk"));
+
+    assertThatThrownBy(
+            () ->
+                new TestService(this.storageStrategy)
+                    .deleteGem(repoId, "gems", "rack", "2.2.8", "ruby"))
+        .isInstanceOf(ItemNotFoundException.class)
+        .hasMessageContaining("gemNotFound");
+    verify(this.storageStrategy, never()).delete(any());
   }
 
   @Test

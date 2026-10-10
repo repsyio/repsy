@@ -1866,7 +1866,7 @@ class NuGetPublishProtocolIT extends AbstractIT {
   class UnexpectedFailure {
 
     @Test
-    @DisplayName("answers 500 'Publish failed' and logs the exception with its stack trace")
+    @DisplayName("answers 500 errorOccurred through the error advice and logs the exception")
     void logsTheException(final CapturedOutput output) throws Exception {
       final var repo = NuGetPublishProtocolIT.this.nugetRepo();
       final var pkg = new Pkg(uniquePackageId(), "1.0.0");
@@ -1877,12 +1877,9 @@ class NuGetPublishProtocolIT extends AbstractIT {
       NuGetPublishProtocolIT.this
           .protocol(push(repo, pkg.nupkg(), NuGetPublishProtocolIT.this.adminProtocolBearerToken()))
           .andExpect(status().isInternalServerError())
-          .andExpect(jsonPath("$.errors[0].message").value("Publish failed"));
+          .andExpect(jsonPath("$.msgId").value("errorOccurred"));
 
-      assertThat(output.getAll())
-          .contains("ERROR")
-          .contains("NuGet publish failed")
-          .contains("java.lang.IllegalStateException: storage backend down");
+      assertThat(output.getAll()).contains("ERROR").contains("storage backend down");
       verifyNoInteractions(NuGetPublishProtocolIT.this.usageUpdateService);
     }
   }
@@ -1912,7 +1909,7 @@ class NuGetPublishProtocolIT extends AbstractIT {
             .protocol(
                 push(repo, pkg.nupkg(), NuGetPublishProtocolIT.this.adminProtocolBearerToken()))
             .andExpect(status().isInternalServerError())
-            .andExpect(jsonPath("$.errors[0].message").value("Publish failed"));
+            .andExpect(jsonPath("$.msgId").value("errorOccurred"));
       }
 
       NuGetPublishProtocolIT.this.assertNothingStored(repo, pkg.id());

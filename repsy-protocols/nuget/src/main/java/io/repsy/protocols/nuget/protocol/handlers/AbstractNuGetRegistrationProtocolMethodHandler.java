@@ -88,9 +88,6 @@ public abstract class AbstractNuGetRegistrationProtocolMethodHandler
     } catch (final ItemNotFoundException | IllegalArgumentException e) {
       log.debug("NuGet registration not found: {}", e.getMessage());
       return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-    } catch (final Exception e) {
-      log.error("NuGet registration failed: ", e);
-      return ResponseEntity.internalServerError().build();
     }
   }
 

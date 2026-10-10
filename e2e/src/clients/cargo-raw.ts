@@ -28,7 +28,7 @@
  *    `{"warnings":{"invalid_categories":[],"invalid_badges":[],"other":[]}}`. **Every** exception the
  *    handler's `catch (Exception e)` sees -- an invalid name/version, a too-long field, a
  *    duplicate-version `ItemAlreadyExistException` -- becomes a flat 400 with a Cargo-shaped
- *    `{"errors":[{"detail":"<exception message>"}]}` body (`CargoErrorResponse.of`); there is no
+ *    `{"errors":[{"detail":"<exception message>"}]}` body (`ProtocolErrorBody.withDetail`); there is no
  *    403/409 on this route (`AbstractCargoPublishProtocolMethodHandler.handle`).
  *  - `AbstractCargoProtocolFacade.publish` writes the `.crate` bytes and appends the index line to
  *    storage (`AbstractCargoStorageService.writeCrateAndIndex`, `StorageStrategy.write` /
@@ -59,13 +59,15 @@
  *    are excluded by `EXCLUDED_PATTERN` so they never match this handler instead of their own.
  *    Body `text/plain`, one JSON `CrateIndexEntry` per line (`name, vers, deps, cksum, features,
  *    yanked, links, v, features2, rust_version`, `NON_NULL` so an absent optional field is omitted,
- *    not `null`). **404** both when the crate has no index entries at all AND on any exception
- *    the handler's own `catch` swallows (`AbstractCargoSparseIndexProtocolMethodHandler.handle`).
+ *    not `null`). **404** when the crate has no index entries at all or the lookup finds no crate
+ *    (`ItemNotFoundException`); any other failure is no longer swallowed as a 404 (RPS-2060) and is
+ *    answered by `ProtocolErrorAdvice` (500, or 503 when storage is down).
  *  - Download: `GET /<repoName>/.../api/v1/crates/<name>/<version>/download`
  *    (`AbstractCargoDownloadProtocolMethodHandler.DOWNLOAD_PATTERN`, matched by the relative path's
  *    suffix, not a fixed prefix), `permission: READ`. `application/octet-stream` on success; **404**
- *    on ANY exception (missing crate, missing version -- `AbstractCargoDownloadProtocolMethodHandler
- *    .handle`'s `catch`). The name segment is normalised before lookup
+ *    when the crate or version is missing (`ItemNotFoundException`); any other failure is answered
+ *    by `ProtocolErrorAdvice` (500, or 503 when storage is down; RPS-2060, it used to be a 404 for
+ *    ANY exception). The name segment is normalised before lookup
  *    (`CrateUtils.extractCrateNameAndVersion`), so a download under either the hyphenated or the
  *    normalised spelling resolves to the same stored crate.
  *  - Auth header: `CargoAuthPreProcessor.normalizeAuthHeader` treats any `Authorization` value that

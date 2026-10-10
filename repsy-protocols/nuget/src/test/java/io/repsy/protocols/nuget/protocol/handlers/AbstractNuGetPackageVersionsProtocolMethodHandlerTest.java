@@ -17,6 +17,7 @@ package io.repsy.protocols.nuget.protocol.handlers;
 
 import static io.repsy.protocols.nuget.NuGetTestContexts.context;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -147,14 +148,15 @@ class AbstractNuGetPackageVersionsProtocolMethodHandlerTest {
 
   @Test
   @DisplayName(
-      "handle() answers 500 for any other failure instead of pretending the package is missing")
+      "handle() lets any other failure propagate instead of pretending the package is missing")
   void handlesUnexpectedFailure() {
     final var ctx = context(PATH);
     when(this.facade.getPackageVersions(ctx)).thenThrow(new IllegalStateException("db down"));
 
-    final var response =
-        this.handler.handle(ctx, new MockHttpServletRequest(), new MockHttpServletResponse());
-
-    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
+    assertThatThrownBy(
+            () ->
+                this.handler.handle(
+                    ctx, new MockHttpServletRequest(), new MockHttpServletResponse()))
+        .isInstanceOf(IllegalStateException.class);
   }
 }

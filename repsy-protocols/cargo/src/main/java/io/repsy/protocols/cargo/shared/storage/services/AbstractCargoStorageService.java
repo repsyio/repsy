@@ -16,11 +16,11 @@
 package io.repsy.protocols.cargo.shared.storage.services;
 
 import io.repsy.core.error_handling.exceptions.ErrorOccurredException;
-import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
+import io.repsy.protocols.shared.storage.AbstractArtifactStorageService;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -29,20 +29,22 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.UUID;
-import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 
-@RequiredArgsConstructor
 @NullMarked
-public abstract class AbstractCargoStorageService implements CargoStorageService {
+public abstract class AbstractCargoStorageService extends AbstractArtifactStorageService
+    implements CargoStorageService {
 
   private static final int ONE = 1;
   private static final int TWO = 2;
   private static final int THREE = 3;
   private static final String CRATES_PATH = "crates";
   private static final String CRATES_FILE_NAME_FMT = "%s-%s.crate";
-  private final StorageStrategy storageStrategy;
+
+  protected AbstractCargoStorageService(final StorageStrategy storageStrategy) {
+    super(storageStrategy);
+  }
 
   @Override
   public BaseUsages writeCrateAndIndex(
@@ -81,9 +83,7 @@ public abstract class AbstractCargoStorageService implements CargoStorageService
     final var cratePath = Paths.get(CRATES_PATH, crateName, crateFileName);
     final var storagePath = StoragePath.of(repoId, cratePath.toString());
 
-    return this.storageStrategy
-        .get(storagePath, repoName)
-        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.CRATE_NOT_FOUND));
+    return this.requireResource(storagePath, repoName, ProtocolErrorCodes.CRATE_NOT_FOUND);
   }
 
   @Override
@@ -95,10 +95,7 @@ public abstract class AbstractCargoStorageService implements CargoStorageService
     final var cratePath = Paths.get(CRATES_PATH, crateName, crateFileName);
     final var storagePath = StoragePath.of(repoId, cratePath.toString());
 
-    final var usage = this.storageStrategy.getFileUsage(storagePath, repoName);
-    this.storageStrategy.delete(storagePath);
-
-    return usage;
+    return this.deleteFileWithUsage(storagePath, repoName);
   }
 
   @Override
@@ -149,22 +146,10 @@ public abstract class AbstractCargoStorageService implements CargoStorageService
   }
 
   @Override
-  public void createRepo(final UUID repoId) {
-
-    this.storageStrategy.createDirectory(repoId.toString());
-  }
-
-  @Override
   public String getCrateRelativePath(final String crateName, final String versionName) {
 
     final var crateFileName = String.format(CRATES_FILE_NAME_FMT, crateName, versionName);
     return Paths.get(CRATES_PATH, crateName, crateFileName).toString();
-  }
-
-  @Override
-  public void deleteRepo(final UUID repoId) {
-    final var storagePath = StoragePath.of(repoId);
-    this.storageStrategy.delete(storagePath);
   }
 
   private Path getIndexPath(final String name) {

@@ -33,6 +33,7 @@ import io.repsy.protocols.maven.shared.storage.MavenMetadataStore;
 import io.repsy.protocols.maven.shared.utils.MavenStoragePathUtils;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import io.repsy.protocols.shared.storage.AbstractArtifactStorageService;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
@@ -49,12 +50,12 @@ import org.springframework.core.io.Resource;
 import org.springframework.ui.freemarker.FreeMarkerTemplateUtils;
 
 @NullMarked
-public abstract class AbstractMavenStorageService<ID> implements MavenStorageService<ID> {
+public abstract class AbstractMavenStorageService<ID> extends AbstractArtifactStorageService
+    implements MavenStorageService<ID> {
 
   private static final String METADATA_FILENAME = "maven-metadata.xml";
 
   private final Configuration freeMarkerConfiguration;
-  private final StorageStrategy storageStrategy;
 
   /** Rewrites the stored {@code maven-metadata.xml} files and guards them with its locks. */
   private final MavenMetadataStore<ID> metadataStore;
@@ -62,15 +63,9 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
   protected AbstractMavenStorageService(
       final Configuration freeMarkerConfiguration, final StorageStrategy storageStrategy) {
 
+    super(storageStrategy);
     this.freeMarkerConfiguration = freeMarkerConfiguration;
-    this.storageStrategy = storageStrategy;
     this.metadataStore = new MavenMetadataStore<>(storageStrategy);
-  }
-
-  @Override
-  public void createRepo(final UUID repoId) {
-
-    this.storageStrategy.createDirectory(repoId.toString());
   }
 
   @Override
@@ -181,11 +176,7 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
 
     final var artifactPath = this.getPath(groupId, artifactId);
     final var storagePath = StoragePath.of(repoId, artifactPath.toString());
-    final var usage = this.storageStrategy.calculatePathUsage(storagePath);
-
-    this.storageStrategy.delete(storagePath);
-
-    return usage;
+    return this.deleteTreeWithUsage(storagePath);
   }
 
   @Override

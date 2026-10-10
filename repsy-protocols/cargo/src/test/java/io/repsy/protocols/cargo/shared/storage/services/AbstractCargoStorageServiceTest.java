@@ -177,6 +177,17 @@ class AbstractCargoStorageServiceTest {
     verify(storageStrategy).delete(path(CRATE_PATH));
   }
 
+  @Test
+  @DisplayName("deleteCrate() lets a storage IOException through and deletes nothing")
+  void deleteCrateKeepsIoException() throws IOException {
+    when(storageStrategy.getFileUsage(path(CRATE_PATH), eq(REPO_NAME)))
+        .thenThrow(new IOException("disk"));
+
+    assertThatThrownBy(() -> service.deleteCrate(REPO_ID, REPO_NAME, "serde", "1.0.0"))
+        .isInstanceOf(IOException.class);
+    verify(storageStrategy, never()).delete(any());
+  }
+
   @Nested
   @DisplayName("deletePackage()")
   class DeletePackageTests {

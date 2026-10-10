@@ -18,15 +18,18 @@ package io.repsy.protocols.cargo.protocol.handlers;
 import static io.repsy.protocols.cargo.protocol.handlers.CargoHandlerTestSupport.context;
 import static io.repsy.protocols.cargo.protocol.handlers.CargoHandlerTestSupport.errorDetail;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
 import io.repsy.protocols.cargo.protocol.facades.contracts.CargoProtocolFacade;
+import io.repsy.protocols.cargo.shared.constants.CargoConstants;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.util.Map;
 import java.util.Optional;
@@ -158,10 +161,22 @@ class AbstractCargoYankProtocolMethodHandlerTest {
     }
 
     @Test
-    @DisplayName("returns 400 with a cargo error body when the facade fails")
-    void returnsBadRequestOnError() {
+    @DisplayName("lets an unexpected failure propagate to the error advice (it was a 400)")
+    void unexpectedFailurePropagates() {
       final var ctx = context(YANK_PATH);
-      doThrow(new IllegalStateException("crateVersionNotFound")).when(facade).yank(ctx);
+      final var request = new MockHttpServletRequest();
+      doThrow(new IllegalStateException("db down")).when(facade).yank(ctx);
+
+      assertThatThrownBy(() -> handler.handle(ctx, request, new MockHttpServletResponse()))
+          .isInstanceOf(IllegalStateException.class);
+      assertThat(request.getAttribute(CargoConstants.ERROR_BODY_ATTRIBUTE)).isEqualTo(true);
+    }
+
+    @Test
+    @DisplayName("returns 400 with a cargo error body when the crate version does not exist")
+    void returnsBadRequestWhenVersionMissing() {
+      final var ctx = context(YANK_PATH);
+      doThrow(new ItemNotFoundException("crateVersionNotFound")).when(facade).yank(ctx);
 
       final var result =
           handler.handle(ctx, new MockHttpServletRequest(), new MockHttpServletResponse());

@@ -18,6 +18,7 @@ package io.repsy.protocols.cargo.protocol.handlers;
 import static io.repsy.protocols.cargo.protocol.handlers.CargoHandlerTestSupport.context;
 import static io.repsy.protocols.cargo.protocol.handlers.CargoHandlerTestSupport.errorDetail;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
@@ -27,6 +28,7 @@ import static org.mockito.Mockito.when;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
 import io.repsy.protocols.cargo.protocol.facades.contracts.CargoProtocolFacade;
+import io.repsy.protocols.cargo.shared.constants.CargoConstants;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateListItem;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.time.Instant;
@@ -276,18 +278,16 @@ class AbstractCargoSearchProtocolMethodHandlerTest {
     }
 
     @Test
-    @DisplayName("answers 400 with a fixed message, not the exception's, when the search fails")
-    void doesNotLeakTheExceptionMessage() {
+    @DisplayName("lets a failing search propagate to the error advice, marked for the cargo body")
+    void failingSearchPropagates() {
       final var ctx = context(SEARCH_PATH);
+      final var request = new MockHttpServletRequest("GET", SEARCH_PATH);
       when(facade.search(eq(ctx), eq(""), any(Pageable.class)))
           .thenThrow(new IllegalStateException("could not execute query: select * from secret"));
 
-      final var result =
-          handler.handle(
-              ctx, new MockHttpServletRequest("GET", SEARCH_PATH), new MockHttpServletResponse());
-
-      assertThat(result.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-      assertThat(errorDetail(result)).isEqualTo("Search failed");
+      assertThatThrownBy(() -> handler.handle(ctx, request, new MockHttpServletResponse()))
+          .isInstanceOf(IllegalStateException.class);
+      assertThat(request.getAttribute(CargoConstants.ERROR_BODY_ATTRIBUTE)).isEqualTo(true);
     }
 
     @Test

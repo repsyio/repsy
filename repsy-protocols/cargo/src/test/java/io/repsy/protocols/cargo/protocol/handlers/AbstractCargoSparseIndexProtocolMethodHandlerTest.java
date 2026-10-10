@@ -16,15 +16,18 @@
 package io.repsy.protocols.cargo.protocol.handlers;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
 import io.repsy.protocols.cargo.protocol.facades.contracts.CargoProtocolFacade;
+import io.repsy.protocols.cargo.shared.constants.CargoConstants;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateIndexEntry;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
@@ -241,9 +244,19 @@ class AbstractCargoSparseIndexProtocolMethodHandlerTest {
     }
 
     @Test
-    @DisplayName("returns 404 when the facade fails")
-    void returnsNotFoundOnError() {
+    @DisplayName("lets an unexpected failure propagate to the error advice (it was a 404)")
+    void unexpectedFailurePropagates() {
       when(facade.getIndexEntries(ctx)).thenThrow(new IllegalStateException("boom"));
+
+      assertThatThrownBy(() -> handler.handle(ctx, request, new MockHttpServletResponse()))
+          .isInstanceOf(IllegalStateException.class);
+      verify(request).setAttribute(CargoConstants.ERROR_BODY_ATTRIBUTE, true);
+    }
+
+    @Test
+    @DisplayName("returns 404 when the crate lookup finds nothing")
+    void returnsNotFoundWhenCrateMissing() {
+      when(facade.getIndexEntries(ctx)).thenThrow(new ItemNotFoundException("crateNotFound"));
       when(request.getServletPath()).thenReturn("/se/rd/serde");
 
       final var result = handler.handle(ctx, request, new MockHttpServletResponse());

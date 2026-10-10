@@ -67,9 +67,6 @@ public abstract class AbstractNuGetPackageVersionsProtocolMethodHandler
     } catch (final ItemNotFoundException e) {
       log.debug("NuGet package versions not found: {}", e.getMessage());
       return ResponseEntity.notFound().build();
-    } catch (final Exception e) {
-      log.error("NuGet package versions failed", e);
-      return ResponseEntity.internalServerError().build();
     }
   }
 

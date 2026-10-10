@@ -31,6 +31,7 @@ import io.repsy.protocols.pypi.shared.python_package.dtos.ReleaseArchiveIndexLis
 import io.repsy.protocols.pypi.shared.utils.PackageStorageUtils;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import io.repsy.protocols.shared.storage.AbstractArtifactStorageService;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.Paths;
@@ -40,7 +41,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Predicate;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.ByteArrayResource;
@@ -49,14 +49,19 @@ import org.springframework.ui.freemarker.FreeMarkerTemplateUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 @Slf4j
-@RequiredArgsConstructor
 @NullMarked
-public abstract class AbstractPypiStorageService<ID> implements PypiStorageService<ID> {
+public abstract class AbstractPypiStorageService<ID> extends AbstractArtifactStorageService
+    implements PypiStorageService<ID> {
 
   private static final String PATH_DELIMITER = "/";
 
-  private final StorageStrategy storageStrategy;
   private final Configuration freeMarkerConfiguration;
+
+  protected AbstractPypiStorageService(
+      final StorageStrategy storageStrategy, final Configuration freeMarkerConfiguration) {
+    super(storageStrategy);
+    this.freeMarkerConfiguration = freeMarkerConfiguration;
+  }
 
   protected abstract String buildRepoUri(BaseRepoInfo<ID> baseRepoInfo);
 
@@ -66,11 +71,7 @@ public abstract class AbstractPypiStorageService<ID> implements PypiStorageServi
 
     final var storagePath = StoragePath.of(repoId, packageNormalizedName);
 
-    final var usage = this.storageStrategy.calculatePathUsage(storagePath);
-
-    this.storageStrategy.delete(storagePath);
-
-    return usage;
+    return this.deleteTreeWithUsage(storagePath);
   }
 
   /** mark archive files belongs to given release version as deleted and return total usage */
@@ -127,9 +128,7 @@ public abstract class AbstractPypiStorageService<ID> implements PypiStorageServi
 
     final var storagePath = StoragePath.of(repoId, Paths.get(packageName, fileName).toString());
 
-    return this.storageStrategy
-        .get(storagePath, repoName)
-        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.ITEM_NOT_FOUND));
+    return this.requireResource(storagePath, repoName, ProtocolErrorCodes.ITEM_NOT_FOUND);
   }
 
   private void addDirectoryUpLink(
@@ -206,9 +205,8 @@ public abstract class AbstractPypiStorageService<ID> implements PypiStorageServi
               Paths.get(packageName, filename + "." + HASH_ALGORITHM).toString());
 
       final var resource =
-          this.storageStrategy
-              .get(fileStoragePath, repoInfo.getName())
-              .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.ITEM_NOT_FOUND));
+          this.requireResource(
+              fileStoragePath, repoInfo.getName(), ProtocolErrorCodes.ITEM_NOT_FOUND);
 
       final var item =
           ReleaseArchiveIndexListItem.builder()
@@ -228,19 +226,6 @@ public abstract class AbstractPypiStorageService<ID> implements PypiStorageServi
     }
 
     return archiveFiles;
-  }
-
-  /** mark repo directory as deleted */
-  @Override
-  public void deleteRepo(final UUID repoId) {
-    final var storagePath = StoragePath.of(repoId);
-    this.storageStrategy.delete(storagePath);
-  }
-
-  @Override
-  public void createRepo(final UUID repoId) {
-
-    this.storageStrategy.createDirectory(repoId.toString());
   }
 
   @Override

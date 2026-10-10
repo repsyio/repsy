@@ -17,15 +17,16 @@ package io.repsy.protocols.nuget.protocol.handlers;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.storage.core.exceptions.StorageUnavailableException;
 import io.repsy.protocols.nuget.protocol.NuGetProtocolProvider;
-import io.repsy.protocols.nuget.protocol.dtos.NuGetErrorResponse;
 import io.repsy.protocols.nuget.protocol.facades.contracts.NuGetProtocolFacade;
+import io.repsy.protocols.shared.dtos.ProtocolErrorBody;
 import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
 import io.repsy.protocols.shared.handlers.HandlerRoute;
+import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.Part;
+import java.io.IOException;
 import java.util.Collection;
 import java.util.Locale;
 import lombok.extern.slf4j.Slf4j;
@@ -61,15 +62,16 @@ public abstract class AbstractNuGetPublishProtocolMethodHandler
 
   /**
    * Publishes the package. A validation failure is a 400 and an existing version a 409, in NuGet's
-   * error body. A storage outage ({@link StorageUnavailableException}) is rethrown so that {@code
-   * ErrorHandler} answers it 503 with {@code Retry-After}, the same as on every other format
-   * (RPS-2104); any other failure is logged and answered 500.
+   * error body. Any other failure (a storage outage, a database failure) is left to propagate to
+   * {@code ProtocolErrorAdvice}, which answers 500, or 503 with {@code Retry-After} for a storage
+   * outage, the same as on every other format (RPS-2104, RPS-2060).
    */
   @Override
   public ResponseEntity<Object> handle(
       final ProtocolContext context,
       final HttpServletRequest request,
-      final HttpServletResponse response) {
+      final HttpServletResponse response)
+      throws IOException, ServletException {
 
     try {
       this.validateRequest(request);
@@ -87,18 +89,7 @@ public abstract class AbstractNuGetPublishProtocolMethodHandler
       return this.handleException(e.getMessage());
     } catch (final ResponseStatusException e) {
       return this.handleConflict(e);
-    } catch (final Exception e) {
-      return this.unexpectedFailure(e);
     }
-  }
-
-  private ResponseEntity<Object> unexpectedFailure(final Exception e) {
-    if (e instanceof final StorageUnavailableException outage) {
-      throw outage;
-    }
-
-    log.error("NuGet publish failed", e);
-    return this.createErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Publish failed");
   }
 
   private void validateRequest(final HttpServletRequest request) {
@@ -120,7 +111,7 @@ public abstract class AbstractNuGetPublishProtocolMethodHandler
   }
 
   private void processPublishing(final ProtocolContext context, final Part nupkgPart)
-      throws Exception {
+      throws IOException {
 
     try (final var inputStream = nupkgPart.getInputStream()) {
       this.facade.publish(context, inputStream);
@@ -147,6 +138,6 @@ public abstract class AbstractNuGetPublishProtocolMethodHandler
   private ResponseEntity<Object> createErrorResponse(
       final HttpStatus status, final String message) {
 
-    return ResponseEntity.status(status).body(NuGetErrorResponse.of(message));
+    return ResponseEntity.status(status).body(ProtocolErrorBody.withMessage(message));
   }
 }

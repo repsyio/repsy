@@ -109,7 +109,7 @@ class NuGetReadProtocolIT extends AbstractIT {
   class UnexpectedFailure {
 
     @Test
-    @DisplayName("answers 500 for the version list and logs the exception with its stack trace")
+    @DisplayName("answers 500 for the version list and logs it through the error advice")
     void versionList(final CapturedOutput output) throws Exception {
       doThrow(new IllegalStateException("database down"))
           .when(NuGetReadProtocolIT.this.nugetPackageService)
@@ -117,14 +117,11 @@ class NuGetReadProtocolIT extends AbstractIT {
 
       NuGetReadProtocolIT.this.read(VERSIONS_PATH).andExpect(status().isInternalServerError());
 
-      assertThat(output.getAll())
-          .contains("ERROR")
-          .contains("NuGet package versions failed")
-          .contains("java.lang.IllegalStateException: database down");
+      assertThat(output.getAll()).contains("ERROR").contains("database down");
     }
 
     @Test
-    @DisplayName("answers 500 for the .nupkg download and logs the exception with its stack trace")
+    @DisplayName("answers 500 for the .nupkg download and logs it through the error advice")
     void nupkg(final CapturedOutput output) throws Exception {
       doThrow(new IllegalStateException("storage backend down"))
           .when(NuGetReadProtocolIT.this.nugetStorageService)
@@ -132,14 +129,11 @@ class NuGetReadProtocolIT extends AbstractIT {
 
       NuGetReadProtocolIT.this.read(NUPKG_PATH).andExpect(status().isInternalServerError());
 
-      assertThat(output.getAll())
-          .contains("ERROR")
-          .contains("NuGet download failed")
-          .contains("java.lang.IllegalStateException: storage backend down");
+      assertThat(output.getAll()).contains("ERROR").contains("storage backend down");
     }
 
     @Test
-    @DisplayName("answers 500 for the .nuspec download and logs the exception with its stack trace")
+    @DisplayName("answers 500 for the .nuspec download and logs it through the error advice")
     void nuspec(final CapturedOutput output) throws Exception {
       doThrow(new IllegalStateException("storage backend down"))
           .when(NuGetReadProtocolIT.this.nugetStorageService)
@@ -147,10 +141,7 @@ class NuGetReadProtocolIT extends AbstractIT {
 
       NuGetReadProtocolIT.this.read(NUSPEC_PATH).andExpect(status().isInternalServerError());
 
-      assertThat(output.getAll())
-          .contains("ERROR")
-          .contains("NuGet download failed")
-          .contains("java.lang.IllegalStateException: storage backend down");
+      assertThat(output.getAll()).contains("ERROR").contains("storage backend down");
     }
   }
 }
