@@ -13,12 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.protocols.npm.shared.audit.services;
+package io.repsy.protocols.npm.shared.audit;
 
-import io.repsy.os.server.security.scan.dtos.KnownVulnerabilityRow;
-import io.repsy.os.server.security.scan.dtos.Severity;
-import io.repsy.protocols.npm.shared.audit.NpmAdvisory;
-import io.repsy.protocols.npm.shared.audit.NpmSeverity;
 import io.repsy.protocols.npm.shared.utils.NpmSemver;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
@@ -67,18 +63,19 @@ public class NpmAdvisoryMapper {
    *
    * @param rows The findings on the requested packages
    * @param versionsByName The requested versions by package name
+   * @return The advisories, one for each vulnerability and package
    */
   public static List<NpmAdvisory> toAdvisories(
-      final List<KnownVulnerabilityRow> rows, final Map<String, Set<String>> versionsByName) {
+      final List<NpmVulnerabilityFinding> rows, final Map<String, Set<String>> versionsByName) {
 
-    final var groups = new LinkedHashMap<Key, List<KnownVulnerabilityRow>>();
+    final var groups = new LinkedHashMap<Key, List<NpmVulnerabilityFinding>>();
 
     for (final var row : rows) {
-      final var requested = versionsByName.getOrDefault(row.getPackageName(), Set.of());
+      final var requested = versionsByName.getOrDefault(row.packageName(), Set.of());
 
-      if (requested.contains(row.getPackageVersion())) {
+      if (requested.contains(row.packageVersion())) {
         groups
-            .computeIfAbsent(new Key(row.getCveId(), row.getPackageName()), _ -> new ArrayList<>())
+            .computeIfAbsent(new Key(row.cveId(), row.packageName()), _ -> new ArrayList<>())
             .add(row);
       }
     }
@@ -97,9 +94,9 @@ public class NpmAdvisoryMapper {
   }
 
   /** The requested versions the vulnerability was found in, oldest first; only semver ones. */
-  private static List<String> vulnerableVersions(final List<KnownVulnerabilityRow> group) {
+  private static List<String> vulnerableVersions(final List<NpmVulnerabilityFinding> group) {
     return group.stream()
-        .map(KnownVulnerabilityRow::getPackageVersion)
+        .map(NpmVulnerabilityFinding::packageVersion)
         .distinct()
         .filter(NpmSemver::isValid)
         .sorted(Comparator.comparing(NpmSemver::parse))
@@ -107,16 +104,16 @@ public class NpmAdvisoryMapper {
   }
 
   private static NpmAdvisory build(
-      final Key key, final List<KnownVulnerabilityRow> group, final List<String> vulnerable) {
+      final Key key, final List<NpmVulnerabilityFinding> group, final List<String> vulnerable) {
 
     final var patched = patchedVersion(group, vulnerable.getFirst());
-    final var description = firstNonBlank(group, KnownVulnerabilityRow::getDescription);
-    final var referenceUrl = firstNonBlank(group, KnownVulnerabilityRow::getReferenceUrl);
+    final var description = firstNonBlank(group, NpmVulnerabilityFinding::description);
+    final var referenceUrl = firstNonBlank(group, NpmVulnerabilityFinding::referenceUrl);
     final var newest = Optional.ofNullable(newestScan(group));
     final var cvss =
         group.stream()
-            .filter(row -> row.getCvssScore() != null)
-            .max(Comparator.comparingDouble(KnownVulnerabilityRow::getCvssScore));
+            .filter(row -> row.cvssScore() != null)
+            .max(Comparator.comparingDouble(NpmVulnerabilityFinding::cvssScore));
 
     return new NpmAdvisory(
         id(key),
@@ -131,27 +128,16 @@ public class NpmAdvisoryMapper {
         Objects.requireNonNullElse(description, ""),
         recommendation(patched),
         Objects.requireNonNullElse(referenceUrl, ""),
-        cvss.map(KnownVulnerabilityRow::getCvssScore).orElse(null),
-        cvss.map(KnownVulnerabilityRow::getCvssVector).orElse(null),
-        newest.map(KnownVulnerabilityRow::getCompletedAt).orElse(Instant.EPOCH),
-        newest.map(KnownVulnerabilityRow::getScannerName).orElse(null));
+        cvss.map(NpmVulnerabilityFinding::cvssScore).orElse(null),
+        cvss.map(NpmVulnerabilityFinding::cvssVector).orElse(null),
+        newest.map(NpmVulnerabilityFinding::completedAt).orElse(Instant.EPOCH),
+        newest.map(NpmVulnerabilityFinding::scannerName).orElse(null));
   }
 
   private static String recommendation(final @Nullable String patched) {
     return patched == null
         ? "No fix is available yet."
         : "Upgrade to version " + patched + " or later.";
-  }
-
-  /** The maps of severities: Trivy's {@code MEDIUM} is npm's {@code moderate}. */
-  static NpmSeverity toNpmSeverity(final @Nullable Severity severity) {
-    return switch (severity) {
-      case CRITICAL -> NpmSeverity.CRITICAL;
-      case HIGH -> NpmSeverity.HIGH;
-      case MEDIUM -> NpmSeverity.MODERATE;
-      case LOW, UNKNOWN -> NpmSeverity.LOW;
-      case null, default -> throw new IllegalArgumentException("unknown severity " + severity);
-    };
   }
 
   /**
@@ -201,9 +187,9 @@ public class NpmAdvisoryMapper {
     return cveId + ": " + summary;
   }
 
-  private static NpmSeverity worstSeverity(final List<KnownVulnerabilityRow> group) {
+  private static NpmSeverity worstSeverity(final List<NpmVulnerabilityFinding> group) {
     return group.stream()
-        .map(row -> toNpmSeverity(row.getSeverity()))
+        .map(NpmVulnerabilityFinding::severity)
         .max(Comparator.naturalOrder())
         .orElse(NpmSeverity.LOW);
   }
@@ -213,12 +199,12 @@ public class NpmAdvisoryMapper {
    * fixes as {@code "1.2.3, 2.0.1"}, one for each maintained branch.
    */
   private static @Nullable String patchedVersion(
-      final List<KnownVulnerabilityRow> group, final String smallestVulnerable) {
+      final List<NpmVulnerabilityFinding> group, final String smallestVulnerable) {
 
     final var floor = NpmSemver.parse(smallestVulnerable);
 
     return group.stream()
-        .map(KnownVulnerabilityRow::getFixedVersion)
+        .map(NpmVulnerabilityFinding::fixedVersion)
         .filter(Objects::nonNull)
         .flatMap(fixed -> Arrays.stream(fixed.split(",", -1)))
         .map(String::strip)
@@ -229,8 +215,8 @@ public class NpmAdvisoryMapper {
   }
 
   private static @Nullable String firstNonBlank(
-      final List<KnownVulnerabilityRow> group,
-      final Function<KnownVulnerabilityRow, @Nullable String> field) {
+      final List<NpmVulnerabilityFinding> group,
+      final Function<NpmVulnerabilityFinding, @Nullable String> field) {
 
     return group.stream()
         .map(field)
@@ -239,11 +225,11 @@ public class NpmAdvisoryMapper {
         .orElse(null);
   }
 
-  private static @Nullable KnownVulnerabilityRow newestScan(
-      final List<KnownVulnerabilityRow> group) {
+  private static @Nullable NpmVulnerabilityFinding newestScan(
+      final List<NpmVulnerabilityFinding> group) {
     return group.stream()
-        .filter(row -> row.getCompletedAt() != null)
-        .max(Comparator.comparing(KnownVulnerabilityRow::getCompletedAt))
+        .filter(row -> row.completedAt() != null)
+        .max(Comparator.comparing(NpmVulnerabilityFinding::completedAt))
         .orElse(null);
   }
 }

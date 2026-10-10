@@ -13,25 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.protocols.npm.shared.audit.services;
+package io.repsy.protocols.npm.shared.audit;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import io.repsy.os.server.protocols.npm.shared.audit.services.NpmAdvisoryMapper.Key;
-import io.repsy.os.server.security.scan.dtos.FixStatus;
-import io.repsy.os.server.security.scan.dtos.KnownVulnerabilityRow;
-import io.repsy.os.server.security.scan.dtos.Severity;
-import io.repsy.protocols.npm.shared.audit.NpmAdvisory;
-import io.repsy.protocols.npm.shared.audit.NpmSeverity;
+import io.repsy.protocols.npm.shared.audit.NpmAdvisoryMapper.Key;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 
 @DisplayName("NpmAdvisoryMapper")
 class NpmAdvisoryMapperTest {
@@ -39,86 +31,11 @@ class NpmAdvisoryMapperTest {
   private static final Instant T1 = Instant.parse("2026-09-24T10:00:00Z");
   private static final Instant T2 = Instant.parse("2026-09-25T10:00:00Z");
 
-  private record Row(
-      String cveId,
-      Severity severity,
-      String packageName,
-      String packageVersion,
-      String fixedVersion,
-      String description,
-      String referenceUrl,
-      Double cvssScore,
-      String cvssVector,
-      Instant completedAt,
-      String scannerName)
-      implements KnownVulnerabilityRow {
-
-    @Override
-    public String getCveId() {
-      return this.cveId;
-    }
-
-    @Override
-    public Severity getSeverity() {
-      return this.severity;
-    }
-
-    @Override
-    public String getPackageName() {
-      return this.packageName;
-    }
-
-    @Override
-    public String getPackageVersion() {
-      return this.packageVersion;
-    }
-
-    @Override
-    public String getFixedVersion() {
-      return this.fixedVersion;
-    }
-
-    @Override
-    public String getDescription() {
-      return this.description;
-    }
-
-    @Override
-    public String getReferenceUrl() {
-      return this.referenceUrl;
-    }
-
-    @Override
-    public FixStatus getFixStatus() {
-      return FixStatus.FIXED;
-    }
-
-    @Override
-    public Double getCvssScore() {
-      return this.cvssScore;
-    }
-
-    @Override
-    public String getCvssVector() {
-      return this.cvssVector;
-    }
-
-    @Override
-    public Instant getCompletedAt() {
-      return this.completedAt;
-    }
-
-    @Override
-    public String getScannerName() {
-      return this.scannerName;
-    }
-  }
-
-  private static Row row(
+  private static NpmVulnerabilityFinding row(
       final String cve, final String name, final String version, final String fixed) {
-    return new Row(
+    return new NpmVulnerabilityFinding(
         cve,
-        Severity.HIGH,
+        NpmSeverity.HIGH,
         name,
         version,
         fixed,
@@ -131,31 +48,19 @@ class NpmAdvisoryMapperTest {
   }
 
   private static List<NpmAdvisory> map(
-      final List<KnownVulnerabilityRow> rows, final String name, final String... versions) {
+      final List<NpmVulnerabilityFinding> rows, final String name, final String... versions) {
     return NpmAdvisoryMapper.toAdvisories(rows, Map.of(name, Set.of(versions)));
-  }
-
-  @ParameterizedTest
-  @CsvSource({"CRITICAL, CRITICAL", "HIGH, HIGH", "MEDIUM, MODERATE", "LOW, LOW", "UNKNOWN, LOW"})
-  @DisplayName("maps Trivy severities to npm severities, and an unknown one to low, never info")
-  void severities(final Severity trivy, final NpmSeverity npm) {
-    assertThat(NpmAdvisoryMapper.toNpmSeverity(trivy)).isEqualTo(npm);
-  }
-
-  @Test
-  @DisplayName("refuses a missing severity")
-  void missingSeverity() {
-    assertThatThrownBy(() -> NpmAdvisoryMapper.toNpmSeverity(null))
-        .isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test
   @DisplayName("takes the worst severity of the findings of one vulnerability")
   void worstSeverity() {
     final var low =
-        new Row("CVE-1", Severity.LOW, "a", "1.0.0", null, null, null, null, null, T1, null);
+        new NpmVulnerabilityFinding(
+            "CVE-1", NpmSeverity.LOW, "a", "1.0.0", null, null, null, null, null, T1, null);
     final var medium =
-        new Row("CVE-1", Severity.MEDIUM, "a", "1.1.0", null, null, null, null, null, T1, null);
+        new NpmVulnerabilityFinding(
+            "CVE-1", NpmSeverity.MODERATE, "a", "1.1.0", null, null, null, null, null, T1, null);
 
     assertThat(map(List.of(low, medium), "a", "1.0.0", "1.1.0").getFirst().severity())
         .isEqualTo(NpmSeverity.MODERATE);
@@ -190,7 +95,7 @@ class NpmAdvisoryMapperTest {
   @DisplayName("lists the requested vulnerable versions, oldest first, without duplicates")
   void vulnerableVersionsAreTheRequestedOnes() {
     final var rows =
-        List.<KnownVulnerabilityRow>of(
+        List.<NpmVulnerabilityFinding>of(
             row("CVE-1", "a", "1.10.0", null),
             row("CVE-1", "a", "1.2.0", null),
             row("CVE-1", "a", "1.2.0", null),
@@ -205,10 +110,10 @@ class NpmAdvisoryMapperTest {
   @DisplayName("computes everything from the requested versions: 2.0.0 alone is patched in 2.0.3")
   void restrictsToTheRequestedVersionsBeforeComputing() {
     final var rows =
-        List.<KnownVulnerabilityRow>of(
-            new Row(
+        List.<NpmVulnerabilityFinding>of(
+            new NpmVulnerabilityFinding(
                 "CVE-9",
-                Severity.CRITICAL,
+                NpmSeverity.CRITICAL,
                 "a",
                 "1.0.0",
                 "1.0.5",
@@ -218,8 +123,8 @@ class NpmAdvisoryMapperTest {
                 "v1",
                 T1,
                 "s1"),
-            new Row(
-                "CVE-9", Severity.LOW, "a", "2.0.0", "2.0.3", "two", null, 3.0, "v2", T2, "s2"));
+            new NpmVulnerabilityFinding(
+                "CVE-9", NpmSeverity.LOW, "a", "2.0.0", "2.0.3", "two", null, 3.0, "v2", T2, "s2"));
 
     final var only2 = map(rows, "a", "2.0.0");
     final var only1 = map(rows, "a", "1.0.0");
@@ -243,7 +148,7 @@ class NpmAdvisoryMapperTest {
   @DisplayName(
       "leaves out a vulnerability when none of the requested versions is among its versions")
   void requestedVersionMustBeVulnerable() {
-    final var rows = List.<KnownVulnerabilityRow>of(row("CVE-1", "a", "1.0.0", null));
+    final var rows = List.<NpmVulnerabilityFinding>of(row("CVE-1", "a", "1.0.0", null));
 
     assertThat(map(rows, "a", "2.0.0")).isEmpty();
     assertThat(map(rows, "other", "1.0.0")).isEmpty();
@@ -260,7 +165,7 @@ class NpmAdvisoryMapperTest {
   @DisplayName("makes one advisory for each vulnerability and package")
   void oneAdvisoryPerVulnerabilityAndPackage() {
     final var rows =
-        List.<KnownVulnerabilityRow>of(
+        List.<NpmVulnerabilityFinding>of(
             row("CVE-1", "a", "1.0.0", null),
             row("CVE-2", "a", "1.0.0", null),
             row("CVE-1", "b", "1.0.0", null));
@@ -316,7 +221,8 @@ class NpmAdvisoryMapperTest {
   @DisplayName("takes a blank reference as none")
   void blankReference() {
     final var blank =
-        new Row("CVE-1", Severity.LOW, "a", "1.0.0", null, "d", " ", null, null, T1, null);
+        new NpmVulnerabilityFinding(
+            "CVE-1", NpmSeverity.LOW, "a", "1.0.0", null, "d", " ", null, null, T1, null);
 
     final var advisory = map(List.of(blank), "a", "1.0.0").getFirst();
 
@@ -341,7 +247,7 @@ class NpmAdvisoryMapperTest {
   @DisplayName("names a CVE in cves and a GitHub advisory in its own field")
   void identifiers() {
     final var rows =
-        List.<KnownVulnerabilityRow>of(
+        List.<NpmVulnerabilityFinding>of(
             row("CVE-1", "a", "1.0.0", null), row("GHSA-x", "a", "1.0.0", null));
 
     final var advisories = map(rows, "a", "1.0.0");
@@ -356,11 +262,31 @@ class NpmAdvisoryMapperTest {
   @DisplayName("takes the CVSS of the finding with the highest score and the newest scan's facts")
   void cvssAndScan() {
     final var lowScore =
-        new Row(
-            "CVE-1", Severity.HIGH, "a", "1.0.0", null, null, null, 4.0, "low", T1, "old-scanner");
+        new NpmVulnerabilityFinding(
+            "CVE-1",
+            NpmSeverity.HIGH,
+            "a",
+            "1.0.0",
+            null,
+            null,
+            null,
+            4.0,
+            "low",
+            T1,
+            "old-scanner");
     final var highScore =
-        new Row(
-            "CVE-1", Severity.HIGH, "a", "1.1.0", null, null, null, 9.8, "high", T2, "new-scanner");
+        new NpmVulnerabilityFinding(
+            "CVE-1",
+            NpmSeverity.HIGH,
+            "a",
+            "1.1.0",
+            null,
+            null,
+            null,
+            9.8,
+            "high",
+            T2,
+            "new-scanner");
 
     final var advisory = map(List.of(lowScore, highScore), "a", "1.0.0", "1.1.0").getFirst();
 
@@ -374,7 +300,8 @@ class NpmAdvisoryMapperTest {
   @DisplayName("has no CVSS and an epoch time when the scan says nothing")
   void nothingKnown() {
     final var bare =
-        new Row("CVE-1", Severity.LOW, "a", "1.0.0", null, null, null, null, null, null, null);
+        new NpmVulnerabilityFinding(
+            "CVE-1", NpmSeverity.LOW, "a", "1.0.0", null, null, null, null, null, null, null);
 
     final var advisory = map(List.of(bare), "a", "1.0.0").getFirst();
 

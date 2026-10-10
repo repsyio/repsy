@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.shared.error_handling.dtos;
+package io.repsy.protocols.oci.dtos;
 
 import java.util.List;
 import org.jspecify.annotations.NullMarked;

@@ -13,14 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.shared.error_handling.utils;
+package io.repsy.protocols.oci.utils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 import io.repsy.core.response.dtos.ResponseType;
 import io.repsy.core.response.dtos.RestResponse;
 import io.repsy.core.response.services.RestResponseFactory;
-import io.repsy.os.shared.error_handling.dtos.OciErrorCode;
+import io.repsy.protocols.oci.dtos.OciErrorCode;
+import java.util.Locale;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -28,7 +29,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.springframework.context.support.ResourceBundleMessageSource;
+import org.springframework.context.support.StaticMessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -48,8 +49,9 @@ class OciErrorsTest {
   }
 
   private static RestResponseFactory factory() {
-    final var messageSource = new ResourceBundleMessageSource();
-    messageSource.setBasename("messages");
+    final var messageSource = new StaticMessageSource();
+    messageSource.addMessage("manifestNotFound", Locale.ROOT, "Manifest not found.");
+    messageSource.addMessage("manifestNotFound", Locale.ENGLISH, "Manifest not found.");
     return new RestResponseFactory(messageSource);
   }
 
