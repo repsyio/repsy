@@ -37,12 +37,10 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Service("nugetApiFacade")
-@Transactional
 @RequiredArgsConstructor
 @NullMarked
 public class NuGetApiFacade implements ProtocolApiFacade {
@@ -57,7 +55,6 @@ public class NuGetApiFacade implements ProtocolApiFacade {
   }
 
   @Override
-  @Transactional(propagation = Propagation.NOT_SUPPORTED)
   public void deleteRepo(final RepoInfo repoInfo) {
     this.nugetStorageService.deleteRepo(repoInfo.getId());
   }
