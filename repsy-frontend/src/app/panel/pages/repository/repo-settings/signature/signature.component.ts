@@ -26,6 +26,8 @@ import {
   KeyStoreForm,
   KeyStoreItem,
   MavenKeyStoresApi,
+  PgpPublicKeyForm,
+  PgpPublicKeyItem,
   RepoPermissionInfo,
   ReposApi,
   RepoSettingsForm,
@@ -35,8 +37,6 @@ import { SelectorComponent } from '../../../../shared/components/selector/select
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { ToggleComponent } from '../../../../shared/components/toggle/toggle.component';
 import { saveRepoSetting } from '../save-repo-setting';
-import { CreateMavenPgpPublicKeyRequest } from './dto/pgp-public-key-form';
-import { PgpPublicKeyItem } from './dto/pgp-public-key-item';
 
 @Component({
   selector: 'app-signature',
@@ -231,7 +231,7 @@ export class SignatureComponent implements OnInit {
 
     this.isSubmitting = true;
 
-    const request: CreateMavenPgpPublicKeyRequest = { armoredKey: trimmed };
+    const request: PgpPublicKeyForm = { armoredKey: trimmed };
 
     this.mavenKeyStoresApi
       .createMavenPgpPublicKey(this.activeRepository.repoName, request)

@@ -18,12 +18,17 @@ import { RouterTestingModule } from '@angular/router/testing';
 import { of, Subject, throwError } from 'rxjs';
 
 import { environment } from '../../../../../../environments/environment';
-import { AllowedKeyserverItem, KeyStoreItem, MavenKeyStoresApi, ReposApi } from '../../../../../../generated/api';
+import {
+  AllowedKeyserverItem,
+  KeyStoreItem,
+  MavenKeyStoresApi,
+  PgpPublicKeyItem,
+  ReposApi,
+} from '../../../../../../generated/api';
 import { DangerModalService } from '../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../shared/components/toast/toast.service';
 import { permission } from '../../testing/protocol-service-spec-helpers';
 import { releaseAwareParentForm } from '../testing/repo-settings-spec-helpers';
-import { PgpPublicKeyItem } from './dto/pgp-public-key-item';
 import { SignatureComponent } from './signature.component';
 
 const REPO = 'maven-repo';

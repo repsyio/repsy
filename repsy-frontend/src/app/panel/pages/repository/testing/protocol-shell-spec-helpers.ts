@@ -26,8 +26,9 @@ import { BehaviorSubject, Observable, of, throwError } from 'rxjs';
 
 import { RepoPermissionInfo } from '../../../../../generated/api';
 import { AuthService } from '../../../../auth/pages/service/auth.service';
+import { RepoRouteSlug } from '../../../shared/util/repo-api-type';
 import { RepositoryBreadcrumbComponent } from '../breadcrumb/repository-breadcrumb.component';
-import { RepoContext, RepoLookupService, RepoType } from '../repo-entry/repo-lookup.service';
+import { RepoContext, RepoLookupService } from '../repo-entry/repo-lookup.service';
 import { permission } from './protocol-service-spec-helpers';
 
 @Component({ selector: 'app-repository-breadcrumb', standalone: true, template: '' })
@@ -36,7 +37,7 @@ class BreadcrumbStubComponent {}
 export interface ProtocolShellSpec<S> {
   /** The shell component class. */
   component: Type<unknown>;
-  repoType: RepoType;
+  repoType: RepoRouteSlug;
   /** The protocol service class the shell loads the permissions through. */
   service: Type<S>;
   /** The service method that requests the permissions (`selectRepository` on NuGet and PyPI). */

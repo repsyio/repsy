@@ -17,7 +17,8 @@ import { DefaultUrlSerializer, NavigationEnd, Router } from '@angular/router';
 import { Subject } from 'rxjs';
 
 import { BreadcrumbSecurityLinkService } from '../../../shared/service/breadcrumb-security-link.service';
-import { RepoContext, RepoLookupService, RepoType } from '../repo-entry/repo-lookup.service';
+import { RepoRouteSlug } from '../../../shared/util/repo-api-type';
+import { RepoContext, RepoLookupService } from '../repo-entry/repo-lookup.service';
 import { RepositoryBreadcrumbComponent } from './repository-breadcrumb.component';
 
 describe('RepositoryBreadcrumbComponent', () => {
@@ -51,7 +52,7 @@ describe('RepositoryBreadcrumbComponent', () => {
   afterEach(() => component.ngOnDestroy());
 
   /** Puts the app on `url`, inside a repository of `repoType` named `repoName`, and renders the breadcrumb. */
-  function visit(url: string, repoType: RepoType = 'maven', repoName = 'acme-repo'): void {
+  function visit(url: string, repoType: RepoRouteSlug = 'maven', repoName = 'acme-repo'): void {
     currentRepo = { repoName, repoType };
     currentUrl = url;
     component.ngOnInit();
@@ -137,7 +138,7 @@ describe('RepositoryBreadcrumbComponent', () => {
   });
 
   describe('the icon', () => {
-    const icons: [RepoType, string][] = [
+    const icons: [RepoRouteSlug, string][] = [
       ['maven', 'assets/icons/repo/maven.svg'],
       ['npm', 'assets/icons/repo/npm.svg'],
       ['pypi', 'assets/icons/repo/pypi.svg'],
@@ -158,7 +159,7 @@ describe('RepositoryBreadcrumbComponent', () => {
     }
 
     it('is empty for an unknown repository type', () => {
-      visit('/acme-repo', 'unknown' as RepoType);
+      visit('/acme-repo', 'unknown' as RepoRouteSlug);
 
       expect(component.repoIcon).toBe('');
     });

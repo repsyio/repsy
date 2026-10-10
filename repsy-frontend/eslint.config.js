@@ -61,6 +61,15 @@ export default tseslint.config(
           "MethodDefinition[key.name=/[Gg]olang/]",
           "PropertyDefinition[key.name=/[Gg]olang/]",
         ].map((selector) => ({ selector, message: "Write Golang as Go (RPS-2124)." })),
+        // RPS-2127: a data type is a role (`Info`, `Item`, `Form`, `Payload`), never `Dto` or `Model`.
+        ...[
+          "ClassDeclaration[id.name=/(Dto|DTO|Model)$/]",
+          "TSInterfaceDeclaration[id.name=/(Dto|DTO|Model)$/]",
+          "TSTypeAliasDeclaration[id.name=/(Dto|DTO|Model)$/]",
+        ].map((selector) => ({
+          selector,
+          message: "Name a data type by its role (Info, Item, Form, Payload), not Dto or Model (RPS-2127).",
+        })),
       ],
       "check-file/filename-naming-convention": [
         "warn",

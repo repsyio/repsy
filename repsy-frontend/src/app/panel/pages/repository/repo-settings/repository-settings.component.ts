@@ -25,7 +25,6 @@ import { RepoPermissionInfo, ReposApi, RepoSettingsInfo } from '../../../../../g
 import { SpinnerComponent } from '../../../../shared/components/spinner/spinner.component';
 import { ToastService } from '../../../shared/components/toast/toast.service';
 import { RepoType } from '../../../shared/dto/repo/repo-type';
-import { MavenRepoSettingsForm } from '../maven/dto/maven-repo-settings-form';
 import { RepoLookupService } from '../repo-entry/repo-lookup.service';
 import { CleanupPolicyComponent } from './cleanup-policy/cleanup-policy.component';
 import { DeleteOrphanLayersComponent } from './delete-orphan-layers/delete-orphan-layers.component';
@@ -69,7 +68,7 @@ export class RepositorySettingsComponent implements OnInit, OnDestroy {
   public repoType: string;
   public activeRepository: RepoPermissionInfo;
   public repositorySettings: RepoSettingsInfo;
-  public mavenRepositorySettings: MavenRepoSettingsForm;
+  public mavenRepositorySettings: RepoSettingsInfo;
 
   private repoContext$: Subscription;
 
@@ -142,7 +141,7 @@ export class RepositorySettingsComponent implements OnInit, OnDestroy {
               ...this.repositorySettings,
             });
           } else if (this.repoType === RepoType.MAVEN) {
-            this.mavenRepositorySettings = res as MavenRepoSettingsForm;
+            this.mavenRepositorySettings = res;
             this.mavenSettingsForm.patchValue({
               privateRepository: this.mavenRepositorySettings.privateRepo,
               ...this.mavenRepositorySettings,

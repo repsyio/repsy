@@ -18,6 +18,7 @@ import { TestBed } from '@angular/core/testing';
 import { CanMatchFn, DefaultUrlSerializer, Route, Router, Routes, UrlTree } from '@angular/router';
 import { firstValueFrom, isObservable, Observable, of, throwError } from 'rxjs';
 
+import { RepoRouteSlug } from '../../../shared/util/repo-api-type';
 import { CargoComponent } from '../cargo/cargo.component';
 import { CARGO_ROUTES } from '../cargo/cargo.routes';
 import { DockerComponent } from '../docker/docker.component';
@@ -36,11 +37,11 @@ import { PypiComponent } from '../pypi/pypi.component';
 import { PYPI_ROUTES } from '../pypi/pypi.routes';
 import { RubyComponent } from '../ruby/ruby.component';
 import { RUBY_ROUTES } from '../ruby/ruby.routes';
-import { RepoLookupService, RepoType } from './repo-lookup.service';
+import { RepoLookupService } from './repo-lookup.service';
 import { REPOSITORY_DYNAMIC_ROUTES } from './repository-dynamic.routes';
 
 /** The nine entries in the order they must be declared, with the route set each one lazy-loads. */
-const ENTRIES: { type: RepoType; routes: Routes; component: Type<unknown> }[] = [
+const ENTRIES: { type: RepoRouteSlug; routes: Routes; component: Type<unknown> }[] = [
   { type: 'maven', routes: MAVEN_ROUTES, component: MavenComponent },
   { type: 'npm', routes: NPM_ROUTES, component: NpmComponent },
   { type: 'pypi', routes: PYPI_ROUTES, component: PypiComponent },

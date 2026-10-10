@@ -18,9 +18,9 @@ import { inject } from '@angular/core';
 import { RedirectCommand, ResolveFn, Router } from '@angular/router';
 import { catchError, map, of } from 'rxjs';
 
-import { RepoContext, RepoLookupService, RepoType } from './repo-lookup.service';
+import { RepoContext, RepoLookupService } from './repo-lookup.service';
 
-export type { RepoContext, RepoType };
+export type { RepoContext };
 export type RepoRouteData = RepoContext;
 
 /**
