@@ -34,6 +34,7 @@ import io.repsy.os.server.security.scan.entities.VulnerabilityFinding;
 import io.repsy.os.server.security.scan.entities.VulnerabilityScan;
 import io.repsy.os.server.security.scan.repositories.VulnerabilityFindingRepository;
 import io.repsy.os.server.security.scan.repositories.VulnerabilityScanRepository;
+import io.repsy.os.server.security.scan.utils.LatestScanMarkerUtils;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -253,6 +254,7 @@ class NpmAuditProtocolIT extends AbstractIntegrationTest {
         .setParameter("createdAt", createdAt)
         .setParameter("id", saved.getId())
         .executeUpdate();
+    LatestScanMarkerUtils.refreshRepoOf(this.jdbcTemplate, saved.getId());
 
     return saved;
   }
@@ -285,6 +287,7 @@ class NpmAuditProtocolIT extends AbstractIntegrationTest {
     finding.setCvssScore(7.2);
     finding.setCvssVector("CVSS:3.1/AV:N/AC:L/PR:H/UI:N/S:U/C:H/I:H/A:H");
     this.findingRepository.saveAndFlush(finding);
+    LatestScanMarkerUtils.refreshRepoOf(this.jdbcTemplate, scan.getId());
   }
 
   private void seedLodash(final Repo repo) {
