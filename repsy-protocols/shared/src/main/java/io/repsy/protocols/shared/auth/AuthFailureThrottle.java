@@ -179,16 +179,20 @@ public class AuthFailureThrottle {
               + " failed password checks; letting it through",
           client,
           this.maxFailures);
-      final var registry = this.meterRegistry.get();
-
-      if (registry != null) {
-        registry.counter(WOULD_BLOCK_METRIC, "network", client).increment();
-      }
-
+      this.countWouldBlock(client);
       return;
     }
 
     throw new TooManyRequestsException(this.secondsLeft(window, now));
+  }
+
+  private void countWouldBlock(final @NonNull String client) {
+
+    final var registry = this.meterRegistry.get();
+
+    if (registry != null) {
+      registry.counter(WOULD_BLOCK_METRIC, "network", client).increment();
+    }
   }
 
   /** Counts one failed BCrypt check for the client of the current request. */
