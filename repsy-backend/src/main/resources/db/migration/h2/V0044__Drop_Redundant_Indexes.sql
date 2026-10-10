@@ -1,0 +1,4 @@
+-- RPS-2121: nothing to do on H2. The single-column indexes the PostgreSQL V0044 drops are the ones
+-- H2 bound the foreign keys of V0001 to ("Index ... belongs to constraint"), so they cannot be
+-- dropped without dropping the constraint, and an embedded single-node database does not feel the
+-- extra index write. The file exists so both dialects share one version history.
