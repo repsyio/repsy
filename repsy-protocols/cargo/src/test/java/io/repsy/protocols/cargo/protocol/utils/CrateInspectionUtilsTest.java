@@ -114,7 +114,8 @@ class CrateInspectionUtilsTest {
   @DisplayName("inspectCrate() refuses a Cargo.toml larger than the size limit, naming the limit")
   void refusesOversizedCargoToml() throws IOException {
     final var files = new LinkedHashMap<String, String>();
-    files.put("demo-1.0.0/Cargo.toml", cargoTomlOfSize(CrateInspectionUtils.MAX_CARGO_TOML_BYTES + 1));
+    files.put(
+        "demo-1.0.0/Cargo.toml", cargoTomlOfSize(CrateInspectionUtils.MAX_CARGO_TOML_BYTES + 1));
 
     final var crate = crate(files);
 
@@ -128,7 +129,9 @@ class CrateInspectionUtilsTest {
   void refusesOversizedNestedCargoToml() throws IOException {
     final var files = new LinkedHashMap<String, String>();
     files.put("demo-1.0.0/Cargo.toml", "[package]\nname = \"demo\"\n");
-    files.put("demo-1.0.0/sub/Cargo.toml", cargoTomlOfSize(CrateInspectionUtils.MAX_CARGO_TOML_BYTES + 1));
+    files.put(
+        "demo-1.0.0/sub/Cargo.toml",
+        cargoTomlOfSize(CrateInspectionUtils.MAX_CARGO_TOML_BYTES + 1));
 
     final var crate = crate(files);
 
@@ -140,7 +143,8 @@ class CrateInspectionUtilsTest {
   void skipsOversizedEntryThatIsNotCargoToml() throws IOException {
     final var files = new LinkedHashMap<String, String>();
     files.put("demo-1.0.0/Cargo.toml", "[package]\nname = \"demo\"\n");
-    files.put("demo-1.0.0/README.md", "#".repeat((int) CrateInspectionUtils.MAX_CARGO_TOML_BYTES + 1));
+    files.put(
+        "demo-1.0.0/README.md", "#".repeat((int) CrateInspectionUtils.MAX_CARGO_TOML_BYTES + 1));
 
     assertThat(hasLib(crate(files))).isFalse();
   }
