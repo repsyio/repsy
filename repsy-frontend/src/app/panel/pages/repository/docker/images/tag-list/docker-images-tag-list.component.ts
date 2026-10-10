@@ -47,7 +47,7 @@ import { TagListItem } from '../../dto/tag-list-item';
 import { DockerService } from '../../service/docker.service';
 
 @Component({
-  selector: 'app-docker-tag-list',
+  selector: 'app-docker-images-tag-list',
   standalone: true,
   imports: [
     CommonModule,

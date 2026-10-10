@@ -15,7 +15,7 @@
 ///
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { ProfileAvatarComponent } from './profile.avatar.component';
+import { ProfileAvatarComponent } from './profile-avatar.component';
 
 // RPS-1402: the avatar used to load a Gravatar image (sending the email hash to a third party).
 describe('ProfileAvatarComponent', () => {

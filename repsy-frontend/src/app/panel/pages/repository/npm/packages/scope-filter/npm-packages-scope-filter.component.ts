@@ -60,7 +60,7 @@ import { NpmService } from '../../service/npm.service';
     NgOptimizedImage,
     SpinnerComponent,
   ],
-  templateUrl: './npm-packages-scoped-list.component.html',
+  templateUrl: './npm-packages-scope-filter.component.html',
 })
 export class NpmPackagesScopeFilterComponent implements OnDestroy {
   public loading = true;

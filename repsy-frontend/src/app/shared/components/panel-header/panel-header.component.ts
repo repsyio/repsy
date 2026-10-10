@@ -19,7 +19,7 @@ import { Component, ElementRef, EventEmitter, HostListener, Input, Output, viewC
 import { Router, RouterLink } from '@angular/router';
 
 import { AuthService } from '../../../auth/pages/service/auth.service';
-import { ProfileAvatarComponent } from '../../../panel/shared/components/avatar/profile.avatar.component';
+import { ProfileAvatarComponent } from '../../../panel/shared/components/avatar/profile-avatar.component';
 import { DividerComponent } from '../divider/divider.component';
 
 @Component({

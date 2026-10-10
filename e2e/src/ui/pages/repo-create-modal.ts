@@ -24,7 +24,7 @@ export type NameValidator = 'required' | 'maxlength' | 'pattern';
 
 /**
  * The create-repository modal, shared by the dashboard ("Create Repository") and the repository
- * list ("Create"): both open the same `<app-repository-modal>`, so one page object serves both.
+ * list ("Create"): both open the same `<app-repository-create-modal>`, so one page object serves both.
  * It is not a page of its own, so `goto()` is not supported; open it through the page that hosts it
  * (`RepositoriesPage.openCreateModal()`).
  */

@@ -41,7 +41,7 @@ import { getRepoDomain } from '../../docker-repo-util';
 import { DockerService } from '../../service/docker.service';
 
 @Component({
-  selector: 'app-docker-manifest-list',
+  selector: 'app-docker-images-manifest-list',
   standalone: true,
   imports: [
     CommonModule,

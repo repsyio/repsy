@@ -89,7 +89,7 @@ export default tseslint.config(
         },
       ],
       "check-file/filename-naming-convention": [
-        "warn",
+        "error",
         { "**/*.ts": "KEBAB_CASE" },
         { ignoreMiddleExtensions: true },
       ],

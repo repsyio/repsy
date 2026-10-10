@@ -20,7 +20,7 @@ import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { BehaviorSubject } from 'rxjs';
 
-import { SplashService } from '../../../shared/components/splash-screen/splasht.service';
+import { SplashService } from '../../../shared/components/splash/splash.service';
 import { AuthService } from '../../pages/service/auth.service';
 import { AuthRedirectComponent } from './auth-redirect.component';
 

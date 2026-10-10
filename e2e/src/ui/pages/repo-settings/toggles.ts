@@ -22,7 +22,7 @@
  */
 import { expect, type Locator, type Page } from '@playwright/test';
 
-/** A section built around one `app-toggle-component` and a hint text. */
+/** A section built around one `app-toggle` and a hint text. */
 abstract class ToggleSection {
   readonly root: Locator;
   readonly toggle: Locator;

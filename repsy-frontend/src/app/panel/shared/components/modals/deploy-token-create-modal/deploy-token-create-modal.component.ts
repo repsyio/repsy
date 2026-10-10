@@ -34,7 +34,7 @@ import { RadioGroupComponent, RadioOption } from '../../radio-group/radio-group.
 import { ToastService } from '../../toast/toast.service';
 
 @Component({
-  selector: 'app-deploy-token-modal',
+  selector: 'app-deploy-token-create-modal',
   imports: [DialogDirective, ReactiveFormsModule, RadioGroupComponent],
   standalone: true,
   templateUrl: './deploy-token-create-modal.component.html',
