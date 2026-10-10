@@ -15,7 +15,7 @@
  */
 package io.repsy.os.server.protocols.pypi.shared.python_package.dtos;
 
-public interface ReleaseProjectURLInfo {
+public interface ReleaseProjectUrlInfo {
   String getLabel();
 
   String getUrl();

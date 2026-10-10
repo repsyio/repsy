@@ -18,7 +18,7 @@ package io.repsy.os.server.protocols.pypi.shared.python_package.mappers;
 import io.repsy.os.generated.model.ReleaseDetail;
 import io.repsy.os.server.protocols.pypi.shared.python_package.dtos.ReleaseClassifierInfo;
 import io.repsy.os.server.protocols.pypi.shared.python_package.dtos.ReleaseListItem;
-import io.repsy.os.server.protocols.pypi.shared.python_package.dtos.ReleaseProjectURLInfo;
+import io.repsy.os.server.protocols.pypi.shared.python_package.dtos.ReleaseProjectUrlInfo;
 import io.repsy.os.server.protocols.pypi.shared.python_package.entities.Release;
 import io.repsy.protocols.pypi.shared.python_package.dtos.PypiPackageListItem;
 import java.time.Instant;
@@ -46,13 +46,13 @@ public interface PypiPackageMapper {
   io.repsy.os.generated.model.ReleaseClassifierInfo toReleaseClassifierInfoDto(
       ReleaseClassifierInfo source);
 
-  io.repsy.os.generated.model.ReleaseProjectURLInfo toReleaseProjectURLInfoDto(
-      ReleaseProjectURLInfo source);
+  io.repsy.os.generated.model.ReleaseProjectUrlInfo toReleaseProjectUrlInfoDto(
+      ReleaseProjectUrlInfo source);
 
   default ReleaseDetail toReleaseDetail(
       final Release release,
       final List<ReleaseClassifierInfo> classifiers,
-      final List<ReleaseProjectURLInfo> projectURLs) {
+      final List<ReleaseProjectUrlInfo> projectUrls) {
     return ReleaseDetail.builder()
         .id(release.getId())
         .version(release.getVersion())
@@ -70,7 +70,7 @@ public interface PypiPackageMapper {
         .descriptionContentType(release.getDescriptionContentType())
         .createdAt(release.getCreatedAt())
         .classifiers(this.mapList(classifiers, this::toReleaseClassifierInfoDto))
-        .projectUrls(this.mapList(projectURLs, this::toReleaseProjectURLInfoDto))
+        .projectUrls(this.mapList(projectUrls, this::toReleaseProjectUrlInfoDto))
         .build();
   }
 

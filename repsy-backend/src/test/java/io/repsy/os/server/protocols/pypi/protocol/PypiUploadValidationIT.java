@@ -23,7 +23,7 @@ import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.os.AbstractIT;
-import io.repsy.os.generated.model.ReleaseProjectURLInfo;
+import io.repsy.os.generated.model.ReleaseProjectUrlInfo;
 import io.repsy.os.server.core.UrlParserProperties;
 import io.repsy.os.server.protocols.pypi.protocol.facades.PypiProtocolFacade;
 import io.repsy.os.server.protocols.pypi.ui.facades.PypiApiFacade;
@@ -336,7 +336,7 @@ class PypiUploadValidationIT extends AbstractIT {
             "Programming Language :: Python :: 3", "License :: OSI Approved :: MIT License");
 
     assertThat(release.getProjectUrls())
-        .extracting(ReleaseProjectURLInfo::getLabel)
+        .extracting(ReleaseProjectUrlInfo::getLabel)
         .containsExactly("Homepage");
   }
 }

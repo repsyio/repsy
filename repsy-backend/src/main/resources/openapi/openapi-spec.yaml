@@ -7797,8 +7797,8 @@ components:
         projectUrls:
           type: array
           items:
-            "$ref": "#/components/schemas/ReleaseProjectURLInfo"
-    ReleaseProjectURLInfo:
+            "$ref": "#/components/schemas/ReleaseProjectUrlInfo"
+    ReleaseProjectUrlInfo:
       type: object
       properties:
         label:

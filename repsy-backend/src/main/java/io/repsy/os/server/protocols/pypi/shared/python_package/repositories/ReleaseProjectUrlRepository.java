@@ -15,7 +15,7 @@
  */
 package io.repsy.os.server.protocols.pypi.shared.python_package.repositories;
 
-import io.repsy.os.server.protocols.pypi.shared.python_package.dtos.ReleaseProjectURLInfo;
+import io.repsy.os.server.protocols.pypi.shared.python_package.dtos.ReleaseProjectUrlInfo;
 import io.repsy.os.server.protocols.pypi.shared.python_package.entities.ReleaseProjectUrl;
 import java.util.List;
 import java.util.UUID;
@@ -29,7 +29,7 @@ import org.springframework.stereotype.Repository;
 @NullMarked
 public interface ReleaseProjectUrlRepository extends JpaRepository<ReleaseProjectUrl, UUID> {
 
-  List<ReleaseProjectURLInfo> findAllByReleaseId(UUID releaseId);
+  List<ReleaseProjectUrlInfo> findAllByReleaseId(UUID releaseId);
 
   @Modifying
   @Query(
