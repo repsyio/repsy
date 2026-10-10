@@ -21,6 +21,7 @@ import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.libs.protocol.router.ProtocolProvider;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -36,6 +37,11 @@ import org.springframework.http.HttpMethod;
  *
  * <p>The handler registers itself from this constructor, before the subclass constructor body has
  * run; registration only reads the route, so nothing of the subclass is needed yet.
+ *
+ * <p>The methods and the path test are the route's alone. A downstream handler (for example a Repsy
+ * Cloud subclass that names its operation for a quota pre-processor, or asks for a configurable
+ * permission) adds or replaces properties through {@link #additionalProperties()} instead of
+ * overriding {@link #getProperties()}.
  */
 @NullMarked
 public abstract class AbstractRoutedProtocolMethodHandler implements ProtocolMethodHandler {
@@ -68,9 +74,32 @@ public abstract class AbstractRoutedProtocolMethodHandler implements ProtocolMet
     return this.route.methods();
   }
 
+  /**
+   * The route's properties with {@link #additionalProperties()} on top: a key both set takes the
+   * additional value. Without additional properties this is the route's own map, unchanged.
+   */
   @Override
   public final Map<String, Object> getProperties() {
-    return this.route.properties();
+    final var additional = this.additionalProperties();
+
+    if (additional.isEmpty()) {
+      return this.route.properties();
+    }
+
+    final var merged = new LinkedHashMap<>(this.route.properties());
+    merged.putAll(additional);
+
+    return Map.copyOf(merged);
+  }
+
+  /**
+   * Properties ({@link HandlerPropertyKeys}) a subclass adds to the route's, or replaces in it.
+   * Read on every {@link #getProperties()} call, never from the constructor, so it may use fields
+   * the subclass constructor set. It cannot remove a key or change the methods or the path. Empty
+   * unless overridden.
+   */
+  protected Map<String, Object> additionalProperties() {
+    return Map.of();
   }
 
   @Override
