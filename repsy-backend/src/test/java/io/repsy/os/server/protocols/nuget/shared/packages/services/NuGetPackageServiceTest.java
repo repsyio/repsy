@@ -28,7 +28,7 @@ import io.repsy.os.server.protocols.nuget.shared.packages.mappers.NuGetPackageMa
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageRepository;
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageVersionRepository;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetDependencyInfo;
-import io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils;
+import io.repsy.protocols.nuget.shared.utils.NuGetDependencyJsonUtils;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.List;
@@ -45,7 +45,7 @@ import org.mockito.Mockito;
  * dependencies to JSON, warn, and store the version with a {@code null} dependencies column anyway.
  * These tests force that serialization to fail (there is no realistic nuspec input that does, since
  * a dependency is a handful of plain strings, so the failure is injected through a mocked {@link
- * NuGetPackageUtils#toDependencyGroupsJson}) and assert the push now fails instead.
+ * NuGetDependencyJsonUtils#toDependencyGroupsJson}) and assert the push now fails instead.
  */
 @DisplayName("NuGetPackageService.publishVersion dependency serialization (RPS-1146)")
 class NuGetPackageServiceTest {
@@ -87,10 +87,10 @@ class NuGetPackageServiceTest {
     when(this.packageVersionRepository.findByNugetPackageIdAndVersion(pkg.getId(), "1.0.0"))
         .thenReturn(Optional.empty());
 
-    try (MockedStatic<NuGetPackageUtils> utils =
-        mockStatic(NuGetPackageUtils.class, Mockito.CALLS_REAL_METHODS)) {
+    try (MockedStatic<NuGetDependencyJsonUtils> utils =
+        mockStatic(NuGetDependencyJsonUtils.class, Mockito.CALLS_REAL_METHODS)) {
       utils
-          .when(() -> NuGetPackageUtils.toDependencyGroupsJson(any()))
+          .when(() -> NuGetDependencyJsonUtils.toDependencyGroupsJson(any()))
           .thenThrow(new IllegalStateException("mapper misconfigured"));
 
       assertThatThrownBy(
@@ -141,7 +141,7 @@ class NuGetPackageServiceTest {
             ArgumentMatchers.argThat(
                 v ->
                     v.getDependencies() != null
-                        && NuGetPackageUtils.parseDependenciesJson(
+                        && NuGetDependencyJsonUtils.parseDependenciesJson(
                                 v.getDependencies(), "Some.Package", "1.0.0")
                             .equals(List.of(new NuGetDependencyInfo("Serilog", "3.1.1", null)))));
   }

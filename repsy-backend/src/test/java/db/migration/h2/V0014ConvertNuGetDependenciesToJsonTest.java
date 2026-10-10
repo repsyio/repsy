@@ -19,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import io.repsy.core.web.configs.XmlMapperConfig;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetDependencyInfo;
-import io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils;
+import io.repsy.protocols.nuget.shared.utils.NuGetDependencyJsonUtils;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -67,22 +67,22 @@ class V0014ConvertNuGetDependenciesToJsonTest {
     insert(id, xml);
 
     assertThat(xml).startsWith("<ArrayList>");
-    assertThat(NuGetPackageUtils.parseDependenciesJson(xml, PACKAGE_ID, VERSION)).isEmpty();
+    assertThat(NuGetDependencyJsonUtils.parseDependenciesJson(xml, PACKAGE_ID, VERSION)).isEmpty();
 
     migrateTo("14");
 
     final var stored = dependenciesOf(id);
     assertThat(stored).startsWith("[");
-    assertThat(NuGetPackageUtils.parseDependenciesJson(stored, PACKAGE_ID, VERSION))
+    assertThat(NuGetDependencyJsonUtils.parseDependenciesJson(stored, PACKAGE_ID, VERSION))
         .isEqualTo(DEPENDENCIES);
-    assertThat(stored).isEqualTo(NuGetPackageUtils.toDependenciesJson(DEPENDENCIES));
+    assertThat(stored).isEqualTo(NuGetDependencyJsonUtils.toDependenciesJson(DEPENDENCIES));
   }
 
   @Test
   @DisplayName("leaves JSON, null and unreadable values alone")
   void leavesOtherValuesAlone() throws Exception {
 
-    final var json = NuGetPackageUtils.toDependenciesJson(DEPENDENCIES);
+    final var json = NuGetDependencyJsonUtils.toDependenciesJson(DEPENDENCIES);
     final var malformed = "<ArrayList><item><packageId>Broken</packageId>";
     final var jsonId = UUID.randomUUID();
     final var nullId = UUID.randomUUID();
@@ -113,9 +113,13 @@ class V0014ConvertNuGetDependenciesToJsonTest {
 
     migrateTo("14");
 
-    assertThat(NuGetPackageUtils.parseDependenciesJson(dependenciesOf(first), PACKAGE_ID, VERSION))
+    assertThat(
+            NuGetDependencyJsonUtils.parseDependenciesJson(
+                dependenciesOf(first), PACKAGE_ID, VERSION))
         .isEqualTo(DEPENDENCIES.subList(0, 1));
-    assertThat(NuGetPackageUtils.parseDependenciesJson(dependenciesOf(second), PACKAGE_ID, VERSION))
+    assertThat(
+            NuGetDependencyJsonUtils.parseDependenciesJson(
+                dependenciesOf(second), PACKAGE_ID, VERSION))
         .isEqualTo(DEPENDENCIES.subList(1, 3));
   }
 

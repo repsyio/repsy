@@ -17,7 +17,7 @@ package io.repsy.os.server.protocols.nuget.shared.utils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils;
+import io.repsy.protocols.nuget.shared.utils.NuspecUtils;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -32,8 +32,8 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-@DisplayName("NuGetPackageUtils nuspec metadata (RPS-945)")
-class NuGetPackageUtilsTest {
+@DisplayName("NuspecUtils nuspec metadata (RPS-945)")
+class NuspecUtilsMetadataTest {
 
   private static String nuspec(final String metadataXml) {
     return """
@@ -59,7 +59,7 @@ class NuGetPackageUtilsTest {
       final var xml =
           nuspec("<repository type=\"git\" url=\"https://github.com/repsyio/repsy\" />");
 
-      assertThat(NuGetPackageUtils.extractRepositoryUrl(xml))
+      assertThat(NuspecUtils.extractRepositoryUrl(xml))
           .isEqualTo("https://github.com/repsyio/repsy");
     }
 
@@ -71,8 +71,7 @@ class NuGetPackageUtilsTest {
               "<repository type=\"git\" url=\" https://example.test/r.git \" branch=\"main\""
                   + " commit=\"abc123\"></repository>");
 
-      assertThat(NuGetPackageUtils.extractRepositoryUrl(xml))
-          .isEqualTo("https://example.test/r.git");
+      assertThat(NuspecUtils.extractRepositoryUrl(xml)).isEqualTo("https://example.test/r.git");
     }
 
     @Test
@@ -80,8 +79,7 @@ class NuGetPackageUtilsTest {
     void plainTextForm() {
       final var xml = nuspec("<repository>https://example.test/plain.git</repository>");
 
-      assertThat(NuGetPackageUtils.extractRepositoryUrl(xml))
-          .isEqualTo("https://example.test/plain.git");
+      assertThat(NuspecUtils.extractRepositoryUrl(xml)).isEqualTo("https://example.test/plain.git");
     }
 
     @Test
@@ -89,21 +87,19 @@ class NuGetPackageUtilsTest {
     void attributeWinsOverText() {
       final var xml = nuspec("<repository url=\"https://example.test/attr\">ignored</repository>");
 
-      assertThat(NuGetPackageUtils.extractRepositoryUrl(xml))
-          .isEqualTo("https://example.test/attr");
+      assertThat(NuspecUtils.extractRepositoryUrl(xml)).isEqualTo("https://example.test/attr");
     }
 
     @Test
     @DisplayName("is null when the nuspec declares no repository")
     void absent() {
-      assertThat(NuGetPackageUtils.extractRepositoryUrl(nuspec(""))).isNull();
+      assertThat(NuspecUtils.extractRepositoryUrl(nuspec(""))).isNull();
     }
 
     @Test
     @DisplayName("is null for an empty repository element")
     void emptyElement() {
-      assertThat(NuGetPackageUtils.extractRepositoryUrl(nuspec("<repository type=\"git\" />")))
-          .isNull();
+      assertThat(NuspecUtils.extractRepositoryUrl(nuspec("<repository type=\"git\" />"))).isNull();
     }
 
     @Test
@@ -111,7 +107,7 @@ class NuGetPackageUtilsTest {
     void malformedXml() {
       final var xml = "<package><metadata><repository>https://example.test/x</repository>";
 
-      assertThat(NuGetPackageUtils.extractRepositoryUrl(xml)).isEqualTo("https://example.test/x");
+      assertThat(NuspecUtils.extractRepositoryUrl(xml)).isEqualTo("https://example.test/x");
     }
 
     @Test
@@ -119,7 +115,7 @@ class NuGetPackageUtilsTest {
     void overlongUrl() {
       final var xml = nuspec("<repository url=\"https://example.test/" + "a".repeat(500) + "\" />");
 
-      assertThat(NuGetPackageUtils.extractRepositoryUrl(xml)).isNull();
+      assertThat(NuspecUtils.extractRepositoryUrl(xml)).isNull();
     }
 
     @Test
@@ -128,7 +124,7 @@ class NuGetPackageUtilsTest {
       final var url = "https://example.test/" + "a".repeat(512 - 21);
       final var xml = nuspec("<repository url=\"" + url + "\" />");
 
-      assertThat(NuGetPackageUtils.extractRepositoryUrl(xml)).isEqualTo(url);
+      assertThat(NuspecUtils.extractRepositoryUrl(xml)).isEqualTo(url);
     }
 
     @Test
@@ -141,7 +137,7 @@ class NuGetPackageUtilsTest {
           <package><metadata><repository url="&xxe;" /></metadata></package>
           """;
 
-      assertThat(NuGetPackageUtils.extractRepositoryUrl(xml)).isNull();
+      assertThat(NuspecUtils.extractRepositoryUrl(xml)).isNull();
     }
   }
 
@@ -180,7 +176,7 @@ class NuGetPackageUtilsTest {
       final var xml = nuspec("<readme>docs/README.md</readme>");
       final var nupkg = this.nupkg(entries("docs/README.md", utf8("# Fixture\n\nHello")));
 
-      assertThat(NuGetPackageUtils.extractReadme(nupkg, xml)).isEqualTo("# Fixture\n\nHello");
+      assertThat(NuspecUtils.extractReadme(nupkg, xml)).isEqualTo("# Fixture\n\nHello");
     }
 
     @Test
@@ -189,7 +185,7 @@ class NuGetPackageUtilsTest {
       final var xml = nuspec("<readme>docs\\README.md</readme>");
       final var nupkg = this.nupkg(entries("docs/README.md", utf8("readme")));
 
-      assertThat(NuGetPackageUtils.extractReadme(nupkg, xml)).isEqualTo("readme");
+      assertThat(NuspecUtils.extractReadme(nupkg, xml)).isEqualTo("readme");
     }
 
     @Test
@@ -198,7 +194,7 @@ class NuGetPackageUtilsTest {
       final var xml = nuspec("<readme>docs/My Readme.md</readme>");
       final var nupkg = this.nupkg(entries("docs/My%20Readme.md", utf8("spaced")));
 
-      assertThat(NuGetPackageUtils.extractReadme(nupkg, xml)).isEqualTo("spaced");
+      assertThat(NuspecUtils.extractReadme(nupkg, xml)).isEqualTo("spaced");
     }
 
     @Test
@@ -207,7 +203,7 @@ class NuGetPackageUtilsTest {
       final var xml = nuspec("<readme>/README.MD</readme>");
       final var nupkg = this.nupkg(entries("readme.md", utf8("case")));
 
-      assertThat(NuGetPackageUtils.extractReadme(nupkg, xml)).isEqualTo("case");
+      assertThat(NuspecUtils.extractReadme(nupkg, xml)).isEqualTo("case");
     }
 
     @Test
@@ -216,7 +212,7 @@ class NuGetPackageUtilsTest {
       final var xml = nuspec("<readme>README.md</readme>");
       final var nupkg = this.nupkg(entries("README.md", utf8("﻿with bom")));
 
-      assertThat(NuGetPackageUtils.extractReadme(nupkg, xml)).isEqualTo("with bom");
+      assertThat(NuspecUtils.extractReadme(nupkg, xml)).isEqualTo("with bom");
     }
 
     @Test
@@ -224,7 +220,7 @@ class NuGetPackageUtilsTest {
     void noReadmeElement() throws IOException {
       final var nupkg = this.nupkg(entries("README.md", utf8("not declared")));
 
-      assertThat(NuGetPackageUtils.extractReadme(nupkg, nuspec(""))).isNull();
+      assertThat(NuspecUtils.extractReadme(nupkg, nuspec(""))).isNull();
     }
 
     @Test
@@ -233,7 +229,7 @@ class NuGetPackageUtilsTest {
       final var xml = nuspec("<readme>docs/README.md</readme>");
       final var nupkg = this.nupkg(entries("lib/net8.0/Fixture.dll", utf8("MZ")));
 
-      assertThat(NuGetPackageUtils.extractReadme(nupkg, xml)).isNull();
+      assertThat(NuspecUtils.extractReadme(nupkg, xml)).isNull();
     }
 
     @Test
@@ -242,7 +238,7 @@ class NuGetPackageUtilsTest {
       final var xml = nuspec("<readme>README.md</readme>");
       final var nupkg = this.nupkg(entries("README.md", new byte[256 * 1024 + 1]));
 
-      assertThat(NuGetPackageUtils.extractReadme(nupkg, xml)).isNull();
+      assertThat(NuspecUtils.extractReadme(nupkg, xml)).isNull();
     }
 
     @Test
@@ -252,7 +248,7 @@ class NuGetPackageUtilsTest {
       final var content = "a".repeat(256 * 1024);
       final var nupkg = this.nupkg(entries("README.md", utf8(content)));
 
-      assertThat(NuGetPackageUtils.extractReadme(nupkg, xml)).isEqualTo(content);
+      assertThat(NuspecUtils.extractReadme(nupkg, xml)).isEqualTo(content);
     }
 
     @Test
@@ -261,7 +257,7 @@ class NuGetPackageUtilsTest {
       final var xml = nuspec("<readme>README.md</readme>");
       final var nupkg = this.nupkg(entries("README.md", new byte[] {'a', 0, 'b'}));
 
-      assertThat(NuGetPackageUtils.extractReadme(nupkg, xml)).isNull();
+      assertThat(NuspecUtils.extractReadme(nupkg, xml)).isNull();
     }
 
     @Test
@@ -269,8 +265,7 @@ class NuGetPackageUtilsTest {
     void unreadableArchive() throws IOException {
       final var broken = Files.write(this.tempDir.resolve("broken.nupkg"), utf8("not a zip"));
 
-      assertThat(NuGetPackageUtils.extractReadme(broken, nuspec("<readme>README.md</readme>")))
-          .isNull();
+      assertThat(NuspecUtils.extractReadme(broken, nuspec("<readme>README.md</readme>"))).isNull();
     }
   }
 }

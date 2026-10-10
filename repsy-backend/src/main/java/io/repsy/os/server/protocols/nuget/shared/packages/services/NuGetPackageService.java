@@ -31,7 +31,9 @@ import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPack
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetPackageSearchResult;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetVersionInfo;
 import io.repsy.protocols.nuget.shared.packages.services.AbstractNuGetPackageService;
-import io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils;
+import io.repsy.protocols.nuget.shared.utils.NuGetDependencyJsonUtils;
+import io.repsy.protocols.nuget.shared.utils.NuGetVersionUtils;
+import io.repsy.protocols.nuget.shared.utils.NuspecUtils;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.IOException;
@@ -138,7 +140,7 @@ public class NuGetPackageService extends AbstractNuGetPackageService<UUID> {
         .findByNugetPackageIdAndListedTrueOrderByPublishedAtDescVersionAsc(pkg.getId())
         .stream()
         .map(v -> v.getVersion().toLowerCase(Locale.ROOT))
-        .sorted(NuGetPackageUtils.VERSION_COMPARATOR)
+        .sorted(NuGetVersionUtils.VERSION_COMPARATOR)
         .toList();
   }
 
@@ -188,7 +190,7 @@ public class NuGetPackageService extends AbstractNuGetPackageService<UUID> {
         .stream()
         .map(v -> this.converter.toRegistrationInfo(v, packageId))
         .sorted(
-            Comparator.comparing(NuGetVersionInfo::version, NuGetPackageUtils.VERSION_COMPARATOR))
+            Comparator.comparing(NuGetVersionInfo::version, NuGetVersionUtils.VERSION_COMPARATOR))
         .toList();
   }
 
@@ -212,7 +214,7 @@ public class NuGetPackageService extends AbstractNuGetPackageService<UUID> {
           versions.stream().map(v -> this.converter.toVersionInfo(v, packageId)).toList(),
           pageable,
           versionOrder,
-          Comparator.comparing(NuGetVersionInfo::version, NuGetPackageUtils.VERSION_COMPARATOR));
+          Comparator.comparing(NuGetVersionInfo::version, NuGetVersionUtils.VERSION_COMPARATOR));
     }
 
     final var sortedPageable =
@@ -452,7 +454,7 @@ public class NuGetPackageService extends AbstractNuGetPackageService<UUID> {
   private Optional<NuGetPackageVersion> findVersion(final NuGetPackage pkg, final String version) {
 
     return this.packageVersionRepository.findByNugetPackageIdAndVersionIgnoreCase(
-        pkg.getId(), NuGetPackageUtils.normalizeNuGetVersion(version));
+        pkg.getId(), NuGetVersionUtils.normalizeNuGetVersion(version));
   }
 
   private NuGetPackage findPackage(final UUID repoId, final String packageId) {
@@ -501,24 +503,24 @@ public class NuGetPackageService extends AbstractNuGetPackageService<UUID> {
     pkgVersion.setPublishedAt(Instant.now());
     pkgVersion.setDownloadCount(0);
     pkgVersion.setCreatedAt(Instant.now());
-    pkgVersion.setTitle(NuGetPackageUtils.extractTitle(nuspecXml));
-    pkgVersion.setDescription(NuGetPackageUtils.extractMetadataField(nuspecXml, "description"));
-    pkgVersion.setAuthors(NuGetPackageUtils.extractMetadataField(nuspecXml, "authors"));
-    pkgVersion.setTags(NuGetPackageUtils.extractTags(nuspecXml));
-    pkgVersion.setIconUrl(NuGetPackageUtils.extractUrl(nuspecXml, "iconUrl"));
-    pkgVersion.setLicenseUrl(NuGetPackageUtils.extractUrl(nuspecXml, "licenseUrl"));
-    pkgVersion.setProjectUrl(NuGetPackageUtils.extractUrl(nuspecXml, "projectUrl"));
-    pkgVersion.setRepositoryUrl(NuGetPackageUtils.extractRepositoryUrl(nuspecXml));
+    pkgVersion.setTitle(NuspecUtils.extractTitle(nuspecXml));
+    pkgVersion.setDescription(NuspecUtils.extractMetadataField(nuspecXml, "description"));
+    pkgVersion.setAuthors(NuspecUtils.extractMetadataField(nuspecXml, "authors"));
+    pkgVersion.setTags(NuspecUtils.extractTags(nuspecXml));
+    pkgVersion.setIconUrl(NuspecUtils.extractUrl(nuspecXml, "iconUrl"));
+    pkgVersion.setLicenseUrl(NuspecUtils.extractUrl(nuspecXml, "licenseUrl"));
+    pkgVersion.setProjectUrl(NuspecUtils.extractUrl(nuspecXml, "projectUrl"));
+    pkgVersion.setRepositoryUrl(NuspecUtils.extractRepositoryUrl(nuspecXml));
     pkgVersion.setReadme(readme);
 
     final var groups =
-        NuGetPackageUtils.extractDependencyGroupsFromNuspec(
+        NuspecUtils.extractDependencyGroupsFromNuspec(
             nuspecXml, nugetPackage.getPackageId(), version);
     if (!groups.isEmpty()) {
       // A failure here must fail the push (RPS-1146): the client sent these dependencies, so
       // storing the version without them, silently, would corrupt what was published. This runs
       // before saveAndFlush, so nothing is written when it throws.
-      pkgVersion.setDependencies(NuGetPackageUtils.toDependencyGroupsJson(groups));
+      pkgVersion.setDependencies(NuGetDependencyJsonUtils.toDependencyGroupsJson(groups));
     }
 
     return pkgVersion;

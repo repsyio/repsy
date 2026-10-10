@@ -15,7 +15,7 @@
  */
 package io.repsy.protocols.nuget.shared.storage.services;
 
-import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.normalizeNuGetVersion;
+import static io.repsy.protocols.nuget.shared.utils.NuGetVersionUtils.normalizeNuGetVersion;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;

@@ -18,6 +18,9 @@ package io.repsy.protocols.cargo.protocol.facades;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.protocols.cargo.protocol.facades.contracts.CargoProtocolFacade;
+import io.repsy.protocols.cargo.protocol.utils.CrateInspectionUtils;
+import io.repsy.protocols.cargo.protocol.utils.CratePublishBodyUtils;
+import io.repsy.protocols.cargo.protocol.utils.CratePublishRequestUtils;
 import io.repsy.protocols.cargo.protocol.utils.CrateUtils;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateIndexEntry;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateListItem;
@@ -108,10 +111,10 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
    * the declared length is checked against {@link #maxCrateBytes} before anything is read, the
    * tarball is inspected and the checksum is taken from the spool's own hash, and the file is
    * streamed into storage. The publish-metadata JSON is bounded the same way in {@link
-   * CrateUtils#getPublishRequest}, which runs first, so a request that fails validation is refused
-   * before the (potentially large) crate that follows it is even looked at. A body with no byte in
-   * it, one that stops inside a length field, and a crate of zero bytes are refused with a {@code
-   * 400} in Cargo's error shape, and nothing is stored (RPS-1466).
+   * CratePublishBodyUtils#getPublishRequest}, which runs first, so a request that fails validation
+   * is refused before the (potentially large) crate that follows it is even looked at. A body with
+   * no byte in it, one that stops inside a length field, and a crate of zero bytes are refused with
+   * a {@code 400} in Cargo's error shape, and nothing is stored (RPS-1466).
    */
   @Override
   public void publish(final ProtocolContext context, final InputStream requestBody)
@@ -121,13 +124,13 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
         RequestBodies.nonEmpty(requestBody)
             .orElseThrow(() -> new IllegalArgumentException("the publish body is empty"));
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-    final var published = CrateUtils.getPublishRequest(inputStream, this.objectMapper);
+    final var published = CratePublishBodyUtils.getPublishRequest(inputStream, this.objectMapper);
 
-    CrateUtils.validatePublishRequest(published);
+    CratePublishRequestUtils.validatePublishRequest(published);
 
-    final var request = CrateUtils.dropOverLongMetadata(published);
+    final var request = CratePublishRequestUtils.dropOverLongMetadata(published);
 
-    final var crateLength = CrateUtils.readCrateLength(inputStream);
+    final var crateLength = CratePublishBodyUtils.readCrateLength(inputStream);
 
     if (crateLength == 0) {
       throw new IllegalArgumentException("the crate is empty");
@@ -153,16 +156,17 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
       }
 
       final var crateName = CrateUtils.normalizeCrateName(request.name());
-      final CrateUtils.CrateInspection inspection;
+      final CrateInspectionUtils.CrateInspection inspection;
       try (final var inspectionStream = spool.openStream()) {
-        inspection = CrateUtils.inspectCrate(inspectionStream);
+        inspection = CrateInspectionUtils.inspectCrate(inspectionStream);
       }
 
       final var requestWithChecksum =
-          CrateUtils.createCratePublishRequestWithChecksum(
+          CratePublishRequestUtils.createCratePublishRequestWithChecksum(
               request, spool.sha256Hex(), inspection.hasLib());
 
-      final var indexJsonLine = CrateUtils.getIndexJsonLine(requestWithChecksum, this.objectMapper);
+      final var indexJsonLine =
+          CratePublishRequestUtils.getIndexJsonLine(requestWithChecksum, this.objectMapper);
 
       final var usages =
           this.cargoCrateService.publish(

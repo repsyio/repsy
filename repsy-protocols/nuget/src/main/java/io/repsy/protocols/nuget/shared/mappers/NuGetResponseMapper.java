@@ -15,7 +15,7 @@
  */
 package io.repsy.protocols.nuget.shared.mappers;
 
-import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.NUGET_CONTEXT;
+import static io.repsy.protocols.nuget.shared.utils.NuGetRegistrationPageUtils.NUGET_CONTEXT;
 
 import io.repsy.protocols.nuget.shared.dtos.NuGetCatalogDependency;
 import io.repsy.protocols.nuget.shared.dtos.NuGetCatalogEntry;
