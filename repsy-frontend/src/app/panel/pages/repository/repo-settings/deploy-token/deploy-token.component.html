@@ -373,7 +373,7 @@
       </app-npm-config>
     }
     @case (RepoType.GOLANG) {
-      <app-golang-config
+      <app-go-config
         (openChange)="openConfigure($event)"
         [(open)]="showConfig"
         [baseUrl]="this.environment.repoBaseUrl"
@@ -381,7 +381,7 @@
         [repoName]="this.activeRepository.repoName"
         [deployToken]="true"
       >
-      </app-golang-config>
+      </app-go-config>
     }
     @case (RepoType.CARGO) {
       <app-cargo-config

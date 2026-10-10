@@ -41,7 +41,7 @@ import { PagedData } from '../../../../shared/dto/paged-data';
 import { RepoType } from '../../../../shared/dto/repo/repo-type';
 import { CargoConfigComponent } from '../../cargo/config/cargo-config.component';
 import { DockerConfigComponent } from '../../docker/config/docker-config.component';
-import { GolangConfigComponent } from '../../golang/config/golang-config.component';
+import { GoConfigComponent } from '../../go/config/go-config.component';
 import { HelmConfigComponent } from '../../helm/config/helm-config.component';
 import { MavenConfigComponent } from '../../maven/config/maven-config.component';
 import { NpmConfigComponent } from '../../npm/config/npm-config.component';
@@ -63,7 +63,7 @@ import { TokenCreateInfo } from './dto/token-create-info';
     EmptyListComponent,
     DockerConfigComponent,
     CargoConfigComponent,
-    GolangConfigComponent,
+    GoConfigComponent,
     HelmConfigComponent,
     NgClass,
     MavenConfigComponent,

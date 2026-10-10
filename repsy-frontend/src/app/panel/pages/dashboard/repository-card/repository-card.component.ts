@@ -30,7 +30,7 @@ export class RepositoryCardComponent {
   @Input() npmRegistryCount: number;
   @Input() pypiRepoCount: number;
   @Input() dockerRepoCount: number;
-  @Input() golangRepoCount: number;
+  @Input() goRepoCount: number;
   @Input() cargoRepoCount: number;
   @Input() helmRepoCount: number;
   @Input() nugetRepoCount: number;
@@ -58,7 +58,7 @@ export class RepositoryCardComponent {
     this.route('cargo');
   }
 
-  routeGolang() {
+  routeGo() {
     this.route('golang');
   }
 

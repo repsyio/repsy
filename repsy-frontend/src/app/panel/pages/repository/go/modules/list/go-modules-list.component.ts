@@ -16,142 +16,130 @@
 
 import { CommonModule, NgOptimizedImage } from '@angular/common';
 import { Component, OnDestroy } from '@angular/core';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { RouterLink } from '@angular/router';
 import moment from 'moment';
 import { Subscription } from 'rxjs';
 import { finalize } from 'rxjs/operators';
 
 import { environment } from '../../../../../../../environments/environment';
-import {
-  GoModuleVersionListItem,
-  RepoPermissionInfo,
-  VersionSecuritySummary,
-} from '../../../../../../../generated/api';
+import { GoModuleListItem, RepoPermissionInfo, VersionSecuritySummary } from '../../../../../../../generated/api';
 import { AuthService } from '../../../../../../auth/pages/service/auth.service';
 import { SpinnerComponent } from '../../../../../../shared/components/spinner/spinner.component';
 import { DropdownComponent } from '../../../../../shared/components/dropdown/dropdown.component';
 import { EmptyListComponent } from '../../../../../shared/components/empty-list/empty-list.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
+import { PackageSecurityBadgeComponent } from '../../../../../shared/components/package-security-badge/package-security-badge.component';
 import { PaginationComponent } from '../../../../../shared/components/pagination/pagination.component';
 import { SearchboxComponent } from '../../../../../shared/components/searchbox/searchbox.component';
 import { SortSelectorComponent } from '../../../../../shared/components/sort-selector/sort-selector.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { TooltipComponent } from '../../../../../shared/components/tooltip/tooltip.component';
-import { VersionSecurityBadgeComponent } from '../../../../../shared/components/version-security-badge/version-security-badge.component';
 import { PagedData } from '../../../../../shared/dto/paged-data';
 import { Sort } from '../../../../../shared/dto/sort';
-import { emptiesList, pageAfterDelete } from '../../../../../shared/util/list-page-after-delete.util';
 import { SecurityService } from '../../../../security/service/security.service';
-import { GolangConfigComponent } from '../../config/golang-config.component';
-import { GolangService } from '../../service/golang.service';
+import { GoConfigComponent } from '../../config/go-config.component';
+import { GoService } from '../../service/go.service';
 
 @Component({
-  selector: 'app-golang-module-version-list',
+  selector: 'app-go-modules-list',
   standalone: true,
   imports: [
     CommonModule,
     RouterLink,
-    GolangConfigComponent,
-    DropdownComponent,
     EmptyListComponent,
+    GoConfigComponent,
     PaginationComponent,
     SearchboxComponent,
     SortSelectorComponent,
+    DropdownComponent,
     TooltipComponent,
     NgOptimizedImage,
     SpinnerComponent,
-    VersionSecurityBadgeComponent,
+    PackageSecurityBadgeComponent,
   ],
-  templateUrl: './golang-module-version-list.component.html',
+  templateUrl: './go-modules-list.component.html',
 })
-export class GolangModuleVersionListComponent implements OnDestroy {
-  public loading = true;
-  public showConfig = false;
-  public pageNum = 0;
-  public pageSize = 10;
-  public searchText = '';
-  public error: string;
-  public modulePath: string;
-  public pagedData: PagedData<GoModuleVersionListItem>;
-  public versions: GoModuleVersionListItem[];
-  public activeRepo: RepoPermissionInfo;
-  public securitySummary: Record<string, VersionSecuritySummary> = {};
-  public sortOption: Sort = { name: 'Newest', column: 'id', type: 'DESC' };
-  public sortOptions: Sort[] = [
+export class GoModulesListComponent implements OnDestroy {
+  loading = true;
+  showConfig = false;
+  pageNum = 0;
+  pageSize = 10;
+  searchText = '';
+  error: string;
+  pagedData: PagedData<GoModuleListItem>;
+  activeRepo: RepoPermissionInfo;
+  securitySummary: Record<string, VersionSecuritySummary> = {};
+  sortOption: Sort = { name: 'Newest', column: 'id', type: 'DESC' };
+  sortOptions: Sort[] = [
     { name: 'Newest', column: 'id', type: 'DESC' },
     { name: 'Oldest', column: 'id', type: 'ASC' },
   ];
-  public readonly baseUrl: string;
-  public readonly username: string;
 
+  modules: GoModuleListItem[];
+
+  readonly baseUrl: string;
+  readonly username: string;
   private readonly repositoryChanges$: Subscription;
   private securitySummarySubscription?: Subscription;
 
   constructor(
-    private readonly route: ActivatedRoute,
-    private readonly router: Router,
-    private readonly golangService: GolangService,
+    private readonly authService: AuthService,
+    private readonly goService: GoService,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
-    private readonly authService: AuthService,
     private readonly securityService: SecurityService,
   ) {
     this.baseUrl = environment.repoBaseUrl;
     this.username = this.authService.username;
-    this.pagedData = new PagedData<GoModuleVersionListItem>();
+    this.pagedData = new PagedData<GoModuleListItem>();
     this.activeRepo = {} as RepoPermissionInfo;
 
-    this.repositoryChanges$ = this.golangService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
+    this.repositoryChanges$ = this.goService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
         this.activeRepo = Object.assign({}, repo);
-        this.modulePath = this.route.snapshot.queryParamMap.get('modulePath');
-        if (!this.modulePath) {
-          this.router.navigate(['/' + this.activeRepo.repoName]);
-          return;
-        }
-        this.fetchVersions();
+        this.fetchModules();
         this.fetchSecuritySummary();
       }
     });
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     this.repositoryChanges$.unsubscribe();
     this.securitySummarySubscription?.unsubscribe();
   }
 
-  public loadPage(pageNum: number): void {
+  loadPage(pageNum: number): void {
     this.pageNum = pageNum;
-    this.fetchVersions();
+    this.fetchModules();
   }
 
-  public refreshPage(): void {
-    this.fetchVersions();
+  refreshPage(): void {
+    this.fetchModules();
   }
 
-  public search(text: string): void {
+  search(modulePath: string) {
     this.pageNum = 0;
-    this.searchText = text;
-    this.fetchVersions();
+    this.searchText = modulePath;
+    this.fetchModules();
   }
 
-  public sort(option: Sort): void {
+  sort(option: Sort): void {
     this.sortOption = option;
-    this.fetchVersions();
+    this.fetchModules();
   }
 
-  public openConfig(open: boolean): void {
+  openConfig(open: boolean) {
     this.showConfig = open;
   }
 
-  public timeAgo(date: Date | string): string {
+  timeAgo(date: Date | string): string {
     return moment(date).fromNow();
   }
 
-  public deleteVersion(version: GoModuleVersionListItem): void {
-    this.dangerModalService.show('Delete Version', 'Delete', () => {
-      this.golangService
-        .deleteModuleVersion(this.modulePath, version.version)
+  deleteModule(mod: GoModuleListItem) {
+    this.dangerModalService.show('Delete Module', 'Delete', () => {
+      this.goService
+        .deleteModule(mod.modulePath)
         .pipe(
           finalize(() => {
             this.loading = false;
@@ -159,47 +147,41 @@ export class GolangModuleVersionListComponent implements OnDestroy {
         )
         .subscribe({
           next: () => {
-            if (emptiesList(this.versions.length, this.pageNum, this.searchText)) {
-              this.router.navigateByUrl('/' + this.activeRepo.repoName).then(() => {
-                this.toastService.show('Version deleted successfully', 'success');
-              });
-            } else {
-              this.pageNum = pageAfterDelete(this.versions.length, this.pageNum);
-              this.refreshPage();
-              this.toastService.show('Version deleted successfully', 'success');
-            }
+            this.refreshPage();
+            this.toastService.show('Module deleted successfully', 'success');
           },
           error: () => {},
         });
     });
   }
 
-  private fetchVersions(): void {
+  private fetchModules(): void {
     this.loading = true;
-    this.golangService
-      .fetchModuleVersions(this.modulePath, this.searchText, this.sortOption, this.pageNum, this.pageSize)
+
+    this.goService
+      .fetchModules(this.searchText, this.sortOption, this.pageNum, this.pageSize)
       .pipe(
         finalize(() => {
           this.loading = false;
         }),
       )
       .subscribe({
-        next: (pagedData: PagedData<GoModuleVersionListItem>) => {
+        next: (pagedData: PagedData<GoModuleListItem>) => {
           this.pagedData.page = pagedData.page;
-          this.versions = pagedData.content;
+          this.modules = pagedData.content;
         },
         error: () => {},
       });
   }
 
-  public get canManage(): boolean {
+  get canManage(): boolean {
     return this.activeRepo?.canManage ?? false;
   }
 
   private fetchSecuritySummary(): void {
     this.securitySummarySubscription?.unsubscribe();
     this.securitySummarySubscription = this.securityService
-      .watchVersionSecuritySummary(this.activeRepo.repoName, this.modulePath)
+      .watchArtifactSecuritySummary(this.activeRepo.repoName)
       .subscribe({
         next: (summary) => {
           this.securitySummary = summary;

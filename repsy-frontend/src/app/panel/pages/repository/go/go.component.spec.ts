@@ -15,13 +15,13 @@
 ///
 
 import { describeProtocolShell } from '../testing/protocol-shell-spec-helpers';
-import { GolangComponent } from './golang.component';
-import { GolangService } from './service/golang.service';
+import { GoComponent } from './go.component';
+import { GoService } from './service/go.service';
 
 describeProtocolShell({
-  component: GolangComponent,
+  component: GoComponent,
   repoType: 'golang',
-  service: GolangService,
+  service: GoService,
   loadMethod: 'getRepository',
   permissionsField: 'activeRepo',
 });

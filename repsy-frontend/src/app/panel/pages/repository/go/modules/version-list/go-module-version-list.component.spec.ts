@@ -33,39 +33,35 @@ import {
   pageOf,
   REPO_NAME,
 } from '../../../testing/repo-list-spec-helpers';
-import { GolangService } from '../../service/golang.service';
-import { GolangModuleVersionListComponent } from './golang-module-version-list.component';
+import { GoService } from '../../service/go.service';
+import { GoModuleVersionListComponent } from './go-module-version-list.component';
 
-describe('GolangModuleVersionListComponent', () => {
-  let component: GolangModuleVersionListComponent;
-  let golangService: jasmine.SpyObj<GolangService>;
+describe('GoModuleVersionListComponent', () => {
+  let component: GoModuleVersionListComponent;
+  let goService: jasmine.SpyObj<GoService>;
   let securityService: jasmine.SpyObj<SecurityService>;
   let toastService: jasmine.SpyObj<ToastService>;
   let router: jasmine.SpyObj<Router>;
   let dangerModalService: DangerModalService;
   let repoChanges: BehaviorSubject<RepoPermissionInfo | null>;
-  const VERSION = { version: 'v1.2.3' } as Parameters<GolangModuleVersionListComponent['deleteVersion']>[0];
+  const VERSION = { version: 'v1.2.3' } as Parameters<GoModuleVersionListComponent['deleteVersion']>[0];
 
   function build(modulePath: string | null = 'github.com/acme/lib'): ListFixture {
     repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
-    golangService = jasmine.createSpyObj<GolangService>(
-      'GolangService',
-      ['fetchModuleVersions', 'deleteModuleVersion'],
-      {
-        repoChanges,
-      },
-    );
+    goService = jasmine.createSpyObj<GoService>('GoService', ['fetchModuleVersions', 'deleteModuleVersion'], {
+      repoChanges,
+    });
     securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['watchVersionSecuritySummary']);
     securityService.watchVersionSecuritySummary.and.returnValue(of({}));
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
     router = jasmine.createSpyObj<Router>('Router', ['navigate', 'navigateByUrl']);
     dangerModalService = new DangerModalService();
-    component = new GolangModuleVersionListComponent(
+    component = new GoModuleVersionListComponent(
       {
         snapshot: { queryParamMap: convertToParamMap(modulePath ? { modulePath } : {}) },
       } as ActivatedRoute,
       router,
-      golangService,
+      goService,
       toastService,
       dangerModalService,
       { username: 'alice' } as AuthService,
@@ -74,11 +70,11 @@ describe('GolangModuleVersionListComponent', () => {
     return {
       component,
       repoChanges,
-      load: golangService.fetchModuleVersions,
+      load: goService.fetchModuleVersions,
       args: { search: 1, sort: 2, page: 3 },
       respond: (content, totalPages) =>
-        golangService.fetchModuleVersions.and.returnValue(of(pageOf(content, totalPages) as never)),
-      fail: () => golangService.fetchModuleVersions.and.returnValue(throwError(() => 'boom')),
+        goService.fetchModuleVersions.and.returnValue(of(pageOf(content, totalPages) as never)),
+      fail: () => goService.fetchModuleVersions.and.returnValue(throwError(() => 'boom')),
       security: {
         watch: securityService.watchVersionSecuritySummary,
         argsFor: (repoName) => [repoName, 'github.com/acme/lib'],
@@ -97,7 +93,7 @@ describe('GolangModuleVersionListComponent', () => {
       flushMicrotasks();
 
       expect(component.modulePath).toBe('github.com/acme/lib');
-      expect(golangService.fetchModuleVersions).toHaveBeenCalledOnceWith(
+      expect(goService.fetchModuleVersions).toHaveBeenCalledOnceWith(
         'github.com/acme/lib',
         '',
         component.sortOption,
@@ -113,7 +109,7 @@ describe('GolangModuleVersionListComponent', () => {
       flushMicrotasks();
 
       expect(router.navigate).toHaveBeenCalledOnceWith([`/${REPO_NAME}`]);
-      expect(golangService.fetchModuleVersions).not.toHaveBeenCalled();
+      expect(goService.fetchModuleVersions).not.toHaveBeenCalled();
       expect(securityService.watchVersionSecuritySummary).not.toHaveBeenCalled();
     }));
   });
@@ -123,7 +119,7 @@ describe('GolangModuleVersionListComponent', () => {
       list: build(),
       dangerModal: dangerModalService,
       toast: toastService.show,
-      remove: golangService.deleteModuleVersion,
+      remove: goService.deleteModuleVersion,
       invoke: () => component.deleteVersion(VERSION),
       title: 'Delete Version',
       message: 'Version deleted successfully',
@@ -137,7 +133,7 @@ describe('GolangModuleVersionListComponent', () => {
     describePagedDelete(() => ({
       list: build(),
       dangerModal: dangerModalService,
-      remove: golangService.deleteModuleVersion,
+      remove: goService.deleteModuleVersion,
       invoke: () => component.deleteVersion(VERSION),
       navigate: router.navigateByUrl,
     }));
@@ -159,22 +155,22 @@ describe('GolangModuleVersionListComponent', () => {
   });
 });
 
-describe('GolangModuleVersionListComponent template', () => {
+describe('GoModuleVersionListComponent template', () => {
   async function render(content: unknown[], totalPages: number): Promise<HTMLElement> {
-    const golangService = jasmine.createSpyObj<GolangService>('GolangService', ['fetchModuleVersions'], {
+    const goService = jasmine.createSpyObj<GoService>('GoService', ['fetchModuleVersions'], {
       repoChanges: new BehaviorSubject<RepoPermissionInfo | null>(permission(REPO_NAME, { canManage: true })),
     });
-    golangService.fetchModuleVersions.and.returnValue(of(pageOf(content, totalPages) as never));
+    goService.fetchModuleVersions.and.returnValue(of(pageOf(content, totalPages) as never));
     const securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['watchVersionSecuritySummary']);
     securityService.watchVersionSecuritySummary.and.returnValue(of({}));
 
-    const { el } = await renderComponent(GolangModuleVersionListComponent, [
+    const { el } = await renderComponent(GoModuleVersionListComponent, [
       {
         provide: ActivatedRoute,
         useValue: { snapshot: { queryParamMap: convertToParamMap({ modulePath: 'github.com/acme/lib' }) } },
       },
       { provide: AuthService, useValue: { username: 'alice' } },
-      { provide: GolangService, useValue: golangService },
+      { provide: GoService, useValue: goService },
       { provide: SecurityService, useValue: securityService },
     ]);
     return el;

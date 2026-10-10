@@ -61,15 +61,15 @@
       </span>
     </button>
 
-    <!-- Golang Row -->
+    <!-- Go Row -->
     <button
       data-testid="repo-count-row-golang"
       type="button"
-      (click)="routeGolang()"
+      (click)="routeGo()"
       class="flex h-[43px] w-full items-center justify-between rounded-[12px] border border-[#101112] bg-linear-to-b from-[rgba(17,16,16,0.6)] to-[#1D1C1C] px-[20px] hover:border-[#404141]"
     >
       <span class="text-[13px] text-[#FDFDFD]">
-        <span data-testid="repo-count-value-golang">{{ golangRepoCount }}</span> / Repositories are in use.
+        <span data-testid="repo-count-value-golang">{{ goRepoCount }}</span> / Repositories are in use.
       </span>
       <span class="h-[23px] w-[32px]">
         <img ngSrc="/assets/icons/golang/golang-light.svg" alt="Go" height="23" width="60" />

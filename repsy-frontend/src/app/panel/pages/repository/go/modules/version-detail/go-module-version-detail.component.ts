@@ -28,27 +28,27 @@ import { DangerModalService } from '../../../../../shared/components/modals/dang
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { versionLoadError } from '../../../../../shared/util/version-load-error.util';
-import { GolangService } from '../../service/golang.service';
+import { GoService } from '../../service/go.service';
 
 @Component({
-  selector: 'app-golang-module-version-detail',
+  selector: 'app-go-module-version-detail',
   standalone: true,
   imports: [CommonModule, CopyClipboardComponent, NgOptimizedImage, SpinnerComponent, SecurityScanSectionComponent],
-  templateUrl: './golang-module-version-detail.component.html',
+  templateUrl: './go-module-version-detail.component.html',
 })
-export class GolangModuleVersionDetailComponent implements OnDestroy {
-  public readonly securityRepoType = RepoType.Golang;
-  public loading = true;
-  public error: string;
-  public modulePath: string;
-  public canonicalModulePath: string;
-  public versionName: string;
-  public versionInfo: GoModuleVersionListItem;
-  public getCommand: string;
-  public goEnvCommand: string;
-  public goproxyEndpoints: { label: string; url: string }[];
-  public activeRepo: RepoPermissionInfo;
-  public readonly repoBaseUrl: string;
+export class GoModuleVersionDetailComponent implements OnDestroy {
+  readonly securityRepoType = RepoType.Golang;
+  loading = true;
+  error: string;
+  modulePath: string;
+  canonicalModulePath: string;
+  versionName: string;
+  versionInfo: GoModuleVersionListItem;
+  getCommand: string;
+  goEnvCommand: string;
+  goproxyEndpoints: { label: string; url: string }[];
+  activeRepo: RepoPermissionInfo;
+  readonly repoBaseUrl: string;
 
   /** How many versions the module had when the page loaded: deleting the only one removes the module. */
   private versionCount = 0;
@@ -58,14 +58,14 @@ export class GolangModuleVersionDetailComponent implements OnDestroy {
   constructor(
     private readonly route: ActivatedRoute,
     private readonly router: Router,
-    private readonly golangService: GolangService,
+    private readonly goService: GoService,
     private readonly toastService: ToastService,
     private readonly dangerModalService: DangerModalService,
   ) {
     this.repoBaseUrl = environment.repoBaseUrl;
     this.activeRepo = {} as RepoPermissionInfo;
 
-    this.repositoryChanges$ = this.golangService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
+    this.repositoryChanges$ = this.goService.repoChanges.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
         this.activeRepo = Object.assign({}, repo);
         this.modulePath = this.route.snapshot.queryParamMap.get('modulePath');
@@ -97,13 +97,13 @@ export class GolangModuleVersionDetailComponent implements OnDestroy {
     });
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     this.repositoryChanges$.unsubscribe();
   }
 
-  public deleteVersion(): void {
+  deleteVersion(): void {
     this.dangerModalService.show('Delete Version', 'Delete', () => {
-      this.golangService
+      this.goService
         .deleteModuleVersion(this.modulePath, this.versionName)
         .pipe(
           finalize(() => {
@@ -131,7 +131,7 @@ export class GolangModuleVersionDetailComponent implements OnDestroy {
   private fetchVersion(): void {
     this.loading = true;
     this.error = undefined;
-    this.golangService
+    this.goService
       .fetchModuleInfo(this.modulePath)
       .pipe(
         finalize(() => {
@@ -157,11 +157,11 @@ export class GolangModuleVersionDetailComponent implements OnDestroy {
       });
   }
 
-  public get canManage(): boolean {
+  get canManage(): boolean {
     return this.activeRepo?.canManage ?? false;
   }
 
-  public get securityArtifactName(): string {
+  get securityArtifactName(): string {
     return this.canonicalModulePath ?? this.modulePath;
   }
 }

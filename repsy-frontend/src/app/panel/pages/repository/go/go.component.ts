@@ -23,30 +23,30 @@ import { AuthService } from '../../../../auth/pages/service/auth.service';
 import { RepositoryBreadcrumbComponent } from '../breadcrumb/repository-breadcrumb.component';
 import { currentRepoOfType } from '../repo-entry/current-repo-of-type';
 import { RepoLookupService } from '../repo-entry/repo-lookup.service';
-import { GolangService } from './service/golang.service';
+import { GoService } from './service/go.service';
 
 @Component({
-  selector: 'app-golang',
-  templateUrl: './golang.component.html',
+  selector: 'app-go',
+  templateUrl: './go.component.html',
   standalone: true,
   imports: [RouterOutlet, RepositoryBreadcrumbComponent],
 })
-export class GolangComponent implements OnInit, OnDestroy {
-  public activeRepo: RepoPermissionInfo | null = null;
-  public loading = true;
-  public isAuthenticated = false;
-  public isPublicView = false;
+export class GoComponent implements OnInit, OnDestroy {
+  activeRepo: RepoPermissionInfo | null = null;
+  loading = true;
+  isAuthenticated = false;
+  isPublicView = false;
 
   private repoSubscription: Subscription | null = null;
 
   constructor(
     private readonly repoLookupService: RepoLookupService,
-    private readonly golangService: GolangService,
+    private readonly goService: GoService,
     private readonly authService: AuthService,
     private readonly router: Router,
   ) {}
 
-  public ngOnInit(): void {
+  ngOnInit(): void {
     this.isAuthenticated = this.authService.isAuthenticated();
 
     this.repoSubscription = currentRepoOfType(this.repoLookupService, 'golang').subscribe((repoContext) => {
@@ -54,7 +54,7 @@ export class GolangComponent implements OnInit, OnDestroy {
     });
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     if (this.repoSubscription) {
       this.repoSubscription.unsubscribe();
     }
@@ -63,7 +63,7 @@ export class GolangComponent implements OnInit, OnDestroy {
   private loadRepo(repoName: string): void {
     this.loading = true;
 
-    this.golangService.getRepository(repoName).subscribe({
+    this.goService.getRepository(repoName).subscribe({
       next: (repo: RepoPermissionInfo) => {
         if (repo.private && !this.isAuthenticated) {
           this.router.navigate(['/not-found'], {

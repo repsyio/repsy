@@ -15,15 +15,15 @@
 ///
 
 import { environment } from '../../../../../../environments/environment';
-import { GolangConfigComponent } from './golang-config.component';
+import { GoConfigComponent } from './go-config.component';
 
-describe('GolangConfigComponent', () => {
+describe('GoConfigComponent', () => {
   const originalRepoBaseUrl = environment.repoBaseUrl;
 
-  let component: GolangConfigComponent;
+  let component: GoConfigComponent;
 
   beforeEach(() => {
-    component = new GolangConfigComponent();
+    component = new GoConfigComponent();
     component.username = 'alice';
     component.repoName = 'go-repo';
     component.deployToken = true;

@@ -51,7 +51,7 @@ export class DashboardContentComponent {
   public pypiRepoCount = 0;
   public dockerRepoCount = 0;
   public cargoRepoCount = 0;
-  public golangRepoCount = 0;
+  public goRepoCount = 0;
   public helmRepoCount = 0;
   public nugetRepoCount = 0;
   public rubyRepoCount = 0;
@@ -106,7 +106,7 @@ export class DashboardContentComponent {
         this.mavenRepoCount = counts[RepoType.Maven] ?? 0;
         this.dockerRepoCount = counts[RepoType.Docker] ?? 0;
         this.cargoRepoCount = counts[RepoType.Cargo] ?? 0;
-        this.golangRepoCount = counts[RepoType.Golang] ?? 0;
+        this.goRepoCount = counts[RepoType.Golang] ?? 0;
         this.helmRepoCount = counts[RepoType.Helm] ?? 0;
         this.nugetRepoCount = counts[RepoType.Nuget] ?? 0;
         this.rubyRepoCount = counts[RepoType.Ruby] ?? 0;

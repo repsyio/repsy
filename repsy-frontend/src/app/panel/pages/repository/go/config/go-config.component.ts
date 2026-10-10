@@ -21,13 +21,13 @@ import { MarkdownComponent } from '../../../../shared/components/markdown/markdo
 import { DialogDirective } from '../../../../shared/directives/dialog.directive';
 
 @Component({
-  selector: 'app-golang-config',
+  selector: 'app-go-config',
   standalone: true,
   imports: [DialogDirective, MarkdownComponent],
-  templateUrl: './golang-config.component.html',
-  styleUrl: './golang-config.component.css',
+  templateUrl: './go-config.component.html',
+  styleUrl: './go-config.component.css',
 })
-export class GolangConfigComponent implements OnInit, OnChanges {
+export class GoConfigComponent implements OnInit, OnChanges {
   @Input() baseUrl: string;
   @Input() username = '<username>';
   @Input() repoName = '<repo_name>';
@@ -37,7 +37,7 @@ export class GolangConfigComponent implements OnInit, OnChanges {
   @Input() open: boolean;
   @Output() openChange = new EventEmitter<boolean>();
 
-  public markdown: string;
+  markdown: string;
 
   ngOnInit(): void {
     this.updateMarkdown();

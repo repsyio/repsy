@@ -22,8 +22,8 @@ import { GoModuleInfo, GoModuleVersionListItem, RepoPermissionInfo } from '../..
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
 import { permission } from '../../../testing/protocol-service-spec-helpers';
-import { GolangService } from '../../service/golang.service';
-import { GolangModuleVersionDetailComponent } from './golang-module-version-detail.component';
+import { GoService } from '../../service/go.service';
+import { GoModuleVersionDetailComponent } from './go-module-version-detail.component';
 
 const REPO = 'go-repo';
 const FOUND = { version: 'v1.2.3' } as GoModuleVersionListItem;
@@ -32,9 +32,9 @@ function moduleInfo(modulePath: string | undefined, versions: GoModuleVersionLis
   return { modulePath, versions } as GoModuleInfo;
 }
 
-describe('GolangModuleVersionDetailComponent', () => {
-  let component: GolangModuleVersionDetailComponent;
-  let golangService: jasmine.SpyObj<GolangService>;
+describe('GoModuleVersionDetailComponent', () => {
+  let component: GoModuleVersionDetailComponent;
+  let goService: jasmine.SpyObj<GoService>;
   let toastService: jasmine.SpyObj<ToastService>;
   let router: jasmine.SpyObj<Router>;
   let dangerModalService: DangerModalService;
@@ -42,10 +42,10 @@ describe('GolangModuleVersionDetailComponent', () => {
 
   function build(query: Record<string, string> = { modulePath: 'github.com/acme/lib', version: 'v1.2.3' }): void {
     component?.ngOnDestroy();
-    component = new GolangModuleVersionDetailComponent(
+    component = new GoModuleVersionDetailComponent(
       { snapshot: { queryParamMap: convertToParamMap(query) } } as ActivatedRoute,
       router,
-      golangService,
+      goService,
       toastService,
       dangerModalService,
     );
@@ -53,11 +53,11 @@ describe('GolangModuleVersionDetailComponent', () => {
 
   beforeEach(() => {
     repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
-    golangService = jasmine.createSpyObj<GolangService>('GolangService', ['fetchModuleInfo', 'deleteModuleVersion'], {
+    goService = jasmine.createSpyObj<GoService>('GoService', ['fetchModuleInfo', 'deleteModuleVersion'], {
       repoChanges,
     });
-    golangService.fetchModuleInfo.and.returnValue(of(moduleInfo('github.com/acme/lib', [FOUND])));
-    golangService.deleteModuleVersion.and.returnValue(of(undefined));
+    goService.fetchModuleInfo.and.returnValue(of(moduleInfo('github.com/acme/lib', [FOUND])));
+    goService.deleteModuleVersion.and.returnValue(of(undefined));
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
     router = jasmine.createSpyObj<Router>('Router', ['navigate']);
     router.navigate.and.resolveTo(true);
@@ -73,7 +73,7 @@ describe('GolangModuleVersionDetailComponent', () => {
 
   describe('when a repository is selected', () => {
     it('keeps a not-found message and no data when the version does not exist', () => {
-      golangService.fetchModuleInfo.and.returnValue(throwError(() => new HttpErrorResponse({ status: 404 })));
+      goService.fetchModuleInfo.and.returnValue(throwError(() => new HttpErrorResponse({ status: 404 })));
 
       select();
 
@@ -83,7 +83,7 @@ describe('GolangModuleVersionDetailComponent', () => {
     });
 
     it('says the version could not be loaded for a server error', () => {
-      golangService.fetchModuleInfo.and.returnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
+      goService.fetchModuleInfo.and.returnValue(throwError(() => new HttpErrorResponse({ status: 500 })));
 
       select();
 
@@ -95,7 +95,7 @@ describe('GolangModuleVersionDetailComponent', () => {
     it('finds the version of the query in the module info', () => {
       select();
 
-      expect(golangService.fetchModuleInfo).toHaveBeenCalledOnceWith('github.com/acme/lib');
+      expect(goService.fetchModuleInfo).toHaveBeenCalledOnceWith('github.com/acme/lib');
       expect(component.modulePath).toBe('github.com/acme/lib');
       expect(component.versionName).toBe('v1.2.3');
       expect(component.versionInfo).toBe(FOUND);
@@ -123,7 +123,7 @@ describe('GolangModuleVersionDetailComponent', () => {
     });
 
     it('shows an error when the module has no such version', () => {
-      golangService.fetchModuleInfo.and.returnValue(
+      goService.fetchModuleInfo.and.returnValue(
         of(moduleInfo('github.com/acme/lib', [{ version: 'v0.1.0' } as never])),
       );
 
@@ -140,7 +140,7 @@ describe('GolangModuleVersionDetailComponent', () => {
       select();
 
       expect(router.navigate).toHaveBeenCalledOnceWith([`/${REPO}`]);
-      expect(golangService.fetchModuleInfo).not.toHaveBeenCalled();
+      expect(goService.fetchModuleInfo).not.toHaveBeenCalled();
       expect(component.getCommand).toBeUndefined();
     });
 
@@ -148,11 +148,11 @@ describe('GolangModuleVersionDetailComponent', () => {
       repoChanges.next(null);
 
       expect(router.navigate).not.toHaveBeenCalled();
-      expect(golangService.fetchModuleInfo).not.toHaveBeenCalled();
+      expect(goService.fetchModuleInfo).not.toHaveBeenCalled();
     });
 
     it('stops loading when the request fails', () => {
-      golangService.fetchModuleInfo.and.returnValue(throwError(() => new Error('boom')));
+      goService.fetchModuleInfo.and.returnValue(throwError(() => new Error('boom')));
 
       select();
 
@@ -175,13 +175,13 @@ describe('GolangModuleVersionDetailComponent', () => {
 
       select();
 
-      expect(golangService.fetchModuleInfo).not.toHaveBeenCalled();
+      expect(goService.fetchModuleInfo).not.toHaveBeenCalled();
     });
   });
 
   describe('securityArtifactName', () => {
     it('is the module path from the query until the module info has arrived', () => {
-      golangService.fetchModuleInfo.and.returnValue(new Subject<GoModuleInfo>());
+      goService.fetchModuleInfo.and.returnValue(new Subject<GoModuleInfo>());
 
       select();
 
@@ -189,7 +189,7 @@ describe('GolangModuleVersionDetailComponent', () => {
     });
 
     it('is the canonical module path the server reports', () => {
-      golangService.fetchModuleInfo.and.returnValue(of(moduleInfo('github.com/Acme/Lib', [FOUND])));
+      goService.fetchModuleInfo.and.returnValue(of(moduleInfo('github.com/Acme/Lib', [FOUND])));
 
       select();
 
@@ -198,7 +198,7 @@ describe('GolangModuleVersionDetailComponent', () => {
     });
 
     it('falls back to the module path from the query when the server reports none', () => {
-      golangService.fetchModuleInfo.and.returnValue(of(moduleInfo(undefined, [FOUND])));
+      goService.fetchModuleInfo.and.returnValue(of(moduleInfo(undefined, [FOUND])));
 
       select();
 
@@ -213,11 +213,11 @@ describe('GolangModuleVersionDetailComponent', () => {
       component.deleteVersion();
 
       expect(dangerModalService.modal).toEqual({ title: 'Delete Version', action: 'Delete', message: null });
-      expect(golangService.deleteModuleVersion).not.toHaveBeenCalled();
+      expect(goService.deleteModuleVersion).not.toHaveBeenCalled();
     });
 
     it('deletes the version, then goes to the module page and toasts', async () => {
-      golangService.fetchModuleInfo.and.returnValue(
+      goService.fetchModuleInfo.and.returnValue(
         of(moduleInfo('github.com/acme/lib', [FOUND, { version: 'v1.0.0' } as GoModuleVersionListItem])),
       );
       select();
@@ -226,7 +226,7 @@ describe('GolangModuleVersionDetailComponent', () => {
       dangerModalService.call();
       await Promise.resolve();
 
-      expect(golangService.deleteModuleVersion).toHaveBeenCalledOnceWith('github.com/acme/lib', 'v1.2.3');
+      expect(goService.deleteModuleVersion).toHaveBeenCalledOnceWith('github.com/acme/lib', 'v1.2.3');
       expect(router.navigate).toHaveBeenCalledOnceWith([`/${REPO}/modules`], {
         queryParams: { modulePath: 'github.com/acme/lib' },
       });
@@ -239,13 +239,13 @@ describe('GolangModuleVersionDetailComponent', () => {
       dangerModalService.call();
       await Promise.resolve();
 
-      expect(golangService.deleteModuleVersion).toHaveBeenCalledOnceWith('github.com/acme/lib', 'v1.2.3');
+      expect(goService.deleteModuleVersion).toHaveBeenCalledOnceWith('github.com/acme/lib', 'v1.2.3');
       expect(router.navigate).toHaveBeenCalledOnceWith([`/${REPO}`]);
       expect(toastService.show).toHaveBeenCalledOnceWith('Version deleted successfully', 'success');
     });
 
     it('stays on the page, without a toast, when the delete fails', () => {
-      golangService.deleteModuleVersion.and.returnValue(throwError(() => new Error('boom')));
+      goService.deleteModuleVersion.and.returnValue(throwError(() => new Error('boom')));
       component.deleteVersion();
 
       dangerModalService.call();

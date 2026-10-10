@@ -30,14 +30,14 @@ import {
   pageOf,
   REPO_NAME,
 } from '../../../testing/repo-list-spec-helpers';
-import { GolangService } from '../../service/golang.service';
-import { GolangModulesListComponent } from './golang-modules-list.component';
+import { GoService } from '../../service/go.service';
+import { GoModulesListComponent } from './go-modules-list.component';
 
 const MODULE = { modulePath: 'github.com/acme/lib' } as GoModuleListItem;
 
-describe('GolangModulesListComponent', () => {
-  let component: GolangModulesListComponent;
-  let golangService: jasmine.SpyObj<GolangService>;
+describe('GoModulesListComponent', () => {
+  let component: GoModulesListComponent;
+  let goService: jasmine.SpyObj<GoService>;
   let securityService: jasmine.SpyObj<SecurityService>;
   let toastService: jasmine.SpyObj<ToastService>;
   let dangerModalService: DangerModalService;
@@ -45,16 +45,16 @@ describe('GolangModulesListComponent', () => {
 
   function build(): ListFixture {
     repoChanges = new BehaviorSubject<RepoPermissionInfo | null>(null);
-    golangService = jasmine.createSpyObj<GolangService>('GolangService', ['fetchModules', 'deleteModule'], {
+    goService = jasmine.createSpyObj<GoService>('GoService', ['fetchModules', 'deleteModule'], {
       repoChanges,
     });
     securityService = jasmine.createSpyObj<SecurityService>('SecurityService', ['watchArtifactSecuritySummary']);
     securityService.watchArtifactSecuritySummary.and.returnValue(of({}));
     toastService = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
     dangerModalService = new DangerModalService();
-    component = new GolangModulesListComponent(
+    component = new GoModulesListComponent(
       { username: 'alice' } as AuthService,
-      golangService,
+      goService,
       toastService,
       dangerModalService,
       securityService,
@@ -62,11 +62,11 @@ describe('GolangModulesListComponent', () => {
     return {
       component,
       repoChanges,
-      load: golangService.fetchModules,
+      load: goService.fetchModules,
       args: { search: 0, sort: 1, page: 2 },
       respond: (content, totalPages) =>
-        golangService.fetchModules.and.returnValue(of(pageOf(content, totalPages) as never)),
-      fail: () => golangService.fetchModules.and.returnValue(throwError(() => 'boom')),
+        goService.fetchModules.and.returnValue(of(pageOf(content, totalPages) as never)),
+      fail: () => goService.fetchModules.and.returnValue(throwError(() => 'boom')),
       security: { watch: securityService.watchArtifactSecuritySummary, argsFor: (repoName) => [repoName] },
     };
   }
@@ -78,28 +78,28 @@ describe('GolangModulesListComponent', () => {
   describe('searching', () => {
     beforeEach(fakeAsync(() => {
       build();
-      golangService.fetchModules.and.returnValue(of(pageOf([], 1) as never));
+      goService.fetchModules.and.returnValue(of(pageOf([], 1) as never));
       repoChanges.next(permission(REPO_NAME));
       flushMicrotasks();
-      golangService.fetchModules.calls.reset();
+      goService.fetchModules.calls.reset();
     }));
 
     it('passes the text as q, from the first page', fakeAsync(() => {
       component.loadPage(2);
       flushMicrotasks();
-      golangService.fetchModules.calls.reset();
+      goService.fetchModules.calls.reset();
 
       component.search('acme');
       flushMicrotasks();
 
       expect(component.pageNum).toBe(0);
-      expect(golangService.fetchModules).toHaveBeenCalledOnceWith('acme', component.sortOption, 0, 10);
+      expect(goService.fetchModules).toHaveBeenCalledOnceWith('acme', component.sortOption, 0, 10);
     }));
 
     it('keeps searching while paging and sorting', fakeAsync(() => {
       component.search('acme');
       flushMicrotasks();
-      golangService.fetchModules.calls.reset();
+      goService.fetchModules.calls.reset();
       const oldest = component.sortOptions[1];
 
       component.sort(oldest);
@@ -107,7 +107,7 @@ describe('GolangModulesListComponent', () => {
       component.loadPage(1);
       flushMicrotasks();
 
-      expect(golangService.fetchModules.calls.allArgs()).toEqual([
+      expect(goService.fetchModules.calls.allArgs()).toEqual([
         ['acme', oldest, 0, 10],
         ['acme', oldest, 1, 10],
       ]);
@@ -116,12 +116,12 @@ describe('GolangModulesListComponent', () => {
     it('lists without q again when the search text is cleared', fakeAsync(() => {
       component.search('acme');
       flushMicrotasks();
-      golangService.fetchModules.calls.reset();
+      goService.fetchModules.calls.reset();
 
       component.search('');
       flushMicrotasks();
 
-      expect(golangService.fetchModules).toHaveBeenCalledOnceWith('', component.sortOption, 0, 10);
+      expect(goService.fetchModules).toHaveBeenCalledOnceWith('', component.sortOption, 0, 10);
     }));
   });
 
@@ -130,7 +130,7 @@ describe('GolangModulesListComponent', () => {
       list: build(),
       dangerModal: dangerModalService,
       toast: toastService.show,
-      remove: golangService.deleteModule,
+      remove: goService.deleteModule,
       invoke: () => component.deleteModule(MODULE),
       title: 'Delete Module',
       message: 'Module deleted successfully',
