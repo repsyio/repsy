@@ -17,17 +17,17 @@ package io.repsy.os.shared.user.controllers;
 
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 
+import io.repsy.core.web.http.NoStore;
+import io.repsy.core.web.http.ResponseEntities;
+import io.repsy.core.web.paging.SortValidator;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.os.generated.model.UserCreateForm;
 import io.repsy.os.generated.model.UserResponse;
 import io.repsy.os.generated.model.UserUpdateForm;
 import io.repsy.os.shared.auth.PanelAuthHelper;
-import io.repsy.os.shared.http.NoStore;
-import io.repsy.os.shared.http.ResponseEntities;
 import io.repsy.os.shared.user.services.ReservedUsernameService;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.os.shared.utils.MultiPortNames;
-import io.repsy.os.shared.utils.SortValidator;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.net.URI;

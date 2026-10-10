@@ -15,6 +15,7 @@
  */
 package io.repsy.os.shared.configs;
 
+import io.repsy.core.web.paging.PagingParameterInterceptor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;

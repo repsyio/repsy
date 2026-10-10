@@ -15,7 +15,7 @@
  */
 package io.repsy.os.server.protocols.maven.shared.keystore.configs;
 
-import io.repsy.os.shared.http.ResponseSizeLimitInterceptor;
+import io.repsy.core.web.http.ResponseSizeLimitInterceptor;
 import java.net.http.HttpClient;
 import java.time.Duration;
 import org.jspecify.annotations.NonNull;

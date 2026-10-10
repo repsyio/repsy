@@ -15,13 +15,13 @@
  */
 package io.repsy.os.server.protocols.docker.ui.controllers;
 
+import io.repsy.core.web.http.ResponseEntities;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.os.generated.model.CleanupPolicyForm;
 import io.repsy.os.generated.model.CleanupPolicyItem;
 import io.repsy.os.generated.model.CleanupPolicyStatusForm;
 import io.repsy.os.server.protocols.docker.shared.cleanup.services.CleanupPolicyService;
 import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
-import io.repsy.os.shared.http.ResponseEntities;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.utils.MultiPortNames;
 import io.repsy.protocols.shared.repo.dtos.Permission;

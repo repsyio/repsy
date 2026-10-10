@@ -17,6 +17,8 @@ package io.repsy.os.panel.profile.controllers;
 
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 
+import io.repsy.core.web.http.NoStore;
+import io.repsy.core.web.http.ResponseEntities;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.os.generated.model.LoginInfo;
 import io.repsy.os.generated.model.PasswordForm;
@@ -24,8 +26,6 @@ import io.repsy.os.generated.model.ProfileInfo;
 import io.repsy.os.generated.model.UpdateUsernameForm;
 import io.repsy.os.panel.profile.services.ProfileService;
 import io.repsy.os.shared.auth.PanelAuthHelper;
-import io.repsy.os.shared.http.NoStore;
-import io.repsy.os.shared.http.ResponseEntities;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.os.shared.utils.MultiPortNames;
 import jakarta.servlet.http.HttpServletResponse;

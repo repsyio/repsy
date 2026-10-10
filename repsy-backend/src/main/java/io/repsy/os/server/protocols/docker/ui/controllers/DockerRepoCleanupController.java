@@ -15,13 +15,13 @@
  */
 package io.repsy.os.server.protocols.docker.ui.controllers;
 
+import io.repsy.core.web.http.ResponseEntities;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.generated.model.UntaggedManifestCleanupResult;
 import io.repsy.os.server.protocols.docker.shared.layer.dtos.OrphanLayerInfo;
 import io.repsy.os.server.protocols.docker.ui.facades.DockerApiFacade;
 import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
-import io.repsy.os.shared.http.ResponseEntities;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;

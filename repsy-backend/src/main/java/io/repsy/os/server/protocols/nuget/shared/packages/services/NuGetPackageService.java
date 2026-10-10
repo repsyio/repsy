@@ -17,6 +17,10 @@ package io.repsy.os.server.protocols.nuget.shared.packages.services;
 
 import com.github.f4b6a3.uuid.UuidCreator;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
+import io.repsy.core.web.paging.OffsetPageRequest;
+import io.repsy.core.web.paging.VersionSortPaging;
+import io.repsy.core.web.utils.LikePatterns;
+import io.repsy.core.web_error.ConstraintViolations;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.generated.model.NuGetDeletedItem;
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackage;
@@ -24,10 +28,6 @@ import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackageV
 import io.repsy.os.server.protocols.nuget.shared.packages.mappers.NuGetPackageMapper;
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageRepository;
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageVersionRepository;
-import io.repsy.os.shared.error_handling.utils.ConstraintViolations;
-import io.repsy.os.shared.utils.LikePatterns;
-import io.repsy.os.shared.utils.OffsetPageRequest;
-import io.repsy.os.shared.utils.VersionSortPaging;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetPackageSearchResult;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetVersionInfo;
 import io.repsy.protocols.nuget.shared.packages.services.AbstractNuGetPackageService;

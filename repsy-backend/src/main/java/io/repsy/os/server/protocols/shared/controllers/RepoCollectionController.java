@@ -17,15 +17,15 @@ package io.repsy.os.server.protocols.shared.controllers;
 
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 
+import io.repsy.core.web.http.ResponseEntities;
+import io.repsy.core.web.paging.SortValidator;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.os.generated.model.RepoCreateForm;
 import io.repsy.os.generated.model.RepoListInfo;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.auth.PanelAuthHelper;
-import io.repsy.os.shared.http.ResponseEntities;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.utils.MultiPortNames;
-import io.repsy.os.shared.utils.SortValidator;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import jakarta.validation.Valid;
 import java.util.Map;

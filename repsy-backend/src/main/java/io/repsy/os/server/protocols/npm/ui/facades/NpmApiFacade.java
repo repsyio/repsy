@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.npm.ui.facades;
 
 import io.repsy.core.events.ArtifactVersionDeletedEvent;
+import io.repsy.core.web.paging.SortValidator;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.generated.model.NpmPackageInfo;
 import io.repsy.os.generated.model.PackageVersionDetail;
@@ -25,7 +26,6 @@ import io.repsy.os.server.protocols.npm.shared.npm_package.services.NpmPackageSe
 import io.repsy.os.server.protocols.npm.shared.storage.services.NpmStorageService;
 import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
-import io.repsy.os.shared.utils.SortValidator;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
