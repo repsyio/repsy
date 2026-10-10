@@ -24,15 +24,17 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import io.repsy.libs.storage.core.dtos.StaleFile;
+import io.repsy.os.server.protocols.docker.shared.abandoned_upload.sources.DockerAbandonedBlobUploadSource;
 import io.repsy.os.server.protocols.docker.shared.layer.repositories.LayerRepository;
 import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
+import io.repsy.os.server.protocols.helm.shared.abandoned_upload.sources.HelmAbandonedBlobUploadSource;
 import io.repsy.os.server.protocols.helm.shared.chart.entities.HelmChartVersion;
 import io.repsy.os.server.protocols.helm.shared.chart.repositories.HelmChartVersionRepository;
 import io.repsy.os.server.protocols.helm.shared.oci.repositories.HelmOciBlobRepository;
 import io.repsy.os.server.protocols.helm.shared.oci.repositories.HelmOciManifestRepository;
 import io.repsy.os.server.protocols.helm.shared.storage.services.HelmStorageService;
 import io.repsy.os.shared.repo.entities.Repo;
-import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -66,7 +68,7 @@ class AbandonedBlobUploadCleanupServiceTest {
   private static final String OTHER_DIGEST =
       "sha256:0000000000000000000000000000000000000000000000000000000000000002";
 
-  @Mock RepoRepository repoRepository;
+  @Mock RepoTxService repoTxService;
   @Mock LayerRepository layerRepository;
   @Mock HelmOciManifestRepository helmOciManifestRepository;
   @Mock HelmOciBlobRepository helmOciBlobRepository;
@@ -81,13 +83,15 @@ class AbandonedBlobUploadCleanupServiceTest {
   void setUp() {
     this.service =
         new AbandonedBlobUploadCleanupService(
-            this.repoRepository,
-            this.layerRepository,
-            this.helmOciManifestRepository,
-            this.helmOciBlobRepository,
-            this.helmChartVersionRepository,
-            this.dockerStorageService,
-            this.helmStorageService,
+            this.repoTxService,
+            List.of(
+                new HelmAbandonedBlobUploadSource(
+                    this.helmOciManifestRepository,
+                    this.helmOciBlobRepository,
+                    this.helmChartVersionRepository,
+                    this.helmStorageService),
+                new DockerAbandonedBlobUploadSource(
+                    this.layerRepository, this.dockerStorageService)),
             this.usageUpdateService,
             TTL);
   }
@@ -107,9 +111,9 @@ class AbandonedBlobUploadCleanupServiceTest {
   }
 
   private void givenRepos(final Repo docker, final Repo helm) {
-    when(this.repoRepository.findAllByTypeOrderByCreatedAtDescNameAsc(RepoType.DOCKER))
+    when(this.repoTxService.findReposByType(RepoType.DOCKER))
         .thenReturn(docker == null ? List.of() : List.of(docker));
-    when(this.repoRepository.findAllByTypeOrderByCreatedAtDescNameAsc(RepoType.HELM))
+    when(this.repoTxService.findReposByType(RepoType.HELM))
         .thenReturn(helm == null ? List.of() : List.of(helm));
   }
 
@@ -345,10 +349,8 @@ class AbandonedBlobUploadCleanupServiceTest {
     final var docker = repo(RepoType.DOCKER);
     final var listing = new CountDownLatch(1);
     final var release = new CountDownLatch(1);
-    when(this.repoRepository.findAllByTypeOrderByCreatedAtDescNameAsc(RepoType.DOCKER))
-        .thenReturn(List.of(docker));
-    when(this.repoRepository.findAllByTypeOrderByCreatedAtDescNameAsc(RepoType.HELM))
-        .thenReturn(List.of());
+    when(this.repoTxService.findReposByType(RepoType.DOCKER)).thenReturn(List.of(docker));
+    when(this.repoTxService.findReposByType(RepoType.HELM)).thenReturn(List.of());
     when(this.dockerStorageService.listStaleBlobFiles(docker.getId(), THRESHOLD))
         .thenAnswer(
             invocation -> {

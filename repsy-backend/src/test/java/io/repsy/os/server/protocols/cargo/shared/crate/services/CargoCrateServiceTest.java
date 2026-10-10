@@ -45,9 +45,10 @@ import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoCrateMe
 import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoCrateRepository;
 import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoKeywordRepository;
 import io.repsy.os.shared.repo.entities.Repo;
-import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.cargo.shared.crate.dtos.BaseCrateInfo;
 import io.repsy.protocols.cargo.shared.crate.dtos.CratePublishRequest;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.IOException;
 import java.sql.SQLException;
@@ -71,7 +72,7 @@ import tools.jackson.databind.ObjectMapper;
 @DisplayName("CargoCrateService")
 class CargoCrateServiceTest {
 
-  @Mock RepoRepository repoRepository;
+  @Mock RepoTxService repoTxService;
   @Mock CargoCrateRepository crateRepository;
   @Mock CargoCrateIndexRepository crateIndexRepository;
   @Mock CargoCrateMetaRepository crateMetaRepository;
@@ -98,8 +99,8 @@ class CargoCrateServiceTest {
       final var repoId = UUID.randomUUID();
       final var repoInfo = CargoCrateServiceTest.this.createRepoInfo(repoId);
 
-      when(CargoCrateServiceTest.this.repoRepository.findById(repoInfo.getId()))
-          .thenReturn(Optional.empty());
+      when(CargoCrateServiceTest.this.repoTxService.requireRepo(repoInfo.getId()))
+          .thenThrow(new ItemNotFoundException(ProtocolErrorCodes.REPO_NOT_FOUND));
 
       final var request = CargoCrateServiceTest.this.createPublishRequest("test-crate", "1.0.0");
 
@@ -120,8 +121,7 @@ class CargoCrateServiceTest {
       existingCrate.setId(UUID.randomUUID());
       existingCrate.setOriginalName("test-crate");
 
-      when(CargoCrateServiceTest.this.repoRepository.findById(repoId))
-          .thenReturn(Optional.of(new Repo()));
+      when(CargoCrateServiceTest.this.repoTxService.requireRepo(repoId)).thenReturn(new Repo());
       when(CargoCrateServiceTest.this.crateRepository.findByRepoIdAndName(repoId, "test_crate"))
           .thenReturn(Optional.of(existingCrate));
       when(CargoCrateServiceTest.this.crateIndexRepository.findByCrateIdAndVers(
@@ -150,8 +150,7 @@ class CargoCrateServiceTest {
       existingCrate.setName("foo_bar");
       existingCrate.setOriginalName("Foo-Bar");
 
-      when(CargoCrateServiceTest.this.repoRepository.findById(repoId))
-          .thenReturn(Optional.of(new Repo()));
+      when(CargoCrateServiceTest.this.repoTxService.requireRepo(repoId)).thenReturn(new Repo());
       when(CargoCrateServiceTest.this.crateRepository.findByRepoIdAndName(repoId, "foo_bar"))
           .thenReturn(Optional.of(existingCrate));
 
@@ -171,8 +170,7 @@ class CargoCrateServiceTest {
       final var repoInfo = CargoCrateServiceTest.this.createRepoInfo(repoId);
       final var request = CargoCrateServiceTest.this.createPublishRequest("my-Crate", "1.0.0");
 
-      when(CargoCrateServiceTest.this.repoRepository.findById(repoId))
-          .thenReturn(Optional.of(new Repo()));
+      when(CargoCrateServiceTest.this.repoTxService.requireRepo(repoId)).thenReturn(new Repo());
       final var insertedCrate = new CargoCrate();
       insertedCrate.setId(UUID.randomUUID());
       insertedCrate.setName("my_crate");
@@ -224,8 +222,7 @@ class CargoCrateServiceTest {
       final var existingCrate = new CargoCrate();
       existingCrate.setId(UUID.randomUUID());
       existingCrate.setOriginalName("test-crate");
-      when(CargoCrateServiceTest.this.repoRepository.findById(repoId))
-          .thenReturn(Optional.of(new Repo()));
+      when(CargoCrateServiceTest.this.repoTxService.requireRepo(repoId)).thenReturn(new Repo());
       when(CargoCrateServiceTest.this.crateRepository.findByRepoIdAndName(repoId, "test_crate"))
           .thenReturn(Optional.of(existingCrate));
       when(CargoCrateServiceTest.this.crateIndexRepository.findByCrateIdAndVers(
@@ -275,8 +272,7 @@ class CargoCrateServiceTest {
       existingCrate.setOriginalName("test-crate");
       existingCrate.setMaxVersion("1.0.0");
 
-      when(CargoCrateServiceTest.this.repoRepository.findById(repoId))
-          .thenReturn(Optional.of(new Repo()));
+      when(CargoCrateServiceTest.this.repoTxService.requireRepo(repoId)).thenReturn(new Repo());
       when(CargoCrateServiceTest.this.crateRepository.findByRepoIdAndName(repoId, "test_crate"))
           .thenReturn(Optional.of(existingCrate));
       when(CargoCrateServiceTest.this.crateIndexRepository.findByCrateIdAndVers(
@@ -312,8 +308,8 @@ class CargoCrateServiceTest {
       this.existingCrate.setMaxVersion("1.0.0");
 
       lenient()
-          .when(CargoCrateServiceTest.this.repoRepository.findById(this.repoId))
-          .thenReturn(Optional.of(new Repo()));
+          .when(CargoCrateServiceTest.this.repoTxService.requireRepo(this.repoId))
+          .thenReturn(new Repo());
       lenient()
           .when(
               CargoCrateServiceTest.this.crateRepository.findByRepoIdAndName(

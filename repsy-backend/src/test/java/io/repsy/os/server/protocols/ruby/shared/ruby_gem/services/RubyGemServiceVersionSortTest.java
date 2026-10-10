@@ -26,7 +26,7 @@ import io.repsy.os.server.protocols.ruby.shared.ruby_gem.mappers.RubyGemMapper;
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.repositories.RubyGemDependencyRepository;
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.repositories.RubyGemRepository;
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.repositories.RubyGemVersionRepository;
-import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.os.shared.repo.services.RepoTxService;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -50,7 +50,7 @@ class RubyGemServiceVersionSortTest {
   private final RubyGemVersionRepository versionRepository = mock(RubyGemVersionRepository.class);
   private final RubyGemDependencyRepository dependencyRepository =
       mock(RubyGemDependencyRepository.class);
-  private final RepoRepository repoRepository = mock(RepoRepository.class);
+  private final RepoTxService repoTxService = mock(RepoTxService.class);
   private final RubyGemMapper converter = mock(RubyGemMapper.class);
 
   private final RubyGemService service =
@@ -58,7 +58,7 @@ class RubyGemServiceVersionSortTest {
           this.gemRepository,
           this.versionRepository,
           this.dependencyRepository,
-          this.repoRepository,
+          this.repoTxService,
           this.converter);
 
   @Test

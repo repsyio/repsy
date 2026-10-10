@@ -33,6 +33,7 @@ import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.os.shared.repo.utils.RepoUtils;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import java.util.Collection;
 import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.List;
@@ -42,6 +43,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
@@ -136,8 +138,52 @@ public class RepoTxService {
     return this.repoRepository.findByNameAndType(name, type).map(this::mapToRepoInfo);
   }
 
-  public @NonNull Repo getRepoEntity(final @NonNull UUID repoId) {
+  /**
+   * The repo entity, for a service that relates its own rows to it.
+   *
+   * @throws ItemNotFoundException {@code repoNotFound} if there is no such repo
+   */
+  public @NonNull Repo requireRepo(final @NonNull UUID repoId) {
     return this.findRepoById(repoId);
+  }
+
+  /**
+   * The repo entity of the type with the name.
+   *
+   * @throws ItemNotFoundException {@code repoNotFound} if there is no such repo
+   */
+  public @NonNull Repo requireRepo(final @NonNull String name, final @NonNull RepoType type) {
+    return this.findRepoOrThrowException(this.repoRepository.findByNameAndType(name, type));
+  }
+
+  public boolean repoExists(final @NonNull UUID repoId) {
+    return this.repoRepository.existsById(repoId);
+  }
+
+  /** The repos of the type, the newest first. */
+  public @NonNull List<Repo> findReposByType(final @NonNull RepoType type) {
+    return this.repoRepository.findAllByTypeOrderByCreatedAtDescNameAsc(type);
+  }
+
+  /** The names of the repos with the ids, keyed by id; an id that is gone is left out. */
+  public @NonNull Map<UUID, String> findRepoNames(final @NonNull Collection<UUID> repoIds) {
+    return this.repoRepository.findAllById(repoIds).stream()
+        .collect(Collectors.toMap(Repo::getId, Repo::getName));
+  }
+
+  /** The committed {@code pgpVerifyAllSignaturesEnabled} of the repo, empty if it is gone. */
+  public @NonNull Optional<Boolean> findPgpVerifyAllSignaturesEnabled(final @NonNull UUID repoId) {
+    return this.repoRepository.findPgpVerifyAllSignaturesEnabledById(repoId);
+  }
+
+  /** The disk usage of every repo together, {@code 0} when there is none. */
+  public long getTotalDiskUsage() {
+    final var total = this.repoRepository.getTotalDiskUsage();
+    return total != null ? total : 0L;
+  }
+
+  public long countRepos() {
+    return this.repoRepository.count();
   }
 
   /**

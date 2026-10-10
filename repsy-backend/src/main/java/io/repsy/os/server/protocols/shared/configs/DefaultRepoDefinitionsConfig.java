@@ -15,7 +15,6 @@
  */
 package io.repsy.os.server.protocols.shared.configs;
 
-import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
 import io.repsy.os.shared.repo.dtos.DefaultRepoDefinition;
 import io.repsy.protocols.cargo.shared.storage.services.CargoStorageService;
 import io.repsy.protocols.golang.shared.storage.services.GoStorageService;
@@ -32,7 +31,8 @@ import org.springframework.context.annotation.Configuration;
 
 /**
  * The default repository each protocol gets for a new user (RPS-2062). Every storage service is
- * taken as the protocol library's interface, the one place all nine are reached the same way.
+ * taken as the protocol library's interface, the one place the other eight are reached the same
+ * way; the Docker one is {@code DockerDefaultRepoDefinitionConfig}.
  */
 @Configuration(proxyBeanMethods = false)
 @NullMarked
@@ -41,11 +41,6 @@ public class DefaultRepoDefinitionsConfig {
   @Bean
   public DefaultRepoDefinition cargoDefaultRepo(final CargoStorageService storage) {
     return new DefaultRepoDefinition("cargo", RepoType.CARGO, storage::createRepo);
-  }
-
-  @Bean
-  public DefaultRepoDefinition dockerDefaultRepo(final DockerStorageService storage) {
-    return new DefaultRepoDefinition("docker", RepoType.DOCKER, storage::createRepo);
   }
 
   @Bean

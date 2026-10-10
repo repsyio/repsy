@@ -54,7 +54,7 @@ import io.repsy.os.server.protocols.maven.shared.artifact.repositories.VersionSi
 import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreService;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.entities.Repo;
-import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
 import io.repsy.protocols.maven.shared.artifact.dtos.PluginPrefixChange;
 import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredPlugin;
@@ -63,6 +63,7 @@ import io.repsy.protocols.maven.shared.artifact.dtos.SignatureOutcome;
 import io.repsy.protocols.maven.shared.keystore.dtos.PublicKeySources;
 import io.repsy.protocols.maven.shared.keystore.services.PgpVerifierService;
 import io.repsy.protocols.maven.shared.utils.MavenGavUtils;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import io.repsy.protocols.shared.storage.StorageStrategyRegistry;
 import java.io.ByteArrayOutputStream;
@@ -157,7 +158,7 @@ class ArtifactDeploymentServiceTest {
       <updated>20260921101010</updated></snapshotVersion></snapshotVersions></versioning>\
       </metadata>""";
 
-  @Mock RepoRepository repoRepository;
+  @Mock RepoTxService repoTxService;
   @Mock ArtifactRepository artifactRepository;
   @Mock ArtifactVersionRepository artifactVersionRepository;
   @Mock VersionDeveloperRepository versionDeveloperRepository;
@@ -217,7 +218,7 @@ class ArtifactDeploymentServiceTest {
             this.storageStrategyRegistry);
     this.artifactService =
         new ArtifactDeploymentService(
-            this.repoRepository,
+            this.repoTxService,
             this.artifactRepository,
             this.artifactVersionRepository,
             this.versionDeveloperRepository,
@@ -543,7 +544,7 @@ class ArtifactDeploymentServiceTest {
         new ByteArrayResource(ARMORED_SIGNATURE.getBytes(StandardCharsets.UTF_8)));
 
     verifyNoInteractions(
-        this.repoRepository,
+        this.repoTxService,
         this.pgpVerifierService,
         this.keyStoreService,
         this.artifactRepository,
@@ -964,7 +965,7 @@ class ArtifactDeploymentServiceTest {
     verify(this.versionSignatureService).recordVerified(version, "lib-1.0.pom");
     verify(this.versionSignatureService).refreshSigned(id, version, "com/acme/lib/1.0", false);
     verify(this.artifactVersionRepository, never()).save(any());
-    verifyNoInteractions(this.repoRepository, this.pgpVerifierService, this.keyStoreService);
+    verifyNoInteractions(this.repoTxService, this.pgpVerifierService, this.keyStoreService);
   }
 
   @Test
@@ -1049,7 +1050,7 @@ class ArtifactDeploymentServiceTest {
         this.artifactRepository,
         this.artifactVersionRepository,
         this.storageStrategy,
-        this.repoRepository);
+        this.repoTxService);
     this.verifyNoSignatureStateTouched();
   }
 
@@ -1255,7 +1256,7 @@ class ArtifactDeploymentServiceTest {
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessage("itemNotFound");
 
-    verifyNoInteractions(this.repoRepository, this.pgpVerifierService);
+    verifyNoInteractions(this.repoTxService, this.pgpVerifierService);
   }
 
   @Test
@@ -1581,7 +1582,7 @@ class ArtifactDeploymentServiceTest {
         .thenReturn(List.of(artifact));
     final var repo = new Repo();
     repo.setId(id);
-    when(this.repoRepository.findById(id)).thenReturn(Optional.of(repo));
+    when(this.repoTxService.requireRepo(id)).thenReturn(repo);
 
     this.artifactService.deleteArtifactVersion(
         repo(id, true, true, true), "com.acme", "lib", "1.0");
@@ -1726,7 +1727,7 @@ class ArtifactDeploymentServiceTest {
         .hasMessage("artifactVersionNotFound");
 
     verify(this.artifactVersionRepository, never()).save(any());
-    verifyNoInteractions(this.repoRepository);
+    verifyNoInteractions(this.repoTxService);
   }
 
   private static final String POM_OF_GROUP =
@@ -1745,8 +1746,7 @@ class ArtifactDeploymentServiceTest {
     repo.setName("mvn");
     repo.setReleases(true);
     repo.setSnapshots(true);
-    when(this.repoRepository.findByNameAndType("mvn", RepoType.MAVEN))
-        .thenReturn(Optional.of(repo));
+    when(this.repoTxService.requireRepo("mvn", RepoType.MAVEN)).thenReturn(repo);
 
     return repo;
   }
@@ -1827,7 +1827,7 @@ class ArtifactDeploymentServiceTest {
         new ByteArrayResource(new byte[] {'P', 'K', 3, 4, 0, 0}));
 
     verifyNoInteractions(
-        this.repoRepository,
+        this.repoTxService,
         this.artifactRepository,
         this.artifactVersionRepository,
         this.artifactUpsertHelper);
@@ -1844,7 +1844,7 @@ class ArtifactDeploymentServiceTest {
         new ByteArrayResource(ARTIFACT_METADATA_MIXED.getBytes(StandardCharsets.UTF_8)));
 
     verifyNoInteractions(
-        this.repoRepository,
+        this.repoTxService,
         this.artifactRepository,
         this.artifactVersionRepository,
         this.artifactUpsertHelper);
@@ -1861,7 +1861,7 @@ class ArtifactDeploymentServiceTest {
         new ByteArrayResource(ARMORED_SIGNATURE.getBytes(StandardCharsets.UTF_8)));
 
     verify(this.artifactVersionRepository, never()).save(any());
-    verifyNoInteractions(this.repoRepository, this.artifactRepository, this.artifactUpsertHelper);
+    verifyNoInteractions(this.repoTxService, this.artifactRepository, this.artifactUpsertHelper);
   }
 
   @Test
@@ -1908,7 +1908,7 @@ class ArtifactDeploymentServiceTest {
         new ByteArrayResource(new byte[] {1}));
 
     verifyNoInteractions(
-        this.repoRepository,
+        this.repoTxService,
         this.artifactRepository,
         this.artifactVersionRepository,
         this.artifactUpsertHelper);
@@ -1918,7 +1918,8 @@ class ArtifactDeploymentServiceTest {
   @DisplayName("a POM still needs its repo row and answers repoNotFound without it (RPS-1179)")
   void aPomOfAMissingRepoAnswersRepoNotFound() {
     final var id = UUID.randomUUID();
-    when(this.repoRepository.findByNameAndType("mvn", RepoType.MAVEN)).thenReturn(Optional.empty());
+    when(this.repoTxService.requireRepo("mvn", RepoType.MAVEN))
+        .thenThrow(new ItemNotFoundException(ProtocolErrorCodes.REPO_NOT_FOUND));
 
     assertThatThrownBy(
             () ->

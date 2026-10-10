@@ -30,7 +30,7 @@ import io.repsy.os.server.protocols.pypi.shared.python_package.repositories.Rele
 import io.repsy.os.server.protocols.pypi.shared.python_package.repositories.ReleaseProjectUrlRepository;
 import io.repsy.os.server.protocols.pypi.shared.python_package.repositories.ReleaseRepository;
 import io.repsy.os.server.protocols.pypi.shared.storage.services.PypiStorageService;
-import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.os.shared.repo.services.RepoTxService;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -52,7 +52,7 @@ import org.springframework.data.domain.Sort;
 @DisplayName("PypiPackageService.getReleaseList version sort (RPS-1688)")
 class PypiPackageServiceVersionSortTest {
 
-  private final RepoRepository repoRepository = mock(RepoRepository.class);
+  private final RepoTxService repoTxService = mock(RepoTxService.class);
   private final PypiStorageService pypiStorageService = mock(PypiStorageService.class);
   private final ReleaseRepository releaseRepository = mock(ReleaseRepository.class);
   private final ConversionService conversionService = mock(ConversionService.class);
@@ -66,7 +66,7 @@ class PypiPackageServiceVersionSortTest {
 
   private final PypiPackageService service =
       new PypiPackageService(
-          this.repoRepository,
+          this.repoTxService,
           this.pypiStorageService,
           this.releaseRepository,
           this.conversionService,

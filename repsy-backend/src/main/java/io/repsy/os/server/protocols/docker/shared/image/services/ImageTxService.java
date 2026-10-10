@@ -26,7 +26,7 @@ import io.repsy.os.server.protocols.docker.shared.layer.repositories.LayerReposi
 import io.repsy.os.server.protocols.docker.shared.tag.entities.Tag;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.TagRepository;
-import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.docker.shared.image.exceptions.ImageDeletedException;
 import io.repsy.protocols.docker.shared.image.services.ImageService;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
@@ -51,7 +51,7 @@ public class ImageTxService implements ImageService<UUID> {
 
   private final ImageMapper imageConverter;
   private final ImageRepository imageRepository;
-  private final RepoRepository repoRepository;
+  private final RepoTxService repoTxService;
   private final LayerRepository layerRepository;
   private final TagRepository tagRepository;
   private final ManifestRepository manifestRepository;
@@ -198,10 +198,7 @@ public class ImageTxService implements ImageService<UUID> {
   public Page<io.repsy.os.generated.model.ImageListItem> findAllByRepoIdAndContainsName(
       final UUID repoId, final String imageName, final Pageable pageable) {
 
-    final var repo =
-        this.repoRepository
-            .findById(repoId)
-            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.REPO_NOT_FOUND));
+    final var repo = this.repoTxService.requireRepo(repoId);
 
     final var page =
         this.imageRepository.findAllByRepoIdAndContainsName(

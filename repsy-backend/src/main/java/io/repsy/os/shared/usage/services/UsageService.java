@@ -17,12 +17,10 @@ package io.repsy.os.shared.usage.services;
 
 import static io.repsy.os.shared.utils.UsageUtils.humanReadable;
 
-import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.os.generated.model.RepoUsageInfo;
 import io.repsy.os.generated.model.TotalUsageInfo;
 import io.repsy.os.generated.model.UsageInfo;
-import io.repsy.os.shared.repo.repositories.RepoRepository;
-import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
+import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,15 +34,12 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class UsageService {
 
-  private final @NonNull RepoRepository repoRepository;
+  private final @NonNull RepoTxService repoTxService;
 
   public @NonNull RepoUsageInfo getRepoUsageInfo(
       final @NonNull String repoName, final @NonNull RepoType repoType) {
 
-    final var repo =
-        this.repoRepository
-            .findByNameAndType(repoName, repoType)
-            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.REPO_NOT_FOUND));
+    final var repo = this.repoTxService.requireRepo(repoName, repoType);
 
     final var diskUsed = this.createUsageInfo(repo.getDiskUsage());
 
@@ -52,11 +47,8 @@ public class UsageService {
   }
 
   public @NonNull TotalUsageInfo getTotalUsageInfo() {
-    final var totalDiskUsage = this.repoRepository.getTotalDiskUsage();
-    final var diskUsage = totalDiskUsage != null ? totalDiskUsage : 0L;
-
-    final var diskUsed = this.createUsageInfo(diskUsage);
-    final var reposCount = this.repoRepository.count();
+    final var diskUsed = this.createUsageInfo(this.repoTxService.getTotalDiskUsage());
+    final var reposCount = this.repoTxService.countRepos();
 
     return TotalUsageInfo.builder().diskUsed(diskUsed).reposCount(reposCount).build();
   }

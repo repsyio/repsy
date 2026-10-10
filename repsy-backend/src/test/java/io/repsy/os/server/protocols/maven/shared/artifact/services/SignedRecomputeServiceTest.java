@@ -30,7 +30,7 @@ import static org.mockito.Mockito.when;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactVersionRepository;
 import io.repsy.os.shared.repo.events.PgpKeySourcesChangedEvent;
 import io.repsy.os.shared.repo.events.PgpVerifyAllSignaturesToggledEvent;
-import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.os.shared.repo.services.RepoTxService;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -52,7 +52,7 @@ class SignedRecomputeServiceTest {
   private static final UUID BEFORE_THE_FIRST = new UUID(0L, 0L);
 
   @Mock ArtifactVersionRepository artifactVersionRepository;
-  @Mock RepoRepository repoRepository;
+  @Mock RepoTxService repoTxService;
   @Mock ArtifactSignatureService artifactSignatureService;
 
   private SignedRecomputeService service;
@@ -68,7 +68,7 @@ class SignedRecomputeServiceTest {
     this.service =
         new SignedRecomputeService(
             this.artifactVersionRepository,
-            this.repoRepository,
+            this.repoTxService,
             this.artifactSignatureService,
             this::submit,
             2);
@@ -239,7 +239,7 @@ class SignedRecomputeServiceTest {
   }
 
   private void verifyAllIs(final boolean enabled) {
-    when(this.repoRepository.findPgpVerifyAllSignaturesEnabledById(this.repoId))
+    when(this.repoTxService.findPgpVerifyAllSignaturesEnabled(this.repoId))
         .thenReturn(Optional.of(enabled));
   }
 
@@ -274,7 +274,7 @@ class SignedRecomputeServiceTest {
   @Test
   @DisplayName("a key change of a repo that is gone recomputes nothing")
   void aKeyChangeOfAMissingRepoIsIgnored() {
-    when(this.repoRepository.findPgpVerifyAllSignaturesEnabledById(this.repoId))
+    when(this.repoTxService.findPgpVerifyAllSignaturesEnabled(this.repoId))
         .thenReturn(Optional.empty());
 
     this.service.onKeySourcesChanged(new PgpKeySourcesChangedEvent(this.repoId));
@@ -316,7 +316,7 @@ class SignedRecomputeServiceTest {
   @Test
   @DisplayName("a setting that cannot be read does not throw into the request, and queues nothing")
   void anUnreadableSettingDoesNotFailAKeyChange() {
-    when(this.repoRepository.findPgpVerifyAllSignaturesEnabledById(this.repoId))
+    when(this.repoTxService.findPgpVerifyAllSignaturesEnabled(this.repoId))
         .thenThrow(new IllegalStateException("database is down"));
 
     assertThatCode(
@@ -332,7 +332,7 @@ class SignedRecomputeServiceTest {
     final var single =
         new SignedRecomputeService(
             this.artifactVersionRepository,
-            this.repoRepository,
+            this.repoTxService,
             this.artifactSignatureService,
             this::submit,
             0);

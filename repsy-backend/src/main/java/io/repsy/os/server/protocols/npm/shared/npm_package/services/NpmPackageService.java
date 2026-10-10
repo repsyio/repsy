@@ -39,7 +39,7 @@ import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageK
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageMaintainerRepository;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageVersionRepository;
 import io.repsy.os.shared.repo.entities.Repo;
-import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.npm.shared.constants.NpmConstants;
 import io.repsy.protocols.npm.shared.npm_package.dtos.BaseNpmPackageInfo;
 import io.repsy.protocols.npm.shared.npm_package.dtos.NpmPackageSnapshot;
@@ -80,7 +80,7 @@ public class NpmPackageService extends AbstractNpmPackageService<UUID> {
   private static final String VERSION_UNIQUE_CONSTRAINT =
       "ux_npm_package_version__package_id_version";
 
-  private final RepoRepository repoRepository;
+  private final RepoTxService repoTxService;
   private final NpmPackageRepository npmPackageRepository;
   private final PackageVersionRepository packageVersionRepository;
   private final PackageDistTagRepository packageDistTagRepository;
@@ -102,10 +102,7 @@ public class NpmPackageService extends AbstractNpmPackageService<UUID> {
     final PublishKind kind;
 
     try {
-      final var repo =
-          this.repoRepository
-              .findById(repoInfo.getStorageKey())
-              .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.REPO_NOT_FOUND));
+      final var repo = this.repoTxService.requireRepo(repoInfo.getStorageKey());
 
       kind =
           this.recordVersion(

@@ -23,6 +23,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 import io.repsy.core.events.UserCreatedEvent;
+import io.repsy.os.server.protocols.docker.shared.storage.configs.DockerDefaultRepoDefinitionConfig;
 import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
 import io.repsy.os.server.protocols.shared.configs.DefaultRepoDefinitionsConfig;
 import io.repsy.os.shared.repo.dtos.DefaultRepoDefinition;
@@ -75,7 +76,7 @@ class DefaultRepoSeedingListenerTest {
     final List<DefaultRepoDefinition> definitions =
         List.of(
             config.cargoDefaultRepo(this.cargo),
-            config.dockerDefaultRepo(this.docker),
+            new DockerDefaultRepoDefinitionConfig().dockerDefaultRepo(this.docker),
             config.goDefaultRepo(this.go),
             config.helmDefaultRepo(this.helm),
             config.mavenDefaultRepo(this.maven),

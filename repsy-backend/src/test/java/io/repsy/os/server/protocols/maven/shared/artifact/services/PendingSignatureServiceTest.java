@@ -43,7 +43,7 @@ import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreServi
 import io.repsy.os.server.protocols.maven.shared.keystore.services.MavenPgpCaps;
 import io.repsy.os.server.protocols.shared.configs.TestStorageRegistries;
 import io.repsy.os.shared.repo.entities.Repo;
-import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.protocols.maven.shared.keystore.dtos.PublicKeySources;
@@ -53,6 +53,7 @@ import java.io.InputStream;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -82,7 +83,7 @@ class PendingSignatureServiceTest {
   @Mock PendingSignatureRepository pendingSignatureRepository;
   @Mock ArtifactRepository artifactRepository;
   @Mock ArtifactVersionRepository artifactVersionRepository;
-  @Mock RepoRepository repoRepository;
+  @Mock RepoTxService repoTxService;
   @Mock ArtifactSignatureService artifactSignatureService;
   @Mock PgpVerifierService pgpVerifierService;
   @Mock KeyStoreService keyStoreService;
@@ -113,7 +114,7 @@ class PendingSignatureServiceTest {
             this.pendingSignatureRepository,
             this.artifactRepository,
             this.artifactVersionRepository,
-            this.repoRepository,
+            this.repoTxService,
             this.artifactSignatureService,
             this.pgpVerifierService,
             this.keyStoreService,
@@ -376,7 +377,7 @@ class PendingSignatureServiceTest {
     repo.setName("mvn");
     when(this.pendingSignatureRepository.findByCreatedAtBefore(any(Instant.class)))
         .thenReturn(List.of(old));
-    when(this.repoRepository.findAllById(any())).thenReturn(List.of(repo));
+    when(this.repoTxService.findRepoNames(any())).thenReturn(Map.of(repo.getId(), repo.getName()));
 
     final var before = Instant.now().minus(Duration.ofHours(24));
     assertThat(this.service.purgeOlderThan(Duration.ofHours(24))).isEqualTo(1);

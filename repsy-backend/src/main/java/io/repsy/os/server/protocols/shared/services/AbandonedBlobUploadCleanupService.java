@@ -17,34 +17,22 @@ package io.repsy.os.server.protocols.shared.services;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StaleFile;
-import io.repsy.os.server.protocols.docker.shared.layer.repositories.LayerRepository;
-import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
-import io.repsy.os.server.protocols.helm.shared.chart.repositories.HelmChartVersionRepository;
-import io.repsy.os.server.protocols.helm.shared.oci.repositories.HelmOciBlobRepository;
-import io.repsy.os.server.protocols.helm.shared.oci.repositories.HelmOciManifestRepository;
-import io.repsy.os.server.protocols.helm.shared.storage.services.HelmStorageService;
+import io.repsy.os.server.protocols.shared.sources.AbandonedBlobUploadSource;
 import io.repsy.os.shared.repo.entities.Repo;
-import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
-import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.HashSet;
+import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.locks.ReentrantLock;
-import java.util.regex.Pattern;
+import java.util.function.Predicate;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import tools.jackson.core.JacksonException;
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.ObjectMapper;
 
 /**
  * Removes the blob uploads that were started and never finalized (RPS-1041), and the finalized
@@ -87,42 +75,23 @@ import tools.jackson.databind.ObjectMapper;
 @Service
 public class AbandonedBlobUploadCleanupService {
 
-  private static final Pattern UPLOAD_SESSION_NAME =
-      Pattern.compile(
-          "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
-
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-  private static final String DIGEST_FIELD_NAME = "digest";
-
-  private final @NonNull RepoRepository repoRepository;
-  private final @NonNull LayerRepository layerRepository;
-  private final @NonNull HelmOciManifestRepository helmOciManifestRepository;
-  private final @NonNull HelmOciBlobRepository helmOciBlobRepository;
-  private final @NonNull HelmChartVersionRepository helmChartVersionRepository;
-  private final @NonNull DockerStorageService dockerStorageService;
-  private final @NonNull HelmStorageService helmStorageService;
+  private final @NonNull RepoTxService repoTxService;
+  private final @NonNull List<AbandonedBlobUploadSource> sources;
   private final @NonNull UsageUpdateService usageUpdateService;
   private final @NonNull Duration ttl;
 
   private final ReentrantLock passLock = new ReentrantLock();
 
   public AbandonedBlobUploadCleanupService(
-      final @NonNull RepoRepository repoRepository,
-      final @NonNull LayerRepository layerRepository,
-      final @NonNull HelmOciManifestRepository helmOciManifestRepository,
-      final @NonNull HelmOciBlobRepository helmOciBlobRepository,
-      final @NonNull HelmChartVersionRepository helmChartVersionRepository,
-      final @NonNull DockerStorageService dockerStorageService,
-      final @NonNull HelmStorageService helmStorageService,
+      final @NonNull RepoTxService repoTxService,
+      final @NonNull List<AbandonedBlobUploadSource> sources,
       final @NonNull UsageUpdateService usageUpdateService,
       final @Value("${repsy.storage.abandoned-upload-cleanup.ttl:PT24H}") @NonNull Duration ttl) {
-    this.repoRepository = repoRepository;
-    this.layerRepository = layerRepository;
-    this.helmOciManifestRepository = helmOciManifestRepository;
-    this.helmOciBlobRepository = helmOciBlobRepository;
-    this.helmChartVersionRepository = helmChartVersionRepository;
-    this.dockerStorageService = dockerStorageService;
-    this.helmStorageService = helmStorageService;
+    this.repoTxService = repoTxService;
+    this.sources =
+        sources.stream()
+            .sorted(Comparator.comparing((AbandonedBlobUploadSource s) -> s.repoType().name()))
+            .toList();
     this.usageUpdateService = usageUpdateService;
     this.ttl = ttl;
   }
@@ -147,9 +116,11 @@ public class AbandonedBlobUploadCleanupService {
     }
 
     try {
-      final var released =
-          this.cleanupRepos(RepoType.DOCKER, notModifiedSince)
-              + this.cleanupRepos(RepoType.HELM, notModifiedSince);
+      var released = 0L;
+
+      for (final var source : this.sources) {
+        released += this.cleanupRepos(source, notModifiedSince);
+      }
 
       if (released > 0) {
         log.info("Released {} bytes held by abandoned blob uploads", released);
@@ -161,13 +132,14 @@ public class AbandonedBlobUploadCleanupService {
     }
   }
 
-  private long cleanupRepos(final @NonNull RepoType type, final @NonNull Instant notModifiedSince) {
+  private long cleanupRepos(
+      final @NonNull AbandonedBlobUploadSource source, final @NonNull Instant notModifiedSince) {
 
     var released = 0L;
 
-    for (final var repo : this.repoRepository.findAllByTypeOrderByCreatedAtDescNameAsc(type)) {
+    for (final var repo : this.repoTxService.findReposByType(source.repoType())) {
       try {
-        released += this.cleanupRepo(repo, notModifiedSince);
+        released += this.cleanupRepo(source, repo, notModifiedSince);
       } catch (final RuntimeException e) {
         log.warn("Failed to clean up the abandoned blob uploads of repo {}", repo.getId(), e);
       }
@@ -176,14 +148,22 @@ public class AbandonedBlobUploadCleanupService {
     return released;
   }
 
-  private long cleanupRepo(final @NonNull Repo repo, final @NonNull Instant notModifiedSince) {
+  private long cleanupRepo(
+      final @NonNull AbandonedBlobUploadSource source,
+      final @NonNull Repo repo,
+      final @NonNull Instant notModifiedSince) {
 
-    final var files = this.listStaleBlobFiles(repo, notModifiedSince);
-    final var helmReferencedDigests = this.helmReferencedDigestsIfNeeded(repo, files);
+    final var files = source.listStaleBlobFiles(repo.getId(), notModifiedSince);
+
+    if (files.isEmpty()) {
+      return 0L;
+    }
+
+    final var collectable = source.collectableIn(repo.getId());
 
     var released = 0L;
     for (final var file : files) {
-      released += this.collectIfNeeded(repo, file, helmReferencedDigests);
+      released += this.collectIfNeeded(source, repo, file, collectable);
     }
 
     if (released > 0) {
@@ -194,123 +174,21 @@ public class AbandonedBlobUploadCleanupService {
     return released;
   }
 
-  /**
-   * The repo's referenced Helm digests, loaded once per repo per pass — only when the repo is Helm
-   * and has at least one stale file candidate to check them against.
-   */
-  private @NonNull Set<String> helmReferencedDigestsIfNeeded(
-      final @NonNull Repo repo, final @NonNull List<StaleFile> files) {
-
-    return repo.getType() == RepoType.HELM && !files.isEmpty()
-        ? this.loadHelmReferencedDigests(repo.getId())
-        : Set.of();
-  }
-
   private long collectIfNeeded(
+      final @NonNull AbandonedBlobUploadSource source,
       final @NonNull Repo repo,
       final @NonNull StaleFile file,
-      final @NonNull Set<String> helmReferencedDigests) {
+      final @NonNull Predicate<StaleFile> collectable) {
 
-    if (!this.isCollectable(repo, file, helmReferencedDigests)) {
+    if (!collectable.test(file)) {
       return 0L;
     }
 
     try {
-      final var freed = this.deleteBlobFile(repo, file);
-      this.deleteHelmBlobRowIfNeeded(repo, file);
-      return freed;
+      return source.deleteBlobFile(repo.getId(), repo.getName(), file.name());
     } catch (final IOException | RuntimeException e) {
       log.warn("Failed to delete abandoned upload {} of repo {}", file.name(), repo.getId(), e);
       return 0L;
-    }
-  }
-
-  private void deleteHelmBlobRowIfNeeded(final @NonNull Repo repo, final @NonNull StaleFile file) {
-
-    if (repo.getType() == RepoType.HELM && !UPLOAD_SESSION_NAME.matcher(file.name()).matches()) {
-      this.helmOciBlobRepository.deleteByRepoIdAndDigest(repo.getId(), file.name());
-    }
-  }
-
-  private @NonNull List<StaleFile> listStaleBlobFiles(
-      final @NonNull Repo repo, final @NonNull Instant notModifiedSince) {
-
-    return repo.getType() == RepoType.DOCKER
-        ? this.dockerStorageService.listStaleBlobFiles(repo.getId(), notModifiedSince)
-        : this.helmStorageService.listStaleBlobFiles(repo.getId(), notModifiedSince);
-  }
-
-  private long deleteBlobFile(final @NonNull Repo repo, final @NonNull StaleFile file)
-      throws IOException {
-
-    return repo.getType() == RepoType.DOCKER
-        ? this.dockerStorageService.deleteBlobFile(repo.getId(), repo.getName(), file.name())
-        : this.helmStorageService.deleteBlobFile(repo.getId(), repo.getName(), file.name());
-  }
-
-  private boolean isCollectable(
-      final @NonNull Repo repo,
-      final @NonNull StaleFile file,
-      final @NonNull Set<String> helmReferencedDigests) {
-
-    if (UPLOAD_SESSION_NAME.matcher(file.name()).matches()) {
-      return repo.getType() != RepoType.DOCKER
-          || !this.layerRepository.existsByIdAndRepoId(UUID.fromString(file.name()), repo.getId());
-    }
-
-    // A digest-named file is a finalized blob. It is collectable once nothing references it any
-    // more (RPS-1112 for Helm, RPS-1172 for Docker).
-    return repo.getType() == RepoType.DOCKER
-        ? !this.layerRepository.existsByRepoIdAndDigest(repo.getId(), file.name())
-        : !helmReferencedDigests.contains(file.name());
-  }
-
-  /**
-   * Every digest the repo's Helm OCI manifests or chart versions still reference, loaded once per
-   * repo per pass rather than once per candidate file.
-   */
-  private @NonNull Set<String> loadHelmReferencedDigests(final @NonNull UUID repoId) {
-
-    final var digests = new HashSet<String>();
-
-    try (final var contents = this.helmOciManifestRepository.streamContentByRepoId(repoId)) {
-      contents.forEach(content -> collectDigests(content, digests));
-    }
-
-    for (final var chartVersion : this.helmChartVersionRepository.findAllByChartRepoId(repoId)) {
-      digests.add(chartVersion.getDigest());
-    }
-
-    return digests;
-  }
-
-  private static void collectDigests(
-      final @NonNull String manifestJson, final @NonNull Set<String> into) {
-
-    try {
-      collectDigests(OBJECT_MAPPER.readTree(manifestJson), into);
-    } catch (final JacksonException e) {
-      log.warn("Failed to parse a Helm OCI manifest while sweeping unreferenced blobs", e);
-    }
-  }
-
-  private static void collectDigests(
-      final @NonNull JsonNode node, final @NonNull Set<String> into) {
-
-    if (node.isObject()) {
-      node.properties().forEach(entry -> collectDigestsFromProperty(entry, into));
-    } else if (node.isArray()) {
-      node.forEach(child -> collectDigests(child, into));
-    }
-  }
-
-  private static void collectDigestsFromProperty(
-      final Map.@NonNull Entry<String, JsonNode> property, final @NonNull Set<String> into) {
-
-    if (DIGEST_FIELD_NAME.equals(property.getKey()) && property.getValue().isString()) {
-      into.add(property.getValue().asString());
-    } else {
-      collectDigests(property.getValue(), into);
     }
   }
 }

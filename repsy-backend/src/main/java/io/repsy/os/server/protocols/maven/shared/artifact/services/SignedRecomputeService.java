@@ -19,7 +19,7 @@ import io.repsy.os.config.async.SignedRecomputeExecutorConfig;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactVersionRepository;
 import io.repsy.os.shared.repo.events.PgpKeySourcesChangedEvent;
 import io.repsy.os.shared.repo.events.PgpVerifyAllSignaturesToggledEvent;
-import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.os.shared.repo.services.RepoTxService;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -81,7 +81,7 @@ public class SignedRecomputeService {
   private static final UUID BEFORE_THE_FIRST = new UUID(0L, 0L);
 
   private final ArtifactVersionRepository artifactVersionRepository;
-  private final RepoRepository repoRepository;
+  private final RepoTxService repoTxService;
   private final ArtifactSignatureService artifactSignatureService;
   private final Executor executor;
   private final int batchSize;
@@ -91,13 +91,13 @@ public class SignedRecomputeService {
 
   public SignedRecomputeService(
       final ArtifactVersionRepository artifactVersionRepository,
-      final RepoRepository repoRepository,
+      final RepoTxService repoTxService,
       final ArtifactSignatureService artifactSignatureService,
       @Qualifier(SignedRecomputeExecutorConfig.BEAN_NAME) final Executor executor,
       @Value("${repsy.maven.signed-recompute.batch-size:200}") final int batchSize) {
 
     this.artifactVersionRepository = artifactVersionRepository;
-    this.repoRepository = repoRepository;
+    this.repoTxService = repoTxService;
     this.artifactSignatureService = artifactSignatureService;
     this.executor = executor;
     this.batchSize = Math.max(1, batchSize);
@@ -142,7 +142,7 @@ public class SignedRecomputeService {
     final var repoId = event.repoId();
 
     try {
-      if (!this.repoRepository.findPgpVerifyAllSignaturesEnabledById(repoId).orElse(false)) {
+      if (!this.repoTxService.findPgpVerifyAllSignaturesEnabled(repoId).orElse(false)) {
         log.debug(
             "Maven repo {} does not verify every signature: its key sources are not used", repoId);
 
