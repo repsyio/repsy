@@ -25,7 +25,7 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import io.repsy.libs.storage.core.services.StorageStrategy;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.cargo.shared.crate.storage.CargoStorageService;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
@@ -81,7 +81,7 @@ import tools.jackson.databind.ObjectMapper;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("Cargo publish keeps storage and the database in agreement (RPS-1124)")
-class CargoPublishStorageConsistencyIT extends AbstractIntegrationTest {
+class CargoPublishStorageConsistencyIT extends AbstractIT {
 
   private static final String PUBLISH_PATH = "/{repo}/api/v1/crates/new";
 

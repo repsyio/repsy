@@ -16,14 +16,14 @@
 package io.repsy.os.server.protocols.pypi.shared.storage.services;
 
 import freemarker.template.Configuration;
-import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.os.server.shared.utils.RequestBaseUrlUtils;
 import io.repsy.protocols.pypi.shared.storage.services.AbstractPypiStorageService;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import io.repsy.protocols.shared.repo.dtos.RepoType;
+import io.repsy.protocols.shared.storage.StorageStrategyRegistry;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -33,10 +33,10 @@ import org.springframework.web.util.UriComponentsBuilder;
 public class PypiStorageService extends AbstractPypiStorageService<UUID> {
 
   public PypiStorageService(
-      @Qualifier("osStorageStrategyPypi") final StorageStrategy storageStrategy,
+      final StorageStrategyRegistry storageStrategyRegistry,
       final Configuration freeMarkerConfiguration) {
 
-    super(storageStrategy, freeMarkerConfiguration);
+    super(storageStrategyRegistry.get(RepoType.PYPI), freeMarkerConfiguration);
   }
 
   @Override

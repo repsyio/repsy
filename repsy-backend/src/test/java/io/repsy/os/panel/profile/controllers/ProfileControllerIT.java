@@ -35,7 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.user.entities.User;
@@ -59,10 +59,10 @@ import org.springframework.test.util.ReflectionTestUtils;
  *
  * <p>The container, the fake {@code multiport.ports.api} local port ({@link #apiPort()}, needed
  * because {@code ProfileController} is only registered on the "api" connector), the user and JWT
- * fixtures and the per-test rollback all come from {@link AbstractIntegrationTest}.
+ * fixtures and the per-test rollback all come from {@link AbstractIT}.
  */
 @DisplayName("ProfileController /api/profile/*")
-class ProfileControllerIT extends AbstractIntegrationTest {
+class ProfileControllerIT extends AbstractIT {
 
   private String refreshTokenFor(final User user) {
     final var token =

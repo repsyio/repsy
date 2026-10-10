@@ -16,12 +16,12 @@
 package io.repsy.os.server.protocols.maven.shared.storage.services;
 
 import freemarker.template.Configuration;
-import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.protocols.maven.shared.storage.services.AbstractMavenStorageService;
+import io.repsy.protocols.shared.repo.dtos.RepoType;
+import io.repsy.protocols.shared.storage.StorageStrategyRegistry;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
 @Slf4j
@@ -30,9 +30,9 @@ import org.springframework.stereotype.Service;
 public class MavenStorageService extends AbstractMavenStorageService<UUID> {
 
   public MavenStorageService(
-      @Qualifier("osStorageStrategyMaven") final StorageStrategy storageStrategy,
+      final StorageStrategyRegistry storageStrategyRegistry,
       final Configuration freeMarkerConfiguration) {
 
-    super(freeMarkerConfiguration, storageStrategy);
+    super(freeMarkerConfiguration, storageStrategyRegistry.get(RepoType.MAVEN));
   }
 }

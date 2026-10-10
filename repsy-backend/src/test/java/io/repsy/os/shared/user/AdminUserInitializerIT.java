@@ -24,7 +24,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
@@ -50,7 +50,7 @@ import org.springframework.http.MediaType;
  */
 @ExtendWith(OutputCaptureExtension.class)
 @DisplayName("AdminUserInitializer password reset")
-class AdminUserInitializerIT extends AbstractIntegrationTest {
+class AdminUserInitializerIT extends AbstractIT {
 
   @Autowired private AdminUserInitializer adminUserInitializer;
 

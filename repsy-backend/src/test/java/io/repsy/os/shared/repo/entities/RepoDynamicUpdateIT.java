@@ -17,7 +17,7 @@ package io.repsy.os.shared.repo.entities;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -46,7 +46,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("Repo full-row save versus a concurrent usage increment")
-class RepoDynamicUpdateIT extends AbstractIntegrationTest {
+class RepoDynamicUpdateIT extends AbstractIT {
 
   private static final long TIMEOUT_SECONDS = 20;
 

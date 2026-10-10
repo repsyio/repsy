@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.user.entities.UserRole;
@@ -44,7 +44,7 @@ import org.springframework.test.util.ReflectionTestUtils;
  * npm's equivalent case).
  */
 @DisplayName("Docker's pre-processor answers 401, not 403, for a rejected bearer")
-class DockerAuthPreProcessorIT extends AbstractIntegrationTest {
+class DockerAuthPreProcessorIT extends AbstractIT {
 
   private static final String IMAGE = "some-image";
   private static final String MANIFEST_PATH = "/v2/{repo}/" + IMAGE + "/manifests/latest";

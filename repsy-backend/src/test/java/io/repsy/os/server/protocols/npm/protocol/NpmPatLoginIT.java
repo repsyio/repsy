@@ -23,7 +23,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 import com.auth0.jwt.JWT;
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.server.shared.auth.AbstractPatIntegrationTest;
+import io.repsy.os.server.shared.auth.AbstractPatIT;
 import io.repsy.os.shared.auth.dtos.AuthenticationType;
 import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.repo.entities.Repo;
@@ -54,7 +54,7 @@ import tools.jackson.databind.ObjectMapper;
  * token that the panel does not take.
  */
 @DisplayName("npm login with a personal access token")
-class NpmPatLoginIT extends AbstractPatIntegrationTest {
+class NpmPatLoginIT extends AbstractPatIT {
 
   private static final String PACKUMENT = "/{repo}/login-package";
   private static final String LOGIN = "/{repo}/-/user/org.couchdb.user:{name}";

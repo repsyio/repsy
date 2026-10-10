@@ -76,11 +76,11 @@ public abstract class H2IntegrationTest {
    *
    * <p>{@code AdminUserInitializer} publishes a {@code UserCreatedEvent} at context startup and the
    * {@code @Async} per-protocol {@code *AuthListener}s then each create one default repo, in their
-   * own committed transaction, independently of this class's test transaction. {@link
-   * AbstractIntegrationTest}'s classes wait for the same thing through {@code
-   * CommittedRowsGuard#awaitDefaultRepos} before their first test; the H2 suites share one context
-   * and database the same way but had no such barrier, so the first H2 class of a run could start,
-   * and read the repo counts, while a listener was still committing its insert (RPS-1674).
+   * own committed transaction, independently of this class's test transaction. {@link AbstractIT}'s
+   * classes wait for the same thing through {@code CommittedRowsGuard#awaitDefaultRepos} before
+   * their first test; the H2 suites share one context and database the same way but had no such
+   * barrier, so the first H2 class of a run could start, and read the repo counts, while a listener
+   * was still committing its insert (RPS-1674).
    */
   @BeforeEach
   void awaitDefaultReposSeeded() {

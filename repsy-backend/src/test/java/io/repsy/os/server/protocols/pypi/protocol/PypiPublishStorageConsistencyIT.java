@@ -27,7 +27,7 @@ import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.core.UrlParserProperties;
 import io.repsy.os.server.protocols.pypi.protocol.facades.PypiProtocolFacade;
 import io.repsy.os.server.protocols.pypi.shared.storage.services.PypiStorageService;
@@ -79,7 +79,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("PyPI upload keeps storage and the database in agreement (RPS-1124)")
-class PypiPublishStorageConsistencyIT extends AbstractIntegrationTest {
+class PypiPublishStorageConsistencyIT extends AbstractIT {
 
   /** A summary the database refuses through {@link #rejectSummaryAtTheDatabase()}. */
   private static final String REJECTED_SUMMARY = "reject-me";

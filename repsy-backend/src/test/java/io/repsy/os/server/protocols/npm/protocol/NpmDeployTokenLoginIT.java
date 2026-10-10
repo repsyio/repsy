@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 import com.auth0.jwt.JWT;
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.shared.token.entities.RepoDeployToken;
 import io.repsy.os.server.shared.token.repositories.RepoDeployTokenRepository;
 import io.repsy.os.server.shared.token.utils.DeployTokenHash;
@@ -54,7 +54,7 @@ import tools.jackson.databind.ObjectMapper;
  * up whichever side (issuer or verifier) moves.
  */
 @DisplayName("npm login with a deploy token")
-class NpmDeployTokenLoginIT extends AbstractIntegrationTest {
+class NpmDeployTokenLoginIT extends AbstractIT {
 
   private static final String PACKAGE = "login-package";
   private static final String PACKUMENT = "/{repo}/" + PACKAGE;

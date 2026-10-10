@@ -28,7 +28,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -47,7 +47,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * that.
  */
 @DisplayName("Helm OCI override keeps the previous digest pullable (RPS-1314)")
-class HelmOciOverrideDigestIT extends AbstractIntegrationTest {
+class HelmOciOverrideDigestIT extends AbstractIT {
 
   private static final String CHART = "payments";
   private static final String OCTET_STREAM = "application/octet-stream";

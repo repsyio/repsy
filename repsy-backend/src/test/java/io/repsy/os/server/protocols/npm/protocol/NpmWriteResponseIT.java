@@ -23,7 +23,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.user.entities.UserRole;
@@ -46,7 +46,7 @@ import tools.jackson.databind.ObjectMapper;
  * version.
  */
 @DisplayName("npm wire protocol publish and delete answers")
-class NpmWriteResponseIT extends AbstractIntegrationTest {
+class NpmWriteResponseIT extends AbstractIT {
 
   private static final String PACKAGE_PATH = "/{repo}/{name}";
   private static final String ABBREVIATED = "application/vnd.npm.install-v1+json";

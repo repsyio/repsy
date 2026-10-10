@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -40,7 +40,7 @@ import org.springframework.http.MediaType;
  * header used to be minted by two separate {@code getUuid()} calls, so they carried different ids.
  */
 @DisplayName("Docker upload start")
-class DockerUploadStartIT extends AbstractIntegrationTest {
+class DockerUploadStartIT extends AbstractIT {
 
   private static final String IMAGE = "app";
 

@@ -21,7 +21,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.user.entities.UserRole;
 import java.util.ArrayList;
 import java.util.List;
@@ -45,7 +45,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("HTTP Basic remembers a successful password check")
-class BasicAuthCacheIT extends AbstractIntegrationTest {
+class BasicAuthCacheIT extends AbstractIT {
 
   /**
    * A route that takes Basic credentials and needs an admin: {@code MANAGE} on a repo that does not

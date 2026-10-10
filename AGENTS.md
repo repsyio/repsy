@@ -242,7 +242,7 @@ for SonarCloud.
 - Integration tests use Testcontainers with **PostgreSQL 18** (`postgres:18`), wired in through
   `@ServiceConnection`. Keep it on the same major version as the images documented in
   `README.md`.
-- Every `*IT` extends `AbstractIntegrationTest` and shares that one PostgreSQL container. The
+- Every `*IT` extends `AbstractIT` and shares that one PostgreSQL container. The
   container is per test JVM: `mvn verify` runs `it.fork.count` JVMs at once (see "Build & verify"),
   each with its own container, storage root and Spring contexts, and Failsafe hands the classes out
   to them one by one. So a class only ever shares a database with the classes of its own JVM, and a
@@ -252,7 +252,7 @@ for SonarCloud.
   the rows it creates and deletes exactly those in an `@AfterEach`. It never empties a table, and
   it measures a baseline instead of asserting the absolute size of a table that other classes
   fill. `DefaultRepoSeedingIT` and the H2 suites own their database and are the exceptions.
-- `CommittedRowsGuard` (registered on `AbstractIntegrationTest`) enforces that. It snapshots the row
+- `CommittedRowsGuard` (registered on `AbstractIT`) enforces that. It snapshots the row
   count of every table once the default repos are seeded, and after each class it fails the class
   whose counts differ, naming the class and the tables. It also deletes the `users` and `repo` rows
   the class added, so the next class starts clean and the failure stays with the class that
@@ -771,7 +771,7 @@ Old springdoc tag to new tag. Several old tags may map to one new tag (one area,
   of the repo has the digest), and a tag (`docker_tag`) is a pointer to it. A migration that changes
   populated data is tested on legacy data at the previous version: see `DockerManifestMigrationScenario`
   (`V0024DockerContentAddressedManifestsTest` on H2, `DockerManifestMigrationIT` on PostgreSQL, which
-  owns its container instead of extending `AbstractIntegrationTest`).
+  owns its container instead of extending `AbstractIT`).
 - A Docker image (`docker_image`) exists while it stores a manifest. A manifest push creates it in the
   same transaction that saves the manifest (`ImageTxService.getOrCreateImage`, an insert that skips an
   existing row), so a push that fails leaves no image behind; what the tags and untagged manifests reach

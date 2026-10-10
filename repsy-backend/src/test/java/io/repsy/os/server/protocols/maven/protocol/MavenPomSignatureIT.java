@@ -23,7 +23,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.maven.shared.keystore.PgpTestKeys;
 import io.repsy.os.server.protocols.maven.shared.keystore.support.StubKeyServers;
 import io.repsy.os.server.protocols.maven.shared.storage.services.MavenStorageService;
@@ -81,7 +81,7 @@ import tools.jackson.databind.ObjectMapper;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("Maven POM signature is verified before it is stored (RPS-1186, RPS-1191)")
-class MavenPomSignatureIT extends AbstractIntegrationTest {
+class MavenPomSignatureIT extends AbstractIT {
 
   private static final PgpTestKeys KEYS = PgpTestKeys.generate();
   private static final PgpTestKeys OTHER_KEYS = PgpTestKeys.generate();

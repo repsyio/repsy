@@ -21,7 +21,7 @@ import static io.repsy.os.server.protocols.docker.protocol.handlers.DockerWire.i
 import static io.repsy.os.server.protocols.docker.protocol.handlers.DockerWire.sha256;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestRepository;
 import io.repsy.os.shared.repo.entities.Repo;
@@ -68,7 +68,7 @@ import org.springframework.web.context.WebApplicationContext;
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("Concurrent first pushes of one manifest into one image (RPS-1314)")
 @Import(DockerConcurrentFirstPushIT.ManifestSaveHook.class)
-class DockerConcurrentFirstPushIT extends AbstractIntegrationTest {
+class DockerConcurrentFirstPushIT extends AbstractIT {
 
   private static final String IMAGE = "app";
   private static final long TIMEOUT_SECONDS = 30;

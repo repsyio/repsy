@@ -23,7 +23,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.PagingAssertions;
 import io.repsy.os.server.protocols.docker.shared.image.repositories.ImageRepository;
 import io.repsy.os.server.protocols.docker.shared.image.services.ImageTxService;
@@ -70,7 +70,7 @@ import tools.jackson.databind.ObjectMapper;
 
 /** Full-stack Testcontainers coverage for the Docker image-management API. */
 @DisplayName("DockerImageController /api/docker/images/*")
-class DockerImageControllerIT extends AbstractIntegrationTest {
+class DockerImageControllerIT extends AbstractIT {
 
   private static final String MANIFEST_MEDIA_TYPE =
       "application/vnd.docker.distribution.manifest.v2+json";

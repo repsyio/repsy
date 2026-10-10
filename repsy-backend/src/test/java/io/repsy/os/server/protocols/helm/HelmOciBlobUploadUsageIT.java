@@ -24,7 +24,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
@@ -53,7 +53,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * uncommitted data. The mock records the disk-usage deltas the upload post-processor requests.
  */
 @DisplayName("Helm OCI blob upload usage")
-class HelmOciBlobUploadUsageIT extends AbstractIntegrationTest {
+class HelmOciBlobUploadUsageIT extends AbstractIT {
 
   private static final String CHART = "app";
 

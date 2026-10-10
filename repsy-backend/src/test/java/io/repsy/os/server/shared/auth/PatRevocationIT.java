@@ -40,7 +40,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
  * a login (the decision of RPS-1898). Each case is paired with the request working before.
  */
 @DisplayName("A personal access token ends when it is revoked, expires or its user is deleted")
-class PatRevocationIT extends AbstractPatIntegrationTest {
+class PatRevocationIT extends AbstractPatIT {
 
   private static final String READ = "/{repo}/com/example/lib/1.0/lib-1.0.pom";
 

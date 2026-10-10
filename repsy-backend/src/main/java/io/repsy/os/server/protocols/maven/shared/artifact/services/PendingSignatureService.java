@@ -36,6 +36,8 @@ import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import io.repsy.protocols.shared.repo.dtos.RepoType;
+import io.repsy.protocols.shared.storage.StorageStrategyRegistry;
 import java.io.ByteArrayInputStream;
 import java.time.Duration;
 import java.time.Instant;
@@ -50,7 +52,6 @@ import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -156,7 +157,7 @@ public class PendingSignatureService {
       final PgpVerifierService pgpVerifierService,
       final KeyStoreService keyStoreService,
       final UsageUpdateService usageUpdateService,
-      @Qualifier("osStorageStrategyMaven") final StorageStrategy storageStrategy,
+      final StorageStrategyRegistry storageStrategyRegistry,
       final PlatformTransactionManager transactionManager,
       final MavenPgpCaps caps) {
 
@@ -168,7 +169,7 @@ public class PendingSignatureService {
     this.pgpVerifierService = pgpVerifierService;
     this.keyStoreService = keyStoreService;
     this.usageUpdateService = usageUpdateService;
-    this.storageStrategy = storageStrategy;
+    this.storageStrategy = storageStrategyRegistry.get(RepoType.MAVEN);
     this.caps = caps;
     this.newTransaction = new TransactionTemplate(transactionManager);
     this.newTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);

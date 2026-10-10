@@ -16,16 +16,16 @@
 package io.repsy.os.server.security.shared.resolvers;
 
 import io.repsy.libs.storage.core.dtos.StoragePath;
-import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.os.server.security.shared.ArtifactStorageResolver;
 import io.repsy.protocols.cargo.shared.storage.services.CargoStorageService;
+import io.repsy.protocols.shared.repo.dtos.RepoType;
+import io.repsy.protocols.shared.storage.StorageStrategyRegistry;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.NullMarked;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -37,8 +37,7 @@ public class CargoArtifactStorageResolver implements ArtifactStorageResolver {
 
   private final @NonNull CargoStorageService cargoStorageService;
 
-  @Qualifier("osStorageStrategyCargo")
-  private final @NonNull StorageStrategy cargoStorageStrategy;
+  private final @NonNull StorageStrategyRegistry storageStrategyRegistry;
 
   @Override
   public @NonNull Optional<String> resolve(
@@ -50,7 +49,8 @@ public class CargoArtifactStorageResolver implements ArtifactStorageResolver {
     final var cratePath =
         this.cargoStorageService.getCrateRelativePath(artifactName, artifactVersion);
 
-    return this.cargoStorageStrategy
+    return this.storageStrategyRegistry
+        .get(RepoType.CARGO)
         .get(StoragePath.of(repoId, cratePath), repoName)
         .map(resource -> cratePath);
   }

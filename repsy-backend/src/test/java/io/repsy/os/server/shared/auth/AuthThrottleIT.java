@@ -30,7 +30,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.shared.token.entities.RepoDeployToken;
 import io.repsy.os.server.shared.token.repositories.RepoDeployTokenRepository;
 import io.repsy.os.server.shared.token.utils.DeployTokenHash;
@@ -64,14 +64,14 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
  * another BCrypt verification, on the protocol routes, on the {@code /api} routes that take Basic
  * credentials, and on the panel login, which share one count.
  *
- * <p>Every test starts with an empty throttle ({@link AbstractIntegrationTest}), and MockMvc's
- * default address is the one client that fails; a second client is sent from another address with
- * {@code remoteAddr}. The throttle, the password cache and the user service are spies: the first
- * gives the tests a clock, the other two show whether a request reached the hash check or the user
- * lookup. That gives this class a Spring context of its own.
+ * <p>Every test starts with an empty throttle ({@link AbstractIT}), and MockMvc's default address
+ * is the one client that fails; a second client is sent from another address with {@code
+ * remoteAddr}. The throttle, the password cache and the user service are spies: the first gives the
+ * tests a clock, the other two show whether a request reached the hash check or the user lookup.
+ * That gives this class a Spring context of its own.
  */
 @DisplayName("Failed password checks are throttled per client")
-class AuthThrottleIT extends AbstractIntegrationTest {
+class AuthThrottleIT extends AbstractIT {
 
   private static final int MAX_FAILURES = 20;
 

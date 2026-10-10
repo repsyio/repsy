@@ -24,7 +24,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.maven.shared.artifact.services.ArtifactService;
 import io.repsy.os.server.protocols.maven.shared.storage.services.MavenStorageService;
 import io.repsy.os.shared.repo.entities.Repo;
@@ -72,7 +72,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName(
     "Maven registration that fails after the store keeps repo and usage in step (RPS-1199)")
-class MavenPostStoreFailureIT extends AbstractIntegrationTest {
+class MavenPostStoreFailureIT extends AbstractIT {
 
   private static final String POM_PATH = "com/example/lib/1.0/lib-1.0.pom";
 

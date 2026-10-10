@@ -31,7 +31,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 import com.jayway.jsonpath.JsonPath;
 import io.repsy.core.events.ArtifactVersionDeletedEvent;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.docker.shared.image.repositories.ImageRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestChildRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestRepository;
@@ -74,7 +74,7 @@ import org.springframework.web.context.WebApplicationContext;
  */
 @RecordApplicationEvents
 @DisplayName("Docker protocol DELETE of manifests and tags (RPS-1216)")
-class DockerManifestDeleteIT extends AbstractIntegrationTest {
+class DockerManifestDeleteIT extends AbstractIT {
 
   private static final String IMAGE = "app";
 

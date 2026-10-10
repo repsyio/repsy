@@ -19,7 +19,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -31,7 +31,7 @@ import org.springframework.http.HttpHeaders;
  * credentials. See {@link CorsConfigurationRestrictedIT} for the configured case.
  */
 @DisplayName("CORS, app.allowed-origins unset (RPS-1590)")
-class CorsConfigurationIT extends AbstractIntegrationTest {
+class CorsConfigurationIT extends AbstractIT {
 
   @Test
   @DisplayName("does not answer a preflight from any origin with CORS headers")

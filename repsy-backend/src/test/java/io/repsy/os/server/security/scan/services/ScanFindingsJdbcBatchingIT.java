@@ -17,7 +17,7 @@ package io.repsy.os.server.security.scan.services;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.security.scan.dtos.FixStatus;
 import io.repsy.os.server.security.scan.dtos.ScanStatus;
 import io.repsy.os.server.security.scan.dtos.Severity;
@@ -43,7 +43,7 @@ import org.springframework.beans.factory.annotation.Autowired;
  * spring.jpa.properties.hibernate.jdbc.batch_size} is 50, so 2,000 findings take about 40 prepared
  * statements instead of 2,000. It runs inside the test transaction, so nothing is committed.
  */
-class ScanFindingsJdbcBatchingIT extends AbstractIntegrationTest {
+class ScanFindingsJdbcBatchingIT extends AbstractIT {
 
   private static final int FINDINGS = 2_000;
   private static final int BATCH_SIZE = 50;

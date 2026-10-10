@@ -30,7 +30,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.token.dtos.TokenScope;
 import io.repsy.os.shared.token.entities.PersonalAccessToken;
 import io.repsy.os.shared.token.repositories.PersonalAccessTokenRepository;
@@ -71,7 +71,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
  * <p>Every test runs in one transaction that is rolled back afterwards.
  */
 @DisplayName("PersonalAccessTokenController /api/profile/access-tokens/*")
-class PersonalAccessTokenControllerIT extends AbstractIntegrationTest {
+class PersonalAccessTokenControllerIT extends AbstractIT {
 
   private static final String BASE = "/api/profile/access-tokens";
   private static final String SECRET_PATTERN = "rut-[A-Za-z0-9_-]{43}";

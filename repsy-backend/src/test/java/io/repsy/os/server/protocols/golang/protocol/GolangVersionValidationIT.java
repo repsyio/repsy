@@ -19,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.ByteArrayOutputStream;
@@ -47,7 +47,7 @@ import org.springframework.mock.web.MockHttpServletResponse;
  */
 @DisplayName(
     "Go module upload validates the version string against Go's own semver grammar (RPS-1227)")
-class GolangVersionValidationIT extends AbstractIntegrationTest {
+class GolangVersionValidationIT extends AbstractIT {
 
   private static final String MODULE = "example.com/semver";
 

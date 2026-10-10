@@ -15,7 +15,7 @@
  */
 package io.repsy.os.shared.search;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.golang.shared.go_module.repositories.GoModuleRepository;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactRepository;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.NpmPackageRepository;
@@ -27,7 +27,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 /** The contains-searches on PostgreSQL, where the trigram indexes serve them (RPS-2117). */
 @DisplayName("Contains searches are case-insensitive and literal on PostgreSQL (RPS-2117)")
-class TrigramSearchParityIT extends AbstractIntegrationTest {
+class TrigramSearchParityIT extends AbstractIT {
 
   @Autowired private ArtifactRepository artifactRepository;
   @Autowired private NpmPackageRepository npmPackageRepository;

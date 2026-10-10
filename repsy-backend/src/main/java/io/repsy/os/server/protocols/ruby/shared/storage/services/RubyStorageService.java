@@ -15,10 +15,10 @@
  */
 package io.repsy.os.server.protocols.ruby.shared.storage.services;
 
-import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.protocols.ruby.shared.storage.services.AbstractRubyStorageService;
+import io.repsy.protocols.shared.repo.dtos.RepoType;
+import io.repsy.protocols.shared.storage.StorageStrategyRegistry;
 import org.jspecify.annotations.NullMarked;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,8 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 @NullMarked
 public class RubyStorageService extends AbstractRubyStorageService {
 
-  public RubyStorageService(
-      @Qualifier("osStorageStrategyRuby") final StorageStrategy storageStrategy) {
-    super(storageStrategy);
+  public RubyStorageService(final StorageStrategyRegistry storageStrategyRegistry) {
+    super(storageStrategyRegistry.get(RepoType.RUBY));
   }
 }

@@ -54,7 +54,7 @@ import tools.jackson.databind.ObjectMapper;
  * right.
  */
 @DisplayName("A token made from a personal access token is never a panel token")
-class PatDerivedTokensArePanelProofIT extends AbstractPatIntegrationTest {
+class PatDerivedTokensArePanelProofIT extends AbstractPatIT {
 
   @Autowired private PanelAuthHelper panelAuthHelper;
   @Autowired private ObjectMapper objectMapper;

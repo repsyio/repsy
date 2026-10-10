@@ -27,7 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.protocols.ruby.shared.utils.CompactIndexFormatter;
@@ -43,7 +43,7 @@ import org.springframework.test.web.servlet.request.AbstractMockHttpServletReque
  * with its last remaining version, yanked or not, and what the gem still serves stays consistent.
  */
 @DisplayName("RubyGemApiController DELETE .../versions/{version} keeps the other versions")
-class RubyGemVersionDeleteIT extends AbstractIntegrationTest {
+class RubyGemVersionDeleteIT extends AbstractIT {
 
   private static final String GEM = "keep-gem";
   private static final String VERSION_PATH = "/api/ruby/gems/{repo}/{gem}/versions/{version}";

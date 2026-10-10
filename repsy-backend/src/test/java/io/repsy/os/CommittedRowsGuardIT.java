@@ -40,10 +40,9 @@ import org.springframework.transaction.annotation.Transactional;
  * RPS-1011: {@link CommittedRowsGuard} fails the class that leaves committed rows behind, and only
  * that class.
  *
- * <p>The fixture classes below are real {@link AbstractIntegrationTest} subclasses, so the guard is
- * wired in exactly as for every other suite. They are run through the JUnit engine from the tests,
- * and the {@code $} in their binary names keeps Surefire and Failsafe from running them on their
- * own.
+ * <p>The fixture classes below are real {@link AbstractIT} subclasses, so the guard is wired in
+ * exactly as for every other suite. They are run through the JUnit engine from the tests, and the
+ * {@code $} in their binary names keeps Surefire and Failsafe from running them on their own.
  *
  * <p>This class doesn't run in a test transaction: the fixtures commit, and the counts it compares
  * must see their rows. Its own guard doubles as a check that the cleanup left the database as it
@@ -51,7 +50,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("Committed-rows guard")
-class CommittedRowsGuardIT extends AbstractIntegrationTest {
+class CommittedRowsGuardIT extends AbstractIT {
 
   @Test
   @DisplayName("fails the class that leaves a user and a repo behind, naming both tables")
@@ -140,13 +139,13 @@ class CommittedRowsGuardIT extends AbstractIntegrationTest {
   // Fixtures: what a suite of the shared database might do
   // ---------------------------------------------------------------------------------------------
 
-  private static UUID commitUser(final AbstractIntegrationTest test) {
+  private static UUID commitUser(final AbstractIT test) {
     return test.userTxService
         .create(uniqueUsername("guard"), UserRole.USER, VALID_PASSWORD_HASH)
         .getId();
   }
 
-  private static Repo commitRepo(final AbstractIntegrationTest test) {
+  private static Repo commitRepo(final AbstractIT test) {
     final var repo = new Repo();
     repo.setName(uniqueRepoName("guard"));
     repo.setType(RepoType.MAVEN);
@@ -157,7 +156,7 @@ class CommittedRowsGuardIT extends AbstractIntegrationTest {
 
   /** Commits a user and a repo and forgets to delete them. */
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
-  static class LeakingFixture extends AbstractIntegrationTest {
+  static class LeakingFixture extends AbstractIT {
 
     @Test
     void commitsAndForgetsToClean() {
@@ -168,7 +167,7 @@ class CommittedRowsGuardIT extends AbstractIntegrationTest {
 
   /** Commits a user and a repo and deletes both again. */
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
-  static class CleanFixture extends AbstractIntegrationTest {
+  static class CleanFixture extends AbstractIT {
 
     @Test
     void commitsAndCleansUp() {
@@ -182,7 +181,7 @@ class CommittedRowsGuardIT extends AbstractIntegrationTest {
 
   /** Commits in a {@code @Nested} class and deletes it all once, in the outer {@code @AfterAll}. */
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
-  static class NestedFixture extends AbstractIntegrationTest {
+  static class NestedFixture extends AbstractIT {
 
     private static final List<UUID> COMMITTED_USERS = new CopyOnWriteArrayList<>();
 
@@ -203,7 +202,7 @@ class CommittedRowsGuardIT extends AbstractIntegrationTest {
   }
 
   /** Runs in the default per-test transaction, which is rolled back. */
-  static class RolledBackFixture extends AbstractIntegrationTest {
+  static class RolledBackFixture extends AbstractIT {
 
     @Test
     void createsRowsInsideTheTestTransaction() {

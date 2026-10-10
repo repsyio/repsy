@@ -22,7 +22,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.NpmSearchCandidateRepository;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageKeywordRepository;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageMaintainerRepository;
@@ -50,7 +50,7 @@ import tools.jackson.databind.ObjectMapper;
  * Packages are published over the wire, so what is searched is what the real publish flow stored.
  */
 @DisplayName("npm wire protocol GET /-/v1/search")
-class NpmSearchProtocolIT extends AbstractIntegrationTest {
+class NpmSearchProtocolIT extends AbstractIT {
 
   private static final String SEARCH = "/{repo}/-/v1/search";
 

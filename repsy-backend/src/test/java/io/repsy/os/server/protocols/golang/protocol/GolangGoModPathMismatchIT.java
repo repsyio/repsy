@@ -19,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.ByteArrayOutputStream;
@@ -46,7 +46,7 @@ import org.springframework.mock.web.MockHttpServletResponse;
  */
 @DisplayName(
     "Go module upload compares the go.mod module directive against the URL path (RPS-1228)")
-class GolangGoModPathMismatchIT extends AbstractIntegrationTest {
+class GolangGoModPathMismatchIT extends AbstractIT {
 
   private static final String MODULE = "example.com/modpath";
   private static final String VERSION = "v1.0.0";

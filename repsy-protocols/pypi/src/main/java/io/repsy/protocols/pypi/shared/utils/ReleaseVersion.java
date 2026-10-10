@@ -42,9 +42,9 @@ public class ReleaseVersion {
               + "(?<dev>\\.dev(0|[1-9][0-9]*))?(?:\\+(?<local>[a-z0-9]+(?:\\.[a-z0-9]+)*))?$");
   private static final @NonNull Pattern LOCAL_SEPARATOR = Pattern.compile("[-_.]");
 
-  private boolean isPreRelease;
-  private boolean isPostRelease;
-  private boolean isDevelopmentRelease;
+  private boolean preRelease;
+  private boolean postRelease;
+  private boolean developmentRelease;
   private String version;
 
   public static @NonNull ReleaseVersion of(final @NonNull String releaseVersion) {
@@ -62,9 +62,9 @@ public class ReleaseVersion {
         && isNormalizedLocal(normalizedVersionMatcher.group("local"))) {
       final ReleaseVersion rv = new ReleaseVersion();
 
-      rv.isPreRelease = normalizedVersionMatcher.group("pre") != null;
-      rv.isPostRelease = normalizedVersionMatcher.group("post") != null;
-      rv.isDevelopmentRelease = normalizedVersionMatcher.group("dev") != null;
+      rv.preRelease = normalizedVersionMatcher.group("pre") != null;
+      rv.postRelease = normalizedVersionMatcher.group("post") != null;
+      rv.developmentRelease = normalizedVersionMatcher.group("dev") != null;
       rv.version = trimmedVersion;
 
       return rv;
@@ -79,9 +79,9 @@ public class ReleaseVersion {
 
     final var rv = new ReleaseVersion();
 
-    rv.isPreRelease = versionMatcher.group("pre") != null;
-    rv.isPostRelease = versionMatcher.group("post") != null;
-    rv.isDevelopmentRelease = versionMatcher.group("dev") != null;
+    rv.preRelease = versionMatcher.group("pre") != null;
+    rv.postRelease = versionMatcher.group("post") != null;
+    rv.developmentRelease = versionMatcher.group("dev") != null;
 
     rv.normalize(
         versionMatcher.group("epoch"),
@@ -126,7 +126,7 @@ public class ReleaseVersion {
   }
 
   public boolean isFinalRelease() {
-    return !this.isPreRelease && !this.isPostRelease && !this.isDevelopmentRelease;
+    return !this.preRelease && !this.postRelease && !this.developmentRelease;
   }
 
   private void normalize(
@@ -147,19 +147,19 @@ public class ReleaseVersion {
 
     normalizedVersionBuilder.append(release);
 
-    if (this.isPreRelease && preSignifier != null) {
+    if (this.preRelease && preSignifier != null) {
       normalizedVersionBuilder.append(this.resolvePreSignifier(preSignifier));
       normalizedVersionBuilder.append(Objects.requireNonNullElse(preNumeral, "0"));
     }
 
-    if (this.isPostRelease) {
+    if (this.postRelease) {
       normalizedVersionBuilder.append(".post");
       normalizedVersionBuilder.append(
           Objects.requireNonNullElseGet(
               postNumeral1, () -> Objects.requireNonNullElse(postNumeral2, "0")));
     }
 
-    if (this.isDevelopmentRelease) {
+    if (this.developmentRelease) {
       normalizedVersionBuilder.append(".dev");
       normalizedVersionBuilder.append(Objects.requireNonNullElse(devNumeral, "0"));
     }

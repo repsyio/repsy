@@ -63,7 +63,7 @@ class H2LastAdminConcurrencyIT extends H2IntegrationTest {
 
   /**
    * Made once per class: a BCrypt hash costs about 100 ms, and every test makes users. {@link
-   * H2IntegrationTest} has no shared hash to reuse, as {@code AbstractIntegrationTest} has.
+   * H2IntegrationTest} has no shared hash to reuse, as {@code AbstractIT} has.
    */
   private static final String PASSWORD_HASH = PasswordHasher.hash("Other1234!");
 

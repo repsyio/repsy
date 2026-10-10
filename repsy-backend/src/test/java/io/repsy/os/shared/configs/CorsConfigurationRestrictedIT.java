@@ -20,7 +20,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
@@ -34,7 +34,7 @@ import org.springframework.test.context.TestPropertySource;
  */
 @TestPropertySource(properties = "APP_ALLOWED_ORIGINS=https://allowed.example.com")
 @DisplayName("CORS, app.allowed-origins configured (RPS-1102, RPS-1590)")
-class CorsConfigurationRestrictedIT extends AbstractIntegrationTest {
+class CorsConfigurationRestrictedIT extends AbstractIT {
 
   private static final String ALLOWED_ORIGIN = "https://allowed.example.com";
   private static final String OTHER_ORIGIN = "https://not-allowed.example.com";

@@ -19,7 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
 import io.repsy.libs.storage.core.services.StorageStrategy;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.shared.tasks.StorageTrashCleanupTask;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.IOException;
@@ -55,7 +55,7 @@ import org.springframework.util.FileSystemUtils;
  * <p>No database row is written, so the committed-rows guard has nothing to check.
  */
 @DisplayName("Storage trash cleanup")
-class StorageTrashCleanupIT extends AbstractIntegrationTest {
+class StorageTrashCleanupIT extends AbstractIT {
 
   private static final Duration TIMEOUT = Duration.ofSeconds(20);
 

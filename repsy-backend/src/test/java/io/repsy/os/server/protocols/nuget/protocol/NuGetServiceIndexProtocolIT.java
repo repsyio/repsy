@@ -20,7 +20,7 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.ArrayList;
@@ -40,7 +40,7 @@ import tools.jackson.databind.ObjectMapper;
  * Search service!" (RPS-1240, after RPS-1213 had already fixed the registration type).
  */
 @DisplayName("NuGet wire protocol service index")
-class NuGetServiceIndexProtocolIT extends AbstractIntegrationTest {
+class NuGetServiceIndexProtocolIT extends AbstractIT {
 
   private Repo repo;
 

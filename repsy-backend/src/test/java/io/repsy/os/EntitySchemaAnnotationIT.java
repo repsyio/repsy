@@ -30,7 +30,7 @@ import org.springframework.beans.factory.annotation.Autowired;
  * only reads {@code information_schema}, so it commits no rows.
  */
 @DisplayName("Entity @Column mappings against the PostgreSQL schema")
-class EntitySchemaAnnotationIT extends AbstractIntegrationTest {
+class EntitySchemaAnnotationIT extends AbstractIT {
 
   @Autowired private EntityManagerFactory entityManagerFactory;
 

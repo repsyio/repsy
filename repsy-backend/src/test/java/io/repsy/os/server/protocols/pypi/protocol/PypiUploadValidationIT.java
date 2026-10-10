@@ -22,7 +22,7 @@ import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.generated.model.ReleaseProjectURLInfo;
 import io.repsy.os.server.core.UrlParserProperties;
 import io.repsy.os.server.protocols.pypi.protocol.facades.PypiProtocolFacade;
@@ -56,7 +56,7 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
  * dropped instead and the rest of the publish goes through, matching {@code PypiPublishLimits}.
  */
 @DisplayName("PyPI upload validation (RPS-1224, RPS-1137)")
-class PypiUploadValidationIT extends AbstractIntegrationTest {
+class PypiUploadValidationIT extends AbstractIT {
 
   @Autowired private RepoTxService repoTxService;
   @Autowired private PypiApiFacade pypiApiFacade;

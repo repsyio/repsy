@@ -23,7 +23,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.maven.shared.storage.services.MavenStorageService;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
@@ -64,7 +64,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("Maven POM is validated before it is stored (RPS-1058)")
-class MavenPomStorageConsistencyIT extends AbstractIntegrationTest {
+class MavenPomStorageConsistencyIT extends AbstractIT {
 
   private static final String POM_PATH = "com/example/lib/1.0/lib-1.0.pom";
   private static final String MALFORMED_POM =

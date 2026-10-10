@@ -20,7 +20,7 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.ByteArrayOutputStream;
@@ -52,7 +52,7 @@ import org.springframework.mock.web.MockHttpServletResponse;
  * rolled-back transaction.
  */
 @DisplayName("Go @latest/@v/list follow the real GOPROXY version semantics (RPS-1720 C8)")
-class GolangVersionSemanticsIT extends AbstractIntegrationTest {
+class GolangVersionSemanticsIT extends AbstractIT {
 
   private Repo goRepo() {
     return this.seedRepo(RepoType.GOLANG, uniqueRepoName("golang"));

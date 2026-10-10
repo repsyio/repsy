@@ -27,7 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.HeapOrder;
 import io.repsy.os.PagingAssertions;
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackage;
@@ -57,7 +57,7 @@ import org.springframework.test.web.servlet.ResultActions;
 
 /** Full-stack integration coverage for the NuGet package-management API. */
 @DisplayName("NuGetPackageController /api/nuget/packages/*")
-class NuGetPackageControllerIT extends AbstractIntegrationTest {
+class NuGetPackageControllerIT extends AbstractIT {
 
   @Autowired private RepoTxService repoTxService;
   @Autowired private NuGetPackageRepository nugetPackageRepository;

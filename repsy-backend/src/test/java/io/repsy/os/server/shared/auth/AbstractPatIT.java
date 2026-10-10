@@ -15,7 +15,7 @@
  */
 package io.repsy.os.server.shared.auth;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.token.dtos.TokenScope;
 import io.repsy.os.shared.token.entities.PersonalAccessToken;
@@ -35,9 +35,9 @@ import org.springframework.test.web.servlet.request.AbstractMockHttpServletReque
 /**
  * What the personal access token integration tests share (RPS-1903): seeding a token for a user,
  * and sending a request on the protocol port. It adds no Spring configuration, so every subclass
- * shares the context of {@link AbstractIntegrationTest}.
+ * shares the context of {@link AbstractIT}.
  */
-public abstract class AbstractPatIntegrationTest extends AbstractIntegrationTest {
+public abstract class AbstractPatIT extends AbstractIT {
 
   /** A token as the panel shows it once: its id, its owner and its secret. */
   protected record Pat(UUID id, User owner, String secret) {}

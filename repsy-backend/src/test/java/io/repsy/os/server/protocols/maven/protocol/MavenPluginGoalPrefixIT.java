@@ -21,7 +21,7 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactRepository;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactVersionRepository;
 import io.repsy.os.server.protocols.maven.shared.storage.services.MavenStorageService;
@@ -68,7 +68,7 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("A plugin registers the goalPrefix of its jar, in either order (RPS-1458, RPS-1589)")
-class MavenPluginGoalPrefixIT extends AbstractIntegrationTest {
+class MavenPluginGoalPrefixIT extends AbstractIT {
 
   private static final String GROUP = "com.example.prefixes";
   private static final String GROUP_DIR = "com/example/prefixes/";

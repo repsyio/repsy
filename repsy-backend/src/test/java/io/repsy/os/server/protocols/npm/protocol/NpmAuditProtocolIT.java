@@ -26,7 +26,7 @@ import com.jayway.jsonpath.JsonPath;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.security.scan.dtos.FixStatus;
 import io.repsy.os.server.security.scan.dtos.ScanStatus;
 import io.repsy.os.server.security.scan.dtos.Severity;
@@ -79,7 +79,7 @@ import org.springframework.test.web.servlet.request.AbstractMockHttpServletReque
  * above that never mention it are unchanged by it.
  */
 @DisplayName("npm wire protocol audit endpoints")
-class NpmAuditProtocolIT extends AbstractIntegrationTest {
+class NpmAuditProtocolIT extends AbstractIT {
 
   private static final String BULK = "/{repo}/-/npm/v1/security/advisories/bulk";
   private static final String AUDITS = "/{repo}/-/npm/v1/security/audits";

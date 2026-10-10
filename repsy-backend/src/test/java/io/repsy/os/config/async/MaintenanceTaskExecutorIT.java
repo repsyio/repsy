@@ -21,7 +21,7 @@ import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 
 import io.repsy.libs.storage.gateway.filesystem.services.FileSystemStorageStrategy;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.docker.shared.layer.dtos.OrphanLayerInfo;
 import io.repsy.os.server.protocols.docker.shared.layer.services.OrphanLayerCleanupService;
 import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
@@ -61,7 +61,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
  * database.
  */
 @DisplayName("Maintenance @Async executor")
-class MaintenanceTaskExecutorIT extends AbstractIntegrationTest {
+class MaintenanceTaskExecutorIT extends AbstractIT {
 
   private static final long TIMEOUT_SECONDS = 10;
   private static final int POOL_SIZE = 2;

@@ -32,7 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -74,7 +74,7 @@ import org.springframework.web.context.WebApplicationContext;
  * the Ruby case here pins what the handler does with a form-typed body and an empty one.
  */
 @DisplayName("Empty and form-typed upload bodies (RPS-1466)")
-class EmptyUploadBodyIT extends AbstractIntegrationTest {
+class EmptyUploadBodyIT extends AbstractIT {
 
   private static final String FORM = "application/x-www-form-urlencoded";
   private static final String OCTET = "application/octet-stream";

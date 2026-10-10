@@ -29,7 +29,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -50,7 +50,7 @@ import org.yaml.snakeyaml.Yaml;
  * for a classic upload and an OCI push alike, and rendered per entry.
  */
 @DisplayName("Helm index.yaml carries apiVersion and dependencies (RPS-1557)")
-class HelmIndexChartMetadataIT extends AbstractIntegrationTest {
+class HelmIndexChartMetadataIT extends AbstractIT {
 
   private static final String CHART = "payments";
   private static final String OCTET_STREAM = "application/octet-stream";

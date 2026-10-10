@@ -31,7 +31,7 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.core.UrlParserProperties;
 import io.repsy.os.server.protocols.npm.protocol.facades.NpmProtocolFacade;
 import io.repsy.os.server.protocols.npm.shared.storage.services.NpmStorageService;
@@ -98,7 +98,7 @@ import tools.jackson.databind.ObjectMapper;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("npm operations on a package whose metadata file is gone (RPS-1300)")
-class NpmMissingMetadataIT extends AbstractIntegrationTest {
+class NpmMissingMetadataIT extends AbstractIT {
 
   private static final String UNDELETABLE_VERSION = "1.9.9";
   private static final String VERSION_TRIGGER = "it_refuse_missing_metadata_version_delete";

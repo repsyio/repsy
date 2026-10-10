@@ -21,7 +21,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoCrateIndexRepository;
 import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoCrateRepository;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -53,7 +53,7 @@ import org.springframework.test.web.servlet.ResultActions;
  * name. Real crates.io refuses this.
  */
 @DisplayName("Cargo publish refuses a different spelling of an existing crate's name (RPS-1721)")
-class CargoPublishNameSpellingIT extends AbstractIntegrationTest {
+class CargoPublishNameSpellingIT extends AbstractIT {
 
   private static final String PUBLISH = "/{repo}/api/v1/crates/new";
 

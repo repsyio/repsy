@@ -62,6 +62,7 @@ import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredVersion;
 import io.repsy.protocols.maven.shared.artifact.dtos.SignatureOutcome;
 import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import io.repsy.protocols.shared.storage.StorageStrategyRegistry;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -167,6 +168,7 @@ class ArtifactServiceTest {
   @Mock PendingSignatureService pendingSignatureService;
   @Mock PendingSignatureRepository pendingSignatureRepository;
   @Mock StorageStrategy storageStrategy;
+  @Mock StorageStrategyRegistry storageStrategyRegistry;
 
   @InjectMocks ArtifactService artifactService;
 
@@ -177,6 +179,9 @@ class ArtifactServiceTest {
   @BeforeEach
   void theSettingReadUnderTheLockIsOn() {
     lenient().when(this.versionSignatureService.lockAndIsVerifyAll(any())).thenReturn(true);
+    lenient()
+        .when(this.storageStrategyRegistry.get(RepoType.MAVEN))
+        .thenReturn(this.storageStrategy);
   }
 
   private static RepoInfo repoVerifyingAllSignatures(final UUID id) {

@@ -28,7 +28,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.config.async.SignedRecomputeExecutorConfig;
 import io.repsy.os.generated.model.RepoSettingsForm;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactVersionRepository;
@@ -81,7 +81,7 @@ import tools.jackson.databind.ObjectMapper;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("Maven signed is recomputed when verify-all is toggled (RPS-1316)")
-class MavenSignedRecomputeIT extends AbstractIntegrationTest {
+class MavenSignedRecomputeIT extends AbstractIT {
 
   private static final PgpTestKeys KEYS = PgpTestKeys.generate();
   private static final Duration RECOMPUTE_TIMEOUT = Duration.ofSeconds(20);

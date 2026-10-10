@@ -349,7 +349,7 @@
                          Spring Boot jar (classes under BOOT-INF/classes) and fail class resolution. -->
                     <classesDirectory>${project.build.outputDirectory}</classesDirectory>
                     <!-- RPS-1453: every JVM starts its own postgres:18 container and its own storage
-                         root (AbstractIntegrationTest), so the IT classes of different JVMs never share
+                         root (AbstractIT), so the IT classes of different JVMs never share
                          a database and CommittedRowsGuard still sees only its own JVM's rows. Failsafe
                          hands the classes out to the JVMs one by one. -->
                     <forkCount>${it.fork.count}</forkCount>

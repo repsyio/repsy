@@ -28,7 +28,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.head;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -56,7 +56,7 @@ import tools.jackson.databind.ObjectMapper;
  */
 @DisplayName("npm wire protocol reads: packument, HEAD and tarball")
 @SuppressWarnings("unchecked")
-class NpmPackumentReadIT extends AbstractIntegrationTest {
+class NpmPackumentReadIT extends AbstractIT {
 
   private static final String PACKAGE_PATH = "/{repo}/{packagePath}";
   private static final String ABBREVIATED = "application/vnd.npm.install-v1+json";

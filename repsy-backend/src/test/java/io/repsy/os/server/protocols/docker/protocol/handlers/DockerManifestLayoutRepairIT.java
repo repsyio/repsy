@@ -26,7 +26,7 @@ import static org.mockito.Mockito.verify;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.docker.shared.image.repositories.ImageRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.services.DockerManifestLayoutRepairService;
@@ -58,7 +58,7 @@ import org.springframework.web.context.WebApplicationContext;
  * the database migration leaves behind.
  */
 @DisplayName("Docker manifest layout repair (RPS-1216)")
-class DockerManifestLayoutRepairIT extends AbstractIntegrationTest {
+class DockerManifestLayoutRepairIT extends AbstractIT {
 
   private static final String IMAGE = "app";
 

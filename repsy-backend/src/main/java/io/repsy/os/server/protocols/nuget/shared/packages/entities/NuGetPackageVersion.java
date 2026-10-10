@@ -57,10 +57,10 @@ public class NuGetPackageVersion {
   private String version;
 
   @Column(name = "is_prerelease", nullable = false)
-  private boolean isPrerelease;
+  private boolean prerelease;
 
   @Column(name = "is_listed", nullable = false)
-  private boolean isListed;
+  private boolean listed;
 
   @Column(name = "published_at", nullable = false)
   private Instant publishedAt;

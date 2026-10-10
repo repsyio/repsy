@@ -41,7 +41,7 @@ import org.junit.jupiter.params.provider.EnumSource;
  * refused token is answered {@code 401}, as every protocol answers a caller that may not do it.
  */
 @DisplayName("A personal access token is limited to its scopes and to what its owner may do")
-class PatScopeIntersectionIT extends AbstractPatIntegrationTest {
+class PatScopeIntersectionIT extends AbstractPatIT {
 
   private static final String READ_PATH = "/{repo}/com/example/lib/1.0/lib-1.0.pom";
   private static final String WRITE_PATH = "/{repo}/com/example/lib/1.0/lib-1.0.pom.sha1";

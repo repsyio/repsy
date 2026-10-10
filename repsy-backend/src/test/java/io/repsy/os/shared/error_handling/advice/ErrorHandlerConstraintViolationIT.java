@@ -19,7 +19,7 @@ import static io.repsy.os.shared.error_handling.advice.ConstraintViolationChecks
 import static io.repsy.os.shared.error_handling.advice.ConstraintViolationChecks.user;
 import static io.repsy.os.shared.error_handling.advice.ConstraintViolationChecks.violationOf;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,7 +32,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * and not one a unit test made up. The {@code users} table is the fixture: a {@code varchar(25)}
  * username, a unique username index and a check on the role.
  */
-class ErrorHandlerConstraintViolationIT extends AbstractIntegrationTest {
+class ErrorHandlerConstraintViolationIT extends AbstractIT {
 
   @Autowired private ErrorHandler errorHandler;
   @Autowired private JdbcTemplate jdbcTemplate;

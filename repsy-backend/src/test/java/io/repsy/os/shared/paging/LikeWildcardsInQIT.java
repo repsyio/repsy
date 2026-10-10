@@ -21,7 +21,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.helm.shared.chart.entities.HelmChart;
 import io.repsy.os.server.protocols.helm.shared.chart.entities.HelmChartVersion;
 import io.repsy.os.server.protocols.helm.shared.chart.repositories.HelmChartRepository;
@@ -51,7 +51,7 @@ import org.springframework.beans.factory.annotation.Autowired;
  * matches, so the test fails on a {@code like %:q%} query.
  */
 @DisplayName("_ and % in q match literally (RPS-1891)")
-class LikeWildcardsInQIT extends AbstractIntegrationTest {
+class LikeWildcardsInQIT extends AbstractIT {
 
   @Autowired private NpmPackageRepository npmPackageRepository;
   @Autowired private PackageVersionRepository npmPackageVersionRepository;

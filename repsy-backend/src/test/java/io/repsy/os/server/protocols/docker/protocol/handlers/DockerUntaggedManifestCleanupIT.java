@@ -30,7 +30,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 import com.jayway.jsonpath.JsonPath;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.docker.shared.image.repositories.ImageRepository;
 import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
 import io.repsy.os.server.shared.http.BareBodyAssertions;
@@ -58,7 +58,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 @DisplayName("Deleting the untagged manifests of a Docker repository (RPS-1216)")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
-class DockerUntaggedManifestCleanupIT extends AbstractIntegrationTest {
+class DockerUntaggedManifestCleanupIT extends AbstractIT {
 
   private static final String IMAGE = "app";
 

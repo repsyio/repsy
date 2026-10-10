@@ -17,7 +17,7 @@ package io.repsy.os.server.protocols.shared.limits;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -28,7 +28,7 @@ import org.junit.jupiter.api.Test;
  */
 @DisplayName(
     "Helm, Cargo, Go, npm, Docker, PyPI and Maven publish limits against the PostgreSQL schema")
-class PublishGuardLimitsIT extends AbstractIntegrationTest {
+class PublishGuardLimitsIT extends AbstractIT {
 
   @Test
   @DisplayName("every limit equals its column, or is within an unbounded or longer one")

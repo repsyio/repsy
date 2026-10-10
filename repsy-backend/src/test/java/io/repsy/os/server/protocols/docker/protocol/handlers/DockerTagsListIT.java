@@ -28,7 +28,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.shared.token.entities.RepoDeployToken;
 import io.repsy.os.server.shared.token.repositories.RepoDeployTokenRepository;
 import io.repsy.os.server.shared.token.utils.DeployTokenHash;
@@ -65,7 +65,7 @@ import org.springframework.web.context.WebApplicationContext;
  * uncommitted data.
  */
 @DisplayName("Docker tags/list (RPS-1489)")
-class DockerTagsListIT extends AbstractIntegrationTest {
+class DockerTagsListIT extends AbstractIT {
 
   private static final String IMAGE = "app";
   private static final Pattern NEXT_LINK = Pattern.compile("^<(?<url>[^>]+)>; rel=\"next\"$");

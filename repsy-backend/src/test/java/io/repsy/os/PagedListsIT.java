@@ -54,7 +54,7 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
  * list, the {@code q} filter included, are pinned by the integration test of its protocol.
  */
 @DisplayName("Paged panel lists: page, size, sort and q")
-class PagedListsIT extends AbstractIntegrationTest {
+class PagedListsIT extends AbstractIT {
 
   private static final String SPEC_RESOURCE = "openapi/openapi-spec.yaml";
 

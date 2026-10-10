@@ -29,7 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.auth0.jwt.JWT;
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.user.entities.UserRole;
@@ -51,7 +51,7 @@ import org.springframework.test.web.servlet.request.AbstractMockHttpServletReque
  * ?downloadToken=}. These tests pin the token's scope and that a panel token no longer works there.
  */
 @DisplayName("Maven download token")
-class MavenDownloadTokenIT extends AbstractIntegrationTest {
+class MavenDownloadTokenIT extends AbstractIT {
 
   private static final String JAR = "com/example/lib/1.0/lib-1.0.jar";
   private static final String OTHER_JAR = "com/example/lib/1.0/lib-1.0-sources.jar";

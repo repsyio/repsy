@@ -23,7 +23,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import com.jayway.jsonpath.JsonPath;
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.server.shared.token.entities.RepoDeployToken;
 import io.repsy.os.server.shared.token.repositories.RepoDeployTokenRepository;
 import io.repsy.os.server.shared.token.utils.DeployTokenHash;
@@ -54,7 +54,7 @@ import org.springframework.test.web.servlet.request.AbstractMockHttpServletReque
  * below by {@code publicRepoWriteNowRequiresAuth}.
  */
 @DisplayName("Cargo owners route (RPS-1239)")
-class CargoOwnersProtocolIT extends AbstractIntegrationTest {
+class CargoOwnersProtocolIT extends AbstractIT {
 
   private static final String OWNERS = "/{repo}/api/v1/crates/some-crate/owners";
 

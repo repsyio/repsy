@@ -17,7 +17,7 @@ package io.repsy.os.server.protocols.pypi.protocol;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.RepsyApplication;
 import io.repsy.os.server.protocols.pypi.shared.storage.services.PypiStorageService;
 import io.repsy.os.shared.repo.entities.Repo;
@@ -85,7 +85,7 @@ import org.springframework.web.client.RestClient;
       "MULTIPART_MAX_REQUEST_SIZE=100KB",
     })
 @DisplayName("PyPI upload rules (RPS-2092)")
-class PypiUploadRulesIT extends AbstractIntegrationTest {
+class PypiUploadRulesIT extends AbstractIT {
 
   private static final int PROTOCOL_PORT = freePort();
   private static final int API_PORT = freePort();

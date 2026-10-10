@@ -22,7 +22,7 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
-import io.repsy.os.AbstractIntegrationTest;
+import io.repsy.os.AbstractIT;
 import io.repsy.os.HeapOrder;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -41,7 +41,7 @@ import org.springframework.http.MediaType;
  * every update of a row. The id ends the order.
  */
 @DisplayName("Ruby /info lists versions in a fixed order (RPS-1614)")
-class RubyIndexOrderIT extends AbstractIntegrationTest {
+class RubyIndexOrderIT extends AbstractIT {
 
   private void push(final Repo repo, final String token, final String name, final String version)
       throws Exception {

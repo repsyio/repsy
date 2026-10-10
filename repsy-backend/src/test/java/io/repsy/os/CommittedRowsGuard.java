@@ -39,7 +39,7 @@ import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 /**
  * Fails an integration test class that leaves committed rows behind in the database every {@link
- * AbstractIntegrationTest} subclass shares (RPS-1011).
+ * AbstractIT} subclass shares (RPS-1011).
  *
  * <p>Most tests run in a transaction that is rolled back, but the ones that need committed data (an
  * {@code @Async} listener cannot see an open transaction) delete only what they create. A class
@@ -63,9 +63,9 @@ import org.springframework.test.context.junit.jupiter.SpringExtension;
  * <p>The snapshot is taken per class rather than once per JVM, so a leak is reported once, against
  * the class that left it, and not again against every class that follows.
  *
- * <p>It is registered on {@link AbstractIntegrationTest}. Classes that own their database (the H2
- * suites, {@code DefaultRepoSeedingIT}) don't extend it and aren't checked. A {@code @Nested} class
- * is checked as part of the class that encloses it, not on its own.
+ * <p>It is registered on {@link AbstractIT}. Classes that own their database (the H2 suites, {@code
+ * DefaultRepoSeedingIT}) don't extend it and aren't checked. A {@code @Nested} class is checked as
+ * part of the class that encloses it, not on its own.
  */
 public final class CommittedRowsGuard implements BeforeAllCallback, AfterAllCallback {
 
