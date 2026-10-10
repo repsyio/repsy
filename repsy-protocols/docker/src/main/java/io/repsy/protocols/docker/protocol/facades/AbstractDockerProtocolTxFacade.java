@@ -15,80 +15,79 @@
  */
 package io.repsy.protocols.docker.protocol.facades;
 
-import static io.repsy.protocols.docker.shared.utils.ManifestNameGenerator.generate;
-import static io.repsy.protocols.docker.shared.utils.MediaTypes.DOCKER_CONFIG_JSON;
-import static io.repsy.protocols.docker.shared.utils.MediaTypes.DOCKER_MANIFEST_LIST;
-import static io.repsy.protocols.docker.shared.utils.MediaTypes.DOCKER_MANIFEST_SCHEMA1;
-import static io.repsy.protocols.docker.shared.utils.MediaTypes.DOCKER_MANIFEST_SCHEMA2;
-import static io.repsy.protocols.docker.shared.utils.MediaTypes.OCI_CONFIG_JSON;
-import static io.repsy.protocols.docker.shared.utils.MediaTypes.OCI_EMPTY;
-import static io.repsy.protocols.docker.shared.utils.MediaTypes.OCI_IMAGE_INDEX;
-import static io.repsy.protocols.docker.shared.utils.MediaTypes.OCI_MANIFEST_SCHEMA1;
-
-import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.protocols.docker.protocol.parser.DockerPathParserLayer;
 import io.repsy.protocols.docker.protocol.parser.DockerPathParserManifest;
-import io.repsy.protocols.docker.shared.constants.DockerConstants;
-import io.repsy.protocols.docker.shared.image.dtos.BaseImageInfo;
 import io.repsy.protocols.docker.shared.image.services.ImageService;
 import io.repsy.protocols.docker.shared.layer.dtos.LayerInfo;
 import io.repsy.protocols.docker.shared.layer.services.LayerService;
 import io.repsy.protocols.docker.shared.storage.services.DockerStorageService;
-import io.repsy.protocols.docker.shared.tag.dtos.BaseManifestDetail;
-import io.repsy.protocols.docker.shared.tag.dtos.BaseTagDetail;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestDetails;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestForm;
-import io.repsy.protocols.docker.shared.tag.dtos.ManifestInfo;
-import io.repsy.protocols.docker.shared.tag.dtos.ManifestList;
-import io.repsy.protocols.docker.shared.tag.dtos.OciImageConfig;
 import io.repsy.protocols.docker.shared.tag.dtos.SavedManifest;
-import io.repsy.protocols.docker.shared.tag.dtos.TagForm;
 import io.repsy.protocols.docker.shared.tag.dtos.TagPage;
 import io.repsy.protocols.docker.shared.tag.services.ManifestService;
-import io.repsy.protocols.docker.shared.utils.DockerDigestCalculator;
-import io.repsy.protocols.docker.shared.utils.DockerPushGuards;
 import io.repsy.protocols.docker.shared.utils.DockerTagPaging;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
-import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.BlobDigests;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Paths;
-import java.util.LinkedHashSet;
-import java.util.List;
-import lombok.RequiredArgsConstructor;
-import org.apache.commons.lang3.StringUtils;
-import org.json.JSONException;
-import org.json.JSONObject;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 import tools.jackson.databind.ObjectMapper;
 
+/**
+ * The transactional persistence layer of the Docker protocol. It is the one class a product extends
+ * (the backend's {@code DockerProtocolFacade}); the work is split by concern into {@link
+ * DockerManifestWriter} (push), {@link DockerManifestReader} (pull) and {@link DockerBlobResolver}
+ * (files and layer rows), and this class keeps the layer upload and the tag list. The constructor
+ * and the protected collaborators are the contract of a subclass.
+ */
 @NullMarked
-@RequiredArgsConstructor
 public abstract class AbstractDockerProtocolTxFacade<ID>
     implements DockerProtocolFacade<ID>, DockerPathParserLayer, DockerPathParserManifest {
-
-  private static final String MULTIPLATFORM = "Multiplatform";
-  private static final String USAGES_PROPERTY = "usages";
-  private static final String ARTIFACT_NAME_PROPERTY = "artifactName";
-  private static final String ARTIFACT_VERSION_PROPERTY = "artifactVersion";
 
   protected final DockerStorageService<ID> dockerStorageService;
   protected final LayerService<ID> layerService;
   protected final ImageService<ID> imageService;
   protected final ManifestService<ID> manifestService;
   protected final ObjectMapper objectMapper;
+
+  private final DockerBlobResolver<ID> blobs;
+  private final DockerManifestWriter<ID> manifestWriter;
+  private final DockerManifestReader<ID> manifestReader;
+
+  protected AbstractDockerProtocolTxFacade(
+      final DockerStorageService<ID> dockerStorageService,
+      final LayerService<ID> layerService,
+      final ImageService<ID> imageService,
+      final ManifestService<ID> manifestService,
+      final ObjectMapper objectMapper) {
+
+    this.dockerStorageService = dockerStorageService;
+    this.layerService = layerService;
+    this.imageService = imageService;
+    this.manifestService = manifestService;
+    this.objectMapper = objectMapper;
+
+    this.blobs = new DockerBlobResolver<>(dockerStorageService, layerService);
+    this.manifestWriter =
+        new DockerManifestWriter<>(
+            dockerStorageService,
+            layerService,
+            imageService,
+            manifestService,
+            objectMapper,
+            this.blobs);
+    this.manifestReader =
+        new DockerManifestReader<>(imageService, manifestService, this.blobs, this);
+  }
 
   @Override
   public long uploadLayerChunk(
@@ -107,7 +106,7 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
 
     ProtocolContextUtils.addUsages(context, chunkUsages);
 
-    return this.getResource(repoInfo, relativePath).contentLength();
+    return this.blobs.getResource(repoInfo, relativePath).contentLength();
   }
 
   @Override
@@ -116,7 +115,7 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
       throws IOException {
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-    final var resource = this.getResource(repoInfo, relativePath);
+    final var resource = this.blobs.getResource(repoInfo, relativePath);
 
     if (!BlobDigests.matches(digest, resource.getInputStream())) {
       throw new BadRequestException(ProtocolErrorCodes.DIGEST_MISMATCH);
@@ -129,7 +128,7 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
 
-    return this.getResource(repoInfo, relativePath).contentLength();
+    return this.blobs.getResource(repoInfo, relativePath).contentLength();
   }
 
   @Override
@@ -138,7 +137,7 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
       throws IOException {
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-    final var resource = this.getResource(repoInfo, relativePath);
+    final var resource = this.blobs.getResource(repoInfo, relativePath);
     layerInfo.setSize(resource.contentLength());
 
     this.layerService.update(layerInfo, repoInfo.getId());
@@ -149,35 +148,7 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
       final ProtocolContext context, final String imageName, final ManifestForm form)
       throws IOException {
 
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-
-    this.verifyReference(form);
-    this.checkRepoAllowOverride(repoInfo, form.getTagName(), imageName, form.getDigest());
-
-    // Created in this transaction, after every check that needs no image: a push that fails from
-    // here on rolls the new image back with everything else, so it never leaves an image that
-    // stores no manifest (RPS-1350).
-    final var imageInfo = this.imageService.getOrCreateImage(repoInfo.getId(), imageName);
-
-    // DockerManifestValidator.validate already refused a Content-Type the registry does not
-    // store, before anything for this push was looked up or written.
-    final var usage =
-        switch (form.getContentType()) {
-          case OCI_MANIFEST_SCHEMA1, DOCKER_MANIFEST_SCHEMA1, DOCKER_MANIFEST_SCHEMA2 ->
-              this.createManifest(repoInfo, imageInfo, form);
-
-          case OCI_IMAGE_INDEX, DOCKER_MANIFEST_LIST ->
-              this.createManifestList(repoInfo, imageInfo, form);
-
-          default ->
-              throw new BadRequestException(ProtocolErrorCodes.MANIFEST_MEDIA_TYPE_UNSUPPORTED);
-        };
-
-    context.addProperty(ARTIFACT_NAME_PROPERTY, imageInfo.getName());
-    context.addProperty(ARTIFACT_VERSION_PROPERTY, form.getTagName());
-    context.addProperty(USAGES_PROPERTY, usage);
-
-    return new SavedManifest<>(form.getDigest(), imageInfo);
+    return this.manifestWriter.saveManifest(context, imageName, form);
   }
 
   @Override
@@ -187,15 +158,15 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
 
-    final var layer = this.findLayerInfoByRepoIdAndDigest(repoInfo.getId(), digest);
+    final var layer = this.blobs.findLayerInfoByRepoIdAndDigest(repoInfo.getId(), digest);
 
     final var parsedPath = this.parseForLayer(servletPath, layer.getDigest());
 
-    if (!this.checkLayerExistsInStorage(repoInfo, parsedPath.getRelativePath(), layer)) {
+    if (!this.blobs.checkLayerExistsInStorage(repoInfo, parsedPath.getRelativePath(), layer)) {
       throw new ItemNotFoundException(ProtocolErrorCodes.LAYER_NOT_FOUND);
     }
 
-    return this.getLayerResource(layer.getDigest(), repoInfo, parsedPath.getRelativePath());
+    return this.blobs.getLayerResource(layer.getDigest(), repoInfo, parsedPath.getRelativePath());
   }
 
   @Override
@@ -206,8 +177,7 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
       final String requestPath)
       throws IOException {
 
-    return this.performDatabaseLookupForManifest(
-        context, manifestReference, imageName, requestPath);
+    return this.manifestReader.getManifest(context, manifestReference, imageName, requestPath);
   }
 
   @Override
@@ -224,363 +194,5 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
 
     return DockerTagPaging.page(
         this.manifestService.findTagNamesByImageId(imageInfo.getId()), limit, last);
-  }
-
-  private BaseUsages createManifest(
-      final BaseRepoInfo<ID> repoInfo, final BaseImageInfo<ID> imageInfo, final ManifestForm form)
-      throws IOException {
-
-    final var manifestInfo =
-        this.objectMapper.readValue(form.getManifestJson(), ManifestInfo.class);
-
-    this.verifyLayers(repoInfo.getId(), manifestInfo);
-
-    // Extracted BEFORE the manifest is written: a config blob RPS-1116 refuses must leave nothing
-    // on disk, so a rejected push cannot be found again by a later GET even though it was refused.
-    final var platform =
-        this.isAttestationManifest(manifestInfo)
-            ? DockerConstants.UNKNOWN_PLATFORM
-            : this.extractPlatform(repoInfo, manifestInfo.getConfig());
-
-    final var usages = this.writeManifest(repoInfo, form);
-
-    final var tagForm = TagForm.of(form, imageInfo.getName(), platform, manifestInfo);
-
-    this.manifestService.createSinglePlatformManifest(repoInfo.getId(), imageInfo, tagForm);
-
-    return usages;
-  }
-
-  private boolean isAttestationManifest(final ManifestInfo manifestInfo) {
-
-    return manifestInfo.getSubject() != null
-        || OCI_EMPTY.equals(manifestInfo.getConfig().getMediaType());
-  }
-
-  private BaseUsages createManifestList(
-      final BaseRepoInfo<ID> repoInfo, final BaseImageInfo<ID> imageInfo, final ManifestForm form)
-      throws IOException {
-
-    final var manifestList =
-        this.objectMapper.readValue(form.getManifestJson(), ManifestList.class);
-
-    final var tagForm = TagForm.of(form, imageInfo.getName(), MULTIPLATFORM, manifestList);
-
-    // Before the index is written: an index that references a manifest the image does not have
-    // must leave nothing behind.
-    this.manifestService.verifyManifestsExist(
-        repoInfo.getId(), imageInfo.getId(), tagForm.getManifestDigests());
-
-    final var usages = this.writeManifest(repoInfo, form);
-
-    this.manifestService.createManifestList(repoInfo.getId(), imageInfo.getId(), tagForm);
-
-    return usages;
-  }
-
-  private BaseUsages writeFileAndUpdateUsage(
-      final InputStream inputStream,
-      final BaseRepoInfo<ID> repoInfo,
-      final RelativePath relativePath) {
-
-    final var storagePath = StoragePath.of(repoInfo.getStorageKey(), relativePath.getPath());
-
-    return this.dockerStorageService.writeInputStreamToPath(
-        repoInfo.getName(), storagePath, inputStream);
-  }
-
-  private Resource getResource(final BaseRepoInfo<ID> repoInfo, final RelativePath relativePath) {
-
-    final var storagePath = StoragePath.of(repoInfo.getStorageKey(), relativePath.getPath());
-
-    return this.dockerStorageService
-        .findResource(storagePath, repoInfo.getName())
-        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.RESOURCE_NOT_FOUND));
-  }
-
-  /**
-   * Refuses a tag push that would move an existing tag to another manifest while the repo forbids
-   * overriding. Pushing the manifest a tag already points at changes nothing and is accepted, and
-   * so is any push by digest: there is no tag to move.
-   */
-  private void checkRepoAllowOverride(
-      final BaseRepoInfo<ID> repoInfo,
-      final String reference,
-      final String imageName,
-      final String digest) {
-
-    if (repoInfo.isAllowOverride()) {
-      return;
-    }
-
-    final var existingTag =
-        this.manifestService.findActiveTagByNameAndRepoAndImage(
-            repoInfo.getId(), imageName, reference);
-
-    if (existingTag.isPresent() && !digest.equals(existingTag.get().getDigest())) {
-      throw new AccessNotAllowedException(ProtocolErrorCodes.PACKAGE_OVERRIDE_DISABLED);
-    }
-  }
-
-  private BaseUsages writeManifest(final BaseRepoInfo<ID> repoInfo, final ManifestForm form)
-      throws IOException {
-
-    try (final var inputStream = new ByteArrayInputStream(form.getManifestBytes())) {
-      return this.writeFileAndUpdateUsage(inputStream, repoInfo, form.getRelativePath());
-    }
-  }
-
-  private void verifyLayers(final ID repoId, final ManifestInfo manifestInfo) {
-
-    final var configDigest = manifestInfo.getConfig().getDigest();
-
-    // A manifest may name one blob more than once (RPS-1490): its config as one of its layers (the
-    // empty {} descriptor of `oras push` without files) and two layers of identical bytes. The
-    // stored blob is one row, so the lookup is by distinct digest.
-    final var distinctDigests = new LinkedHashSet<>(manifestInfo.getLayerDigests());
-    distinctDigests.add(configDigest);
-    final var digests = List.copyOf(distinctDigests);
-
-    this.layerService.isAllExistsByRepoIdAndDigests(repoId, digests);
-  }
-
-  /**
-   * Refuses a manifest pushed by a digest reference that is not the manifest's own digest, of the
-   * algorithm the reference names: the registry calculates both the {@code sha256} and the {@code
-   * sha512} digest of the pushed bytes (RPS-1242 made {@code sha512} references routable).
-   */
-  private void verifyReference(final ManifestForm form) {
-
-    final var reference = form.getTagName();
-
-    if (!BlobDigests.startsWithDigestPrefix(reference)) {
-      return;
-    }
-
-    final var digest = DockerDigestCalculator.normalize(reference);
-
-    if (!digest.equals(form.getDigest()) && !digest.equals(form.getDigestSha512())) {
-      throw new BadRequestException(ProtocolErrorCodes.DIGEST_MISMATCH);
-    }
-  }
-
-  /**
-   * Resolves the platform a manifest is stored under. Only an <em>image config</em> media type
-   * ({@code DOCKER_CONFIG_JSON}/{@code OCI_CONFIG_JSON}) is required to carry {@code os}/{@code
-   * architecture}: any other config media type is an OCI artifact, legitimately without either, and
-   * is stored under {@link DockerConstants#UNKNOWN_PLATFORM} (RPS-1116).
-   */
-  private String extractPlatform(final BaseRepoInfo<ID> repoInfo, final OciImageConfig config)
-      throws IOException {
-
-    if (!isImageConfigMediaType(config.getMediaType())) {
-      return DockerConstants.UNKNOWN_PLATFORM;
-    }
-
-    final var layer = this.findLayerInfoByRepoIdAndDigest(repoInfo.getId(), config.getDigest());
-    final var configJson = this.getConfig(repoInfo, layer);
-
-    return parsePlatform(configJson);
-  }
-
-  private static boolean isImageConfigMediaType(final @Nullable String mediaType) {
-
-    return DOCKER_CONFIG_JSON.equals(mediaType) || OCI_CONFIG_JSON.equals(mediaType);
-  }
-
-  /**
-   * A config blob that is not JSON, or a JSON object without {@code os} or {@code architecture}, is
-   * the client's mistake, not a server failure (RPS-1116): {@code org.json} throws a bare {@code
-   * JSONException} for both, which is turned into a 400 that names the problem.
-   */
-  private static String parsePlatform(final String config) {
-
-    final JSONObject json;
-    try {
-      json = new JSONObject(config);
-    } catch (final JSONException _) {
-      throw new BadRequestException(ProtocolErrorCodes.MANIFEST_CONFIG_INVALID);
-    }
-
-    try {
-      final var os = json.getString("os");
-      final var architecture = json.getString("architecture");
-
-      if (StringUtils.isBlank(os) || StringUtils.isBlank(architecture)) {
-        throw new BadRequestException(ProtocolErrorCodes.MANIFEST_CONFIG_INVALID);
-      }
-
-      final var platform = os + "/" + architecture;
-
-      // RPS-1139: os/architecture come from the config blob, not the manifest JSON that
-      // DockerManifestValidator already checked, so the length is guarded here, before it reaches
-      // docker_manifest.platform.
-      DockerPushGuards.rejectPlatformTooLong(platform);
-
-      return platform;
-    } catch (final JSONException _) {
-      throw new BadRequestException(ProtocolErrorCodes.MANIFEST_CONFIG_INVALID);
-    }
-  }
-
-  private String getConfig(final BaseRepoInfo<ID> repoInfo, final LayerInfo layerInfo)
-      throws IOException {
-
-    Resource resource;
-
-    try {
-      final var storagePath =
-          StoragePath.of(
-              repoInfo.getStorageKey(),
-              Paths.get(DockerConstants.BLOBS, layerInfo.getDigest()).toString());
-
-      resource = this.getResource(repoInfo, storagePath.getRelativePath());
-    } catch (final ItemNotFoundException _) {
-      final var storagePath =
-          StoragePath.of(
-              repoInfo.getStorageKey(),
-              Paths.get(DockerConstants.BLOBS, layerInfo.getUuid().toString()).toString());
-
-      resource = this.getResource(repoInfo, storagePath.getRelativePath());
-    }
-
-    return resource.getContentAsString(StandardCharsets.UTF_8);
-  }
-
-  private LayerInfo findLayerInfoByRepoIdAndDigest(final ID repoId, final String digest) {
-
-    return this.layerService
-        .findLayerInfoByRepoIdAndDigest(repoId, digest)
-        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.LAYER_NOT_FOUND));
-  }
-
-  private boolean checkLayerExistsInStorage(
-      final BaseRepoInfo<ID> repoInfo, final RelativePath relativePath, final LayerInfo layerInfo) {
-
-    final var idx = BlobDigests.indexOfDigestPrefix(relativePath.getPath());
-
-    if (this.checkLayerForSha(idx, repoInfo, relativePath, layerInfo)) {
-      return true;
-    }
-
-    return this.checkLayerForUuid(idx, repoInfo, relativePath, layerInfo);
-  }
-
-  private boolean checkLayerForUuid(
-      final int idx,
-      final BaseRepoInfo<ID> repoInfo,
-      final RelativePath relativePath,
-      final LayerInfo layerInfo) {
-
-    final var mutPath =
-        idx > 0
-            ? relativePath.getPath().substring(0, idx) + layerInfo.getUuid().toString()
-            : relativePath.getPath();
-
-    final var sp = StoragePath.of(repoInfo.getStorageKey(), mutPath);
-
-    return this.dockerStorageService.existsResource(sp, repoInfo.getName());
-  }
-
-  private boolean checkLayerForSha(
-      final int idx,
-      final BaseRepoInfo<ID> repoInfo,
-      final RelativePath relativePath,
-      final LayerInfo layerInfo) {
-
-    final var mutatedPath =
-        idx > 0
-            ? relativePath.getPath().substring(0, idx) + layerInfo.getDigest()
-            : relativePath.getPath();
-
-    final var storagePath = StoragePath.of(repoInfo.getStorageKey(), mutatedPath);
-
-    return this.dockerStorageService.existsResource(storagePath, repoInfo.getName());
-  }
-
-  private ManifestDetails performDatabaseLookupForManifest(
-      final ProtocolContext context,
-      final String manifestReference,
-      final String imageName,
-      final String requestPath)
-      throws IOException {
-
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
-
-    final var imageInfo =
-        this.imageService.getImageInfoByRepoIdAndName(repoInfo.getId(), imageName);
-
-    final var digest = this.resolveManifestDigest(repoInfo, imageName, manifestReference);
-
-    final var manifest =
-        this.manifestService.getManifestByRepoIdAndImageNameAndDigest(
-            repoInfo.getId(), imageInfo, digest);
-
-    final var manifestResource =
-        this.getManifestResource(repoInfo, imageName, manifest, requestPath);
-    final var manifestStr = manifestResource.getContentAsString(StandardCharsets.UTF_8);
-
-    // The digest reported is in the algorithm the client asked for: a reference by sha512 gets
-    // the sha512 digest back, a tag or a sha256 reference the canonical sha256 one (RPS-1244).
-    return new ManifestDetails(
-        manifest.getMediaType(),
-        DockerDigestCalculator.reportedDigest(manifestReference, manifest.getDigest()),
-        manifestStr);
-  }
-
-  /**
-   * Reads the manifest's file: at its digest, or, for a manifest an earlier version stored, under
-   * the legacy name generated from its {@code storage_name} until the repair service has renamed
-   * it. Both are tried, so a file that was renamed just before its row was updated is still found.
-   */
-  private Resource getManifestResource(
-      final BaseRepoInfo<ID> repoInfo,
-      final String imageName,
-      final BaseManifestDetail<ID> manifest,
-      final String requestPath) {
-
-    if (manifest.getStorageName() != null) {
-      final var legacyName =
-          generate(repoInfo.getStorageKey(), imageName, manifest.getStorageName());
-      final var legacyPath = this.parseForManifest(requestPath, legacyName).getRelativePath();
-
-      if (this.existsResource(repoInfo, legacyPath)) {
-        return this.getResource(repoInfo, legacyPath);
-      }
-    }
-
-    final var path = this.parseForManifest(requestPath, manifest.getDigest()).getRelativePath();
-
-    return this.getResource(repoInfo, path);
-  }
-
-  private boolean existsResource(final BaseRepoInfo<ID> repoInfo, final RelativePath relativePath) {
-
-    return this.dockerStorageService.existsResource(
-        StoragePath.of(repoInfo.getStorageKey(), relativePath.getPath()), repoInfo.getName());
-  }
-
-  private String resolveManifestDigest(
-      final BaseRepoInfo<ID> repoInfo, final String imageName, final String reference) {
-
-    if (BlobDigests.startsWithDigestPrefix(reference)) {
-      return DockerDigestCalculator.normalize(reference);
-    }
-
-    return this.manifestService
-        .findActiveTagByNameAndRepoAndImage(repoInfo.getId(), imageName, reference)
-        .map(BaseTagDetail::getDigest)
-        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.TAG_NOT_FOUND));
-  }
-
-  private Resource getLayerResource(
-      final String digest, final BaseRepoInfo<ID> repoInfo, final RelativePath relativePath) {
-
-    final var idx = BlobDigests.indexOfDigestPrefix(relativePath.getPath());
-
-    final var mutatedPath =
-        idx > 0 ? relativePath.getPath().substring(0, idx) + digest : relativePath.getPath();
-
-    return this.getResource(repoInfo, new RelativePath(mutatedPath));
   }
 }

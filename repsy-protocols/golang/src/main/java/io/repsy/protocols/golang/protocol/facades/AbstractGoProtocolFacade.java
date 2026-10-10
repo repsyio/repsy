@@ -57,7 +57,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 @NullMarked
 @Slf4j
-public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I> {
+public abstract class AbstractGoProtocolFacade<ID> implements GoProtocolFacade<ID> {
 
   private static final String PATH_SEPARATOR = "/";
   private static final String LIST_SUFFIX = "/@v/list";
@@ -77,8 +77,8 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
           .disable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)
           .build();
 
-  private final GoStorageService<I> goStorageService;
-  private final GoModuleService<I> goModuleService;
+  private final GoStorageService<ID> goStorageService;
+  private final GoModuleService<ID> goModuleService;
   private final long maxModuleZipBytes;
 
   /**
@@ -87,8 +87,8 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
    *     being held whole in memory or spooled to disk without bound (RPS-1119).
    */
   protected AbstractGoProtocolFacade(
-      final GoStorageService<I> goStorageService,
-      final GoModuleService<I> goModuleService,
+      final GoStorageService<ID> goStorageService,
+      final GoModuleService<ID> goModuleService,
       final long maxModuleZipBytes) {
     this.goStorageService = goStorageService;
     this.goModuleService = goModuleService;
@@ -97,7 +97,7 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
 
   @Override
   public Resource download(final ProtocolContext context) {
-    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     final var path = decodePath(ProtocolContextUtils.getRelativePath(context).getPath());
 
     if (path.endsWith(LIST_SUFFIX)) {
@@ -128,7 +128,7 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
     final var inputStream =
         RequestBodies.nonEmpty(requestBody)
             .orElseThrow(() -> new BadRequestException(ProtocolErrorCodes.GO_MODULE_ZIP_EMPTY));
-    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     final var path = ProtocolContextUtils.getRelativePath(context).getPath();
     final var modulePath = GoVersionUtils.extractModulePath(path);
 
@@ -157,7 +157,7 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
 
   private void uploadSpooled(
       final ProtocolContext context,
-      final BaseRepoInfo<I> repoInfo,
+      final BaseRepoInfo<ID> repoInfo,
       final String decodedPath,
       final String version,
       final SpooledUpload spool)
@@ -197,7 +197,7 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
    * the row is rolled back with the failure, so a partly written version would be orphaned files.
    */
   private BaseUsages storeFiles(
-      final BaseRepoInfo<I> repoInfo,
+      final BaseRepoInfo<ID> repoInfo,
       final String escapedPath,
       final String version,
       final byte[] modContent,
@@ -258,7 +258,7 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
     }
   }
 
-  private Resource handleVersionList(final BaseRepoInfo<I> repoInfo, final String path) {
+  private Resource handleVersionList(final BaseRepoInfo<ID> repoInfo, final String path) {
     final var versions = this.listVersions(repoInfo, path);
     if (!versions.isEmpty()) {
       return new ByteArrayResource(versions.getBytes(StandardCharsets.UTF_8));
@@ -287,7 +287,7 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
    * release a caller would pick. A tagged pre-release (e.g. {@code v1.0.0-rc1}) is a real version
    * and stays in the list; only the {@code isPseudoVersion} shape is excluded.
    */
-  private String listVersions(final BaseRepoInfo<I> repoInfo, final String path) {
+  private String listVersions(final BaseRepoInfo<ID> repoInfo, final String path) {
     final var atVPath = path.substring(0, path.length() - "list".length());
     final var atVStoragePath = StoragePath.of(repoInfo.getStorageKey(), atVPath);
 
@@ -299,7 +299,7 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
         .collect(Collectors.joining("\n"));
   }
 
-  private Resource handleLatestVersion(final BaseRepoInfo<I> repoInfo, final String path) {
+  private Resource handleLatestVersion(final BaseRepoInfo<ID> repoInfo, final String path) {
     // path was canonicalized by decodePath(): the module segment is the !-escaped storage form.
     final var escapedModulePath = path.substring(1, path.length() - LATEST_SUFFIX.length());
     final var decodedModulePath = GoVersionUtils.decodeModulePath(escapedModulePath);
@@ -324,7 +324,7 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
    * all-lower-case is unaffected: the fallback path equals the primary one and is skipped.
    */
   private Resource getResourceWithLegacyFallback(
-      final BaseRepoInfo<I> repoInfo, final String path) {
+      final BaseRepoInfo<ID> repoInfo, final String path) {
     try {
       return this.goStorageService.getResource(
           repoInfo.getName(), StoragePath.of(repoInfo.getStorageKey(), path));
@@ -350,7 +350,7 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
   }
 
   private BaseUsages writeModFile(
-      final BaseRepoInfo<I> repoInfo,
+      final BaseRepoInfo<ID> repoInfo,
       final String modulePath,
       final String version,
       final byte[] modContent) {
@@ -364,7 +364,7 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
 
   @SneakyThrows
   private BaseUsages writeInfoFile(
-      final BaseRepoInfo<I> repoInfo, final String modulePath, final String version) {
+      final BaseRepoInfo<ID> repoInfo, final String modulePath, final String version) {
 
     final var versionInfo = GoVersionInfo.builder().version(version).time(Instant.now()).build();
     final var infoJson = OBJECT_MAPPER.writeValueAsString(versionInfo);
