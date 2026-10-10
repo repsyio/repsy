@@ -23,9 +23,7 @@ import static io.repsy.os.shared.auth.utils.AuthUtils.removeBasicPrefix;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
-import io.repsy.os.server.shared.auth.AuthFailureThrottle;
 import io.repsy.os.server.shared.auth.ProtocolAuthService;
-import io.repsy.os.server.shared.auth.VerifiedPasswordCache;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.dtos.AuthenticationType;
 import io.repsy.os.shared.auth.utils.JwtUtils;
@@ -36,6 +34,8 @@ import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.docker.protocol.parser.DockerScopes;
 import io.repsy.protocols.docker.shared.auth.services.DockerAuthService;
+import io.repsy.protocols.shared.auth.AuthFailureThrottle;
+import io.repsy.protocols.shared.auth.VerifiedPasswordCache;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.repo.dtos.Credentials;

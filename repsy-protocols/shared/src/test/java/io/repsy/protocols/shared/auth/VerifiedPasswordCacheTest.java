@@ -13,17 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.shared.auth;
+package io.repsy.protocols.shared.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.google.common.base.Ticker;
-import io.repsy.os.shared.auth.utils.PasswordHasher;
-import io.repsy.os.shared.user.dtos.UserInfo;
-import io.repsy.os.shared.user.entities.UserRole;
 import java.time.Duration;
-import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -54,13 +50,27 @@ class VerifiedPasswordCacheTest {
   private final VerifiedPasswordCache cache =
       new VerifiedPasswordCache(new BasicAuthCacheProperties(true, TTL_SECONDS, 100), this.ticker);
 
-  private static UserInfo user(final String username, final String hash) {
-    return UserInfo.builder()
-        .id(UUID.randomUUID())
-        .username(username)
-        .hash(hash)
-        .role(UserRole.USER)
-        .build();
+  private static TestUser user(final String username, final String hash) {
+    return new TestUser(username, hash, null);
+  }
+
+  private record TestUser(String username, String hash, String salt)
+      implements StoredPasswordCredentials {
+
+    @Override
+    public String getUsername() {
+      return this.username;
+    }
+
+    @Override
+    public String getHash() {
+      return this.hash;
+    }
+
+    @Override
+    public String getSalt() {
+      return this.salt;
+    }
   }
 
   @Test

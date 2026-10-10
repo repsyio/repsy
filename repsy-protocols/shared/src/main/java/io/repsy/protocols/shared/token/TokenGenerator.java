@@ -13,11 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.shared.token.utils;
+package io.repsy.protocols.shared.token;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
-import io.repsy.os.shared.token.dtos.TokenType;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
@@ -28,16 +27,16 @@ import org.apache.commons.lang3.RandomStringUtils;
 import org.jspecify.annotations.NonNull;
 
 @UtilityClass
-final class TokenGenerator {
+public final class TokenGenerator {
 
   private static final @NonNull SecureRandom SECURE_RANDOM = new SecureRandom();
   private static final @NonNull String ALGORITHM = "SHA-256";
   private static final int TOKEN_LENGTH = 32;
 
-  public static @NonNull String generate(final @NonNull TokenType tokenType) {
+  public static @NonNull String generate(final @NonNull String prefix) {
 
     try {
-      return createToken(tokenType.getPrefix());
+      return createToken(prefix);
     } catch (final NoSuchAlgorithmException e) {
       throw new IllegalStateException(
           "Failed to generate token due to missing algorithm: " + ALGORITHM, e);

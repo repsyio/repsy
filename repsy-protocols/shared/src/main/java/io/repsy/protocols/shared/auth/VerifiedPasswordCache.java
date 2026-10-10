@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.shared.auth;
+package io.repsy.protocols.shared.auth;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -21,8 +21,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Ticker;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import io.repsy.os.shared.auth.utils.PasswordHasher;
-import io.repsy.os.shared.user.dtos.UserInfo;
 import java.nio.ByteBuffer;
 import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
@@ -95,7 +93,8 @@ public class VerifiedPasswordCache {
    *
    * @see PasswordHasher#matches
    */
-  public boolean matches(final @NonNull UserInfo user, final @NonNull String password) {
+  public boolean matches(
+      final @NonNull StoredPasswordCredentials user, final @NonNull String password) {
 
     if (this.verified == null || user.getHash() == null) {
       return PasswordHasher.matches(password, user.getHash(), user.getSalt());
@@ -120,7 +119,8 @@ public class VerifiedPasswordCache {
    * Tells whether this password already matched the stored hash of {@code user} a moment ago, which
    * costs a lookup and never a hash check.
    */
-  public boolean isRemembered(final @NonNull UserInfo user, final @NonNull String password) {
+  public boolean isRemembered(
+      final @NonNull StoredPasswordCredentials user, final @NonNull String password) {
 
     return this.verified != null
         && user.getHash() != null
@@ -128,12 +128,13 @@ public class VerifiedPasswordCache {
   }
 
   @VisibleForTesting
-  long hitCount() {
+  public long hitCount() {
 
     return this.verified == null ? 0 : this.verified.stats().hitCount();
   }
 
-  private @NonNull String keyOf(final @NonNull UserInfo user, final @NonNull String password) {
+  private @NonNull String keyOf(
+      final @NonNull StoredPasswordCredentials user, final @NonNull String password) {
 
     final var mac = this.newMac();
 

@@ -13,15 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.shared.token.utils;
+package io.repsy.protocols.shared.auth;
 
-import java.time.Instant;
-import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
-@UtilityClass
-public class DeployTokenUtils {
-  public static boolean isExpired(final @NonNull Instant expirationDate) {
-    return Instant.now().isAfter(expirationDate);
-  }
+/**
+ * What {@link VerifiedPasswordCache} needs to know about the stored password of a user: the
+ * username and the stored hash and salt. Each product's user DTO implements it, so the cache does
+ * not depend on any user model.
+ */
+@NullMarked
+public interface StoredPasswordCredentials {
+
+  String getUsername();
+
+  @Nullable String getHash();
+
+  @Nullable String getSalt();
 }

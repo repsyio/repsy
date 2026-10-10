@@ -13,25 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.shared.user.dtos;
+package io.repsy.protocols.shared.token;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import io.repsy.os.shared.user.entities.UserRole;
-import io.repsy.protocols.shared.auth.StoredPasswordCredentials;
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.time.Duration;
 import java.time.Instant;
-import java.util.UUID;
-import lombok.Builder;
-import lombok.Data;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
 
-@Data
-@Builder
-public class UserInfo implements StoredPasswordCredentials {
-  @JsonIgnore private UUID id;
-  private String username;
-  private String hash;
-  private String salt;
-  private UserRole role;
-  private Instant createdAt;
-  private Instant lastLoginAt;
-  private int tokenVersion;
+@DisplayName("DeployTokenUtils")
+class DeployTokenUtilsTest {
+
+  @Test
+  @DisplayName("a date in the past is expired")
+  void pastIsExpired() {
+    assertThat(DeployTokenUtils.isExpired(Instant.now().minus(Duration.ofMinutes(1)))).isTrue();
+  }
+
+  @Test
+  @DisplayName("a date in the future is not expired")
+  void futureIsNotExpired() {
+    assertThat(DeployTokenUtils.isExpired(Instant.now().plus(Duration.ofMinutes(1)))).isFalse();
+  }
 }

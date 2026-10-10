@@ -16,6 +16,7 @@
 package io.repsy.os.shared.token.utils;
 
 import io.repsy.os.shared.token.dtos.TokenType;
+import io.repsy.protocols.shared.token.TokenGenerator;
 import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.NonNull;
 
@@ -24,7 +25,7 @@ public class TokenFactory {
 
   public static @NonNull String of(final @NonNull TokenType tokenType) {
 
-    return TokenGenerator.generate(tokenType);
+    return TokenGenerator.generate(tokenType.getPrefix());
   }
 
   public static @NonNull String deployToken() {

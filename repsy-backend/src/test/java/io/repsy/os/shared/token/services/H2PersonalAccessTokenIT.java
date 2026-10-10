@@ -19,11 +19,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import io.repsy.os.H2IntegrationTest;
 import io.repsy.os.generated.model.AccessTokenForm;
-import io.repsy.os.shared.auth.utils.PasswordHasher;
 import io.repsy.os.shared.token.dtos.TokenScope;
 import io.repsy.os.shared.token.repositories.PersonalAccessTokenRepository;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.os.shared.user.services.UserTxService;
+import io.repsy.protocols.shared.auth.PasswordHasher;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.time.Duration;

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.shared.auth;
+package io.repsy.protocols.shared.auth;
 
 /**
  * The three states of {@code repsy.security.auth-throttle.mode}. A new enforcement switch starts in

@@ -17,7 +17,7 @@ package io.repsy.os.shared.user.migration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.repsy.os.shared.auth.utils.PasswordHasher;
+import io.repsy.protocols.shared.auth.PasswordHasher;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.UUID;

@@ -13,12 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.shared.auth.utils;
+package io.repsy.protocols.shared.auth;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
-import io.repsy.os.shared.constants.ErrorConstants;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.security.MessageDigest;
 import java.util.Map;
 import java.util.Objects;
@@ -95,7 +95,7 @@ public class PasswordHasher {
   public static void requireFitsBcrypt(final @NonNull String password) {
 
     if (!fitsBcrypt(password)) {
-      throw new BadRequestException(ErrorConstants.PASSWORD_TOO_LONG);
+      throw new BadRequestException(ProtocolErrorCodes.PASSWORD_TOO_LONG);
     }
   }
 
