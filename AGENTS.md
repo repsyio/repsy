@@ -283,7 +283,8 @@ for SonarCloud.
 - Lombok and MapStruct annotation processors are available via `core-parent`.
 - New source files need the Apache 2.0 licence header (see any existing file), or RAT fails
   the build.
-- Frontend: follow the Angular Style Guide and run `pnpm lint` in `repsy-frontend/`.
+- Frontend: follow the Angular Style Guide and the "JavaScript and TypeScript naming" rules below, and run
+  `pnpm lint` in `repsy-frontend/` (and in `e2e/` for the Playwright suite).
 - Commit messages: conventional commits, prefixed with the Jira key where there is one
   (for example `RPS-844: ...`).
 
@@ -372,6 +373,64 @@ them in both repositories together.
 `@ConfigurationProperties` and lowercase package names over the backend and the protocol libraries. Classes that
 predate it sit in its freeze lists with a reason; the lists may only shrink, so rename or move a class and delete
 its entry, never add one.
+
+## JavaScript and TypeScript naming
+
+The naming rules of the Angular frontends and the Playwright e2e suites of Repsy OS and Repsy Cloud
+(RPS-2123). They are the target: some existing code still breaks them, and the Jira stories labelled
+`js-naming` migrate it. Do not add new exceptions. Eslint reports the rules as `warn` (`repsy-frontend/eslint.config.js`,
+`e2e/eslint.config.js`); the story that migrates a family of names flips its rule to `error`. The same rules
+are in `repsy-mono`'s `AGENTS.md`; change them in both repositories together, like the Java section.
+
+Exempt: generated code (`src/generated/**`, `src/api/generated/**`, `src/generated/repsy-e2e/**`), the
+generator limitations (`NugetPackagesApi`, `OauthAccountsApi`), `app-root`, wire and contract names
+(`baseURL`, `toHaveURL`, `uploadUuid` for `Docker-Upload-UUID`, quoted header and JSON keys, `type=golang`,
+`RepoType.GOLANG`, the route slug `golang`), the mustache test packages under `e2e/src/packages/**`, and
+all-caps constants.
+
+### Files and folders
+
+- File and folder names are `kebab-case`, and the file name is the kebab-case of the class it holds
+  (`go-module-list.component.ts` holds `GoModuleListComponent`). Underscores in the test package directories
+  are not renamed.
+- Angular files carry exactly one role suffix: `.component`, `.service`, `.routes`, `.guard`, `.pipe`,
+  `.directive`, `.interceptor`, `.resolver`, `.spec`. Role folders are plural and hold only that role
+  (`services`, `components`, `guards`, `dtos`, `constants`, `utils`).
+- No barrel files (`index.ts` that re-export); import from the file that declares the symbol. The generated
+  API index is the one allowed import point of generated code, never a deep path under it.
+
+### Types and classes
+
+- `PascalCase`, with the role suffix of the file (`FooComponent`, `FooService`, `FooGuard`). No `I` or `T`
+  prefix, and no `Dto`, `Model`, `UI`, `Helper` or `Util` suffix; hand-written DTO types follow the Java
+  roles (`Info`, `Item`, `Form`, `Payload`).
+- Abbreviations are written as words: `Url`, `Id`, `Ui`, `NuGet`, `Go`, `OAuth` (not `URL`, `ID`, `UI`,
+  `Nuget`, `Golang`, `Oauth`). Identifiers are `xxxId`, not `xxxUuid`.
+- One simple class name per concept. When two formats need the same word, prefix the format.
+- Component selector = `app-` + kebab-case of the class without `Component` (`GoConfigComponent` is
+  `app-go-config`). Directive selectors are `app` + camelCase.
+- E2e page objects end in `*Section`, `*Page` or `*Modal`; harness clients are `<format>-raw.ts` and
+  `<format>-adapter.ts`.
+
+### Methods, fields and variables
+
+- `fetch*` calls the remote API and returns an Observable or Promise; `get*` and `find*` are synchronous
+  (`find*` may return `undefined`); `load*` fills component state; `on*` is an event handler.
+- Parameters that mirror the API path use the path vocabulary: `repoOwner`, `repoName`, `packageName`,
+  `imageName`, `tagName`, `xxxId`.
+- Booleans read as predicates (`isLoading`, `hasError`, `canEdit`). Observables end in `$` (`repos$`).
+- No `_` or `#` prefixed members, and no explicit `public`: a member is public unless it says `private` or
+  `protected`.
+
+### Constants and error codes
+
+- Constants are `UPPER_SNAKE_CASE`, in a `constants` folder. Error codes (`msgId`, later `code`) are a client
+  contract: compare against the `ERROR_CODES` constants, never an inline literal, and never rename one.
+
+### Tests
+
+- A test title is a sentence about the behaviour: no `should`, no `Success -` or `Fail -` prefix. Spec files
+  are `<name>.spec.ts` next to the code (frontend) or under `tests/<area>/` (e2e).
 
 ## Merging to `main`
 
