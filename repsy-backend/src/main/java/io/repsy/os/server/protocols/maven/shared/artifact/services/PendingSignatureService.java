@@ -29,10 +29,10 @@ import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactV
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.PendingSignatureRepository;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreService;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.MavenPgpCaps;
-import io.repsy.os.server.protocols.maven.shared.keystore.services.PgpVerifierService;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
+import io.repsy.protocols.maven.shared.keystore.services.PgpVerifierService;
 import io.repsy.protocols.maven.shared.utils.MavenGavUtils;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.protocols.maven.shared.keystore.services;
+package io.repsy.protocols.maven.shared.keystore.services;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -24,9 +24,9 @@ import com.google.common.base.Ticker;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.SignatureNotVerifiedException;
-import io.repsy.os.server.protocols.maven.shared.keystore.PgpTestKeys;
-import io.repsy.os.server.protocols.maven.shared.keystore.dtos.PublicKeySources;
-import io.repsy.os.server.protocols.maven.shared.keystore.support.StubKeyServers;
+import io.repsy.protocols.maven.shared.keystore.PgpTestKeys;
+import io.repsy.protocols.maven.shared.keystore.dtos.PublicKeySources;
+import io.repsy.protocols.maven.shared.keystore.support.StubKeyServers;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;

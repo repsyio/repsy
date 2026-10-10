@@ -41,9 +41,9 @@ import io.repsy.os.server.protocols.maven.shared.artifact.repositories.VersionDe
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.VersionLicenseRepository;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.VersionSignatureRepository;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreService;
-import io.repsy.os.server.protocols.maven.shared.keystore.services.PgpVerifierService;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.protocols.maven.shared.keystore.services.PgpVerifierService;
 import io.repsy.protocols.shared.storage.StorageStrategyRegistry;
 import java.nio.file.Path;
 import java.time.LocalDateTime;

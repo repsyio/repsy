@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.protocols.maven.shared.keystore.services;
+package io.repsy.protocols.maven.shared.keystore.services;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.bouncycastle.openpgp.PGPUtil.getDecoderStream;
@@ -26,8 +26,8 @@ import com.google.common.cache.CacheStats;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.SignatureNotVerifiedException;
-import io.repsy.os.server.protocols.maven.shared.keystore.dtos.ParsedPublicKey;
-import io.repsy.os.server.protocols.maven.shared.keystore.dtos.PublicKeySources;
+import io.repsy.protocols.maven.shared.keystore.dtos.ParsedPublicKey;
+import io.repsy.protocols.maven.shared.keystore.dtos.PublicKeySources;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -87,7 +87,8 @@ public class PgpVerifierService {
   // verification. The parsed ring collection is kept instead, keyed by the SHA-256 of the armored
   // text: an armoredKey that changes can never be answered by a stale ring, and the key is a
   // fixed-size digest, not the 64 KB text. Only a successful parse is kept (a corrupt row is
-  // parsed, and logged, again). KeyStoreService evicts a key's entry when the key is deleted.
+  // parsed, and logged, again). The backend's key store service evicts a key's entry when the key
+  // is deleted.
   private static final long PARSED_KEY_CACHE_SIZE = 500;
 
   private final @NonNull RestClient restClient;
@@ -313,8 +314,12 @@ public class PgpVerifierService {
     return this.parsedRegisteredKeys.stats();
   }
 
+  /**
+   * How many parsed registered keys are cached. Public only so that the backend's key store tests
+   * can see a deleted key evicted (RPS-1814) now that this class lives in a library.
+   */
   @VisibleForTesting
-  long parsedRegisteredKeyCount() {
+  public long parsedRegisteredKeyCount() {
     return this.parsedRegisteredKeys.size();
   }
 

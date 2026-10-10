@@ -51,9 +51,7 @@ import io.repsy.os.server.protocols.maven.shared.artifact.repositories.PendingSi
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.VersionDeveloperRepository;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.VersionLicenseRepository;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.VersionSignatureRepository;
-import io.repsy.os.server.protocols.maven.shared.keystore.dtos.PublicKeySources;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreService;
-import io.repsy.os.server.protocols.maven.shared.keystore.services.PgpVerifierService;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
@@ -62,6 +60,8 @@ import io.repsy.protocols.maven.shared.artifact.dtos.PluginPrefixChange;
 import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredPlugin;
 import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredVersion;
 import io.repsy.protocols.maven.shared.artifact.dtos.SignatureOutcome;
+import io.repsy.protocols.maven.shared.keystore.dtos.PublicKeySources;
+import io.repsy.protocols.maven.shared.keystore.services.PgpVerifierService;
 import io.repsy.protocols.maven.shared.utils.MavenGavUtils;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import io.repsy.protocols.shared.storage.StorageStrategyRegistry;
