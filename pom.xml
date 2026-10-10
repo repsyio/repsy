@@ -41,12 +41,6 @@
     <checkstyle.config.location>${maven.multiModuleProjectDirectory}/core/config/checkstyle.xml</checkstyle.config.location>
 
     <!--
-      RPS-2054: core-dependencies sets sonar.skip=true for itself, but core-parent inherits it, so
-      every module here would be skipped by the SonarCloud scanner. Analyze the modules again.
-    -->
-    <sonar.skip>false</sonar.skip>
-
-    <!--
       RPS-1453: extra JVM arguments of every forked test JVM. core-parent (RPS-1471) appends this
       property to the argLine of Surefire and Failsafe, after the JaCoCo agent and -Duser.timezone.
       C1 only, because a test JVM lives for a few minutes and mostly runs code once (context
