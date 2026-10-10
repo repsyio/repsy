@@ -17,6 +17,7 @@ package io.repsy.protocols.npm.shared.utils;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.protocols.npm.shared.constants.NpmConstants;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.util.Collection;
 import java.util.Map;
 import lombok.AccessLevel;
@@ -97,10 +98,10 @@ public final class NpmPublishLimits {
   public static void checkScopeAndName(final @Nullable String scopeName, final String packageName) {
 
     if (scopeName != null && scopeName.length() > MAX_SCOPE_LENGTH) {
-      throw new BadRequestException("packageScopeTooLong");
+      throw new BadRequestException(ProtocolErrorCodes.PACKAGE_SCOPE_TOO_LONG);
     }
     if (packageName.length() > MAX_NAME_LENGTH) {
-      throw new BadRequestException("packageNameTooLong");
+      throw new BadRequestException(ProtocolErrorCodes.PACKAGE_NAME_TOO_LONG);
     }
   }
 
@@ -112,7 +113,7 @@ public final class NpmPublishLimits {
    */
   public static void checkVersion(final String versionName) {
     if (versionName.length() > MAX_VERSION_LENGTH) {
-      throw new BadRequestException("packageVersionTooLong");
+      throw new BadRequestException(ProtocolErrorCodes.PACKAGE_VERSION_TOO_LONG);
     }
   }
 
@@ -123,7 +124,7 @@ public final class NpmPublishLimits {
    */
   public static void checkDistTagName(final String tagName) {
     if (tagName.length() > MAX_DIST_TAG_LENGTH) {
-      throw new BadRequestException("distTagNameTooLong");
+      throw new BadRequestException(ProtocolErrorCodes.DIST_TAG_NAME_TOO_LONG);
     }
   }
 
@@ -134,7 +135,7 @@ public final class NpmPublishLimits {
    */
   public static void checkDeprecationMessage(final String message) {
     if (message.length() > MAX_DEPRECATION_MESSAGE_LENGTH) {
-      throw new BadRequestException("deprecationMessageTooLong");
+      throw new BadRequestException(ProtocolErrorCodes.DEPRECATION_MESSAGE_TOO_LONG);
     }
   }
 
@@ -159,10 +160,10 @@ public final class NpmPublishLimits {
       final @Nullable Object tagName, final @Nullable Object version) {
 
     if (tagName instanceof final String tag && tag.length() > MAX_DIST_TAG_LENGTH) {
-      throw new BadRequestException("distTagNameTooLong");
+      throw new BadRequestException(ProtocolErrorCodes.DIST_TAG_NAME_TOO_LONG);
     }
     if (version instanceof final String value && value.length() > MAX_VERSION_LENGTH) {
-      throw new BadRequestException("packageVersionTooLong");
+      throw new BadRequestException(ProtocolErrorCodes.PACKAGE_VERSION_TOO_LONG);
     }
   }
 

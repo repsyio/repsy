@@ -47,6 +47,7 @@ import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.os.shared.user.services.UserTxService;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.time.Instant;
 import java.time.Period;
@@ -95,7 +96,7 @@ class NpmAuthenticatorImplTest {
   private static void assertUnauthorized(final ThrowingCallable call) {
     assertThatThrownBy(call)
         .isExactlyInstanceOf(UnAuthorizedException.class)
-        .hasMessage(ErrorConstants.UN_AUTHORIZED);
+        .hasMessage(ProtocolErrorCodes.UN_AUTHORIZED);
   }
 
   @BeforeEach
@@ -290,7 +291,7 @@ class NpmAuthenticatorImplTest {
   @DisplayName("resolveUsername refuses a Bearer value that is no token, or has an unknown type")
   void whoamiJunkBearer() {
     when(this.jwtUtils.extractAuthenticationType("Bearer junk", TokenRealm.PROTOCOL))
-        .thenThrow(new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED));
+        .thenThrow(new UnAuthorizedException(ProtocolErrorCodes.ACCESS_NOT_ALLOWED));
     when(this.jwtUtils.extractAuthenticationType("Bearer odd", TokenRealm.PROTOCOL))
         .thenThrow(new BadRequestException("invalidAuthenticationType"));
 
@@ -307,7 +308,7 @@ class NpmAuthenticatorImplTest {
     when(this.jwtUtils.extractProtocolUserClaims("Bearer jwt"))
         .thenReturn(new ProtocolUserClaims(UUID.randomUUID(), "ghost", null));
     when(this.userTxService.getAuthenticatedUserByUsername("ghost"))
-        .thenThrow(new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED));
+        .thenThrow(new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED));
 
     assertUnauthorized(() -> this.authenticator.resolveUsername(this.repo, "Bearer jwt"));
   }
@@ -450,7 +451,7 @@ class NpmAuthenticatorImplTest {
   void revokeJunk() {
     this.callerIsUserWithBearer("mine");
     when(this.jwtUtils.verifyProtocolToken("junk"))
-        .thenThrow(new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED));
+        .thenThrow(new UnAuthorizedException(ProtocolErrorCodes.ACCESS_NOT_ALLOWED));
     when(this.jwtUtils.verifyProtocolToken("odd"))
         .thenThrow(new BadRequestException("invalidAuthenticationType"));
     tokenClaims("scanner", UUID.randomUUID(), AuthenticationType.DOCKER_SCAN);

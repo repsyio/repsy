@@ -22,6 +22,7 @@ import io.repsy.os.generated.model.ProfileInfo;
 import io.repsy.os.generated.model.UserRole;
 import io.repsy.os.shared.auth.services.LoginInfoFactory;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
+import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.user.services.ReservedUsernameService;
 import io.repsy.os.shared.user.services.UserTxService;
 import java.time.Instant;
@@ -88,7 +89,7 @@ public class ProfileService {
     this.reservedUsernameService.requireNotReserved(newUsername);
 
     if (this.userTxService.existsByUsername(newUsername)) {
-      throw new BadRequestException("usernameInUse");
+      throw new BadRequestException(ErrorConstants.USERNAME_IN_USE);
     }
   }
 }

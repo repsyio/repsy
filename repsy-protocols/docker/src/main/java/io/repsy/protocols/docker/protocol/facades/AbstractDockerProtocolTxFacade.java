@@ -54,6 +54,7 @@ import io.repsy.protocols.docker.shared.tag.services.ManifestService;
 import io.repsy.protocols.docker.shared.utils.DockerDigestCalculator;
 import io.repsy.protocols.docker.shared.utils.DockerPushGuards;
 import io.repsy.protocols.docker.shared.utils.DockerTagPaging;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.BlobDigests;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
@@ -118,7 +119,7 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
     final var resource = this.getResource(repoInfo, relativePath);
 
     if (!BlobDigests.matches(digest, resource.getInputStream())) {
-      throw new BadRequestException("digestMismatch");
+      throw new BadRequestException(ProtocolErrorCodes.DIGEST_MISMATCH);
     }
   }
 
@@ -168,7 +169,8 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
           case OCI_IMAGE_INDEX, DOCKER_MANIFEST_LIST ->
               this.createManifestList(repoInfo, imageInfo, form);
 
-          default -> throw new BadRequestException("manifestMediaTypeUnsupported");
+          default ->
+              throw new BadRequestException(ProtocolErrorCodes.MANIFEST_MEDIA_TYPE_UNSUPPORTED);
         };
 
     context.addProperty(ARTIFACT_NAME_PROPERTY, imageInfo.getName());
@@ -190,7 +192,7 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
     final var parsedPath = this.parseForLayer(servletPath, layer.getDigest());
 
     if (!this.checkLayerExistsInStorage(repoInfo, parsedPath.getRelativePath(), layer)) {
-      throw new ItemNotFoundException("layerNotFound");
+      throw new ItemNotFoundException(ProtocolErrorCodes.LAYER_NOT_FOUND);
     }
 
     return this.getLayerResource(layer.getDigest(), repoInfo, parsedPath.getRelativePath());
@@ -293,7 +295,7 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
 
     return this.dockerStorageService
         .findResource(storagePath, repoInfo.getName())
-        .orElseThrow(() -> new ItemNotFoundException("resourceNotFound"));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.RESOURCE_NOT_FOUND));
   }
 
   /**
@@ -316,7 +318,7 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
             repoInfo.getId(), imageName, reference);
 
     if (existingTag.isPresent() && !digest.equals(existingTag.get().getDigest())) {
-      throw new AccessNotAllowedException("packageOverrideDisabled");
+      throw new AccessNotAllowedException(ProtocolErrorCodes.PACKAGE_OVERRIDE_DISABLED);
     }
   }
 
@@ -358,7 +360,7 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
     final var digest = DockerDigestCalculator.normalize(reference);
 
     if (!digest.equals(form.getDigest()) && !digest.equals(form.getDigestSha512())) {
-      throw new BadRequestException("digestMismatch");
+      throw new BadRequestException(ProtocolErrorCodes.DIGEST_MISMATCH);
     }
   }
 
@@ -397,7 +399,7 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
     try {
       json = new JSONObject(config);
     } catch (final JSONException _) {
-      throw new BadRequestException("manifestConfigInvalid");
+      throw new BadRequestException(ProtocolErrorCodes.MANIFEST_CONFIG_INVALID);
     }
 
     try {
@@ -405,7 +407,7 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
       final var architecture = json.getString("architecture");
 
       if (StringUtils.isBlank(os) || StringUtils.isBlank(architecture)) {
-        throw new BadRequestException("manifestConfigInvalid");
+        throw new BadRequestException(ProtocolErrorCodes.MANIFEST_CONFIG_INVALID);
       }
 
       final var platform = os + "/" + architecture;
@@ -417,7 +419,7 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
 
       return platform;
     } catch (final JSONException _) {
-      throw new BadRequestException("manifestConfigInvalid");
+      throw new BadRequestException(ProtocolErrorCodes.MANIFEST_CONFIG_INVALID);
     }
   }
 
@@ -449,7 +451,7 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
 
     return this.layerService
         .findLayerInfoByRepoIdAndDigest(repoId, digest)
-        .orElseThrow(() -> new ItemNotFoundException("layerNotFound"));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.LAYER_NOT_FOUND));
   }
 
   private boolean checkLayerExistsInStorage(
@@ -568,7 +570,7 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
     return this.manifestService
         .findActiveTagByNameAndRepoAndImage(repoInfo.getId(), imageName, reference)
         .map(BaseTagDetail::getDigest)
-        .orElseThrow(() -> new ItemNotFoundException("tagNotFound"));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.TAG_NOT_FOUND));
   }
 
   private Resource getLayerResource(

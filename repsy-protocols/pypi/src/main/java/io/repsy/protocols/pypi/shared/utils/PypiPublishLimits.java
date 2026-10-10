@@ -17,6 +17,7 @@ package io.repsy.protocols.pypi.shared.utils;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.protocols.pypi.shared.python_package.dtos.PackageUploadForm;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.util.ArrayList;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -102,7 +103,7 @@ public final class PypiPublishLimits {
    */
   public static void checkPackageName(final String name) {
     if (name.length() > MAX_NAME_LENGTH) {
-      throw new BadRequestException("pypiPackageNameTooLong");
+      throw new BadRequestException(ProtocolErrorCodes.PYPI_PACKAGE_NAME_TOO_LONG);
     }
   }
 
@@ -114,7 +115,7 @@ public final class PypiPublishLimits {
    */
   public static void checkVersion(final @Nullable String version) {
     if (version != null && version.length() > MAX_VERSION_LENGTH) {
-      throw new BadRequestException("pypiVersionTooLong");
+      throw new BadRequestException(ProtocolErrorCodes.PYPI_VERSION_TOO_LONG);
     }
   }
 
@@ -127,7 +128,7 @@ public final class PypiPublishLimits {
    */
   public static void checkArchiveFilename(final String filename) {
     if (filename.length() > MAX_ARCHIVE_FILENAME_LENGTH) {
-      throw new BadRequestException("pypiArchiveFileNameTooLong");
+      throw new BadRequestException(ProtocolErrorCodes.PYPI_ARCHIVE_FILE_NAME_TOO_LONG);
     }
   }
 
@@ -139,7 +140,7 @@ public final class PypiPublishLimits {
    */
   public static void checkRequiresPython(final @Nullable String requiresPython) {
     if (requiresPython != null && requiresPython.length() > MAX_REQUIRES_PYTHON_LENGTH) {
-      throw new BadRequestException("pypiRequiresPythonTooLong");
+      throw new BadRequestException(ProtocolErrorCodes.PYPI_REQUIRES_PYTHON_TOO_LONG);
     }
   }
 

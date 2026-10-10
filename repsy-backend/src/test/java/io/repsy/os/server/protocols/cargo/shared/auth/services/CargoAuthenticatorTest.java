@@ -43,6 +43,7 @@ import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.os.shared.user.mappers.UserMapper;
 import io.repsy.os.shared.user.repositories.UserRepository;
 import io.repsy.os.shared.user.services.UserTxService;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.nio.charset.StandardCharsets;
 import java.time.temporal.TemporalAmount;
 import java.util.Base64;
@@ -84,7 +85,7 @@ class CargoAuthenticatorTest {
   private static void assertUnauthorized(final ThrowingCallable call) {
     assertThatThrownBy(call)
         .isExactlyInstanceOf(UnAuthorizedException.class)
-        .hasMessage(ErrorConstants.UN_AUTHORIZED);
+        .hasMessage(ProtocolErrorCodes.UN_AUTHORIZED);
   }
 
   @BeforeEach

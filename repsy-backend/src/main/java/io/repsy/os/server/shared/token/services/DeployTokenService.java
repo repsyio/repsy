@@ -29,6 +29,7 @@ import io.repsy.os.server.shared.token.utils.DeployTokenUtils;
 import io.repsy.os.server.shared.token.utils.TokenUsernameGenerator;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.token.utils.TokenFactory;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.time.Duration;
 import java.time.Instant;
@@ -117,11 +118,11 @@ public class DeployTokenService {
       final var date = repoDeployToken.getExpirationDate().truncatedTo(ChronoUnit.MICROS);
 
       if (!date.isAfter(now)) {
-        throw new BadRequestException("deployTokenExpirationInPast");
+        throw new BadRequestException(ProtocolErrorCodes.DEPLOY_TOKEN_EXPIRATION_IN_PAST);
       }
 
       if (isBeyondMaximumExpiration(date, now)) {
-        throw new BadRequestException("deployTokenExpirationTooLate");
+        throw new BadRequestException(ProtocolErrorCodes.DEPLOY_TOKEN_EXPIRATION_TOO_LATE);
       }
 
       repoDeployToken.setExpirationDate(date);
@@ -193,6 +194,6 @@ public class DeployTokenService {
 
     return this.deployTokenRepository
         .findByRepoIdAndId(repoId, tokenId)
-        .orElseThrow(() -> new ItemNotFoundException("tokenNotFound"));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.TOKEN_NOT_FOUND));
   }
 }

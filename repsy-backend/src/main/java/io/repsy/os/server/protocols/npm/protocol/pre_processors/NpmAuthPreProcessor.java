@@ -28,6 +28,7 @@ import io.repsy.os.server.shared.auth.AuthChallenges;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
@@ -112,7 +113,7 @@ public class NpmAuthPreProcessor extends ProtocolProcessor {
       final @Nullable String authHeader, final UUID repoId, final Permission permission) {
 
     if (authHeader == null) {
-      throw new UnAuthorizedException("unAuthorized");
+      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
 
     this.authenticateRequest(authHeader, repoId, permission);
@@ -126,7 +127,7 @@ public class NpmAuthPreProcessor extends ProtocolProcessor {
           this.authenticator.handleBasicAuth(header, permission, repoId);
       case final String header when header.startsWith(AUTH_BEARER) ->
           this.authenticator.handleBearerAuth(header, repoId, permission);
-      default -> throw new UnAuthorizedException("unAuthorized");
+      default -> throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
   }
 

@@ -32,6 +32,7 @@ import io.repsy.protocols.nuget.shared.packages.dtos.NuGetPackageSearchResult;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetVersionInfo;
 import io.repsy.protocols.nuget.shared.packages.services.AbstractNuGetPackageService;
 import io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.IOException;
 import java.time.Instant;
@@ -57,8 +58,6 @@ import org.springframework.web.server.ResponseStatusException;
 @NullMarked
 public class NuGetPackageService extends AbstractNuGetPackageService<UUID> {
 
-  private static final String ERR_PACKAGE_NOT_FOUND = "packageNotFound";
-  private static final String ERR_VERSION_NOT_FOUND = "versionNotFound";
   private static final String VERSION_UNIQUE_CONSTRAINT =
       "ux_nuget_package_version__package_id_version";
 
@@ -322,7 +321,7 @@ public class NuGetPackageService extends AbstractNuGetPackageService<UUID> {
 
     final var pkgVersion =
         this.findVersion(pkg, version)
-            .orElseThrow(() -> new ItemNotFoundException(ERR_VERSION_NOT_FOUND));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.VERSION_NOT_FOUND));
 
     this.packageVersionRepository.incrementDownloadCount(pkgVersion.getId());
   }
@@ -336,7 +335,7 @@ public class NuGetPackageService extends AbstractNuGetPackageService<UUID> {
 
     final var pkgVersion =
         this.findVersion(pkg, version)
-            .orElseThrow(() -> new ItemNotFoundException(ERR_VERSION_NOT_FOUND));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.VERSION_NOT_FOUND));
 
     pkgVersion.setListed(false);
 
@@ -352,7 +351,7 @@ public class NuGetPackageService extends AbstractNuGetPackageService<UUID> {
 
     final var pkgVersion =
         this.findVersion(pkg, version)
-            .orElseThrow(() -> new ItemNotFoundException(ERR_VERSION_NOT_FOUND));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.VERSION_NOT_FOUND));
 
     pkgVersion.setListed(true);
 
@@ -416,7 +415,7 @@ public class NuGetPackageService extends AbstractNuGetPackageService<UUID> {
     final var pkgVersion =
         this.findLeftoverBuildMetadataVersion(pkg, version)
             .or(() -> this.findVersion(pkg, version))
-            .orElseThrow(() -> new ItemNotFoundException(ERR_VERSION_NOT_FOUND));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.VERSION_NOT_FOUND));
 
     this.packageVersionRepository.delete(pkgVersion);
 
@@ -459,7 +458,7 @@ public class NuGetPackageService extends AbstractNuGetPackageService<UUID> {
   private NuGetPackage findPackage(final UUID repoId, final String packageId) {
     return this.packageRepository
         .findByRepoIdAndPackageIdIgnoreCase(repoId, packageId.toLowerCase(Locale.ROOT))
-        .orElseThrow(() -> new ItemNotFoundException(ERR_PACKAGE_NOT_FOUND));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.PACKAGE_NOT_FOUND));
   }
 
   /**
@@ -485,7 +484,7 @@ public class NuGetPackageService extends AbstractNuGetPackageService<UUID> {
 
     return this.packageRepository
         .findByRepoIdAndPackageIdIgnoreCase(repoId, normalizedId)
-        .orElseThrow(() -> new ItemNotFoundException(ERR_PACKAGE_NOT_FOUND));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.PACKAGE_NOT_FOUND));
   }
 
   private NuGetPackageVersion createNuGetPackageVersion(

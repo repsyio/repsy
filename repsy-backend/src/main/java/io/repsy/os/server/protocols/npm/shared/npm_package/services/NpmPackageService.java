@@ -38,7 +38,6 @@ import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageD
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageKeywordRepository;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageMaintainerRepository;
 import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.PackageVersionRepository;
-import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.protocols.npm.shared.constants.NpmConstants;
@@ -48,6 +47,7 @@ import io.repsy.protocols.npm.shared.npm_package.dtos.PackageDistributionTagMapL
 import io.repsy.protocols.npm.shared.npm_package.services.AbstractNpmPackageService;
 import io.repsy.protocols.npm.shared.utils.NpmPackageUtils;
 import io.repsy.protocols.npm.shared.utils.NpmVersionComparator;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.IOException;
 import java.net.URISyntaxException;
@@ -76,7 +76,6 @@ import org.springframework.transaction.annotation.Transactional;
 @NullMarked
 public class NpmPackageService extends AbstractNpmPackageService<UUID> {
 
-  private static final String PACKAGE_VERSION_ALREADY_EXISTS = "packageVersionAlreadyExists";
   private static final String VERSION_UNIQUE_CONSTRAINT =
       "ux_npm_package_version__package_id_version";
 
@@ -105,7 +104,7 @@ public class NpmPackageService extends AbstractNpmPackageService<UUID> {
       final var repo =
           this.repoRepository
               .findById(repoInfo.getStorageKey())
-              .orElseThrow(() -> new ItemNotFoundException(ErrorConstants.REPO_NOT_FOUND));
+              .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.REPO_NOT_FOUND));
 
       kind =
           this.recordVersion(
@@ -122,7 +121,7 @@ public class NpmPackageService extends AbstractNpmPackageService<UUID> {
         throw e;
       }
 
-      throw new AccessNotAllowedException(PACKAGE_VERSION_ALREADY_EXISTS);
+      throw new AccessNotAllowedException(ProtocolErrorCodes.PACKAGE_VERSION_ALREADY_EXISTS);
     }
 
     return writer.write(kind);
@@ -168,7 +167,7 @@ public class NpmPackageService extends AbstractNpmPackageService<UUID> {
     final var npmPackage =
         this.npmPackageRepository
             .findWithLockByRepoIdAndScopeAndName(repoId, scopeName, packageName)
-            .orElseThrow(() -> new ItemNotFoundException(ErrorConstants.PACKAGE_NOT_FOUND));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.PACKAGE_NOT_FOUND));
 
     if (inserted == 0) {
       return this.recordVersionOf(npmPackage, versionName, payload, allowOverride);
@@ -194,7 +193,7 @@ public class NpmPackageService extends AbstractNpmPackageService<UUID> {
     }
 
     if (!allowOverride) {
-      throw new AccessNotAllowedException(PACKAGE_VERSION_ALREADY_EXISTS);
+      throw new AccessNotAllowedException(ProtocolErrorCodes.PACKAGE_VERSION_ALREADY_EXISTS);
     }
 
     this.replaceVersion(
@@ -395,7 +394,8 @@ public class NpmPackageService extends AbstractNpmPackageService<UUID> {
         versions.stream()
             .filter(version -> version.getVersion().equals(versionName))
             .findFirst()
-            .orElseThrow(() -> new ItemNotFoundException(ErrorConstants.PACKAGE_VERSION_NOT_FOUND));
+            .orElseThrow(
+                () -> new ItemNotFoundException(ProtocolErrorCodes.PACKAGE_VERSION_NOT_FOUND));
 
     if (versions.size() == 1) {
       return this.removePackage(npmPackage, List.of(versionName), packageRemover);
@@ -441,7 +441,7 @@ public class NpmPackageService extends AbstractNpmPackageService<UUID> {
     return remaining.stream()
         .filter(version -> version.getVersion().equals(latestName))
         .findFirst()
-        .orElseThrow(() -> new ItemNotFoundException(ErrorConstants.PACKAGE_VERSION_NOT_FOUND));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.PACKAGE_VERSION_NOT_FOUND));
   }
 
   public List<PackageDistributionTagMapListItem> getDistributionTags(
@@ -470,7 +470,8 @@ public class NpmPackageService extends AbstractNpmPackageService<UUID> {
     final var packageVersion =
         this.packageVersionRepository
             .findByNpmPackageIdAndVersion(npmPackage.getId(), versionName)
-            .orElseThrow(() -> new BadRequestException(ErrorConstants.PACKAGE_VERSION_NOT_FOUND));
+            .orElseThrow(
+                () -> new BadRequestException(ProtocolErrorCodes.PACKAGE_VERSION_NOT_FOUND));
 
     this.pointTagAt(npmPackage, packageVersion, tagName);
 
@@ -541,7 +542,7 @@ public class NpmPackageService extends AbstractNpmPackageService<UUID> {
 
     return this.npmPackageRepository
         .findWithLockByRepoIdAndScopeAndName(repoInfo.getStorageKey(), scopeName, packageName)
-        .orElseThrow(() -> new ItemNotFoundException(ErrorConstants.PACKAGE_NOT_FOUND));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.PACKAGE_NOT_FOUND));
   }
 
   public Page<io.repsy.os.generated.model.NpmPackageListItem> getPackagesContainsScope(
@@ -666,7 +667,7 @@ public class NpmPackageService extends AbstractNpmPackageService<UUID> {
 
     return this.npmPackageRepository
         .findByRepoIdAndScopeAndName(repoId, scopeName, packageName)
-        .orElseThrow(() -> new ItemNotFoundException(ErrorConstants.PACKAGE_NOT_FOUND));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.PACKAGE_NOT_FOUND));
   }
 
   private PackageVersion findPackageVersionByPackageIdAndVersion(
@@ -674,7 +675,7 @@ public class NpmPackageService extends AbstractNpmPackageService<UUID> {
 
     return this.packageVersionRepository
         .findByNpmPackageIdAndVersion(packageId, versionName)
-        .orElseThrow(() -> new ItemNotFoundException(ErrorConstants.PACKAGE_VERSION_NOT_FOUND));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.PACKAGE_VERSION_NOT_FOUND));
   }
 
   private void addDistTag(

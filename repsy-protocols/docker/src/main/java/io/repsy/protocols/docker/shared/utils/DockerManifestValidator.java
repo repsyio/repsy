@@ -27,6 +27,7 @@ import io.repsy.protocols.docker.shared.tag.dtos.ManifestLayer;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestList;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestListManifest;
 import io.repsy.protocols.docker.shared.tag.dtos.OciImageConfig;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.util.List;
 import lombok.experimental.UtilityClass;
 import org.apache.commons.lang3.StringUtils;
@@ -77,7 +78,7 @@ public final class DockerManifestValidator {
 
       case OCI_IMAGE_INDEX, DOCKER_MANIFEST_LIST -> validateIndex(manifestJson);
 
-      default -> throw new BadRequestException("manifestMediaTypeUnsupported");
+      default -> throw new BadRequestException(ProtocolErrorCodes.MANIFEST_MEDIA_TYPE_UNSUPPORTED);
     }
   }
 
@@ -96,7 +97,7 @@ public final class DockerManifestValidator {
   private static void validateConfig(final @Nullable OciImageConfig config) {
 
     if (config == null || StringUtils.isBlank(config.getDigest())) {
-      throw new BadRequestException("manifestConfigMissing");
+      throw new BadRequestException(ProtocolErrorCodes.MANIFEST_CONFIG_MISSING);
     }
 
     // RPS-1139: the config's own mediaType is stored in docker_manifest.config_media_type.
@@ -108,7 +109,7 @@ public final class DockerManifestValidator {
     if (layers == null
         || layers.stream()
             .anyMatch(layer -> layer == null || StringUtils.isBlank(layer.getDigest()))) {
-      throw new BadRequestException("manifestLayersInvalid");
+      throw new BadRequestException(ProtocolErrorCodes.MANIFEST_LAYERS_INVALID);
     }
   }
 
@@ -120,7 +121,7 @@ public final class DockerManifestValidator {
     if (manifests == null
         || manifests.stream()
             .anyMatch(entry -> entry == null || StringUtils.isBlank(entry.getDigest()))) {
-      throw new BadRequestException("manifestListManifestsInvalid");
+      throw new BadRequestException(ProtocolErrorCodes.MANIFEST_LIST_MANIFESTS_INVALID);
     }
 
     validateSchemaVersion(index.getSchemaVersion(), SCHEMA_VERSION_2);
@@ -149,7 +150,7 @@ public final class DockerManifestValidator {
   private static void validateSchemaVersion(final long actual, final int expected) {
 
     if (actual != expected) {
-      throw new BadRequestException("manifestSchemaVersionInvalid");
+      throw new BadRequestException(ProtocolErrorCodes.MANIFEST_SCHEMA_VERSION_INVALID);
     }
   }
 
@@ -160,17 +161,17 @@ public final class DockerManifestValidator {
     try {
       tree = OBJECT_MAPPER.readTree(manifestJson);
     } catch (final JacksonException _) {
-      throw new BadRequestException("manifestInvalidJson");
+      throw new BadRequestException(ProtocolErrorCodes.MANIFEST_INVALID_JSON);
     }
 
     if (!tree.isObject()) {
-      throw new BadRequestException("manifestInvalidJson");
+      throw new BadRequestException(ProtocolErrorCodes.MANIFEST_INVALID_JSON);
     }
 
     try {
       return OBJECT_MAPPER.treeToValue(tree, type);
     } catch (final JacksonException _) {
-      throw new BadRequestException("manifestInvalid");
+      throw new BadRequestException(ProtocolErrorCodes.MANIFEST_INVALID);
     }
   }
 }

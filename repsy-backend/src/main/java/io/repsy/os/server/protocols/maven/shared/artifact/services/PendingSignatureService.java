@@ -34,6 +34,7 @@ import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.ByteArrayInputStream;
 import java.time.Duration;
@@ -205,7 +206,7 @@ public class PendingSignatureService {
     final var armored = new String(signature, UTF_8);
 
     if (!Arrays.equals(armored.getBytes(UTF_8), signature)) {
-      throw new SignatureNotVerifiedException("artifactSignatureNotVerified");
+      throw new SignatureNotVerifiedException(ProtocolErrorCodes.ARTIFACT_SIGNATURE_NOT_VERIFIED);
     }
 
     final var keyId = this.pgpVerifierService.readSignerKeyId(new ByteArrayResource(signature));
@@ -241,7 +242,7 @@ public class PendingSignatureService {
           if (isNewRow
               && this.pendingSignatureRepository.countByRepoId(repoId)
                   >= this.caps.getMaxPendingSignaturesPerRepo()) {
-            throw new BadRequestException("pendingSignatureLimitReached");
+            throw new BadRequestException(ProtocolErrorCodes.PENDING_SIGNATURE_LIMIT_REACHED);
           }
 
           // RPS-1817: check total bytes cap. For an update, judge by net growth: the new signature
@@ -257,7 +258,7 @@ public class PendingSignatureService {
           final var totalBytes = currentBytes + newBytes;
 
           if (totalBytes > this.caps.getMaxBytesPerRepo()) {
-            throw new BadRequestException("pendingSignatureBytesLimitReached");
+            throw new BadRequestException(ProtocolErrorCodes.PENDING_SIGNATURE_BYTES_LIMIT_REACHED);
           }
 
           row.setRepoId(repoId);
@@ -469,7 +470,7 @@ public class PendingSignatureService {
           repoInfo.getName(),
           e.getMessage());
 
-      return new SignatureNotVerifiedException("pendingSignatureNotVerified");
+      return new SignatureNotVerifiedException(ProtocolErrorCodes.PENDING_SIGNATURE_NOT_VERIFIED);
     }
   }
 

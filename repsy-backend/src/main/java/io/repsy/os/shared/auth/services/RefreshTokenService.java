@@ -19,6 +19,7 @@ import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.shared.auth.dtos.RefreshTokenClaims;
 import io.repsy.os.shared.auth.entities.RefreshToken;
 import io.repsy.os.shared.auth.repositories.RefreshTokenRepository;
+import io.repsy.os.shared.constants.ErrorConstants;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.UUID;
@@ -31,8 +32,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @RequiredArgsConstructor
 public class RefreshTokenService {
-
-  private static final @NonNull String REFRESH_TOKEN_EXPIRED = "refreshTokenExpired";
 
   private final @NonNull RefreshTokenRepository repository;
   private final @NonNull EntityManager entityManager;
@@ -71,9 +70,9 @@ public class RefreshTokenService {
         this.repository
             .findById(claims.tokenId())
             .filter(candidate -> candidate.getFamilyId().equals(claims.familyId()))
-            .orElseThrow(() -> new UnAuthorizedException(REFRESH_TOKEN_EXPIRED));
+            .orElseThrow(() -> new UnAuthorizedException(ErrorConstants.REFRESH_TOKEN_EXPIRED));
     this.repository.revokeFamily(token.getFamilyId(), now);
-    throw new UnAuthorizedException(REFRESH_TOKEN_EXPIRED);
+    throw new UnAuthorizedException(ErrorConstants.REFRESH_TOKEN_EXPIRED);
   }
 
   /**

@@ -25,6 +25,7 @@ import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
 import io.repsy.protocols.npm.shared.auth.services.NpmIdentityResolver;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -107,7 +108,7 @@ public abstract class AbstractNpmWhoamiProtocolMethodHandler<ID> implements Prot
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
           .header(WWW_AUTHENTICATE, challenge)
           .contentType(MediaType.APPLICATION_JSON)
-          .body(Map.of("error", "unAuthorized"));
+          .body(Map.of("error", ProtocolErrorCodes.UN_AUTHORIZED));
     }
   }
 }

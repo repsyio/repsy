@@ -29,6 +29,7 @@ import io.repsy.os.server.protocols.docker.shared.tag.repositories.TagRepository
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.mappers.RepoMapper;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -78,10 +79,11 @@ public class CleanupPolicyService {
     final var policy =
         this.policyRepository
             .findByRepoId(repoId)
-            .orElseThrow(() -> new ItemNotFoundException("cleanupPolicyNotFound"));
+            .orElseThrow(
+                () -> new ItemNotFoundException(ProtocolErrorCodes.CLEANUP_POLICY_NOT_FOUND));
 
     if (!policy.isEnabled()) {
-      throw new BadRequestException("cleanupPolicyDisabled");
+      throw new BadRequestException(ProtocolErrorCodes.CLEANUP_POLICY_DISABLED);
     }
 
     // Refused now, not when the policy runs: a bad pattern would otherwise fail every run.
@@ -121,7 +123,7 @@ public class CleanupPolicyService {
             .orElseGet(() -> this.createDefaultPolicy(repoId));
 
     if (!policy.isEnabled()) {
-      throw new BadRequestException("cleanupPolicyDisabled");
+      throw new BadRequestException(ProtocolErrorCodes.CLEANUP_POLICY_DISABLED);
     }
 
     policy.setNextRunAt(Instant.now());
@@ -158,7 +160,7 @@ public class CleanupPolicyService {
     final var repo =
         this.repoRepository
             .findById(repoId)
-            .orElseThrow(() -> new ItemNotFoundException("repoNotFound"));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.REPO_NOT_FOUND));
 
     final var policy = new CleanupPolicy();
 
@@ -262,7 +264,7 @@ public class CleanupPolicyService {
     try {
       compileAnchored(regex);
     } catch (final PatternSyntaxException e) {
-      throw new BadRequestException("invalidRegex");
+      throw new BadRequestException(ProtocolErrorCodes.INVALID_REGEX);
     }
   }
 

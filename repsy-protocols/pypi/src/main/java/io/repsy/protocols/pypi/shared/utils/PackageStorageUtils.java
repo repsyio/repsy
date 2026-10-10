@@ -17,6 +17,7 @@ package io.repsy.protocols.pypi.shared.utils;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.protocols.pypi.shared.python_package.dtos.PackageUploadForm;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.io.IOException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -141,14 +142,14 @@ public final class PackageStorageUtils {
     final var originalFilename = file.getOriginalFilename();
 
     if (originalFilename == null) {
-      throw new BadRequestException("archiveFileNameNull");
+      throw new BadRequestException(ProtocolErrorCodes.ARCHIVE_FILE_NAME_NULL);
     }
 
     PypiPublishLimits.checkArchiveFilename(originalFilename);
 
     if (!ARCHIVE_UPLOAD_PATTERN.matcher(originalFilename).matches()
         || extractVersionFromArchiveFilename(originalFilename) == null) {
-      throw new BadRequestException("archiveFileNameInvalid");
+      throw new BadRequestException(ProtocolErrorCodes.ARCHIVE_FILE_NAME_INVALID);
     }
   }
 
@@ -164,7 +165,7 @@ public final class PackageStorageUtils {
         extractVersionFromArchiveFilename(Objects.requireNonNull(file.getOriginalFilename()));
 
     if (!ReleaseVersion.of(version).getVersion().equals(filenameVersion)) {
-      throw new BadRequestException("archiveVersionMismatch");
+      throw new BadRequestException(ProtocolErrorCodes.ARCHIVE_VERSION_MISMATCH);
     }
   }
 
@@ -186,7 +187,7 @@ public final class PackageStorageUtils {
   public static void checkSha256Digest(final PackageUploadForm uploadForm) {
 
     if (!StringUtils.hasText(uploadForm.getSha256_digest())) {
-      throw new BadRequestException("sha256DigestMissing");
+      throw new BadRequestException(ProtocolErrorCodes.SHA256_DIGEST_MISSING);
     }
   }
 

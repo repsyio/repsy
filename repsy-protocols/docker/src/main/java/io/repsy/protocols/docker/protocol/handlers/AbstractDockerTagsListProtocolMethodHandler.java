@@ -22,6 +22,7 @@ import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import io.repsy.protocols.docker.protocol.facades.DockerProtocolFacade;
 import io.repsy.protocols.docker.shared.tag.dtos.TagListResponse;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -169,12 +170,12 @@ public abstract class AbstractDockerTagsListProtocolMethodHandler<ID>
       final var limit = Integer.parseInt(value);
 
       if (limit < 0) {
-        throw new BadRequestException("paginationNumberInvalid");
+        throw new BadRequestException(ProtocolErrorCodes.PAGINATION_NUMBER_INVALID);
       }
 
       return limit;
     } catch (final NumberFormatException e) {
-      throw new BadRequestException("paginationNumberInvalid");
+      throw new BadRequestException(ProtocolErrorCodes.PAGINATION_NUMBER_INVALID);
     }
   }
 }

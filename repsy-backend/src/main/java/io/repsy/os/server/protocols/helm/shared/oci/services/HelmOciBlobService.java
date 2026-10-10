@@ -22,6 +22,7 @@ import io.repsy.os.server.protocols.helm.shared.oci.repositories.HelmOciBlobRepo
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciBlobForm;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciBlobInfo;
 import io.repsy.protocols.helm.shared.oci.services.OciBlobService;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -70,7 +71,7 @@ public class HelmOciBlobService implements OciBlobService<UUID> {
     return this.helmOciBlobRepository
         .findByRepoIdAndDigest(repoId, form.getDigest())
         .map(this::toDetail)
-        .orElseThrow(() -> new ItemNotFoundException("blobNotFound"));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.BLOB_NOT_FOUND));
   }
 
   @Override

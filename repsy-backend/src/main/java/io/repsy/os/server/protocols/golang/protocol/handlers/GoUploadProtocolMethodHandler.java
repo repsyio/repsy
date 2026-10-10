@@ -19,6 +19,7 @@ import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.protocols.golang.protocol.GolangProtocolProvider;
 import io.repsy.protocols.golang.protocol.facades.contracts.GoProtocolFacade;
 import io.repsy.protocols.golang.protocol.handlers.AbstractGoUploadProtocolMethodHandler;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.util.Locale;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
@@ -46,7 +47,7 @@ public class GoUploadProtocolMethodHandler extends AbstractGoUploadProtocolMetho
   /** The message the auth pre-processor answers for the same id (RPS-1450). */
   @Override
   protected String unauthorizedText(final @Nullable String msgId) {
-    final var id = msgId == null ? "unAuthorized" : msgId;
+    final var id = msgId == null ? ProtocolErrorCodes.UN_AUTHORIZED : msgId;
 
     return this.messageSource.getMessage(id, null, id, Locale.getDefault());
   }

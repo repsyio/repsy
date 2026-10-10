@@ -26,6 +26,7 @@ import io.repsy.os.shared.auth.services.LoginInfoFactory;
 import io.repsy.os.shared.auth.services.RefreshTokenService;
 import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.auth.utils.PasswordHasher;
+import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.services.UserTxService;
 import java.time.Instant;
@@ -40,9 +41,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
 public class AuthUserService {
-
-  private static final @NonNull String INVALID_CREDENTIALS = "invalidCredentials";
-  private static final @NonNull String REFRESH_TOKEN_EXPIRED = "refreshTokenExpired";
 
   private final @NonNull UserTxService userTxService;
   private final @NonNull LoginInfoFactory loginInfoFactory;
@@ -64,12 +62,12 @@ public class AuthUserService {
       // Perform the same hash work for unknown usernames to avoid leaking account existence.
       PasswordHasher.verifyDummy(form.getPassword());
       this.authFailureThrottle.recordFailure();
-      throw new UnAuthorizedException(INVALID_CREDENTIALS);
+      throw new UnAuthorizedException(ErrorConstants.INVALID_CREDENTIALS);
     }
 
     if (!PasswordHasher.matches(form.getPassword(), user.getHash(), user.getSalt())) {
       this.authFailureThrottle.recordFailure();
-      throw new UnAuthorizedException(INVALID_CREDENTIALS);
+      throw new UnAuthorizedException(ErrorConstants.INVALID_CREDENTIALS);
     }
 
     // Hashes from an older algorithm or work factor are replaced now that the password is known.
@@ -84,7 +82,7 @@ public class AuthUserService {
     // be written, or has already committed and is caught here, instead of a foreign-key violation
     // surfacing from the insert (RPS-1152).
     if (!this.userTxService.lockUserExists(user.getId())) {
-      throw new UnAuthorizedException(INVALID_CREDENTIALS);
+      throw new UnAuthorizedException(ErrorConstants.INVALID_CREDENTIALS);
     }
 
     return this.loginInfoFactory.create(user, Instant.now().truncatedTo(ChronoUnit.SECONDS));
@@ -106,19 +104,19 @@ public class AuthUserService {
 
     // A password or username change bumps the version, which revokes the older refresh tokens.
     if (claims.tokenVersion() != user.getTokenVersion()) {
-      throw new UnAuthorizedException(REFRESH_TOKEN_EXPIRED);
+      throw new UnAuthorizedException(ErrorConstants.REFRESH_TOKEN_EXPIRED);
     }
 
     // The tokens' own expiry is capped at the session end; this guards it independently.
     if (!Instant.now().isBefore(claims.sessionStart().plus(AuthUtils.TIMEOUT_SESSION))) {
-      throw new UnAuthorizedException(REFRESH_TOKEN_EXPIRED);
+      throw new UnAuthorizedException(ErrorConstants.REFRESH_TOKEN_EXPIRED);
     }
 
     // Locks the user row so a deletion racing this request either waits for the refresh token to
     // be written, or has already committed and is caught here, instead of a foreign-key violation
     // surfacing from the insert (RPS-1152).
     if (!this.userTxService.lockUserExists(user.getId())) {
-      throw new UnAuthorizedException(REFRESH_TOKEN_EXPIRED);
+      throw new UnAuthorizedException(ErrorConstants.REFRESH_TOKEN_EXPIRED);
     }
 
     return this.loginInfoFactory.create(user, claims.sessionStart(), claims.familyId());

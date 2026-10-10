@@ -28,6 +28,7 @@ import io.repsy.protocols.ruby.shared.utils.GemspecParser;
 import io.repsy.protocols.ruby.shared.utils.RubyGemspecMarshalWriter;
 import io.repsy.protocols.ruby.shared.utils.RubyMarshalWriter;
 import io.repsy.protocols.ruby.shared.utils.RubySpecsIndexWriter;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import io.repsy.protocols.shared.utils.SpooledUpload;
@@ -73,7 +74,7 @@ public abstract class AbstractRubyProtocolFacade<ID> implements RubyProtocolFaca
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     final var entry =
         this.findLiveGemspecEntry(repoInfo, gemspecName)
-            .orElseThrow(() -> new ItemNotFoundException("gemVersionNotFound"));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.GEM_VERSION_NOT_FOUND));
     return RubyGemspecMarshalWriter.dumpGemspec(
         entry.getGemName(),
         entry.getVersion(),
@@ -100,7 +101,7 @@ public abstract class AbstractRubyProtocolFacade<ID> implements RubyProtocolFaca
     final var entry =
         this.gemService
             .findByGemFilename(repoInfo, filename)
-            .orElseThrow(() -> new ItemNotFoundException("gemNotFound"));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.GEM_NOT_FOUND));
     return this.storageService.getGem(
         repoInfo.getStorageKey(),
         repoInfo.getName(),

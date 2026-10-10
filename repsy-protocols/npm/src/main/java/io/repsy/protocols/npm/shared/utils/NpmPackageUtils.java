@@ -18,6 +18,7 @@ package io.repsy.protocols.npm.shared.utils;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.protocols.npm.shared.constants.NpmConstants;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.UncheckedIOException;
@@ -81,14 +82,14 @@ public final class NpmPackageUtils {
     final var oldVersions = (Map<String, Object>) oldMetadata.get(NpmConstants.VERSIONS);
 
     if (!(newMetadata.get(NpmConstants.VERSIONS) instanceof final Map<?, ?> newVersions)) {
-      throw new BadRequestException("badRequest");
+      throw new BadRequestException(ProtocolErrorCodes.BAD_REQUEST);
     }
 
     final var missing =
         oldVersions.keySet().stream().filter(name -> !newVersions.containsKey(name)).toList();
 
     if (missing.size() != 1) {
-      throw new ItemAlreadyExistException("unpublishPayloadStale");
+      throw new ItemAlreadyExistException(ProtocolErrorCodes.UNPUBLISH_PAYLOAD_STALE);
     }
 
     return missing.getFirst();
@@ -211,7 +212,8 @@ public final class NpmPackageUtils {
         ((Map<String, Object>) payload.get(NpmConstants.VERSIONS)).entrySet().iterator().next();
     final var versionName = version.getKey();
 
-    NpmSemver.parse(versionName); // throws BadRequestException("invalidPackageVersion")
+    NpmSemver.parse(
+        versionName); // throws BadRequestException(ProtocolErrorCodes.INVALID_PACKAGE_VERSION)
 
     return versionName;
   }
@@ -362,7 +364,7 @@ public final class NpmPackageUtils {
   private static void checkNameMatches(final String expected, final @Nullable Object actual) {
 
     if (actual instanceof final String name && !expected.equals(name)) {
-      throw new BadRequestException("packageNameMismatch");
+      throw new BadRequestException(ProtocolErrorCodes.PACKAGE_NAME_MISMATCH);
     }
   }
 

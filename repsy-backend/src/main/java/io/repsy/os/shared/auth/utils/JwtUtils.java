@@ -28,6 +28,7 @@ import io.repsy.os.shared.auth.dtos.ProtocolTokenClaims;
 import io.repsy.os.shared.auth.dtos.ProtocolUserClaims;
 import io.repsy.os.shared.auth.dtos.RefreshTokenClaims;
 import io.repsy.os.shared.constants.ErrorConstants;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import jakarta.annotation.PostConstruct;
 import java.security.SecureRandom;
 import java.time.Instant;
@@ -94,16 +95,16 @@ public class JwtUtils {
     } catch (final TokenExpiredException _) {
       throw new UnAuthorizedException(expiredMessageId);
     } catch (final JWTVerificationException _) {
-      throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
     }
   }
 
   private @NonNull DecodedJWT verifyAndDecode(
       final @NonNull String token, final @NonNull TokenRealm realm) {
-    final var decodedJWT = this.decode(token, "sessionExpired");
+    final var decodedJWT = this.decode(token, ErrorConstants.SESSION_EXPIRED);
 
     if (isRefreshToken(decodedJWT)) {
-      throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
     }
 
     checkRealm(decodedJWT, realm);
@@ -121,7 +122,7 @@ public class JwtUtils {
     }
 
     if (!audience.contains(realm.getAudience())) {
-      throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
     }
   }
 
@@ -136,8 +137,8 @@ public class JwtUtils {
       case PROTOCOL -> {
         /* Accepted, see above. */
       }
-      case PANEL -> throw new UnAuthorizedException("sessionExpired");
-      case DOWNLOAD -> throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
+      case PANEL -> throw new UnAuthorizedException(ErrorConstants.SESSION_EXPIRED);
+      case DOWNLOAD -> throw new UnAuthorizedException(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
       case null, default -> throw new IllegalStateException("Unexpected token realm: " + realm);
     }
   }
@@ -148,7 +149,7 @@ public class JwtUtils {
 
   private @NonNull String getToken(final @NonNull String authHeader) {
     if (!authHeader.contains("Bearer")) {
-      throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
     }
 
     return authHeader.replaceFirst("^Bearer ", "");
@@ -372,14 +373,14 @@ public class JwtUtils {
     final var decodedJWT = this.decodeDownloadToken(token);
 
     if (isRefreshToken(decodedJWT)) {
-      throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
     }
 
     checkRealm(decodedJWT, TokenRealm.DOWNLOAD);
 
     if (!repoId.toString().equals(decodedJWT.getSubject())
         || !canonicalPath(path).equals(decodedJWT.getClaim(CLAIM_PATH).asString())) {
-      throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
     }
   }
 
@@ -387,9 +388,9 @@ public class JwtUtils {
     try {
       return JWT.require(Algorithm.HMAC512(this.secret)).build().verify(token);
     } catch (final TokenExpiredException _) {
-      throw new UnAuthorizedException("downloadTokenExpired");
+      throw new UnAuthorizedException(ErrorConstants.DOWNLOAD_TOKEN_EXPIRED);
     } catch (final JWTVerificationException _) {
-      throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
     }
   }
 
@@ -464,17 +465,17 @@ public class JwtUtils {
     final var username = decodedJWT.getClaim(CLAIM_USERNAME).asString();
 
     if (username == null) {
-      throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
     }
 
     return new ProtocolUserClaims(subjectOrNull(decodedJWT), username, tokenVersion);
   }
 
   public @NonNull RefreshTokenClaims verifyRefreshToken(final @NonNull String token) {
-    final var decodedJWT = this.decode(token, "refreshTokenExpired");
+    final var decodedJWT = this.decode(token, ErrorConstants.REFRESH_TOKEN_EXPIRED);
 
     if (!isRefreshToken(decodedJWT)) {
-      throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
     }
 
     return this.refreshTokenClaims(decodedJWT);
@@ -488,7 +489,7 @@ public class JwtUtils {
 
     // A refresh token without these claims predates refresh-token rotation and cannot be exchanged.
     if (sessionStart == null || tokenVersion == null || tokenId == null || familyId == null) {
-      throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
     }
 
     try {
@@ -499,7 +500,7 @@ public class JwtUtils {
           sessionStart,
           tokenVersion);
     } catch (final IllegalArgumentException _) {
-      throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
     }
   }
 
@@ -515,7 +516,7 @@ public class JwtUtils {
     try {
       return UUID.fromString(decodedJWT.getSubject());
     } catch (final IllegalArgumentException | NullPointerException _) {
-      throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
     }
   }
 
@@ -530,7 +531,7 @@ public class JwtUtils {
     final var expiresAt = decodedJWT.getExpiresAtAsInstant();
 
     if (expiresAt == null) {
-      throw new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.ACCESS_NOT_ALLOWED);
     }
 
     return new ProtocolTokenClaims(

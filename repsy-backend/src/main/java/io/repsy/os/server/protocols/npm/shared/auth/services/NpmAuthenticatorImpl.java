@@ -30,13 +30,13 @@ import io.repsy.os.shared.auth.services.RevokedProtocolTokenService;
 import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.TokenRealm;
-import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.token.dtos.PersonalAccessTokenInfo;
 import io.repsy.os.shared.token.dtos.TokenType;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.npm.shared.auth.services.NpmAuthenticator;
 import io.repsy.protocols.npm.shared.auth.services.NpmIdentityResolver;
 import io.repsy.protocols.npm.shared.auth.services.NpmTokenRevoker;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.repo.dtos.Credentials;
 import java.time.Duration;
@@ -130,7 +130,7 @@ public class NpmAuthenticatorImpl extends ProtocolAuthService
       final @NonNull DeployTokenInfo deployTokenInfo, final @NonNull String username) {
 
     if (deployTokenInfo.isExpired()) {
-      throw new UnAuthorizedException("unAuthorized");
+      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
 
     this.deployTokenService.updateLastUsedTime(deployTokenInfo.getId());
@@ -173,13 +173,13 @@ public class NpmAuthenticatorImpl extends ProtocolAuthService
     final var caller = this.resolveCaller(repoInfo.getStorageKey(), authHeader);
 
     if (this.deployTokenService.findByRepoIdAndToken(repoInfo.getStorageKey(), token).isPresent()) {
-      throw new AccessNotAllowedException("deployTokenNotRevocable");
+      throw new AccessNotAllowedException(ProtocolErrorCodes.DEPLOY_TOKEN_NOT_REVOCABLE);
     }
 
     final var claims = this.issuedTokenClaims(token);
 
     if (!claims.subject().equals(caller.id())) {
-      throw new AccessNotAllowedException("loginTokenNotYours");
+      throw new AccessNotAllowedException(ProtocolErrorCodes.LOGIN_TOKEN_NOT_YOURS);
     }
 
     try {
@@ -198,12 +198,12 @@ public class NpmAuthenticatorImpl extends ProtocolAuthService
 
       if (claims.authenticationType() == AuthenticationType.ANONYMOUS
           || claims.authenticationType() == AuthenticationType.DOCKER_SCAN) {
-        throw new ItemNotFoundException("loginTokenNotFound");
+        throw new ItemNotFoundException(ProtocolErrorCodes.LOGIN_TOKEN_NOT_FOUND);
       }
 
       return claims;
     } catch (final UnAuthorizedException | BadRequestException _) {
-      throw new ItemNotFoundException("loginTokenNotFound");
+      throw new ItemNotFoundException(ProtocolErrorCodes.LOGIN_TOKEN_NOT_FOUND);
     }
   }
 
@@ -214,7 +214,7 @@ public class NpmAuthenticatorImpl extends ProtocolAuthService
       final @NonNull UUID repoId, final @Nullable String authHeader) {
 
     if (authHeader == null) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
 
     if (AuthUtils.isBasicToken(authHeader)) {
@@ -225,7 +225,7 @@ public class NpmAuthenticatorImpl extends ProtocolAuthService
       return this.bearerCaller(repoId, authHeader);
     }
 
-    throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+    throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
   }
 
   private @NonNull Caller basicCaller(final @NonNull UUID repoId, final @NonNull String header) {
@@ -234,7 +234,7 @@ public class NpmAuthenticatorImpl extends ProtocolAuthService
         AuthUtils.extractCredentialsFromBasicToken(AuthUtils.removeBasicPrefix(header));
 
     if (credentials == null) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
 
     if (TokenType.REPSY_USER_TOKEN.matches(credentials.getPassword())) {
@@ -279,16 +279,17 @@ public class NpmAuthenticatorImpl extends ProtocolAuthService
         yield this.deployTokenService
             .findByRepoIdAndTokenId(repoId, tokenId)
             .map(NpmAuthenticatorImpl::callerOf)
-            .orElseThrow(() -> new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED));
+            .orElseThrow(() -> new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED));
       }
       case PERSONAL_ACCESS_TOKEN -> {
         final var tokenId = this.jwtUtils.extractUserId(header, TokenRealm.PROTOCOL);
 
         yield super.findLivePersonalAccessToken(tokenId)
             .map(NpmAuthenticatorImpl::personalAccessTokenCaller)
-            .orElseThrow(() -> new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED));
+            .orElseThrow(() -> new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED));
       }
-      case ANONYMOUS, DOCKER_SCAN -> throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      case ANONYMOUS, DOCKER_SCAN ->
+          throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
       default -> {
         final var user = this.authenticateJwtUser(header);
 
@@ -301,7 +302,7 @@ public class NpmAuthenticatorImpl extends ProtocolAuthService
     try {
       return this.jwtUtils.extractAuthenticationType(header, TokenRealm.PROTOCOL);
     } catch (final BadRequestException _) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
   }
 
@@ -318,7 +319,7 @@ public class NpmAuthenticatorImpl extends ProtocolAuthService
   private static @NonNull Caller callerOf(final @NonNull DeployTokenInfo deployToken) {
 
     if (deployToken.isExpired() || deployToken.getUsername() == null) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
 
     return new Caller(deployToken.getId(), deployToken.getUsername());

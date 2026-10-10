@@ -31,6 +31,7 @@ import io.repsy.os.shared.token.repositories.PersonalAccessTokenRepository;
 import io.repsy.os.shared.token.utils.TokenFactory;
 import io.repsy.os.shared.token.utils.TokenHash;
 import io.repsy.os.shared.user.repositories.UserRepository;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -131,7 +132,7 @@ public class PersonalAccessTokenService {
     final var token =
         this.tokenRepository
             .findById(tokenId)
-            .orElseThrow(() -> new ItemNotFoundException("accessTokenNotFound"));
+            .orElseThrow(() -> new ItemNotFoundException(ErrorConstants.ACCESS_TOKEN_NOT_FOUND));
 
     return this.converter.toWhoAmI(this.converter.toInfo(token));
   }
@@ -182,7 +183,7 @@ public class PersonalAccessTokenService {
     final var token =
         this.tokenRepository
             .findByUserIdAndId(userId, tokenId)
-            .orElseThrow(() -> new ItemNotFoundException("accessTokenNotFound"));
+            .orElseThrow(() -> new ItemNotFoundException(ErrorConstants.ACCESS_TOKEN_NOT_FOUND));
 
     this.tokenRepository.delete(token);
   }
@@ -208,7 +209,7 @@ public class PersonalAccessTokenService {
     final var scopes = form.getScopes();
 
     if (scopes == null || scopes.isEmpty() || scopes.stream().anyMatch(Objects::isNull)) {
-      throw new BadRequestException("validationError");
+      throw new BadRequestException(ProtocolErrorCodes.VALIDATION_ERROR);
     }
 
     return scopes;
@@ -232,11 +233,11 @@ public class PersonalAccessTokenService {
     final var date = requested.truncatedTo(ChronoUnit.MICROS);
 
     if (!date.isAfter(now)) {
-      throw new BadRequestException("accessTokenExpirationInPast");
+      throw new BadRequestException(ErrorConstants.ACCESS_TOKEN_EXPIRATION_IN_PAST);
     }
 
     if (isBeyondMaximumExpiration(date, now)) {
-      throw new BadRequestException("accessTokenExpirationTooLate");
+      throw new BadRequestException(ErrorConstants.ACCESS_TOKEN_EXPIRATION_TOO_LATE);
     }
 
     return date;
@@ -265,7 +266,7 @@ public class PersonalAccessTokenService {
   private void lockUser(final @NonNull UUID userId) {
 
     if (this.userRepository.lockUserIdForUpdate(userId).isEmpty()) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
   }
 
@@ -273,7 +274,7 @@ public class PersonalAccessTokenService {
 
     if (this.tokenRepository.countByUserIdAndExpirationDateAfter(userId, now)
         >= MAX_TOKENS_PER_USER) {
-      throw new BadRequestException("accessTokenLimitReached");
+      throw new BadRequestException(ErrorConstants.ACCESS_TOKEN_LIMIT_REACHED);
     }
   }
 }

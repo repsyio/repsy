@@ -20,6 +20,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.protocols.ruby.shared.gem.dtos.GemDependency;
 import io.repsy.protocols.ruby.shared.gem.dtos.GemMetadata;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.utils.BoundedEntryReader;
 import io.repsy.protocols.shared.utils.EntryTooLargeException;
 import java.io.ByteArrayInputStream;
@@ -118,9 +119,9 @@ public class GemspecParser {
         entry = tar.getNextEntry();
       }
     } catch (final IOException e) {
-      throw new BadRequestException("invalidGemFile");
+      throw new BadRequestException(ProtocolErrorCodes.INVALID_GEM_FILE);
     }
-    throw new BadRequestException("invalidGemFile");
+    throw new BadRequestException(ProtocolErrorCodes.INVALID_GEM_FILE);
   }
 
   private static byte[] readMetadataGz(final InputStream tar, final TarArchiveEntry entry)
@@ -128,7 +129,7 @@ public class GemspecParser {
     try {
       return BoundedEntryReader.readAllBytes(tar, entry.getSize(), MAX_METADATA_GZ_BYTES);
     } catch (final EntryTooLargeException e) {
-      throw new BadRequestException("gemMetadataTooLarge");
+      throw new BadRequestException(ProtocolErrorCodes.GEM_METADATA_TOO_LARGE);
     }
   }
 
@@ -155,15 +156,17 @@ public class GemspecParser {
     try (final var gzip = new GZIPInputStream(new ByteArrayInputStream(gzBytes))) {
       spec = loadGemspec(gzip);
     } catch (final IOException | RuntimeException e) {
-      throw new BadRequestException("invalidGemFile");
+      throw new BadRequestException(ProtocolErrorCodes.INVALID_GEM_FILE);
     }
 
     if (spec == null) {
-      throw new BadRequestException("invalidGemFile");
+      throw new BadRequestException(ProtocolErrorCodes.INVALID_GEM_FILE);
     }
 
-    final var name = requireGemField(extractString(spec, "name"), "gemNameMissing");
-    final var version = requireGemField(extractVersion(spec), "gemVersionMissing");
+    final var name =
+        requireGemField(extractString(spec, "name"), ProtocolErrorCodes.GEM_NAME_MISSING);
+    final var version =
+        requireGemField(extractVersion(spec), ProtocolErrorCodes.GEM_VERSION_MISSING);
 
     final var platform = extractPlatform(spec);
     final var requiredRubyVersion = extractRequiredRubyVersion(spec);
@@ -193,16 +196,16 @@ public class GemspecParser {
       final @Nullable String requiredRubyVersion) {
 
     if (isTooLong(name, MAX_NAME_LENGTH)) {
-      throw new BadRequestException("gemNameTooLong");
+      throw new BadRequestException(ProtocolErrorCodes.GEM_NAME_TOO_LONG);
     }
     if (isTooLong(version, MAX_VERSION_LENGTH)) {
-      throw new BadRequestException("gemVersionTooLong");
+      throw new BadRequestException(ProtocolErrorCodes.GEM_VERSION_TOO_LONG);
     }
     if (isTooLong(platform, MAX_PLATFORM_LENGTH)) {
-      throw new BadRequestException("gemPlatformTooLong");
+      throw new BadRequestException(ProtocolErrorCodes.GEM_PLATFORM_TOO_LONG);
     }
     if (isTooLong(requiredRubyVersion, MAX_REQUIRED_RUBY_VERSION_LENGTH)) {
-      throw new BadRequestException("gemRequiredRubyVersionTooLong");
+      throw new BadRequestException(ProtocolErrorCodes.GEM_REQUIRED_RUBY_VERSION_TOO_LONG);
     }
   }
 
@@ -340,10 +343,10 @@ public class GemspecParser {
    */
   private static void rejectOverLongDependency(final String name, final String requirements) {
     if (isTooLong(name, MAX_DEPENDENCY_NAME_LENGTH)) {
-      throw new BadRequestException("gemDependencyNameTooLong");
+      throw new BadRequestException(ProtocolErrorCodes.GEM_DEPENDENCY_NAME_TOO_LONG);
     }
     if (isTooLong(requirements, MAX_DEPENDENCY_REQUIREMENTS_LENGTH)) {
-      throw new BadRequestException("gemDependencyRequirementsTooLong");
+      throw new BadRequestException(ProtocolErrorCodes.GEM_DEPENDENCY_REQUIREMENTS_TOO_LONG);
     }
   }
 

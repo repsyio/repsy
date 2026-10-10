@@ -35,6 +35,7 @@ import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.utils.RepoUtils;
 import io.repsy.protocols.docker.shared.layer.dtos.LayerInfo;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
@@ -160,12 +161,12 @@ public class DockerApiFacade implements ProtocolApiFacade {
         this.imageTxService.getImageInfoByRepoIdAndName(repoInfo.getStorageKey(), imageName);
 
     if (!this.manifestService.existsByImageIdAndConfigDigest(imageInfo.getId(), configDigest)) {
-      throw new ItemNotFoundException("layerNotFound");
+      throw new ItemNotFoundException(ProtocolErrorCodes.LAYER_NOT_FOUND);
     }
 
     return this.layerTxService
         .findLayerInfoByRepoIdAndDigest(repoInfo.getStorageKey(), configDigest)
-        .orElseThrow(() -> new ItemNotFoundException("layerNotFound"));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.LAYER_NOT_FOUND));
   }
 
   // No transaction: it only reads storage, so it must not hold a connection while it does.
@@ -197,7 +198,7 @@ public class DockerApiFacade implements ProtocolApiFacade {
       }
     }
 
-    throw new ItemNotFoundException("manifestNotFound");
+    throw new ItemNotFoundException(ProtocolErrorCodes.MANIFEST_NOT_FOUND);
   }
 
   @Transactional(readOnly = true)
@@ -235,7 +236,7 @@ public class DockerApiFacade implements ProtocolApiFacade {
 
     return this.dockerStorageService
         .findResource(storagePath, repoInfo.getName())
-        .orElseThrow(() -> new ItemNotFoundException("manifestNotFound"));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.MANIFEST_NOT_FOUND));
   }
 
   /**

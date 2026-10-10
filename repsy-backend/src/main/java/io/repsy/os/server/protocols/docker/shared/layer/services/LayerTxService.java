@@ -24,6 +24,7 @@ import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.protocols.docker.shared.layer.dtos.LayerForm;
 import io.repsy.protocols.docker.shared.layer.dtos.LayerInfo;
 import io.repsy.protocols.docker.shared.layer.services.LayerService;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -99,7 +100,7 @@ public class LayerTxService implements LayerService<UUID> {
     final var foundCount = this.layerRepository.countByRepoIdAndDigestIn(repoId, distinctDigests);
 
     if (foundCount != distinctDigests.size()) {
-      throw new ItemNotFoundException("layerNotFound");
+      throw new ItemNotFoundException(ProtocolErrorCodes.LAYER_NOT_FOUND);
     }
   }
 
@@ -150,6 +151,6 @@ public class LayerTxService implements LayerService<UUID> {
 
     return this.layerRepository
         .findByRepoIdAndDigest(repoId, digest)
-        .orElseThrow(() -> new ItemNotFoundException("layerNotFound"));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.LAYER_NOT_FOUND));
   }
 }

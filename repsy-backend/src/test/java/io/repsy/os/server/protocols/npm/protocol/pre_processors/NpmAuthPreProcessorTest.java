@@ -35,10 +35,10 @@ import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.services.RevokedProtocolTokenService;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.TokenRealm;
-import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.util.Map;
 import java.util.UUID;
@@ -76,7 +76,7 @@ class NpmAuthPreProcessorTest {
 
   NpmAuthPreProcessorTest() {
     when(this.jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
-        .thenThrow(new UnAuthorizedException(ErrorConstants.ACCESS_NOT_ALLOWED));
+        .thenThrow(new UnAuthorizedException(ProtocolErrorCodes.ACCESS_NOT_ALLOWED));
   }
 
   private static ProtocolContext privateRepoContext() {

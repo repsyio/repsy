@@ -36,6 +36,7 @@ import io.repsy.protocols.docker.shared.tag.dtos.SavedManifest;
 import io.repsy.protocols.docker.shared.utils.DockerDigestCalculator;
 import io.repsy.protocols.docker.shared.utils.DockerManifestValidator;
 import io.repsy.protocols.docker.shared.utils.DockerPushGuards;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -124,7 +125,7 @@ public abstract class AbstractDockerManifestPushProtocolMethodHandler<ID>
     final var contentType = request.getHeader(CONTENT_TYPE);
 
     if (contentType == null) {
-      throw new BadRequestException("manifestContentTypeMissing");
+      throw new BadRequestException(ProtocolErrorCodes.MANIFEST_CONTENT_TYPE_MISSING);
     }
 
     // Before anything is looked up or written (RPS-1139): an over-long or grammatically invalid

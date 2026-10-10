@@ -21,6 +21,7 @@ import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.protocols.maven.shared.artifact.services.VersionComparator;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -239,7 +240,7 @@ public class ArtifactUtils {
       return reader.read(new ByteArrayInputStream(content), false);
     } catch (final IOException | XmlPullParserException e) {
       log.warn("Malformed or incomplete maven-metadata.xml received: {}", e.getMessage());
-      throw new BadRequestException("malformedMetadataFile");
+      throw new BadRequestException(ProtocolErrorCodes.MALFORMED_METADATA_FILE);
     }
   }
 
@@ -250,7 +251,7 @@ public class ArtifactUtils {
       return readModel(inputStream);
     } catch (final IOException e) {
       log.warn("Malformed or unreadable POM file received: {}", e.getMessage());
-      throw new BadRequestException("malformedPomFile");
+      throw new BadRequestException(ProtocolErrorCodes.MALFORMED_POM_FILE);
     }
   }
 
@@ -269,7 +270,7 @@ public class ArtifactUtils {
       return reader.read(new InputStreamReader(pomStream, UTF_8));
     } catch (final IOException | XmlPullParserException e) {
       log.warn("Malformed or unreadable POM file received: {}", e.getMessage());
-      throw new BadRequestException("malformedPomFile");
+      throw new BadRequestException(ProtocolErrorCodes.MALFORMED_POM_FILE);
     }
   }
 
@@ -315,7 +316,7 @@ public class ArtifactUtils {
           path,
           declared,
           gav.getGroupId());
-      throw new BadRequestException("pomGroupIdMismatch");
+      throw new BadRequestException(ProtocolErrorCodes.POM_GROUP_ID_MISMATCH);
     }
   }
 

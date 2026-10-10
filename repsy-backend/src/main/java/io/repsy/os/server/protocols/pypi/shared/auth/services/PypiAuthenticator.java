@@ -24,8 +24,8 @@ import io.repsy.os.server.shared.auth.ProtocolAuthService;
 import io.repsy.os.server.shared.auth.VerifiedPasswordCache;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.utils.JwtUtils;
-import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.user.services.UserTxService;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
@@ -53,7 +53,7 @@ public class PypiAuthenticator extends ProtocolAuthService {
     final var credentials = extractCredentialsFromBasicToken(basicToken);
 
     if (credentials == null) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
 
     if (super.tryAuthorizeWithPat(repoId, credentials.getPassword(), permission)) {

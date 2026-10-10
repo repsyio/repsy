@@ -23,6 +23,7 @@ import io.repsy.core.web_error.ConstraintViolations;
 import io.repsy.os.generated.model.RepoListInfo;
 import io.repsy.os.generated.model.RepoSettingsForm;
 import io.repsy.os.generated.model.RepoSettingsInfo;
+import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.events.PgpKeySourcesChangedEvent;
@@ -30,6 +31,7 @@ import io.repsy.os.shared.repo.events.PgpVerifyAllSignaturesToggledEvent;
 import io.repsy.os.shared.repo.mappers.RepoMapper;
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.os.shared.repo.utils.RepoUtils;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.EnumMap;
 import java.util.EnumSet;
@@ -342,7 +344,7 @@ public class RepoTxService {
     final var touchesReleasesSnapshots =
         settings.getReleases() != null || settings.getSnapshots() != null;
     if (touchesReleasesSnapshots && !RELEASES_SNAPSHOTS_SUPPORTED_TYPES.contains(repo.getType())) {
-      throw new BadRequestException("releasesSnapshotsUnsupported");
+      throw new BadRequestException(ErrorConstants.RELEASES_SNAPSHOTS_UNSUPPORTED);
     }
   }
 
@@ -352,12 +354,13 @@ public class RepoTxService {
         settings.getPgpVerifyAllSignaturesEnabled() != null
             || settings.getPgpKeyServerLookupEnabled() != null;
     if (touchesPgp && !PGP_SETTINGS_SUPPORTED_TYPES.contains(repo.getType())) {
-      throw new BadRequestException("pgpSettingsUnsupported");
+      throw new BadRequestException(ErrorConstants.PGP_SETTINGS_UNSUPPORTED);
     }
   }
 
   private @NonNull Repo findRepoOrThrowException(final @NonNull Optional<Repo> repoOptional) {
-    return repoOptional.orElseThrow(() -> new ItemNotFoundException("repoNotFound"));
+    return repoOptional.orElseThrow(
+        () -> new ItemNotFoundException(ProtocolErrorCodes.REPO_NOT_FOUND));
   }
 
   private @NonNull Repo findRepoById(final @NonNull UUID repoId) {
@@ -374,7 +377,7 @@ public class RepoTxService {
 
   private void checkIfRepoExists(final @NonNull String name) {
     if (this.repoRepository.existsByName(name)) {
-      throw new ItemAlreadyExistException("repoExists");
+      throw new ItemAlreadyExistException(ErrorConstants.REPO_EXISTS);
     }
   }
 
@@ -391,7 +394,7 @@ public class RepoTxService {
       this.repoRepository.saveAndFlush(repo);
     } catch (final DataIntegrityViolationException e) {
       if (ConstraintViolations.violatesConstraint(e, "ux_repo__name")) {
-        throw new ItemAlreadyExistException("repoExists");
+        throw new ItemAlreadyExistException(ErrorConstants.REPO_EXISTS);
       }
       throw e;
     }

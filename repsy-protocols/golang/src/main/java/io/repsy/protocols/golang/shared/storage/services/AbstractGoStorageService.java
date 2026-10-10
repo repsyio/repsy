@@ -20,6 +20,7 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Collections;
@@ -35,7 +36,6 @@ import org.springframework.core.io.Resource;
 @NullMarked
 public abstract class AbstractGoStorageService<ID> implements GoStorageService<ID> {
 
-  private static final String ERR_ITEM_NOT_FOUND = "itemNotFound";
   private static final String ZIP_EXTENSION = ".zip";
 
   private final StorageStrategy storageStrategy;
@@ -67,7 +67,7 @@ public abstract class AbstractGoStorageService<ID> implements GoStorageService<I
   public Resource getResource(final String repoName, final StoragePath storagePath) {
     return this.storageStrategy
         .get(storagePath, repoName)
-        .orElseThrow(() -> new ItemNotFoundException(ERR_ITEM_NOT_FOUND));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.ITEM_NOT_FOUND));
   }
 
   @Override

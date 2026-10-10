@@ -25,9 +25,9 @@ import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.server.protocols.shared.aop.config.RepoOperation;
 import io.repsy.os.server.protocols.shared.aop.utils.ResolverUtils;
 import io.repsy.os.server.shared.auth.ProtocolAuthService;
-import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.repo.dtos.RepoScope;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
@@ -104,13 +104,13 @@ public class ProtocolAuthInterceptor implements HandlerInterceptor {
     final var authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
 
     if (authHeader == null) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
 
     final var authenticator = this.getUnknownRepoAuthenticator(methodHandler);
     authenticator.authorizeUnknownRepoRequest(authHeader, this.getPermission(methodHandler));
 
-    return new ItemNotFoundException("repoNotFound");
+    return new ItemNotFoundException(ProtocolErrorCodes.REPO_NOT_FOUND);
   }
 
   private ProtocolAuthService getUnknownRepoAuthenticator(final HandlerMethod methodHandler) {
@@ -159,14 +159,14 @@ public class ProtocolAuthInterceptor implements HandlerInterceptor {
     final var typeOpt = RepoType.fromString(scope.name());
 
     if (typeOpt.isEmpty()) {
-      throw new ItemNotFoundException("repoTypeNotFound");
+      throw new ItemNotFoundException(ProtocolErrorCodes.REPO_TYPE_NOT_FOUND);
     }
 
     if (repoInfo.getType() == typeOpt.get()) {
       return;
     }
 
-    throw new BadRequestException("repoScopeNotMatched");
+    throw new BadRequestException(ProtocolErrorCodes.REPO_SCOPE_NOT_MATCHED);
   }
 
   private RepoScope getRepoScope(final HandlerMethod methodHandler) {

@@ -24,6 +24,7 @@ import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.golang.protocol.GolangProtocolProvider;
 import io.repsy.protocols.golang.protocol.facades.contracts.GoProtocolFacade;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -38,8 +39,6 @@ import org.springframework.http.ResponseEntity;
 
 @NullMarked
 public abstract class AbstractGoUploadProtocolMethodHandler<ID> implements ProtocolMethodHandler {
-
-  private static final String DEFAULT_UNAUTHORIZED_MSG_ID = "unAuthorized";
 
   private final PathParser pathParser;
   private final GoProtocolFacade<ID> goProtocolFacade;
@@ -103,6 +102,6 @@ public abstract class AbstractGoUploadProtocolMethodHandler<ID> implements Proto
    * GolangAuthPreProcessor} answers.
    */
   protected String unauthorizedText(final @Nullable String msgId) {
-    return msgId == null ? DEFAULT_UNAUTHORIZED_MSG_ID : msgId;
+    return msgId == null ? ProtocolErrorCodes.UN_AUTHORIZED : msgId;
   }
 }

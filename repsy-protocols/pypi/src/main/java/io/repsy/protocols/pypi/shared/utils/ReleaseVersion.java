@@ -16,6 +16,7 @@
 package io.repsy.protocols.pypi.shared.utils;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.regex.Pattern;
@@ -73,7 +74,7 @@ public class ReleaseVersion {
     final var versionMatcher = VERSION_PATTERN.matcher(trimmedVersion);
 
     if (!versionMatcher.matches()) {
-      throw new BadRequestException("badVersionString");
+      throw new BadRequestException(ProtocolErrorCodes.BAD_VERSION_STRING);
     }
 
     final var rv = new ReleaseVersion();

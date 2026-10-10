@@ -27,6 +27,7 @@ import io.repsy.os.server.protocols.helm.shared.chart.repositories.HelmChartVers
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartForm;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartInfo;
 import io.repsy.protocols.helm.shared.chart.services.ChartService;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
@@ -75,7 +76,7 @@ public class HelmChartService implements ChartService<UUID> {
     final var version =
         this.helmChartVersionRepository
             .findByRepoIdAndNameAndVersion(repoId, form.getName(), form.getVersion())
-            .orElseThrow(() -> new ItemNotFoundException("chartNotFound"));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.CHART_NOT_FOUND));
     version.setDescription(form.getDescription());
     version.setAppVersion(form.getAppVersion());
     version.setType(form.getType());
@@ -103,7 +104,7 @@ public class HelmChartService implements ChartService<UUID> {
           this.helmChartVersionRepository.findByChartAndVersion(chart, form.getVersion());
 
       if (existing.isPresent() && !allowOverride) {
-        throw new ItemAlreadyExistException("chartAlreadyExists");
+        throw new ItemAlreadyExistException(ProtocolErrorCodes.CHART_ALREADY_EXISTS);
       }
 
       replaced = existing.map(this::toDetail).orElse(null);
@@ -120,7 +121,7 @@ public class HelmChartService implements ChartService<UUID> {
         throw e;
       }
 
-      throw new ItemAlreadyExistException("chartAlreadyExists");
+      throw new ItemAlreadyExistException(ProtocolErrorCodes.CHART_ALREADY_EXISTS);
     }
 
     fileWriter.write(replaced);
@@ -134,7 +135,7 @@ public class HelmChartService implements ChartService<UUID> {
     return this.helmChartVersionRepository
         .findByRepoIdAndNameAndVersion(repoId, name, version)
         .map(this::toDetail)
-        .orElseThrow(() -> new ItemNotFoundException("chartNotFound"));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.CHART_NOT_FOUND));
   }
 
   @Override
@@ -171,7 +172,7 @@ public class HelmChartService implements ChartService<UUID> {
         .findByRepoIdAndName(repoId, name)
         .flatMap(this.helmChartVersionRepository::findFirstByChartOrderByCreatedAtDescIdDesc)
         .<HelmChartInfo>map(this::toDetail)
-        .orElseThrow(() -> new ItemNotFoundException("chartNotFound"));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.CHART_NOT_FOUND));
   }
 
   /**
@@ -183,7 +184,7 @@ public class HelmChartService implements ChartService<UUID> {
     final var chart =
         this.helmChartRepository
             .findByRepoIdAndName(repoId, name)
-            .orElseThrow(() -> new ItemNotFoundException("chartNotFound"));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.CHART_NOT_FOUND));
 
     return this.helmChartVersionRepository
         .findAllByChartAndVersionContainingIgnoreCase(chart, query, pageable)
@@ -223,7 +224,7 @@ public class HelmChartService implements ChartService<UUID> {
     final var chartVersion =
         this.helmChartVersionRepository
             .findByChartAndVersion(chart, version)
-            .orElseThrow(() -> new ItemNotFoundException("chartNotFound"));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.CHART_NOT_FOUND));
     this.helmChartVersionRepository.delete(chartVersion);
     if (this.helmChartVersionRepository.findAllByChart(chart).isEmpty()) {
       this.helmChartRepository.delete(chart);
@@ -252,7 +253,7 @@ public class HelmChartService implements ChartService<UUID> {
   private HelmChart lockExistingChart(final UUID repoId, final String name) {
     return this.helmChartRepository
         .findWithLockByRepoIdAndName(repoId, name)
-        .orElseThrow(() -> new ItemNotFoundException("chartNotFound"));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.CHART_NOT_FOUND));
   }
 
   /**
@@ -283,7 +284,7 @@ public class HelmChartService implements ChartService<UUID> {
 
     return this.helmChartRepository
         .findWithLockByRepoIdAndName(repoId, name)
-        .orElseThrow(() -> new ItemNotFoundException("chartNotFound"));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.CHART_NOT_FOUND));
   }
 
   private HelmChartVersion findOrCreateVersion(final HelmChart chart, final HelmChartForm form) {

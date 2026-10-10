@@ -26,6 +26,7 @@ import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
 import io.repsy.protocols.npm.protocol.facades.NpmProtocolFacade;
 import io.repsy.protocols.npm.shared.utils.ExtractPath;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.BoundedEntryReader;
 import io.repsy.protocols.shared.utils.EntryTooLargeException;
@@ -174,7 +175,8 @@ public abstract class AbstractNpmPackagePublishOrDeprecateProtocolMethodHandler
       // instead of 413.
       final var body =
           RequestBodies.nonEmpty(request.getInputStream())
-              .orElseThrow(() -> new BadRequestException("npmPublishBodyEmpty"));
+              .orElseThrow(
+                  () -> new BadRequestException(ProtocolErrorCodes.NPM_PUBLISH_BODY_EMPTY));
 
       final byte[] bytes;
       try {

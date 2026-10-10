@@ -19,6 +19,7 @@ import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Paths;
@@ -65,7 +66,7 @@ public abstract class AbstractRubyStorageService implements RubyStorageService {
 
     return this.storageStrategy
         .get(storagePath, repoName)
-        .orElseThrow(() -> new ItemNotFoundException("gemNotFound"));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.GEM_NOT_FOUND));
   }
 
   @Override
@@ -85,7 +86,7 @@ public abstract class AbstractRubyStorageService implements RubyStorageService {
       this.storageStrategy.delete(storagePath);
       return usage;
     } catch (final IOException e) {
-      throw new ItemNotFoundException("gemNotFound");
+      throw new ItemNotFoundException(ProtocolErrorCodes.GEM_NOT_FOUND);
     }
   }
 

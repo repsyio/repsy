@@ -33,6 +33,7 @@ import io.repsy.os.server.security.scanner.trivy.TrivyScannerClientProperties;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.helm.shared.constants.HelmConstants;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.utils.BlobDigests;
 import java.time.Instant;
 import java.util.Map;
@@ -59,7 +60,6 @@ public class ArtifactScanListener {
   private static final String DOCKER_REPO_TYPE = "DOCKER";
   private static final String HELM_REPO_TYPE = "HELM";
   private static final String NO_SCANNER_NAME = "none";
-  private static final String SCAN_NOT_FOUND_MSG_ID = "vulnerabilityScanNotFound";
 
   private final @NonNull VulnerabilityScannerRegistry scannerRegistry;
   private final @NonNull VulnerabilityScanTxService scanTxService;
@@ -117,7 +117,7 @@ public class ArtifactScanListener {
         scanId,
         () -> {
           this.scanTxService.recordScanFailure(scanId, "Scan executor is saturated; retry later");
-          throw new RetryableException("scanExecutorSaturated");
+          throw new RetryableException(ProtocolErrorCodes.SCAN_EXECUTOR_SATURATED);
         });
   }
 
@@ -192,7 +192,7 @@ public class ArtifactScanListener {
       final @NonNull UUID scanId,
       final @NonNull ItemNotFoundException exception) {
 
-    if (!SCAN_NOT_FOUND_MSG_ID.equals(exception.getMessage())) {
+    if (!ProtocolErrorCodes.VULNERABILITY_SCAN_NOT_FOUND.equals(exception.getMessage())) {
       this.handleScanFailure(event, scanId, exception);
       return;
     }

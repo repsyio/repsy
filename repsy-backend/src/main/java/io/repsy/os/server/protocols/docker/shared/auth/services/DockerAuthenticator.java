@@ -30,13 +30,13 @@ import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.dtos.AuthenticationType;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.TokenRealm;
-import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.token.dtos.TokenType;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.docker.protocol.parser.DockerScopes;
 import io.repsy.protocols.docker.shared.auth.services.DockerAuthService;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.repo.dtos.Credentials;
 import io.repsy.protocols.shared.repo.dtos.Permission;
@@ -78,7 +78,7 @@ public class DockerAuthenticator extends ProtocolAuthService implements DockerAu
   public UserInfo authenticateUser(final @Nullable String authHeader) {
 
     if (authHeader == null || !isBearerToken(authHeader)) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
 
     return this.authenticatePanelBearer(authHeader);
@@ -88,7 +88,7 @@ public class DockerAuthenticator extends ProtocolAuthService implements DockerAu
   public String authenticateUserDockerCli(final String authHeader, final List<String> grants) {
 
     if (!isBasicToken(authHeader)) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
 
     final var credentials = this.getBasicAuthCredentials(removeBasicPrefix(authHeader));
@@ -96,7 +96,7 @@ public class DockerAuthenticator extends ProtocolAuthService implements DockerAu
     return this.authenticateWithPersonalAccessToken(credentials, grants)
         .or(() -> this.authenticateWithDeployToken(credentials))
         .or(() -> this.authenticateWithUsernamePassword(credentials, grants))
-        .orElseThrow(() -> new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED));
+        .orElseThrow(() -> new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED));
   }
 
   /**
@@ -108,7 +108,7 @@ public class DockerAuthenticator extends ProtocolAuthService implements DockerAu
   public void authorizePublicRead(final BaseRepoInfo<UUID> repoInfo) {
 
     if (repoInfo.isPrivateRepo()) {
-      throw new ItemNotFoundException("repoNotFound");
+      throw new ItemNotFoundException(ProtocolErrorCodes.REPO_NOT_FOUND);
     }
   }
 
@@ -117,7 +117,7 @@ public class DockerAuthenticator extends ProtocolAuthService implements DockerAu
     final var credentials = extractCredentialsFromBasicToken(basicToken);
 
     if (credentials == null) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
 
     return credentials;
@@ -147,7 +147,7 @@ public class DockerAuthenticator extends ProtocolAuthService implements DockerAu
     final var narrowed = PatDockerGrants.narrow(grants, token.scopes(), admin);
 
     if (!grants.isEmpty() && narrowed.isEmpty()) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
 
     this.touchPersonalAccessToken(token);
@@ -190,7 +190,7 @@ public class DockerAuthenticator extends ProtocolAuthService implements DockerAu
     }
 
     if (deployTokenOpt.get().isExpired()) {
-      throw new UnAuthorizedException("deployTokenExpired");
+      throw new UnAuthorizedException(ProtocolErrorCodes.DEPLOY_TOKEN_EXPIRED);
     }
 
     this.deployTokenService.updateLastUsedTime(deployTokenOpt.get().getId());
@@ -225,7 +225,7 @@ public class DockerAuthenticator extends ProtocolAuthService implements DockerAu
     final var grants = this.jwtUtils.extractAccess(authHeader, TokenRealm.PROTOCOL);
 
     if (grants != null && !DockerScopes.allowsDelete(grants, name)) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
   }
 
@@ -251,7 +251,7 @@ public class DockerAuthenticator extends ProtocolAuthService implements DockerAu
       final UUID repoId, final UUID tokenId, final Permission permission) {
 
     if (permission == Permission.MANAGE) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
 
     super.authorizeTokenRequestTokenId(repoId, tokenId, permission);
@@ -266,13 +266,13 @@ public class DockerAuthenticator extends ProtocolAuthService implements DockerAu
       final String authHeader, final UUID repoId, final Permission permission) {
 
     if (permission != Permission.READ) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
 
     final var tokenRepoId = this.jwtUtils.extractUserId(authHeader, TokenRealm.PROTOCOL);
 
     if (!tokenRepoId.equals(repoId)) {
-      throw new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED);
+      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
   }
 }

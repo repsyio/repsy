@@ -26,6 +26,7 @@ import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
 import io.repsy.protocols.npm.shared.auth.services.NpmTokenRevoker;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
@@ -63,7 +64,6 @@ public abstract class AbstractNpmTokenRevokeProtocolMethodHandler<ID>
   private static final String BEARER_PREFIX = "Bearer ";
   private static final String TOKEN_PATH_REGEX = "/-/user/token/[^/]+";
   private static final String TOKEN_PATH_PREFIX = "/-/user/token/";
-  private static final String DEFAULT_FORBIDDEN_MSG_ID = "accessNotAllowed";
 
   private final PathParser pathParser;
   private final NpmTokenRevoker<ID> tokenRevoker;
@@ -122,10 +122,11 @@ public abstract class AbstractNpmTokenRevokeProtocolMethodHandler<ID>
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
           .header(WWW_AUTHENTICATE, challenge)
           .contentType(MediaType.APPLICATION_JSON)
-          .body(Map.of("error", "unAuthorized"));
+          .body(Map.of("error", ProtocolErrorCodes.UN_AUTHORIZED));
 
     } catch (final AccessNotAllowedException e) {
-      final var msgId = e.getMessage() == null ? DEFAULT_FORBIDDEN_MSG_ID : e.getMessage();
+      final var msgId =
+          e.getMessage() == null ? ProtocolErrorCodes.ACCESS_NOT_ALLOWED : e.getMessage();
       final var body = new LinkedHashMap<String, Object>();
 
       body.put("error", this.forbiddenText(msgId));
@@ -142,6 +143,6 @@ public abstract class AbstractNpmTokenRevokeProtocolMethodHandler<ID>
    * fallback; the application overrides it to resolve the id into its message.
    */
   protected String forbiddenText(final @Nullable String msgId) {
-    return msgId == null ? DEFAULT_FORBIDDEN_MSG_ID : msgId;
+    return msgId == null ? ProtocolErrorCodes.ACCESS_NOT_ALLOWED : msgId;
   }
 }

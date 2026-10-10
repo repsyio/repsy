@@ -16,6 +16,7 @@
 package io.repsy.protocols.golang.shared.module.validators;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.nio.charset.StandardCharsets;
 import java.util.regex.Pattern;
 import lombok.experimental.UtilityClass;
@@ -39,13 +40,13 @@ public class GoModFileValidator {
    */
   public static void validate(final byte[] content, final String expectedModulePath) {
     if (content.length == 0) {
-      throw new BadRequestException("goModFileEmpty");
+      throw new BadRequestException(ProtocolErrorCodes.GO_MOD_FILE_EMPTY);
     }
 
     final var text = new String(content, StandardCharsets.UTF_8);
 
     if (!MODULE_DIRECTIVE.matcher(text).find()) {
-      throw new BadRequestException("goModMissingModuleDirective");
+      throw new BadRequestException(ProtocolErrorCodes.GO_MOD_MISSING_MODULE_DIRECTIVE);
     }
 
     validateModulePath(text);
@@ -59,7 +60,7 @@ public class GoModFileValidator {
     }
     final var firstSegment = matcher.group(1).split("/", -1)[0];
     if (!firstSegment.contains(".")) {
-      throw new BadRequestException("goModInvalidModulePath");
+      throw new BadRequestException(ProtocolErrorCodes.GO_MOD_INVALID_MODULE_PATH);
     }
   }
 
@@ -70,7 +71,7 @@ public class GoModFileValidator {
     }
     final var declared = unquote(matcher.group(1));
     if (!declared.equals(expectedModulePath)) {
-      throw new BadRequestException("goModModulePathMismatch");
+      throw new BadRequestException(ProtocolErrorCodes.GO_MOD_MODULE_PATH_MISMATCH);
     }
   }
 

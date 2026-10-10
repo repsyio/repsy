@@ -47,6 +47,7 @@ import io.repsy.protocols.ruby.shared.storage.services.AbstractRubyStorageServic
 import io.repsy.protocols.ruby.shared.utils.CompactIndexFormatter;
 import io.repsy.protocols.ruby.shared.utils.GemFilenameCandidates;
 import io.repsy.protocols.ruby.shared.utils.RubyGemVersionComparator;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.IOException;
 import java.time.Instant;
@@ -71,9 +72,6 @@ import org.springframework.transaction.annotation.Transactional;
 @NullMarked
 public class RubyGemService implements RubyGemProtocolService<UUID> {
 
-  private static final String GEM_NOT_FOUND = "gemNotFound";
-  private static final String GEM_VERSION_NOT_FOUND = "gemVersionNotFound";
-  private static final String REPO_NOT_FOUND = "repoNotFound";
   private static final String RUNTIME_TYPE = "runtime";
   private static final String VERSION_UNIQUE_CONSTRAINT =
       "ux_ruby_gem_version__gem_id_version_platform";
@@ -97,7 +95,7 @@ public class RubyGemService implements RubyGemProtocolService<UUID> {
     final var gem =
         this.gemRepository
             .findByRepoIdAndName(repoInfo.getId(), gemName)
-            .orElseThrow(() -> new ItemNotFoundException(GEM_NOT_FOUND));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.GEM_NOT_FOUND));
     final var rows = this.versionRepository.findAllCompactByGemId(gem.getId());
     return this.toCompactEntries(rows);
   }
@@ -195,7 +193,7 @@ public class RubyGemService implements RubyGemProtocolService<UUID> {
         throw e;
       }
 
-      throw new ItemAlreadyExistException("gemVersionAlreadyExists");
+      throw new ItemAlreadyExistException(ProtocolErrorCodes.GEM_VERSION_ALREADY_EXISTS);
     }
 
     return fileWriter.write(replacesExisting);
@@ -211,15 +209,15 @@ public class RubyGemService implements RubyGemProtocolService<UUID> {
     final var gem =
         this.gemRepository
             .findByRepoIdAndName(repoInfo.getId(), gemName)
-            .orElseThrow(() -> new ItemNotFoundException(GEM_NOT_FOUND));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.GEM_NOT_FOUND));
 
     final var gemVersion =
         this.versionRepository
             .findByGemIdAndVersionAndPlatform(gem.getId(), version, platform)
-            .orElseThrow(() -> new ItemNotFoundException(GEM_VERSION_NOT_FOUND));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.GEM_VERSION_NOT_FOUND));
 
     if (gemVersion.isYanked()) {
-      throw new BadRequestException("gemVersionAlreadyYanked");
+      throw new BadRequestException(ProtocolErrorCodes.GEM_VERSION_ALREADY_YANKED);
     }
 
     gemVersion.setYanked(true);
@@ -269,7 +267,7 @@ public class RubyGemService implements RubyGemProtocolService<UUID> {
     final var gemVersion =
         this.versionRepository
             .findByGemIdAndVersionAndPlatform(gemId, version, platform)
-            .orElseThrow(() -> new ItemNotFoundException(GEM_VERSION_NOT_FOUND));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.GEM_VERSION_NOT_FOUND));
     final var deps = this.dependencyRepository.findAllByGemVersionId(gemVersion.getId());
     return this.converter.toGemVersionInfoDto(gemVersion, deps);
   }
@@ -285,7 +283,7 @@ public class RubyGemService implements RubyGemProtocolService<UUID> {
     final var gem =
         this.gemRepository
             .findByRepoIdAndName(repoId, gemName)
-            .orElseThrow(() -> new ItemNotFoundException(GEM_NOT_FOUND));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.GEM_NOT_FOUND));
 
     final var latestRows =
         this.versionRepository.findByGemIdAndVersion(gem.getId(), gem.getLatest());
@@ -293,7 +291,7 @@ public class RubyGemService implements RubyGemProtocolService<UUID> {
         latestRows.stream()
             .max(Comparator.comparing(RubyGemVersion::getCreatedAt))
             .or(() -> this.versionRepository.findFirstByGemIdOrderByCreatedAtDesc(gem.getId()))
-            .orElseThrow(() -> new ItemNotFoundException(GEM_NOT_FOUND));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.GEM_NOT_FOUND));
 
     return this.converter.toGemPackageInfoDto(gem, newest);
   }
@@ -302,7 +300,7 @@ public class RubyGemService implements RubyGemProtocolService<UUID> {
     return this.gemRepository
         .findByRepoIdAndName(repoId, gemName)
         .map(RubyGem::getId)
-        .orElseThrow(() -> new ItemNotFoundException(GEM_NOT_FOUND));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.GEM_NOT_FOUND));
   }
 
   @Transactional
@@ -323,7 +321,7 @@ public class RubyGemService implements RubyGemProtocolService<UUID> {
     final var gemVersion =
         this.versionRepository
             .findByGemIdAndVersionAndPlatform(gemId, version, platform)
-            .orElseThrow(() -> new ItemNotFoundException(GEM_VERSION_NOT_FOUND));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.GEM_VERSION_NOT_FOUND));
     this.versionRepository.delete(gemVersion);
     this.versionRepository.flush();
 
@@ -338,7 +336,7 @@ public class RubyGemService implements RubyGemProtocolService<UUID> {
     final var gem =
         this.gemRepository
             .findById(gemId)
-            .orElseThrow(() -> new ItemNotFoundException(GEM_NOT_FOUND));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.GEM_NOT_FOUND));
 
     if (!this.versionRepository.existsByGemIdAndVersion(gemId, gem.getLatest())) {
       // Same choice as yankGem: the newest live version, else the newest one there is.
@@ -445,7 +443,7 @@ public class RubyGemService implements RubyGemProtocolService<UUID> {
   private Repo requireRepo(final UUID repoId) {
     return this.repoRepository
         .findById(repoId)
-        .orElseThrow(() -> new ItemNotFoundException(REPO_NOT_FOUND));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.REPO_NOT_FOUND));
   }
 
   private RubyGem upsertGem(final Repo repo, final String name, final String version) {
@@ -474,7 +472,7 @@ public class RubyGemService implements RubyGemProtocolService<UUID> {
 
     return this.gemRepository
         .findByRepoIdAndName(repo.getId(), name)
-        .orElseThrow(() -> new ItemNotFoundException(GEM_NOT_FOUND));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.GEM_NOT_FOUND));
   }
 
   /**
@@ -492,7 +490,7 @@ public class RubyGemService implements RubyGemProtocolService<UUID> {
     if (existing.isPresent()) {
       final var v = existing.get();
       if (v.isYanked() || !allowOverride) {
-        throw new ItemAlreadyExistException("gemVersionAlreadyExists");
+        throw new ItemAlreadyExistException(ProtocolErrorCodes.GEM_VERSION_ALREADY_EXISTS);
       }
       this.overrideVersion(v, metadata, checksum);
       return true;

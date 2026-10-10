@@ -40,6 +40,7 @@ import io.repsy.protocols.helm.shared.oci.services.OciBlobService;
 import io.repsy.protocols.helm.shared.oci.services.OciManifestService;
 import io.repsy.protocols.helm.shared.storage.services.HelmStorageService;
 import io.repsy.protocols.helm.shared.utils.HelmVersionComparator;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.BlobDigests;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
@@ -176,7 +177,7 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmProtocolFa
             chart ->
                 this.helmStorageService.findBlob(
                     repoInfo.getStorageKey(), chart.digest(), repoInfo.getName()))
-        .orElseThrow(() -> new ItemNotFoundException("chartNotFound"));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.CHART_NOT_FOUND));
   }
 
   /**
@@ -315,7 +316,7 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmProtocolFa
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     return this.helmStorageService
         .findBlob(repoInfo.getStorageKey(), uploadId.toString(), repoInfo.getName())
-        .orElseThrow(() -> new ItemNotFoundException("blobNotFound"))
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.BLOB_NOT_FOUND))
         .contentLength();
   }
 
@@ -345,7 +346,7 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmProtocolFa
     final var resource =
         this.helmStorageService
             .findBlob(repoInfo.getStorageKey(), digest, repoInfo.getName())
-            .orElseThrow(() -> new ItemNotFoundException("blobNotFound"));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.BLOB_NOT_FOUND));
     final var form =
         HelmOciBlobForm.builder()
             .digest(digest)
@@ -362,10 +363,10 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmProtocolFa
     final var upload =
         this.helmStorageService
             .findBlob(repoInfo.getStorageKey(), uploadId.toString(), repoInfo.getName())
-            .orElseThrow(() -> new ItemNotFoundException("blobNotFound"));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.BLOB_NOT_FOUND));
 
     if (!BlobDigests.matches(digest, upload.getInputStream())) {
-      throw new BadRequestException("digestMismatch");
+      throw new BadRequestException(ProtocolErrorCodes.DIGEST_MISMATCH);
     }
   }
 
@@ -387,7 +388,7 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmProtocolFa
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     return this.helmStorageService
         .findBlob(repoInfo.getStorageKey(), digest, repoInfo.getName())
-        .orElseThrow(() -> new ItemNotFoundException("blobNotFound"));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.BLOB_NOT_FOUND));
   }
 
   @Override
@@ -403,7 +404,7 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmProtocolFa
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     return this.ociManifestService
         .findByNameAndReference(repoInfo.getId(), name, reference)
-        .orElseThrow(() -> new ItemNotFoundException("manifestNotFound"));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.MANIFEST_NOT_FOUND));
   }
 
   @Override

@@ -17,6 +17,7 @@ package io.repsy.os.server.protocols.docker.shared.utils;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.storage.core.dtos.RelativePath;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.utils.BlobDigests;
 import java.util.regex.Pattern;
 import lombok.Builder;
@@ -122,7 +123,7 @@ public class PathParserUtils {
       // The request path is for the log, the client gets a fixed msgId (RPS-1127).
       log.debug(
           "Invalid {} path format: {}", config.pathType(), cleanedPath.replaceAll("[\\r\\n]", "_"));
-      throw new BadRequestException("dockerPathInvalid");
+      throw new BadRequestException(ProtocolErrorCodes.DOCKER_PATH_INVALID);
     }
 
     final var parsedValue = fileName != null ? fileName : matcher.group(config.groupName());

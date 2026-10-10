@@ -17,6 +17,7 @@ package io.repsy.protocols.docker.shared.utils;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.protocols.docker.shared.constants.DockerConstants;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.utils.BlobDigests;
 import java.util.regex.Pattern;
 import lombok.experimental.UtilityClass;
@@ -58,7 +59,7 @@ public final class DockerPushGuards {
 
     if (name.length() > DockerConstants.MAX_IMAGE_NAME_LENGTH
         || !IMAGE_NAME_PATTERN.matcher(name).matches()) {
-      throw new BadRequestException("dockerImageNameInvalid");
+      throw new BadRequestException(ProtocolErrorCodes.DOCKER_IMAGE_NAME_INVALID);
     }
   }
 
@@ -79,18 +80,20 @@ public final class DockerPushGuards {
 
     if (reference.length() > DockerConstants.MAX_REFERENCE_LENGTH) {
       throw new BadRequestException(
-          isDigestShaped ? "dockerDigestInvalid" : "dockerReferenceInvalid");
+          isDigestShaped
+              ? ProtocolErrorCodes.DOCKER_DIGEST_INVALID
+              : ProtocolErrorCodes.DOCKER_REFERENCE_INVALID);
     }
 
     if (isDigestShaped) {
       if (!BlobDigests.isSupported(reference)) {
-        throw new BadRequestException("dockerDigestInvalid");
+        throw new BadRequestException(ProtocolErrorCodes.DOCKER_DIGEST_INVALID);
       }
       return;
     }
 
     if (!TAG_PATTERN.matcher(reference).matches()) {
-      throw new BadRequestException("dockerReferenceInvalid");
+      throw new BadRequestException(ProtocolErrorCodes.DOCKER_REFERENCE_INVALID);
     }
   }
 
@@ -106,7 +109,7 @@ public final class DockerPushGuards {
   public static void rejectMediaTypeTooLong(final @Nullable String mediaType) {
 
     if (mediaType != null && mediaType.length() > DockerConstants.MAX_MEDIA_TYPE_LENGTH) {
-      throw new BadRequestException("dockerMediaTypeTooLong");
+      throw new BadRequestException(ProtocolErrorCodes.DOCKER_MEDIA_TYPE_TOO_LONG);
     }
   }
 
@@ -121,7 +124,7 @@ public final class DockerPushGuards {
   public static void rejectPlatformTooLong(final String platform) {
 
     if (platform.length() > DockerConstants.MAX_PLATFORM_LENGTH) {
-      throw new BadRequestException("dockerPlatformTooLong");
+      throw new BadRequestException(ProtocolErrorCodes.DOCKER_PLATFORM_TOO_LONG);
     }
   }
 }

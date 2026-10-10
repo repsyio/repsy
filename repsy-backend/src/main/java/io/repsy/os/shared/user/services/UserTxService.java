@@ -30,6 +30,7 @@ import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.os.shared.user.mappers.UserMapper;
 import io.repsy.os.shared.user.repositories.UserRepository;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
@@ -49,11 +50,6 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class UserTxService {
 
-  private static final @NonNull String ERR_USER_NOT_FOUND = "userNotFound";
-  private static final @NonNull String ERR_USERNAME_IN_USE = "usernameInUse";
-  private static final @NonNull String ERR_CANNOT_DELETE_LAST_ADMIN = "cannotDeleteLastAdminUser";
-  private static final @NonNull String ERR_CANNOT_DEMOTE_LAST_ADMIN = "cannotDemoteLastAdminUser";
-
   private final @NonNull UserRepository userRepository;
   private final @NonNull UserMapper userConverter;
 
@@ -62,7 +58,7 @@ public class UserTxService {
       final @NonNull String username, final @NonNull UserRole role, final @Nullable String hash) {
 
     if (this.userRepository.existsByUsername(username)) {
-      throw new BadRequestException(ERR_USERNAME_IN_USE);
+      throw new BadRequestException(ErrorConstants.USERNAME_IN_USE);
     }
 
     final var user = new User();
@@ -92,7 +88,7 @@ public class UserTxService {
    */
   public @NonNull UserInfo getAuthenticatedUserByUsername(final @NonNull String username) {
     return this.findUserInfoByUsername(username)
-        .orElseThrow(() -> new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED));
+        .orElseThrow(() -> new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED));
   }
 
   /** Same as {@link #getAuthenticatedUserByUsername(String)}, for tokens that carry a user id. */
@@ -100,7 +96,7 @@ public class UserTxService {
     return this.userRepository
         .findById(userId)
         .map(this.userConverter::toUserInfo)
-        .orElseThrow(() -> new UnAuthorizedException(ErrorConstants.UN_AUTHORIZED));
+        .orElseThrow(() -> new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED));
   }
 
   public @NonNull Optional<UserInfo> findUserInfoByUsername(final @NonNull String username) {
@@ -157,7 +153,7 @@ public class UserTxService {
   @Transactional
   public @NonNull UserResponse createUserWithRole(final @NonNull UserCreateForm dto) {
     if (this.userRepository.existsByUsername(dto.getUsername())) {
-      throw new BadRequestException(ERR_USERNAME_IN_USE);
+      throw new BadRequestException(ErrorConstants.USERNAME_IN_USE);
     }
 
     final var hash = PasswordHasher.hash(dto.getPassword());
@@ -183,7 +179,7 @@ public class UserTxService {
 
     if (!user.getUsername().equals(dto.getUsername())) {
       if (this.userRepository.existsByUsername(dto.getUsername())) {
-        throw new BadRequestException(ERR_USERNAME_IN_USE);
+        throw new BadRequestException(ErrorConstants.USERNAME_IN_USE);
       }
       user.setUsername(dto.getUsername());
       user.revokeRefreshTokens();
@@ -216,7 +212,7 @@ public class UserTxService {
     final var user = this.findUserById(userId);
 
     if (user.getRole() == UserRole.ADMIN && adminCount <= 1) {
-      throw new BadRequestException(ERR_CANNOT_DELETE_LAST_ADMIN);
+      throw new BadRequestException(ErrorConstants.CANNOT_DELETE_LAST_ADMIN_USER);
     }
 
     this.userRepository.delete(user);
@@ -251,7 +247,7 @@ public class UserTxService {
   @Transactional
   public void updateLastLoginAt(final @NonNull String username) {
     if (this.userRepository.updateLastLoginAt(username, Instant.now()) == 0) {
-      throw new ItemNotFoundException(ERR_USER_NOT_FOUND);
+      throw new ItemNotFoundException(ErrorConstants.USER_NOT_FOUND);
     }
   }
 
@@ -272,7 +268,7 @@ public class UserTxService {
     final var user = this.findUserById(userId);
 
     if (mayDemote && user.getRole() == UserRole.ADMIN && adminCount <= 1) {
-      throw new BadRequestException(ERR_CANNOT_DEMOTE_LAST_ADMIN);
+      throw new BadRequestException(ErrorConstants.CANNOT_DEMOTE_LAST_ADMIN_USER);
     }
 
     return user;
@@ -281,12 +277,12 @@ public class UserTxService {
   private @NonNull User findUserById(final @NonNull UUID id) {
     return this.userRepository
         .findById(id)
-        .orElseThrow(() -> new ItemNotFoundException(ERR_USER_NOT_FOUND));
+        .orElseThrow(() -> new ItemNotFoundException(ErrorConstants.USER_NOT_FOUND));
   }
 
   private @NonNull User findUserByUsername(final @NonNull String username) {
     return this.userRepository
         .findByUsername(username)
-        .orElseThrow(() -> new ItemNotFoundException(ERR_USER_NOT_FOUND));
+        .orElseThrow(() -> new ItemNotFoundException(ErrorConstants.USER_NOT_FOUND));
   }
 }

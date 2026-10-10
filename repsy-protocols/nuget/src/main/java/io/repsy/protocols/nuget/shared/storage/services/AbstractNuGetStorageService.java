@@ -21,6 +21,7 @@ import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -74,14 +75,14 @@ public abstract class AbstractNuGetStorageService implements NuGetStorageService
   public Resource getNuPkg(final UUID repoId, final String packageId, final String version) {
 
     return this.getPackageFile(repoId, packageId, version, NUPKG_EXTENSION)
-        .orElseThrow(() -> new ItemNotFoundException("nupkgNotFound"));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.NUPKG_NOT_FOUND));
   }
 
   @Override
   public Resource getNuspec(final UUID repoId, final String packageId, final String version) {
 
     return this.getPackageFile(repoId, packageId, version, NUSPEC_EXTENSION)
-        .orElseThrow(() -> new ItemNotFoundException("nuspecNotFound"));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.NUSPEC_NOT_FOUND));
   }
 
   @Override

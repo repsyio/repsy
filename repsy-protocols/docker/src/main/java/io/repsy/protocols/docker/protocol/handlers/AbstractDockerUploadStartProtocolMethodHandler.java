@@ -23,6 +23,7 @@ import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.BlobDigests;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
@@ -104,7 +105,7 @@ public abstract class AbstractDockerUploadStartProtocolMethodHandler
     final var digestAlgorithm = request.getParameter(DIGEST_ALGORITHM_PARAMETER);
 
     if (digestAlgorithm != null && !BlobDigests.isSupportedAlgorithm(digestAlgorithm)) {
-      throw new BadRequestException("dockerDigestAlgorithmUnsupported");
+      throw new BadRequestException(ProtocolErrorCodes.DOCKER_DIGEST_ALGORITHM_UNSUPPORTED);
     }
 
     // Minted once: the Location a client PATCHes/PUTs against and the Docker-Upload-UUID it may

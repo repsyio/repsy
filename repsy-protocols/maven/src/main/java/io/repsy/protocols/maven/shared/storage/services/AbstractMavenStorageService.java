@@ -31,6 +31,7 @@ import io.repsy.protocols.maven.shared.artifact.dtos.PluginPrefixChange;
 import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredPlugin;
 import io.repsy.protocols.maven.shared.utils.ArtifactMetadataSynthesizer;
 import io.repsy.protocols.maven.shared.utils.ArtifactUtils;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -69,7 +70,6 @@ import org.springframework.ui.freemarker.FreeMarkerTemplateUtils;
 public abstract class AbstractMavenStorageService<ID> implements MavenStorageService<ID> {
 
   private static final String METADATA_FILENAME = "maven-metadata.xml";
-  private static final String ERR_ITEM_NOT_FOUND = "itemNotFound";
 
   /**
    * A stored {@code maven-metadata.xml.asc} and its own checksum siblings, in the order they are
@@ -152,7 +152,7 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
     try {
       return this.storageStrategy
           .get(storagePath, repoName)
-          .orElseThrow(() -> new ItemNotFoundException(ERR_ITEM_NOT_FOUND));
+          .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.ITEM_NOT_FOUND));
 
     } catch (final IsADirectoryException _) {
       if (!storagePath.getPath().endsWith("/")) {
@@ -659,7 +659,7 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
 
     return this.storageStrategy
         .get(storagePath, repoName)
-        .orElseThrow(() -> new ItemNotFoundException(ERR_ITEM_NOT_FOUND));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.ITEM_NOT_FOUND));
   }
 
   /**
@@ -756,7 +756,7 @@ public abstract class AbstractMavenStorageService<ID> implements MavenStorageSer
     final var resource =
         this.storageStrategy
             .get(metadataStoragePath, repoName)
-            .orElseThrow(() -> new ItemNotFoundException(ERR_ITEM_NOT_FOUND));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.ITEM_NOT_FOUND));
 
     final var metadataContent = resource.getContentAsString(StandardCharsets.UTF_8);
 

@@ -29,6 +29,7 @@ import io.repsy.os.server.protocols.docker.shared.tag.repositories.TagRepository
 import io.repsy.os.shared.repo.repositories.RepoRepository;
 import io.repsy.protocols.docker.shared.image.exceptions.ImageDeletedException;
 import io.repsy.protocols.docker.shared.image.services.ImageService;
+import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -133,7 +134,7 @@ public class ImageTxService implements ImageService<UUID> {
 
     return this.imageRepository
         .findByIdForUpdate(imageId)
-        .orElseThrow(() -> new ItemNotFoundException("imageNotFound"));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.IMAGE_NOT_FOUND));
   }
 
   /**
@@ -156,7 +157,7 @@ public class ImageTxService implements ImageService<UUID> {
     }
 
     if (!repoId.equals(image.getRepo().getId())) {
-      throw new ItemNotFoundException("imageNotFound");
+      throw new ItemNotFoundException(ProtocolErrorCodes.IMAGE_NOT_FOUND);
     }
 
     // Flushed first: the count must see the manifests this transaction deleted.
@@ -194,7 +195,7 @@ public class ImageTxService implements ImageService<UUID> {
     final var repo =
         this.repoRepository
             .findById(repoId)
-            .orElseThrow(() -> new ItemNotFoundException("repoNotFound"));
+            .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.REPO_NOT_FOUND));
 
     final var page =
         this.imageRepository.findAllByRepoIdAndContainsName(
@@ -215,7 +216,7 @@ public class ImageTxService implements ImageService<UUID> {
     return this.imageRepository
         .findListItemByRepoIdAndName(repoId, imageName)
         .map(item -> this.toDto(item, this.untaggedStatsOf(List.of(item)).get(item.getId())))
-        .orElseThrow(() -> new ItemNotFoundException("imageNotFound"));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.IMAGE_NOT_FOUND));
   }
 
   /** The untagged stats of all the listed images in one query, whatever their number (RPS-1566). */
@@ -267,6 +268,6 @@ public class ImageTxService implements ImageService<UUID> {
 
     return this.imageRepository
         .findByRepoIdAndName(repoId, imageName)
-        .orElseThrow(() -> new ItemNotFoundException("imageNotFound"));
+        .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.IMAGE_NOT_FOUND));
   }
 }
