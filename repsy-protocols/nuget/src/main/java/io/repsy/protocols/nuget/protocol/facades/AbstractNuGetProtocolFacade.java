@@ -16,17 +16,17 @@
 package io.repsy.protocols.nuget.protocol.facades;
 
 import static io.repsy.protocols.nuget.shared.mappers.NuGetResponseMapper.toLeafItem;
-import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.FORMAT_JSON;
-import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.NUGET_CONTEXT;
-import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.buildRegistrationPages;
 import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.checkVersionAllowance;
 import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.copyStreamToFile;
 import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.extractPackageId;
 import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.extractPackageIdAndVersion;
-import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.isSemVer2;
-import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.normalizeNuGetVersion;
-import static io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils.readNuspecMetadata;
+import static io.repsy.protocols.nuget.shared.utils.NuGetRegistrationPageUtils.FORMAT_JSON;
+import static io.repsy.protocols.nuget.shared.utils.NuGetRegistrationPageUtils.NUGET_CONTEXT;
+import static io.repsy.protocols.nuget.shared.utils.NuGetRegistrationPageUtils.buildRegistrationPages;
 import static io.repsy.protocols.nuget.shared.utils.NuGetServiceIndexResources.build;
+import static io.repsy.protocols.nuget.shared.utils.NuGetVersionUtils.isSemVer2;
+import static io.repsy.protocols.nuget.shared.utils.NuGetVersionUtils.normalizeNuGetVersion;
+import static io.repsy.protocols.nuget.shared.utils.NuspecUtils.readNuspecMetadata;
 
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;

@@ -42,7 +42,7 @@ import org.springframework.data.domain.Sort;
  * RPS-1688: {@code getVersionInfosPage} whitelists a {@code version} sort but used to pass it
  * straight through to a JPA {@code ORDER BY}, which sorts the column as a string ({@code "10.0.0"}
  * above {@code "9.0.0"}). This proves the fix at the service layer, not just in the {@code
- * NuGetPackageUtils.VERSION_COMPARATOR} it now sorts with (already covered by {@code
+ * NuGetVersionUtils.VERSION_COMPARATOR} it now sorts with (already covered by {@code
  * NuGetPackageUtilsTest}): a mocked repository returns the versions in an order neither a plain
  * string sort nor insertion order would produce, and the page must still come back correct.
  */

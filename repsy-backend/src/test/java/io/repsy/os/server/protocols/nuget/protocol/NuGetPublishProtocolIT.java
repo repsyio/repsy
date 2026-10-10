@@ -51,7 +51,8 @@ import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetDependencyInfo;
 import io.repsy.protocols.nuget.shared.packages.services.NuGetPackageService;
-import io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils;
+import io.repsy.protocols.nuget.shared.utils.NuGetDependencyJsonUtils;
+import io.repsy.protocols.nuget.shared.utils.NuspecUtils;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -500,7 +501,7 @@ class NuGetPublishProtocolIT extends AbstractIT {
       assertThat(stored.getDependencies()).startsWith("[");
     }
 
-    return NuGetPackageUtils.parseDependenciesJson(
+    return NuGetDependencyJsonUtils.parseDependenciesJson(
         stored.getDependencies(), pkg.id(), stored.getVersion());
   }
 
@@ -677,7 +678,7 @@ class NuGetPublishProtocolIT extends AbstractIT {
               v -> {
                 assertThat(v.getDependencies()).startsWith("[");
                 assertThat(
-                        NuGetPackageUtils.parseDependenciesJson(
+                        NuGetDependencyJsonUtils.parseDependenciesJson(
                             v.getDependencies(), pkg.id(), v.getVersion()))
                     .containsExactly(
                         new NuGetDependencyInfo("Newtonsoft.Json", "13.0.3", "net8.0"));
@@ -1081,8 +1082,8 @@ class NuGetPublishProtocolIT extends AbstractIT {
    * <packageTypes><packageType name="SymbolsPackage" /></packageTypes>}. Before this fix, nothing
    * inspected that element, so a raw {@code PUT} of a {@code .snupkg} answered 201 and silently
    * replaced the stored {@code .nupkg}'s bytes with the symbol package's. {@link
-   * io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils#readNuspecMetadata} now refuses such a
-   * push with a 400 before anything is read or written.
+   * io.repsy.protocols.nuget.shared.utils.NuspecUtils#readNuspecMetadata} now refuses such a push
+   * with a 400 before anything is read or written.
    */
   @Nested
   @DisplayName("a symbol package (.snupkg), RPS-1569")
@@ -1198,7 +1199,7 @@ class NuGetPublishProtocolIT extends AbstractIT {
     void rejectsOversizedNuspec() throws Exception {
       final var repo = NuGetPublishProtocolIT.this.nugetRepo();
       final var id = uniquePackageId();
-      final var bomb = zip(nuspecOfSize(id, NuGetPackageUtils.MAX_NUSPEC_BYTES + 1));
+      final var bomb = zip(nuspecOfSize(id, NuspecUtils.MAX_NUSPEC_BYTES + 1));
 
       NuGetPublishProtocolIT.this
           .protocol(push(repo, bomb, NuGetPublishProtocolIT.this.adminProtocolBearerToken()))
@@ -1215,7 +1216,7 @@ class NuGetPublishProtocolIT extends AbstractIT {
     void publishesNuspecAtLimit() throws Exception {
       final var repo = NuGetPublishProtocolIT.this.nugetRepo();
       final var id = uniquePackageId();
-      final var nupkg = zip(nuspecOfSize(id, NuGetPackageUtils.MAX_NUSPEC_BYTES));
+      final var nupkg = zip(nuspecOfSize(id, NuspecUtils.MAX_NUSPEC_BYTES));
 
       final var response =
           NuGetPublishProtocolIT.this.pushAs(
@@ -1902,9 +1903,9 @@ class NuGetPublishProtocolIT extends AbstractIT {
       final var repo = NuGetPublishProtocolIT.this.nugetRepo();
       final var pkg = new Pkg(uniquePackageId(), "1.0.0", true);
 
-      try (var utils = mockStatic(NuGetPackageUtils.class, Mockito.CALLS_REAL_METHODS)) {
+      try (var utils = mockStatic(NuGetDependencyJsonUtils.class, Mockito.CALLS_REAL_METHODS)) {
         utils
-            .when(() -> NuGetPackageUtils.toDependencyGroupsJson(any()))
+            .when(() -> NuGetDependencyJsonUtils.toDependencyGroupsJson(any()))
             .thenThrow(new IllegalStateException("mapper misconfigured"));
 
         NuGetPublishProtocolIT.this

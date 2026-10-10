@@ -16,69 +16,24 @@
 package io.repsy.protocols.cargo.protocol.utils;
 
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.protocols.cargo.shared.crate.dtos.CrateIndexDep;
-import io.repsy.protocols.cargo.shared.crate.dtos.CrateIndexEntry;
-import io.repsy.protocols.cargo.shared.crate.dtos.CratePublishDep;
-import io.repsy.protocols.cargo.shared.crate.dtos.CratePublishRequest;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateVersionListItem;
 import io.repsy.protocols.cargo.shared.crate.services.SemverComparator;
-import io.repsy.protocols.shared.limits.FieldLimits;
-import io.repsy.protocols.shared.utils.BoundedEntryReader;
-import io.repsy.protocols.shared.utils.EntryTooLargeException;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
-import java.util.List;
 import java.util.Locale;
-import java.util.Map;
-import java.util.regex.Pattern;
 import lombok.experimental.UtilityClass;
-import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
-import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
-import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
-import org.jspecify.annotations.Nullable;
-import org.semver4j.Semver;
-import org.semver4j.SemverException;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.util.Pair;
-import tools.jackson.databind.ObjectMapper;
 
-@Slf4j
+/**
+ * Crate names and request paths, the order of a crate's versions and the column limits of its
+ * metadata.
+ */
 @UtilityClass
 public class CrateUtils {
 
-  private static final long MEBIBYTE = 1024L * 1024L;
-
-  /**
-   * The largest {@code Cargo.toml} a crate may carry, in bytes. A real manifest is a few kilobytes,
-   * and even one that lists thousands of features stays far below this; the limit only has to stop
-   * a decompression bomb, which the tar header size lets {@link #inspectCrate(InputStream)} refuse
-   * before it inflates any of it.
-   */
-  public static final long MAX_CARGO_TOML_BYTES = 10 * MEBIBYTE;
-
-  /**
-   * The largest publish-metadata JSON a request may carry, in bytes (RPS-1119). A real {@code cargo
-   * publish} metadata document is a few kilobytes even for a crate with a long dependency list;
-   * this only has to stop a client-declared length that would otherwise be cast straight into an
-   * {@code int} and read into memory unbounded.
-   */
-  public static final long MAX_METADATA_JSON_BYTES = 5 * MEBIBYTE;
-
-  /** {@code cargo_crate_meta.edition}: a longer value is dropped rather than refused (RPS-1141). */
-  private static final int MAX_EDITION_LENGTH = 10;
-
-  private static final Pattern EDITION_LINE = Pattern.compile("^edition\\s*=\\s*\"([^\"]*)\"");
-
   private static final int TWO = 2;
   private static final int THREE = 3;
-
-  private static final Pattern CRATE_NAME_PATTERN = Pattern.compile("^[a-zA-Z0-9][a-zA-Z0-9_-]*$");
 
   // The limits of the columns the published metadata is stored in (RPS-1072). Every one is a
   // varchar of exactly this length in PostgreSQL and H2, except where its Javadoc says the two
@@ -138,29 +93,14 @@ public class CrateUtils {
    */
   public static final int MAX_KEYWORD_LENGTH = 20;
 
-  private static final int MAX_KEYWORDS = 5;
-
   public static Pair<String, String> extractCrateNameAndVersion(final ProtocolContext context) {
 
-    final var segments = CrateUtils.splitPath(context);
+    final var segments = splitPath(context);
 
-    final var crateName = CrateUtils.normalizeCrateName(segments[segments.length - THREE]);
+    final var crateName = normalizeCrateName(segments[segments.length - THREE]);
     final var versionName = segments[segments.length - TWO];
 
     return Pair.of(crateName, versionName);
-  }
-
-  private static long readU32LittleEndian(final InputStream inputStream) throws IOException {
-
-    final var bytes = inputStream.readNBytes(Integer.BYTES);
-
-    // A body that stops inside a length field is the client's mistake, not a server fault: the
-    // buffer underflow it would otherwise end in surfaced as a 500 (RPS-1466).
-    if (bytes.length < Integer.BYTES) {
-      throw new IllegalArgumentException("the publish body ends before a length field is complete");
-    }
-
-    return Integer.toUnsignedLong(ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).getInt());
   }
 
   private static String[] splitPath(final ProtocolContext context) {
@@ -178,256 +118,6 @@ public class CrateUtils {
   public static String normalizeCrateName(final String name) {
 
     return name.toLowerCase(Locale.ROOT).replace('-', '_');
-  }
-
-  /**
-   * Refuses a publish whose metadata cannot be stored. It runs before the crate or its index entry
-   * is written, so a refused publish leaves nothing behind. A value is rejected when cutting or
-   * dropping it would change what the registry serves: the name and version identify the crate, the
-   * rust-version says which compilers may use it, and {@code links} is what the index resolves the
-   * native library a crate links to by. The descriptive fields that can be dropped instead are
-   * handled by {@link #dropOverLongMetadata(CratePublishRequest)}.
-   */
-  public static void validatePublishRequest(final CratePublishRequest request) {
-    validateCrateName(request.name());
-    validateVersion(request.vers());
-    validateKeywords(request.keywords());
-    validateRustVersion(request.rustVersion());
-    validateLinks(request.links());
-  }
-
-  /**
-   * Returns the request without the descriptive metadata that does not fit its column (RPS-1072):
-   * the homepage, repository, documentation, license and license file are dropped, and so is any
-   * author or category that is too long. Cutting a URL would make it point somewhere else and
-   * cutting a name or an SPDX expression would make it say something it does not, so a value is
-   * dropped whole. The publish itself goes through: none of these is needed to fetch the crate, and
-   * the {@code .crate} file, which carries its own Cargo.toml, is stored untouched.
-   */
-  public static CratePublishRequest dropOverLongMetadata(final CratePublishRequest request) {
-
-    return new CratePublishRequest(
-        request.name(),
-        request.vers(),
-        request.hasLib(),
-        request.deps(),
-        request.features(),
-        FieldLimits.dropEntriesIfTooLong(request.authors(), MAX_AUTHOR_LENGTH, "author"),
-        request.description(),
-        FieldLimits.dropIfTooLong(
-            request.documentation(), MAX_DOCUMENTATION_LENGTH, "documentation"),
-        FieldLimits.dropIfTooLong(request.homepage(), MAX_HOMEPAGE_LENGTH, "homepage"),
-        request.readme(),
-        request.readmeFile(),
-        request.keywords(),
-        FieldLimits.dropEntriesIfTooLong(request.categories(), MAX_CATEGORY_LENGTH, "category"),
-        FieldLimits.dropIfTooLong(request.license(), MAX_LICENSE_LENGTH, "license"),
-        FieldLimits.dropIfTooLong(request.licenseFile(), MAX_LICENSE_FILE_LENGTH, "license_file"),
-        FieldLimits.dropIfTooLong(request.repository(), MAX_REPOSITORY_LENGTH, "repository"),
-        request.links(),
-        request.rustVersion(),
-        request.cksum(),
-        request.features2());
-  }
-
-  private static void validateCrateName(final @Nullable String name) {
-
-    if (name == null || name.isBlank()) {
-      throw new IllegalArgumentException("crate name cannot be empty");
-    }
-
-    if (name.length() > MAX_NAME_LENGTH) {
-      throw new IllegalArgumentException(
-          "crate name `%s` must be at most %d characters".formatted(name, MAX_NAME_LENGTH));
-    }
-
-    if (!CRATE_NAME_PATTERN.matcher(name).matches()) {
-      throw new IllegalArgumentException(
-          "crate name `%s` must start with an alphanumeric character and contain only alphanumerics, `-`, or `_`"
-              .formatted(name));
-    }
-  }
-
-  private static void validateVersion(final @Nullable String vers) {
-
-    if (vers == null || vers.isBlank()) {
-      throw new IllegalArgumentException("version cannot be empty");
-    }
-
-    if (vers.length() > MAX_VERSION_LENGTH) {
-      throw new IllegalArgumentException(
-          "version must be at most %d characters".formatted(MAX_VERSION_LENGTH));
-    }
-
-    try {
-      new Semver(vers);
-    } catch (final SemverException ex) {
-      throw new IllegalArgumentException(
-          "version `%s` is not a valid semver format (expected MAJOR.MINOR.PATCH)".formatted(vers));
-    }
-  }
-
-  private static void validateRustVersion(final @Nullable String rustVersion) {
-
-    if (rustVersion != null && rustVersion.length() > MAX_RUST_VERSION_LENGTH) {
-      throw new IllegalArgumentException(
-          "rust-version must be at most %d characters".formatted(MAX_RUST_VERSION_LENGTH));
-    }
-  }
-
-  private static void validateLinks(final @Nullable String links) {
-
-    if (links != null && links.length() > MAX_LINKS_LENGTH) {
-      throw new IllegalArgumentException(
-          "links must be at most %d characters".formatted(MAX_LINKS_LENGTH));
-    }
-  }
-
-  private static void validateKeywords(final @Nullable List<String> keywords) {
-
-    if (keywords == null) {
-      return;
-    }
-
-    if (keywords.size() > MAX_KEYWORDS) {
-      throw new IllegalArgumentException(
-          "a crate may have at most %d keywords, got %d".formatted(MAX_KEYWORDS, keywords.size()));
-    }
-
-    for (final var kw : keywords) {
-      validateKeyword(kw);
-    }
-  }
-
-  private static void validateKeyword(final String kw) {
-
-    if (kw.length() > MAX_KEYWORD_LENGTH) {
-      throw new IllegalArgumentException(
-          "keyword `%s` must be at most %d characters".formatted(kw, MAX_KEYWORD_LENGTH));
-    }
-  }
-
-  public static String getIndexJsonLine(
-      final CratePublishRequest request, final ObjectMapper objectMapper) {
-
-    final var deps =
-        request.deps() == null
-            ? List.<CrateIndexDep>of()
-            : request.deps().stream().map(CrateUtils::toIndexDep).toList();
-
-    final var features =
-        request.features() != null ? request.features() : Map.<String, List<String>>of();
-
-    final var v = request.features2() != null ? 2 : 1;
-
-    final var entry =
-        new CrateIndexEntry(
-            request.name(),
-            request.vers(),
-            deps,
-            request.cksum(),
-            features,
-            false,
-            request.links(),
-            v,
-            request.features2(),
-            request.rustVersion());
-
-    return objectMapper.writeValueAsString(entry);
-  }
-
-  private static CrateIndexDep toIndexDep(final CratePublishDep dep) {
-
-    final String packageName;
-    final String name;
-
-    if (dep.explicitNameInToml() != null) {
-      name = dep.explicitNameInToml();
-      packageName = dep.name();
-    } else {
-      name = dep.name();
-      packageName = null;
-    }
-
-    return new CrateIndexDep(
-        name,
-        dep.versionReq(),
-        dep.features(),
-        dep.optional(),
-        dep.defaultFeatures(),
-        dep.target(),
-        dep.kind(),
-        dep.registry(),
-        packageName);
-  }
-
-  public static CratePublishRequest createCratePublishRequestWithChecksum(
-      final CratePublishRequest request, final String checksum, final boolean hasLib) {
-
-    return new CratePublishRequest(
-        request.name(),
-        request.vers(),
-        hasLib,
-        request.deps(),
-        request.features(),
-        request.authors(),
-        request.description(),
-        request.documentation(),
-        request.homepage(),
-        request.readme(),
-        request.readmeFile(),
-        request.keywords(),
-        request.categories(),
-        request.license(),
-        request.licenseFile(),
-        request.repository(),
-        request.links(),
-        request.rustVersion(),
-        checksum,
-        request.features2());
-  }
-
-  /**
-   * Reads the publish-metadata JSON that precedes the {@code .crate} in Cargo's wire format: a
-   * little-endian {@code u32} length, then that many bytes of JSON. The length is a value the
-   * client sent and is capped at {@link #MAX_METADATA_JSON_BYTES} before it is cast to an {@code
-   * int} and read, so a malicious or corrupt length can neither wrap negative nor force an
-   * unbounded read into memory (RPS-1119). A body that ends before the declared length is refused
-   * rather than silently parsed from a short buffer.
-   */
-  public static CratePublishRequest getPublishRequest(
-      final InputStream inputStream, final ObjectMapper objectMapper) throws IOException {
-
-    final var jsonLength = CrateUtils.readU32LittleEndian(inputStream);
-
-    if (jsonLength == 0) {
-      throw new IllegalArgumentException("the crate's metadata JSON is empty");
-    }
-
-    if (jsonLength > MAX_METADATA_JSON_BYTES) {
-      throw new IllegalArgumentException(
-          "the crate's metadata JSON must be at most %d MiB"
-              .formatted(MAX_METADATA_JSON_BYTES / MEBIBYTE));
-    }
-
-    final var jsonBytes = inputStream.readNBytes((int) jsonLength);
-
-    if (jsonBytes.length != jsonLength) {
-      throw new IllegalArgumentException("the crate's metadata JSON is shorter than declared");
-    }
-
-    return objectMapper.readValue(jsonBytes, CratePublishRequest.class);
-  }
-
-  /**
-   * Reads the length prefix (a little-endian {@code u32}) that precedes the {@code .crate} bytes in
-   * Cargo's wire format. The length is untrusted client input; the caller checks it against the
-   * configured maximum crate size and then spools exactly this many bytes, instead of casting it
-   * straight to an {@code int} and reading it all into memory (RPS-1119).
-   */
-  public static long readCrateLength(final InputStream inputStream) throws IOException {
-
-    return CrateUtils.readU32LittleEndian(inputStream);
   }
 
   /**
@@ -457,108 +147,5 @@ public class CrateUtils {
     }
 
     return comparator.thenComparing(tieBreaker);
-  }
-
-  /** Whether the crate has a library target, and the edition its manifest declares, if any. */
-  public record CrateInspection(boolean hasLib, @Nullable String edition) {}
-
-  /**
-   * Makes one pass over the spooled {@code .crate} tarball, reading whichever of the two entries it
-   * needs to answer both {@link CrateInspection#hasLib()} (an {@code src/lib.rs}, or a {@code
-   * [lib]} table in {@code Cargo.toml}) and {@link CrateInspection#edition()} (the {@code edition}
-   * key of {@code Cargo.toml}'s {@code [package]} table, RPS-1141). Only the first {@code
-   * Cargo.toml} whose {@code [package]} table declares an edition is used, which is the crate's own
-   * manifest: it is written before any nested one a vendored path dependency might carry. An
-   * edition over {@link #MAX_EDITION_LENGTH} characters (the column's width) is dropped rather than
-   * refused, the same way the descriptive metadata in {@link
-   * #dropOverLongMetadata(CratePublishRequest)} is.
-   */
-  public static CrateInspection inspectCrate(final InputStream crateStream) throws IOException {
-    try (final var tar = new TarArchiveInputStream(new GzipCompressorInputStream(crateStream))) {
-
-      var hasLib = false;
-      String edition = null;
-
-      TarArchiveEntry entry;
-
-      while ((entry = tar.getNextEntry()) != null) {
-        final var entryName = entry.getName();
-
-        if (entryName.endsWith("/src/lib.rs")) {
-          hasLib = true;
-        }
-
-        if (entryName.endsWith("/Cargo.toml")) {
-          final var toml = new String(readCargoToml(tar, entry), StandardCharsets.UTF_8);
-
-          if (toml.lines().anyMatch(line -> line.trim().equals("[lib]"))) {
-            hasLib = true;
-          }
-
-          if (edition == null) {
-            edition = extractEdition(toml);
-          }
-        }
-      }
-      return new CrateInspection(hasLib, edition);
-    }
-  }
-
-  /** Reads the {@code edition} key of the manifest's {@code [package]} table, if it has one. */
-  private static @Nullable String extractEdition(final String toml) {
-
-    var inPackageTable = false;
-
-    for (final var rawLine : toml.lines().toList()) {
-      final var line = rawLine.trim();
-
-      if (isTableHeader(line)) {
-        inPackageTable = "[package]".equals(line);
-        continue;
-      }
-
-      if (!inPackageTable) {
-        continue;
-      }
-
-      final var edition = matchEditionValue(line);
-
-      if (edition != null) {
-        return trimToColumnWidth(edition);
-      }
-    }
-
-    return null;
-  }
-
-  private static boolean isTableHeader(final String line) {
-    return line.startsWith("[") && line.endsWith("]");
-  }
-
-  private static @Nullable String matchEditionValue(final String line) {
-    final var matcher = EDITION_LINE.matcher(line);
-    return matcher.find() ? matcher.group(1) : null;
-  }
-
-  private static @Nullable String trimToColumnWidth(final String edition) {
-    if (edition.length() > MAX_EDITION_LENGTH) {
-      log.warn("Skipping edition: longer than {} characters", MAX_EDITION_LENGTH);
-      return null;
-    }
-
-    return edition;
-  }
-
-  private static byte[] readCargoToml(final InputStream tar, final TarArchiveEntry entry)
-      throws IOException {
-
-    try {
-      return BoundedEntryReader.readAllBytes(tar, entry.getSize(), MAX_CARGO_TOML_BYTES);
-    } catch (final EntryTooLargeException e) {
-      throw new IllegalArgumentException(
-          "Cargo.toml in the crate must be at most %d MiB"
-              .formatted(MAX_CARGO_TOML_BYTES / MEBIBYTE),
-          e);
-    }
   }
 }

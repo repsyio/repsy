@@ -23,6 +23,7 @@ import io.repsy.protocols.nuget.protocol.NuGetProtocolProvider;
 import io.repsy.protocols.nuget.protocol.facades.contracts.NuGetProtocolFacade;
 import io.repsy.protocols.nuget.shared.utils.NuGetBaseUrlResolver;
 import io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils;
+import io.repsy.protocols.nuget.shared.utils.NuGetVersionUtils;
 import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
 import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
@@ -65,7 +66,7 @@ public abstract class AbstractNuGetSearchProtocolMethodHandler
       final var skipStr = request.getParameter("skip");
       final var takeStr = request.getParameter("take");
       final var prerelease = "true".equalsIgnoreCase(request.getParameter("prerelease"));
-      final var semVer2 = NuGetPackageUtils.acceptsSemVer2(request.getParameter("semVerLevel"));
+      final var semVer2 = NuGetVersionUtils.acceptsSemVer2(request.getParameter("semVerLevel"));
 
       final var skip = NuGetPackageUtils.parseNonNegativeParam(skipStr, 0, "skip");
       final var take =

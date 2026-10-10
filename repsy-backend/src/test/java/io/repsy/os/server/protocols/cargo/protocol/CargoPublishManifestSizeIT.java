@@ -21,7 +21,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import io.repsy.os.AbstractIT;
-import io.repsy.protocols.cargo.protocol.utils.CrateUtils;
+import io.repsy.protocols.cargo.protocol.utils.CrateInspectionUtils;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -99,7 +99,7 @@ class CargoPublishManifestSizeIT extends AbstractIT {
             .perform(
                 put(PUBLISH, repo.getName())
                     .header(AUTHORIZATION, token)
-                    .content(publishBody(CrateUtils.MAX_CARGO_TOML_BYTES + 1))
+                    .content(publishBody(CrateInspectionUtils.MAX_CARGO_TOML_BYTES + 1))
                     .with(protocolPort()))
             .andReturn();
 
@@ -126,7 +126,7 @@ class CargoPublishManifestSizeIT extends AbstractIT {
             .perform(
                 put(PUBLISH, repo.getName())
                     .header(AUTHORIZATION, token)
-                    .content(publishBody(CrateUtils.MAX_CARGO_TOML_BYTES))
+                    .content(publishBody(CrateInspectionUtils.MAX_CARGO_TOML_BYTES))
                     .with(protocolPort()))
             .andReturn();
 

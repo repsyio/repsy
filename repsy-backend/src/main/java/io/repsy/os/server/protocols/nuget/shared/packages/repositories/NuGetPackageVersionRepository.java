@@ -81,7 +81,7 @@ public interface NuGetPackageVersionRepository extends JpaRepository<NuGetPackag
    * Every version {@link #searchByNugetPackageId(UUID, String, Pageable)} would page through,
    * unpaged. A {@code version} sort (RPS-1688) is not a database {@code ORDER BY}: the column sorts
    * as a string there, so {@code 10.0.0} would sit above {@code 9.0.0}. The service sorts this
-   * whole set with {@code NuGetPackageUtils.VERSION_COMPARATOR} and slices the requested page from
+   * whole set with {@code NuGetVersionUtils.VERSION_COMPARATOR} and slices the requested page from
    * it instead.
    */
   @Query(

@@ -19,7 +19,8 @@ import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackage;
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackageVersion;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetPackageSearchResult;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetVersionInfo;
-import io.repsy.protocols.nuget.shared.utils.NuGetPackageUtils;
+import io.repsy.protocols.nuget.shared.utils.NuGetDependencyJsonUtils;
+import io.repsy.protocols.nuget.shared.utils.NuGetVersionUtils;
 import java.util.Comparator;
 import java.util.List;
 import org.jspecify.annotations.NullMarked;
@@ -73,9 +74,9 @@ public interface NuGetPackageMapper {
       final NuGetVersionInfo base, final NuGetPackageVersion v, final @Nullable String readme) {
 
     final var groups =
-        NuGetPackageUtils.parseDependencyGroupsJson(
+        NuGetDependencyJsonUtils.parseDependencyGroupsJson(
             v.getDependencies(), base.packageId(), v.getVersion());
-    final var deps = NuGetPackageUtils.flatten(groups);
+    final var deps = NuGetDependencyJsonUtils.flatten(groups);
     return new NuGetVersionInfo(
         base.packageId(),
         base.version(),
@@ -104,13 +105,13 @@ public interface NuGetPackageMapper {
     // A client that did not opt in to SemVer 2.0.0 must not be handed a version it cannot parse.
     final var allVersions =
         listedVersions.stream()
-            .filter(v -> semVer2 || !NuGetPackageUtils.isSemVer2(v.getVersion()))
+            .filter(v -> semVer2 || !NuGetVersionUtils.isSemVer2(v.getVersion()))
             .toList();
 
     // Highest version first, as NuGet orders versions: a backport published after a newer release
     // (1.0.5 after 2.0.0) must not be reported as the latest.
     final Comparator<NuGetPackageVersion> highestFirst =
-        Comparator.comparing(NuGetPackageVersion::getVersion, NuGetPackageUtils.VERSION_COMPARATOR)
+        Comparator.comparing(NuGetPackageVersion::getVersion, NuGetVersionUtils.VERSION_COMPARATOR)
             .reversed();
 
     final var filteredVersions =
