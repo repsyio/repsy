@@ -45,7 +45,7 @@ public abstract class AbstractRubyGemDownloadProtocolMethodHandler
       final RubyProtocolProvider provider) {
 
     super(
-        HandlerRoute.read(HttpMethod.GET).path(DOWNLOAD_PATTERN.asMatchPredicate()),
+        HandlerRoute.read(HttpMethod.GET).path(DOWNLOAD_PATTERN.asMatchPredicate()).head(),
         basePathParser,
         facade,
         provider);
@@ -75,5 +75,27 @@ public abstract class AbstractRubyGemDownloadProtocolMethodHandler
     } catch (final Exception e) {
       return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
     }
+  }
+
+  /** 200 with the headers of the {@code GET} when the gem file exists, else 404. */
+  @Override
+  public ResponseEntity<Object> handleHead(
+      final ProtocolContext context,
+      final HttpServletRequest request,
+      final HttpServletResponse response) {
+
+    final var relativePath = ProtocolContextUtils.getRelativePath(context).getPath();
+    final var matcher = DOWNLOAD_PATTERN.matcher(relativePath);
+
+    if (!matcher.matches() || !this.facade.gemFileExists(context, matcher.group(1))) {
+      return ResponseEntity.notFound().build();
+    }
+
+    return ResponseEntity.ok()
+        .contentType(MediaType.APPLICATION_OCTET_STREAM)
+        .header(
+            HttpHeaders.CONTENT_DISPOSITION,
+            Objects.requireNonNull(RubyContentDisposition.forPath(relativePath)))
+        .build();
   }
 }

@@ -31,6 +31,7 @@ import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 @Slf4j
@@ -45,7 +46,7 @@ public abstract class AbstractNuGetPackageVersionsProtocolMethodHandler
       final PathParser basePathParser,
       final NuGetProtocolFacade facade,
       final NuGetProtocolProvider provider) {
-    super(HandlerRoute.read(HttpMethod.GET), basePathParser, facade, provider);
+    super(HandlerRoute.read(HttpMethod.GET).head(), basePathParser, facade, provider);
   }
 
   @Override
@@ -69,6 +70,22 @@ public abstract class AbstractNuGetPackageVersionsProtocolMethodHandler
     } catch (final Exception e) {
       log.error("NuGet package versions failed", e);
       return ResponseEntity.internalServerError().build();
+    }
+  }
+
+  /** Resolves what the {@code GET} would answer, so that a missing package is a 404. */
+  @Override
+  public ResponseEntity<Object> handleHead(
+      final ProtocolContext context,
+      final HttpServletRequest request,
+      final HttpServletResponse response) {
+    try {
+      this.facade.getPackageVersions(context);
+
+      return ResponseEntity.ok().contentType(APPLICATION_JSON).build();
+    } catch (final ItemNotFoundException | IllegalArgumentException e) {
+      log.debug("NuGet HEAD not found: {}", e.getMessage());
+      return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
     }
   }
 }

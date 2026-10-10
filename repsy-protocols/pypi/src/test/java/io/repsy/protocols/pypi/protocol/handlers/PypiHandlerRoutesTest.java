@@ -134,22 +134,24 @@ class PypiHandlerRoutesTest {
   }
 
   @Test
-  @DisplayName("head hands every path to the base parser")
+  @DisplayName("simple and file download also answer HEAD, and only their own paths")
   void head() {
-    final var h = handler(AbstractPypiHeadProtocolMethodHandler.class, BASE, FACADE, PROVIDER);
-    assertRoute(
-        h,
-        List.of(HttpMethod.HEAD),
+    final var simple =
+        handler(AbstractPypiSimpleProtocolMethodHandler.class, BASE, FACADE, PROVIDER);
+    final var file =
+        handler(AbstractPypiFileDownloadProtocolMethodHandler.class, FACADE, BASE, PROVIDER);
+    final var expected =
         Map.of(
-            "permission",
-            Permission.READ,
-            "writeOperation",
-            false,
-            "skipUsagePostProcessor",
-            true));
-    assertThat(parse(h, "HEAD", "/repo/simple/foo")).isPresent();
-    assertThat(parse(h, "HEAD", "/repo/foo/-/foo-1.0.tar.gz")).isPresent();
-    assertThat(parse(h, "HEAD", "/repo/anything/else")).isPresent();
+            "permission", Permission.READ, "writeOperation", false, "skipUsagePostProcessor", true);
+
+    assertThat(simple.answersHead()).isTrue();
+    assertThat(simple.getHeadProperties()).isEqualTo(expected);
+    assertThat(file.answersHead()).isTrue();
+    assertThat(file.getHeadProperties()).isEqualTo(expected);
+    assertThat(parse(simple, "HEAD", "/repo/simple/foo")).isPresent();
+    assertThat(parse(simple, "HEAD", "/repo/foo/-/foo-1.0.tar.gz")).isEmpty();
+    assertThat(parse(file, "HEAD", "/repo/foo/-/foo-1.0.tar.gz")).isPresent();
+    assertThat(parse(file, "HEAD", "/repo/anything/else")).isEmpty();
   }
 
   @Test

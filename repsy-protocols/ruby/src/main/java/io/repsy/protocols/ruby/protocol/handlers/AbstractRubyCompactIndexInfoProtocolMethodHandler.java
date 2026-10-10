@@ -44,7 +44,7 @@ public abstract class AbstractRubyCompactIndexInfoProtocolMethodHandler
       final RubyProtocolProvider provider) {
 
     super(
-        HandlerRoute.read(HttpMethod.GET).path(INFO_PATTERN.asMatchPredicate()),
+        HandlerRoute.read(HttpMethod.GET).path(INFO_PATTERN.asMatchPredicate()).head(),
         basePathParser,
         facade,
         provider);
@@ -70,5 +70,27 @@ public abstract class AbstractRubyCompactIndexInfoProtocolMethodHandler
             HttpHeaders.CONTENT_DISPOSITION,
             Objects.requireNonNull(RubyContentDisposition.forPath(relativePath)))
         .body(body);
+  }
+
+  /** 200 with the headers of the {@code GET} when the gem exists, else 404; nothing is read. */
+  @Override
+  public ResponseEntity<Object> handleHead(
+      final ProtocolContext context,
+      final HttpServletRequest request,
+      final HttpServletResponse response) {
+
+    final var relativePath = ProtocolContextUtils.getRelativePath(context).getPath();
+    final var matcher = INFO_PATTERN.matcher(relativePath);
+
+    if (!matcher.matches() || !this.facade.gemExists(context, matcher.group(1))) {
+      return ResponseEntity.notFound().build();
+    }
+
+    return ResponseEntity.ok()
+        .contentType(MediaType.TEXT_PLAIN)
+        .header(
+            HttpHeaders.CONTENT_DISPOSITION,
+            Objects.requireNonNull(RubyContentDisposition.forPath(relativePath)))
+        .build();
   }
 }

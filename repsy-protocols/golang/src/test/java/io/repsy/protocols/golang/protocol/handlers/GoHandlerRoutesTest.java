@@ -80,17 +80,18 @@ class GoHandlerRoutesTest {
   }
 
   @Test
-  @DisplayName("head is a read that is not counted as a download")
+  @DisplayName("download also answers HEAD, a read that is not counted as a download")
   void head() {
-    assertRoute(
-        handler(AbstractGoHeadProtocolMethodHandler.class),
-        HttpMethod.HEAD,
-        Map.of(
-            "permission",
-            Permission.READ,
-            "writeOperation",
-            false,
-            "skipUsagePostProcessor",
-            true));
+    final var h = handler(AbstractGoDownloadProtocolMethodHandler.class);
+    assertThat(h.answersHead()).isTrue();
+    assertThat(h.getHeadProperties())
+        .isEqualTo(
+            Map.of(
+                "permission",
+                Permission.READ,
+                "writeOperation",
+                false,
+                "skipUsagePostProcessor",
+                true));
   }
 }

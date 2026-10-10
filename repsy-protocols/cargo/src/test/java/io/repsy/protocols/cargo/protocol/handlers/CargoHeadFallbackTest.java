@@ -22,11 +22,13 @@ import static org.mockito.Mockito.when;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.PathParser;
+import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
 import io.repsy.protocols.cargo.protocol.facades.contracts.CargoProtocolFacade;
 import io.repsy.protocols.cargo.shared.crate.dtos.CrateIndexEntry;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -38,15 +40,15 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import tools.jackson.databind.ObjectMapper;
 
 @ExtendWith(MockitoExtension.class)
-@DisplayName("AbstractCargoHeadProtocolMethodHandler (RPS-1465)")
-class AbstractCargoHeadProtocolMethodHandlerTest {
+@DisplayName("The HEAD of the Cargo download and sparse index handlers (RPS-1465, RPS-2059)")
+class CargoHeadFallbackTest {
 
   private static final String DOWNLOAD_PATH = "/api/v1/crates/serde/1.0.0/download";
 
@@ -54,29 +56,47 @@ class AbstractCargoHeadProtocolMethodHandlerTest {
   @Mock private CargoProtocolFacade facade;
   @Mock private CargoProtocolProvider provider;
 
-  private AbstractCargoHeadProtocolMethodHandler handler;
+  private AbstractCargoDownloadProtocolMethodHandler download;
+  private AbstractCargoSparseIndexProtocolMethodHandler sparse;
 
   @BeforeEach
   void setUp() {
-    handler = new TestHandler(basePathParser, facade, provider);
+    download = new TestDownload(basePathParser, facade, provider);
+    sparse = new TestSparse(basePathParser, facade, provider);
   }
 
-  static class TestHandler extends AbstractCargoHeadProtocolMethodHandler {
+  static class TestDownload extends AbstractCargoDownloadProtocolMethodHandler {
 
-    TestHandler(final PathParser p, final CargoProtocolFacade f, final CargoProtocolProvider pr) {
+    TestDownload(final PathParser p, final CargoProtocolFacade f, final CargoProtocolProvider pr) {
       super(p, f, pr);
     }
   }
 
+  static class TestSparse extends AbstractCargoSparseIndexProtocolMethodHandler {
+
+    TestSparse(final PathParser p, final CargoProtocolFacade f, final CargoProtocolProvider pr) {
+      super(p, f, new ObjectMapper(), pr);
+    }
+  }
+
+  /** What the router asks: the download handler first, then the sparse index. */
+  private Optional<ProtocolContext> parse(final MockHttpServletRequest request) {
+    final var parsed = download.getPathParser().parse(request);
+
+    return parsed.isPresent() ? parsed : sparse.getPathParser().parse(request);
+  }
+
   @Test
-  @DisplayName("registers itself, supports only HEAD, needs READ and is not a billed download")
+  @DisplayName("both answer HEAD, need READ and are not a billed download")
   void metadata() {
-    verify(provider).registerMethodHandler(handler);
-    assertThat(handler.getSupportedMethods()).containsExactly(HttpMethod.HEAD);
-    assertThat(handler.getProperties())
-        .containsEntry("permission", Permission.READ)
-        .containsEntry("writeOperation", false)
-        .containsEntry("skipUsagePostProcessor", true);
+    final var expected =
+        Map.of(
+            "permission", Permission.READ, "writeOperation", false, "skipUsagePostProcessor", true);
+
+    assertThat(download.answersHead()).isTrue();
+    assertThat(sparse.answersHead()).isTrue();
+    assertThat(download.getHeadProperties()).isEqualTo(expected);
+    assertThat(sparse.getHeadProperties()).isEqualTo(expected);
   }
 
   @ParameterizedTest(name = "recognises ''{0}''")
@@ -95,7 +115,7 @@ class AbstractCargoHeadProtocolMethodHandlerTest {
     final var ctx = context(path);
     when(basePathParser.parse(request)).thenReturn(Optional.of(ctx));
 
-    final var parsed = handler.getPathParser().parse(request);
+    final var parsed = parse(request);
 
     if (path.startsWith("/config.json")) {
       assertThat(parsed).isEmpty();
@@ -118,7 +138,7 @@ class AbstractCargoHeadProtocolMethodHandlerTest {
     final var request = new MockHttpServletRequest("HEAD", path);
     when(basePathParser.parse(request)).thenReturn(Optional.of(context(path)));
 
-    assertThat(handler.getPathParser().parse(request)).isEmpty();
+    assertThat(parse(request)).isEmpty();
   }
 
   @Test
@@ -127,7 +147,7 @@ class AbstractCargoHeadProtocolMethodHandlerTest {
     final var request = new MockHttpServletRequest("HEAD", DOWNLOAD_PATH);
     when(basePathParser.parse(request)).thenReturn(Optional.empty());
 
-    assertThat(handler.getPathParser().parse(request)).isEmpty();
+    assertThat(parse(request)).isEmpty();
   }
 
   @Test
@@ -137,7 +157,7 @@ class AbstractCargoHeadProtocolMethodHandlerTest {
     when(facade.getCrate(ctx)).thenReturn(new ByteArrayResource(new byte[] {1, 2, 3}));
 
     final var response =
-        handler.handle(
+        download.handleHead(
             ctx, new MockHttpServletRequest("HEAD", DOWNLOAD_PATH), new MockHttpServletResponse());
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -157,7 +177,7 @@ class AbstractCargoHeadProtocolMethodHandlerTest {
     when(facade.getCrate(ctx)).thenThrow(new ItemNotFoundException("crateNotFound"));
 
     final var response =
-        handler.handle(
+        download.handleHead(
             ctx, new MockHttpServletRequest("HEAD", DOWNLOAD_PATH), new MockHttpServletResponse());
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
@@ -172,7 +192,7 @@ class AbstractCargoHeadProtocolMethodHandlerTest {
         .thenReturn(List.of(org.mockito.Mockito.mock(CrateIndexEntry.class)));
 
     final var response =
-        handler.handle(
+        sparse.handleHead(
             ctx, new MockHttpServletRequest("HEAD", "/se/rd/serde"), new MockHttpServletResponse());
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -187,7 +207,7 @@ class AbstractCargoHeadProtocolMethodHandlerTest {
     when(facade.getIndexEntries(ctx)).thenReturn(List.of());
 
     final var response =
-        handler.handle(
+        sparse.handleHead(
             ctx, new MockHttpServletRequest("HEAD", "/se/rd/serde"), new MockHttpServletResponse());
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
@@ -200,7 +220,7 @@ class AbstractCargoHeadProtocolMethodHandlerTest {
     when(facade.getIndexEntries(ctx)).thenThrow(new IllegalStateException("boom"));
 
     final var response =
-        handler.handle(
+        sparse.handleHead(
             ctx, new MockHttpServletRequest("HEAD", "/se/rd/serde"), new MockHttpServletResponse());
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);

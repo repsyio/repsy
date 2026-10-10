@@ -33,4 +33,34 @@ public interface ProtocolMethodHandler {
   ResponseEntity<Object> handle(
       ProtocolContext parsedPath, HttpServletRequest request, HttpServletResponse response)
       throws Exception;
+
+  /**
+   * Whether this handler also answers a {@code HEAD} for the paths it parses for its own method
+   * (the router's HEAD fallback). A {@code HEAD} is first offered to the handlers registered for
+   * {@code HEAD} itself; only when none of them parses it, the handlers that answer {@code HEAD}
+   * for their own route are asked, in registration order.
+   */
+  default boolean answersHead() {
+    return false;
+  }
+
+  /**
+   * The properties the processors see for a {@code HEAD} answered by {@link #handleHead}. A {@code
+   * HEAD} is not a download, so these usually differ from {@link #getProperties()}.
+   */
+  default Map<String, Object> getHeadProperties() {
+    return this.getProperties();
+  }
+
+  /**
+   * Answers the {@code HEAD} of a path this handler parsed: the status and the headers of the
+   * {@code GET}, without a body (the body is never streamed).
+   */
+  default ResponseEntity<Object> handleHead(
+      final ProtocolContext parsedPath,
+      final HttpServletRequest request,
+      final HttpServletResponse response)
+      throws Exception {
+    throw new UnsupportedOperationException("This handler does not answer HEAD");
+  }
 }

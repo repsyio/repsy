@@ -45,7 +45,13 @@ public abstract class AbstractNuGetServiceIndexProtocolMethodHandler
       final NuGetProtocolProvider provider,
       final NuGetBaseUrlResolver baseUrlResolver) {
     super(
-        HandlerRoute.read(HttpMethod.GET).skipPreProcessor(true).skipHeaderPreProcessor(true),
+        HandlerRoute.read(HttpMethod.GET)
+            .skipPreProcessor(true)
+            .skipHeaderPreProcessor(true)
+            .head(
+                HandlerRoute.read(HttpMethod.HEAD)
+                    .skipUsagePostProcessor(true)
+                    .skipPreProcessor(true)),
         basePathParser,
         facade,
         provider);
@@ -74,5 +80,14 @@ public abstract class AbstractNuGetServiceIndexProtocolMethodHandler
       log.error("NuGet service index failed", e);
       return ResponseEntity.internalServerError().build();
     }
+  }
+
+  /** The headers of the service index; it is a fixed document, so nothing is built. */
+  @Override
+  public ResponseEntity<Object> handleHead(
+      final ProtocolContext context,
+      final HttpServletRequest request,
+      final HttpServletResponse response) {
+    return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).build();
   }
 }

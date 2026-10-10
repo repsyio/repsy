@@ -50,7 +50,7 @@ public abstract class AbstractRubyGemspecProtocolMethodHandler
       final RubyProtocolProvider provider) {
 
     super(
-        HandlerRoute.read(HttpMethod.GET).path(GEMSPEC_PATH_PATTERN.asMatchPredicate()),
+        HandlerRoute.read(HttpMethod.GET).path(GEMSPEC_PATH_PATTERN.asMatchPredicate()).head(),
         basePathParser,
         facade,
         provider);
@@ -90,5 +90,27 @@ public abstract class AbstractRubyGemspecProtocolMethodHandler
     } catch (final IOException e) {
       throw new UncheckedIOException(e);
     }
+  }
+
+  /** 200 with the headers of the {@code GET} when the gemspec exists, else 404. */
+  @Override
+  public ResponseEntity<Object> handleHead(
+      final ProtocolContext context,
+      final HttpServletRequest request,
+      final HttpServletResponse response) {
+
+    final var relativePath = ProtocolContextUtils.getRelativePath(context).getPath();
+    final var matcher = GEMSPEC_PATH_PATTERN.matcher(relativePath);
+
+    if (!matcher.matches() || !this.facade.gemspecExists(context, matcher.group(1))) {
+      return ResponseEntity.notFound().build();
+    }
+
+    return ResponseEntity.ok()
+        .contentType(MediaType.APPLICATION_OCTET_STREAM)
+        .header(
+            HttpHeaders.CONTENT_DISPOSITION,
+            Objects.requireNonNull(RubyContentDisposition.forPath(relativePath)))
+        .build();
   }
 }

@@ -125,27 +125,45 @@ class NuGetHandlerRoutesTest {
   }
 
   @Test
-  @DisplayName("head answers the download, versions and registration routes")
+  @DisplayName("the download, versions and registration routes answer HEAD, nothing else does")
   void head() {
-    final var h =
-        handler(AbstractNuGetHeadProtocolMethodHandler.class, BASE, FACADE, PROVIDER, RESOLVER);
-    assertRoute(
-        h,
-        List.of(HttpMethod.HEAD),
+    final var nupkg =
+        handler(AbstractNuGetDownloadProtocolMethodHandler.class, BASE, FACADE, PROVIDER, true);
+    final var nuspec =
+        handler(AbstractNuGetDownloadProtocolMethodHandler.class, BASE, FACADE, PROVIDER, false);
+    final var versions =
+        handler(AbstractNuGetPackageVersionsProtocolMethodHandler.class, BASE, FACADE, PROVIDER);
+    final var index =
+        handler(
+            AbstractNuGetRegistrationProtocolMethodHandler.class,
+            BASE,
+            FACADE,
+            PROVIDER,
+            RESOLVER,
+            true);
+    final var leaf =
+        handler(
+            AbstractNuGetRegistrationProtocolMethodHandler.class,
+            BASE,
+            FACADE,
+            PROVIDER,
+            RESOLVER,
+            false);
+    final var expected =
         Map.of(
-            "permission",
-            Permission.READ,
-            "writeOperation",
-            false,
-            "skipUsagePostProcessor",
-            true));
-    assertThat(parse(h, "HEAD", "/repo/v3/package/foo/1.0.0/foo.1.0.0.nupkg")).isPresent();
-    assertThat(parse(h, "HEAD", "/repo/v3/package/foo/1.0.0/foo.nuspec")).isPresent();
-    assertThat(parse(h, "HEAD", "/repo/v3/package/foo/index.json")).isPresent();
-    assertThat(parse(h, "HEAD", "/repo/v3/registration/foo/index.json")).isPresent();
-    assertThat(parse(h, "HEAD", "/repo/v3/registration/foo/1.0.0.json")).isPresent();
-    assertThat(parse(h, "HEAD", "/repo/v3/search")).isEmpty();
-    assertThat(parse(h, "HEAD", "/repo/v3/index.json")).isEmpty();
+            "permission", Permission.READ, "writeOperation", false, "skipUsagePostProcessor", true);
+
+    for (final var h : List.of(nupkg, nuspec, versions, index, leaf)) {
+      assertThat(h.answersHead()).isTrue();
+      assertThat(h.getHeadProperties()).isEqualTo(expected);
+      assertThat(parse(h, "HEAD", "/repo/v3/search")).isEmpty();
+      assertThat(parse(h, "HEAD", "/repo/v3/index.json")).isEmpty();
+    }
+    assertThat(parse(nupkg, "HEAD", "/repo/v3/package/foo/1.0.0/foo.1.0.0.nupkg")).isPresent();
+    assertThat(parse(nuspec, "HEAD", "/repo/v3/package/foo/1.0.0/foo.nuspec")).isPresent();
+    assertThat(parse(versions, "HEAD", "/repo/v3/package/foo/index.json")).isPresent();
+    assertThat(parse(index, "HEAD", "/repo/v3/registration/foo/index.json")).isPresent();
+    assertThat(parse(leaf, "HEAD", "/repo/v3/registration/foo/1.0.0.json")).isPresent();
   }
 
   @Test
@@ -257,24 +275,21 @@ class NuGetHandlerRoutesTest {
     assertThat(parse(get, "GET", "/repo/v3/index.json")).isPresent();
     assertThat(parse(get, "GET", "/repo/V3/Index.JSON")).isPresent();
     assertThat(parse(get, "GET", "/repo/v3/search")).isEmpty();
-    assertThat(parse(get, "HEAD", "/repo/v3/index.json")).isEmpty();
 
-    final var head =
-        handler(AbstractNuGetServiceIndexHeadProtocolMethodHandler.class, BASE, PROVIDER);
-    assertRoute(
-        head,
-        List.of(HttpMethod.HEAD),
-        Map.of(
-            "permission",
-            Permission.READ,
-            "writeOperation",
-            false,
-            "skipUsagePostProcessor",
-            true,
-            "skipPreProcessor",
-            true));
-    assertThat(parse(head, "HEAD", "/repo/v3/index.json")).isPresent();
-    assertThat(parse(head, "HEAD", "/repo/V3/INDEX.json")).isPresent();
-    assertThat(parse(head, "HEAD", "/repo/v3/search")).isEmpty();
+    assertThat(get.answersHead()).isTrue();
+    assertThat(get.getHeadProperties())
+        .isEqualTo(
+            Map.of(
+                "permission",
+                Permission.READ,
+                "writeOperation",
+                false,
+                "skipUsagePostProcessor",
+                true,
+                "skipPreProcessor",
+                true));
+    assertThat(parse(get, "HEAD", "/repo/v3/index.json")).isPresent();
+    assertThat(parse(get, "HEAD", "/repo/V3/INDEX.json")).isPresent();
+    assertThat(parse(get, "HEAD", "/repo/v3/search")).isEmpty();
   }
 }

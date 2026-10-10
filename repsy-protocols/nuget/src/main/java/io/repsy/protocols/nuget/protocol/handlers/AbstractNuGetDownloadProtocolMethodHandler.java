@@ -30,11 +30,13 @@ import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 @Slf4j
@@ -55,7 +57,7 @@ public abstract class AbstractNuGetDownloadProtocolMethodHandler
       final NuGetProtocolFacade facade,
       final NuGetProtocolProvider provider,
       final boolean nupkg) {
-    super(HandlerRoute.read(HttpMethod.GET), basePathParser, facade, provider);
+    super(HandlerRoute.read(HttpMethod.GET).head(), basePathParser, facade, provider);
     this.nupkg = nupkg;
   }
 
@@ -106,6 +108,38 @@ public abstract class AbstractNuGetDownloadProtocolMethodHandler
     } catch (final Exception e) {
       log.error("NuGet download failed", e);
       return ResponseEntity.internalServerError().build();
+    }
+  }
+
+  /** The status and headers of the {@code GET} with the file's length; no body. */
+  @Override
+  public ResponseEntity<Object> handleHead(
+      final ProtocolContext context,
+      final HttpServletRequest request,
+      final HttpServletResponse response)
+      throws IOException {
+
+    try {
+      if (this.nupkg) {
+        final var resource = this.facade.getNuPackage(context);
+
+        return ResponseEntity.ok()
+            .header(CONTENT_TYPE, APPLICATION_OCTET_STREAM.toString())
+            .header(CONTENT_DISPOSITION, contentDisposition(context, true))
+            .contentLength(resource.contentLength())
+            .build();
+      }
+
+      final var resource = this.facade.downloadNuspec(context);
+
+      return ResponseEntity.ok()
+          .header(CONTENT_TYPE, APPLICATION_XML.toString())
+          .header(CONTENT_DISPOSITION, contentDisposition(context, false))
+          .contentLength(resource.contentLength())
+          .build();
+    } catch (final ItemNotFoundException | IllegalArgumentException e) {
+      log.debug("NuGet HEAD not found: {}", e.getMessage());
+      return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
     }
   }
 }

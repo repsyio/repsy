@@ -29,6 +29,7 @@ import io.repsy.protocols.ruby.protocol.facades.contracts.RubyProtocolFacade;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -164,18 +165,26 @@ class RubyHandlerRoutesTest {
   }
 
   @Test
-  @DisplayName("head is a read that is not counted, and uses the parser it is given")
+  @DisplayName("the index, gem and gemspec routes also answer HEAD, a read that is not counted")
   void head() {
-    final var h = handler(AbstractRubyHeadProtocolMethodHandler.class);
-    assertThat(h.getSupportedMethods()).containsExactly(HttpMethod.HEAD);
-    assertThat(h.getProperties())
-        .isEqualTo(
-            Map.of(
-                "permission",
-                Permission.READ,
-                "writeOperation",
-                false,
-                "skipUsagePostProcessor",
-                true));
+    final var expected =
+        Map.of(
+            "permission", Permission.READ, "writeOperation", false, "skipUsagePostProcessor", true);
+
+    for (final var type :
+        List.of(
+            AbstractRubyCompactIndexInfoProtocolMethodHandler.class,
+            AbstractRubyCompactIndexNamesProtocolMethodHandler.class,
+            AbstractRubyCompactIndexVersionsProtocolMethodHandler.class,
+            AbstractRubySpecsIndexProtocolMethodHandler.class,
+            AbstractRubyGemDownloadProtocolMethodHandler.class,
+            AbstractRubyGemspecProtocolMethodHandler.class)) {
+      final var h = handler(type);
+      assertThat(h.answersHead()).as(type.getSimpleName()).isTrue();
+      assertThat(h.getHeadProperties()).as(type.getSimpleName()).isEqualTo(expected);
+    }
+
+    assertThat(handler(AbstractRubyDependenciesProtocolMethodHandler.class).answersHead())
+        .isFalse();
   }
 }

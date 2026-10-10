@@ -22,6 +22,7 @@ import static org.mockito.Mockito.when;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -136,6 +137,76 @@ class ProtocolRouterControllerTest {
         .isSameAs(handlerFailure);
   }
 
+  @Test
+  void aHeadNobodyRegisteredIsAnsweredByTheGetHandlerThatAnswersHead() throws Exception {
+    final var seen = new ArrayList<Map<String, Object>>();
+    final var provider = new RecordingProvider();
+    provider.registerPreProcessor(new PropertiesProcessor(seen));
+    final var get = new HeadHandler(true, "get-body", "head-answer");
+    provider.registerMethodHandler(get);
+    final var controller = new ProtocolRouterController(List.of(provider), List.of());
+
+    final var head = controller.route(requestFor(HttpMethod.HEAD), mock(HttpServletResponse.class));
+
+    assertThat(head.getBody()).isEqualTo("head-answer");
+    assertThat(seen).containsExactly(Map.of("head", true));
+
+    seen.clear();
+    final var got = controller.route(requestFor(HttpMethod.GET), mock(HttpServletResponse.class));
+
+    assertThat(got.getBody()).isEqualTo("get-body");
+    assertThat(seen).containsExactly(Map.of("head", false));
+  }
+
+  @Test
+  void aHandlerRegisteredForHeadWinsOverTheFallback() throws Exception {
+    final var provider = new RecordingProvider();
+    provider.registerMethodHandler(new HeadHandler(true, "get-body", "fallback"));
+    provider.registerMethodHandler(
+        new RecordingHandler(
+            HttpMethod.HEAD, (context, request, response) -> ResponseEntity.ok().body("own")));
+    final var controller = new ProtocolRouterController(List.of(provider), List.of());
+
+    final var head = controller.route(requestFor(HttpMethod.HEAD), mock(HttpServletResponse.class));
+
+    assertThat(head.getBody()).isEqualTo("own");
+  }
+
+  @Test
+  void aGetHandlerThatDoesNotAnswerHeadLeavesTheHeadUnanswered() {
+    final var provider = new RecordingProvider();
+    provider.registerMethodHandler(new HeadHandler(false, "get-body", "head-answer"));
+    final var controller = new ProtocolRouterController(List.of(provider), List.of());
+
+    assertThatThrownBy(
+            () -> controller.route(requestFor(HttpMethod.HEAD), mock(HttpServletResponse.class)))
+        .isInstanceOf(HttpRequestMethodNotSupportedException.class);
+  }
+
+  @Test
+  void aFailingHeadAnswerStillSettlesLikeAFailingHandler() {
+    final var settled = new AtomicInteger();
+    final var failure = new IllegalStateException("boom");
+    final var provider = new RecordingProvider();
+    provider.registerPostProcessor(new RecordingProcessor(1, true, settled, null));
+    provider.registerMethodHandler(
+        new HeadHandler(true, "get-body", "head-answer") {
+          @Override
+          public ResponseEntity<Object> handleHead(
+              final ProtocolContext parsedPath,
+              final HttpServletRequest request,
+              final HttpServletResponse response) {
+            throw failure;
+          }
+        });
+    final var controller = new ProtocolRouterController(List.of(provider), List.of());
+
+    assertThatThrownBy(
+            () -> controller.route(requestFor(HttpMethod.HEAD), mock(HttpServletResponse.class)))
+        .isSameAs(failure);
+    assertThat(settled.get()).isEqualTo(1);
+  }
+
   private static final class RecordingProvider extends ProtocolProvider {
 
     @Override
@@ -198,15 +269,21 @@ class ProtocolRouterControllerTest {
 
   private static final class RecordingHandler implements ProtocolMethodHandler {
 
+    private final HttpMethod method;
     private final HandleFn handleFn;
 
     private RecordingHandler(final HandleFn handleFn) {
+      this(HttpMethod.PUT, handleFn);
+    }
+
+    private RecordingHandler(final HttpMethod method, final HandleFn handleFn) {
+      this.method = method;
       this.handleFn = handleFn;
     }
 
     @Override
     public List<HttpMethod> getSupportedMethods() {
-      return List.of(HttpMethod.PUT);
+      return List.of(this.method);
     }
 
     @Override
@@ -226,6 +303,86 @@ class ProtocolRouterControllerTest {
         final HttpServletResponse response)
         throws Exception {
       return this.handleFn.handle(parsedPath, request, response);
+    }
+  }
+
+  /** A GET handler; the properties tell a GET from a HEAD to the processors. */
+  private static class HeadHandler implements ProtocolMethodHandler {
+
+    private final boolean answersHead;
+    private final String getBody;
+    private final String headBody;
+
+    private HeadHandler(final boolean answersHead, final String getBody, final String headBody) {
+      this.answersHead = answersHead;
+      this.getBody = getBody;
+      this.headBody = headBody;
+    }
+
+    @Override
+    public List<HttpMethod> getSupportedMethods() {
+      return List.of(HttpMethod.GET);
+    }
+
+    @Override
+    public Map<String, Object> getProperties() {
+      return Map.of("head", false);
+    }
+
+    @Override
+    public boolean answersHead() {
+      return this.answersHead;
+    }
+
+    @Override
+    public Map<String, Object> getHeadProperties() {
+      return Map.of("head", true);
+    }
+
+    @Override
+    public PathParser getPathParser() {
+      return request -> Optional.of(new ProtocolContext());
+    }
+
+    @Override
+    public ResponseEntity<Object> handle(
+        final ProtocolContext parsedPath,
+        final HttpServletRequest request,
+        final HttpServletResponse response) {
+      return ResponseEntity.ok().body(this.getBody);
+    }
+
+    @Override
+    public ResponseEntity<Object> handleHead(
+        final ProtocolContext parsedPath,
+        final HttpServletRequest request,
+        final HttpServletResponse response) {
+      return ResponseEntity.ok().body(this.headBody);
+    }
+  }
+
+  private static final class PropertiesProcessor extends ProtocolProcessor {
+
+    private final List<Map<String, Object>> seen;
+
+    private PropertiesProcessor(final List<Map<String, Object>> seen) {
+      this.seen = seen;
+    }
+
+    @Override
+    protected int getPriority() {
+      return 1;
+    }
+
+    @Override
+    protected ProcessorResult process(
+        final ProtocolContext context,
+        final HttpServletRequest request,
+        final HttpServletResponse response,
+        final Map<String, Object> properties) {
+      this.seen.add(properties);
+
+      return ProcessorResult.next();
     }
   }
 }

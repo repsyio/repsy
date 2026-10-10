@@ -44,7 +44,10 @@ public abstract class AbstractPypiSimpleProtocolMethodHandler<ID>
       final PypiProtocolFacade<ID> pypiProtocolFacade,
       final PypiProtocolProvider provider) {
     super(
-        HandlerRoute.read(HttpMethod.GET).method("simple").path(SIMPLE_PATTERN.asMatchPredicate()),
+        HandlerRoute.read(HttpMethod.GET)
+            .method("simple")
+            .path(SIMPLE_PATTERN.asMatchPredicate())
+            .head(),
         basePathParser,
         pypiProtocolFacade,
         provider);
@@ -82,5 +85,40 @@ public abstract class AbstractPypiSimpleProtocolMethodHandler<ID>
         .contentLength(resource.contentLength())
         .contentType(MediaType.TEXT_HTML)
         .body(resource);
+  }
+
+  /**
+   * 200 for the package list of the repo and for a package that exists, 404 for one that does not,
+   * 307 to the normalized name; no body, and no page is rendered.
+   */
+  @Override
+  public ResponseEntity<Object> handleHead(
+      final ProtocolContext context,
+      final HttpServletRequest request,
+      final HttpServletResponse response) {
+
+    final var relativePath = ProtocolContextUtils.getRelativePath(context).getPath();
+    final var matcher = SIMPLE_PATTERN.matcher(relativePath);
+
+    if (!matcher.matches()) {
+      return ResponseEntity.notFound().build();
+    }
+
+    final var packageName = matcher.group(1);
+
+    if (packageName == null) {
+      // The path parser already guarantees the repo exists for `/simple/`.
+      return ResponseEntity.ok().build();
+    }
+
+    final var normalizedUri = this.getNormalizedUri(request, packageName);
+
+    if (normalizedUri != null) {
+      return ResponseEntity.status(HttpStatus.TEMPORARY_REDIRECT).location(normalizedUri).build();
+    }
+
+    return this.facade.packageExists(context, packageName)
+        ? ResponseEntity.ok().build()
+        : ResponseEntity.notFound().build();
   }
 }

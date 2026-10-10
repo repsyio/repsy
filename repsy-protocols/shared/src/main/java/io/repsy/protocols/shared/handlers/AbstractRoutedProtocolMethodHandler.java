@@ -80,13 +80,17 @@ public abstract class AbstractRoutedProtocolMethodHandler implements ProtocolMet
    */
   @Override
   public final Map<String, Object> getProperties() {
+    return this.withAdditional(this.route.properties());
+  }
+
+  private Map<String, Object> withAdditional(final Map<String, Object> own) {
     final var additional = this.additionalProperties();
 
     if (additional.isEmpty()) {
-      return this.route.properties();
+      return own;
     }
 
-    final var merged = new LinkedHashMap<>(this.route.properties());
+    final var merged = new LinkedHashMap<>(own);
     merged.putAll(additional);
 
     return Map.copyOf(merged);
@@ -103,12 +107,33 @@ public abstract class AbstractRoutedProtocolMethodHandler implements ProtocolMet
   }
 
   @Override
+  public final boolean answersHead() {
+    return this.route.answersHead();
+  }
+
+  @Override
+  public final Map<String, Object> getHeadProperties() {
+    final var headProperties = this.route.headProperties();
+
+    return this.withAdditional(headProperties == null ? this.route.properties() : headProperties);
+  }
+
+  @Override
   public PathParser getPathParser() {
     return this.pathParser;
   }
 
+  /** A HEAD the route answers is parsed like the GET it mirrors. */
+  private HttpMethod effectiveMethod(final HttpServletRequest request) {
+    final var requested = HttpMethod.valueOf(request.getMethod());
+
+    return HttpMethod.HEAD.equals(requested) && this.route.answersHead()
+        ? HttpMethod.GET
+        : requested;
+  }
+
   private Optional<ProtocolContext> route(final HttpServletRequest request) {
-    final var method = HttpMethod.valueOf(request.getMethod());
+    final var method = this.effectiveMethod(request);
 
     if (!this.accepts(method, request)) {
       return Optional.empty();

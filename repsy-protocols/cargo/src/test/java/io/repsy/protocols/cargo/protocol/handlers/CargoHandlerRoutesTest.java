@@ -81,23 +81,31 @@ class CargoHandlerRoutesTest {
   }
 
   @Test
-  @DisplayName("head")
+  @DisplayName("download and sparse index also answer HEAD through the router fallback")
   void head() {
-    final var h = handler(AbstractCargoHeadProtocolMethodHandler.class, BASE, FACADE, PROVIDER);
-    assertRoute(
-        h,
-        List.of(HttpMethod.HEAD),
+    final var download =
+        handler(AbstractCargoDownloadProtocolMethodHandler.class, BASE, FACADE, PROVIDER);
+    final var expected =
         Map.of(
-            "permission",
-            Permission.READ,
-            "writeOperation",
-            false,
-            "skipUsagePostProcessor",
-            true));
-    assertThat(parse(h, "HEAD", "/api/v1/crates/foo/1.0.0/download")).isPresent();
-    assertThat(parse(h, "HEAD", "/1/a")).isPresent();
-    assertThat(parse(h, "HEAD", "/api/v1/crates/foo")).isEmpty();
-    assertThat(parse(h, "HEAD", "/config.json")).isEmpty();
+            "permission", Permission.READ, "writeOperation", false, "skipUsagePostProcessor", true);
+    assertThat(download.answersHead()).isTrue();
+    assertThat(download.getHeadProperties()).isEqualTo(expected);
+    assertThat(parse(download, "HEAD", "/api/v1/crates/foo/1.0.0/download")).isPresent();
+    assertThat(parse(download, "HEAD", "/api/v1/crates/foo")).isEmpty();
+    assertThat(parse(download, "HEAD", "/1/a")).isEmpty();
+
+    final var sparse =
+        handler(
+            AbstractCargoSparseIndexProtocolMethodHandler.class,
+            BASE,
+            FACADE,
+            new ObjectMapper(),
+            PROVIDER);
+    assertThat(sparse.answersHead()).isTrue();
+    assertThat(sparse.getHeadProperties()).isEqualTo(expected);
+    assertThat(parse(sparse, "HEAD", "/1/a")).isPresent();
+    assertThat(parse(sparse, "HEAD", "/config.json")).isEmpty();
+    assertThat(parse(sparse, "HEAD", "/api/v1/crates/foo")).isEmpty();
   }
 
   @Test
@@ -211,19 +219,18 @@ class CargoHandlerRoutesTest {
     assertThat(parse(get, "GET", "/other")).isEmpty();
     assertThat(parse(get, "PUT", "/config.json")).isEmpty();
 
-    final var head = handler(AbstractCargoConfigHeadProtocolMethodHandler.class, BASE, PROVIDER);
-    assertRoute(
-        head,
-        List.of(HttpMethod.HEAD),
-        Map.of(
-            "permission",
-            Permission.READ,
-            "skipUsagePostProcessor",
-            true,
-            "skipPreProcessor",
-            true));
-    assertThat(parse(head, "HEAD", "/config.json")).isPresent();
-    assertThat(parse(head, "HEAD", "/other")).isEmpty();
+    assertThat(get.answersHead()).isTrue();
+    assertThat(get.getHeadProperties())
+        .isEqualTo(
+            Map.of(
+                "permission",
+                Permission.READ,
+                "skipUsagePostProcessor",
+                true,
+                "skipPreProcessor",
+                true));
+    assertThat(parse(get, "HEAD", "/config.json")).isPresent();
+    assertThat(parse(get, "HEAD", "/other")).isEmpty();
   }
 
   @Test

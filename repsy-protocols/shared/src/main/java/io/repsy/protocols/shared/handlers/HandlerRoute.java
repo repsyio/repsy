@@ -39,17 +39,21 @@ import org.springframework.http.HttpMethod;
  */
 @NullMarked
 public record HandlerRoute(
-    List<HttpMethod> methods, Map<String, Object> properties, @Nullable Predicate<String> path) {
+    List<HttpMethod> methods,
+    Map<String, Object> properties,
+    @Nullable Predicate<String> path,
+    @Nullable Map<String, Object> headProperties) {
 
   public HandlerRoute {
     methods = List.copyOf(methods);
     properties = Map.copyOf(properties);
+    headProperties = headProperties == null ? null : Map.copyOf(headProperties);
   }
 
   /** A route that needs {@code permission} and sets no other property. */
   public static HandlerRoute of(final Permission permission, final HttpMethod... methods) {
     return new HandlerRoute(
-        List.of(methods), Map.of(HandlerPropertyKeys.PERMISSION, permission), null);
+        List.of(methods), Map.of(HandlerPropertyKeys.PERMISSION, permission), null, null);
   }
 
   /** A read route: {@link Permission#READ} and {@code writeOperation=false}. */
@@ -88,12 +92,35 @@ public record HandlerRoute(
 
   /** The same route that only accepts the relative paths {@code path} accepts. */
   public HandlerRoute path(final Predicate<String> relativePathTest) {
-    return new HandlerRoute(this.methods, this.properties, relativePathTest);
+    return new HandlerRoute(this.methods, this.properties, relativePathTest, this.headProperties);
   }
 
   private HandlerRoute with(final String key, final Object value) {
     final var copy = new LinkedHashMap<>(this.properties);
     copy.put(key, value);
-    return new HandlerRoute(this.methods, copy, this.path);
+    return new HandlerRoute(this.methods, copy, this.path, this.headProperties);
+  }
+
+  /**
+   * This route also answers {@code HEAD} (the router's HEAD fallback) for the paths it accepts,
+   * with the properties of a read that is not a download: {@link Permission#READ}, {@code
+   * writeOperation=false} and {@code skipUsagePostProcessor=true}.
+   */
+  public HandlerRoute head() {
+    return this.head(read(HttpMethod.HEAD).skipUsagePostProcessor(true));
+  }
+
+  /**
+   * This route also answers {@code HEAD} with exactly the properties of {@code headRoute} (its
+   * methods and path are not used). A {@code HEAD} may need other properties than the {@code GET}
+   * it mirrors (for example a pre-processor the {@code GET} skips).
+   */
+  public HandlerRoute head(final HandlerRoute headRoute) {
+    return new HandlerRoute(this.methods, this.properties, this.path, headRoute.properties());
+  }
+
+  /** Whether this route answers {@code HEAD} through the router's fallback. */
+  public boolean answersHead() {
+    return this.headProperties != null;
   }
 }

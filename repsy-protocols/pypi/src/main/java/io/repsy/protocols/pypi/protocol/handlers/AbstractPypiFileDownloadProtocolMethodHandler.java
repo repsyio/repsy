@@ -15,6 +15,7 @@
  */
 package io.repsy.protocols.pypi.protocol.handlers;
 
+import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.pypi.protocol.PypiProtocolProvider;
@@ -24,8 +25,10 @@ import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
+import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -43,7 +46,7 @@ public abstract class AbstractPypiFileDownloadProtocolMethodHandler<ID>
       final PathParser basePathParser,
       final PypiProtocolProvider provider) {
     super(
-        HandlerRoute.read(HttpMethod.GET).path(DOWNLOAD_PATTERN.asMatchPredicate()),
+        HandlerRoute.read(HttpMethod.GET).path(DOWNLOAD_PATTERN.asMatchPredicate()).head(),
         basePathParser,
         pypiProtocolFacade,
         provider);
@@ -77,5 +80,37 @@ public abstract class AbstractPypiFileDownloadProtocolMethodHandler<ID>
   /** The header of a file download; the {@code HEAD} of the same file answers it too. */
   static String contentDisposition(final String fileName) {
     return "attachment; filename=\"" + fileName + "\"";
+  }
+
+  /** The status and headers of the {@code GET} with the file's length; the file is not streamed. */
+  @Override
+  public ResponseEntity<Object> handleHead(
+      final ProtocolContext context,
+      final HttpServletRequest request,
+      final HttpServletResponse response)
+      throws IOException {
+
+    final var matcher =
+        DOWNLOAD_PATTERN.matcher(ProtocolContextUtils.getRelativePath(context).getPath());
+
+    if (!matcher.matches()) {
+      return ResponseEntity.notFound().build();
+    }
+
+    final var fileName = matcher.group(2);
+    final Resource resource;
+
+    try {
+      resource = this.facade.downloadArchiveFile(context, matcher.group(1), fileName);
+    } catch (final ItemNotFoundException _) {
+      return ResponseEntity.notFound().build();
+    }
+
+    return ResponseEntity.ok()
+        .contentType(MediaType.APPLICATION_OCTET_STREAM)
+        .header(HttpHeaders.CONTENT_DISPOSITION, contentDisposition(fileName))
+        .header(HttpHeaders.ACCEPT_RANGES, "bytes")
+        .contentLength(resource.contentLength())
+        .build();
   }
 }

@@ -33,6 +33,7 @@ import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -56,8 +57,8 @@ import org.springframework.mock.web.MockHttpServletResponse;
  * response headers.
  */
 @ExtendWith(MockitoExtension.class)
-@DisplayName("AbstractMavenHeadProtocolMethodHandler (RPS-1368)")
-class AbstractMavenHeadProtocolMethodHandlerTest {
+@DisplayName("The HEAD of the Maven download handler (RPS-1368, RPS-2059)")
+class MavenDownloadHeadTest {
 
   @Mock private MavenProtocolProvider provider;
   @Mock private MavenProtocolFacade<UUID> facade;
@@ -66,15 +67,6 @@ class AbstractMavenHeadProtocolMethodHandlerTest {
   @TempDir private Path dir;
 
   private final ProtocolContext context = new ProtocolContext();
-
-  private static class TestHead extends AbstractMavenHeadProtocolMethodHandler<UUID> {
-    TestHead(
-        final PathParser parser,
-        final MavenProtocolFacade<UUID> facade,
-        final MavenProtocolProvider provider) {
-      super(parser, facade, provider);
-    }
-  }
 
   private static class TestDownload extends AbstractMavenDownloadProtocolMethodHandler<UUID> {
     TestDownload(
@@ -92,8 +84,8 @@ class AbstractMavenHeadProtocolMethodHandlerTest {
   }
 
   private ResponseEntity<Object> head(final String path) throws Exception {
-    return new TestHead(this.pathParser, this.facade, this.provider)
-        .handle(this.context, request("HEAD", path), new MockHttpServletResponse());
+    return new TestDownload(this.pathParser, this.facade, this.provider)
+        .handleHead(this.context, request("HEAD", path), new MockHttpServletResponse());
   }
 
   private ResponseEntity<Object> get(final String path) throws Exception {
@@ -116,18 +108,21 @@ class AbstractMavenHeadProtocolMethodHandlerTest {
   @Test
   @DisplayName("registers for HEAD, needs read permission and is not a download")
   void registers() {
-    final var handler = new TestHead(this.pathParser, this.facade, this.provider);
+    final var handler = new TestDownload(this.pathParser, this.facade, this.provider);
 
     verify(this.provider).registerMethodHandler(handler);
-    assertThat(handler.getSupportedMethods()).containsExactly(HttpMethod.HEAD);
+    assertThat(handler.getSupportedMethods()).containsExactly(HttpMethod.GET);
+    assertThat(handler.answersHead()).isTrue();
 
     final var request = request("HEAD", "/g/demo/1.0/demo-1.0.jar");
     when(this.pathParser.parse(request)).thenReturn(java.util.Optional.of(this.context));
     assertThat(handler.getPathParser().parse(request)).containsSame(this.context);
-    assertThat(handler.getProperties())
-        .containsEntry("permission", Permission.READ)
-        .containsEntry("writeOperation", false)
-        .containsEntry("skipUsagePostProcessor", true);
+    assertThat(handler.getHeadProperties())
+        .containsExactlyInAnyOrderEntriesOf(
+            Map.of(
+                "permission", Permission.READ,
+                "writeOperation", false,
+                "skipUsagePostProcessor", true));
   }
 
   @Test
