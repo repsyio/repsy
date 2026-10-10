@@ -66,7 +66,7 @@ const SESSION_INVALID_MESSAGE = 'Session invalid, please log in again.';
 export class RefreshTokenInterceptor implements HttpInterceptor {
   // The refresh currently in flight, shared by every request that hit sessionExpired meanwhile.
   // It is cleared once the refresh settles, so the next refresh always starts from a clean state.
-  private _refresh$: Observable<string> | null = null;
+  private refresh$: Observable<string> | null = null;
 
   constructor(
     private readonly router: Router,
@@ -78,43 +78,43 @@ export class RefreshTokenInterceptor implements HttpInterceptor {
   intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
     return next.handle(req).pipe(
       catchError((res: HttpErrorResponse) => {
-        if (res?.status !== 401 || RefreshTokenInterceptor._isPath(req, LOGIN_PATH)) {
+        if (res?.status !== 401 || RefreshTokenInterceptor.isPath(req, LOGIN_PATH)) {
           return throwError(() => res);
         }
         if (!this.authService.isAuthenticated()) {
           return throwError(() => res);
         }
 
-        if (RefreshTokenInterceptor._isPath(req, REFRESH_PATH)) {
-          return this._logOut(SESSION_EXPIRED_MESSAGE);
+        if (RefreshTokenInterceptor.isPath(req, REFRESH_PATH)) {
+          return this.signOut(SESSION_EXPIRED_MESSAGE);
         }
 
         if (problemCode(res) === ERROR_CODES.SESSION_EXPIRED) {
-          return this._refreshToken().pipe(
+          return this.refreshSession().pipe(
             switchMap((accessToken: string) =>
               next.handle(req.clone({ setHeaders: { Authorization: `Bearer ${accessToken}` } })).pipe(
                 // Fresh token, still refused: nothing left to try.
                 catchError((retried: HttpErrorResponse) =>
-                  retried?.status === 401 ? this._logOut(SESSION_INVALID_MESSAGE) : throwError(() => retried),
+                  retried?.status === 401 ? this.signOut(SESSION_INVALID_MESSAGE) : throwError(() => retried),
                 ),
               ),
             ),
           );
         }
 
-        return this._logOut(
+        return this.signOut(
           problemCode(res) === ERROR_CODES.REFRESH_TOKEN_EXPIRED ? SESSION_EXPIRED_MESSAGE : SESSION_INVALID_MESSAGE,
         );
       }),
     );
   }
 
-  private static _isPath(req: HttpRequest<unknown>, path: string): boolean {
+  private static isPath(req: HttpRequest<unknown>, path: string): boolean {
     return req.url.split('?')[0].endsWith(path);
   }
 
   // Ends the session and completes the request silently: the user is on their way to /login.
-  private _logOut(message: string): Observable<never> {
+  private signOut(message: string): Observable<never> {
     // A concurrent request may have logged out already, once is enough.
     if (this.authService.isAuthenticated()) {
       this.authService.logOut();
@@ -124,17 +124,17 @@ export class RefreshTokenInterceptor implements HttpInterceptor {
     return EMPTY;
   }
 
-  private _refreshToken(): Observable<string> {
-    if (!this._refresh$) {
-      this._refresh$ = this.authService.refreshToken().pipe(
+  private refreshSession(): Observable<string> {
+    if (!this.refresh$) {
+      this.refresh$ = this.authService.refreshToken().pipe(
         catchError((error: HttpErrorResponse) => {
-          this._logOut(SESSION_EXPIRED_MESSAGE);
+          this.signOut(SESSION_EXPIRED_MESSAGE);
           return throwError(() => error);
         }),
-        finalize(() => (this._refresh$ = null)),
+        finalize(() => (this.refresh$ = null)),
         share(),
       );
     }
-    return this._refresh$;
+    return this.refresh$;
   }
 }

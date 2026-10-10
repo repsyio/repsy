@@ -743,7 +743,7 @@ describe('AuthService', () => {
 
     // RPS-1672: Firefox replicates `localStorage` between tabs asynchronously, so a tab that just got the
     // Web Lock can still read its own spent token for a few milliseconds after another tab rotated it and
-    // released the lock. `_syncFromStorage` cannot see that (it is a plain, synchronous read in this spec,
+    // released the lock. `syncFromStorage` cannot see that (it is a plain, synchronous read in this spec,
     // same as real Chromium/WebKit), so these drive the hand-over through a real BroadcastChannel instead,
     // the way the two engines actually differ.
     describe('the broadcast channel hand-over', () => {

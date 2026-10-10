@@ -41,14 +41,14 @@ export class AuthGuard implements CanActivate, CanActivateChild {
     route: ActivatedRouteSnapshot,
     state: RouterStateSnapshot,
   ): Observable<boolean | UrlTree> | Promise<boolean | UrlTree> | boolean | UrlTree {
-    return this.authService.isAuthenticated() ? true : this._toLogin(state);
+    return this.authService.isAuthenticated() ? true : this.toLogin(state);
   }
 
   canActivateChild(
     childRoute: ActivatedRouteSnapshot,
     state: RouterStateSnapshot,
   ): Observable<boolean | UrlTree> | Promise<boolean | UrlTree> | boolean | UrlTree {
-    return this.authService.isAuthenticated() ? true : this._toLogin(state);
+    return this.authService.isAuthenticated() ? true : this.toLogin(state);
   }
 
   /**
@@ -56,7 +56,7 @@ export class AuthGuard implements CanActivate, CanActivateChild {
    * return the visitor there (RPS-1278). The redirect is a UrlTree, so the router replaces the
    * blocked navigation instead of racing a second one.
    */
-  private _toLogin(state: RouterStateSnapshot): UrlTree {
+  private toLogin(state: RouterStateSnapshot): UrlTree {
     const returnUrl = safeReturnUrl(state.url);
     return this.router.createUrlTree(
       ['/'],

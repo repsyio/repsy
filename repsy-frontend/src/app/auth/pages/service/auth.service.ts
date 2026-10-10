@@ -47,7 +47,7 @@ const REFRESH_LOCK = 'repsy-refresh';
 /** Name of the BroadcastChannel a tab announces its rotated (or freshly logged-in) session pair on. */
 const SESSION_CHANNEL_NAME = 'repsy-session';
 
-/** What `_update` announces on {@link SESSION_CHANNEL_NAME}: the pair it just stored. */
+/** What `storeSession` announces on {@link SESSION_CHANNEL_NAME}: the pair it just stored. */
 interface SessionBroadcastMessage {
   readonly type: 'session';
   readonly username: string;
@@ -60,7 +60,7 @@ interface SessionBroadcastMessage {
  * spend, for another tab's BroadcastChannel hand-over of a pair that tab may already be rotating
  * (RPS-1672). Firefox replicates `localStorage` between tabs asynchronously (a probe found 17 of 20
  * first reads right after another tab released the Web Lock still returned the OLD value there, none in
- * Chromium or WebKit), so the plain `localStorage` re-read `_syncFromStorage` does can lose that race.
+ * Chromium or WebKit), so the plain `localStorage` re-read `syncFromStorage` does can lose that race.
  * The BroadcastChannel message carries the rotated pair directly instead of relying on that replication
  * timing, and {@link onBroadcast} resolves the wait the moment it arrives; this bound only matters when
  * nothing was actually racing, so it is generous rather than tight.
@@ -116,15 +116,15 @@ function sleep(ms: number): Promise<void> {
   providedIn: 'root',
 })
 export class AuthService {
-  private _accessToken: string;
-  private _refreshToken: string;
-  private _username: string;
+  private currentAccessToken: string;
+  private currentRefreshToken: string;
+  private currentUsername: string;
   private readonly isBrowser: boolean;
   private readonly _authenticated$ = new BehaviorSubject<boolean>(false);
   private readonly _sessionEndedElsewhere$ = new Subject<void>();
   private readonly tabId = randomTabId();
   private readonly channel: BroadcastChannel | null;
-  /** Resolvers of a pending {@link _waitForHandover}, woken as soon as {@link onBroadcast} adopts a pair. */
+  /** Resolvers of a pending {@link waitForHandover}, woken as soon as {@link onBroadcast} adopts a pair. */
   private readonly handoverWaiters = new Set<() => void>();
 
   /**
@@ -145,7 +145,7 @@ export class AuthService {
       // after the other and Chromium replicates them between processes one event at a time, so the first event
       // can arrive while a re-read still finds the keys that follow empty. Reading that as a logout sent the
       // second tab to /login with a valid session (RPS-1767); the events that follow complete the pair.
-      this._syncFromStorage(event.key !== null && event.newValue !== null);
+      this.syncFromStorage(event.key !== null && event.newValue !== null);
     }
   };
 
@@ -155,9 +155,9 @@ export class AuthService {
     if (!message || message.type !== 'session') {
       return;
     }
-    this._username = message.username;
-    this._accessToken = message.token;
-    this._refreshToken = message.refreshToken;
+    this.currentUsername = message.username;
+    this.currentAccessToken = message.token;
+    this.currentRefreshToken = message.refreshToken;
     this._authenticated$.next(this.isAuthenticated());
     this.handoverWaiters.forEach((wake) => wake());
   };
@@ -170,7 +170,7 @@ export class AuthService {
     this.channel =
       this.isBrowser && typeof BroadcastChannel !== 'undefined' ? new BroadcastChannel(SESSION_CHANNEL_NAME) : null;
     if (this.isBrowser) {
-      this._readStorage();
+      this.readStorage();
       window.addEventListener('storage', this.onStorage);
       inject(DestroyRef).onDestroy(() => window.removeEventListener('storage', this.onStorage));
     }
@@ -182,21 +182,21 @@ export class AuthService {
   }
 
   get username(): string {
-    return this._username;
+    return this.currentUsername;
   }
 
   get accessToken(): string {
-    return this._accessToken;
+    return this.currentAccessToken;
   }
 
   isAuthenticated(): boolean {
-    return !!(this._accessToken && this._refreshToken);
+    return !!(this.currentAccessToken && this.currentRefreshToken);
   }
 
   logIn(form: LoginForm): Observable<void> {
     return this.authApi.login(form).pipe(
       map((r) => {
-        this._update(r.username!, r.token!, r.refreshToken!);
+        this.storeSession(r.username!, r.token!, r.refreshToken!);
       }),
     );
   }
@@ -209,10 +209,10 @@ export class AuthService {
    */
   refreshToken(): Observable<string> {
     return defer(() => {
-      if (!this._refreshToken) {
+      if (!this.currentRefreshToken) {
         return throwError(() => new Error('No refresh token presents.'));
       }
-      const spentBefore = this._refreshToken;
+      const spentBefore = this.currentRefreshToken;
       return from(this._withRefreshLock(() => this._refreshOnce(spentBefore))).pipe(
         mergeMap((accessToken) => (accessToken ? of(accessToken) : EMPTY)),
       );
@@ -220,7 +220,7 @@ export class AuthService {
   }
 
   updateLoginInfo(loginInfo: LoginInfo): void {
-    this._update(loginInfo.username!, loginInfo.token!, loginInfo.refreshToken!);
+    this.storeSession(loginInfo.username!, loginInfo.token!, loginInfo.refreshToken!);
   }
 
   /**
@@ -232,11 +232,11 @@ export class AuthService {
    * must not be able to fail or hang on a server round trip.
    */
   logOut(): void {
-    const refreshToken = this._refreshToken;
+    const refreshToken = this.currentRefreshToken;
 
-    this._username = null;
-    this._accessToken = null;
-    this._refreshToken = null;
+    this.currentUsername = null;
+    this.currentAccessToken = null;
+    this.currentRefreshToken = null;
 
     if (this.isBrowser) {
       SESSION_KEYS.forEach((key) => localStorage.removeItem(key));
@@ -248,40 +248,40 @@ export class AuthService {
     }
   }
 
-  private _update(username: string, accessToken: string, refreshToken: string): void {
-    this._username = username;
-    this._accessToken = accessToken;
-    this._refreshToken = refreshToken;
+  private storeSession(username: string, accessToken: string, refreshToken: string): void {
+    this.currentUsername = username;
+    this.currentAccessToken = accessToken;
+    this.currentRefreshToken = refreshToken;
 
     if (this.isBrowser) {
-      localStorage.setItem(USERNAME_KEY, this._username);
-      localStorage.setItem(TOKEN_KEY, this._accessToken);
-      localStorage.setItem(REFRESH_TOKEN_KEY, this._refreshToken);
+      localStorage.setItem(USERNAME_KEY, this.currentUsername);
+      localStorage.setItem(TOKEN_KEY, this.currentAccessToken);
+      localStorage.setItem(REFRESH_TOKEN_KEY, this.currentRefreshToken);
       this.channel?.postMessage({
         type: 'session',
-        username: this._username,
-        token: this._accessToken,
-        refreshToken: this._refreshToken,
+        username: this.currentUsername,
+        token: this.currentAccessToken,
+        refreshToken: this.currentRefreshToken,
       } satisfies SessionBroadcastMessage);
     }
     this._authenticated$.next(this.isAuthenticated());
   }
 
-  private _readStorage(): void {
-    this._username = localStorage.getItem(USERNAME_KEY);
-    this._accessToken = localStorage.getItem(TOKEN_KEY);
-    this._refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+  private readStorage(): void {
+    this.currentUsername = localStorage.getItem(USERNAME_KEY);
+    this.currentAccessToken = localStorage.getItem(TOKEN_KEY);
+    this.currentRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
   }
 
   /** Adopts whatever the shared storage holds now, i.e. what the other tabs did to the session. */
-  private _syncFromStorage(keepSession = false): void {
+  private syncFromStorage(keepSession = false): void {
     const wasAuthenticated = this.isAuthenticated();
-    const { _username, _accessToken, _refreshToken } = this;
-    this._readStorage();
+    const { currentUsername, currentAccessToken, currentRefreshToken } = this;
+    this.readStorage();
     if (keepSession && wasAuthenticated && !this.isAuthenticated()) {
-      this._username = _username;
-      this._accessToken = _accessToken;
-      this._refreshToken = _refreshToken;
+      this.currentUsername = currentUsername;
+      this.currentAccessToken = currentAccessToken;
+      this.currentRefreshToken = currentRefreshToken;
       return;
     }
     this._authenticated$.next(this.isAuthenticated());
@@ -345,32 +345,32 @@ export class AuthService {
     // while this tab was still queued for the lock, see `onBroadcast`): re-reading storage at that point
     // could only replace a value already known good with a `localStorage` that has not caught up yet
     // (RPS-1672, Firefox).
-    if (this.isBrowser && this._refreshToken === spentBefore) {
-      this._syncFromStorage();
+    if (this.isBrowser && this.currentRefreshToken === spentBefore) {
+      this.syncFromStorage();
     }
     // Only the Web Lock path needs the hand-over: the `localStorage` lock's own settle delay already
     // covers the plain-HTTP case (RPS-1672; see the class doc and `HANDOVER_WAIT_MS`).
-    if (this.isBrowser && navigator.locks && this._refreshToken === spentBefore) {
-      await this._waitForHandover(spentBefore);
+    if (this.isBrowser && navigator.locks && this.currentRefreshToken === spentBefore) {
+      await this.waitForHandover(spentBefore);
     }
-    if (!this._refreshToken) {
+    if (!this.currentRefreshToken) {
       return null;
     }
-    if (this._refreshToken !== spentBefore) {
-      return this._accessToken;
+    if (this.currentRefreshToken !== spentBefore) {
+      return this.currentAccessToken;
     }
     // The refresh call completes without an answer when `RefreshTokenInterceptor` logged the session out
     // for a refused refresh token: no token, like the session that ended in another tab.
     return firstValueFrom(
       this.authApi
-        .refreshToken({ refreshToken: this._refreshToken }, 'body', false, {
+        .refreshToken({ refreshToken: this.currentRefreshToken }, 'body', false, {
           // Not toasted by `errorHandlerInterceptor` (RPS-1754): a failed refresh ends the session, and
           // `RefreshTokenInterceptor` shows the one "Session expired" toast for it.
           context: new HttpContext().set(SILENT_ERROR, true),
         })
         .pipe(
           map((r) => {
-            this._update(r.username!, r.token!, r.refreshToken!);
+            this.storeSession(r.username!, r.token!, r.refreshToken!);
             return r.token!;
           }),
         ),
@@ -383,8 +383,8 @@ export class AuthService {
    * pair. Resolves at once if there is no channel (an old browser) or the token has already changed by
    * the time it is called (the broadcast, or a `storage` event, got here first).
    */
-  private _waitForHandover(spentBefore: string): Promise<void> {
-    if (!this.channel || this._refreshToken !== spentBefore) {
+  private waitForHandover(spentBefore: string): Promise<void> {
+    if (!this.channel || this.currentRefreshToken !== spentBefore) {
       return Promise.resolve();
     }
     return new Promise((resolve) => {

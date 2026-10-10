@@ -95,7 +95,7 @@ export class LoginComponent implements OnInit {
         }),
       )
       .subscribe({
-        next: () => this.router.navigateByUrl(this._returnUrl()),
+        next: () => this.router.navigateByUrl(this.returnUrl()),
         error: (error: HttpErrorResponse) => {
           // errorHandlerInterceptor leaves 401 responses to their callers, so show invalidCredentials here.
           if (error.status === 401) {
@@ -121,7 +121,7 @@ export class LoginComponent implements OnInit {
   }
 
   // The page the visitor asked for before AuthGuard sent them to the form (RPS-1278), or "/".
-  private _returnUrl(): string {
+  private returnUrl(): string {
     return safeReturnUrl(this.router.parseUrl(this.router.url).queryParams[RETURN_URL_PARAM]) ?? '/';
   }
 }
