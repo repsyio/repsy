@@ -25,7 +25,6 @@ import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.storage.AbstractArtifactStorageService;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.UncheckedIOException;
 import java.nio.file.Paths;
 import java.time.Instant;
 import java.util.Collection;
@@ -112,18 +111,9 @@ public abstract class AbstractDockerStorageService<ID> extends AbstractArtifactS
 
     // The usage has to be known before the file is gone, so it can be refunded. A failure here
     // must not delete the file (or let the caller's transaction, which already removed the row,
-    // commit): propagate it as unchecked so it rolls back the same way a failure from
+    // commit): it is unchecked, so it rolls back the same way a failure from
     // storageStrategy.delete already does (RPS-1463).
-    final long usage;
-    try {
-      usage = this.storageStrategy.getFileUsage(storagePath, repoInfo.getName());
-    } catch (final IOException e) {
-      throw new UncheckedIOException(e);
-    }
-
-    this.storageStrategy.delete(storagePath);
-
-    return usage;
+    return this.deleteFileWithUsage(storagePath, repoInfo.getName());
   }
 
   @Override
@@ -142,8 +132,7 @@ public abstract class AbstractDockerStorageService<ID> extends AbstractArtifactS
   }
 
   @Override
-  public long deleteBlobFile(final UUID repoId, final String repoName, final String fileName)
-      throws IOException {
+  public long deleteBlobFile(final UUID repoId, final String repoName, final String fileName) {
 
     final var storagePath = StoragePath.of(repoId, Paths.get(BLOBS_PATH, fileName).toString());
 

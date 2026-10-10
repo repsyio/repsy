@@ -15,6 +15,7 @@
  */
 package io.repsy.protocols.helm.shared.storage.services;
 
+import io.repsy.core.error_handling.exceptions.ErrorOccurredException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StaleFile;
 import io.repsy.libs.storage.core.dtos.StoragePath;
@@ -56,8 +57,8 @@ public abstract class AbstractHelmStorageService<ID> extends AbstractArtifactSto
   }
 
   @Override
-  public long deleteChart(final StoragePath storagePath, final String repoName) throws IOException {
-    final var usage = this.storageStrategy.getFileUsage(storagePath, repoName);
+  public long deleteChart(final StoragePath storagePath, final String repoName) {
+    final var usage = this.fileUsage(storagePath, repoName);
     log.debug("Deleting chart at {} ({} bytes)", storagePath, usage);
     this.storageStrategy.delete(storagePath);
     return usage;
@@ -65,17 +66,16 @@ public abstract class AbstractHelmStorageService<ID> extends AbstractArtifactSto
 
   @Override
   public long deleteChartFile(
-      final UUID repoId, final String filename, final String digest, final String repoName)
-      throws IOException {
+      final UUID repoId, final String filename, final String digest, final String repoName) {
     final var classicPath = StoragePath.of(repoId, HelmConstants.CHARTS_PATH + "/" + filename);
-    final var classicUsage = this.storageStrategy.getFileUsage(classicPath, repoName);
+    final var classicUsage = this.fileUsage(classicPath, repoName);
     if (classicUsage > 0) {
       log.debug("Deleting classic chart at {} ({} bytes)", classicPath, classicUsage);
       this.storageStrategy.delete(classicPath);
       return classicUsage;
     }
     final var ociPath = StoragePath.of(repoId, "oci/blobs/" + digest);
-    final var ociUsage = this.storageStrategy.getFileUsage(ociPath, repoName);
+    final var ociUsage = this.fileUsage(ociPath, repoName);
     if (ociUsage > 0) {
       log.debug("Deleting OCI blob at {} ({} bytes)", ociPath, ociUsage);
       this.storageStrategy.delete(ociPath);
@@ -85,10 +85,9 @@ public abstract class AbstractHelmStorageService<ID> extends AbstractArtifactSto
 
   @Override
   public long deleteManifestFile(
-      final UUID repoId, final String name, final String reference, final String repoName)
-      throws IOException {
+      final UUID repoId, final String name, final String reference, final String repoName) {
     final var path = StoragePath.of(repoId, "oci/manifests/" + name + "/" + reference);
-    final var usage = this.storageStrategy.getFileUsage(path, repoName);
+    final var usage = this.fileUsage(path, repoName);
     if (usage > 0) {
       log.debug("Deleting OCI manifest file at {} ({} bytes)", path, usage);
       this.storageStrategy.delete(path);
@@ -133,21 +132,24 @@ public abstract class AbstractHelmStorageService<ID> extends AbstractArtifactSto
   }
 
   @Override
-  public long deleteBlobFile(final UUID repoId, final String repoName, final String fileName)
-      throws IOException {
+  public long deleteBlobFile(final UUID repoId, final String repoName, final String fileName) {
     final var storagePath = StoragePath.of(repoId, OCI_BLOBS_PATH + "/" + fileName);
     return this.deleteFileWithUsage(storagePath, repoName);
   }
 
   @Override
-  public long deleteBlob(final UUID repoId, final String digest, final String repoName)
-      throws IOException {
+  public long deleteBlob(final UUID repoId, final String digest, final String repoName) {
     final var storagePath = StoragePath.of(repoId, OCI_BLOBS_PATH + "/" + digest);
     final var blob = this.storageStrategy.get(storagePath, repoName);
     if (blob.isEmpty()) {
       return 0;
     }
-    final var usage = blob.get().contentLength();
+    final long usage;
+    try {
+      usage = blob.get().contentLength();
+    } catch (final IOException e) {
+      throw new ErrorOccurredException(e);
+    }
     log.debug("Deleting OCI blob at {} ({} bytes)", storagePath, usage);
     this.storageStrategy.delete(storagePath);
     return usage;

@@ -15,13 +15,11 @@
  */
 package io.repsy.protocols.ruby.shared.storage.services;
 
-import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.storage.AbstractArtifactStorageService;
-import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Paths;
 import java.util.UUID;
@@ -81,11 +79,7 @@ public abstract class AbstractRubyStorageService extends AbstractArtifactStorage
     final var gemPath = Paths.get(GEMS_PATH, gemName, filename);
     final var storagePath = StoragePath.of(repoId, gemPath.toString());
 
-    try {
-      return this.deleteFileWithUsage(storagePath, repoName);
-    } catch (final IOException e) {
-      throw new ItemNotFoundException(ProtocolErrorCodes.GEM_NOT_FOUND);
-    }
+    return this.deleteFileWithUsage(storagePath, repoName);
   }
 
   @Override

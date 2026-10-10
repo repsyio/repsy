@@ -15,7 +15,6 @@
  */
 package io.repsy.protocols.cargo.shared.storage.services;
 
-import io.repsy.core.error_handling.exceptions.ErrorOccurredException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
@@ -88,8 +87,7 @@ public abstract class AbstractCargoStorageService extends AbstractArtifactStorag
 
   @Override
   public long deleteCrate(
-      final UUID repoId, final String repoName, final String crateName, final String versionName)
-      throws IOException {
+      final UUID repoId, final String repoName, final String crateName, final String versionName) {
 
     final var crateFileName = String.format(CRATES_FILE_NAME_FMT, crateName, versionName);
     final var cratePath = Paths.get(CRATES_PATH, crateName, crateFileName);
@@ -107,17 +105,13 @@ public abstract class AbstractCargoStorageService extends AbstractArtifactStorag
     final var crateStoragePath = StoragePath.of(repoId, cratePath.toString());
     final var indexStoragePath = StoragePath.of(repoId, indexPath.toString());
 
-    try {
-      final var crateUsage = this.storageStrategy.calculatePathUsage(crateStoragePath);
-      final var indexUsage = this.storageStrategy.getFileUsage(indexStoragePath, repoName);
+    final var crateUsage = this.storageStrategy.calculatePathUsage(crateStoragePath);
+    final var indexUsage = this.fileUsage(indexStoragePath, repoName);
 
-      this.storageStrategy.delete(crateStoragePath);
-      this.storageStrategy.delete(indexStoragePath);
+    this.storageStrategy.delete(crateStoragePath);
+    this.storageStrategy.delete(indexStoragePath);
 
-      return crateUsage + indexUsage;
-    } catch (final IOException e) {
-      throw new ErrorOccurredException(e);
-    }
+    return crateUsage + indexUsage;
   }
 
   @Override

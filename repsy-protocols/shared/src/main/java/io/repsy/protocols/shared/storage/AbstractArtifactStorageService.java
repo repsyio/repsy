@@ -15,6 +15,7 @@
  */
 package io.repsy.protocols.shared.storage;
 
+import io.repsy.core.error_handling.exceptions.ErrorOccurredException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
@@ -28,12 +29,14 @@ import org.springframework.core.io.Resource;
  * directory lifecycle and the three storage moves each service repeated (read a file that must
  * exist, delete a file and report its size, delete a directory tree and report its size).
  *
- * <p>The error contract of those moves is the one the services already had, and is deliberately
- * left to the caller where formats differ: {@link #requireResource} throws {@link
- * ItemNotFoundException} with the code the format passes (a 404), while {@link
- * #deleteFileWithUsage} lets the {@link IOException} of the size lookup through, so each service
- * decides whether a failing delete is an error of its own (Cargo: 500) or a missing item (Ruby:
- * {@code gemNotFound}, 404). Neither move deletes anything when the size lookup fails.
+ * <p>One failure contract for every format (RPS-2168). A file that is not there is not a failure of
+ * a delete: it holds no bytes, the size lookup answers zero and the delete is a no-op, so a missing
+ * item is answered (404) by the layer that knows the item, never by the storage service. {@link
+ * #requireResource} is the read side of that: {@link ItemNotFoundException} carrying the code the
+ * format passes. A failing size lookup (an {@link IOException}) is a storage failure and is never
+ * answered as a missing item: it is an {@link ErrorOccurredException} (500 {@code errorOccurred}),
+ * and nothing is deleted. A strategy that is unavailable throws its own unchecked exception (503)
+ * from the delete, which passes through unchanged.
  */
 @NullMarked
 public abstract class AbstractArtifactStorageService {
@@ -64,12 +67,23 @@ public abstract class AbstractArtifactStorageService {
   }
 
   /**
+   * The bytes of one file, zero when there is none. A failing lookup is answered as {@link
+   * ErrorOccurredException} (500), never as a missing item.
+   */
+  protected long fileUsage(final StoragePath storagePath, final String repoName) {
+    try {
+      return this.storageStrategy.getFileUsage(storagePath, repoName);
+    } catch (final IOException e) {
+      throw new ErrorOccurredException(e);
+    }
+  }
+
+  /**
    * Deletes one file and returns the bytes it held. The size is read first so it can be refunded;
    * when that lookup fails nothing is deleted.
    */
-  protected long deleteFileWithUsage(final StoragePath storagePath, final String repoName)
-      throws IOException {
-    final var usage = this.storageStrategy.getFileUsage(storagePath, repoName);
+  protected long deleteFileWithUsage(final StoragePath storagePath, final String repoName) {
+    final var usage = this.fileUsage(storagePath, repoName);
     this.storageStrategy.delete(storagePath);
 
     return usage;

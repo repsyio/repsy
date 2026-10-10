@@ -41,10 +41,9 @@ public interface CargoStorageService {
 
   Resource getCrate(UUID repoId, String repoName, String crateName, String versionName);
 
-  long deleteCrate(UUID repoId, String repoName, String crateName, String versionName)
-      throws IOException;
+  long deleteCrate(UUID repoId, String repoName, String crateName, String versionName);
 
-  long deletePackage(UUID repoId, String repoName, String crateName) throws IOException;
+  long deletePackage(UUID repoId, String repoName, String crateName);
 
   void deleteRepo(UUID repoId);
 

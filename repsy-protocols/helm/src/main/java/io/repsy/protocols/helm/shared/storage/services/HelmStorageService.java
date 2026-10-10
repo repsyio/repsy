@@ -38,17 +38,15 @@ public interface HelmStorageService<ID> {
 
   Optional<Resource> findResource(StoragePath storagePath, String repoName) throws IOException;
 
-  long deleteChart(StoragePath storagePath, String repoName) throws IOException;
+  long deleteChart(StoragePath storagePath, String repoName);
 
-  long deleteChartFile(UUID repoId, String filename, String digest, String repoName)
-      throws IOException;
+  long deleteChartFile(UUID repoId, String filename, String digest, String repoName);
 
   /**
    * Deletes the stored manifest file and answers the bytes it held (zero when there was none), so
    * the caller can release them from the repo's disk usage.
    */
-  long deleteManifestFile(UUID repoId, String name, String reference, String repoName)
-      throws IOException;
+  long deleteManifestFile(UUID repoId, String name, String reference, String repoName);
 
   void clearTrash();
 
@@ -75,13 +73,13 @@ public interface HelmStorageService<ID> {
    * Deletes one file of the repo's {@code oci/blobs} directory and answers the bytes it held, so
    * the caller can release them from the repo's disk usage.
    */
-  long deleteBlobFile(UUID repoId, String repoName, String fileName) throws IOException;
+  long deleteBlobFile(UUID repoId, String repoName, String fileName);
 
   /**
    * Deletes the finalized blob stored under {@code digest} and answers the bytes it held, or zero
    * when there is no such blob.
    */
-  long deleteBlob(UUID repoId, String digest, String repoName) throws IOException;
+  long deleteBlob(UUID repoId, String digest, String repoName);
 
   Optional<Resource> findBlob(UUID repoId, String digest, String repoName);
 

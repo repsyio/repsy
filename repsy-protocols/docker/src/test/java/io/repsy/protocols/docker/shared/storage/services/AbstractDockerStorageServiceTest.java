@@ -25,6 +25,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.repsy.core.error_handling.exceptions.ErrorOccurredException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.libs.storage.core.dtos.StaleFile;
@@ -33,7 +34,6 @@ import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -128,25 +128,26 @@ class AbstractDockerStorageServiceTest {
   }
 
   @Test
-  @DisplayName("deleteBlobFile() lets the IOException of the size lookup through, deleting nothing")
-  void deleteBlobFileKeepsTheIoException() throws IOException {
+  @DisplayName("deleteBlobFile() answers the IOException of the size lookup as errorOccurred (500)")
+  void deleteBlobFileAnswersTheIoExceptionAsErrorOccurred() throws IOException {
     when(this.storageStrategy.getFileUsage(any(), eq("repo"))).thenThrow(new IOException("disk"));
     final var service = new TestStorageService(this.storageStrategy);
 
     assertThatThrownBy(() -> service.deleteBlobFile(REPO_UUID, "repo", "upload-id"))
-        .isInstanceOf(IOException.class);
+        .isInstanceOf(ErrorOccurredException.class)
+        .hasCauseInstanceOf(IOException.class);
     verify(this.storageStrategy, never()).delete(any());
   }
 
   @Test
-  @DisplayName("deleteManifest() answers a failing usage lookup as UncheckedIOException")
-  void deleteManifestFailureIsUncheckedIoException() throws IOException {
+  @DisplayName("deleteManifest() answers a failing usage lookup as errorOccurred (500)")
+  void deleteManifestFailureIsErrorOccurred() throws IOException {
     when(this.storageStrategy.getFileUsage(any(), eq("repo"))).thenThrow(new IOException("disk"));
     final var repoInfo = BaseRepoInfo.<UUID>builder().storageKey(REPO_UUID).name("repo").build();
     final var service = new TestStorageService(this.storageStrategy);
 
     assertThatThrownBy(() -> service.deleteManifest(repoInfo, "sha256:abc"))
-        .isInstanceOf(UncheckedIOException.class)
+        .isInstanceOf(ErrorOccurredException.class)
         .hasCauseInstanceOf(IOException.class);
     verify(this.storageStrategy, never()).delete(any());
   }

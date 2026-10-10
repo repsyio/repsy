@@ -26,6 +26,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.repsy.core.error_handling.exceptions.ErrorOccurredException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StaleFile;
 import io.repsy.libs.storage.core.dtos.StoragePath;
@@ -209,63 +210,74 @@ class AbstractHelmStorageServiceTest {
   }
 
   @Test
-  @DisplayName("deleteBlobFile() lets the IOException of the size lookup through, deleting nothing")
-  void deleteBlobFileKeepsTheIoException() throws IOException {
+  @DisplayName(
+      "deleteBlobFile() answers the IOException of the size lookup as errorOccurred (500), deleting nothing")
+  void deleteBlobFileAnswersTheIoExceptionAsErrorOccurred() throws IOException {
     when(this.storageStrategy.getFileUsage(any(), eq(REPO_NAME)))
         .thenThrow(new IOException("disk"));
     final var service = new TestStorageService(this.storageStrategy);
 
     assertThatThrownBy(() -> service.deleteBlobFile(REPO_UUID, REPO_NAME, "upload"))
-        .isInstanceOf(IOException.class);
+        .isInstanceOf(ErrorOccurredException.class)
+        .hasCauseInstanceOf(IOException.class);
     verify(this.storageStrategy, never()).delete(any());
   }
 
   @Test
-  @DisplayName("deleteChart() lets the IOException of the size lookup through, deleting nothing")
-  void deleteChartKeepsTheIoException() throws IOException {
+  @DisplayName(
+      "deleteChart() answers the IOException of the size lookup as errorOccurred (500), deleting nothing")
+  void deleteChartAnswersTheIoExceptionAsErrorOccurred() throws IOException {
     final var path = StoragePath.of(REPO_UUID, "charts/a-1.0.0.tgz");
     when(this.storageStrategy.getFileUsage(path, REPO_NAME)).thenThrow(new IOException("disk"));
     final var service = new TestStorageService(this.storageStrategy);
 
-    assertThatThrownBy(() -> service.deleteChart(path, REPO_NAME)).isInstanceOf(IOException.class);
+    assertThatThrownBy(() -> service.deleteChart(path, REPO_NAME))
+        .isInstanceOf(ErrorOccurredException.class)
+        .hasCauseInstanceOf(IOException.class);
     verify(this.storageStrategy, never()).delete(any());
   }
 
   @Test
-  @DisplayName("deleteChartFile() lets the IOException of the size lookup through")
-  void deleteChartFileKeepsTheIoException() throws IOException {
+  @DisplayName(
+      "deleteChartFile() answers the IOException of the size lookup as errorOccurred (500)")
+  void deleteChartFileAnswersTheIoExceptionAsErrorOccurred() throws IOException {
     when(this.storageStrategy.getFileUsage(any(), eq(REPO_NAME)))
         .thenThrow(new IOException("disk"));
     final var service = new TestStorageService(this.storageStrategy);
 
     assertThatThrownBy(
             () -> service.deleteChartFile(REPO_UUID, "a-1.0.0.tgz", "sha256:abc", REPO_NAME))
-        .isInstanceOf(IOException.class);
+        .isInstanceOf(ErrorOccurredException.class)
+        .hasCauseInstanceOf(IOException.class);
     verify(this.storageStrategy, never()).delete(any());
   }
 
   @Test
-  @DisplayName("deleteManifestFile() lets the IOException of the size lookup through")
-  void deleteManifestFileKeepsTheIoException() throws IOException {
+  @DisplayName(
+      "deleteManifestFile() answers the IOException of the size lookup as errorOccurred (500)")
+  void deleteManifestFileAnswersTheIoExceptionAsErrorOccurred() throws IOException {
     when(this.storageStrategy.getFileUsage(any(), eq(REPO_NAME)))
         .thenThrow(new IOException("disk"));
     final var service = new TestStorageService(this.storageStrategy);
 
     assertThatThrownBy(() -> service.deleteManifestFile(REPO_UUID, "payments", "1.0.0", REPO_NAME))
-        .isInstanceOf(IOException.class);
+        .isInstanceOf(ErrorOccurredException.class)
+        .hasCauseInstanceOf(IOException.class);
     verify(this.storageStrategy, never()).delete(any());
   }
 
   @Test
-  @DisplayName("deleteBlob() lets the IOException of the size lookup through, deleting nothing")
-  void deleteBlobKeepsTheIoException() throws IOException {
+  @DisplayName(
+      "deleteBlob() answers the IOException of the size lookup as errorOccurred (500), deleting nothing")
+  void deleteBlobAnswersTheIoExceptionAsErrorOccurred() throws IOException {
     final var blob = mock(Resource.class);
     when(blob.contentLength()).thenThrow(new IOException("disk"));
     when(this.storageStrategy.get(any(), eq(REPO_NAME))).thenReturn(Optional.of(blob));
     final var service = new TestStorageService(this.storageStrategy);
 
     assertThatThrownBy(() -> service.deleteBlob(REPO_UUID, "sha256:abc", REPO_NAME))
-        .isInstanceOf(IOException.class);
+        .isInstanceOf(ErrorOccurredException.class)
+        .hasCauseInstanceOf(IOException.class);
     verify(this.storageStrategy, never()).delete(any());
   }
 }

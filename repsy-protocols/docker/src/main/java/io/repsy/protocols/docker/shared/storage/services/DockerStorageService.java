@@ -73,7 +73,7 @@ public interface DockerStorageService<ID> {
    * Deletes one file of the repo's {@code blobs} directory and answers the bytes it held, so the
    * caller can release them from the repo's disk usage.
    */
-  long deleteBlobFile(UUID repoId, String repoName, String fileName) throws IOException;
+  long deleteBlobFile(UUID repoId, String repoName, String fileName);
 
   BaseUsages rename(UUID repoId, RelativePath relativePath, String digest);
 

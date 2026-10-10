@@ -23,6 +23,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.repsy.core.error_handling.exceptions.ErrorOccurredException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.StoragePath;
@@ -147,8 +148,10 @@ class AbstractRubyStorageServiceTest {
   }
 
   @Test
-  @DisplayName("deleteGem() answers a failing usage lookup as gemNotFound and deletes nothing")
-  void deleteGemFailureIsGemNotFound() throws IOException {
+  @DisplayName(
+      "deleteGem() answers a failing usage lookup as ErrorOccurredException (500), not as"
+          + " gemNotFound, and deletes nothing")
+  void deleteGemFailureIsErrorOccurred() throws IOException {
     final var repoId = UUID.fromString("00000000-0000-0000-0000-000000000001");
     when(this.storageStrategy.getFileUsage(any(), eq("gems"))).thenThrow(new IOException("disk"));
 
@@ -156,8 +159,8 @@ class AbstractRubyStorageServiceTest {
             () ->
                 new TestService(this.storageStrategy)
                     .deleteGem(repoId, "gems", "rack", "2.2.8", "ruby"))
-        .isInstanceOf(ItemNotFoundException.class)
-        .hasMessageContaining("gemNotFound");
+        .isInstanceOf(ErrorOccurredException.class)
+        .hasCauseInstanceOf(IOException.class);
     verify(this.storageStrategy, never()).delete(any());
   }
 

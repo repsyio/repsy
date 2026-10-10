@@ -198,7 +198,7 @@ final class HelmOciManifestFacade<ID> {
         this.helmStorageService.deleteManifestFile(
             repoInfo.getStorageKey(), form.getName(), form.getReference(), repoInfo.getName());
       }
-    } catch (final IOException | RuntimeException e) {
+    } catch (final RuntimeException e) {
       log.warn(
           "The file of manifest {}:{} of a push that did not commit could not be undone: {}",
           form.getName(),
