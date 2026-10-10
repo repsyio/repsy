@@ -18,127 +18,39 @@ package io.repsy.os.server.protocols.docker.protocol.pre_processors;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.libs.protocol.router.ProcessorResult;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.os.server.protocols.docker.shared.auth.services.DockerAuthenticator;
 import io.repsy.os.server.shared.auth.AuthChallenges;
-import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
+import io.repsy.os.server.shared.auth.BasicOrBearerAuthPreProcessor;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.handlers.HandlerPropertyKeys;
 import io.repsy.protocols.shared.repo.dtos.Permission;
-import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
+/**
+ * Docker: only the Bearer token of the registry token flow ({@code /v2/token}). Basic credentials
+ * are refused, every refusal names the token endpoint in its challenge, a push or delete needs
+ * credentials on a public repository too, and a delete also needs a token issued for it.
+ */
 @Component
-@RequiredArgsConstructor
 @NullMarked
-public class DockerAuthPreProcessor extends ProtocolProcessor {
+public class DockerAuthPreProcessor extends BasicOrBearerAuthPreProcessor<DockerAuthenticator> {
 
-  private static final int PRIORITY = 100;
-  private static final String AUTH_BEARER = "Bearer ";
-
-  private final DockerProtocolProvider provider;
-  private final DockerAuthenticator authenticator;
-
-  @PostConstruct
-  public void register() {
-
-    this.provider.registerPreProcessor(this);
+  public DockerAuthPreProcessor(
+      final DockerProtocolProvider provider, final DockerAuthenticator authenticator) {
+    super(authenticator, provider);
   }
 
+  /** The Docker routes say what they need by their permission, not by {@code writeOperation}. */
   @Override
-  protected int getPriority() {
-
-    return PRIORITY;
-  }
-
-  @Override
-  protected ProcessorResult process(
-      final ProtocolContext context,
-      final HttpServletRequest request,
-      final HttpServletResponse response,
-      final Map<String, Object> properties) {
-
-    final var repoInfo = UrlPropertiesUtils.getRepoInfo(context);
-
-    if (this.shouldSkipAuthentication(repoInfo, properties)) {
-      return ProcessorResult.next();
-    }
-
-    try {
-      this.authenticate(request, repoInfo.getStorageKey(), properties);
-    } catch (final UnAuthorizedException ex) {
-      throw AuthChallenges.challenged(ex, DockerAuthChallenge.of(context, request, properties));
-    }
-
-    this.authorizeGrantedAccess(context, request, repoInfo, properties);
-
-    return ProcessorResult.next();
-  }
-
-  /**
-   * A token that passed the role check must also have been issued for what the request does
-   * (RPS-1434). The answer is a 401 like any other refusal, and its challenge names the scope to
-   * ask for, so a client that requested less can request the right one.
-   */
-  private void authorizeGrantedAccess(
-      final ProtocolContext context,
-      final HttpServletRequest request,
-      final RepoInfo repoInfo,
-      final Map<String, Object> properties) {
-
-    final var permission = (Permission) properties.get(HandlerPropertyKeys.PERMISSION);
-    final var authHeader = this.authenticator.emulateAuthHeader(request);
-
-    if (permission != Permission.MANAGE || authHeader == null) {
-      return;
-    }
-
-    final var name =
-        Objects.requireNonNullElse(
-            DockerAuthChallenge.requestedName(context, repoInfo), repoInfo.getName());
-
-    try {
-      this.authenticator.authorizeGrantedAccess(authHeader, name, permission);
-    } catch (final UnAuthorizedException ex) {
-      throw AuthChallenges.challenged(
-          ex, DockerAuthChallenge.insufficientScope(request, "repository:" + name + ":delete"));
-    }
-  }
-
-  private void authenticate(
-      final HttpServletRequest request, final UUID repoId, final Map<String, Object> properties) {
-
-    final var authHeader = this.authenticator.emulateAuthHeader(request);
-
-    if (authHeader == null) {
-      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
-    }
-
-    this.authenticateRequest(authHeader, repoId, properties);
-  }
-
-  private void authenticateRequest(
-      final String authHeader, final UUID repoId, final Map<String, Object> properties) {
-
-    if (!authHeader.startsWith(AUTH_BEARER)) {
-      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
-    }
-
-    final var permission = (Permission) properties.get(HandlerPropertyKeys.PERMISSION);
-
-    this.authenticator.handleBearerAuth(authHeader, repoId, permission);
-  }
-
-  private boolean shouldSkipAuthentication(
+  protected boolean shouldSkipAuthentication(
       final RepoInfo repoInfo, final Map<String, Object> properties) {
 
     final var skipPreProcessor =
@@ -155,5 +67,59 @@ public class DockerAuthPreProcessor extends ProtocolProcessor {
     }
 
     return !repoInfo.isPrivateRepo();
+  }
+
+  @Override
+  protected ProcessorResult missingCredential(final HttpServletRequest request) {
+    throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
+  }
+
+  /** Basic credentials are exchanged for a token at {@code /v2/token}, never taken here. */
+  @Override
+  protected void authenticateBasic(
+      final String credential, final UUID repoId, final Permission permission) {
+
+    throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
+  }
+
+  @Override
+  protected ProcessorResult refused(
+      final UnAuthorizedException exception,
+      final @Nullable String credential,
+      final ProtocolContext context,
+      final HttpServletRequest request,
+      final Map<String, Object> properties) {
+
+    throw AuthChallenges.challenged(
+        exception, DockerAuthChallenge.of(context, request, properties));
+  }
+
+  /**
+   * A token that passed the role check must also have been issued for what the request does
+   * (RPS-1434). The answer is a 401 like any other refusal, and its challenge names the scope to
+   * ask for, so a client that requested less can request the right one.
+   */
+  @Override
+  protected void afterAuthentication(
+      final ProtocolContext context,
+      final HttpServletRequest request,
+      final RepoInfo repoInfo,
+      final Permission permission,
+      final @Nullable String credential) {
+
+    if (permission != Permission.MANAGE || credential == null) {
+      return;
+    }
+
+    final var name =
+        Objects.requireNonNullElse(
+            DockerAuthChallenge.requestedName(context, repoInfo), repoInfo.getName());
+
+    try {
+      this.authenticator.authorizeGrantedAccess(credential, name, permission);
+    } catch (final UnAuthorizedException ex) {
+      throw AuthChallenges.challenged(
+          ex, DockerAuthChallenge.insufficientScope(request, "repository:" + name + ":delete"));
+    }
   }
 }

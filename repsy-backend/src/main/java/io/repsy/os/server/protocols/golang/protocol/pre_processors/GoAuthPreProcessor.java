@@ -20,83 +20,54 @@ import static org.springframework.http.HttpHeaders.WWW_AUTHENTICATE;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.libs.protocol.router.ProcessorResult;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.os.server.protocols.golang.shared.auth.services.GoAuthenticator;
-import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
-import io.repsy.os.shared.repo.dtos.RepoInfo;
+import io.repsy.os.server.shared.auth.BasicOrBearerAuthPreProcessor;
 import io.repsy.protocols.golang.protocol.GolangProtocolProvider;
-import io.repsy.protocols.shared.auth.BasicAuthChallenge;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
-import io.repsy.protocols.shared.handlers.HandlerPropertyKeys;
-import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
-import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 
+/** Go: Basic or Bearer, every refusal answered as text the go command prints. */
 @Component
-public class GoAuthPreProcessor extends ProtocolProcessor {
+@NullMarked
+public class GoAuthPreProcessor extends BasicOrBearerAuthPreProcessor<GoAuthenticator> {
 
-  private static final int PRIORITY = 100;
-
-  private static final String AUTH_BEARER = "Bearer ";
-  private static final String AUTH_BASIC = "Basic ";
-
-  private final @NonNull GoAuthenticator authenticator;
-  private final @NonNull MessageSource messageSource;
+  private final MessageSource messageSource;
 
   public GoAuthPreProcessor(
-      final @NonNull GoAuthenticator authenticator,
-      final @NonNull MessageSource messageSource,
-      final @NonNull GolangProtocolProvider provider) {
+      final GoAuthenticator authenticator,
+      final MessageSource messageSource,
+      final GolangProtocolProvider provider) {
 
-    this.authenticator = authenticator;
+    super(authenticator, provider);
     this.messageSource = messageSource;
-    provider.registerPreProcessor(this);
   }
 
   @Override
-  protected int getPriority() {
-    return PRIORITY;
+  protected ProcessorResult missingCredential(final HttpServletRequest request) {
+    return ProcessorResult.of(this.unauthorized(ProtocolErrorCodes.UNAUTHORIZED_REQUEST));
   }
 
   @Override
-  protected @NonNull ProcessorResult process(
-      @NonNull final ProtocolContext context,
-      @NonNull final HttpServletRequest request,
-      @NonNull final HttpServletResponse response,
-      @NonNull final Map<@NonNull String, @NonNull Object> properties) {
+  protected ProcessorResult refused(
+      final UnAuthorizedException exception,
+      final @Nullable String credential,
+      final ProtocolContext context,
+      final HttpServletRequest request,
+      final Map<String, Object> properties) {
 
-    final var repoInfo = UrlPropertiesUtils.getRepoInfo(context);
-
-    if (this.shouldSkipAuthentication(repoInfo, properties)) {
-      return ProcessorResult.next();
-    }
-
-    final var authHeader = this.authenticator.emulateAuthHeader(request);
-
-    if (authHeader == null) {
-      return ProcessorResult.of(this.unauthorized(ProtocolErrorCodes.UNAUTHORIZED_REQUEST));
-    }
-
-    final var permission = (Permission) properties.get(HandlerPropertyKeys.PERMISSION);
-
-    try {
-      this.authenticateRequest(authHeader, repoInfo.getStorageKey(), permission);
-    } catch (final UnAuthorizedException ex) {
-      return ProcessorResult.of(
-          this.unauthorized(Objects.toString(ex.getMessage(), ProtocolErrorCodes.UN_AUTHORIZED)));
-    }
-
-    return ProcessorResult.next();
+    return ProcessorResult.of(
+        this.unauthorized(
+            Objects.toString(exception.getMessage(), ProtocolErrorCodes.UN_AUTHORIZED)));
   }
 
   /**
@@ -110,30 +81,8 @@ public class GoAuthPreProcessor extends ProtocolProcessor {
     final var text = this.messageSource.getMessage(msgId, null, msgId, Locale.getDefault());
 
     return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-        .header(WWW_AUTHENTICATE, BasicAuthChallenge.REPSY)
+        .header(WWW_AUTHENTICATE, this.challenge(null))
         .contentType(MediaType.TEXT_PLAIN)
         .body(text);
-  }
-
-  private void authenticateRequest(
-      final @NonNull String authHeader,
-      final @NonNull UUID repoId,
-      final @NonNull Permission permission) {
-
-    switch (authHeader) {
-      case final String header when header.startsWith(AUTH_BASIC) ->
-          this.authenticator.handleBasicAuth(header, permission, repoId);
-      case final String header when header.startsWith(AUTH_BEARER) ->
-          this.authenticator.handleBearerAuth(header, repoId, permission);
-      default -> throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
-    }
-  }
-
-  private boolean shouldSkipAuthentication(
-      final @NonNull RepoInfo repoInfo,
-      final @NonNull Map<@NonNull String, @NonNull Object> properties) {
-
-    final var writeOperation = (boolean) properties.get(HandlerPropertyKeys.WRITE_OPERATION);
-    return !repoInfo.isPrivateRepo() && !writeOperation;
   }
 }

@@ -15,133 +15,52 @@
  */
 package io.repsy.os.server.protocols.maven.protocol.pre_processors;
 
-import static org.springframework.http.HttpHeaders.WWW_AUTHENTICATE;
-
-import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
-import io.repsy.libs.protocol.router.ProcessorResult;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.os.server.protocols.maven.shared.auth.services.MavenAuthenticator;
-import io.repsy.os.server.shared.auth.AuthChallenges;
+import io.repsy.os.server.shared.auth.BasicOrBearerAuthPreProcessor;
 import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.maven.protocol.MavenProtocolProvider;
-import io.repsy.protocols.shared.auth.BasicAuthChallenge;
-import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
-import io.repsy.protocols.shared.handlers.HandlerPropertyKeys;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import java.util.Map;
-import java.util.UUID;
-import org.jspecify.annotations.NonNull;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
+/** Maven: Basic or Bearer, or the single-path download token of the web UI. */
 @Component
-public class MavenAuthPreProcessor extends ProtocolProcessor {
-
-  private static final int PRIORITY = 100;
+@NullMarked
+public class MavenAuthPreProcessor extends BasicOrBearerAuthPreProcessor<MavenAuthenticator> {
 
   /**
    * The web UI downloads a file by navigating to it, which cannot set an {@code Authorization}
    * header, so it carries a short-lived download token for that one file in this parameter.
    */
-  private static final @NonNull String DOWNLOAD_TOKEN_PARAMETER = "downloadToken";
-
-  private static final String AUTH_BEARER = "Bearer ";
-  private static final String AUTH_BASIC = "Basic ";
-
-  private final @NonNull MavenAuthenticator authenticator;
+  private static final String DOWNLOAD_TOKEN_PARAMETER = "downloadToken";
 
   public MavenAuthPreProcessor(
-      final @NonNull MavenAuthenticator authenticator,
-      final @NonNull MavenProtocolProvider provider) {
-
-    this.authenticator = authenticator;
-    provider.registerPreProcessor(this);
+      final MavenAuthenticator authenticator, final MavenProtocolProvider provider) {
+    super(authenticator, provider);
   }
 
   @Override
-  protected int getPriority() {
-    return PRIORITY;
-  }
-
-  @Override
-  protected @NonNull ProcessorResult process(
-      @NonNull final ProtocolContext context,
-      @NonNull final HttpServletRequest request,
-      @NonNull final HttpServletResponse response,
-      @NonNull final Map<@NonNull String, @NonNull Object> properties) {
-
-    final var repoInfo = UrlPropertiesUtils.getRepoInfo(context);
-
-    if (this.shouldSkipAuthentication(repoInfo, properties)) {
-      return ProcessorResult.next();
-    }
-
-    final var permission = (Permission) properties.get(HandlerPropertyKeys.PERMISSION);
-
-    try {
-      return this.authenticate(context, request, repoInfo, permission);
-    } catch (final UnAuthorizedException ex) {
-      throw AuthChallenges.challenged(ex, BasicAuthChallenge.REPSY);
-    }
-  }
-
-  private ProcessorResult authenticate(
-      final @NonNull ProtocolContext context,
-      final @NonNull HttpServletRequest request,
-      final @NonNull RepoInfo repoInfo,
-      final @NonNull Permission permission) {
+  protected boolean authenticateOtherwise(
+      final ProtocolContext context,
+      final HttpServletRequest request,
+      final RepoInfo repoInfo,
+      final Permission permission) {
 
     final var downloadToken = request.getParameter(DOWNLOAD_TOKEN_PARAMETER);
 
-    if (downloadToken != null) {
-      this.authenticator.handleDownloadToken(
-          downloadToken,
-          repoInfo.getStorageKey(),
-          UrlPropertiesUtils.getRelativePath(context).getPath(),
-          permission);
-
-      return ProcessorResult.next();
+    if (downloadToken == null) {
+      return false;
     }
 
-    final var authHeader = this.authenticator.emulateAuthHeader(request);
+    this.authenticator.handleDownloadToken(
+        downloadToken,
+        repoInfo.getStorageKey(),
+        UrlPropertiesUtils.getRelativePath(context).getPath(),
+        permission);
 
-    if (authHeader == null) {
-      return ProcessorResult.of(
-          ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-              .header(WWW_AUTHENTICATE, BasicAuthChallenge.REPSY)
-              .build());
-    }
-
-    this.authenticateRequest(authHeader, repoInfo.getStorageKey(), permission);
-
-    return ProcessorResult.next();
-  }
-
-  private void authenticateRequest(
-      final @NonNull String authHeader,
-      final @NonNull UUID repoId,
-      final @NonNull Permission permission) {
-
-    switch (authHeader) {
-      case final String header when header.startsWith(AUTH_BASIC) ->
-          this.authenticator.handleBasicAuth(header, permission, repoId);
-      case final String header when header.startsWith(AUTH_BEARER) ->
-          this.authenticator.handleBearerAuth(header, repoId, permission);
-      default -> throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
-    }
-  }
-
-  private boolean shouldSkipAuthentication(
-      final @NonNull RepoInfo repoInfo,
-      final @NonNull Map<@NonNull String, @NonNull Object> properties) {
-
-    final var writeOperation = (boolean) properties.get(HandlerPropertyKeys.WRITE_OPERATION);
-
-    return !repoInfo.isPrivateRepo() && !writeOperation;
+    return true;
   }
 }

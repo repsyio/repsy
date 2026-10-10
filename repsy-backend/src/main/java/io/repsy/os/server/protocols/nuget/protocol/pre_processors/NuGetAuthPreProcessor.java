@@ -16,127 +16,96 @@
 package io.repsy.os.server.protocols.nuget.protocol.pre_processors;
 
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
-import static org.springframework.http.HttpHeaders.WWW_AUTHENTICATE;
 
 import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.libs.protocol.router.ProcessorResult;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.os.server.protocols.nuget.shared.auth.services.NuGetAuthenticator;
-import io.repsy.os.server.shared.utils.PreProcessorUtils;
-import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
+import io.repsy.os.server.shared.auth.BasicOrBearerAuthPreProcessor;
 import io.repsy.protocols.nuget.protocol.NuGetProtocolProvider;
-import io.repsy.protocols.shared.auth.BasicAuthChallenge;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
-import io.repsy.protocols.shared.handlers.HandlerPropertyKeys;
 import io.repsy.protocols.shared.repo.dtos.Permission;
-import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import java.util.Map;
 import java.util.UUID;
-import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 
+/**
+ * NuGet: Basic or Bearer, or the API key {@code nuget push -ApiKey} sends in {@code X-NuGet-ApiKey}
+ * (a token without a scheme). Every refusal, a missing permission included, is a 401 with the Basic
+ * challenge and no body, which the NuGet client answers by asking for credentials.
+ */
 @Component
-@RequiredArgsConstructor
 @NullMarked
-public class NuGetAuthPreProcessor extends ProtocolProcessor {
+public class NuGetAuthPreProcessor extends BasicOrBearerAuthPreProcessor<NuGetAuthenticator> {
 
-  private static final int PRIORITY = 100;
   private static final String X_NUGET_API_KEY = "X-NuGet-ApiKey";
-  private static final String AUTH_BASIC = "Basic ";
-  private static final String AUTH_BEARER = "Bearer ";
 
-  private final NuGetAuthenticator authenticator;
-  private final NuGetProtocolProvider provider;
-
-  @PostConstruct
-  public void register() {
-    this.provider.registerPreProcessor(this);
+  public NuGetAuthPreProcessor(
+      final NuGetAuthenticator authenticator, final NuGetProtocolProvider provider) {
+    super(authenticator, provider);
   }
 
+  /** The {@code Authorization} header, or else the API key; a blank value is no credential. */
   @Override
-  protected int getPriority() {
-    return PRIORITY;
-  }
-
-  @Override
-  protected ProcessorResult process(
-      final ProtocolContext context,
-      final HttpServletRequest request,
-      final HttpServletResponse response,
-      final Map<String, Object> properties) {
-
-    final var repoInfo = UrlPropertiesUtils.getRepoInfo(context);
-
-    if (PreProcessorUtils.shouldSkipAuthentication(
-        HandlerPropertyKeys.SKIP_PRE_PROCESSOR,
-        HandlerPropertyKeys.WRITE_OPERATION,
-        repoInfo,
-        properties)) {
-      return ProcessorResult.next();
-    }
-
-    final var rawAuthHeader = this.extractAuthHeader(request);
-
-    if (rawAuthHeader == null) {
-      return ProcessorResult.of(
-          ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-              .header(WWW_AUTHENTICATE, BasicAuthChallenge.REPSY)
-              .build());
-    }
-
-    final var authHeader = this.normalizeAuthHeader(rawAuthHeader);
-
-    try {
-      this.authenticateRequest(authHeader, repoInfo.getId(), properties);
-    } catch (final AccessNotAllowedException | UnAuthorizedException ignored) {
-      return ProcessorResult.of(
-          ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-              .header(WWW_AUTHENTICATE, BasicAuthChallenge.REPSY)
-              .build());
-    }
-
-    return ProcessorResult.next();
-  }
-
-  private String normalizeAuthHeader(final String authHeader) {
-
-    if (authHeader.startsWith(AUTH_BASIC) || authHeader.startsWith(AUTH_BEARER)) {
-      return authHeader;
-    }
-
-    return AUTH_BEARER + authHeader;
-  }
-
-  private @Nullable String extractAuthHeader(final HttpServletRequest request) {
+  protected @Nullable String credential(final HttpServletRequest request) {
 
     final var authHeader = request.getHeader(AUTHORIZATION);
+
     if (authHeader != null && !authHeader.isBlank()) {
       return authHeader;
     }
 
     final var nugetApiKey = request.getHeader(X_NUGET_API_KEY);
-    return (nugetApiKey != null && !nugetApiKey.isBlank()) ? nugetApiKey : null;
+
+    return nugetApiKey != null && !nugetApiKey.isBlank() ? nugetApiKey : null;
   }
 
-  private void authenticateRequest(
-      final String authHeader, final UUID repoId, final Map<String, Object> properties) {
+  @Override
+  protected boolean acceptsBareToken() {
+    return true;
+  }
 
-    final var permission = (Permission) properties.get(HandlerPropertyKeys.PERMISSION);
+  @Override
+  protected void authenticateBasic(
+      final String credential, final UUID repoId, final Permission permission) {
 
-    switch (authHeader) {
-      case final String header when header.startsWith(AUTH_BASIC) ->
-          this.authenticator.handleBasicAuth(header, permission, repoId);
-      case final String header when header.startsWith(AUTH_BEARER) ->
-          this.authenticator.handleBearerAuth(header, repoId, permission);
-      default -> throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
+    try {
+      super.authenticateBasic(credential, repoId, permission);
+    } catch (final AccessNotAllowedException ex) {
+      throw refusal(ex);
     }
+  }
+
+  @Override
+  protected void authenticateBearer(
+      final String credential, final UUID repoId, final Permission permission) {
+
+    try {
+      super.authenticateBearer(credential, repoId, permission);
+    } catch (final AccessNotAllowedException ex) {
+      throw refusal(ex);
+    }
+  }
+
+  private static UnAuthorizedException refusal(final AccessNotAllowedException cause) {
+
+    final var refusal = new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
+    refusal.initCause(cause);
+    return refusal;
+  }
+
+  @Override
+  protected ProcessorResult refused(
+      final UnAuthorizedException exception,
+      final @Nullable String credential,
+      final ProtocolContext context,
+      final HttpServletRequest request,
+      final Map<String, Object> properties) {
+
+    return this.missingCredential(request);
   }
 }
