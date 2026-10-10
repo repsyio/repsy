@@ -19,7 +19,7 @@
  */
 import { RepoType } from '../../src/api/panel-api.js';
 import { nugetAdapter } from '../../src/clients/nuget.js';
-import { pushNuget } from '../../src/clients/oversize.js';
+import { pushNuGet } from '../../src/clients/oversize.js';
 import { registerSizeLimitSpecs } from '../../src/scenarios/size-limits.js';
 
 registerSizeLimitSpecs({
@@ -27,6 +27,6 @@ registerSizeLimitSpecs({
   client: 'dotnet nuget push',
   repoType: RepoType.NUGET,
   adapter: nugetAdapter,
-  push: pushNuget,
+  push: pushNuGet,
   clientMessage: /error: Response status code does not indicate success: 413/,
 });

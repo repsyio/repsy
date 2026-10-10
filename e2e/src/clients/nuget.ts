@@ -42,7 +42,7 @@
  * `NUGET_PACKAGES/<idLower>/<verLower>/<idLower>.<verLower>.nupkg`, so comparing whole-file digests is
  * what a restored, still-packed `.nupkg` can actually be checked against.
  *
- * Credential mapping (both push and restore share ONE rendered `nuget.config`, see `renderNugetConfig`
+ * Credential mapping (both push and restore share ONE rendered `nuget.config`, see `renderNuGetConfig`
  * and `nuget-raw.ts`'s `nugetApiKey`/`nugetPublishHeaders`): a `token`-kind credential (a deploy
  * token) is passed to `dotnet nuget push` as `--api-key <token>` -- the panel's "Option B", the
  * server's `X-NuGet-ApiKey` -> Bearer path, authenticates the client's FIRST request. A
@@ -116,7 +116,7 @@ async function renderTemplate(
  * adapter call above goes through this same function, so the credential-rendering logic never drifts
  * between them.
  */
-export async function renderNugetConfig(
+export async function renderNuGetConfig(
   home: string,
   repoName: string,
   credential: MaterializedCredential,
@@ -140,7 +140,7 @@ export async function renderNugetConfig(
  * `dotnet add package` take no `--configfile`, so a real client of those commands finds the
  * credentials here (RPS-1486).
  */
-export function userNugetConfigPath(home: string): string {
+export function userNuGetConfigPath(home: string): string {
   return path.join(home, '.nuget', 'NuGet', 'NuGet.Config');
 }
 
@@ -229,7 +229,7 @@ interface PublishRun {
 /**
  * Builds a fresh `.nupkg` (`buildNupkg`) and runs the real `dotnet nuget push` with
  * `world.credential`. `--allow-insecure-connections` (the flag) and `allowInsecureConnections="true"`
- * (the source attribute, `renderNugetConfig`) are both passed deliberately -- see README.md's "H2"
+ * (the source attribute, `renderNuGetConfig`) are both passed deliberately -- see README.md's "H2"
  * for which one, if either, turned out to be load-bearing.
  */
 async function publishWithClient(world: World, label: string): Promise<PublishRun> {
@@ -241,7 +241,7 @@ async function publishWithClient(world: World, label: string): Promise<PublishRu
   const nupkgFile = path.join(work, 'package.nupkg');
   await fs.writeFile(nupkgFile, nupkgBytes);
 
-  const cfgPath = await renderNugetConfig(home, world.repoName, world.credential);
+  const cfgPath = await renderNuGetConfig(home, world.repoName, world.credential);
   const apiKey = nugetApiKey(world.credential);
 
   const secrets = [world.credential.password, apiKey].filter((s): s is string => Boolean(s));
@@ -329,7 +329,7 @@ export async function resolve(world: World): Promise<AdapterResult> {
   const { packageName: packageId, version } = world.consumeTarget;
 
   const csprojPath = await renderConsumerProject(work, packageId, version);
-  const cfgPath = await renderNugetConfig(home, world.repoName, world.credential);
+  const cfgPath = await renderNuGetConfig(home, world.repoName, world.credential);
   const packagesDir = path.join(home, 'nuget-packages');
 
   const secrets = world.credential.password ? [world.credential.password] : [];

@@ -254,7 +254,7 @@ export async function seedHostileCargo(
 }
 
 /** NuGet: the README, the title and the project, repository and licence URLs of the nuspec. */
-export async function seedHostileNuget(
+export async function seedHostileNuGet(
   repoName: string,
   runId: string,
   opts: SeedOptions = {},

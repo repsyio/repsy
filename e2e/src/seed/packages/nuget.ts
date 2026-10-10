@@ -22,7 +22,7 @@ import { buildNupkg, rawPublish } from '../../clients/nuget-raw.js';
 import type { PackageSeeder } from '../packages.js';
 import { defaultPackageName, DEFAULT_VERSION, expectPublished } from './shared.js';
 
-export const seedNuget: PackageSeeder = async (repoName, ctx, opts) => {
+export const seedNuGet: PackageSeeder = async (repoName, ctx, opts) => {
   const name = opts.name ?? defaultPackageName('nuget', ctx.runId, opts.index);
   const version = opts.version ?? DEFAULT_VERSION;
 

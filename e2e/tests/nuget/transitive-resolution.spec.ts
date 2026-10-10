@@ -58,7 +58,7 @@ import path from 'node:path';
 
 import { RepoType } from '../../src/api/panel-api.js';
 import { isolatedWorkDir, run, type RunResult } from '../../src/clients/exec.js';
-import { nugetEnv, renderNugetConfig } from '../../src/clients/nuget.js';
+import { nugetEnv, renderNuGetConfig } from '../../src/clients/nuget.js';
 import {
   adminCredential,
   buildNupkg,
@@ -124,7 +124,7 @@ async function pushPackage(
   const { home, work } = await isolatedWorkDir(label);
   const file = path.join(work, 'package.nupkg');
   await fs.writeFile(file, nupkg);
-  const cfg = await renderNugetConfig(home, layout.repoName, layout.credential);
+  const cfg = await renderNuGetConfig(home, layout.repoName, layout.credential);
   const apiKey = nugetApiKey(layout.credential) ?? '';
   const pushed = await run(
     'dotnet',
@@ -198,7 +198,7 @@ async function restoreConsumer(
       '</Project>\n',
   );
   const packagesDir = path.join(home, 'nuget-packages');
-  const cfg = await renderNugetConfig(home, layout.repoName, layout.credential);
+  const cfg = await renderNuGetConfig(home, layout.repoName, layout.credential);
   const restored = await run(
     'dotnet',
     [

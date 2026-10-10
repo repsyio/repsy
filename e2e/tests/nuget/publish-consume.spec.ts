@@ -36,7 +36,7 @@ import * as nuget from '../../src/clients/nuget.js';
 import {
   nugetAdapter,
   renderConsumerProject,
-  renderNugetConfig,
+  renderNuGetConfig,
   nugetEnv,
 } from '../../src/clients/nuget.js';
 import {
@@ -78,7 +78,7 @@ test(
 
     // includeCredentials: false -- the config carries ONLY the source, no packageSourceCredentials,
     // so a successful push proves X-NuGet-ApiKey alone authenticated it.
-    const pushCfg = await renderNugetConfig(home, repo.name, credential, {
+    const pushCfg = await renderNuGetConfig(home, repo.name, credential, {
       includeCredentials: false,
     });
 
@@ -120,7 +120,7 @@ test(
       `nuget-apikeyonly-restore-${seeder.runId}`,
     );
     const csprojPath = await renderConsumerProject(restoreWork, packageId, version);
-    const restoreCfg = await renderNugetConfig(restoreHome, repo.name, credential);
+    const restoreCfg = await renderNuGetConfig(restoreHome, repo.name, credential);
     const restoreResult = await run(
       'dotnet',
       [

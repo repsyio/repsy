@@ -3151,7 +3151,7 @@ property, as on nuget.org): both used to lack it (RPS-1555).
 - **`dotnet nuget delete <id> <version> --source <index.json> --api-key <key> --non-interactive`**,
   NuGet's unlist command: `204`, `listed: false` in the registration, the flat container still lists and
   serves the version byte for byte, and `dotnet restore` of `[version]` still resolves it. It is also a
-  client cell of the permission matrix, `unlist-client` (`nuget-manage.ts`, `dotnetNugetDelete`), for
+  client cell of the permission matrix, `unlist-client` (`nuget-manage.ts`, `dotnetNuGetDelete`), for
   every credential: WRITE, a read-only token and an anonymous caller get a 401.
 - **Symbol packages.** A real `dotnet pack --include-symbols -p:SymbolPackageFormat=snupkg` output
   round-trips (`dotnet nuget push x.nupkg` sends the `.nupkg` alone, the package restores and a
@@ -6599,7 +6599,7 @@ URLs, so the panel must treat it as hostile. `src/ui/hostile-packages.ts` holds 
 (`HOSTILE_PAYLOADS`, `HOSTILE_README`, `HOSTILE_URLS`, `HOSTILE_TEXT`: `<script>`, `onerror`/`onload`/`onclick`
 handlers, `javascript:`, `data:text/html` and `vbscript:` links (also spelled with an entity, a tab and mixed case),
 an external tracking image, a `data:` "image", relative links and images, an `<iframe>`, a `style` attribute that
-loads a background, an HTML comment) and one seeder per protocol (`seedHostileNpm|Pypi|Cargo|Nuget|Maven|Ruby`,
+loads a background, an HTML comment) and one seeder per protocol (`seedHostileNpm|Pypi|Cargo|NuGet|Maven|Ruby`,
 raw HTTP, built on `src/seed/packages`). Every script payload sets `window.__pwned` to its own id. The
 assertions are in `src/ui/hostile-checks.ts`. Repsy Cloud's suite (RPS-1624) reuses both files.
 

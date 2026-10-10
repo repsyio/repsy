@@ -60,10 +60,10 @@ import { isolatedWorkDir, run, type RunResult } from '../../src/clients/exec.js'
 import {
   nugetEnv,
   renderConsumerProject,
-  renderNugetConfig,
-  userNugetConfigPath,
+  renderNuGetConfig,
+  userNuGetConfigPath,
 } from '../../src/clients/nuget.js';
-import { dotnetNugetDelete } from '../../src/clients/nuget-manage.js';
+import { dotnetNuGetDelete } from '../../src/clients/nuget-manage.js';
 import {
   adminCredential,
   buildNupkg,
@@ -166,15 +166,15 @@ async function dotnetAddPackage(
   const { home, work } = await isolatedWorkDir('nuget-add');
   await fs.writeFile(path.join(work, 'app.csproj'), EMPTY_PROJECT);
   if (setup.user !== 'none') {
-    await renderNugetConfig(home, layout.repoName, layout.credential, {
+    await renderNuGetConfig(home, layout.repoName, layout.credential, {
       includeSource: setup.user === 'full',
-      destination: userNugetConfigPath(home),
+      destination: userNuGetConfigPath(home),
     });
   }
   if (setup.projectSource) {
     // Only the source. The panel's snippet does not `<clear/>` the machine-wide sources; this
     // harness's template does (no nuget.org in a runner without network).
-    await renderNugetConfig(home, layout.repoName, layout.credential, {
+    await renderNuGetConfig(home, layout.repoName, layout.credential, {
       includeCredentials: false,
       destination: path.join(work, 'NuGet.Config'),
     });
@@ -350,7 +350,7 @@ async function restoreExact(
 ): Promise<{ result: RunResult; work: string; home: string }> {
   const { home, work } = await isolatedWorkDir('nuget-restore-exact');
   const csproj = await renderConsumerProject(work, packageId, version);
-  const cfg = await renderNugetConfig(home, layout.repoName, layout.credential);
+  const cfg = await renderNuGetConfig(home, layout.repoName, layout.credential);
   const result = await run(
     'dotnet',
     [
@@ -388,7 +388,7 @@ test.describe('nuget > dotnet nuget delete (unlist)', () => {
     const before = await rawDownloadNupkg(layout.repoName, adminCredential(), idLower, '1.1.0');
     expect(before.status).toBe(200);
 
-    const deleted = await dotnetNugetDelete(layout.repoName, layout.credential, packageId, '1.1.0');
+    const deleted = await dotnetNuGetDelete(layout.repoName, layout.credential, packageId, '1.1.0');
     expect(deleted.exitCode, describeRun('dotnet nuget delete', deleted)).toBe(0);
     expect(deleted.stdout, 'the client says what it did').toContain(
       `${packageId} 1.1.0 was deleted successfully.`,
@@ -422,7 +422,7 @@ test.describe('nuget > dotnet nuget delete (unlist)', () => {
     const packageId = `e2e-${seeder.runId}-delete-missing`;
     await seedVersions(layout, packageId, ['1.0.0']);
 
-    const deleted = await dotnetNugetDelete(layout.repoName, layout.credential, packageId, '9.9.9');
+    const deleted = await dotnetNuGetDelete(layout.repoName, layout.credential, packageId, '9.9.9');
     expect(deleted.exitCode, describeRun('dotnet nuget delete', deleted)).not.toBe(0);
     const raw = await rawUnlist(
       layout.repoName,
@@ -465,7 +465,7 @@ async function packWithSymbols(
     path.join(work, 'Greeter.cs'),
     'namespace E2e { public static class Greeter { public static string Hello() => "hello from repsy"; } }\n',
   );
-  const cfg = await renderNugetConfig(home, layout.repoName, layout.credential);
+  const cfg = await renderNuGetConfig(home, layout.repoName, layout.credential);
   const out = path.join(work, 'out');
   const packed = await run(
     'dotnet',
@@ -498,7 +498,7 @@ async function dotnetPush(
   file: string,
   extra: string[] = [],
 ): Promise<RunResult> {
-  const cfg = await renderNugetConfig(home, layout.repoName, layout.credential);
+  const cfg = await renderNuGetConfig(home, layout.repoName, layout.credential);
   const apiKey = nugetApiKey(layout.credential) ?? '';
   return run(
     'dotnet',
@@ -568,7 +568,7 @@ test.describe('nuget > symbol packages (.snupkg)', () => {
       path.join(work, 'Use.cs'),
       'namespace App { public static class Use { public static string Run() => E2e.Greeter.Hello(); } }\n',
     );
-    const cfg = await renderNugetConfig(home, layout.repoName, layout.credential);
+    const cfg = await renderNuGetConfig(home, layout.repoName, layout.credential);
     const secret = layout.credential.password ?? '';
     const restored = await run(
       'dotnet',
@@ -641,7 +641,7 @@ test.describe('nuget > dotnet nuget push --skip-duplicate', () => {
     const nupkgFile = path.join(work, 'package.nupkg');
     await fs.writeFile(nupkgFile, nupkgBytes);
 
-    const cfg = await renderNugetConfig(home, layout.repoName, layout.credential);
+    const cfg = await renderNuGetConfig(home, layout.repoName, layout.credential);
     const apiKey = nugetApiKey(layout.credential) ?? '';
 
     const first = await run(
@@ -789,7 +789,7 @@ test.describe('nuget > dotnet tool install', () => {
       'namespace E2e.Tool { class Program { static void Main() { System.Console.WriteLine("Hello from e2e tool!"); } } }\n',
     );
 
-    const cfg = await renderNugetConfig(home, layout.repoName, layout.credential);
+    const cfg = await renderNuGetConfig(home, layout.repoName, layout.credential);
     const packOut = path.join(work, 'out');
     const packed = await run(
       'dotnet',
@@ -835,8 +835,8 @@ test.describe('nuget > dotnet tool install', () => {
 
     // Install the tool via dotnet tool install with the isolated NuGet.Config.
     const { home: toolHome, work: toolWork } = await isolatedWorkDir('nuget-tool-install');
-    await renderNugetConfig(toolHome, layout.repoName, layout.credential, {
-      destination: userNugetConfigPath(toolHome),
+    await renderNuGetConfig(toolHome, layout.repoName, layout.credential, {
+      destination: userNuGetConfigPath(toolHome),
     });
 
     const toolDir = path.join(toolWork, 'tools');
