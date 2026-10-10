@@ -42,24 +42,24 @@ import { ToastService } from '../../toast/toast.service';
 })
 export class DeployTokenCreateModalComponent implements OnInit {
   /** Element ids of this instance: see `idFactory`. */
-  public readonly id = idFactory('token-create');
+  readonly id = idFactory('token-create');
 
   @Output() openChange = new EventEmitter<boolean>();
   @Output() created = new EventEmitter<TokenCreateInfo>();
-  @Input() public open: boolean;
-  @Input() public repoType: string;
-  @Input() public repoName: string;
+  @Input() open: boolean;
+  @Input() repoType: string;
+  @Input() repoName: string;
 
-  public loading = false;
-  public readonly usernameMessages = USERNAME_MESSAGES;
-  public readonly descriptionMaxLength = DESCRIPTION_MAX_LENGTH;
-  public readonly descriptionMaxMessage = DESCRIPTION_MAX_MESSAGE;
+  loading = false;
+  readonly usernameMessages = USERNAME_MESSAGES;
+  readonly descriptionMaxLength = DESCRIPTION_MAX_LENGTH;
+  readonly descriptionMaxMessage = DESCRIPTION_MAX_MESSAGE;
 
-  public form: FormGroup;
-  public minDate: string;
-  public maxDate: string;
+  form: FormGroup;
+  minDate: string;
+  maxDate: string;
 
-  public accessTypeOptions: RadioOption<boolean>[] = [
+  accessTypeOptions: RadioOption<boolean>[] = [
     { label: 'Read/Write', value: false },
     { label: 'Read Only', value: true },
   ];

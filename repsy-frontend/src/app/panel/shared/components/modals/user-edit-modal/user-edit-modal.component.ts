@@ -36,17 +36,17 @@ import { ToggleComponent } from '../../toggle/toggle.component';
 })
 export class UserEditModalComponent implements OnChanges {
   /** Element ids of this instance: see `idFactory`. */
-  public readonly id = idFactory('user-edit');
+  readonly id = idFactory('user-edit');
 
   @Output() openChange = new EventEmitter<boolean>();
   @Output() updated = new EventEmitter<void>();
-  @Input() public open: boolean;
-  @Input() public user: UserResponse;
-  @Input() public isLastAdmin = false;
+  @Input() open: boolean;
+  @Input() user: UserResponse;
+  @Input() isLastAdmin = false;
 
-  public loading = false;
-  public form: FormGroup;
-  public readonly usernameMessages = USERNAME_MESSAGES;
+  loading = false;
+  form: FormGroup;
+  readonly usernameMessages = USERNAME_MESSAGES;
 
   constructor(
     private readonly fb: FormBuilder,
@@ -59,7 +59,7 @@ export class UserEditModalComponent implements OnChanges {
     });
   }
 
-  public ngOnChanges(changes: SimpleChanges): void {
+  ngOnChanges(changes: SimpleChanges): void {
     if ((changes['user'] || changes['open']) && this.user && this.open) {
       this.form.patchValue({
         username: this.user.username,
@@ -74,13 +74,13 @@ export class UserEditModalComponent implements OnChanges {
     }
   }
 
-  public closeModal(): void {
+  closeModal(): void {
     this.form.reset();
     this.form.get('isAdmin')?.enable();
     this.openChange.emit(false);
   }
 
-  public updateUser(): void {
+  updateUser(): void {
     if (this.form.invalid) {
       return;
     }

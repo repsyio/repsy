@@ -42,8 +42,8 @@ const DESKTOP_QUERY = '(min-width: 48rem)';
   standalone: true,
 })
 export class PanelLayoutComponent implements OnInit, OnDestroy {
-  public isMobileMenuOpen = false;
-  public isAuthenticated = false;
+  isMobileMenuOpen = false;
+  isAuthenticated = false;
 
   private readonly authService = inject(AuthService);
   private readonly document = inject(DOCUMENT);
@@ -63,20 +63,20 @@ export class PanelLayoutComponent implements OnInit, OnDestroy {
   };
   private scrollLocked = false;
 
-  public ngOnInit(): void {
+  ngOnInit(): void {
     // RPS-1264: nothing is loading here (isAuthenticated() is synchronous), so the outlet renders at
     // once instead of sitting behind a fixed 500 ms timer; each routed page shows its own loading state.
     this.isAuthenticated = this.authService.isAuthenticated();
     this.desktopQuery?.addEventListener('change', this.onViewportChange);
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     this.desktopQuery?.removeEventListener('change', this.onViewportChange);
     this.unlockScroll();
   }
 
   /** Without a session there is no sidebar, so there is nothing to open. */
-  public setMobileMenuOpen(open: boolean): void {
+  setMobileMenuOpen(open: boolean): void {
     if (open && !this.isAuthenticated) {
       return;
     }
@@ -88,7 +88,7 @@ export class PanelLayoutComponent implements OnInit, OnDestroy {
     }
   }
 
-  public closeMobileMenu(): void {
+  closeMobileMenu(): void {
     this.setMobileMenuOpen(false);
   }
 

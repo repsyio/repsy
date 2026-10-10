@@ -30,7 +30,7 @@ import { ProfileService } from '../service/profile.service';
   standalone: true,
 })
 export class DeleteAccountComponent {
-  public loading = false;
+  loading = false;
 
   constructor(
     private readonly router: Router,
@@ -40,7 +40,7 @@ export class DeleteAccountComponent {
     private readonly dangerModalService: DangerModalService,
   ) {}
 
-  public confirmAccountDelete(): void {
+  confirmAccountDelete(): void {
     this.dangerModalService.show('Delete Account', 'Delete', () => this.deleteAccount());
   }
 

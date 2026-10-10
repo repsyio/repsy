@@ -30,9 +30,9 @@ import { ToastService } from '../../../../shared/components/toast/toast.service'
   imports: [RouterLink],
 })
 export class DeleteOrphanLayersComponent {
-  @Input() public activeRepository: RepoPermissionInfo;
+  @Input() activeRepository: RepoPermissionInfo;
 
-  public deleting = false;
+  deleting = false;
 
   constructor(
     private readonly dockerRepoCleanupApi: DockerRepoCleanupApi,
@@ -40,7 +40,7 @@ export class DeleteOrphanLayersComponent {
     private readonly toastService: ToastService,
   ) {}
 
-  public deleteOrphanLayers(): void {
+  deleteOrphanLayers(): void {
     this.dangerModalService.show('Delete Orphan Layers', 'Delete', () => {
       this.deleting = true;
       this.dockerRepoCleanupApi

@@ -15,8 +15,8 @@
 ///
 
 export class TagListItem {
-  public name: string;
-  public configDigest: string;
-  public platform: string;
-  public lastUpdatedAt: string;
+  name: string;
+  configDigest: string;
+  platform: string;
+  lastUpdatedAt: string;
 }

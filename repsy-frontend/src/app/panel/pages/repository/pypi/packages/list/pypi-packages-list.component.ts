@@ -60,26 +60,26 @@ import { PypiService } from '../../service/pypi.service';
   templateUrl: './pypi-packages-list.component.html',
 })
 export class PypiPackagesListComponent implements OnDestroy {
-  public loading = true;
-  public showConfig = false;
-  public pageNum = 0;
-  public pageSize = 10;
-  public searchText = '';
-  public error: string;
-  public pagedData: PagedData<PypiPackageListItem>;
-  public activeRepo: RepoPermissionInfo;
-  public securitySummary: Record<string, VersionSecuritySummary> = {};
+  loading = true;
+  showConfig = false;
+  pageNum = 0;
+  pageSize = 10;
+  searchText = '';
+  error: string;
+  pagedData: PagedData<PypiPackageListItem>;
+  activeRepo: RepoPermissionInfo;
+  securitySummary: Record<string, VersionSecuritySummary> = {};
 
-  public packages: PypiPackageListItem[];
-  public sortOption: Sort = { name: 'Newest', column: 'updatedAt', type: 'DESC' };
+  packages: PypiPackageListItem[];
+  sortOption: Sort = { name: 'Newest', column: 'updatedAt', type: 'DESC' };
 
-  public sortOptions: Sort[] = [
+  sortOptions: Sort[] = [
     { name: 'Newest', column: 'updatedAt', type: 'DESC' },
     { name: 'Oldest', column: 'updatedAt', type: 'ASC' },
   ];
 
-  public readonly baseUrl: string;
-  public readonly username: string;
+  readonly baseUrl: string;
+  readonly username: string;
   private readonly repositoryChanges$: Subscription;
   private securitySummarySubscription?: Subscription;
 
@@ -104,40 +104,40 @@ export class PypiPackagesListComponent implements OnDestroy {
     });
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     this.repositoryChanges$.unsubscribe();
     this.securitySummarySubscription?.unsubscribe();
   }
 
-  public loadPage(pageNum: number): void {
+  loadPage(pageNum: number): void {
     this.pageNum = pageNum;
     this.fetchPackages();
   }
 
-  public refreshPage(): void {
+  refreshPage(): void {
     this.fetchPackages();
   }
 
-  public search(packageName: string) {
+  search(packageName: string) {
     this.pageNum = 0;
     this.searchText = packageName;
     this.fetchPackages();
   }
 
-  public sort(option: Sort) {
+  sort(option: Sort) {
     this.sortOption = option;
     this.fetchPackages();
   }
 
-  public openConfig(open: boolean) {
+  openConfig(open: boolean) {
     this.showConfig = open;
   }
 
-  public timeAgo(date: Date | string): string {
+  timeAgo(date: Date | string): string {
     return moment(date).fromNow();
   }
 
-  public deletePackage(pck: PypiPackageListItem) {
+  deletePackage(pck: PypiPackageListItem) {
     this.dangerModalService.show('Delete Package', 'Delete', () => {
       this.loading = true;
       this.pypiService
@@ -176,11 +176,11 @@ export class PypiPackagesListComponent implements OnDestroy {
       });
   }
 
-  public get canManage(): boolean {
+  get canManage(): boolean {
     return this.activeRepo?.canManage ?? false;
   }
 
-  public packageRoute(pkg: PypiPackageListItem): string {
+  packageRoute(pkg: PypiPackageListItem): string {
     return `/${this.activeRepo.repoName}/${pkg.name}`;
   }
 

@@ -60,18 +60,18 @@ const PROBE_SORT: Sort = { name: 'Newest', column: 'publishedAt', type: 'DESC' }
   templateUrl: './nuget-packages-version-detail.component.html',
 })
 export class NuGetPackagesVersionDetailComponent implements OnDestroy {
-  public readonly securityRepoType = RepoType.Nuget;
-  public loading = true;
-  public error: string;
-  public packageId: string;
-  public versionName: string;
-  public installCommand: string;
-  public installCommandUrl: string;
-  public packageReferenceCommand: string;
-  public packageManagerCommand: string;
-  public packageManagerCommandUrl: string;
-  public versionInfo: NuGetVersionInfo;
-  public activeRepo: RepoPermissionInfo;
+  readonly securityRepoType = RepoType.Nuget;
+  loading = true;
+  error: string;
+  packageId: string;
+  versionName: string;
+  installCommand: string;
+  installCommandUrl: string;
+  packageReferenceCommand: string;
+  packageManagerCommand: string;
+  packageManagerCommandUrl: string;
+  versionInfo: NuGetVersionInfo;
+  activeRepo: RepoPermissionInfo;
   private readonly repositoryChanges$: Subscription;
 
   constructor(
@@ -90,11 +90,11 @@ export class NuGetPackagesVersionDetailComponent implements OnDestroy {
     });
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     this.repositoryChanges$.unsubscribe();
   }
 
-  public loadVersion(): void {
+  loadVersion(): void {
     const packageId = this.route.snapshot.paramMap.get('packageName');
     const version = this.route.snapshot.paramMap.get('version');
     if (!packageId || !version) {
@@ -131,7 +131,7 @@ export class NuGetPackagesVersionDetailComponent implements OnDestroy {
       });
   }
 
-  public deleteVersion(): void {
+  deleteVersion(): void {
     this.dangerModalService.show('Delete Version', 'Delete', () => {
       this.loading = true;
       // Deleting the last version removes the package, so its versions page would answer 404: the page
@@ -152,7 +152,7 @@ export class NuGetPackagesVersionDetailComponent implements OnDestroy {
     });
   }
 
-  public get tags(): string[] {
+  get tags(): string[] {
     if (!this.versionInfo?.tags) {
       return [];
     }
@@ -162,7 +162,7 @@ export class NuGetPackagesVersionDetailComponent implements OnDestroy {
       .filter((item) => item.length > 0);
   }
 
-  public get dependenciesByFramework(): { framework: string; deps: NuGetDependencyInfo[] }[] {
+  get dependenciesByFramework(): { framework: string; deps: NuGetDependencyInfo[] }[] {
     if (!this.versionInfo?.dependencies?.length) {
       return [];
     }

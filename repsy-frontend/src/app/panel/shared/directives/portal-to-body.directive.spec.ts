@@ -40,10 +40,10 @@ import { PortalToBodyDirective } from './portal-to-body.directive';
   `,
 })
 class HostComponent {
-  public open = false;
-  public label = 'close';
-  public rowClicks = 0;
-  public rowKeys = 0;
+  open = false;
+  label = 'close';
+  rowClicks = 0;
+  rowKeys = 0;
 }
 
 describe('PortalToBodyDirective', () => {

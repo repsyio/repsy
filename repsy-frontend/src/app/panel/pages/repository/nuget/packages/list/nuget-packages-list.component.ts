@@ -61,21 +61,21 @@ import { NuGetService } from '../../service/nuget.service';
   templateUrl: './nuget-packages-list.component.html',
 })
 export class NuGetPackagesListComponent implements OnDestroy {
-  public loading = true;
-  public showConfig = false;
-  public pageNum = 0;
-  public pageSize = 10;
-  public searchText = '';
-  public error: string;
-  public packages: NuGetPackageListItem[] = [];
-  public pagedData = new PagedData<NuGetPackageListItem>();
-  public activeRepo: RepoPermissionInfo;
-  public securitySummary: Record<string, VersionSecuritySummary> = {};
-  public readonly baseUrl: string;
-  public readonly username: string;
+  loading = true;
+  showConfig = false;
+  pageNum = 0;
+  pageSize = 10;
+  searchText = '';
+  error: string;
+  packages: NuGetPackageListItem[] = [];
+  pagedData = new PagedData<NuGetPackageListItem>();
+  activeRepo: RepoPermissionInfo;
+  securitySummary: Record<string, VersionSecuritySummary> = {};
+  readonly baseUrl: string;
+  readonly username: string;
 
-  public sortOption: Sort = { name: 'Name (A-Z)', column: 'packageId', type: 'ASC' };
-  public sortOptions: Sort[] = [
+  sortOption: Sort = { name: 'Name (A-Z)', column: 'packageId', type: 'ASC' };
+  sortOptions: Sort[] = [
     { name: 'Name (A-Z)', column: 'packageId', type: 'ASC' },
     { name: 'Name (Z-A)', column: 'packageId', type: 'DESC' },
   ];
@@ -102,32 +102,32 @@ export class NuGetPackagesListComponent implements OnDestroy {
     });
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     this.repositoryChanges$.unsubscribe();
     this.securitySummarySubscription?.unsubscribe();
   }
 
-  public loadPage(pageNum: number): void {
+  loadPage(pageNum: number): void {
     this.pageNum = pageNum;
     this.fetchPackages();
   }
 
-  public search(text: string): void {
+  search(text: string): void {
     this.pageNum = 0;
     this.searchText = text;
     this.fetchPackages();
   }
 
-  public sort(option: Sort): void {
+  sort(option: Sort): void {
     this.sortOption = option;
     this.fetchPackages();
   }
 
-  public refreshPage(): void {
+  refreshPage(): void {
     this.fetchPackages();
   }
 
-  public deletePackage(pkg: NuGetPackageListItem): void {
+  deletePackage(pkg: NuGetPackageListItem): void {
     this.dangerModalService.show('Delete Package', 'Delete', () => {
       this.loading = true;
       this.nugetService
@@ -162,19 +162,19 @@ export class NuGetPackagesListComponent implements OnDestroy {
       });
   }
 
-  public get canManage(): boolean {
+  get canManage(): boolean {
     return this.activeRepo?.canManage ?? false;
   }
 
-  public get totalPages(): number {
+  get totalPages(): number {
     return this.pagedData?.page?.totalPages ?? 0;
   }
 
-  public timeAgo(date: Date | string): string {
+  timeAgo(date: Date | string): string {
     return moment(date).fromNow();
   }
 
-  public packageRoute(pkg: NuGetPackageListItem): string {
+  packageRoute(pkg: NuGetPackageListItem): string {
     return `/${this.activeRepo.repoName}/${pkg.packageId}`;
   }
 

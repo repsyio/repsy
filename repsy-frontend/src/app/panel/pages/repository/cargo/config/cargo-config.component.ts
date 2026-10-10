@@ -33,19 +33,19 @@ export class CargoConfigComponent implements OnInit, OnChanges {
   @Input() open: boolean;
   @Output() openChange = new EventEmitter<boolean>();
 
-  public markdown: string;
+  markdown: string;
 
-  public ngOnInit(): void {
+  ngOnInit(): void {
     this.updateMarkdown();
   }
 
-  public ngOnChanges(changes: SimpleChanges): void {
+  ngOnChanges(changes: SimpleChanges): void {
     if (changes['baseUrl'] || changes['username'] || changes['repoName'] || changes['deployToken']) {
       this.updateMarkdown();
     }
   }
 
-  public closeModal(): void {
+  closeModal(): void {
     this.openChange.emit(false);
   }
 

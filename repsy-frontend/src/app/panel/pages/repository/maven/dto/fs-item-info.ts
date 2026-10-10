@@ -15,8 +15,8 @@
 ///
 
 export class FsItemInfo {
-  public size: number;
-  public name: string;
-  public directory: boolean;
-  public createdAt: Date;
+  size: number;
+  name: string;
+  directory: boolean;
+  createdAt: Date;
 }

@@ -133,10 +133,10 @@ export class AuthService {
    * `AuthRedirectComponent`, which shows the login form at "/" and must swap to the dashboard
    * after a login without a route change (RPS-1278).
    */
-  public readonly isAuthenticated$: Observable<boolean> = this._authenticated$.pipe(distinctUntilChanged());
+  readonly isAuthenticated$: Observable<boolean> = this._authenticated$.pipe(distinctUntilChanged());
 
   /** Emits when another tab logged out (or otherwise removed the session) while this tab held one. */
-  public readonly sessionEndedElsewhere$: Observable<void> = this._sessionEndedElsewhere$.asObservable();
+  readonly sessionEndedElsewhere$: Observable<void> = this._sessionEndedElsewhere$.asObservable();
 
   private readonly onStorage = (event: StorageEvent): void => {
     // A null key is `localStorage.clear()`. Other keys and sessionStorage are none of our business.
@@ -181,19 +181,19 @@ export class AuthService {
     this._authenticated$.next(this.isAuthenticated());
   }
 
-  public get username(): string {
+  get username(): string {
     return this._username;
   }
 
-  public get accessToken(): string {
+  get accessToken(): string {
     return this._accessToken;
   }
 
-  public isAuthenticated(): boolean {
+  isAuthenticated(): boolean {
     return !!(this._accessToken && this._refreshToken);
   }
 
-  public logIn(form: LoginForm): Observable<void> {
+  logIn(form: LoginForm): Observable<void> {
     return this.authApi.login(form).pipe(
       map((r) => {
         this._update(r.username!, r.token!, r.refreshToken!);
@@ -207,7 +207,7 @@ export class AuthService {
    * on its way to the login form, see {@link sessionEndedElsewhere$}) or through a refused refresh call
    * (`RefreshTokenInterceptor` has logged out by then).
    */
-  public refreshToken(): Observable<string> {
+  refreshToken(): Observable<string> {
     return defer(() => {
       if (!this._refreshToken) {
         return throwError(() => new Error('No refresh token presents.'));
@@ -219,7 +219,7 @@ export class AuthService {
     });
   }
 
-  public updateLoginInfo(loginInfo: LoginInfo): void {
+  updateLoginInfo(loginInfo: LoginInfo): void {
     this._update(loginInfo.username!, loginInfo.token!, loginInfo.refreshToken!);
   }
 
@@ -231,7 +231,7 @@ export class AuthService {
    * network call succeeds (offline, or the token was already gone), because a client-side sign-out
    * must not be able to fail or hang on a server round trip.
    */
-  public logOut(): void {
+  logOut(): void {
     const refreshToken = this._refreshToken;
 
     this._username = null;

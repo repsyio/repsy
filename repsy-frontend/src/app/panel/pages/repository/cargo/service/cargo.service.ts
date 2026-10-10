@@ -34,7 +34,7 @@ import { Sort } from '../../../../shared/dto/sort';
   providedIn: 'root',
 })
 export class CargoService {
-  public readonly repoChanges: Observable<RepoPermissionInfo>;
+  readonly repoChanges: Observable<RepoPermissionInfo>;
 
   private readonly repoSubject = new BehaviorSubject<RepoPermissionInfo>(null);
 
@@ -49,7 +49,7 @@ export class CargoService {
     return this.repoSubject.getValue()?.repoName ?? '';
   }
 
-  public fetchRepoPermission(repoName: string): Observable<RepoPermissionInfo> {
+  fetchRepoPermission(repoName: string): Observable<RepoPermissionInfo> {
     this.resetActiveRepoIfChanged(repoName);
 
     return this.reposApi.getRepoPermissions(repoName).pipe(tap((info) => this.repoSubject.next(info)));
@@ -63,7 +63,7 @@ export class CargoService {
     this.repoSubject.next(null);
   }
 
-  public searchCrates(
+  searchCrates(
     search: string,
     sortOption: Sort,
     pageIndex: number,
@@ -76,15 +76,15 @@ export class CargoService {
       .pipe(map((r) => ({ content: r?.content ?? [], page: r?.page }) as unknown as PagedData<CrateListItem>));
   }
 
-  public fetchCrate(crateName: string): Observable<CrateInfo> {
+  fetchCrate(crateName: string): Observable<CrateInfo> {
     return this.cargoCratesApi.getCargoCrate(crateName, this.repoName);
   }
 
-  public fetchCrateVersion(crateName: string, version: string): Observable<CrateVersionInfo> {
+  fetchCrateVersion(crateName: string, version: string): Observable<CrateVersionInfo> {
     return this.cargoCratesApi.getCargoCrateVersion(crateName, version, this.repoName);
   }
 
-  public fetchCrateVersions(
+  fetchCrateVersions(
     crateName: string,
     search: string,
     sortOption: Sort,
@@ -98,11 +98,11 @@ export class CargoService {
       .pipe(map((r) => ({ content: r?.content ?? [], page: r?.page }) as unknown as PagedData<CrateVersionListItem>));
   }
 
-  public deleteCrate(crateName: string): Observable<void> {
+  deleteCrate(crateName: string): Observable<void> {
     return this.cargoCratesApi.deleteCargoCrate(crateName, this.repoName).pipe(map(() => undefined));
   }
 
-  public deleteCrateVersion(crateName: string, version: string): Observable<void> {
+  deleteCrateVersion(crateName: string, version: string): Observable<void> {
     return this.cargoCratesApi.deleteCargoCrateVersion(crateName, version, this.repoName).pipe(map(() => undefined));
   }
 }

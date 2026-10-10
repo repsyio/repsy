@@ -69,19 +69,19 @@ export function groupDeleteWarning(groupName: string, summary?: MavenGroupSummar
   templateUrl: './maven-artifacts-group-list.component.html',
 })
 export class MavenArtifactsGroupListComponent implements OnDestroy {
-  public loading = true;
-  public showConfig = false;
-  public baseUrl: string;
-  public username: string;
-  public pageNum = 0;
-  public pageSize = 10;
-  public pagedData: PagedData<ArtifactListItem>;
-  public activeRepo: RepoPermissionInfo;
-  public artifacts: ArtifactListItem[];
-  public searchText = '';
-  public error: string;
-  public sortOption: Sort = { name: 'Newest', column: 'artifactName', type: 'DESC' };
-  public sortOptions: Sort[] = [
+  loading = true;
+  showConfig = false;
+  baseUrl: string;
+  username: string;
+  pageNum = 0;
+  pageSize = 10;
+  pagedData: PagedData<ArtifactListItem>;
+  activeRepo: RepoPermissionInfo;
+  artifacts: ArtifactListItem[];
+  searchText = '';
+  error: string;
+  sortOption: Sort = { name: 'Newest', column: 'artifactName', type: 'DESC' };
+  sortOptions: Sort[] = [
     { name: 'Newest', column: 'artifactName', type: 'DESC' },
     { name: 'Oldest', column: 'artifactName', type: 'ASC' },
   ];
@@ -106,39 +106,39 @@ export class MavenArtifactsGroupListComponent implements OnDestroy {
     });
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     this.repositoryChanges$.unsubscribe();
   }
 
-  public get canManage(): boolean {
+  get canManage(): boolean {
     return this.activeRepo?.canManage ?? false;
   }
 
-  public loadPage(pageNum: number): void {
+  loadPage(pageNum: number): void {
     this.pageNum = pageNum;
     this.fetchArtifacts();
   }
 
-  public refreshPage(): void {
+  refreshPage(): void {
     this.fetchArtifacts();
   }
 
-  public sort(option: Sort) {
+  sort(option: Sort) {
     this.sortOption = option;
     this.fetchArtifacts();
   }
 
-  public search(groupName: string) {
+  search(groupName: string) {
     this.pageNum = 0;
     this.searchText = groupName;
     this.fetchArtifacts();
   }
 
-  public openConfig(open: boolean) {
+  openConfig(open: boolean) {
     this.showConfig = open;
   }
 
-  public timeAgo(date: Date | string): string {
+  timeAgo(date: Date | string): string {
     return moment(date).fromNow();
   }
 
@@ -146,7 +146,7 @@ export class MavenArtifactsGroupListComponent implements OnDestroy {
    * Deleting from this list removes the whole GROUP, although a row is one artifact (RPS-1288): the
    * confirmation names the group and says how many artifacts and versions go with it.
    */
-  public deleteGroup(artifact: ArtifactListItem) {
+  deleteGroup(artifact: ArtifactListItem) {
     const groupName = artifact.groupName;
     this.mavenService.fetchGroupSummary(groupName).subscribe({
       next: (summary) => this.confirmGroupDelete(groupName, groupDeleteWarning(groupName, summary)),

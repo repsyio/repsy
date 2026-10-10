@@ -90,28 +90,28 @@ function joinSorted(entries: (string | undefined)[]): string {
   templateUrl: './maven-artifacts-version-detail.component.html',
 })
 export class MavenArtifactsVersionDetailComponent implements OnDestroy {
-  public readonly securityRepoType = RepoType.Maven;
-  public loading = true;
-  public baseUrl: string;
-  public groupName: string;
-  public artifactName: string;
-  public versionName: string;
-  public error: string;
-  public activeRepo: RepoPermissionInfo;
-  public version: ArtifactVersionInfo;
-  public mavenDependencyHtml: string;
-  public mavenRepositoryHtml: string;
-  public gradleDependencyHtml: string;
-  public gradleKotlinDependencyHtml: string;
-  public sbtDependencyHtml: string;
-  public ivyDependencyHtml: string;
-  public groovyDependencyHtml: string;
-  public leiningenDependencyHtml: string;
-  public buildrDependencyHtml: string;
-  public purlDependencyHtml: string;
-  public bazelDependencyHtml: string;
-  public licensesText = NO_VALUE;
-  public developersText = NO_VALUE;
+  readonly securityRepoType = RepoType.Maven;
+  loading = true;
+  baseUrl: string;
+  groupName: string;
+  artifactName: string;
+  versionName: string;
+  error: string;
+  activeRepo: RepoPermissionInfo;
+  version: ArtifactVersionInfo;
+  mavenDependencyHtml: string;
+  mavenRepositoryHtml: string;
+  gradleDependencyHtml: string;
+  gradleKotlinDependencyHtml: string;
+  sbtDependencyHtml: string;
+  ivyDependencyHtml: string;
+  groovyDependencyHtml: string;
+  leiningenDependencyHtml: string;
+  buildrDependencyHtml: string;
+  purlDependencyHtml: string;
+  bazelDependencyHtml: string;
+  licensesText = NO_VALUE;
+  developersText = NO_VALUE;
 
   private readonly repositoryChanges$: Subscription;
 
@@ -135,7 +135,7 @@ export class MavenArtifactsVersionDetailComponent implements OnDestroy {
     this.breadcrumbSecurityLinkService.show(RepoType.Maven);
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     this.repositoryChanges$.unsubscribe();
     this.breadcrumbSecurityLinkService.clear();
   }
@@ -151,11 +151,11 @@ export class MavenArtifactsVersionDetailComponent implements OnDestroy {
     return matches;
   }
 
-  public get securityArtifactName(): string {
+  get securityArtifactName(): string {
     return `${this.version.artifactGroupName}:${this.version.artifactName}`;
   }
 
-  public loadVersion(): void {
+  loadVersion(): void {
     this.loading = true;
     this.error = null;
 
@@ -210,7 +210,7 @@ export class MavenArtifactsVersionDetailComponent implements OnDestroy {
       });
   }
 
-  public deleteVersion() {
+  deleteVersion() {
     this.mavenService.fetchVersionDeleteWarning(this.groupName, this.artifactName).subscribe((warning) => {
       showVersionDeleteDialog(this.dangerModalService, warning, () => this.confirmDeleteVersion());
     });

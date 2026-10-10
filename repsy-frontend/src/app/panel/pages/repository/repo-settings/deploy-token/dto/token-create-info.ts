@@ -15,7 +15,7 @@
 ///
 
 export class TokenCreateInfo {
-  public token: string;
-  public username: string;
-  public id: string;
+  token: string;
+  username: string;
+  id: string;
 }

@@ -78,20 +78,20 @@ import { TokenCreateInfo } from './dto/token-create-info';
   styleUrl: './deploy-token.component.css',
 })
 export class DeployTokenComponent implements OnInit {
-  @Input() public activeRepository: RepoPermissionInfo;
-  @Input() public repoType: string;
+  @Input() activeRepository: RepoPermissionInfo;
+  @Input() repoType: string;
 
-  public operationLock = false;
-  public pageNum = 0;
-  public pageSize = 3;
-  public deployTokens: DeployTokenInfoListItem[];
-  public pagedData: PagedData<DeployTokenInfoListItem>;
-  public createdDeployToken: TokenCreateInfo;
-  public showCreateTokenModal = false;
-  public showTokenInfoModal = false;
-  public showConfig = false;
-  public selectedDeployToken: DeployTokenInfoListItem;
-  public repoUsage: RepoUsageInfo;
+  operationLock = false;
+  pageNum = 0;
+  pageSize = 3;
+  deployTokens: DeployTokenInfoListItem[];
+  pagedData: PagedData<DeployTokenInfoListItem>;
+  createdDeployToken: TokenCreateInfo;
+  showCreateTokenModal = false;
+  showTokenInfoModal = false;
+  showConfig = false;
+  selectedDeployToken: DeployTokenInfoListItem;
+  repoUsage: RepoUsageInfo;
 
   constructor(
     private readonly deployTokensApi: DeployTokensApi,
@@ -115,7 +115,7 @@ export class DeployTokenComponent implements OnInit {
     });
   }
 
-  public fetchDeployTokens() {
+  fetchDeployTokens() {
     this.fetchRepoUsage();
     this.listPage(this.pageNum).subscribe({
       next: (r) => this.showTokens(r),
@@ -142,16 +142,16 @@ export class DeployTokenComponent implements OnInit {
     return Math.min(this.pageNum, lastPage);
   }
 
-  public loadPage(pageNum: number) {
+  loadPage(pageNum: number) {
     this.pageNum = pageNum;
     this.fetchDeployTokens();
   }
 
-  public createDeployToken(): void {
+  createDeployToken(): void {
     this.showCreateTokenModal = true;
   }
 
-  public rotateDeployToken(deployToken: DeployTokenInfoListItem) {
+  rotateDeployToken(deployToken: DeployTokenInfoListItem) {
     const successMsg = 'Deploy token rotated successfully';
     this.dangerModalService.show('Rotate Deploy Token', 'Rotate', () => {
       this.operationLock = true;
@@ -180,7 +180,7 @@ export class DeployTokenComponent implements OnInit {
 
   // RPS-1285: one chained request. The list is fetched once, after the revoke has completed, for the
   // page that is left (never for a page past the end), so there is no second answer to race it.
-  public revokeDeployToken(deployToken: DeployTokenInfoListItem) {
+  revokeDeployToken(deployToken: DeployTokenInfoListItem) {
     this.dangerModalService.show('Delete Deploy Token', 'Delete', () => {
       this.operationLock = true;
 
@@ -204,12 +204,12 @@ export class DeployTokenComponent implements OnInit {
     });
   }
 
-  public configure(deployToken: DeployTokenInfoListItem) {
+  configure(deployToken: DeployTokenInfoListItem) {
     this.selectedDeployToken = deployToken;
     this.showConfig = true;
   }
 
-  public openConfigure(open: boolean) {
+  openConfigure(open: boolean) {
     this.showConfig = open;
   }
 

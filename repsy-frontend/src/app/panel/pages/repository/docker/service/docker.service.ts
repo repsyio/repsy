@@ -44,7 +44,7 @@ const queryName = (imageName: string): string | undefined => (imageName.includes
   providedIn: 'root',
 })
 export class DockerService {
-  public readonly repoChanges: Observable<RepoPermissionInfo>;
+  readonly repoChanges: Observable<RepoPermissionInfo>;
 
   private readonly repoSubject = new BehaviorSubject<RepoPermissionInfo>(null);
 
@@ -59,7 +59,7 @@ export class DockerService {
     return this.repoSubject.getValue()?.repoName ?? '';
   }
 
-  public fetchRepoPermission(repoName: string): Observable<RepoPermissionInfo> {
+  fetchRepoPermission(repoName: string): Observable<RepoPermissionInfo> {
     this.resetActiveRepoIfChanged(repoName);
 
     return this.reposApi.getRepoPermissions(repoName).pipe(tap((info) => this.repoSubject.next(info)));
@@ -73,7 +73,7 @@ export class DockerService {
     this.repoSubject.next(null);
   }
 
-  public searchImages(
+  searchImages(
     name: string,
     sortOption: Sort,
     pageIndex: number,
@@ -86,7 +86,7 @@ export class DockerService {
       .pipe(map((r) => ({ content: r?.content ?? [], page: r?.page }) as unknown as PagedData<ImageListItem>));
   }
 
-  public searchTags(
+  searchTags(
     name: string,
     sortOption: Sort,
     imageName: string,
@@ -106,7 +106,7 @@ export class DockerService {
       .pipe(map((r) => ({ content: r?.content ?? [], page: r?.page }) as unknown as PagedData<TagListItem>));
   }
 
-  public searchManifests(
+  searchManifests(
     name: string,
     sortOption: Sort,
     imageName: string,
@@ -132,7 +132,7 @@ export class DockerService {
    * The image as the list shows it. A 404 (the image went with its last manifest) is left to the
    * caller, which leaves the page instead of toasting an error.
    */
-  public fetchImageSummary(imageName: string): Observable<ImageListItem> {
+  fetchImageSummary(imageName: string): Observable<ImageListItem> {
     return this.dockerImagesApi.getDockerImage(
       pathName(imageName),
       this.repoName,
@@ -145,23 +145,23 @@ export class DockerService {
     );
   }
 
-  public deleteImage(imageName: string): Observable<void> {
+  deleteImage(imageName: string): Observable<void> {
     return this.dockerImagesApi
       .deleteDockerImage(pathName(imageName), this.repoName, queryName(imageName))
       .pipe(map(() => undefined));
   }
 
-  public fetchTag(imageName: string, tagName: string): Observable<TagDetail> {
+  fetchTag(imageName: string, tagName: string): Observable<TagDetail> {
     return this.dockerImagesApi.getDockerImageTag(pathName(imageName), tagName, this.repoName, queryName(imageName));
   }
 
-  public deleteTag(imageName: string, tagName: string): Observable<void> {
+  deleteTag(imageName: string, tagName: string): Observable<void> {
     return this.dockerImagesApi
       .deleteDockerTag(pathName(imageName), tagName, this.repoName, queryName(imageName))
       .pipe(map(() => undefined));
   }
 
-  public fetchManifestText(imageName: string, digest: string): Observable<string> {
+  fetchManifestText(imageName: string, digest: string): Observable<string> {
     return this.dockerImagesApi.getDockerImageManifest(
       pathName(imageName),
       digest,
@@ -170,7 +170,7 @@ export class DockerService {
     );
   }
 
-  public fetchConfigText(imageName: string, digest: string): Observable<string> {
+  fetchConfigText(imageName: string, digest: string): Observable<string> {
     return this.dockerImagesApi.getDockerImageConfig(pathName(imageName), digest, this.repoName, queryName(imageName));
   }
 }

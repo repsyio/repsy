@@ -31,11 +31,11 @@ import { RepoLookupService } from '../repo-entry/repo-lookup.service';
   templateUrl: './repository-breadcrumb.component.html',
 })
 export class RepositoryBreadcrumbComponent implements OnInit, OnDestroy {
-  public crumbs: string[] = [];
-  public crumbLinks: string[] = [];
-  public crumbQueryParams: (Record<string, string> | null)[] = [];
-  public repoIcon = '';
-  public readonly securityLinkRepoType$: Observable<string | null>;
+  crumbs: string[] = [];
+  crumbLinks: string[] = [];
+  crumbQueryParams: (Record<string, string> | null)[] = [];
+  repoIcon = '';
+  readonly securityLinkRepoType$: Observable<string | null>;
   private routerSubscription: Subscription | null = null;
 
   constructor(
@@ -46,7 +46,7 @@ export class RepositoryBreadcrumbComponent implements OnInit, OnDestroy {
     this.securityLinkRepoType$ = breadcrumbSecurityLinkService.repoType$;
   }
 
-  public ngOnInit(): void {
+  ngOnInit(): void {
     this.updateBreadcrumbs();
 
     this.routerSubscription = this.router.events
@@ -56,7 +56,7 @@ export class RepositoryBreadcrumbComponent implements OnInit, OnDestroy {
       });
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     if (this.routerSubscription) {
       this.routerSubscription.unsubscribe();
     }

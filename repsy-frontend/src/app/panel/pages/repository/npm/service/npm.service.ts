@@ -35,7 +35,7 @@ import { Sort } from '../../../../shared/dto/sort';
   providedIn: 'root',
 })
 export class NpmService {
-  public readonly repoChanges: Observable<RepoPermissionInfo>;
+  readonly repoChanges: Observable<RepoPermissionInfo>;
 
   private readonly repoSubject = new BehaviorSubject<RepoPermissionInfo>(null);
 
@@ -51,7 +51,7 @@ export class NpmService {
     return this.repoSubject.getValue()?.repoName ?? '';
   }
 
-  public fetchRepoPermission(repoName: string): Observable<RepoPermissionInfo> {
+  fetchRepoPermission(repoName: string): Observable<RepoPermissionInfo> {
     this.resetActiveRepoIfChanged(repoName);
 
     return this.reposApi.getRepoPermissions(repoName).pipe(tap((info) => this.repoSubject.next(info)));
@@ -65,7 +65,7 @@ export class NpmService {
     this.repoSubject.next(null);
   }
 
-  public searchPackages(
+  searchPackages(
     scope: string,
     sortOption: Sort,
     pageIndex: number,
@@ -78,7 +78,7 @@ export class NpmService {
       .pipe(map((r) => ({ content: r?.content ?? [], page: r?.page }) as unknown as PagedData<NpmPackageListItem>));
   }
 
-  public searchScopedPackages(
+  searchScopedPackages(
     scope: string,
     name: string,
     sortOption: Sort,
@@ -92,7 +92,7 @@ export class NpmService {
       .pipe(map((r) => ({ content: r?.content ?? [], page: r?.page }) as unknown as PagedData<NpmPackageListItem>));
   }
 
-  public searchUnscopedPackages(
+  searchUnscopedPackages(
     name: string,
     sortOption: Sort,
     pageIndex: number,
@@ -105,7 +105,7 @@ export class NpmService {
       .pipe(map((r) => ({ content: r?.content ?? [], page: r?.page }) as unknown as PagedData<NpmPackageListItem>));
   }
 
-  public searchPackageVersions(
+  searchPackageVersions(
     packageName: string,
     scopeName: string,
     version: string,
@@ -137,14 +137,14 @@ export class NpmService {
     );
   }
 
-  public fetchPackageTags(packageName: string, scopeName: string): Observable<PackageDistributionTagMapListItem[]> {
+  fetchPackageTags(packageName: string, scopeName: string): Observable<PackageDistributionTagMapListItem[]> {
     const call = scopeName
       ? this.npmScopesApi.listNpmScopedPackageTags(scopeName, packageName, this.repoName)
       : this.npmPackagesApi.listNpmPackageTags(packageName, this.repoName);
     return call.pipe(map((r) => r ?? []));
   }
 
-  public fetchPackageVersion(
+  fetchPackageVersion(
     packageName: string,
     scopeName: string,
     versionName: string,
@@ -155,14 +155,14 @@ export class NpmService {
     return call.pipe(map((r) => r as unknown as PackageVersionDetail));
   }
 
-  public deletePackage(packageName: string, scopeName: string): Observable<void> {
+  deletePackage(packageName: string, scopeName: string): Observable<void> {
     const call = scopeName
       ? this.npmScopesApi.deleteScopedNpmPackage(scopeName, packageName, this.repoName)
       : this.npmPackagesApi.deleteNpmPackage(packageName, this.repoName);
     return call.pipe(map(() => undefined));
   }
 
-  public deletePackageVersion(packageName: string, scopeName: string, versionName: string): Observable<void> {
+  deletePackageVersion(packageName: string, scopeName: string, versionName: string): Observable<void> {
     const call = scopeName
       ? this.npmScopesApi.deleteNpmScopedPackageVersion(scopeName, packageName, versionName, this.repoName)
       : this.npmPackagesApi.deleteNpmPackageVersion(packageName, versionName, this.repoName);

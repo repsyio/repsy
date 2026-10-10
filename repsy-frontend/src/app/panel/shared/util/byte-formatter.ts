@@ -18,7 +18,7 @@ const UNITS = ['B', 'K', 'M', 'G', 'T', 'P'];
 const BASE = 1024;
 
 export class ByteFormatter {
-  public static formatBytes(bytes: number, decimals = 2): string {
+  static formatBytes(bytes: number, decimals = 2): string {
     bytes = Math.abs(bytes);
     if (bytes === 0) {
       return '0 B';

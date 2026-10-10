@@ -33,19 +33,19 @@ import { CargoCratesVersionDetailComponent } from './cargo-crates-version-detail
 
 @Component({ selector: 'app-security-scan-section', standalone: true, template: '' })
 class SecurityScanSectionStubComponent {
-  @Input() public repoType: string;
-  @Input() public repoName: string;
-  @Input() public artifactName: string;
-  @Input() public artifactVersion: string;
-  @Input() public canTriggerScan: boolean;
+  @Input() repoType: string;
+  @Input() repoName: string;
+  @Input() artifactName: string;
+  @Input() artifactVersion: string;
+  @Input() canTriggerScan: boolean;
 }
 
 // highlight.js is loaded lazily and is irrelevant to the README, so the highlighting directives are stubbed.
 // eslint-disable-next-line @angular-eslint/directive-selector -- must match the selector of the real directive
 @Directive({ selector: '[highlight]', standalone: true })
 class HighlightStubDirective {
-  @Input() public highlight: string;
-  @Input() public language: string;
+  @Input() highlight: string;
+  @Input() language: string;
 }
 
 // eslint-disable-next-line @angular-eslint/directive-selector -- must match the selector of the real directive

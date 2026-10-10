@@ -22,12 +22,12 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
   imports: [],
 })
 export class SearchboxComponent {
-  @Input() public placeholder: string;
+  @Input() placeholder: string;
   /** Accessible name of the input; falls back to the placeholder. */
-  @Input() public ariaLabel: string;
+  @Input() ariaLabel: string;
   /** The text shown in the input; a parent that resets its query sets this to empty to clear the box. */
-  @Input() public value = '';
-  @Output() public filter = new EventEmitter<string>();
+  @Input() value = '';
+  @Output() filter = new EventEmitter<string>();
 
   onSearch(event: Event) {
     const target = event.target as HTMLInputElement;

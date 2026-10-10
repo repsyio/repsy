@@ -26,28 +26,28 @@ import { UsersApi } from '../../../../../generated/api';
 export class UserService {
   constructor(private readonly usersApi: UsersApi) {}
 
-  public listUsers(q?: string, page?: number, size?: number): Observable<PagedModelUserResponse> {
+  listUsers(q?: string, page?: number, size?: number): Observable<PagedModelUserResponse> {
     return this.usersApi.listUsers(q, page, size);
   }
 
   /** The number of admins on the server, whatever page or search the list shows. */
-  public countAdmins(): Observable<number> {
+  countAdmins(): Observable<number> {
     return this.usersApi.countAdmins();
   }
 
-  public createUser(form: UserCreateForm): Observable<UserResponse> {
+  createUser(form: UserCreateForm): Observable<UserResponse> {
     return this.usersApi.createUser(form);
   }
 
-  public updateUser(userId: string, form: UserUpdateForm): Observable<UserResponse> {
+  updateUser(userId: string, form: UserUpdateForm): Observable<UserResponse> {
     return this.usersApi.updateUser(userId, form);
   }
 
-  public deleteUser(userId: string): Observable<void> {
+  deleteUser(userId: string): Observable<void> {
     return this.usersApi.deleteUser(userId).pipe(map(() => undefined));
   }
 
-  public resetPassword(userId: string): Observable<string> {
+  resetPassword(userId: string): Observable<string> {
     return this.usersApi.resetPassword(userId);
   }
 }

@@ -32,27 +32,27 @@ import { ToastService } from '../../toast/toast.service';
 })
 export class UserResetPasswordModalComponent {
   /** Element ids of this instance: see `idFactory`. */
-  public readonly id = idFactory('user-reset');
+  readonly id = idFactory('user-reset');
 
   @Output() openChange = new EventEmitter<boolean>();
-  @Input() public open: boolean;
-  @Input() public username: string;
-  @Input() public newPassword: string;
+  @Input() open: boolean;
+  @Input() username: string;
+  @Input() newPassword: string;
 
-  public showPassword = false;
+  showPassword = false;
 
   constructor(private readonly toastService: ToastService) {}
 
-  public closeModal(): void {
+  closeModal(): void {
     this.showPassword = false;
     this.openChange.emit(false);
   }
 
-  public togglePasswordVisibility(): void {
+  togglePasswordVisibility(): void {
     this.showPassword = !this.showPassword;
   }
 
-  public copyToClipboard(text: string): void {
+  copyToClipboard(text: string): void {
     void copyToClipboard(text).then((copied) => {
       if (copied) {
         this.toastService.show('Copied to clipboard', 'success');

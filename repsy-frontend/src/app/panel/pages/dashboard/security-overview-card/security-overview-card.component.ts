@@ -29,16 +29,16 @@ import { SecurityService } from '../../security/service/security.service';
   templateUrl: './security-overview-card.component.html',
 })
 export class SecurityOverviewCardComponent implements OnInit {
-  public loading = true;
-  public totalRepoCount = 0;
-  public criticalOrHighCount = 0;
+  loading = true;
+  totalRepoCount = 0;
+  criticalOrHighCount = 0;
 
   constructor(
     private readonly securityService: SecurityService,
     private readonly cdRef: ChangeDetectorRef,
   ) {}
 
-  public ngOnInit(): void {
+  ngOnInit(): void {
     this.securityService
       .getSecuritySummary()
       .pipe(

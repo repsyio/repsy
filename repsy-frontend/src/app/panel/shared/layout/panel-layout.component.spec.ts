@@ -40,10 +40,10 @@ class ProjectingHostComponent {}
 
 /** A `MediaQueryList` the test can flip: `setDesktop(true)` is the viewport reaching the `md` width. */
 class FakeMediaQueryList extends EventTarget {
-  public matches = false;
-  public readonly media = '(min-width: 48rem)';
+  matches = false;
+  readonly media = '(min-width: 48rem)';
 
-  public setDesktop(matches: boolean): void {
+  setDesktop(matches: boolean): void {
     this.matches = matches;
     this.dispatchEvent(Object.assign(new Event('change'), { matches }));
   }

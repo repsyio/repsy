@@ -31,10 +31,10 @@ import { CargoService } from './service/cargo.service';
   imports: [RouterOutlet, RepositoryBreadcrumbComponent],
 })
 export class CargoComponent implements OnInit, OnDestroy {
-  public permissions: RepoPermissionInfo | null = null;
-  public loading = true;
-  public isAuthenticated = false;
-  public isPublicView = false;
+  permissions: RepoPermissionInfo | null = null;
+  loading = true;
+  isAuthenticated = false;
+  isPublicView = false;
 
   private repoSubscription: Subscription | null = null;
 
@@ -45,7 +45,7 @@ export class CargoComponent implements OnInit, OnDestroy {
     private readonly router: Router,
   ) {}
 
-  public ngOnInit(): void {
+  ngOnInit(): void {
     this.isAuthenticated = this.authService.isAuthenticated();
 
     this.repoSubscription = currentRepoOfType(this.repoLookupService, 'cargo').subscribe((repoContext) => {
@@ -53,7 +53,7 @@ export class CargoComponent implements OnInit, OnDestroy {
     });
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     if (this.repoSubscription) {
       this.repoSubscription.unsubscribe();
     }

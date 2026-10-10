@@ -33,7 +33,7 @@ import { Sort } from '../../../../shared/dto/sort';
   providedIn: 'root',
 })
 export class HelmService {
-  public readonly repoChanges: Observable<RepoPermissionInfo>;
+  readonly repoChanges: Observable<RepoPermissionInfo>;
 
   private readonly repoSubject = new BehaviorSubject<RepoPermissionInfo>(null);
 
@@ -48,7 +48,7 @@ export class HelmService {
     return this.repoSubject.getValue()?.repoName ?? '';
   }
 
-  public fetchRepoPermission(repoName: string): Observable<RepoPermissionInfo> {
+  fetchRepoPermission(repoName: string): Observable<RepoPermissionInfo> {
     this.resetActiveRepoIfChanged(repoName);
 
     return this.reposApi.getRepoPermissions(repoName).pipe(tap((info) => this.repoSubject.next(info)));
@@ -62,7 +62,7 @@ export class HelmService {
     this.repoSubject.next(null);
   }
 
-  public searchCharts(
+  searchCharts(
     query: string,
     sortOption: Sort,
     pageIndex: number,
@@ -75,11 +75,11 @@ export class HelmService {
       .pipe(map((r) => ({ content: r?.content ?? [], page: r?.page }) as unknown as PagedData<HelmChartListItem>));
   }
 
-  public fetchChart(name: string): Observable<HelmChartSummary> {
+  fetchChart(name: string): Observable<HelmChartSummary> {
     return this.helmChartsApi.getHelmChart(this.repoName, name);
   }
 
-  public fetchChartVersions(
+  fetchChartVersions(
     name: string,
     search: string,
     sortOption: Sort,
@@ -93,19 +93,19 @@ export class HelmService {
       .pipe(map((r) => ({ content: r?.content ?? [], page: r?.page }) as unknown as PagedData<HelmChartVersionItem>));
   }
 
-  public fetchChartDetail(name: string, version: string): Observable<HelmChartDetail> {
+  fetchChartDetail(name: string, version: string): Observable<HelmChartDetail> {
     return this.helmChartsApi.getHelmChartDetail(this.repoName, name, version);
   }
 
-  public deleteAllVersions(name: string): Observable<void> {
+  deleteAllVersions(name: string): Observable<void> {
     return this.helmChartsApi.deleteAllHelmChartVersions(this.repoName, name).pipe(map(() => undefined));
   }
 
-  public deleteChart(name: string, version: string): Observable<void> {
+  deleteChart(name: string, version: string): Observable<void> {
     return this.helmChartsApi.deleteHelmChartVersion(this.repoName, name, version).pipe(map(() => undefined));
   }
 
-  public fetchOciTags(name: string): Observable<string[]> {
+  fetchOciTags(name: string): Observable<string[]> {
     return this.helmChartsApi.getHelmChartOciTags(this.repoName, name).pipe(map((r) => r ?? []));
   }
 }

@@ -42,7 +42,7 @@ import { PasswordForm, PasswordFormInputElement } from './password-form';
 })
 export class AccountInfoComponent implements OnInit {
   /** Element ids of this instance: see `idFactory`. */
-  public readonly id = idFactory('profile');
+  readonly id = idFactory('profile');
 
   @Input() passwordForm: FormGroup;
   @Input() usernameForm: FormGroup;
@@ -50,12 +50,12 @@ export class AccountInfoComponent implements OnInit {
   /** Access tokens that have not expired. A password change does not revoke them (decision). */
   @Input() liveAccessTokens = 0;
 
-  public loading = false;
+  loading = false;
 
-  public readonly formUi = new PasswordForm();
-  public readonly usernameMessages = USERNAME_MESSAGES;
-  public readonly passwordMessages = PASSWORD_MESSAGES;
-  public readonly mismatchMessage = PASSWORD_MISMATCH_MESSAGE;
+  readonly formUi = new PasswordForm();
+  readonly usernameMessages = USERNAME_MESSAGES;
+  readonly passwordMessages = PASSWORD_MESSAGES;
+  readonly mismatchMessage = PASSWORD_MISMATCH_MESSAGE;
 
   constructor(
     private readonly fb: FormBuilder,
@@ -80,7 +80,7 @@ export class AccountInfoComponent implements OnInit {
     });
   }
 
-  public get hasLiveAccessTokens(): boolean {
+  get hasLiveAccessTokens(): boolean {
     return this.liveAccessTokens > 0;
   }
 
@@ -100,7 +100,7 @@ export class AccountInfoComponent implements OnInit {
     element.inputType = element.visiblePassword ? 'text' : 'password';
   }
 
-  public updatePassword() {
+  updatePassword() {
     if (this.passwordForm.invalid) {
       return;
     }
@@ -128,7 +128,7 @@ export class AccountInfoComponent implements OnInit {
     });
   }
 
-  public updateUsername() {
+  updateUsername() {
     if (this.usernameForm.invalid) {
       return;
     }

@@ -48,11 +48,11 @@ import { DialogDirective } from './dialog.directive';
   `,
 })
 class HostComponent {
-  public open = false;
-  public nested = false;
-  public closable = true;
-  public role = '';
-  public closes: string[] = [];
+  open = false;
+  nested = false;
+  closable = true;
+  role = '';
+  closes: string[] = [];
 }
 
 describe('DialogDirective', () => {

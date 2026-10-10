@@ -35,7 +35,7 @@ export class NpmConfigComponent implements OnInit, OnChanges {
   @Input() open: boolean;
   @Output() openChange = new EventEmitter<boolean>();
 
-  public markdown: string;
+  markdown: string;
 
   ngOnInit(): void {
     this.updateMarkdown();

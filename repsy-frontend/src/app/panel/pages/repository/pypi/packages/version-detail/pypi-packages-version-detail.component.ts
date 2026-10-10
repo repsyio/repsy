@@ -56,20 +56,20 @@ type Classifiers = Record<string, [string]>;
   templateUrl: './pypi-packages-version-detail.component.html',
 })
 export class PypiPackagesVersionDetailComponent implements OnDestroy {
-  public readonly securityRepoType = RepoType.Pypi;
-  public loading = true;
-  public baseUrl: string;
-  public error: string;
-  public packageName: string;
-  public versionName: string;
-  public installation: string;
-  public activeRepo: RepoPermissionInfo;
+  readonly securityRepoType = RepoType.Pypi;
+  loading = true;
+  baseUrl: string;
+  error: string;
+  packageName: string;
+  versionName: string;
+  installation: string;
+  activeRepo: RepoPermissionInfo;
   private readonly repositoryChanges$: Subscription;
-  public versionInfo: ReleaseDetail;
-  public classifiers: Classifiers;
+  versionInfo: ReleaseDetail;
+  classifiers: Classifiers;
 
   /** The home page as a link target: http(s) only (RPS-1623), `null` leaves the anchor inert. */
-  public get homePageUrl(): string | null {
+  get homePageUrl(): string | null {
     return externalHttpUrl(this.versionInfo?.homePage);
   }
 
@@ -95,7 +95,7 @@ export class PypiPackagesVersionDetailComponent implements OnDestroy {
     this.breadcrumbSecurityLinkService.show(RepoType.Pypi);
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     this.repositoryChanges$.unsubscribe();
     this.breadcrumbSecurityLinkService.clear();
   }
@@ -111,7 +111,7 @@ export class PypiPackagesVersionDetailComponent implements OnDestroy {
     return matches;
   }
 
-  public loadVersion(): void {
+  loadVersion(): void {
     this.loading = true;
     this.error = null;
 
@@ -147,7 +147,7 @@ export class PypiPackagesVersionDetailComponent implements OnDestroy {
       });
   }
 
-  public deleteVersion() {
+  deleteVersion() {
     this.dangerModalService.show('Delete Release', 'Delete', () => {
       this.loading = true;
       deleteVersionAndCheckLast$(

@@ -25,9 +25,9 @@ import { scanFailureReason } from '../../util/scan-failure-reason.util';
   templateUrl: './scan-failure-reason.component.html',
 })
 export class ScanFailureReasonComponent {
-  @Input() public message: string | null | undefined = null;
+  @Input() message: string | null | undefined = null;
 
-  public get reason(): string {
+  get reason(): string {
     return scanFailureReason(this.message);
   }
 }

@@ -35,29 +35,29 @@ import { ToggleComponent } from '../../../../shared/components/toggle/toggle.com
   imports: [ReactiveFormsModule, RouterLink, ToggleComponent],
 })
 export class CleanupPolicyComponent implements OnInit {
-  @Input() public activeRepository: RepoPermissionInfo;
+  @Input() activeRepository: RepoPermissionInfo;
 
-  public loading = true;
-  public submitting = false;
-  public editMode = false;
-  public policy?: CleanupPolicyItem;
+  loading = true;
+  submitting = false;
+  editMode = false;
+  policy?: CleanupPolicyItem;
 
-  public readonly cadenceOptions: { value: CleanupPolicyForm.CadenceEnum; label: string }[] = [
+  readonly cadenceOptions: { value: CleanupPolicyForm.CadenceEnum; label: string }[] = [
     { value: 'DAILY', label: 'Every day' },
     { value: 'WEEKLY', label: 'Every week' },
     { value: 'BIWEEKLY', label: 'Every two weeks' },
     { value: 'MONTHLY', label: 'Every month' },
     { value: 'QUARTERLY', label: 'Every quarter' },
   ];
-  public readonly keepNOptions = [1, 5, 10, 25, 50, 100];
-  public readonly olderThanOptions = [
+  readonly keepNOptions = [1, 5, 10, 25, 50, 100];
+  readonly olderThanOptions = [
     { value: 7, label: '7 days' },
     { value: 14, label: '14 days' },
     { value: 30, label: '30 days' },
     { value: 90, label: '90 days' },
   ];
 
-  public readonly form: ReturnType<CleanupPolicyComponent['buildForm']>;
+  readonly form: ReturnType<CleanupPolicyComponent['buildForm']>;
 
   constructor(
     private readonly fb: FormBuilder,
@@ -67,26 +67,26 @@ export class CleanupPolicyComponent implements OnInit {
     this.form = this.buildForm();
   }
 
-  public ngOnInit(): void {
+  ngOnInit(): void {
     this.load();
   }
 
-  public get enabled(): boolean {
+  get enabled(): boolean {
     return this.policy?.enabled === true;
   }
 
-  public get cadenceLabel(): string {
+  get cadenceLabel(): string {
     return this.cadenceOptions.find((o) => o.value === this.policy?.cadence)?.label.toLowerCase() ?? '';
   }
 
-  public toggleEditMode(): void {
+  toggleEditMode(): void {
     this.editMode = !this.editMode;
     if (!this.editMode && this.policy) {
       this.patchForm(this.policy);
     }
   }
 
-  public onToggleChange(enabled: boolean): void {
+  onToggleChange(enabled: boolean): void {
     this.submitting = true;
     this.api
       .updateDockerCleanupPolicyStatus(this.activeRepository.repoName, { enabled })
@@ -101,7 +101,7 @@ export class CleanupPolicyComponent implements OnInit {
       });
   }
 
-  public save(): void {
+  save(): void {
     if (!this.enabled) {
       this.toastService.show('Policy is disabled. Enable it before updating.', 'error');
       return;

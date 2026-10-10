@@ -23,9 +23,9 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
   imports: [CommonModule, NgOptimizedImage],
 })
 export class PaginationComponent {
-  @Input() public pageNum: number;
-  @Input() public totalPages: number;
-  @Output() public pageNumChange = new EventEmitter<number>();
+  @Input() pageNum: number;
+  @Input() totalPages: number;
+  @Output() pageNumChange = new EventEmitter<number>();
 
   previousPage() {
     if (this.pageNum > 0) {

@@ -41,23 +41,23 @@ export interface SeverityCounts {
   templateUrl: './severity-breakdown.component.html',
 })
 export class SeverityBreakdownComponent implements OnChanges, OnDestroy {
-  @Input({ required: true }) public counts: SeverityCounts | null = null;
+  @Input({ required: true }) counts: SeverityCounts | null = null;
 
-  @ViewChild('chartCanvas') public chartCanvasRef?: ElementRef<HTMLCanvasElement>;
+  @ViewChild('chartCanvas') chartCanvasRef?: ElementRef<HTMLCanvasElement>;
 
   private chart?: Chart;
 
-  public get hasFindings(): boolean {
+  get hasFindings(): boolean {
     return (this.counts?.totalCount ?? 0) > 0;
   }
 
-  public ngOnChanges(changes: SimpleChanges): void {
+  ngOnChanges(changes: SimpleChanges): void {
     if (changes['counts'] && this.hasFindings) {
       setTimeout(() => this.renderChart());
     }
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     this.chart?.destroy();
   }
 

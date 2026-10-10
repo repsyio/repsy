@@ -60,22 +60,22 @@ import { RubyService } from '../../service/ruby.service';
   templateUrl: './ruby-gems-version-list.component.html',
 })
 export class RubyGemsVersionListComponent implements OnDestroy {
-  public loading = true;
-  public showConfig = false;
-  public pageNum = 0;
-  public pageSize = 10;
-  public error: string;
-  public gemName: string;
-  public searchText = '';
-  public versions: GemVersionListItem[] = [];
-  public pagedData = new PagedData<GemVersionListItem>();
-  public activeRepo: RepoPermissionInfo;
-  public readonly baseUrl: string;
-  public readonly username: string;
-  public securitySummary: Record<string, VersionSecuritySummary> = {};
+  loading = true;
+  showConfig = false;
+  pageNum = 0;
+  pageSize = 10;
+  error: string;
+  gemName: string;
+  searchText = '';
+  versions: GemVersionListItem[] = [];
+  pagedData = new PagedData<GemVersionListItem>();
+  activeRepo: RepoPermissionInfo;
+  readonly baseUrl: string;
+  readonly username: string;
+  securitySummary: Record<string, VersionSecuritySummary> = {};
 
-  public sortOption: Sort = { name: 'Newest', column: 'createdAt', type: 'DESC' };
-  public sortOptions: Sort[] = [
+  sortOption: Sort = { name: 'Newest', column: 'createdAt', type: 'DESC' };
+  sortOptions: Sort[] = [
     { name: 'Newest', column: 'createdAt', type: 'DESC' },
     { name: 'Oldest', column: 'createdAt', type: 'ASC' },
     VERSION_PRECEDENCE_SORT,
@@ -84,7 +84,7 @@ export class RubyGemsVersionListComponent implements OnDestroy {
   private readonly repositoryChanges$: Subscription;
   private securitySummarySubscription?: Subscription;
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     this.repositoryChanges$.unsubscribe();
     this.securitySummarySubscription?.unsubscribe();
   }
@@ -111,36 +111,36 @@ export class RubyGemsVersionListComponent implements OnDestroy {
     });
   }
 
-  public search(version: string): void {
+  search(version: string): void {
     this.pageNum = 0;
     this.searchText = version;
     this.fetchVersions();
   }
 
-  public sort(option: Sort): void {
+  sort(option: Sort): void {
     this.pageNum = 0;
     this.sortOption = option;
     this.fetchVersions();
   }
 
-  public loadPage(pageNum: number): void {
+  loadPage(pageNum: number): void {
     this.pageNum = pageNum;
     this.fetchVersions();
   }
 
-  public openConfig(open: boolean): void {
+  openConfig(open: boolean): void {
     this.showConfig = open;
   }
 
-  public refreshPage(): void {
+  refreshPage(): void {
     this.fetchVersions();
   }
 
-  public timeAgo(date: Date | string): string {
+  timeAgo(date: Date | string): string {
     return moment(date).fromNow();
   }
 
-  public deleteVersion(version: GemVersionListItem): void {
+  deleteVersion(version: GemVersionListItem): void {
     const isLastVersion = this.pagedData.page.totalElements === 1 && !this.searchText;
     this.dangerModalService.show('Delete Version', 'Delete', () => {
       this.loading = true;
@@ -187,7 +187,7 @@ export class RubyGemsVersionListComponent implements OnDestroy {
       });
   }
 
-  public get canManage(): boolean {
+  get canManage(): boolean {
     return this.activeRepo?.canManage ?? false;
   }
 

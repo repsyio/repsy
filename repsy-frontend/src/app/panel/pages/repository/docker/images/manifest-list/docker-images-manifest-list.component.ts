@@ -60,27 +60,27 @@ import { DockerService } from '../../service/docker.service';
   templateUrl: './docker-images-manifest-list.component.html',
 })
 export class DockerImagesManifestListComponent implements OnDestroy {
-  public loading = true;
-  public showConfig = false;
-  public installText: string;
-  public imageName: string;
-  public tagName: string;
-  public pageNum = 0;
-  public pageSize = 10;
-  public searchText = '';
-  public error: string;
-  public pagedData: PagedData<ManifestListItem>;
-  public activeRepo: RepoPermissionInfo;
-  public manifests: ManifestListItem[];
+  loading = true;
+  showConfig = false;
+  installText: string;
+  imageName: string;
+  tagName: string;
+  pageNum = 0;
+  pageSize = 10;
+  searchText = '';
+  error: string;
+  pagedData: PagedData<ManifestListItem>;
+  activeRepo: RepoPermissionInfo;
+  manifests: ManifestListItem[];
 
-  public sortOption: Sort = { name: 'Newest', column: 'createdAt', type: 'DESC' };
-  public sortOptions: Sort[] = [
+  sortOption: Sort = { name: 'Newest', column: 'createdAt', type: 'DESC' };
+  sortOptions: Sort[] = [
     { name: 'Newest', column: 'createdAt', type: 'DESC' },
     { name: 'Oldest', column: 'createdAt', type: 'ASC' },
   ];
 
-  public readonly baseUrl: string;
-  public readonly username: string;
+  readonly baseUrl: string;
+  readonly username: string;
   private readonly repositoryChanges$: Subscription;
 
   constructor(
@@ -104,35 +104,35 @@ export class DockerImagesManifestListComponent implements OnDestroy {
     });
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     this.repositoryChanges$.unsubscribe();
   }
 
-  public loadPage(pageNum: number): void {
+  loadPage(pageNum: number): void {
     this.pageNum = pageNum;
     this.fetchManifests();
   }
 
-  public refreshPage(): void {
+  refreshPage(): void {
     this.fetchManifests();
   }
 
-  public sort(option: Sort) {
+  sort(option: Sort) {
     this.sortOption = option;
     this.fetchManifests();
   }
 
-  public search(packageName: string) {
+  search(packageName: string) {
     this.pageNum = 0;
     this.searchText = packageName;
     this.fetchManifests();
   }
 
-  public openConfig(open: boolean) {
+  openConfig(open: boolean) {
     this.showConfig = open;
   }
 
-  public timeAgo(date: Date | string): string {
+  timeAgo(date: Date | string): string {
     return moment(date).fromNow();
   }
 
@@ -160,7 +160,7 @@ export class DockerImagesManifestListComponent implements OnDestroy {
       });
   }
 
-  public get canManage(): boolean {
+  get canManage(): boolean {
     return this.activeRepo?.canManage ?? false;
   }
 }

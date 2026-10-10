@@ -32,19 +32,19 @@ import { RETURN_URL_PARAM, safeReturnUrl } from '../util/return-url';
   providedIn: 'root',
 })
 export class AuthGuard implements CanActivate, CanActivateChild {
-  public constructor(
+  constructor(
     private readonly router: Router,
     private readonly authService: AuthService,
   ) {}
 
-  public canActivate(
+  canActivate(
     route: ActivatedRouteSnapshot,
     state: RouterStateSnapshot,
   ): Observable<boolean | UrlTree> | Promise<boolean | UrlTree> | boolean | UrlTree {
     return this.authService.isAuthenticated() ? true : this._toLogin(state);
   }
 
-  public canActivateChild(
+  canActivateChild(
     childRoute: ActivatedRouteSnapshot,
     state: RouterStateSnapshot,
   ): Observable<boolean | UrlTree> | Promise<boolean | UrlTree> | boolean | UrlTree {

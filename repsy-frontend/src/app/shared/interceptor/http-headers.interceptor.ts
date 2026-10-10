@@ -24,7 +24,7 @@ import { AuthService } from '../../auth/pages/service/auth.service';
 export class HttpHeadersInterceptor implements HttpInterceptor {
   constructor(private readonly authService: AuthService) {}
 
-  public intercept(req: HttpRequest<unknown>, next: HttpHandler): Observable<HttpEvent<unknown>> {
+  intercept(req: HttpRequest<unknown>, next: HttpHandler): Observable<HttpEvent<unknown>> {
     let headers = req.headers;
     headers = headers.set('Cache-Control', 'no-cache');
 

@@ -30,21 +30,21 @@ export class ProfileService {
     private readonly authService: AuthService,
   ) {}
 
-  public get(): Observable<ProfileInfo> {
+  get(): Observable<ProfileInfo> {
     return this.profileApi.getProfile();
   }
 
-  public updatePassword(password: string): Observable<LoginInfo> {
+  updatePassword(password: string): Observable<LoginInfo> {
     return this.profileApi
       .updatePassword({ password })
       .pipe(tap((loginInfo) => this.authService.updateLoginInfo(loginInfo)));
   }
 
-  public updateUsername(username: string): Observable<LoginInfo> {
+  updateUsername(username: string): Observable<LoginInfo> {
     return this.profileApi.updateUsername({ username });
   }
 
-  public deleteAccount(): Observable<void> {
+  deleteAccount(): Observable<void> {
     return this.profileApi.deleteProfile();
   }
 }

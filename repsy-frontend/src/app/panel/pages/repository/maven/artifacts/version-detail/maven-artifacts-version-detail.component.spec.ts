@@ -312,11 +312,11 @@ describe('MavenArtifactsVersionDetailComponent template', () => {
 
     @Component({ selector: 'app-security-scan-section', standalone: true, template: '' })
     class SecurityScanSectionStubComponent {
-      @Input() public repoType: string;
-      @Input() public repoName: string;
-      @Input() public artifactName: string;
-      @Input() public artifactVersion: string;
-      @Input() public canTriggerScan: boolean;
+      @Input() repoType: string;
+      @Input() repoName: string;
+      @Input() artifactName: string;
+      @Input() artifactVersion: string;
+      @Input() canTriggerScan: boolean;
     }
     TestBed.overrideComponent(MavenArtifactsVersionDetailComponent, {
       remove: { imports: [SecurityScanSectionComponent] },

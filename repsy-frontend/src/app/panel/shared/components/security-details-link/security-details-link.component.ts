@@ -27,13 +27,13 @@ import { SecurityScanSupportService } from '../../service/security-scan-support.
   imports: [RouterLink, AsyncPipe],
 })
 export class SecurityDetailsLinkComponent implements OnInit {
-  @Input({ required: true }) public repoType: string;
+  @Input({ required: true }) repoType: string;
 
-  public isSupported$: Observable<boolean>;
+  isSupported$: Observable<boolean>;
 
   constructor(private readonly securityScanSupportService: SecurityScanSupportService) {}
 
-  public ngOnInit(): void {
+  ngOnInit(): void {
     this.isSupported$ = this.securityScanSupportService.isSupported(this.repoType);
   }
 }

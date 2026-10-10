@@ -51,35 +51,35 @@ const CLEAN_CLASSES = 'border-success-600 bg-success-900 text-success-400';
   templateUrl: './severity-badge.component.html',
 })
 export class SeverityBadgeComponent {
-  @Input() public severity: Severity | null = null;
-  @Input() public scanned = true;
-  @Input() public count: number | null = null;
-  @Input() public compact = false;
+  @Input() severity: Severity | null = null;
+  @Input() scanned = true;
+  @Input() count: number | null = null;
+  @Input() compact = false;
   /** Status of the newest scan; anything but completed marks the severity as the last known one. */
-  @Input() public scanStatus: ScanStatus | null = null;
+  @Input() scanStatus: ScanStatus | null = null;
   /** For a badge that rolls up several versions: how many of them have an unfinished newest scan. */
-  @Input() public rescanInProgressCount: number | null = null;
+  @Input() rescanInProgressCount: number | null = null;
   /** For a badge that rolls up several versions: how many of them have a failed newest scan. */
-  @Input() public rescanFailedCount: number | null = null;
+  @Input() rescanFailedCount: number | null = null;
   /** For a badge that rolls up several versions: how many have no completed scan and a first scan still unfinished. */
-  @Input() public unscannedInProgressCount: number | null = null;
+  @Input() unscannedInProgressCount: number | null = null;
   /** For a badge that rolls up several versions: how many have no completed scan and a failed first scan. */
-  @Input() public unscannedFailedCount: number | null = null;
+  @Input() unscannedFailedCount: number | null = null;
 
   protected readonly Severity = Severity;
 
   /** Nothing has completed yet and a first scan is still unfinished: there is no severity to show. */
-  public get isFirstScanInProgress(): boolean {
+  get isFirstScanInProgress(): boolean {
     return !this.scanned && (this.unscannedInProgressCount ?? 0) > 0;
   }
 
   /** Nothing has completed yet and every first scan failed. An unfinished one wins, it may still succeed. */
-  public get isFirstScanFailed(): boolean {
+  get isFirstScanFailed(): boolean {
     return !this.scanned && !this.isFirstScanInProgress && (this.unscannedFailedCount ?? 0) > 0;
   }
 
   /** Tooltip of the whole badge while no severity exists yet, naming every unscanned version. */
-  public get unscannedTitle(): string {
+  get unscannedTitle(): string {
     if (!this.isFirstScanInProgress && !this.isFirstScanFailed) {
       return '';
     }
@@ -94,7 +94,7 @@ export class SeverityBadgeComponent {
    * Tooltip of the small icon next to a severity: flags versions the severity is not (or not fully)
    * built from, that is versions being rescanned and versions that have no completed scan yet.
    */
-  public get rescanTitle(): string {
+  get rescanTitle(): string {
     // Without a completed scan there is no last known severity for the icon to qualify.
     if (!this.scanned) {
       return '';
@@ -110,7 +110,7 @@ export class SeverityBadgeComponent {
     return parts.filter(Boolean).join(' ');
   }
 
-  public get rescanInProgress(): boolean {
+  get rescanInProgress(): boolean {
     return (
       isRescanInProgress(this.scanStatus) ||
       (this.rescanInProgressCount ?? 0) > 0 ||
@@ -118,11 +118,11 @@ export class SeverityBadgeComponent {
     );
   }
 
-  public get isClean(): boolean {
+  get isClean(): boolean {
     return this.scanned && !this.severity;
   }
 
-  public get classes(): string {
+  get classes(): string {
     if (this.isClean) {
       return CLEAN_CLASSES;
     }
@@ -136,7 +136,7 @@ export class SeverityBadgeComponent {
       : SEVERITY_CLASSES[Severity.Unknown];
   }
 
-  public get label(): string {
+  get label(): string {
     if (this.isClean) {
       return 'Clean';
     }

@@ -24,5 +24,5 @@ import { Component, input } from '@angular/core';
 })
 export class EmptyListComponent {
   /** Replaces the default "add a new item" text, e.g. when a search simply has no match. */
-  public readonly message = input<string>();
+  readonly message = input<string>();
 }

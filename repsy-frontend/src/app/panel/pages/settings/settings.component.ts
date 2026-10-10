@@ -33,5 +33,5 @@ import { AccessTokensComponent } from './access-tokens/access-tokens.component';
 })
 export class SettingsComponent {
   /** `id` is the element id of the section, used as the link fragment and in the test id. */
-  public readonly sections = [{ id: 'access-tokens', title: 'Access tokens' }];
+  readonly sections = [{ id: 'access-tokens', title: 'Access tokens' }];
 }

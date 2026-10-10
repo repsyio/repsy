@@ -15,9 +15,9 @@
 ///
 
 export class RepoListItem {
-  public name: string;
-  public privateRepo: boolean;
-  public repoType: string;
-  public createdAt: string;
-  public diskUsage: number;
+  name: string;
+  privateRepo: boolean;
+  repoType: string;
+  createdAt: string;
+  diskUsage: number;
 }

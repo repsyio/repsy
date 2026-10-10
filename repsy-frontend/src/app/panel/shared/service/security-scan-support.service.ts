@@ -35,11 +35,11 @@ export class SecurityScanSupportService {
     );
   }
 
-  public isSupported(repoType: string): Observable<boolean> {
+  isSupported(repoType: string): Observable<boolean> {
     return this.supportedRepoTypes$.pipe(map((supported) => supported.has(toApiRepoType(repoType) ?? repoType)));
   }
 
-  public getSupportedRepoTypes(): Observable<Set<string>> {
+  getSupportedRepoTypes(): Observable<Set<string>> {
     return this.supportedRepoTypes$;
   }
 }

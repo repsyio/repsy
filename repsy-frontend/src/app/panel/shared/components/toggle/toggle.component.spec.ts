@@ -114,7 +114,7 @@ describe('ToggleComponent', () => {
   template: `<app-toggle data-testid="host-toggle" [formControl]="control" checkedLabel="On" uncheckedLabel="Off" />`,
 })
 class HostComponent {
-  public control = new FormControl(false, { nonNullable: true });
+  control = new FormControl(false, { nonNullable: true });
 }
 
 describe('ToggleComponent as a form control', () => {

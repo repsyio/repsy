@@ -43,15 +43,15 @@ export class RepoLookupService {
   private readonly inFlight = new Map<string, Observable<RepoRouteSlug>>();
 
   private readonly currentRepoSubject = new BehaviorSubject<RepoContext | null>(null);
-  public readonly currentRepo$ = this.currentRepoSubject.asObservable();
+  readonly currentRepo$ = this.currentRepoSubject.asObservable();
 
   constructor(private readonly reposApi: ReposApi) {}
 
-  public get currentRepo(): RepoContext | null {
+  get currentRepo(): RepoContext | null {
     return this.currentRepoSubject.getValue();
   }
 
-  public getRepoType(repoName: string): Observable<RepoRouteSlug> {
+  getRepoType(repoName: string): Observable<RepoRouteSlug> {
     const cachedType = this.cache.get(repoName);
 
     if (cachedType) {
@@ -62,7 +62,7 @@ export class RepoLookupService {
     return this.sharedFetch(repoName).pipe(tap((repoType) => this.currentRepoSubject.next({ repoName, repoType })));
   }
 
-  public checkRepoType(repoName: string): Observable<RepoRouteSlug> {
+  checkRepoType(repoName: string): Observable<RepoRouteSlug> {
     const cachedType = this.cache.get(repoName);
 
     if (cachedType) {

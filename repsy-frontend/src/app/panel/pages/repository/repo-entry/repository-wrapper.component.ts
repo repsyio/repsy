@@ -34,13 +34,13 @@ import { RepoRouteData } from './repo-type.resolver';
   `,
 })
 export class RepositoryWrapperComponent implements OnInit {
-  public loading = true;
-  public repoData: RepoRouteData | null = null;
+  loading = true;
+  repoData: RepoRouteData | null = null;
 
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
 
-  public ngOnInit(): void {
+  ngOnInit(): void {
     this.route.data.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((data) => {
       this.repoData = data['repoData'] as RepoRouteData | null;
 

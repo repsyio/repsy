@@ -32,7 +32,7 @@ import { Sort } from '../../../../shared/dto/sort';
   providedIn: 'root',
 })
 export class RubyService {
-  public readonly repoChanges: Observable<RepoPermissionInfo>;
+  readonly repoChanges: Observable<RepoPermissionInfo>;
 
   private readonly repoSubject = new BehaviorSubject<RepoPermissionInfo>(null);
 
@@ -47,7 +47,7 @@ export class RubyService {
     return this.repoSubject.getValue()?.repoName ?? '';
   }
 
-  public fetchRepoPermission(repoName: string): Observable<RepoPermissionInfo> {
+  fetchRepoPermission(repoName: string): Observable<RepoPermissionInfo> {
     this.resetActiveRepoIfChanged(repoName);
 
     return this.reposApi.getRepoPermissions(repoName).pipe(tap((info) => this.repoSubject.next(info)));
@@ -61,7 +61,7 @@ export class RubyService {
     this.repoSubject.next(null);
   }
 
-  public searchGems(
+  searchGems(
     search: string,
     sortOption: Sort,
     pageIndex: number,
@@ -72,7 +72,7 @@ export class RubyService {
       .pipe(map((r) => ({ content: r?.content ?? [], page: r?.page }) as unknown as PagedData<GemListItem>));
   }
 
-  public fetchGemVersions(
+  fetchGemVersions(
     gemName: string,
     search: string,
     sortOption: Sort,
@@ -86,15 +86,15 @@ export class RubyService {
       .pipe(map((r) => ({ content: r?.content ?? [], page: r?.page }) as unknown as PagedData<GemVersionListItem>));
   }
 
-  public fetchGemVersion(gemName: string, version: string, platform?: string): Observable<GemVersionInfo> {
+  fetchGemVersion(gemName: string, version: string, platform?: string): Observable<GemVersionInfo> {
     return this.rubyGemsApi.getGemVersion(gemName, version, this.repoName, platform);
   }
 
-  public deleteGem(gemName: string): Observable<void> {
+  deleteGem(gemName: string): Observable<void> {
     return this.rubyGemsApi.deleteGem(gemName, this.repoName).pipe(map(() => undefined));
   }
 
-  public deleteGemVersion(gemName: string, version: string, platform: string): Observable<void> {
+  deleteGemVersion(gemName: string, version: string, platform: string): Observable<void> {
     return this.rubyGemsApi.deleteGemVersion(gemName, version, this.repoName, platform).pipe(map(() => undefined));
   }
 }

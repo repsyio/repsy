@@ -41,13 +41,13 @@ import { parseRequestedScopes } from '../settings/access-tokens/access-token-sco
   templateUrl: './cli-auth.component.html',
 })
 export class CliAuthComponent implements OnInit {
-  public name = '';
-  public scopes: AccessTokenScope[] = [];
-  public created: AccessTokenCreated | null = null;
-  public blockedReason: string | null = null;
+  name = '';
+  scopes: AccessTokenScope[] = [];
+  created: AccessTokenCreated | null = null;
+  blockedReason: string | null = null;
   /** The check of how many live tokens exist is under way / could not be read. */
-  public checkingRoom = true;
-  public roomCheckFailed = false;
+  checkingRoom = true;
+  roomCheckFailed = false;
 
   constructor(
     private readonly route: ActivatedRoute,
@@ -80,11 +80,11 @@ export class CliAuthComponent implements OnInit {
     });
   }
 
-  public scopesText(): string {
+  scopesText(): string {
     return Array.from(this.created?.scopes ?? []).join(', ');
   }
 
-  public onCreated(token: AccessTokenCreated): void {
+  onCreated(token: AccessTokenCreated): void {
     this.created = token;
   }
 }

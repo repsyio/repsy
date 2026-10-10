@@ -45,31 +45,31 @@ import { saveRepoSetting } from '../save-repo-setting';
   imports: [CommonModule, SelectorComponent, ToggleComponent, RouterLink],
 })
 export class SignatureComponent implements OnInit {
-  @Input() public activeRepository: RepoPermissionInfo;
-  @Input() public repoType: string;
-  @Input() public parentForm: FormGroup;
-  @Output() public fetch = new EventEmitter<void>();
-  public verifyAllSignaturesEnabled = false;
-  public keyServerLookupEnabled = true;
-  public pageNum = 1;
-  public pageSize = 5;
-  public keyStores: KeyStoreItem[] = [];
-  public serverLabels: string[] = [];
-  public selectedServerLabel = '';
-  public isSubmitting = false;
+  @Input() activeRepository: RepoPermissionInfo;
+  @Input() repoType: string;
+  @Input() parentForm: FormGroup;
+  @Output() fetch = new EventEmitter<void>();
+  verifyAllSignaturesEnabled = false;
+  keyServerLookupEnabled = true;
+  pageNum = 1;
+  pageSize = 5;
+  keyStores: KeyStoreItem[] = [];
+  serverLabels: string[] = [];
+  selectedServerLabel = '';
+  isSubmitting = false;
   /** A settings save is on its way: both toggles are locked, so a double click sends one request (RPS-1618). */
-  public saving = false;
-  public docsBaseUrl: string;
-  public publicKeys: PgpPublicKeyItem[] = [];
-  public publicKeyPageNum = 1;
-  public publicKeyPageSize = 5;
+  saving = false;
+  docsBaseUrl: string;
+  publicKeys: PgpPublicKeyItem[] = [];
+  publicKeyPageNum = 1;
+  publicKeyPageSize = 5;
 
-  public readonly wellKnownServers = [
+  readonly wellKnownServers = [
     { host: 'keyserver.ubuntu.com', displayName: 'Ubuntu Keyserver' },
     { host: 'keys.openpgp.org', displayName: 'OpenPGP Keyserver' },
   ];
 
-  public readonly signedColumnHint =
+  readonly signedColumnHint =
     "Signed means a key matching the signature's key id is registered on this repo or, with keyserver lookup on, published on a public keyserver. It does not prove who deployed the artifact.";
 
   private allowedKeyservers: AllowedKeyserverItem[] = [];
@@ -92,7 +92,7 @@ export class SignatureComponent implements OnInit {
   }
 
   /** Each toggle sends only its own field, so it cannot change any other setting of the repository. */
-  public changeVerifyAllSignatures(): void {
+  changeVerifyAllSignatures(): void {
     const enabled = this.verifyAllSignaturesEnabled;
 
     this.updateSetting(
@@ -103,7 +103,7 @@ export class SignatureComponent implements OnInit {
     );
   }
 
-  public changeKeyServerLookup(): void {
+  changeKeyServerLookup(): void {
     const enabled = this.keyServerLookupEnabled;
 
     this.updateSetting(
@@ -144,7 +144,7 @@ export class SignatureComponent implements OnInit {
     });
   }
 
-  public createKeyStore(): void {
+  createKeyStore(): void {
     if (this.isSubmitting) {
       return;
     }
@@ -176,7 +176,7 @@ export class SignatureComponent implements OnInit {
       });
   }
 
-  public fetchKeyStores(): void {
+  fetchKeyStores(): void {
     this.pageNum = 1;
     this.mavenKeyStoresApi.listMavenKeyStores(this.activeRepository.repoName, 0, this.pageSize).subscribe({
       next: (r) => {
@@ -186,7 +186,7 @@ export class SignatureComponent implements OnInit {
     });
   }
 
-  public loadMoreKeyStores(): void {
+  loadMoreKeyStores(): void {
     this.mavenKeyStoresApi.listMavenKeyStores(this.activeRepository.repoName, this.pageNum, this.pageSize).subscribe({
       next: (r) => {
         const newItems = r.content ?? [];
@@ -197,7 +197,7 @@ export class SignatureComponent implements OnInit {
     });
   }
 
-  public onScroll(event: Event): void {
+  onScroll(event: Event): void {
     const target = event.target as HTMLElement;
     const bottom = target.scrollHeight === target.scrollTop + target.clientHeight;
     if (bottom) {
@@ -205,7 +205,7 @@ export class SignatureComponent implements OnInit {
     }
   }
 
-  public deleteKeyStore(id: string): void {
+  deleteKeyStore(id: string): void {
     this.dangerModalService.show('Delete key store', 'Delete', () => {
       this.mavenKeyStoresApi.deleteMavenKeyStore(id, this.activeRepository.repoName).subscribe({
         next: () => {
@@ -218,7 +218,7 @@ export class SignatureComponent implements OnInit {
     });
   }
 
-  public addPublicKey(armoredKey: string): void {
+  addPublicKey(armoredKey: string): void {
     if (this.isSubmitting) {
       return;
     }
@@ -250,7 +250,7 @@ export class SignatureComponent implements OnInit {
       });
   }
 
-  public fetchPublicKeys(): void {
+  fetchPublicKeys(): void {
     this.publicKeyPageNum = 1;
     this.mavenKeyStoresApi.listMavenPgpPublicKeys(this.activeRepository.repoName, 0, this.publicKeyPageSize).subscribe({
       next: (r) => {
@@ -260,7 +260,7 @@ export class SignatureComponent implements OnInit {
     });
   }
 
-  public loadMorePublicKeys(): void {
+  loadMorePublicKeys(): void {
     this.mavenKeyStoresApi
       .listMavenPgpPublicKeys(this.activeRepository.repoName, this.publicKeyPageNum, this.publicKeyPageSize)
       .subscribe({
@@ -273,7 +273,7 @@ export class SignatureComponent implements OnInit {
       });
   }
 
-  public onScrollPublicKeys(event: Event): void {
+  onScrollPublicKeys(event: Event): void {
     const target = event.target as HTMLElement;
     const bottom = target.scrollHeight === target.scrollTop + target.clientHeight;
     if (bottom) {
@@ -281,7 +281,7 @@ export class SignatureComponent implements OnInit {
     }
   }
 
-  public deletePublicKey(uuid: string): void {
+  deletePublicKey(uuid: string): void {
     this.dangerModalService.show('Delete Public Key', 'Delete', () => {
       this.mavenKeyStoresApi.deleteMavenPgpPublicKey(uuid, this.activeRepository.repoName).subscribe({
         next: () => {

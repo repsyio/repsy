@@ -46,16 +46,16 @@ import { SeverityBreakdownComponent } from '../severity-breakdown/severity-break
   templateUrl: './package-security-modal.component.html',
 })
 export class PackageSecurityModalComponent implements OnChanges {
-  @Input() public open = false;
-  @Output() public openChange = new EventEmitter<boolean>();
-  @Input({ required: true }) public repoName: string;
-  @Input({ required: true }) public repoType: string;
-  @Input({ required: true }) public artifactName: string;
-  @Input({ required: true }) public packageRoute: string;
-  @Input() public packageQueryParams?: Record<string, string>;
+  @Input() open = false;
+  @Output() openChange = new EventEmitter<boolean>();
+  @Input({ required: true }) repoName: string;
+  @Input({ required: true }) repoType: string;
+  @Input({ required: true }) artifactName: string;
+  @Input({ required: true }) packageRoute: string;
+  @Input() packageQueryParams?: Record<string, string>;
 
-  public loading = false;
-  public detail: RepoSecurityDetail | null = null;
+  loading = false;
+  detail: RepoSecurityDetail | null = null;
 
   private readonly recentScanLinks = new WeakMap<RecentScannedVersion, ArtifactDetailRoute | null>();
 
@@ -64,13 +64,13 @@ export class PackageSecurityModalComponent implements OnChanges {
     private readonly router: Router,
   ) {}
 
-  public ngOnChanges(changes: SimpleChanges): void {
+  ngOnChanges(changes: SimpleChanges): void {
     if (changes['open'] && this.open && this.repoName && this.artifactName) {
       this.fetchDetail();
     }
   }
 
-  public closeModal(): void {
+  closeModal(): void {
     this.openChange.emit(false);
   }
 
@@ -78,7 +78,7 @@ export class PackageSecurityModalComponent implements OnChanges {
    * The detail page of a recent scan's version. Built once per scan: the template binds its `queryParams`
    * object, and a new object on every change detection pass would be an ExpressionChanged error.
    */
-  public recentScanLink(scan: RecentScannedVersion): ArtifactDetailRoute | null {
+  recentScanLink(scan: RecentScannedVersion): ArtifactDetailRoute | null {
     let link = this.recentScanLinks.get(scan);
     if (link === undefined) {
       link = this.buildRecentScanRoute(scan);
@@ -87,7 +87,7 @@ export class PackageSecurityModalComponent implements OnChanges {
     return link;
   }
 
-  public viewAllVersions(event: Event): void {
+  viewAllVersions(event: Event): void {
     event.stopPropagation();
 
     this.closeModal();

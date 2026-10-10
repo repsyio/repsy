@@ -63,8 +63,8 @@ interface ClassifiedUrl {
   encapsulation: ViewEncapsulation.None,
 })
 export class MarkdownComponent implements OnInit, AfterViewInit {
-  @Input() public markdown: string;
-  public markdownHtml: SafeHtml;
+  @Input() markdown: string;
+  markdownHtml: SafeHtml;
 
   // README files (RPS-1006) routinely use tables and strikethrough; gfm covers both. External
   // links already get target="_blank" from restrictLink below, regardless of the renderer.

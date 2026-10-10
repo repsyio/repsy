@@ -42,7 +42,7 @@ export const MAVEN_VERSION_PROBE_SORT: Sort = { name: 'Newest', column: 'version
   providedIn: 'root',
 })
 export class MavenService {
-  public readonly repoChanges: Observable<RepoPermissionInfo>;
+  readonly repoChanges: Observable<RepoPermissionInfo>;
 
   private readonly repoSubject = new BehaviorSubject<RepoPermissionInfo>(null);
 
@@ -58,7 +58,7 @@ export class MavenService {
     return this.repoSubject.getValue()?.repoName ?? '';
   }
 
-  public fetchRepoPermission(repoName: string): Observable<RepoPermissionInfo> {
+  fetchRepoPermission(repoName: string): Observable<RepoPermissionInfo> {
     this.resetActiveRepoIfChanged(repoName);
 
     return this.reposApi.getRepoPermissions(repoName).pipe(tap((info) => this.repoSubject.next(info)));
@@ -72,19 +72,19 @@ export class MavenService {
     this.repoSubject.next(null);
   }
 
-  public updateRepoSettings(form: RepoSettingsForm): Observable<void> {
+  updateRepoSettings(form: RepoSettingsForm): Observable<void> {
     return this.reposApi.updateRepoSettings(this.repoName, form).pipe(map(() => undefined));
   }
 
-  public fetchPathContent(path: string): Observable<FsItemInfo[]> {
+  fetchPathContent(path: string): Observable<FsItemInfo[]> {
     return this.reposApi.getPathContent(path, this.repoName).pipe(map((r) => r as unknown as FsItemInfo[]));
   }
 
-  public createDownloadToken(path: string): Observable<string> {
+  createDownloadToken(path: string): Observable<string> {
     return this.reposApi.createDownloadToken(path, this.repoName);
   }
 
-  public searchGroups(
+  searchGroups(
     groupName: string,
     sortOption: Sort,
     pageIndex: number,
@@ -97,7 +97,7 @@ export class MavenService {
       .pipe(map((r) => ({ content: r?.content ?? [], page: r?.page }) as unknown as PagedData<ArtifactListItem>));
   }
 
-  public searchArtifacts(
+  searchArtifacts(
     groupName: string,
     artifactName: string,
     sortOption: Sort,
@@ -111,7 +111,7 @@ export class MavenService {
       .pipe(map((r) => ({ content: r?.content ?? [], page: r?.page }) as unknown as PagedData<ArtifactListItem>));
   }
 
-  public searchArtifactVersions(
+  searchArtifactVersions(
     groupName: string,
     artifactName: string,
     version: string,
@@ -128,7 +128,7 @@ export class MavenService {
       );
   }
 
-  public fetchArtifactVersion(
+  fetchArtifactVersion(
     groupName: string,
     artifactName: string,
     versionName: string,
@@ -137,7 +137,7 @@ export class MavenService {
   }
 
   /** What deleting the group removes: how many artifacts and versions it holds. */
-  public fetchGroupSummary(groupName: string): Observable<MavenGroupSummary> {
+  fetchGroupSummary(groupName: string): Observable<MavenGroupSummary> {
     return this.mavenGroupsApi.getMavenGroupSummary(groupName, this.repoName);
   }
 
@@ -147,7 +147,7 @@ export class MavenService {
    * `null` when only the version goes. Read from the versions probe and the group summary; a probe that
    * fails asks for nothing more than the plain confirmation.
    */
-  public fetchVersionDeleteWarning(groupName: string, artifactName: string): Observable<string | null> {
+  fetchVersionDeleteWarning(groupName: string, artifactName: string): Observable<string | null> {
     return this.searchArtifactVersions(
       groupName,
       artifactName,
@@ -164,15 +164,15 @@ export class MavenService {
     );
   }
 
-  public deleteGroup(groupName: string): Observable<void> {
+  deleteGroup(groupName: string): Observable<void> {
     return this.mavenArtifactsApi.deleteMavenGroup(groupName, this.repoName);
   }
 
-  public deleteArtifact(groupName: string, artifactName: string): Observable<void> {
+  deleteArtifact(groupName: string, artifactName: string): Observable<void> {
     return this.mavenArtifactsApi.deleteMavenArtifact(groupName, artifactName, this.repoName);
   }
 
-  public deleteVersion(groupName: string, artifactName: string, versionName: string): Observable<void> {
+  deleteVersion(groupName: string, artifactName: string, versionName: string): Observable<void> {
     return this.mavenArtifactsApi.deleteMavenArtifactVersion(groupName, artifactName, versionName, this.repoName);
   }
 }

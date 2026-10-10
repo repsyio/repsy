@@ -44,15 +44,15 @@ import { ToggleComponent } from '../../toggle/toggle.component';
 })
 export class RepositoryCreateModalComponent implements OnInit {
   /** Element ids of this instance: see `idFactory`. */
-  public readonly id = idFactory('repo-create');
+  readonly id = idFactory('repo-create');
 
   @Output() openChange = new EventEmitter<boolean>();
   /** The repository the server created, as the list shows it. */
   @Output() created = new EventEmitter<RepoListInfo | undefined>();
-  @Input() public open: boolean;
+  @Input() open: boolean;
   @Input() selectedOption: RepoType;
 
-  public options = [
+  options = [
     RepoType.DOCKER,
     RepoType.MAVEN,
     RepoType.NPM,
@@ -63,11 +63,11 @@ export class RepositoryCreateModalComponent implements OnInit {
     RepoType.NUGET,
     RepoType.RUBY,
   ];
-  public form: FormGroup;
+  form: FormGroup;
 
-  public loading = false;
-  public readonly descriptionMaxLength = DESCRIPTION_MAX_LENGTH;
-  public readonly descriptionMaxMessage = DESCRIPTION_MAX_MESSAGE;
+  loading = false;
+  readonly descriptionMaxLength = DESCRIPTION_MAX_LENGTH;
+  readonly descriptionMaxMessage = DESCRIPTION_MAX_MESSAGE;
 
   constructor(
     private readonly reposApi: ReposApi,
@@ -77,7 +77,7 @@ export class RepositoryCreateModalComponent implements OnInit {
     private readonly changeDetector: ChangeDetectorRef,
   ) {}
 
-  public ngOnInit(): void {
+  ngOnInit(): void {
     if (this.selectedOption == null) {
       this.selectedOption = RepoType.DOCKER;
     }
@@ -97,17 +97,17 @@ export class RepositoryCreateModalComponent implements OnInit {
     });
   }
 
-  public closeModal() {
+  closeModal() {
     this.form.reset();
     this.form.get('privateRepo').setValue(true);
     this.openChange.emit(false);
   }
 
-  public selectOption(option: string) {
+  selectOption(option: string) {
     this.selectedOption = option as RepoType;
   }
 
-  public createRepo() {
+  createRepo() {
     this.loading = true;
     this.form.disable();
 

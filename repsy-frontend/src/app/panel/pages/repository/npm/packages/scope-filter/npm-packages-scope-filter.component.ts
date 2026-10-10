@@ -63,20 +63,20 @@ import { NpmService } from '../../service/npm.service';
   templateUrl: './npm-packages-scope-filter.component.html',
 })
 export class NpmPackagesScopeFilterComponent implements OnDestroy {
-  public loading = true;
-  public showConfig = false;
-  public baseUrl: string;
-  public error: string;
-  public scopeName: string;
-  public pageNum = 0;
-  public pageSize = 10;
-  public pagedData: PagedData<NpmPackageListItem>;
-  public packages: NpmPackageListItem[];
-  public activeRegistry: RepoPermissionInfo;
-  public searchText = '';
+  loading = true;
+  showConfig = false;
+  baseUrl: string;
+  error: string;
+  scopeName: string;
+  pageNum = 0;
+  pageSize = 10;
+  pagedData: PagedData<NpmPackageListItem>;
+  packages: NpmPackageListItem[];
+  activeRegistry: RepoPermissionInfo;
+  searchText = '';
 
-  public sortOption: Sort = { name: 'Newest', column: 'updatedAt', type: 'DESC' };
-  public sortOptions: Sort[] = [
+  sortOption: Sort = { name: 'Newest', column: 'updatedAt', type: 'DESC' };
+  sortOptions: Sort[] = [
     { name: 'Newest', column: 'updatedAt', type: 'DESC' },
     { name: 'Oldest', column: 'updatedAt', type: 'ASC' },
   ];
@@ -112,37 +112,37 @@ export class NpmPackagesScopeFilterComponent implements OnDestroy {
     });
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     this.registryChanges$.unsubscribe();
   }
 
   /** See `NpmPackagesListComponent.refreshPage` (RPS-1669): the caller can name the control that had
    *  the focus before it started asking, for when this reload's own opener will not survive it. */
-  public refreshPage(previouslyFocused: Element | null = null): void {
+  refreshPage(previouslyFocused: Element | null = null): void {
     this.fetchPackages(previouslyFocused);
   }
 
-  public loadPage(pageNum: number): void {
+  loadPage(pageNum: number): void {
     this.pageNum = pageNum;
     this.fetchPackages();
   }
 
-  public sort(option: Sort) {
+  sort(option: Sort) {
     this.sortOption = option;
     this.fetchPackages();
   }
 
-  public search(packageName: string) {
+  search(packageName: string) {
     this.pageNum = 0;
     this.searchText = packageName;
     this.fetchPackages();
   }
 
-  public openConfig(open: boolean) {
+  openConfig(open: boolean) {
     this.showConfig = open;
   }
 
-  public timeAgo(date: Date | string): string {
+  timeAgo(date: Date | string): string {
     return moment(date).fromNow();
   }
 
@@ -184,7 +184,7 @@ export class NpmPackagesScopeFilterComponent implements OnDestroy {
       });
   }
 
-  public deletePackage(pck: NpmPackageListItem) {
+  deletePackage(pck: NpmPackageListItem) {
     // Captured now (RPS-1669): by the time the reload actually fires, the danger modal has already
     // closed and, since its own opener (this row's menu item) is gone, given up on restoring the focus.
     const previouslyFocused = document.activeElement;
@@ -214,7 +214,7 @@ export class NpmPackagesScopeFilterComponent implements OnDestroy {
     });
   }
 
-  public get canManage(): boolean {
+  get canManage(): boolean {
     return this.activeRegistry?.canManage ?? false;
   }
 }

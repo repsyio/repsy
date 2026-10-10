@@ -32,13 +32,13 @@ import { CopyClipboardComponent } from '../../copy-clipboard/copy-clipboard.comp
 })
 export class DeployTokenInfoModalComponent {
   /** Element ids of this instance: see `idFactory`. */
-  public readonly id = idFactory('token-info');
+  readonly id = idFactory('token-info');
 
   @Output() openChange = new EventEmitter<boolean>();
-  @Input() public open: boolean;
-  @Input() public tokenInfo: TokenCreateInfo;
+  @Input() open: boolean;
+  @Input() tokenInfo: TokenCreateInfo;
 
-  public showToken = false;
+  showToken = false;
 
   closeModal(): void {
     this.openChange.emit(false);

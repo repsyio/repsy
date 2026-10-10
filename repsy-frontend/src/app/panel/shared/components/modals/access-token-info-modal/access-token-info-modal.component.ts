@@ -30,13 +30,13 @@ import { CopyClipboardComponent } from '../../copy-clipboard/copy-clipboard.comp
 })
 export class AccessTokenInfoModalComponent {
   /** Element ids of this instance: see `idFactory`. */
-  public readonly id = idFactory('access-token-info');
+  readonly id = idFactory('access-token-info');
 
   @Output() openChange = new EventEmitter<boolean>();
-  @Input() public open: boolean;
-  @Input() public tokenInfo: AccessTokenCreated;
+  @Input() open: boolean;
+  @Input() tokenInfo: AccessTokenCreated;
 
-  public showToken = false;
+  showToken = false;
 
   closeModal(): void {
     this.showToken = false;

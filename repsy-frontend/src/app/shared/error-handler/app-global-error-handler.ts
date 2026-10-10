@@ -25,10 +25,10 @@ export class AppGlobalErrorHandler implements ErrorHandler {
   private readonly MAX_STACK_LENGTH = 49_999;
   private readonly MAX_URL_LENGTH = 249;
 
-  public constructor(private readonly router: Router) {}
+  constructor(private readonly router: Router) {}
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  public handleError(error: any): void {
+  handleError(error: any): void {
     const errorForm = new ErrorForm();
     errorForm.message = error?.message?.substring(0, this.MAX_MESSAGE_LENGTH) ?? 'unknown error';
     errorForm.stack = error?.stack?.substring(0, this.MAX_STACK_LENGTH) ?? 'N/A';

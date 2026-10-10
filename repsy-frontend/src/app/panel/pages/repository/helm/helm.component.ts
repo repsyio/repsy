@@ -31,10 +31,10 @@ import { HelmService } from './service/helm.service';
   imports: [RouterOutlet, RepositoryBreadcrumbComponent],
 })
 export class HelmComponent implements OnInit, OnDestroy {
-  public permissions: RepoPermissionInfo | null = null;
-  public loading = true;
-  public isAuthenticated = false;
-  public isPublicView = false;
+  permissions: RepoPermissionInfo | null = null;
+  loading = true;
+  isAuthenticated = false;
+  isPublicView = false;
 
   private repoSubscription: Subscription | null = null;
 
@@ -45,7 +45,7 @@ export class HelmComponent implements OnInit, OnDestroy {
     private readonly router: Router,
   ) {}
 
-  public ngOnInit(): void {
+  ngOnInit(): void {
     this.isAuthenticated = this.authService.isAuthenticated();
 
     this.repoSubscription = currentRepoOfType(this.repoLookupService, 'helm').subscribe((repoContext) => {
@@ -53,7 +53,7 @@ export class HelmComponent implements OnInit, OnDestroy {
     });
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     if (this.repoSubscription) {
       this.repoSubscription.unsubscribe();
     }

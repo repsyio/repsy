@@ -23,13 +23,13 @@ import { BehaviorSubject, Observable } from 'rxjs';
 export class BreadcrumbSecurityLinkService {
   private readonly repoType = new BehaviorSubject<string | null>(null);
 
-  public readonly repoType$: Observable<string | null> = this.repoType.asObservable();
+  readonly repoType$: Observable<string | null> = this.repoType.asObservable();
 
-  public show(repoType: string): void {
+  show(repoType: string): void {
     this.repoType.next(repoType);
   }
 
-  public clear(): void {
+  clear(): void {
     this.repoType.next(null);
   }
 }

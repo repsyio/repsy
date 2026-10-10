@@ -61,29 +61,29 @@ import { PypiService } from '../../service/pypi.service';
   templateUrl: './pypi-packages-version-list.component.html',
 })
 export class PypiPackagesVersionListComponent implements OnDestroy {
-  public loading = true;
-  public showConfig = false;
-  public pageNum = 0;
-  public pageSize = 10;
-  public searchText = '';
-  public error: string;
-  public repoName: string;
-  public packageName: string;
-  public finalRelease: string;
-  public versions: ReleaseListItem[];
-  public pagedData: PagedData<ReleaseListItem>;
-  public activeRepo: RepoPermissionInfo;
-  public securitySummary: Record<string, VersionSecuritySummary> = {};
+  loading = true;
+  showConfig = false;
+  pageNum = 0;
+  pageSize = 10;
+  searchText = '';
+  error: string;
+  repoName: string;
+  packageName: string;
+  finalRelease: string;
+  versions: ReleaseListItem[];
+  pagedData: PagedData<ReleaseListItem>;
+  activeRepo: RepoPermissionInfo;
+  securitySummary: Record<string, VersionSecuritySummary> = {};
 
-  public sortOption: Sort = { name: 'Newest', column: 'createdAt', type: 'DESC' };
-  public sortOptions: Sort[] = [
+  sortOption: Sort = { name: 'Newest', column: 'createdAt', type: 'DESC' };
+  sortOptions: Sort[] = [
     { name: 'Newest', column: 'createdAt', type: 'DESC' },
     { name: 'Oldest', column: 'createdAt', type: 'ASC' },
     VERSION_PRECEDENCE_SORT,
   ];
 
-  public readonly baseUrl: string;
-  public readonly username: string;
+  readonly baseUrl: string;
+  readonly username: string;
   private readonly repositoryChanges$: Subscription;
   private securitySummarySubscription?: Subscription;
 
@@ -111,40 +111,40 @@ export class PypiPackagesVersionListComponent implements OnDestroy {
     });
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     this.repositoryChanges$.unsubscribe();
     this.securitySummarySubscription?.unsubscribe();
   }
 
-  public loadPage(pageNum: number): void {
+  loadPage(pageNum: number): void {
     this.pageNum = pageNum;
     this.fetchVersions();
   }
 
-  public refreshPage(): void {
+  refreshPage(): void {
     this.fetchVersions();
   }
 
-  public search(packageName: string) {
+  search(packageName: string) {
     this.pageNum = 0;
     this.searchText = packageName;
     this.fetchVersions();
   }
 
-  public sort(option: Sort) {
+  sort(option: Sort) {
     this.sortOption = option;
     this.fetchVersions();
   }
 
-  public openConfig(open: boolean) {
+  openConfig(open: boolean) {
     this.showConfig = open;
   }
 
-  public timeAgo(date: Date | string): string {
+  timeAgo(date: Date | string): string {
     return moment(date).fromNow();
   }
 
-  public deleteVersion(version: ReleaseListItem) {
+  deleteVersion(version: ReleaseListItem) {
     this.dangerModalService.show('Delete Release', 'Delete', () => {
       this.loading = true;
       this.pypiService
@@ -190,7 +190,7 @@ export class PypiPackagesVersionListComponent implements OnDestroy {
       });
   }
 
-  public get canManage(): boolean {
+  get canManage(): boolean {
     return this.activeRepo?.canManage ?? false;
   }
 

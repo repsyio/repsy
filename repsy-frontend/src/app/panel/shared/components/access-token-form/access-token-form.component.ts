@@ -37,22 +37,22 @@ import { ToastService } from '../toast/toast.service';
 })
 export class AccessTokenFormComponent implements OnInit {
   /** Element ids of this instance: see `idFactory`. */
-  public readonly id = idFactory('access-token-form');
+  readonly id = idFactory('access-token-form');
 
-  @Input() public initialName = '';
-  @Input() public initialScopes: AccessTokenScope[] = [];
-  @Input() public submitLabel = 'Create';
+  @Input() initialName = '';
+  @Input() initialScopes: AccessTokenScope[] = [];
+  @Input() submitLabel = 'Create';
   /** When set, creating is blocked and this says why (for example the limit of tokens is reached). */
-  @Input() public blockedReason: string | null = null;
+  @Input() blockedReason: string | null = null;
   @Output() created = new EventEmitter<AccessTokenCreated>();
   @Output() cancelled = new EventEmitter<void>();
 
-  public readonly scopeOptions = SELECTABLE_SCOPES;
-  public loading = false;
-  public form: FormGroup;
-  public selectedScopes = new Set<AccessTokenScope>();
-  public minDate: string;
-  public maxDate: string;
+  readonly scopeOptions = SELECTABLE_SCOPES;
+  loading = false;
+  form: FormGroup;
+  selectedScopes = new Set<AccessTokenScope>();
+  minDate: string;
+  maxDate: string;
 
   constructor(
     private readonly accessTokensApi: AccessTokensApi,

@@ -53,17 +53,17 @@ import { HelmService } from '../../service/helm.service';
   templateUrl: './helm-charts-version-detail.component.html',
 })
 export class HelmChartsVersionDetailComponent implements OnDestroy {
-  public readonly securityRepoType = RepoType.Helm;
-  public loading = true;
-  public error: string;
-  public chartName: string;
-  public versionName: string;
-  public chart: HelmChartDetail;
-  public classicInstallCommand: string;
-  public ociPullCommand: string;
-  public chartYaml = '';
-  public formattedSize = '';
-  public activeRepo: RepoPermissionInfo = {} as RepoPermissionInfo;
+  readonly securityRepoType = RepoType.Helm;
+  loading = true;
+  error: string;
+  chartName: string;
+  versionName: string;
+  chart: HelmChartDetail;
+  classicInstallCommand: string;
+  ociPullCommand: string;
+  chartYaml = '';
+  formattedSize = '';
+  activeRepo: RepoPermissionInfo = {} as RepoPermissionInfo;
 
   private readonly repositoryChanges$: Subscription;
 
@@ -82,11 +82,11 @@ export class HelmChartsVersionDetailComponent implements OnDestroy {
     });
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     this.repositoryChanges$.unsubscribe();
   }
 
-  public deleteVersion(): void {
+  deleteVersion(): void {
     this.dangerModalService.show('Delete Version', 'Delete', () => {
       this.loading = true;
       // Deleting the last version removes the chart, so its versions page would answer 404: the page

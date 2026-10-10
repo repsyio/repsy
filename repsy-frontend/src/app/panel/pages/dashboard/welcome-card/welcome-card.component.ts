@@ -24,7 +24,7 @@ import { Component, OnInit } from '@angular/core';
   styleUrl: './welcome-card.component.css',
 })
 export class WelcomeCardComponent implements OnInit {
-  public username: string;
+  username: string;
 
   ngOnInit(): void {
     this.username = localStorage.getItem('username');

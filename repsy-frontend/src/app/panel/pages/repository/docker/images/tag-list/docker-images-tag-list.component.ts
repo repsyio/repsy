@@ -68,29 +68,29 @@ import { DockerService } from '../../service/docker.service';
   templateUrl: './docker-images-tag-list.component.html',
 })
 export class DockerImagesTagListComponent implements OnDestroy {
-  public loading = true;
-  public showConfig = false;
-  public installText: string;
-  public imageName: string;
-  public pageNum = 0;
-  public pageSize = 10;
-  public searchText = '';
-  public error: string;
-  public pagedData: PagedData<TagListItem>;
-  public activeRepo: RepoPermissionInfo;
-  public tags: TagListItem[];
+  loading = true;
+  showConfig = false;
+  installText: string;
+  imageName: string;
+  pageNum = 0;
+  pageSize = 10;
+  searchText = '';
+  error: string;
+  pagedData: PagedData<TagListItem>;
+  activeRepo: RepoPermissionInfo;
+  tags: TagListItem[];
   /** What the image still stores; only loaded when it has no tag to list. */
-  public summary?: ImageListItem;
-  public loadingSummary = false;
-  public securitySummary: Record<string, VersionSecuritySummary> = {};
+  summary?: ImageListItem;
+  loadingSummary = false;
+  securitySummary: Record<string, VersionSecuritySummary> = {};
 
-  public sortOption: Sort = { name: 'Newest', column: 'createdAt', type: 'DESC' };
-  public sortOptions: Sort[] = [
+  sortOption: Sort = { name: 'Newest', column: 'createdAt', type: 'DESC' };
+  sortOptions: Sort[] = [
     { name: 'Newest', column: 'createdAt', type: 'DESC' },
     { name: 'Oldest', column: 'createdAt', type: 'ASC' },
   ];
-  public readonly baseUrl: string;
-  public readonly username: string;
+  readonly baseUrl: string;
+  readonly username: string;
   private readonly repositoryChanges$: Subscription;
   private securitySummarySubscription?: Subscription;
 
@@ -119,49 +119,49 @@ export class DockerImagesTagListComponent implements OnDestroy {
     });
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     this.repositoryChanges$.unsubscribe();
     this.securitySummarySubscription?.unsubscribe();
   }
 
-  public loadPage(pageNum: number): void {
+  loadPage(pageNum: number): void {
     this.pageNum = pageNum;
     this.fetchTags();
   }
 
-  public refreshPage(): void {
+  refreshPage(): void {
     this.fetchTags();
   }
 
-  public sort(option: Sort) {
+  sort(option: Sort) {
     this.sortOption = option;
     this.fetchTags();
   }
 
-  public search(packageName: string) {
+  search(packageName: string) {
     this.pageNum = 0;
     this.searchText = packageName;
     this.fetchTags();
   }
 
-  public openConfig(open: boolean) {
+  openConfig(open: boolean) {
     this.showConfig = open;
   }
 
-  public timeAgo(date: Date | string): string {
+  timeAgo(date: Date | string): string {
     return moment(date).fromNow();
   }
 
-  public formatBytes(bytes: number): string {
+  formatBytes(bytes: number): string {
     return ByteFormatter.formatBytes(bytes);
   }
 
   /** True when the image has no tag at all (not just none that match the search). */
-  public get hasNoTags(): boolean {
+  get hasNoTags(): boolean {
     return this.tags?.length === 0 && !this.searchText && this.summary?.tagCount === 0;
   }
 
-  public get untaggedText(): string {
+  get untaggedText(): string {
     const count = this.summary?.untaggedManifestCount ?? 0;
 
     if (count === 0) {
@@ -175,11 +175,11 @@ export class DockerImagesTagListComponent implements OnDestroy {
   }
 
   /** Reloads after "Delete untagged manifests": the image itself may be gone with its last manifest. */
-  public onUntaggedCleaned(): void {
+  onUntaggedCleaned(): void {
     this.refreshPage();
   }
 
-  public deleteImage(): void {
+  deleteImage(): void {
     this.dangerModalService.show('Delete Image', 'Delete', () => {
       this.loading = true;
       this.dockerService
@@ -254,7 +254,7 @@ export class DockerImagesTagListComponent implements OnDestroy {
     });
   }
 
-  public deleteTag(tag: TagListItem) {
+  deleteTag(tag: TagListItem) {
     this.dangerModalService.show('Delete Tag', 'Delete', () => {
       this.loading = true;
       this.dockerService
@@ -276,7 +276,7 @@ export class DockerImagesTagListComponent implements OnDestroy {
     });
   }
 
-  public get canManage(): boolean {
+  get canManage(): boolean {
     return this.activeRepo?.canManage ?? false;
   }
 

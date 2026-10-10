@@ -53,17 +53,17 @@ import { NpmService } from '../../service/npm.service';
   templateUrl: './npm-packages-version-detail.component.html',
 })
 export class NpmPackagesVersionDetailComponent implements OnDestroy {
-  public readonly securityRepoType = RepoType.Npm;
-  public loading = true;
-  public scopeName: string;
-  public packageName: string;
-  public versionName: string;
-  public installation: string;
-  public npmrc: string;
-  public error: string;
-  public activeRegistry: RepoPermissionInfo;
+  readonly securityRepoType = RepoType.Npm;
+  loading = true;
+  scopeName: string;
+  packageName: string;
+  versionName: string;
+  installation: string;
+  npmrc: string;
+  error: string;
+  activeRegistry: RepoPermissionInfo;
   private readonly registryChanges$: Subscription;
-  public versionInfo: PackageVersionDetail;
+  versionInfo: PackageVersionDetail;
 
   constructor(
     private readonly npmService: NpmService,
@@ -85,7 +85,7 @@ export class NpmPackagesVersionDetailComponent implements OnDestroy {
     this.breadcrumbSecurityLinkService.show(RepoType.Npm);
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     this.registryChanges$.unsubscribe();
     this.breadcrumbSecurityLinkService.clear();
   }
@@ -101,11 +101,11 @@ export class NpmPackagesVersionDetailComponent implements OnDestroy {
     return matches;
   }
 
-  public get securityArtifactName(): string {
+  get securityArtifactName(): string {
     return this.scopeName ? `@${this.scopeName}/${this.packageName}` : this.packageName;
   }
 
-  public loadVersion(): void {
+  loadVersion(): void {
     this.loading = true;
     this.error = null;
 
@@ -144,14 +144,14 @@ export class NpmPackagesVersionDetailComponent implements OnDestroy {
       });
   }
 
-  public get keywords(): string {
+  get keywords(): string {
     return (this.versionInfo?.keywords ?? [])
       .map((item) => item.keyword)
       .filter(Boolean)
       .join(', ');
   }
 
-  public deleteVersion() {
+  deleteVersion() {
     this.dangerModalService.show('Delete Version', 'Delete', () => {
       this.loading = true;
       deleteVersionAndCheckLast$(

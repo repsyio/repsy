@@ -31,7 +31,7 @@ import { AuthService } from '../pages/service/auth.service';
   providedIn: 'root',
 })
 export class AuthRedirectGuard implements CanActivate, CanActivateChild {
-  public constructor(
+  constructor(
     private readonly router: Router,
     private readonly authService: AuthService,
   ) {}
@@ -42,14 +42,14 @@ export class AuthRedirectGuard implements CanActivate, CanActivateChild {
    * again: the Back button could not leave the page, RPS-1650).
    */
   /* eslint-disable @typescript-eslint/no-unused-vars */
-  public canActivate(
+  canActivate(
     route: ActivatedRouteSnapshot,
     state: RouterStateSnapshot,
   ): Observable<boolean | UrlTree> | Promise<boolean | UrlTree> | boolean | UrlTree {
     return !this.authService.isAuthenticated() ? true : this.router.createUrlTree(['/']);
   }
 
-  public canActivateChild(
+  canActivateChild(
     childRoute: ActivatedRouteSnapshot,
     state: RouterStateSnapshot,
   ): Observable<boolean | UrlTree> | Promise<boolean | UrlTree> | boolean | UrlTree {

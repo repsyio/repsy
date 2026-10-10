@@ -31,35 +31,35 @@ import { VersionSecurityModalComponent } from '../version-security-modal/version
   templateUrl: './version-security-badge.component.html',
 })
 export class VersionSecurityBadgeComponent implements OnInit {
-  @Input({ required: true }) public repoName: string;
-  @Input({ required: true }) public repoType: string;
-  @Input({ required: true }) public artifactName: string;
-  @Input({ required: true }) public versionName: string;
-  @Input() public severity: Severity | null = null;
-  @Input() public scanned = false;
-  @Input() public scanStatus: ScanStatus | null = null;
+  @Input({ required: true }) repoName: string;
+  @Input({ required: true }) repoType: string;
+  @Input({ required: true }) artifactName: string;
+  @Input({ required: true }) versionName: string;
+  @Input() severity: Severity | null = null;
+  @Input() scanned = false;
+  @Input() scanStatus: ScanStatus | null = null;
 
-  public isSupported$: Observable<boolean>;
-  public showModal = false;
+  isSupported$: Observable<boolean>;
+  showModal = false;
 
   constructor(private readonly securityScanSupportService: SecurityScanSupportService) {}
 
-  public ngOnInit(): void {
+  ngOnInit(): void {
     this.isSupported$ = this.securityScanSupportService.isSupported(this.repoType);
   }
 
   /** The version has no completed scan yet and its first scan is pending, queued or running. */
-  public get firstScanInProgress(): boolean {
+  get firstScanInProgress(): boolean {
     return !this.scanned && isRescanInProgress(this.scanStatus);
   }
 
   /** The version has no completed scan and its scan failed. */
-  public get firstScanFailed(): boolean {
+  get firstScanFailed(): boolean {
     return !this.scanned && hasRescanFailed(this.scanStatus);
   }
 
   /** A completed scan, or a first scan that is unfinished or failed, is worth a badge. */
-  public get visible(): boolean {
+  get visible(): boolean {
     return this.scanned || this.firstScanInProgress || this.firstScanFailed;
   }
 
@@ -67,7 +67,7 @@ export class VersionSecurityBadgeComponent implements OnInit {
    * Opens the modal. The click is not stopped: the badge is a sibling of the row's link, not a child, so it
    * cannot open the row, and it has to reach the document so that an open row menu or selector closes (RPS-1565).
    */
-  public openModal(): void {
+  openModal(): void {
     this.showModal = true;
   }
 }

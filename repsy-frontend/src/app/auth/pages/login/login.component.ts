@@ -45,18 +45,18 @@ import { AuthService } from '../service/auth.service';
 })
 export class LoginComponent implements OnInit {
   /** Element ids of this instance: see `idFactory`. */
-  public readonly id = idFactory('login');
+  readonly id = idFactory('login');
 
-  public form: FormGroup;
-  public readonly usernameMessages = LOGIN_USERNAME_MESSAGES;
-  public readonly passwordMessages = LOGIN_PASSWORD_MESSAGES;
-  public inputType = 'password';
-  public visible = false;
-  public loading = false;
+  form: FormGroup;
+  readonly usernameMessages = LOGIN_USERNAME_MESSAGES;
+  readonly passwordMessages = LOGIN_PASSWORD_MESSAGES;
+  inputType = 'password';
+  visible = false;
+  loading = false;
 
-  public images: string[] = ['hipopotam.png'];
-  public randomImage = '';
-  public apiBaseUrl: string;
+  images: string[] = ['hipopotam.png'];
+  randomImage = '';
+  apiBaseUrl: string;
 
   constructor(
     private readonly router: Router,
@@ -66,7 +66,7 @@ export class LoginComponent implements OnInit {
     private readonly changeDetector: ChangeDetectorRef,
   ) {}
 
-  public ngOnInit(): void {
+  ngOnInit(): void {
     this.apiBaseUrl = environment.apiBaseUrl;
 
     this.setRandomImage();
@@ -77,7 +77,7 @@ export class LoginComponent implements OnInit {
     });
   }
 
-  public login(): void {
+  login(): void {
     this.loading = true;
     this.form.disable();
 
@@ -105,7 +105,7 @@ export class LoginComponent implements OnInit {
       });
   }
 
-  public toggleVisibility(): void {
+  toggleVisibility(): void {
     if (this.visible) {
       this.inputType = 'password';
       this.visible = false;
@@ -115,7 +115,7 @@ export class LoginComponent implements OnInit {
     }
   }
 
-  public setRandomImage() {
+  setRandomImage() {
     const randomIndex = Math.floor(Math.random() * this.images.length);
     this.randomImage = `/assets/images/${this.images[randomIndex]}`;
   }

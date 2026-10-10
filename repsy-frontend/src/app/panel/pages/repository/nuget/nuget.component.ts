@@ -32,10 +32,10 @@ import { NuGetService } from './service/nuget.service';
   imports: [RouterOutlet, RepositoryBreadcrumbComponent],
 })
 export class NuGetComponent implements OnInit, OnDestroy {
-  public activeRepo: RepoPermissionInfo | null = null;
-  public loading = true;
-  public isAuthenticated = false;
-  public isPublicView = false;
+  activeRepo: RepoPermissionInfo | null = null;
+  loading = true;
+  isAuthenticated = false;
+  isPublicView = false;
 
   private repoSubscription: Subscription | null = null;
 
@@ -46,7 +46,7 @@ export class NuGetComponent implements OnInit, OnDestroy {
     private readonly router: Router,
   ) {}
 
-  public ngOnInit(): void {
+  ngOnInit(): void {
     this.isAuthenticated = this.authService.isAuthenticated();
 
     this.repoSubscription = currentRepoOfType(this.repoLookupService, 'nuget').subscribe((repoContext) => {
@@ -54,7 +54,7 @@ export class NuGetComponent implements OnInit, OnDestroy {
     });
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     this.repoSubscription?.unsubscribe();
   }
 

@@ -26,7 +26,7 @@ import { UsageApi } from '../../../../../generated/api';
 export class UsageService {
   constructor(private readonly usageApi: UsageApi) {}
 
-  public getTotalUsage(): Observable<TotalUsageInfo> {
+  getTotalUsage(): Observable<TotalUsageInfo> {
     return this.usageApi.getTotalUsage();
   }
 }

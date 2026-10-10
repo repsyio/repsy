@@ -27,11 +27,11 @@ import { ReposApi, RepoUsageInfo } from '../../../../../../generated/api';
   imports: [ReactiveFormsModule, RouterLink],
 })
 export class RepoStorageComponent implements OnInit {
-  @Input() public repoType: string;
-  @Input() public repoName: string;
-  @Output() public fetch = new EventEmitter<void>();
+  @Input() repoType: string;
+  @Input() repoName: string;
+  @Output() fetch = new EventEmitter<void>();
 
-  public usage: RepoUsageInfo;
+  usage: RepoUsageInfo;
 
   constructor(private readonly reposApi: ReposApi) {}
 

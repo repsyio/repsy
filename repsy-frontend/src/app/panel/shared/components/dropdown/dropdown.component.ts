@@ -30,10 +30,10 @@ export class DropdownComponent implements OnDestroy {
   private static nextId = 0;
 
   /** Accessible name of the trigger button and of the menu it opens. */
-  @Input() public label = 'More options';
+  @Input() label = 'More options';
 
-  public isOpen = false;
-  public readonly menuId = `app-dropdown-menu-${DropdownComponent.nextId++}`;
+  isOpen = false;
+  readonly menuId = `app-dropdown-menu-${DropdownComponent.nextId++}`;
 
   private readonly document = inject(DOCUMENT);
 

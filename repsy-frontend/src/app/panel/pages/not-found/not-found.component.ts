@@ -25,12 +25,12 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
   templateUrl: './not-found.component.html',
 })
 export class NotFoundComponent implements OnInit {
-  public message = 'The page you are looking for does not exist.';
-  public showBackButton = true;
+  message = 'The page you are looking for does not exist.';
+  showBackButton = true;
 
   constructor(private readonly route: ActivatedRoute) {}
 
-  public ngOnInit(): void {
+  ngOnInit(): void {
     // Check if we have a custom message from route data
     this.route.data.subscribe((data) => {
       if (data['message']) {

@@ -60,18 +60,18 @@ import { CargoService } from '../../service/cargo.service';
   templateUrl: './cargo-crates-version-detail.component.html',
 })
 export class CargoCratesVersionDetailComponent implements OnDestroy {
-  public readonly securityRepoType = RepoType.Cargo;
-  public loading = true;
-  public error: string;
-  public packageName: string;
-  public versionName: string;
-  public addDependencyCommand: string;
-  public installBinaryCommand: string;
-  public cargoToml = '';
-  public cargoConfig: string;
-  public activeRepo: RepoPermissionInfo;
-  public crate: CrateInfo;
-  public crateVersion: CrateVersionInfo;
+  readonly securityRepoType = RepoType.Cargo;
+  loading = true;
+  error: string;
+  packageName: string;
+  versionName: string;
+  addDependencyCommand: string;
+  installBinaryCommand: string;
+  cargoToml = '';
+  cargoConfig: string;
+  activeRepo: RepoPermissionInfo;
+  crate: CrateInfo;
+  crateVersion: CrateVersionInfo;
   private readonly repositoryChanges$: Subscription;
 
   constructor(
@@ -90,11 +90,11 @@ export class CargoCratesVersionDetailComponent implements OnDestroy {
     });
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     this.repositoryChanges$.unsubscribe();
   }
 
-  public loadVersion(): void {
+  loadVersion(): void {
     const crateName = this.route.snapshot.paramMap.get('packageName');
     const version = this.route.snapshot.paramMap.get('version');
     if (!crateName || !version) {
@@ -135,7 +135,7 @@ repsy = { index = "sparse+${environment.repoBaseUrl}/${this.activeRepo.repoName}
       });
   }
 
-  public deleteVersion(): void {
+  deleteVersion(): void {
     this.dangerModalService.show('Delete Version', 'Delete', () => {
       this.loading = true;
       deleteVersionAndCheckLast$(

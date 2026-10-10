@@ -32,16 +32,16 @@ import { saveRepoSetting } from '../save-repo-setting';
   imports: [ReactiveFormsModule, SelectorComponent, RouterLink],
 })
 export class MavenVersionAllowanceComponent implements OnInit {
-  @Input() public parentForm: FormGroup;
-  @Input() public repoType: string;
-  @Input() public repoName: string;
-  @Output() public fetch = new EventEmitter<void>();
+  @Input() parentForm: FormGroup;
+  @Input() repoType: string;
+  @Input() repoName: string;
+  @Output() fetch = new EventEmitter<void>();
 
-  public selectedOption: RepoSupport = RepoSupport.ALL;
-  public repoOptions: RepoSupport[] = [];
+  selectedOption: RepoSupport = RepoSupport.ALL;
+  repoOptions: RepoSupport[] = [];
 
   /** A save is on its way: the selector is locked, so a double click sends one request (RPS-1618). */
-  public saving = false;
+  saving = false;
 
   /** The option the repository has, to go back to when a save fails. */
   private savedOption: RepoSupport = RepoSupport.ALL;
@@ -63,7 +63,7 @@ export class MavenVersionAllowanceComponent implements OnInit {
     this.savedOption = this.selectedOption;
   }
 
-  public selectType(option: string) {
+  selectType(option: string) {
     const snapshots =
       option === RepoSupport.SNAPSHOTS || option === RepoSupport.PRE_RELEASE || option === RepoSupport.ALL;
     const releases = option === RepoSupport.RELEASES || option === RepoSupport.STABLE || option === RepoSupport.ALL;

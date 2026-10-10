@@ -30,21 +30,21 @@ import { SeverityBadgeComponent } from '../severity-badge/severity-badge.compone
   templateUrl: './repo-security-badge.component.html',
 })
 export class RepoSecurityBadgeComponent implements OnInit {
-  @Input({ required: true }) public repoName: string;
-  @Input({ required: true }) public repoType: string;
-  @Input() public severity: Severity | null = null;
-  @Input() public scanned = false;
-  @Input() public rescanInProgressCount: number | null = null;
-  @Input() public rescanFailedCount: number | null = null;
-  @Input() public unscannedInProgressCount: number | null = null;
-  @Input() public unscannedFailedCount: number | null = null;
+  @Input({ required: true }) repoName: string;
+  @Input({ required: true }) repoType: string;
+  @Input() severity: Severity | null = null;
+  @Input() scanned = false;
+  @Input() rescanInProgressCount: number | null = null;
+  @Input() rescanFailedCount: number | null = null;
+  @Input() unscannedInProgressCount: number | null = null;
+  @Input() unscannedFailedCount: number | null = null;
 
-  public isSupported$: Observable<boolean>;
-  public showModal = false;
+  isSupported$: Observable<boolean>;
+  showModal = false;
 
   constructor(private readonly securityScanSupportService: SecurityScanSupportService) {}
 
-  public ngOnInit(): void {
+  ngOnInit(): void {
     this.isSupported$ = this.securityScanSupportService.isSupported(this.repoType);
   }
 
@@ -52,7 +52,7 @@ export class RepoSecurityBadgeComponent implements OnInit {
    * Opens the modal. The click is not stopped: the badge is a sibling of the row's link, not a child, so it
    * cannot open the row, and it has to reach the document so that an open row menu or selector closes (RPS-1565).
    */
-  public openModal(): void {
+  openModal(): void {
     this.showModal = true;
   }
 }

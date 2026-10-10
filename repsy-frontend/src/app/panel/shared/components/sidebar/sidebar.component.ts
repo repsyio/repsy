@@ -31,17 +31,17 @@ import { DialogDirective } from '../../directives/dialog.directive';
   styleUrl: './sidebar.component.css',
 })
 export class SidebarComponent implements OnInit {
-  @Input() public isMobileMenuOpen = false;
+  @Input() isMobileMenuOpen = false;
   @Output() closeModal = new EventEmitter<Event>();
 
-  public username: string;
+  username: string;
   /**
    * A signal, not a field (RPS-1456): at "/" the dashboard is created inside the OnPush
    * `AuthRedirectComponent`, so this view is only checked again when something marks it. A plain field
    * set by the profile answer left Users and Security hidden whenever that answer was the last event
    * of the page (a slow host); a signal read by the template refreshes the view by itself.
    */
-  public readonly isAdmin = signal(false);
+  readonly isAdmin = signal(false);
 
   constructor(
     private readonly authService: AuthService,
@@ -57,7 +57,7 @@ export class SidebarComponent implements OnInit {
       .subscribe(() => this.closeIfOpen());
   }
 
-  public ngOnInit(): void {
+  ngOnInit(): void {
     this.username = localStorage.getItem('username');
     this.loadUserRole();
   }
@@ -74,7 +74,7 @@ export class SidebarComponent implements OnInit {
     });
   }
 
-  public logOut(): void {
+  logOut(): void {
     this.authService.logOut();
     this.router.navigateByUrl('login');
   }

@@ -15,8 +15,8 @@
 ///
 
 export class PagedData<T> {
-  public page: Page;
-  public content: T[];
+  page: Page;
+  content: T[];
 
   constructor() {
     this.page = new Page();
@@ -25,8 +25,8 @@ export class PagedData<T> {
 }
 
 class Page {
-  public number: number;
-  public size: number;
-  public totalElements: number;
-  public totalPages: number;
+  number: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
 }

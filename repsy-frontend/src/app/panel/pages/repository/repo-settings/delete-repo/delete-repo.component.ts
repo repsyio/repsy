@@ -31,12 +31,12 @@ import { ToastService } from '../../../../shared/components/toast/toast.service'
   imports: [ReactiveFormsModule, RouterLink],
 })
 export class DeleteRepoComponent {
-  @Input() public activeRepository: RepoPermissionInfo;
-  @Input() public repoType: string;
+  @Input() activeRepository: RepoPermissionInfo;
+  @Input() repoType: string;
 
-  public public: boolean;
-  public loading: boolean;
-  public visibilityForm: FormGroup;
+  public: boolean;
+  loading: boolean;
+  visibilityForm: FormGroup;
 
   constructor(
     private readonly reposApi: ReposApi,
@@ -49,7 +49,7 @@ export class DeleteRepoComponent {
     });
   }
 
-  public deleteRepo() {
+  deleteRepo() {
     const successMsg = 'Repository deleted successfully';
     this.dangerModalService.show('Delete Repository', 'Delete', () => {
       this.loading = true;

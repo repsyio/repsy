@@ -26,22 +26,22 @@ interface Modal {
   providedIn: 'root',
 })
 export class DangerModalService {
-  public modal: Modal;
-  public call: () => void;
+  modal: Modal;
+  call: () => void;
 
-  public show(title: string, action: string, call: () => void) {
+  show(title: string, action: string, call: () => void) {
     this.close();
     this.modal = { title, action, message: null };
     this.call = call;
   }
 
-  public showWithMessage(title: string, action: string, message: string, call: () => void) {
+  showWithMessage(title: string, action: string, message: string, call: () => void) {
     this.close();
     this.modal = { title, action, message };
     this.call = call;
   }
 
-  public close() {
+  close() {
     this.modal = null;
   }
 }

@@ -53,18 +53,18 @@ import { RubyService } from '../../service/ruby.service';
   templateUrl: './ruby-gems-version-detail.component.html',
 })
 export class RubyGemsVersionDetailComponent implements OnDestroy {
-  public readonly securityRepoType = RepoType.Ruby;
-  public loading = true;
-  public error: string;
-  public gemName: string;
-  public versionName: string;
-  public installCommand: string;
-  public gemfileSnippet = '';
-  public activeRepo: RepoPermissionInfo;
-  public gemVersion: GemVersionInfo;
+  readonly securityRepoType = RepoType.Ruby;
+  loading = true;
+  error: string;
+  gemName: string;
+  versionName: string;
+  installCommand: string;
+  gemfileSnippet = '';
+  activeRepo: RepoPermissionInfo;
+  gemVersion: GemVersionInfo;
 
   /** The homepage as a link target: http(s) only (RPS-1623), `null` leaves the anchor inert. */
-  public get homepageUrl(): string | null {
+  get homepageUrl(): string | null {
     return externalHttpUrl(this.gemVersion?.homepage);
   }
   private readonly repositoryChanges$: Subscription;
@@ -85,11 +85,11 @@ export class RubyGemsVersionDetailComponent implements OnDestroy {
     });
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     this.repositoryChanges$.unsubscribe();
   }
 
-  public loadVersion(): void {
+  loadVersion(): void {
     const gemName = this.route.snapshot.paramMap.get('packageName');
     const version = this.route.snapshot.paramMap.get('version');
     if (!gemName || !version) {
@@ -123,7 +123,7 @@ export class RubyGemsVersionDetailComponent implements OnDestroy {
       });
   }
 
-  public deleteVersion(): void {
+  deleteVersion(): void {
     this.dangerModalService.show('Delete Version', 'Delete', () => {
       this.loading = true;
       deleteVersionAndCheckLast$(

@@ -53,12 +53,12 @@ const openDialogs: DialogDirective[] = [];
 })
 export class DialogDirective {
   /** `''` or `dialog` for a dialog, `alertdialog` for a confirmation. */
-  public readonly appDialog = input<string>('');
-  public readonly appDialogClosable = input<boolean>(true);
-  public readonly appDialogClose = output<void>();
+  readonly appDialog = input<string>('');
+  readonly appDialogClosable = input<boolean>(true);
+  readonly appDialogClose = output<void>();
 
   /** The id of the element that names the dialog (its title). */
-  public readonly titleId = uniqueId('dialog-title');
+  readonly titleId = uniqueId('dialog-title');
 
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef).nativeElement;
   private readonly opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -72,12 +72,12 @@ export class DialogDirective {
     });
   }
 
-  public role(): string {
+  role(): string {
     return this.appDialog() === 'alertdialog' ? 'alertdialog' : 'dialog';
   }
 
   @HostListener('document:keydown', ['$event'])
-  public onKeydown(event: KeyboardEvent): void {
+  onKeydown(event: KeyboardEvent): void {
     if (openDialogs[openDialogs.length - 1] !== this || event.defaultPrevented) {
       return;
     }

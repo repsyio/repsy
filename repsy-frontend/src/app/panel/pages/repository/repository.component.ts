@@ -81,15 +81,15 @@ interface ListRequest {
   templateUrl: './repository.component.html',
 })
 export class RepositoryComponent implements OnDestroy {
-  public pageNum = 0;
-  public pageSize = 10;
+  pageNum = 0;
+  pageSize = 10;
   /** The rows of the page the server answered with. */
-  public paginatedRepos: RepoListItem[] = [];
+  paginatedRepos: RepoListItem[] = [];
   /** The total number of pages of the current type and search, from the server's page metadata. */
-  public totalPages = 0;
-  public createRepoModal: boolean;
-  public repoOption = RepoType.ALL;
-  public repoOptions = [
+  totalPages = 0;
+  createRepoModal: boolean;
+  repoOption = RepoType.ALL;
+  repoOptions = [
     RepoType.ALL,
     RepoType.DOCKER,
     RepoType.MAVEN,
@@ -101,15 +101,15 @@ export class RepositoryComponent implements OnDestroy {
     RepoType.NUGET,
     RepoType.RUBY,
   ];
-  public loading = true;
-  public operationLock = false;
-  public username: string;
+  loading = true;
+  operationLock = false;
+  username: string;
   /** Set when the list could not be loaded: the page shows its error state instead of a list. */
-  public error = '';
-  public isAdmin = false;
+  error = '';
+  isAdmin = false;
   /** The text of the search box: it is emptied whenever the list is loaded again, so box and list agree. */
-  public searchQuery = '';
-  public securitySummary: Record<string, RepoSecuritySummary> = {};
+  searchQuery = '';
+  securitySummary: Record<string, RepoSecuritySummary> = {};
 
   /** The search the list currently shows; `searchQuery` runs ahead of it while the typing is debounced. */
   private appliedQuery = '';
@@ -177,12 +177,12 @@ export class RepositoryComponent implements OnDestroy {
     this.dispatch({ option: initialType, q: initialQuery, page: initialPage, spinner: true });
   }
 
-  public ngOnDestroy(): void {
+  ngOnDestroy(): void {
     this.subscriptions.unsubscribe();
     this.securitySummarySubscription?.unsubscribe();
   }
 
-  public loadPage(pageNum: number): void {
+  loadPage(pageNum: number): void {
     this.pageNum = pageNum;
     // No `previouslyFocused` here: the pager stays mounted through a plain page change (its button keeps
     // the focus by itself, see the pagination component), so there is nothing to fall back to.
@@ -190,7 +190,7 @@ export class RepositoryComponent implements OnDestroy {
   }
 
   /** Called on every keystroke; the request goes out when the typing pauses, and it starts from the first page. */
-  public search(repoName: string) {
+  search(repoName: string) {
     this.searchQuery = repoName;
     this.typedSearches.next(repoName);
   }
@@ -199,15 +199,15 @@ export class RepositoryComponent implements OnDestroy {
    *  had the focus before it starts asking (RPS-1669), instead of the moment this reload actually goes
    *  out; a plain refresh (the toolbar button, a modal's `created` event) needs no fallback and leaves it
    *  out. */
-  public refreshPage(previouslyFocused: Element | null = null): void {
+  refreshPage(previouslyFocused: Element | null = null): void {
     this.filterRepos(this.repoOption, previouslyFocused);
   }
 
-  public formatBytes(bytes: number, decimals = 2): string {
+  formatBytes(bytes: number, decimals = 2): string {
     return ByteFormatter.formatBytes(bytes, decimals);
   }
 
-  public filterRepos(option: string, previouslyFocused: Element | null = null) {
+  filterRepos(option: string, previouslyFocused: Element | null = null) {
     // The list is unfiltered again and starts on its first page: the search box and the page index follow.
     this.repoOption = option as RepoType;
     this.searchQuery = '';
@@ -216,7 +216,7 @@ export class RepositoryComponent implements OnDestroy {
     this.dispatch({ option, q: '', page: 0, spinner: true, previouslyFocused });
   }
 
-  public deleteRepository(repo: RepoListItem) {
+  deleteRepository(repo: RepoListItem) {
     if (!this.isAdmin) {
       this.toastService.show('You do not have permission to delete repositories', 'error');
       return;
@@ -246,11 +246,11 @@ export class RepositoryComponent implements OnDestroy {
     });
   }
 
-  public openCreateRepoModal() {
+  openCreateRepoModal() {
     this.createRepoModal = true;
   }
 
-  public timeAgo(date: Date | string): string {
+  timeAgo(date: Date | string): string {
     return moment(date).fromNow();
   }
 

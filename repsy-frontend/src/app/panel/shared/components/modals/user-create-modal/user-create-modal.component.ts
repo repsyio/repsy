@@ -43,19 +43,19 @@ import { ToggleComponent } from '../../toggle/toggle.component';
 })
 export class UserCreateModalComponent {
   /** Element ids of this instance: see `idFactory`. */
-  public readonly id = idFactory('user-create');
+  readonly id = idFactory('user-create');
 
   @Output() openChange = new EventEmitter<boolean>();
   @Output() created = new EventEmitter<void>();
-  @Input() public open: boolean;
+  @Input() open: boolean;
 
-  public loading = false;
-  public form: FormGroup;
-  public readonly usernameMessages = USERNAME_MESSAGES;
-  public readonly passwordMessages = PASSWORD_MESSAGES;
-  public readonly mismatchMessage = PASSWORD_MISMATCH_MESSAGE;
-  public showPassword = false;
-  public showConfirmPassword = false;
+  loading = false;
+  form: FormGroup;
+  readonly usernameMessages = USERNAME_MESSAGES;
+  readonly passwordMessages = PASSWORD_MESSAGES;
+  readonly mismatchMessage = PASSWORD_MISMATCH_MESSAGE;
+  showPassword = false;
+  showConfirmPassword = false;
 
   constructor(
     private readonly userService: UserService,
@@ -96,7 +96,7 @@ export class UserCreateModalComponent {
     return null;
   }
 
-  public closeModal(): void {
+  closeModal(): void {
     this.form.reset();
     this.form.patchValue({ isAdmin: false });
     this.showPassword = false;
@@ -104,7 +104,7 @@ export class UserCreateModalComponent {
     this.openChange.emit(false);
   }
 
-  public createUser(): void {
+  createUser(): void {
     if (this.form.invalid) {
       return;
     }
@@ -138,11 +138,11 @@ export class UserCreateModalComponent {
       });
   }
 
-  public togglePasswordVisibility(): void {
+  togglePasswordVisibility(): void {
     this.showPassword = !this.showPassword;
   }
 
-  public toggleConfirmPasswordVisibility(): void {
+  toggleConfirmPasswordVisibility(): void {
     this.showConfirmPassword = !this.showConfirmPassword;
   }
 }

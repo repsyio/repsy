@@ -33,7 +33,7 @@ import { Sort } from '../../../../shared/dto/sort';
   providedIn: 'root',
 })
 export class PypiService {
-  public readonly repoChanges: Observable<RepoPermissionInfo>;
+  readonly repoChanges: Observable<RepoPermissionInfo>;
   private readonly repoSubject = new BehaviorSubject<RepoPermissionInfo>(null);
 
   constructor(
@@ -47,7 +47,7 @@ export class PypiService {
     return this.repoSubject.getValue()?.repoName ?? '';
   }
 
-  public fetchRepoPermission(repoName: string): Observable<RepoPermissionInfo> {
+  fetchRepoPermission(repoName: string): Observable<RepoPermissionInfo> {
     this.resetActiveRepoIfChanged(repoName);
 
     return this.reposApi.getRepoPermissions(repoName).pipe(tap((info) => this.repoSubject.next(info)));
@@ -61,7 +61,7 @@ export class PypiService {
     this.repoSubject.next(null);
   }
 
-  public fetchRepositoryPackagesLikeName(
+  fetchRepositoryPackagesLikeName(
     name: string,
     sort: Sort,
     pageIndex: number,
@@ -72,7 +72,7 @@ export class PypiService {
       .pipe(map((r) => ({ content: r?.content ?? [], page: r?.page }) as unknown as PagedData<PypiPackageListItem>));
   }
 
-  public fetchPackageReleasesLikeName(
+  fetchPackageReleasesLikeName(
     packageName: string,
     version: string,
     sort: Sort,
@@ -86,15 +86,15 @@ export class PypiService {
       .pipe(map((r) => ({ content: r?.content ?? [], page: r?.page }) as unknown as PagedData<ReleaseListItem>));
   }
 
-  public deletePackage(packageName: string): Observable<void> {
+  deletePackage(packageName: string): Observable<void> {
     return this.pypiPackagesApi.deletePypiPackage(packageName, this.repoName).pipe(map(() => undefined));
   }
 
-  public fetchRelease(packageName: string, release: string): Observable<ReleaseDetail> {
+  fetchRelease(packageName: string, release: string): Observable<ReleaseDetail> {
     return this.pypiPackagesApi.getPypiVersion(packageName, release, this.repoName);
   }
 
-  public deleteRelease(packageName: string, releaseVersion: string): Observable<void> {
+  deleteRelease(packageName: string, releaseVersion: string): Observable<void> {
     return this.pypiPackagesApi
       .deletePypiVersion(packageName, releaseVersion, this.repoName)
       .pipe(map(() => undefined));
