@@ -51,6 +51,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -659,7 +660,12 @@ public class ArtifactSignatureService {
    * @throws ItemNotFoundException {@code artifactVersionNotFound} when the POM is stored but its
    *     version is not registered (RPS-1191)
    */
-  @Transactional(readOnly = true)
+  // RPS-2173: no transaction of its own (SUPPORTS joins one a caller already has). Parking runs in
+  // a REQUIRES_NEW transaction that needs a second pooled connection; a read-only transaction here
+  // held the first one for the whole call, so as many concurrent signature uploads as the pool has
+  // connections waited on each other until Hikari's connection timeout. Each read below is a
+  // transaction of its own, which is all it needs.
+  @Transactional(propagation = Propagation.SUPPORTS, readOnly = true)
   public SignatureOutcome verifySignature(
       final BaseRepoInfo<UUID> repoInfo,
       final StoragePath signedStoragePath,

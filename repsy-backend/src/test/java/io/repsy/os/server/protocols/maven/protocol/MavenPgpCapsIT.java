@@ -22,6 +22,7 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
+import com.zaxxer.hikari.HikariDataSource;
 import io.repsy.libs.testsupport.pgp.PgpTestKeys;
 import io.repsy.os.AbstractIT;
 import io.repsy.os.config.async.SignedRecomputeExecutorConfig;
@@ -32,6 +33,7 @@ import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import java.sql.Connection;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
@@ -44,6 +46,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.IntStream;
+import javax.sql.DataSource;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -74,6 +77,7 @@ class MavenPgpCapsIT extends AbstractIT {
   @Autowired private MavenPgpCaps caps;
   @Autowired private RepoTxService repoTxService;
   @Autowired private MavenStorageService mavenStorageService;
+  @Autowired private DataSource dataSource;
 
   @Qualifier(SignedRecomputeExecutorConfig.BEAN_NAME)
   @Autowired
@@ -334,9 +338,44 @@ class MavenPgpCapsIT extends AbstractIT {
                 this.uploadOutcome(
                     repo, admin, DIR + "caps-1.0-" + name + ".jar.asc", signatureOf(name)));
 
+    assertThat(outcomes).containsOnly("200", "400 pendingSignatureLimitReached");
     assertThat(outcomes).filteredOn("200"::equals).hasSize(2);
     assertThat(outcomes).filteredOn("400 pendingSignatureLimitReached"::equals).hasSize(3);
     assertThat(this.pendingCount(repo)).isEqualTo(cap);
+  }
+
+  @Test
+  @DisplayName("parking a signature needs no second pooled connection while the first is held")
+  void parkingNeverHoldsAConnectionWhileTakingAnother() throws Exception {
+    // RPS-2173: with every connection but one borrowed, an upload that holds its connection while
+    // parking in a transaction of its own waits for a second one that never comes (Hikari times out
+    // and the request fails with 500). Deterministic, no timing involved.
+    final var admin = this.admin();
+    final var repo = this.verifyAllRepo();
+    final var hikari = this.dataSource.unwrap(HikariDataSource.class);
+    final var mxBean = hikari.getHikariConfigMXBean();
+    final var originalTimeout = mxBean.getConnectionTimeout();
+    final var borrowed = new ArrayList<Connection>();
+
+    try {
+      mxBean.setConnectionTimeout(2_000);
+
+      for (int i = 0; i < mxBean.getMaximumPoolSize() - 1; i++) {
+        borrowed.add(hikari.getConnection());
+      }
+
+      assertThat(
+              this.uploadOutcome(repo, admin, DIR + "caps-1.0-pool.jar.asc", signatureOf("pool")))
+          .isEqualTo("200");
+    } finally {
+      for (final var connection : borrowed) {
+        connection.close();
+      }
+
+      mxBean.setConnectionTimeout(originalTimeout);
+    }
+
+    assertThat(this.pendingCount(repo)).isEqualTo(1);
   }
 
   // ---- size of one signature ----
