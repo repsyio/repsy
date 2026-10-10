@@ -19,6 +19,7 @@ import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.libs.protocol.router.ProtocolProvider;
+import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.LinkedHashMap;
@@ -26,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpMethod;
 
 /**
@@ -40,8 +42,9 @@ import org.springframework.http.HttpMethod;
  *
  * <p>The methods and the path test are the route's alone. A downstream handler (for example a Repsy
  * Cloud subclass that names its operation for a quota pre-processor, or asks for a configurable
- * permission) adds or replaces properties through {@link #additionalProperties()} instead of
- * overriding {@link #getProperties()}.
+ * permission) adds properties, or strengthens the permission, through {@link
+ * #additionalProperties()} instead of overriding {@link #getProperties()}; it cannot replace any
+ * other route property.
  */
 @NullMarked
 public abstract class AbstractRoutedProtocolMethodHandler implements ProtocolMethodHandler {
@@ -49,6 +52,8 @@ public abstract class AbstractRoutedProtocolMethodHandler implements ProtocolMet
   private final HandlerRoute route;
   private final PathParser basePathParser;
   private final PathParser pathParser = this::route;
+  private volatile @Nullable Map<String, Object> resolvedProperties;
+  private volatile @Nullable Map<String, Object> resolvedHeadProperties;
 
   /**
    * For a handler that builds its context itself and so overrides {@link #parse}; the base parser
@@ -75,14 +80,26 @@ public abstract class AbstractRoutedProtocolMethodHandler implements ProtocolMet
   }
 
   /**
-   * The route's properties with {@link #additionalProperties()} on top: a key both set takes the
-   * additional value. Without additional properties this is the route's own map, unchanged.
+   * The route's properties with {@link #additionalProperties()} on top, resolved on the first call
+   * and cached (the result is immutable). Without additional properties this is the route's own
+   * map, unchanged. See {@link #additionalProperties()} for what the additional properties may do.
+   *
+   * @throws IllegalStateException when the additional properties replace a route key other than
+   *     {@link HandlerPropertyKeys#PERMISSION}, or weaken the route's permission
    */
   @Override
   public final Map<String, Object> getProperties() {
-    return this.withAdditional(this.route.properties());
+    var resolved = this.resolvedProperties;
+
+    if (resolved == null) {
+      resolved = this.withAdditional(this.route.properties());
+      this.resolvedProperties = resolved;
+    }
+
+    return resolved;
   }
 
+  /** {@code own} with {@link #additionalProperties()} added under the rules of that hook. */
   private Map<String, Object> withAdditional(final Map<String, Object> own) {
     final var additional = this.additionalProperties();
 
@@ -91,16 +108,61 @@ public abstract class AbstractRoutedProtocolMethodHandler implements ProtocolMet
     }
 
     final var merged = new LinkedHashMap<>(own);
-    merged.putAll(additional);
+
+    additional.forEach((key, value) -> merged.put(key, this.checked(own, key, value)));
 
     return Map.copyOf(merged);
   }
 
+  /** The value to put under {@code key}, or an exception when the route does not allow it. */
+  private Object checked(final Map<String, Object> own, final String key, final Object value) {
+    final var routeValue = own.get(key);
+
+    if (routeValue == null) {
+      return value;
+    }
+
+    if (!HandlerPropertyKeys.PERMISSION.equals(key)) {
+      throw this.rejected(key, "replaces a property the route defines");
+    }
+
+    if (!(value instanceof final Permission permission)
+        || !(routeValue instanceof final Permission required)) {
+      throw this.rejected(key, "is not a Permission");
+    }
+
+    if (!permission.isAtLeast(required)) {
+      throw this.rejected(key, "weakens the route's permission " + required + " to " + permission);
+    }
+
+    return value;
+  }
+
+  private IllegalStateException rejected(final String key, final String reason) {
+    return new IllegalStateException(
+        "%s: additionalProperties() key '%s' %s".formatted(this.getClass().getName(), key, reason));
+  }
+
   /**
-   * Properties ({@link HandlerPropertyKeys}) a subclass adds to the route's, or replaces in it.
-   * Read on every {@link #getProperties()} call, never from the constructor, so it may use fields
-   * the subclass constructor set. It cannot remove a key or change the methods or the path. Empty
-   * unless overridden.
+   * Properties ({@link HandlerPropertyKeys}) a subclass adds to the route's. The route is the
+   * single source of the authorization properties, so the contract is, for the properties of the
+   * route and for its HEAD properties alike:
+   *
+   * <ul>
+   *   <li>a key the route does not define may be added (for example {@link
+   *       HandlerPropertyKeys#METHOD});
+   *   <li>{@link HandlerPropertyKeys#PERMISSION} may be replaced, but only by a permission that is
+   *       at least as strong as the route's ({@link Permission#isAtLeast}: NONE, READ, WRITE,
+   *       MANAGE);
+   *   <li>replacing any other key the route defines, or weakening the permission, makes {@link
+   *       #getProperties()} (or {@link #getHeadProperties()}) throw {@link IllegalStateException}
+   *       naming the handler class and key;
+   *   <li>a key can never be removed, and the methods and the path stay the route's.
+   * </ul>
+   *
+   * <p>Read on the first {@link #getProperties()} and {@link #getHeadProperties()} call and never
+   * from the constructor, so it may use fields the subclass constructor set; the results are
+   * cached, so it must not change afterwards. Empty unless overridden.
    */
   protected Map<String, Object> additionalProperties() {
     return Map.of();
@@ -113,9 +175,17 @@ public abstract class AbstractRoutedProtocolMethodHandler implements ProtocolMet
 
   @Override
   public final Map<String, Object> getHeadProperties() {
-    final var headProperties = this.route.headProperties();
+    var resolved = this.resolvedHeadProperties;
 
-    return this.withAdditional(headProperties == null ? this.route.properties() : headProperties);
+    if (resolved == null) {
+      final var headProperties = this.route.headProperties();
+
+      resolved =
+          this.withAdditional(headProperties == null ? this.route.properties() : headProperties);
+      this.resolvedHeadProperties = resolved;
+    }
+
+    return resolved;
   }
 
   @Override

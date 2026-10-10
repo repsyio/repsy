@@ -288,6 +288,22 @@ for SonarCloud.
 - Commit messages: conventional commits, prefixed with the Jira key where there is one
   (for example `RPS-844: ...`).
 
+### Routed protocol method handlers: route properties are the route's
+
+A handler built on `AbstractRoutedProtocolMethodHandler` takes its methods, path test and processor
+properties (`HandlerPropertyKeys`: `permission`, `writeOperation`, `skipPreProcessor`,
+`requireAuthentication`, ...) from its `HandlerRoute`; the route is the single source of the
+authorization properties. A subclass (Repsy Cloud) may only use `additionalProperties()` to:
+
+- **add** a key the route does not define (for example `method`);
+- **replace `permission`** with a permission at least as strong (`Permission.isAtLeast`:
+  `NONE` < `READ` < `WRITE` < `MANAGE`).
+
+Replacing any other route key, or weakening the permission, makes `getProperties()` throw
+`IllegalStateException` (handler class and key in the message) on first use. The result is
+resolved once and cached. Do not override `getProperties()` (it is final) and do not make a route
+weaker in a subclass: change the route, in the owning repo.
+
 ## Java naming
 
 The naming rules of Repsy OS and Repsy Cloud (RPS-2009). They are the target: some existing code still
