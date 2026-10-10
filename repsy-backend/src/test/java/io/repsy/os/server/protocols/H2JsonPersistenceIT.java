@@ -19,11 +19,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
+import io.repsy.libs.testsupport.pgp.PgpTestKeys;
 import io.repsy.os.H2IntegrationTest;
 import io.repsy.os.generated.model.PgpPublicKeyForm;
 import io.repsy.os.server.protocols.cargo.shared.crate.entities.CargoCrateIndex;
 import io.repsy.os.server.protocols.cargo.shared.crate.repositories.CargoCrateIndexRepository;
-import io.repsy.os.server.protocols.maven.shared.keystore.PgpTestKeys;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.KeyStoreService;
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackageVersion;
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageRepository;

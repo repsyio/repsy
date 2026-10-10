@@ -22,6 +22,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 import com.jayway.jsonpath.JsonPath;
+import io.repsy.libs.testsupport.ScanThreadsSettler;
 import io.repsy.os.shared.auth.services.RefreshTokenService;
 import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.auth.utils.JwtUtils;

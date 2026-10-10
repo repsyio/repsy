@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.protocols.maven.shared.keystore;
+package io.repsy.libs.testsupport.pgp;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;

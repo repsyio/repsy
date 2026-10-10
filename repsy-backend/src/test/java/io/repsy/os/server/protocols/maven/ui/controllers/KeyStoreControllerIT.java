@@ -25,9 +25,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.jayway.jsonpath.JsonPath;
+import io.repsy.libs.testsupport.pgp.PgpTestKeys;
 import io.repsy.os.AbstractIT;
 import io.repsy.os.PagingAssertions;
-import io.repsy.os.server.protocols.maven.shared.keystore.PgpTestKeys;
 import io.repsy.os.server.protocols.maven.shared.keystore.entities.AllowedKeyserver;
 import io.repsy.os.server.protocols.maven.shared.keystore.repositories.AllowedKeyserverRepository;
 import io.repsy.os.server.protocols.maven.shared.keystore.repositories.KeyStoreRepository;

@@ -13,25 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os;
+package io.repsy.libs.testsupport;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.repsy.os.CommittedRowsGuard.RowChange;
+import io.repsy.libs.testsupport.AbstractCommittedRowsGuard.RowChange;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-@DisplayName("CommittedRowsGuard: comparing snapshots and reporting the difference")
-class CommittedRowsGuardTest {
+@DisplayName("AbstractCommittedRowsGuard: comparing snapshots and reporting the difference")
+class AbstractCommittedRowsGuardTest {
 
   @Test
   @DisplayName("identical counts are not a difference")
   void identicalCountsAreNotADifference() {
     final var counts = Map.of("users", 1L, "repo", 9L);
 
-    assertThat(CommittedRowsGuard.changes(counts, Map.of("repo", 9L, "users", 1L))).isEmpty();
+    assertThat(AbstractCommittedRowsGuard.changes(counts, Map.of("repo", 9L, "users", 1L)))
+        .isEmpty();
   }
 
   @Test
@@ -40,16 +41,17 @@ class CommittedRowsGuardTest {
     final var before = Map.of("users", 1L, "repo", 9L, "vulnerability_scan", 4L, "npm_package", 0L);
     final var after = Map.of("users", 3L, "repo", 9L, "vulnerability_scan", 2L, "npm_package", 0L);
 
-    assertThat(CommittedRowsGuard.changes(before, after))
+    assertThat(AbstractCommittedRowsGuard.changes(before, after))
         .containsExactly(new RowChange("users", 1, 3), new RowChange("vulnerability_scan", 4, 2));
   }
 
   @Test
   @DisplayName("a table missing from one snapshot counts as empty")
   void aMissingTableCountsAsEmpty() {
-    assertThat(CommittedRowsGuard.changes(Map.of(), Map.of("refresh_tokens", 2L)))
+    assertThat(AbstractCommittedRowsGuard.changes(Map.of(), Map.of("refresh_tokens", 2L)))
         .containsExactly(new RowChange("refresh_tokens", 0, 2));
-    assertThat(CommittedRowsGuard.changes(Map.of("refresh_tokens", 0L), Map.of())).isEmpty();
+    assertThat(AbstractCommittedRowsGuard.changes(Map.of("refresh_tokens", 0L), Map.of()))
+        .isEmpty();
   }
 
   @Test
@@ -63,7 +65,7 @@ class CommittedRowsGuardTest {
   @DisplayName("the message names the class and every leaked table")
   void theMessageNamesTheClassAndTables() {
     final var message =
-        CommittedRowsGuard.message(
+        AbstractCommittedRowsGuard.message(
             "io.repsy.os.SomeIT",
             List.of(new RowChange("repo", 9, 11), new RowChange("users", 1, 2)),
             List.of());
@@ -80,7 +82,7 @@ class CommittedRowsGuardTest {
   @DisplayName("the message lists what the cleanup could not restore")
   void theMessageListsWhatCouldNotBeRestored() {
     final var message =
-        CommittedRowsGuard.message(
+        AbstractCommittedRowsGuard.message(
             "io.repsy.os.SomeIT",
             List.of(new RowChange("refresh_tokens", 0, 1)),
             List.of(new RowChange("refresh_tokens", 0, 1)));

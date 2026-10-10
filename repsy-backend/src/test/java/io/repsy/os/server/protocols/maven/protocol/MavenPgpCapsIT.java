@@ -22,9 +22,9 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
+import io.repsy.libs.testsupport.pgp.PgpTestKeys;
 import io.repsy.os.AbstractIT;
 import io.repsy.os.config.async.SignedRecomputeExecutorConfig;
-import io.repsy.os.server.protocols.maven.shared.keystore.PgpTestKeys;
 import io.repsy.os.server.protocols.maven.shared.keystore.services.MavenPgpCaps;
 import io.repsy.os.server.protocols.maven.shared.storage.services.MavenStorageService;
 import io.repsy.os.shared.repo.entities.Repo;

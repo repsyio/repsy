@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os;
+package io.repsy.libs.testsupport;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;

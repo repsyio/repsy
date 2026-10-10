@@ -23,10 +23,10 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
+import io.repsy.libs.testsupport.pgp.PgpTestKeys;
 import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.maven.shared.artifact.services.ArtifactSignatureService;
 import io.repsy.os.server.protocols.maven.shared.artifact.services.PendingSignatureService;
-import io.repsy.os.server.protocols.maven.shared.keystore.PgpTestKeys;
 import io.repsy.os.server.protocols.maven.shared.storage.services.MavenStorageService;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
