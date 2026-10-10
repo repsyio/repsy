@@ -29,6 +29,7 @@ import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
+import io.repsy.protocols.shared.handlers.HandlerPropertyKeys;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
@@ -59,9 +60,6 @@ public class NpmAuthPreProcessor extends ProtocolProcessor {
       "Bearer realm=\"" + BasicAuthChallenge.REALM + "\", " + CHALLENGE;
 
   private static final String URL_PROPERTIES_KEY = "urlProperties";
-  private static final String PERMISSION_KEY = "permission";
-  private static final String SKIP_PRE_PROCESSOR_KEY = "skipPreProcessor";
-  private static final String WRITE_OPERATION_KEY = "writeOperation";
   private static final String REQUIRE_AUTHENTICATION_KEY = "requireAuthentication";
 
   private final NpmAuthenticatorImpl authenticator;
@@ -90,7 +88,7 @@ public class NpmAuthPreProcessor extends ProtocolProcessor {
       return ProcessorResult.next();
     }
 
-    final var permission = (Permission) properties.get(PERMISSION_KEY);
+    final var permission = (Permission) properties.get(HandlerPropertyKeys.PERMISSION);
 
     final var authHeader = this.authenticator.emulateAuthHeader(request);
 
@@ -134,7 +132,8 @@ public class NpmAuthPreProcessor extends ProtocolProcessor {
   private boolean shouldSkipAuthentication(
       final RepoInfo repoInfo, final Map<String, Object> properties) {
 
-    final var skipPreProcessor = (boolean) properties.getOrDefault(SKIP_PRE_PROCESSOR_KEY, false);
+    final var skipPreProcessor =
+        (boolean) properties.getOrDefault(HandlerPropertyKeys.SKIP_PRE_PROCESSOR, false);
 
     if (skipPreProcessor) {
       return true;
@@ -148,7 +147,7 @@ public class NpmAuthPreProcessor extends ProtocolProcessor {
       return false;
     }
 
-    final var writeOperation = (boolean) properties.get(WRITE_OPERATION_KEY);
+    final var writeOperation = (boolean) properties.get(HandlerPropertyKeys.WRITE_OPERATION);
 
     return !repoInfo.isPrivateRepo() && !writeOperation;
   }

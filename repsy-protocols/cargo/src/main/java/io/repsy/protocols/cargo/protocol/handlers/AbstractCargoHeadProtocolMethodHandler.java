@@ -18,17 +18,14 @@ package io.repsy.protocols.cargo.protocol.handlers;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
 import io.repsy.protocols.cargo.protocol.facades.contracts.CargoProtocolFacade;
-import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpHeaders;
@@ -51,57 +48,36 @@ import org.springframework.http.ResponseEntity;
  */
 @Slf4j
 @NullMarked
-public abstract class AbstractCargoHeadProtocolMethodHandler implements ProtocolMethodHandler {
-
-  private final PathParser basePathParser;
-  private final CargoProtocolFacade facade;
+public abstract class AbstractCargoHeadProtocolMethodHandler
+    extends AbstractFacadeProtocolMethodHandler<CargoProtocolFacade> {
 
   protected AbstractCargoHeadProtocolMethodHandler(
       final PathParser basePathParser,
       final CargoProtocolFacade facade,
       final CargoProtocolProvider provider) {
 
-    this.basePathParser = basePathParser;
-    this.facade = facade;
-
-    provider.registerMethodHandler(this);
+    super(
+        HandlerRoute.read(HttpMethod.HEAD)
+            .skipUsagePostProcessor(true)
+            .path(AbstractCargoHeadProtocolMethodHandler::isDownloadOrIndex),
+        basePathParser,
+        facade,
+        provider);
   }
 
-  @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.HEAD);
-  }
+  /** A {@code HEAD} answers the crate downloads and the sparse index entries. */
+  private static boolean isDownloadOrIndex(final String relativePath) {
+    final var isDownload =
+        AbstractCargoDownloadProtocolMethodHandler.DOWNLOAD_PATTERN.matcher(relativePath).matches();
+    final var isIndex =
+        !AbstractCargoSparseIndexProtocolMethodHandler.EXCLUDED_PATTERN
+                .matcher(relativePath)
+                .matches()
+            && AbstractCargoSparseIndexProtocolMethodHandler.INDEX_PATTERN
+                .matcher(relativePath)
+                .matches();
 
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of(
-        "permission", Permission.READ, "writeOperation", false, "skipUsagePostProcessor", true);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return request -> {
-      final var parsedPathOpt = this.basePathParser.parse(request);
-      if (parsedPathOpt.isEmpty()) {
-        return Optional.empty();
-      }
-
-      final var relativePath = ProtocolContextUtils.getRelativePath(parsedPathOpt.get()).getPath();
-
-      final var isDownload =
-          AbstractCargoDownloadProtocolMethodHandler.DOWNLOAD_PATTERN
-              .matcher(relativePath)
-              .matches();
-      final var isIndex =
-          !AbstractCargoSparseIndexProtocolMethodHandler.EXCLUDED_PATTERN
-                  .matcher(relativePath)
-                  .matches()
-              && AbstractCargoSparseIndexProtocolMethodHandler.INDEX_PATTERN
-                  .matcher(relativePath)
-                  .matches();
-
-      return isDownload || isIndex ? parsedPathOpt : Optional.empty();
-    };
+    return isDownload || isIndex;
   }
 
   @Override

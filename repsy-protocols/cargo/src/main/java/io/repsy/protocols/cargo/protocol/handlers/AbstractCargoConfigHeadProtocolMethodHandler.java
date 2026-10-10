@@ -17,14 +17,12 @@ package io.repsy.protocols.cargo.protocol.handlers;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
+import io.repsy.protocols.shared.handlers.AbstractRoutedProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -41,40 +39,22 @@ import org.springframework.http.ResponseEntity;
  */
 @NullMarked
 public abstract class AbstractCargoConfigHeadProtocolMethodHandler
-    implements ProtocolMethodHandler {
-
-  private final PathParser basePathParser;
+    extends AbstractRoutedProtocolMethodHandler {
 
   protected AbstractCargoConfigHeadProtocolMethodHandler(
       final PathParser basePathParser, final CargoProtocolProvider provider) {
 
-    this.basePathParser = basePathParser;
-
-    provider.registerMethodHandler(this);
+    super(
+        HandlerRoute.of(Permission.READ, HttpMethod.HEAD)
+            .skipUsagePostProcessor(true)
+            .skipPreProcessor(true),
+        basePathParser,
+        provider);
   }
 
   @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.HEAD);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of(
-        "permission", Permission.READ,
-        "skipUsagePostProcessor", true,
-        "skipPreProcessor", true);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return request -> {
-      if (!request.getServletPath().endsWith("/config.json")) {
-        return Optional.empty();
-      }
-
-      return this.basePathParser.parse(request);
-    };
+  protected boolean accepts(final HttpMethod method, final HttpServletRequest request) {
+    return super.accepts(method, request) && request.getServletPath().endsWith("/config.json");
   }
 
   @Override

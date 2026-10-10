@@ -25,6 +25,7 @@ import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
+import io.repsy.protocols.shared.handlers.HandlerPropertyKeys;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
@@ -43,8 +44,6 @@ public class DockerAuthPreProcessor extends ProtocolProcessor {
 
   private static final int PRIORITY = 100;
   private static final String AUTH_BEARER = "Bearer ";
-  private static final String SKIP_PRE_PROCESSOR_KEY = "skipPreProcessor";
-  private static final String PERMISSION_KEY = "permission";
 
   private final DockerProtocolProvider provider;
   private final DockerAuthenticator authenticator;
@@ -96,7 +95,7 @@ public class DockerAuthPreProcessor extends ProtocolProcessor {
       final RepoInfo repoInfo,
       final Map<String, Object> properties) {
 
-    final var permission = (Permission) properties.get(PERMISSION_KEY);
+    final var permission = (Permission) properties.get(HandlerPropertyKeys.PERMISSION);
     final var authHeader = this.authenticator.emulateAuthHeader(request);
 
     if (permission != Permission.MANAGE || authHeader == null) {
@@ -134,7 +133,7 @@ public class DockerAuthPreProcessor extends ProtocolProcessor {
       throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
 
-    final var permission = (Permission) properties.get(PERMISSION_KEY);
+    final var permission = (Permission) properties.get(HandlerPropertyKeys.PERMISSION);
 
     this.authenticator.handleBearerAuth(authHeader, repoId, permission);
   }
@@ -142,13 +141,14 @@ public class DockerAuthPreProcessor extends ProtocolProcessor {
   private boolean shouldSkipAuthentication(
       final RepoInfo repoInfo, final Map<String, Object> properties) {
 
-    final var skipPreProcessor = (boolean) properties.getOrDefault(SKIP_PRE_PROCESSOR_KEY, false);
+    final var skipPreProcessor =
+        (boolean) properties.getOrDefault(HandlerPropertyKeys.SKIP_PRE_PROCESSOR, false);
 
     if (skipPreProcessor) {
       return true;
     }
 
-    final var permission = (Permission) properties.get(PERMISSION_KEY);
+    final var permission = (Permission) properties.get(HandlerPropertyKeys.PERMISSION);
 
     if (permission == Permission.MANAGE || permission == Permission.WRITE) {
       return false;

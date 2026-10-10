@@ -17,15 +17,13 @@ package io.repsy.protocols.ruby.protocol.handlers;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.ruby.protocol.RubyProtocolProvider;
 import io.repsy.protocols.ruby.protocol.facades.contracts.RubyProtocolFacade;
-import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.NullMarked;
@@ -48,7 +46,8 @@ import org.springframework.http.ResponseEntity;
  * of the {@code GET} (RPS-1465).
  */
 @NullMarked
-public abstract class AbstractRubyHeadProtocolMethodHandler implements ProtocolMethodHandler {
+public abstract class AbstractRubyHeadProtocolMethodHandler
+    extends AbstractFacadeProtocolMethodHandler<RubyProtocolFacade> {
 
   private static final Set<String> ALWAYS_EXISTING_PATHS =
       Set.of(
@@ -62,32 +61,22 @@ public abstract class AbstractRubyHeadProtocolMethodHandler implements ProtocolM
   private static final Pattern GEMSPEC_PATTERN =
       Pattern.compile("^/quick/Marshal\\.4\\.8/(.+)\\.gemspec\\.rz$");
 
-  private final PathParser pathParser;
-  private final RubyProtocolFacade facade;
-
   protected AbstractRubyHeadProtocolMethodHandler(
       final PathParser basePathParser,
       final RubyProtocolFacade facade,
       final RubyProtocolProvider provider) {
-    this.pathParser = basePathParser;
-    this.facade = facade;
-    provider.registerMethodHandler(this);
+
+    super(
+        HandlerRoute.read(HttpMethod.HEAD).skipUsagePostProcessor(true),
+        basePathParser,
+        facade,
+        provider);
   }
 
-  @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.HEAD);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of(
-        "permission", Permission.READ, "writeOperation", false, "skipUsagePostProcessor", true);
-  }
-
+  /** The parser the backend passes in decides the whole path, so it is used as it is. */
   @Override
   public PathParser getPathParser() {
-    return this.pathParser;
+    return this.basePathParser();
   }
 
   @Override

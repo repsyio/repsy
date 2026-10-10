@@ -17,20 +17,17 @@ package io.repsy.protocols.ruby.protocol.handlers;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.ruby.protocol.RubyProtocolProvider;
 import io.repsy.protocols.ruby.protocol.facades.contracts.RubyProtocolFacade;
-import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.util.List;
-import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
 import java.util.zip.GZIPOutputStream;
 import org.jspecify.annotations.NullMarked;
@@ -40,7 +37,8 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 @NullMarked
-public abstract class AbstractRubySpecsIndexProtocolMethodHandler implements ProtocolMethodHandler {
+public abstract class AbstractRubySpecsIndexProtocolMethodHandler
+    extends AbstractFacadeProtocolMethodHandler<RubyProtocolFacade> {
 
   private static final String SPECS_PATH = "/specs.4.8.gz";
   private static final String LATEST_SPECS_PATH = "/latest_specs.4.8.gz";
@@ -48,41 +46,16 @@ public abstract class AbstractRubySpecsIndexProtocolMethodHandler implements Pro
   private static final Set<String> SPECS_PATHS =
       Set.of(SPECS_PATH, LATEST_SPECS_PATH, PRERELEASE_SPECS_PATH);
 
-  private final PathParser basePathParser;
-  private final RubyProtocolFacade facade;
-
   protected AbstractRubySpecsIndexProtocolMethodHandler(
       final PathParser basePathParser,
       final RubyProtocolFacade facade,
       final RubyProtocolProvider provider) {
-    this.basePathParser = basePathParser;
-    this.facade = facade;
-    provider.registerMethodHandler(this);
-  }
 
-  @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.GET);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.READ, "writeOperation", false);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return request -> {
-      if (!HttpMethod.GET.name().equals(request.getMethod())) {
-        return Optional.empty();
-      }
-      final var parsedOpt = this.basePathParser.parse(request);
-      if (parsedOpt.isEmpty()) {
-        return Optional.empty();
-      }
-      final var relativePath = ProtocolContextUtils.getRelativePath(parsedOpt.get()).getPath();
-      return SPECS_PATHS.contains(relativePath) ? parsedOpt : Optional.empty();
-    };
+    super(
+        HandlerRoute.read(HttpMethod.GET).path(SPECS_PATHS::contains),
+        basePathParser,
+        facade,
+        provider);
   }
 
   @Override

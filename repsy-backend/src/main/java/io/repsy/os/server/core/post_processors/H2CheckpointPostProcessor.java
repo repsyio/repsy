@@ -19,6 +19,7 @@ import io.repsy.libs.protocol.router.ProcessorResult;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.libs.protocol.router.ProtocolProvider;
+import io.repsy.protocols.shared.handlers.HandlerPropertyKeys;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.sql.Connection;
@@ -68,7 +69,6 @@ import org.springframework.stereotype.Component;
 public class H2CheckpointPostProcessor extends ProtocolProcessor {
 
   private static final int PRIORITY = Integer.MAX_VALUE;
-  private static final String WRITE_OPERATION_KEY = "writeOperation";
   private static final String CHECKPOINT_SQL = "CHECKPOINT SYNC";
 
   private final @NonNull DataSource dataSource;
@@ -133,6 +133,6 @@ public class H2CheckpointPostProcessor extends ProtocolProcessor {
 
   private boolean isWriteOperation(
       final @NonNull Map<@NonNull String, @NonNull Object> properties) {
-    return (boolean) properties.getOrDefault(WRITE_OPERATION_KEY, false);
+    return (boolean) properties.getOrDefault(HandlerPropertyKeys.WRITE_OPERATION, false);
   }
 }

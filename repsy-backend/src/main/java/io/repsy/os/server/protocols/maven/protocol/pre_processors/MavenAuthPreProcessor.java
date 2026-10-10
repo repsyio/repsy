@@ -28,6 +28,7 @@ import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.maven.protocol.MavenProtocolProvider;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
+import io.repsy.protocols.shared.handlers.HandlerPropertyKeys;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -51,8 +52,6 @@ public class MavenAuthPreProcessor extends ProtocolProcessor {
 
   private static final String AUTH_BEARER = "Bearer ";
   private static final String AUTH_BASIC = "Basic ";
-  private static final @NonNull String PERMISSION_KEY = "permission";
-  private static final @NonNull String WRITE_OPERATION_KEY = "writeOperation";
 
   private final @NonNull MavenAuthenticator authenticator;
 
@@ -82,7 +81,7 @@ public class MavenAuthPreProcessor extends ProtocolProcessor {
       return ProcessorResult.next();
     }
 
-    final var permission = (Permission) properties.get(PERMISSION_KEY);
+    final var permission = (Permission) properties.get(HandlerPropertyKeys.PERMISSION);
 
     try {
       return this.authenticate(context, request, repoInfo, permission);
@@ -141,7 +140,7 @@ public class MavenAuthPreProcessor extends ProtocolProcessor {
       final @NonNull RepoInfo repoInfo,
       final @NonNull Map<@NonNull String, @NonNull Object> properties) {
 
-    final var writeOperation = (boolean) properties.get(WRITE_OPERATION_KEY);
+    final var writeOperation = (boolean) properties.get(HandlerPropertyKeys.WRITE_OPERATION);
 
     return !repoInfo.isPrivateRepo() && !writeOperation;
   }

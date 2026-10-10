@@ -31,6 +31,7 @@ import io.repsy.os.shared.error_handling.utils.OciErrors;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
+import io.repsy.protocols.shared.handlers.HandlerPropertyKeys;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
@@ -47,9 +48,6 @@ import org.springframework.stereotype.Component;
 public class HelmAuthPreProcessor extends ProtocolProcessor {
 
   private static final int PRIORITY = 100;
-  private static final String SKIP_PRE_PROCESSOR_KEY = "skipPreProcessor";
-  private static final String PERMISSION_KEY = "permission";
-  private static final String WRITE_OPERATION_KEY = "writeOperation";
 
   private final HelmProtocolProvider provider;
   private final RestResponseFactory resp;
@@ -75,7 +73,10 @@ public class HelmAuthPreProcessor extends ProtocolProcessor {
     final var repoInfo = UrlPropertiesUtils.getRepoInfo(context);
 
     if (PreProcessorUtils.shouldSkipAuthentication(
-        SKIP_PRE_PROCESSOR_KEY, WRITE_OPERATION_KEY, repoInfo, properties)) {
+        HandlerPropertyKeys.SKIP_PRE_PROCESSOR,
+        HandlerPropertyKeys.WRITE_OPERATION,
+        repoInfo,
+        properties)) {
       return ProcessorResult.next();
     }
 
@@ -97,7 +98,7 @@ public class HelmAuthPreProcessor extends ProtocolProcessor {
   private void authenticateRequest(
       final String authHeader, final UUID repoId, final Map<String, Object> properties) {
 
-    final var permission = (Permission) properties.get(PERMISSION_KEY);
+    final var permission = (Permission) properties.get(HandlerPropertyKeys.PERMISSION);
 
     switch (authHeader) {
       case final String h when h.startsWith(AUTH_BASIC) ->

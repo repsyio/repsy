@@ -17,19 +17,15 @@ package io.repsy.protocols.ruby.protocol.handlers;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolMethodHandler;
 import io.repsy.protocols.ruby.protocol.RubyProtocolProvider;
 import io.repsy.protocols.ruby.protocol.facades.contracts.RubyProtocolFacade;
-import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
+import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.utils.EntryTooLargeException;
-import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import io.repsy.protocols.shared.utils.SpooledUpload;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -37,14 +33,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 @NullMarked
-public abstract class AbstractRubyGemPublishProtocolMethodHandler implements ProtocolMethodHandler {
+public abstract class AbstractRubyGemPublishProtocolMethodHandler
+    extends AbstractFacadeProtocolMethodHandler<RubyProtocolFacade> {
 
   private static final String PUBLISH_PATH = "/api/v1/gems";
   private static final String GEM_NAME = "gemName";
   private static final String GEM_VERSION = "gemVersion";
 
-  private final PathParser basePathParser;
-  private final RubyProtocolFacade facade;
   private final long maxGemBytes;
 
   /**
@@ -56,35 +51,14 @@ public abstract class AbstractRubyGemPublishProtocolMethodHandler implements Pro
       final RubyProtocolFacade facade,
       final RubyProtocolProvider provider,
       final long maxGemBytes) {
-    this.basePathParser = basePathParser;
-    this.facade = facade;
+
+    super(
+        HandlerRoute.write(HttpMethod.POST).path(PUBLISH_PATH::equals),
+        basePathParser,
+        facade,
+        provider);
+
     this.maxGemBytes = maxGemBytes;
-    provider.registerMethodHandler(this);
-  }
-
-  @Override
-  public List<HttpMethod> getSupportedMethods() {
-    return List.of(HttpMethod.POST);
-  }
-
-  @Override
-  public Map<String, Object> getProperties() {
-    return Map.of("permission", Permission.WRITE, "writeOperation", true);
-  }
-
-  @Override
-  public PathParser getPathParser() {
-    return request -> {
-      if (!HttpMethod.POST.name().equals(request.getMethod())) {
-        return Optional.empty();
-      }
-      final var parsedOpt = this.basePathParser.parse(request);
-      if (parsedOpt.isEmpty()) {
-        return Optional.empty();
-      }
-      final var relativePath = ProtocolContextUtils.getRelativePath(parsedOpt.get()).getPath();
-      return PUBLISH_PATH.equals(relativePath) ? parsedOpt : Optional.empty();
-    };
   }
 
   @Override

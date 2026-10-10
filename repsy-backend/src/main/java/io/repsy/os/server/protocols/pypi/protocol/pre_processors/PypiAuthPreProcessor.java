@@ -29,6 +29,7 @@ import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.pypi.protocol.PypiProtocolProvider;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
+import io.repsy.protocols.shared.handlers.HandlerPropertyKeys;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -42,8 +43,6 @@ import org.springframework.stereotype.Component;
 public class PypiAuthPreProcessor extends ProtocolProcessor {
 
   private static final int PRIORITY = 100;
-  private static final String PERMISSION_KEY = "permission";
-  private static final String WRITE_OPERATION_KEY = "writeOperation";
 
   private final PypiAuthenticator authenticator;
 
@@ -73,7 +72,7 @@ public class PypiAuthPreProcessor extends ProtocolProcessor {
       return ProcessorResult.next();
     }
 
-    final var permission = (Permission) properties.get(PERMISSION_KEY);
+    final var permission = (Permission) properties.get(HandlerPropertyKeys.PERMISSION);
 
     try {
       this.authenticate(request, repoInfo.getStorageKey(), permission);
@@ -111,7 +110,7 @@ public class PypiAuthPreProcessor extends ProtocolProcessor {
   private boolean shouldSkipAuthentication(
       final RepoInfo repoInfo, final Map<String, Object> properties) {
 
-    final var writeOperation = (boolean) properties.get(WRITE_OPERATION_KEY);
+    final var writeOperation = (boolean) properties.get(HandlerPropertyKeys.WRITE_OPERATION);
 
     return !repoInfo.isPrivateRepo() && !writeOperation;
   }

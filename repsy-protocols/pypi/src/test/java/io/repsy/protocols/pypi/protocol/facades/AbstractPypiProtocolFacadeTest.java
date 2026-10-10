@@ -399,6 +399,7 @@ class AbstractPypiProtocolFacadeTest {
 
       publishRunsFileWriter();
       when(storageService.writePackageArchive(any(), any(), any(), any())).thenReturn(usages);
+      when(usages.getDiskUsage()).thenReturn(300L);
 
       final var ctx = context();
       facade.uploadPackage(ctx, params, file);
@@ -406,7 +407,25 @@ class AbstractPypiProtocolFacadeTest {
       verify(packageService).publishRelease(eq(repoInfo), any(PackageUploadForm.class), any());
       assertThat(ctx.<String>getProperty("artifactName")).isEqualTo("my-package");
       assertThat(ctx.<String>getProperty("artifactVersion")).isEqualTo("1.0.0");
-      assertThat(ctx.<BaseUsages>getProperty("usages")).isSameAs(usages);
+      assertThat(ctx.<BaseUsages>getProperty("usages").getDiskUsage()).isEqualTo(300L);
+    }
+
+    @Test
+    @DisplayName("adds to the usages the request already reported instead of replacing them")
+    void addsToExistingUsages() throws Exception {
+      final var bytes = "content".getBytes();
+      final var file = file("my_package-1.0.0-py3-none-any.whl", bytes);
+      final var params = form("My.Package", "1.0.0", sha256Hex(bytes));
+
+      publishRunsFileWriter();
+      when(storageService.writePackageArchive(any(), any(), any(), any())).thenReturn(usages);
+      when(usages.getDiskUsage()).thenReturn(300L);
+
+      final var ctx = context();
+      ctx.addProperty("usages", BaseUsages.ofDisk(50L));
+      facade.uploadPackage(ctx, params, file);
+
+      assertThat(ctx.<BaseUsages>getProperty("usages").getDiskUsage()).isEqualTo(350L);
     }
   }
 

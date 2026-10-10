@@ -22,6 +22,7 @@ import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.libs.protocol.router.ProtocolProvider;
 import io.repsy.os.server.security.scanner.VulnerabilityScannerRegistry;
 import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
+import io.repsy.protocols.shared.handlers.HandlerPropertyKeys;
 import io.repsy.protocols.shared.utils.BlobDigests;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -42,7 +43,6 @@ public class ArtifactPushedEventPostProcessor extends ProtocolProcessor {
   private static final String ARTIFACT_NAME = "artifactName";
   private static final String ARTIFACT_VERSION = "artifactVersion";
   private static final String STORAGE_PATH = "storagePath";
-  private static final String WRITE_OPERATION = "writeOperation";
 
   private final @NonNull ApplicationEventPublisher eventPublisher;
   private final @NonNull VulnerabilityScannerRegistry scannerRegistry;
@@ -113,7 +113,7 @@ public class ArtifactPushedEventPostProcessor extends ProtocolProcessor {
 
   private boolean isWriteOperation(
       final @NonNull Map<@NonNull String, @NonNull Object> properties) {
-    return (boolean) properties.getOrDefault(WRITE_OPERATION, false);
+    return (boolean) properties.getOrDefault(HandlerPropertyKeys.WRITE_OPERATION, false);
   }
 
   private static boolean isDigestReference(final @Nullable String artifactVersion) {
