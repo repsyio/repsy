@@ -15,109 +15,24 @@
  */
 package io.repsy.os.server.protocols.cargo.protocol.pre_processors;
 
-import static org.springframework.http.HttpHeaders.WWW_AUTHENTICATE;
-
-import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
-import io.repsy.libs.protocol.router.ProcessorResult;
-import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.os.server.protocols.cargo.shared.auth.services.CargoAuthenticator;
-import io.repsy.os.server.shared.auth.AuthChallenges;
-import io.repsy.os.server.shared.utils.PreProcessorUtils;
-import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
+import io.repsy.os.server.shared.auth.BasicOrBearerAuthPreProcessor;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
-import io.repsy.protocols.shared.auth.BasicAuthChallenge;
-import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
-import io.repsy.protocols.shared.handlers.HandlerPropertyKeys;
-import io.repsy.protocols.shared.repo.dtos.Permission;
-import jakarta.annotation.PostConstruct;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import java.util.Map;
-import java.util.UUID;
-import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 
+/** Cargo: Basic or Bearer; the Cargo CLI sends its token without a scheme. */
 @Component
-@RequiredArgsConstructor
 @NullMarked
-public class CargoAuthPreProcessor extends ProtocolProcessor {
+public class CargoAuthPreProcessor extends BasicOrBearerAuthPreProcessor<CargoAuthenticator> {
 
-  private static final int PRIORITY = 100;
-  private static final String AUTH_BASIC = "Basic ";
-  private static final String AUTH_BEARER = "Bearer ";
-
-  private final CargoAuthenticator authenticator;
-  private final CargoProtocolProvider provider;
-
-  @PostConstruct
-  public void register() {
-    this.provider.registerPreProcessor(this);
+  public CargoAuthPreProcessor(
+      final CargoAuthenticator authenticator, final CargoProtocolProvider provider) {
+    super(authenticator, provider);
   }
 
   @Override
-  protected int getPriority() {
-    return PRIORITY;
-  }
-
-  @Override
-  protected ProcessorResult process(
-      final ProtocolContext context,
-      final HttpServletRequest request,
-      final HttpServletResponse response,
-      final Map<String, Object> properties) {
-
-    final var repoInfo = UrlPropertiesUtils.getRepoInfo(context);
-
-    if (PreProcessorUtils.shouldSkipAuthentication(
-        HandlerPropertyKeys.SKIP_PRE_PROCESSOR,
-        HandlerPropertyKeys.WRITE_OPERATION,
-        repoInfo,
-        properties)) {
-      return ProcessorResult.next();
-    }
-
-    final var rawAuthHeader = this.authenticator.emulateAuthHeader(request);
-
-    if (rawAuthHeader == null) {
-      return ProcessorResult.of(
-          ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-              .header(WWW_AUTHENTICATE, BasicAuthChallenge.REPSY)
-              .build());
-    }
-
-    // Cargo CLI sends the token as a raw value with no prefix — normalize to Bearer
-    final var authHeader = this.normalizeAuthHeader(rawAuthHeader);
-
-    try {
-      this.authenticateRequest(authHeader, repoInfo.getId(), properties);
-    } catch (final UnAuthorizedException ex) {
-      throw AuthChallenges.challenged(ex, BasicAuthChallenge.REPSY);
-    }
-
-    return ProcessorResult.next();
-  }
-
-  private void authenticateRequest(
-      final String authHeader, final UUID repoId, final Map<String, Object> properties) {
-
-    final var permission = (Permission) properties.get(HandlerPropertyKeys.PERMISSION);
-
-    switch (authHeader) {
-      case final String header when header.startsWith(AUTH_BASIC) ->
-          this.authenticator.handleBasicAuth(header, permission, repoId);
-      case final String header when header.startsWith(AUTH_BEARER) ->
-          this.authenticator.handleBearerAuth(header, repoId, permission);
-      default -> throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
-    }
-  }
-
-  private String normalizeAuthHeader(final String authHeader) {
-    return (authHeader.startsWith(AUTH_BASIC) || authHeader.startsWith(AUTH_BEARER))
-        ? authHeader
-        : AUTH_BEARER + authHeader;
+  protected boolean acceptsBareToken() {
+    return true;
   }
 }

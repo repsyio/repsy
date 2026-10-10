@@ -15,106 +15,24 @@
  */
 package io.repsy.os.server.protocols.ruby.protocol.pre_processors;
 
-import static org.springframework.http.HttpHeaders.WWW_AUTHENTICATE;
-
-import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
-import io.repsy.libs.protocol.router.ProcessorResult;
-import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.os.server.protocols.ruby.shared.auth.services.RubyAuthenticator;
-import io.repsy.os.server.shared.auth.AuthChallenges;
-import io.repsy.os.server.shared.utils.PreProcessorUtils;
-import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
+import io.repsy.os.server.shared.auth.BasicOrBearerAuthPreProcessor;
 import io.repsy.protocols.ruby.protocol.RubyProtocolProvider;
-import io.repsy.protocols.shared.auth.BasicAuthChallenge;
-import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
-import io.repsy.protocols.shared.handlers.HandlerPropertyKeys;
-import io.repsy.protocols.shared.repo.dtos.Permission;
-import jakarta.annotation.PostConstruct;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import java.util.Map;
-import java.util.UUID;
-import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
+/** RubyGems: Basic or Bearer; {@code gem push} sends its API key without a scheme. */
 @Component
-@RequiredArgsConstructor
 @NullMarked
-public class RubyAuthPreProcessor extends ProtocolProcessor {
+public class RubyAuthPreProcessor extends BasicOrBearerAuthPreProcessor<RubyAuthenticator> {
 
-  private static final int PRIORITY = 100;
-  private static final String AUTH_BASIC = "Basic ";
-  private static final String AUTH_BEARER = "Bearer ";
-
-  private final RubyAuthenticator authenticator;
-  private final RubyProtocolProvider provider;
-
-  @PostConstruct
-  public void register() {
-    this.provider.registerPreProcessor(this);
+  public RubyAuthPreProcessor(
+      final RubyAuthenticator authenticator, final RubyProtocolProvider provider) {
+    super(authenticator, provider);
   }
 
   @Override
-  protected int getPriority() {
-    return PRIORITY;
-  }
-
-  @Override
-  protected ProcessorResult process(
-      final ProtocolContext context,
-      final HttpServletRequest request,
-      final HttpServletResponse response,
-      final Map<String, Object> properties) {
-
-    final var repoInfo = UrlPropertiesUtils.getRepoInfo(context);
-
-    if (PreProcessorUtils.shouldSkipAuthentication(
-        HandlerPropertyKeys.SKIP_PRE_PROCESSOR,
-        HandlerPropertyKeys.WRITE_OPERATION,
-        repoInfo,
-        properties)) {
-      return ProcessorResult.next();
-    }
-
-    final var rawAuthHeader = this.authenticator.emulateAuthHeader(request);
-
-    if (rawAuthHeader == null) {
-      return ProcessorResult.of(
-          org.springframework.http.ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-              .header(WWW_AUTHENTICATE, BasicAuthChallenge.REPSY)
-              .build());
-    }
-
-    final var authHeader = normalizeAuthHeader(rawAuthHeader);
-
-    try {
-      this.authenticateRequest(authHeader, repoInfo.getId(), properties);
-    } catch (final UnAuthorizedException ex) {
-      throw AuthChallenges.challenged(ex, BasicAuthChallenge.REPSY);
-    }
-
-    return ProcessorResult.next();
-  }
-
-  private void authenticateRequest(
-      final String authHeader, final UUID repoId, final Map<String, Object> properties) {
-    final var permission = (Permission) properties.get(HandlerPropertyKeys.PERMISSION);
-
-    switch (authHeader) {
-      case final String h when h.startsWith(AUTH_BASIC) ->
-          this.authenticator.handleBasicAuth(h, permission, repoId);
-      case final String h when h.startsWith(AUTH_BEARER) ->
-          this.authenticator.handleBearerAuth(h, repoId, permission);
-      default -> throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
-    }
-  }
-
-  private static String normalizeAuthHeader(final String authHeader) {
-    return (authHeader.startsWith(AUTH_BASIC) || authHeader.startsWith(AUTH_BEARER))
-        ? authHeader
-        : AUTH_BEARER + authHeader;
+  protected boolean acceptsBareToken() {
+    return true;
   }
 }

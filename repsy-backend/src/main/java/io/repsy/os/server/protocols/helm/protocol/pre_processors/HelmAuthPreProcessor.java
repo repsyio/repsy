@@ -15,97 +15,37 @@
  */
 package io.repsy.os.server.protocols.helm.protocol.pre_processors;
 
-import static io.repsy.os.shared.auth.utils.AuthUtils.AUTH_BASIC;
-import static io.repsy.os.shared.auth.utils.AuthUtils.AUTH_BEARER;
-
-import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.core.response.services.RestResponseFactory;
 import io.repsy.libs.protocol.router.ProcessorResult;
-import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.os.server.protocols.helm.shared.auth.HelmAuthenticator;
-import io.repsy.os.server.shared.auth.AuthChallenges;
-import io.repsy.os.server.shared.utils.PreProcessorUtils;
-import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
+import io.repsy.os.server.shared.auth.BasicOrBearerAuthPreProcessor;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
 import io.repsy.protocols.oci.utils.OciErrors;
-import io.repsy.protocols.shared.auth.BasicAuthChallenge;
-import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
-import io.repsy.protocols.shared.handlers.HandlerPropertyKeys;
-import io.repsy.protocols.shared.repo.dtos.Permission;
-import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import java.util.Map;
-import java.util.UUID;
-import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
+/**
+ * Helm (classic and OCI): Basic or Bearer; a request without credentials is answered in the OCI
+ * error format on the OCI routes.
+ */
 @Component
-@RequiredArgsConstructor
 @NullMarked
-public class HelmAuthPreProcessor extends ProtocolProcessor {
+public class HelmAuthPreProcessor extends BasicOrBearerAuthPreProcessor<HelmAuthenticator> {
 
-  private static final int PRIORITY = 100;
-
-  private final HelmProtocolProvider provider;
   private final RestResponseFactory resp;
-  private final HelmAuthenticator authenticator;
 
-  @PostConstruct
-  public void register() {
-    this.provider.registerPreProcessor(this);
+  public HelmAuthPreProcessor(
+      final HelmProtocolProvider provider,
+      final RestResponseFactory resp,
+      final HelmAuthenticator authenticator) {
+
+    super(authenticator, provider);
+    this.resp = resp;
   }
 
   @Override
-  protected int getPriority() {
-    return PRIORITY;
-  }
-
-  @Override
-  protected ProcessorResult process(
-      final ProtocolContext context,
-      final HttpServletRequest request,
-      final HttpServletResponse response,
-      final Map<String, Object> properties) {
-
-    final var repoInfo = UrlPropertiesUtils.getRepoInfo(context);
-
-    if (PreProcessorUtils.shouldSkipAuthentication(
-        HandlerPropertyKeys.SKIP_PRE_PROCESSOR,
-        HandlerPropertyKeys.WRITE_OPERATION,
-        repoInfo,
-        properties)) {
-      return ProcessorResult.next();
-    }
-
-    final var authHeader = this.authenticator.emulateAuthHeader(request);
-
-    if (authHeader == null) {
-      return ProcessorResult.of(OciErrors.challenge(request, BasicAuthChallenge.REPSY, this.resp));
-    }
-
-    try {
-      this.authenticateRequest(authHeader, repoInfo.getId(), properties);
-    } catch (final UnAuthorizedException ex) {
-      throw AuthChallenges.challenged(ex, BasicAuthChallenge.REPSY);
-    }
-
-    return ProcessorResult.next();
-  }
-
-  private void authenticateRequest(
-      final String authHeader, final UUID repoId, final Map<String, Object> properties) {
-
-    final var permission = (Permission) properties.get(HandlerPropertyKeys.PERMISSION);
-
-    switch (authHeader) {
-      case final String h when h.startsWith(AUTH_BASIC) ->
-          this.authenticator.handleBasicAuth(h, permission, repoId);
-      case final String h when h.startsWith(AUTH_BEARER) ->
-          this.authenticator.handleBearerAuth(h, repoId, permission);
-      default -> throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
-    }
+  protected ProcessorResult missingCredential(final HttpServletRequest request) {
+    return ProcessorResult.of(OciErrors.challenge(request, this.challenge(null), this.resp));
   }
 }

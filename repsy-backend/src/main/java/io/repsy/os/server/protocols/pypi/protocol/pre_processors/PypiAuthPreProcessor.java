@@ -15,103 +15,37 @@
  */
 package io.repsy.os.server.protocols.pypi.protocol.pre_processors;
 
-import static io.repsy.os.shared.auth.utils.AuthUtils.AUTH_BASIC;
-import static io.repsy.os.shared.auth.utils.AuthUtils.AUTH_BEARER;
-
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.libs.protocol.router.ProcessorResult;
-import io.repsy.libs.protocol.router.ProtocolContext;
-import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.os.server.protocols.pypi.shared.auth.services.PypiAuthenticator;
-import io.repsy.os.server.shared.auth.AuthChallenges;
-import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
-import io.repsy.os.shared.repo.dtos.RepoInfo;
+import io.repsy.os.server.shared.auth.BasicOrBearerAuthPreProcessor;
 import io.repsy.protocols.pypi.protocol.PypiProtocolProvider;
-import io.repsy.protocols.shared.auth.BasicAuthChallenge;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
-import io.repsy.protocols.shared.handlers.HandlerPropertyKeys;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-import java.util.Map;
 import java.util.UUID;
 import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
+/** PyPI: Basic (whose password may be a token, as twine sends it) or Bearer. */
 @Component
 @NullMarked
-public class PypiAuthPreProcessor extends ProtocolProcessor {
-
-  private static final int PRIORITY = 100;
-
-  private final PypiAuthenticator authenticator;
+public class PypiAuthPreProcessor extends BasicOrBearerAuthPreProcessor<PypiAuthenticator> {
 
   public PypiAuthPreProcessor(
       final PypiAuthenticator authenticator, final PypiProtocolProvider provider) {
-
-    this.authenticator = authenticator;
-    provider.registerPreProcessor(this);
+    super(authenticator, provider);
   }
 
   @Override
-  protected int getPriority() {
-
-    return PRIORITY;
+  protected ProcessorResult missingCredential(final HttpServletRequest request) {
+    throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
   }
 
   @Override
-  protected ProcessorResult process(
-      final ProtocolContext context,
-      final HttpServletRequest request,
-      final HttpServletResponse response,
-      final Map<String, Object> properties) {
+  protected void authenticateBasic(
+      final String credential, final UUID repoId, final Permission permission) {
 
-    final var repoInfo = UrlPropertiesUtils.getRepoInfo(context);
-
-    if (this.shouldSkipAuthentication(repoInfo, properties)) {
-      return ProcessorResult.next();
-    }
-
-    final var permission = (Permission) properties.get(HandlerPropertyKeys.PERMISSION);
-
-    try {
-      this.authenticate(request, repoInfo.getStorageKey(), permission);
-    } catch (final UnAuthorizedException ex) {
-      throw AuthChallenges.challenged(ex, BasicAuthChallenge.REPSY);
-    }
-
-    return ProcessorResult.next();
-  }
-
-  private void authenticate(
-      final HttpServletRequest request, final UUID repoId, final Permission permission) {
-
-    final var authHeader = this.authenticator.emulateAuthHeader(request);
-
-    if (authHeader == null) {
-      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
-    }
-
-    this.authenticateRequest(authHeader, repoId, permission);
-  }
-
-  private void authenticateRequest(
-      final String authHeader, final UUID repoId, final Permission permission) {
-
-    switch (authHeader) {
-      case final String header when header.startsWith(AUTH_BASIC) ->
-          this.authenticator.handleBasicAuthWithToken(header, permission, repoId);
-      case final String header when header.startsWith(AUTH_BEARER) ->
-          this.authenticator.handleBearerAuth(header, repoId, permission);
-      default -> throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
-    }
-  }
-
-  private boolean shouldSkipAuthentication(
-      final RepoInfo repoInfo, final Map<String, Object> properties) {
-
-    final var writeOperation = (boolean) properties.get(HandlerPropertyKeys.WRITE_OPERATION);
-
-    return !repoInfo.isPrivateRepo() && !writeOperation;
+    this.authenticator.handleBasicAuthWithToken(credential, permission, repoId);
   }
 }
