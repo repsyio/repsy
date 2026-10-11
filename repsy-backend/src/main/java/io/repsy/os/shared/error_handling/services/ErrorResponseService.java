@@ -25,6 +25,8 @@ import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.libs.multiport.configs.props.MultiPortProperties;
 import io.repsy.os.shared.utils.MultiPortNames;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
+import io.repsy.protocols.shared.http.MaskedPathRequestWrapper;
+import io.repsy.protocols.shared.http.UrlMaskingUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.ConstraintViolationException;
@@ -319,7 +321,8 @@ public class ErrorResponseService {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("An exception occurred: {}", exceptionToString(ex, request));
+      log.debug(
+          "An exception occurred: {}", exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
       return null;
     }
 
@@ -331,9 +334,9 @@ public class ErrorResponseService {
           exception.getStatusCode().value(),
           exception.getClass().getName(),
           request.getMethod(),
-          request.getRequestURI());
+          UrlMaskingUtils.maskPath(request.getRequestURI()));
     } else if (!NOT_LOGGED_EXCEPTIONS.contains(ex.getClass().getName())) {
-      log.error(exceptionToString(ex, request));
+      log.error(exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
     }
 
     if (response.isCommitted()) {

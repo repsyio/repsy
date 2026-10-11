@@ -32,6 +32,7 @@ import io.repsy.libs.storage.core.exceptions.StorageUnavailableException;
 import io.repsy.os.shared.error_handling.services.ErrorResponseService;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.exceptions.TooManyRequestsException;
+import io.repsy.protocols.shared.http.MaskedPathRequestWrapper;
 import jakarta.persistence.LockTimeoutException;
 import jakarta.persistence.OptimisticLockException;
 import jakarta.persistence.PessimisticLockException;
@@ -83,7 +84,8 @@ public class ProtocolErrorAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Access not allowed: {}", exceptionToString(ex, request));
+      log.debug(
+          "Access not allowed: {}", exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
 
       return null;
     }
@@ -92,7 +94,7 @@ public class ProtocolErrorAdvice {
     final var messageText =
         exceptionMessage != null ? exceptionMessage : ProtocolErrorCodes.ACCESS_NOT_ALLOWED;
 
-    log.info(exceptionToString(ex, request));
+    log.info(exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
 
     return ResponseEntity.status(HttpStatus.FORBIDDEN)
         .contentType(this.errors.contentType(request))
@@ -106,11 +108,12 @@ public class ProtocolErrorAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Invalid storage path: {}", exceptionToString(ex, request));
+      log.debug(
+          "Invalid storage path: {}", exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
       return null;
     }
 
-    log.info(exceptionToString(ex, request));
+    log.info(exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
 
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
         .contentType(this.errors.contentType(request))
@@ -129,7 +132,7 @@ public class ProtocolErrorAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Bad request: {}", exceptionToString(ex, request));
+      log.debug("Bad request: {}", exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
 
       return null;
     }
@@ -138,7 +141,7 @@ public class ProtocolErrorAdvice {
     final var messageText =
         exceptionMessage != null ? exceptionMessage : ProtocolErrorCodes.BAD_REQUEST;
 
-    log.info(exceptionToString(ex, request));
+    log.info(exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
 
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
         .contentType(this.errors.contentType(request))
@@ -152,7 +155,9 @@ public class ProtocolErrorAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.warn("PGP Verification Exception: {}", exceptionToString(ex, request));
+      log.warn(
+          "PGP Verification Exception: {}",
+          exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
 
       return null;
     }
@@ -163,7 +168,7 @@ public class ProtocolErrorAdvice {
             ? exceptionMessage
             : ProtocolErrorCodes.ARTIFACT_SIGNATURE_NOT_VERIFIED;
 
-    log.info(exceptionToString(ex, request));
+    log.info(exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
 
     return ResponseEntity.status(UNPROCESSABLE_ENTITY)
         .contentType(this.errors.contentType(request))
@@ -177,7 +182,8 @@ public class ProtocolErrorAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("An error occurred: {}", exceptionToString(ex, request));
+      log.debug(
+          "An error occurred: {}", exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
 
       return null;
     }
@@ -186,7 +192,7 @@ public class ProtocolErrorAdvice {
     final var messageText =
         exceptionMessage != null ? exceptionMessage : ProtocolErrorCodes.ERROR_OCCURRED;
 
-    log.error(exceptionToString(ex, request));
+    log.error(exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
 
     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
         .contentType(this.errors.contentType(request))
@@ -202,7 +208,8 @@ public class ProtocolErrorAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Redirect to path: {}", exceptionToString(ex, request));
+      log.debug(
+          "Redirect to path: {}", exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
 
       return null;
     }
@@ -210,7 +217,7 @@ public class ProtocolErrorAdvice {
     final var headers = new HttpHeaders();
     headers.add("Location", ex.getPath());
 
-    log.info(exceptionToString(ex, request));
+    log.info(exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
 
     return ResponseEntity.status(HttpStatus.MOVED_PERMANENTLY)
         .contentType(this.errors.contentType(request))
@@ -227,7 +234,7 @@ public class ProtocolErrorAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Item not found: {}", exceptionToString(ex, request));
+      log.debug("Item not found: {}", exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
 
       return null;
     }
@@ -236,7 +243,7 @@ public class ProtocolErrorAdvice {
     final var messageText =
         exceptionMessage != null ? exceptionMessage : ProtocolErrorCodes.ITEM_NOT_FOUND;
 
-    log.info(exceptionToString(ex, request));
+    log.info(exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
 
     return ResponseEntity.status(HttpStatus.NOT_FOUND)
         .contentType(this.errors.contentType(request))
@@ -250,7 +257,8 @@ public class ProtocolErrorAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Unauthorized request: {}", exceptionToString(ex, request));
+      log.debug(
+          "Unauthorized request: {}", exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
 
       return null;
     }
@@ -264,7 +272,7 @@ public class ProtocolErrorAdvice {
       response.addHeader(HttpHeaders.WWW_AUTHENTICATE, ErrorResponseService.PANEL_AUTH_CHALLENGE);
     }
 
-    log.info(exceptionToString(ex, request));
+    log.info(exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
 
     return this.unauthorizedBody(request, ex);
   }
@@ -316,7 +324,8 @@ public class ProtocolErrorAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Too many requests: {}", exceptionToString(ex, request));
+      log.debug(
+          "Too many requests: {}", exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
       return null;
     }
 
@@ -337,7 +346,8 @@ public class ProtocolErrorAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Item already exists: {}", exceptionToString(ex, request));
+      log.debug(
+          "Item already exists: {}", exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
       return null;
     }
 
@@ -345,7 +355,7 @@ public class ProtocolErrorAdvice {
     final var messageText =
         exceptionMessage != null ? exceptionMessage : ProtocolErrorCodes.ITEM_ALREADY_EXISTS;
 
-    log.info(exceptionToString(ex, request));
+    log.info(exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
 
     return ResponseEntity.status(HttpStatus.CONFLICT)
         .contentType(this.errors.contentType(request))
@@ -383,7 +393,9 @@ public class ProtocolErrorAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Data integrity violation: {}", exceptionToString(ex, request));
+      log.debug(
+          "Data integrity violation: {}",
+          exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
       return null;
     }
 
@@ -402,7 +414,10 @@ public class ProtocolErrorAdvice {
       return this.handleUnexpectedException(ex, request, response);
     }
 
-    log.warn("Constraint violation (SQL state {}): {}", sqlState, exceptionToString(ex, request));
+    log.warn(
+        "Constraint violation (SQL state {}): {}",
+        sqlState,
+        exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
 
     return ResponseEntity.status(status)
         .contentType(this.errors.contentType(request))
@@ -445,11 +460,14 @@ public class ProtocolErrorAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Optimistic lock failure: {}", exceptionToString(ex, request));
+      log.debug(
+          "Optimistic lock failure: {}",
+          exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
       return null;
     }
 
-    log.warn("Optimistic lock failure: {}", exceptionToString(ex, request));
+    log.warn(
+        "Optimistic lock failure: {}", exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
 
     if (!this.errors.isPanelRequest(request)) {
       return this.errors.retryLater(
@@ -498,11 +516,15 @@ public class ProtocolErrorAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Database lock unavailable: {}", exceptionToString(ex, request));
+      log.debug(
+          "Database lock unavailable: {}",
+          exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
       return null;
     }
 
-    log.warn("Database lock unavailable: {}", exceptionToString(ex, request));
+    log.warn(
+        "Database lock unavailable: {}",
+        exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
 
     return this.errors.retryLater(
         this.errors.error(
@@ -530,11 +552,12 @@ public class ProtocolErrorAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Storage unavailable: {}", exceptionToString(ex, request));
+      log.debug(
+          "Storage unavailable: {}", exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
       return null;
     }
 
-    log.error(exceptionToString(ex, request));
+    log.error(exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
 
     if (response.isCommitted()) {
       log.warn("Response already committed, skipping error body write for a storage failure");
@@ -556,11 +579,13 @@ public class ProtocolErrorAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Retryable request failure: {}", exceptionToString(ex, request));
+      log.debug(
+          "Retryable request failure: {}",
+          exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
       return null;
     }
 
-    log.info(exceptionToString(ex, request));
+    log.info(exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
 
     return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
         .contentType(this.errors.contentType(request))

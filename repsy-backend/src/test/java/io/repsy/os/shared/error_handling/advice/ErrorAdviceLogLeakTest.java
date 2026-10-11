@@ -180,4 +180,72 @@ class ErrorAdviceLogLeakTest {
     assertThat(this.logEvents.list)
         .anyMatch(event -> event.getFormattedMessage().contains("HTTP 400"));
   }
+
+  private static MockHttpServletRequest requestWithSecretPath() {
+    final var request = new MockHttpServletRequest("DELETE", "/-/user/token/" + SECRET);
+    request.setRequestURI("/-/user/token/" + SECRET);
+    return request;
+  }
+
+  @Test
+  @DisplayName("a secret in the path is masked: panel advice, with and without a response")
+  void panelMasksPathSecret() {
+    this.panel.handleConversionFailed(conversionFailed(), requestWithSecretPath(), null);
+    this.panel.handleConversionFailed(
+        conversionFailed(), requestWithSecretPath(), new MockHttpServletResponse());
+
+    assertNothingLoggedSecret();
+    assertThat(this.logEvents.list)
+        .anyMatch(event -> event.getFormattedMessage().contains("/-/user/token/***"));
+  }
+
+  @Test
+  @DisplayName("a secret in the path is masked: protocol advice, with and without a response")
+  void protocolMasksPathSecret() {
+    this.protocol.handleDataIntegrityViolation(integrityViolation(), requestWithSecretPath(), null);
+    this.protocol.handleDataIntegrityViolation(
+        integrityViolation(), requestWithSecretPath(), new MockHttpServletResponse());
+
+    assertNothingLoggedSecret();
+  }
+
+  @Test
+  @DisplayName("a secret in the path is masked: fallback, with and without a response")
+  void fallbackMasksPathSecret() {
+    this.errors.fallback(integrityViolation(), requestWithSecretPath(), null);
+    this.errors.fallback(
+        integrityViolation(), requestWithSecretPath(), new MockHttpServletResponse());
+
+    assertNothingLoggedSecret();
+  }
+
+  @Test
+  @DisplayName("a secret in the path is masked in the upstream-failure log line")
+  void fallbackUpstreamMasksPathSecret() {
+    final var upstream =
+        HttpClientErrorException.create(
+            HttpStatus.BAD_REQUEST, "Bad Request", new HttpHeaders(), new byte[0], UTF_8);
+
+    this.errors.fallback(upstream, requestWithSecretPath(), new MockHttpServletResponse());
+
+    assertNothingLoggedSecret();
+    assertThat(this.logEvents.list)
+        .anyMatch(event -> event.getFormattedMessage().contains("/-/user/token/***"));
+  }
+
+  @Test
+  @DisplayName("a request without a secret in the path is logged unchanged")
+  void plainPathUnchanged() {
+    final var request = new MockHttpServletRequest("GET", "/maven/releases/a/b.jar");
+    request.setRequestURI("/maven/releases/a/b.jar");
+
+    this.errors.fallback(
+        HttpClientErrorException.create(
+            HttpStatus.BAD_REQUEST, "Bad Request", new HttpHeaders(), new byte[0], UTF_8),
+        request,
+        new MockHttpServletResponse());
+
+    assertThat(this.logEvents.list)
+        .anyMatch(event -> event.getFormattedMessage().contains("GET /maven/releases/a/b.jar"));
+  }
 }

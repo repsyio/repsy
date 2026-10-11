@@ -20,6 +20,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.google.common.base.Ticker;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
@@ -51,9 +55,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.client.ClientHttpResponse;
+import org.springframework.web.client.ResourceAccessException;
 
 /**
  * The detached-signature check of a Maven upload, with real OpenPGP signatures and a key server
@@ -435,6 +441,45 @@ class PgpVerifierServiceTest {
                 this.serviceWithTheKey()
                     .verify(new ByteArrayResource(POM), signature, noRegisteredKeys()))
         .doesNotThrowAnyException();
+  }
+
+  @Test
+  @DisplayName("keeps credentials of a key server URL out of the log (RPS-2179)")
+  void masksKeyServerCredentialsInTheLog() {
+    final var secret = "s3cr3t-token-value";
+    final var logger = (Logger) LoggerFactory.getLogger(PgpVerifierService.class);
+    final var appender = new ListAppender<ILoggingEvent>();
+    final var originalLevel = logger.getLevel();
+    appender.start();
+    logger.setLevel(Level.TRACE);
+    logger.addAppender(appender);
+
+    try {
+      final var signature = resource(keys.detachedSignature(POM));
+
+      assertThatThrownBy(
+              () ->
+                  this.serviceAnswering(
+                          uri -> {
+                            throw new ResourceAccessException(
+                                "I/O error on GET request for \"" + uri + "\": refused");
+                          })
+                      .verify(
+                          new ByteArrayResource(POM),
+                          signature,
+                          hosts("bob:" + secret + "@keys.acme.com")))
+          .isInstanceOf(ItemNotFoundException.class);
+    } finally {
+      logger.detachAppender(appender);
+      logger.setLevel(originalLevel);
+      appender.stop();
+    }
+
+    assertThat(appender.list)
+        .isNotEmpty()
+        .allSatisfy(event -> assertThat(event.getFormattedMessage()).doesNotContain(secret));
+    assertThat(appender.list)
+        .anyMatch(event -> event.getFormattedMessage().contains("Failed to fetch key"));
   }
 
   @Test
