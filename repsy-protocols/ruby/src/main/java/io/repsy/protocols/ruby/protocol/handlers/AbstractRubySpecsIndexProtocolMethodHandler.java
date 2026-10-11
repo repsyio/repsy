@@ -30,13 +30,11 @@ import java.io.UncheckedIOException;
 import java.util.Objects;
 import java.util.Set;
 import java.util.zip.GZIPOutputStream;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
-@NullMarked
 public abstract class AbstractRubySpecsIndexProtocolMethodHandler
     extends AbstractFacadeProtocolMethodHandler<RubyProtocolFacade> {
 

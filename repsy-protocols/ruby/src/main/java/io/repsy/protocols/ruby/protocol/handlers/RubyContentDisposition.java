@@ -18,7 +18,6 @@ package io.repsy.protocols.ruby.protocol.handlers;
 import io.repsy.protocols.shared.http.ResourceResponses;
 import java.util.Set;
 import java.util.regex.Pattern;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -35,7 +34,6 @@ import org.jspecify.annotations.Nullable;
  *   <li>{@code /names} and {@code /versions} have no extension and need nothing.
  * </ul>
  */
-@NullMarked
 final class RubyContentDisposition {
 
   private static final Pattern GEM_PATTERN = Pattern.compile("^/gems/.+\\.gem$");

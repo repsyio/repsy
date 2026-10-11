@@ -17,12 +17,11 @@ package io.repsy.os.server.protocols.golang.shared.go_module.dtos;
 
 import java.time.Instant;
 import java.util.UUID;
-import org.jspecify.annotations.NonNull;
 
 public interface GoModuleListItem {
-  @NonNull UUID getId();
+  UUID getId();
 
-  @NonNull String getModulePath();
+  String getModulePath();
 
-  @NonNull Instant getCreatedAt();
+  Instant getCreatedAt();
 }

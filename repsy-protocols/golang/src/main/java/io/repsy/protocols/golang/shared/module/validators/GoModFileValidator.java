@@ -20,10 +20,8 @@ import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.nio.charset.StandardCharsets;
 import java.util.regex.Pattern;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 
 @UtilityClass
-@NullMarked
 public class GoModFileValidator {
 
   private static final Pattern MODULE_DIRECTIVE =

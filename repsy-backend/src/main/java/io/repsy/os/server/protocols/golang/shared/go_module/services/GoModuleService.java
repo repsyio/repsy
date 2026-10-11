@@ -46,7 +46,6 @@ import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -58,7 +57,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
-@NullMarked
 public class GoModuleService extends AbstractGoModuleService<UUID> {
 
   /** The unique index on (module, version), created in {@code V0002__Golang_Protocol.sql}. */

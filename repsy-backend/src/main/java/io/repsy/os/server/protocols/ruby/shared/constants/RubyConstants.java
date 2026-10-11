@@ -17,9 +17,7 @@ package io.repsy.os.server.protocols.ruby.shared.constants;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
-import org.jspecify.annotations.NullMarked;
 
-@NullMarked
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class RubyConstants {
 

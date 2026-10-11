@@ -18,12 +18,10 @@ package io.repsy.protocols.ruby.shared.gem.dtos;
 import java.util.List;
 import lombok.Builder;
 import lombok.Value;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 @Value
 @Builder
-@NullMarked
 public class GemMetadata {
 
   String name;

@@ -22,6 +22,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -68,7 +69,8 @@ public interface RubyGemRepository extends JpaRepository<RubyGem, UUID> {
         and (:name is null or lower(g.name) like :name escape '\\')
       group by g.id, g.name, g.latest
       """)
-  Page<GemListItem> findAllByRepoIdContainsName(UUID repoId, String name, Pageable pageable);
+  Page<GemListItem> findAllByRepoIdContainsName(
+      UUID repoId, @Nullable String name, Pageable pageable);
 
   @Query("select g from RubyGem g where g.repo.id = :repoId order by g.name")
   List<RubyGem> findAllByRepoId(UUID repoId);

@@ -25,7 +25,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.Arrays;
 import java.util.List;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -38,7 +37,6 @@ import org.springframework.http.ResponseEntity;
  * (RPS-1554). Before this handler existed, the request matched no route and answered {@code 404
  * unknownPath}, so {@code dumpDependencies} was dead code with nothing serving it.
  */
-@NullMarked
 public abstract class AbstractRubyDependenciesProtocolMethodHandler
     extends AbstractFacadeProtocolMethodHandler<RubyProtocolFacade> {
 

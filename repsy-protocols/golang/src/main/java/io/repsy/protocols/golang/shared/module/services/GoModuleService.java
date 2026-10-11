@@ -19,10 +19,8 @@ import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.IOException;
 import java.util.Optional;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
-@NullMarked
 public interface GoModuleService<I> {
 
   /**

@@ -19,11 +19,9 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Instant;
 import lombok.Builder;
 import lombok.Data;
-import org.jspecify.annotations.NullMarked;
 
 @Data
 @Builder
-@NullMarked
 public class GoVersionInfo {
 
   @JsonProperty("Version")

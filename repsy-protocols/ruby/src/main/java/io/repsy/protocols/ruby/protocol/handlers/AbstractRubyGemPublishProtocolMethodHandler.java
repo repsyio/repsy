@@ -26,13 +26,11 @@ import io.repsy.protocols.shared.utils.SpooledUpload;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
-@NullMarked
 public abstract class AbstractRubyGemPublishProtocolMethodHandler
     extends AbstractFacadeProtocolMethodHandler<RubyProtocolFacade> {
 

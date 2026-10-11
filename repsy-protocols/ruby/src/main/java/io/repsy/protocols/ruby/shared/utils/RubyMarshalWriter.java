@@ -24,11 +24,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 
 /** Encodes gem dependency lists as Ruby Marshal 4.8 streams for the legacy /api/v1/dependencies. */
 @UtilityClass
-@NullMarked
 public class RubyMarshalWriter {
 
   private static final byte[] EMPTY_ARRAY = {0x04, 0x08, 0x5b, 0x00};

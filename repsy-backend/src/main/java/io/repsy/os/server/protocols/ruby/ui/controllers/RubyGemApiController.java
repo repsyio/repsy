@@ -31,7 +31,6 @@ import io.repsy.os.shared.utils.MultiPortNames;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.data.web.PagedModel;
@@ -47,7 +46,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/ruby/gems")
-@NullMarked
 public class RubyGemApiController {
 
   private static final Set<String> GEM_SORT_PROPERTIES = Set.of("id", "name", "updatedAt");

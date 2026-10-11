@@ -15,8 +15,5 @@
  */
 package io.repsy.protocols.ruby.shared.gem.dtos;
 
-import org.jspecify.annotations.NullMarked;
-
 /** Carries the comma-separated version list and the /info MD5 checksum for one gem. */
-@NullMarked
 public record GemVersionsEntry(String versionsCsv, String checksum) {}

@@ -39,11 +39,9 @@ import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 
 @Slf4j
-@NullMarked
 @RequiredArgsConstructor
 public abstract class AbstractRubyProtocolFacade<ID> implements RubyProtocolFacade {
 

@@ -20,12 +20,10 @@ import io.repsy.protocols.golang.protocol.GolangProtocolProvider;
 import io.repsy.protocols.golang.protocol.facades.contracts.GoProtocolFacade;
 import io.repsy.protocols.golang.protocol.handlers.AbstractGoDownloadProtocolMethodHandler;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 @Component
-@NullMarked
 public class GoDownloadProtocolMethodHandler extends AbstractGoDownloadProtocolMethodHandler<UUID> {
 
   public GoDownloadProtocolMethodHandler(

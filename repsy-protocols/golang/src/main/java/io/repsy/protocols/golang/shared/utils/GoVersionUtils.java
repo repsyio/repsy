@@ -23,12 +23,10 @@ import java.util.Set;
 import java.util.regex.Pattern;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 @Slf4j
 @UtilityClass
-@NullMarked
 public class GoVersionUtils {
 
   // The limits of the varchar columns a module upload is stored in (RPS-1072). PostgreSQL and H2

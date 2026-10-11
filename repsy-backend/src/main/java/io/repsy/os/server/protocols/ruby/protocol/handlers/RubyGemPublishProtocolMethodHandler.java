@@ -19,14 +19,12 @@ import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.protocols.ruby.protocol.RubyProtocolProvider;
 import io.repsy.protocols.ruby.protocol.facades.contracts.RubyProtocolFacade;
 import io.repsy.protocols.ruby.protocol.handlers.AbstractRubyGemPublishProtocolMethodHandler;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.util.unit.DataSize;
 
 @Component
-@NullMarked
 public class RubyGemPublishProtocolMethodHandler
     extends AbstractRubyGemPublishProtocolMethodHandler {
 

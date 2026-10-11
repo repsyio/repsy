@@ -13,7 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@NullMarked
 @ApplicationModule(displayName = "Ruby Shared", type = ApplicationModule.Type.OPEN)
 package io.repsy.os.server.protocols.ruby.shared;
 
+import org.jspecify.annotations.NullMarked;
 import org.springframework.modulith.ApplicationModule;

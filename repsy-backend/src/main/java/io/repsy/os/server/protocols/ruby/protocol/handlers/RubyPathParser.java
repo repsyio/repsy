@@ -18,11 +18,9 @@ package io.repsy.os.server.protocols.ruby.protocol.handlers;
 import io.repsy.os.server.protocols.shared.handlers.AbstractRepoPathParser;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
 @Component("osRubyPathParser")
-@NullMarked
 public class RubyPathParser extends AbstractRepoPathParser {
 
   public RubyPathParser(final RepoTxService repoTxService) {

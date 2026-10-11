@@ -28,7 +28,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
@@ -38,7 +37,6 @@ import org.springframework.stereotype.Component;
 
 /** Go: Basic or Bearer, every refusal answered as text the go command prints. */
 @Component
-@NullMarked
 public class GoAuthPreProcessor extends BasicOrBearerAuthPreProcessor<GoAuthenticator> {
 
   private final MessageSource messageSource;

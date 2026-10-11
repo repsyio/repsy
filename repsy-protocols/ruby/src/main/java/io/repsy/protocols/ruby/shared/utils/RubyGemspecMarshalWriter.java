@@ -24,7 +24,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * Produces a Ruby Marshal 4.8 byte stream for a minimal Gem::Specification, suitable for serving
@@ -39,7 +38,6 @@ import org.jspecify.annotations.NullMarked;
  * rely on the fixed prefix always emitting exactly the same sequence of objects and symbols.
  */
 @UtilityClass
-@NullMarked
 public class RubyGemspecMarshalWriter {
 
   // Outer wrapper: 04 08 75 3a 17 "Gem::Specification"

@@ -17,15 +17,14 @@ package io.repsy.os.server.protocols.golang.shared.go_module.dtos;
 
 import java.time.Instant;
 import java.util.UUID;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 public interface GoModuleVersionListItem {
-  @NonNull UUID getId();
+  UUID getId();
 
-  @NonNull String getVersion();
+  String getVersion();
 
   @Nullable String getGoVersion();
 
-  @NonNull Instant getCreatedAt();
+  Instant getCreatedAt();
 }

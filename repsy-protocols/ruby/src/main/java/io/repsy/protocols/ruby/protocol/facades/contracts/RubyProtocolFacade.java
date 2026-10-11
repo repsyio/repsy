@@ -19,10 +19,8 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.shared.utils.SpooledUpload;
 import java.io.IOException;
 import java.util.List;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 
-@NullMarked
 public interface RubyProtocolFacade {
 
   String getNames(ProtocolContext context);

@@ -18,13 +18,11 @@ package io.repsy.os.server.protocols.ruby.shared.storage.services;
 import io.repsy.protocols.ruby.shared.storage.services.AbstractRubyStorageService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import io.repsy.protocols.shared.storage.StorageStrategyRegistry;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional(readOnly = true)
-@NullMarked
 public class RubyStorageService extends AbstractRubyStorageService {
 
   public RubyStorageService(final StorageStrategyRegistry storageStrategyRegistry) {

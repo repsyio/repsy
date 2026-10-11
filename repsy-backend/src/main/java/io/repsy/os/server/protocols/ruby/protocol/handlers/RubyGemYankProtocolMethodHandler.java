@@ -19,12 +19,10 @@ import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.protocols.ruby.protocol.RubyProtocolProvider;
 import io.repsy.protocols.ruby.protocol.facades.contracts.RubyProtocolFacade;
 import io.repsy.protocols.ruby.protocol.handlers.AbstractRubyGemYankProtocolMethodHandler;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 @Component
-@NullMarked
 public class RubyGemYankProtocolMethodHandler extends AbstractRubyGemYankProtocolMethodHandler {
 
   public RubyGemYankProtocolMethodHandler(
