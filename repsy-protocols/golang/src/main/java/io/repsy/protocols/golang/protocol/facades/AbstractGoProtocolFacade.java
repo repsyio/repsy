@@ -44,7 +44,6 @@ import java.util.Locale;
 import java.util.stream.Collectors;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.event.Level;
 import org.springframework.core.io.ByteArrayResource;
@@ -55,7 +54,6 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.cfg.DateTimeFeature;
 import tools.jackson.databind.json.JsonMapper;
 
-@NullMarked
 @Slf4j
 public abstract class AbstractGoProtocolFacade<ID> implements GoProtocolFacade<ID> {
 

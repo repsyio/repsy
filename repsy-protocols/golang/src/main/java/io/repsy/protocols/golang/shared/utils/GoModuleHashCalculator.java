@@ -31,7 +31,6 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import lombok.SneakyThrows;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * Calculates Go module {@code h1:} hashes exactly as {@code golang.org/x/mod/sumdb/dirhash}'s
@@ -48,7 +47,6 @@ import org.jspecify.annotations.NullMarked;
  * against its own {@code go.sum}, so only new uploads get a hash it would recognise.
  */
 @UtilityClass
-@NullMarked
 public class GoModuleHashCalculator {
 
   private static final String H1_PREFIX = "h1:";

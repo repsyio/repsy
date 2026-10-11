@@ -19,10 +19,8 @@ import io.repsy.os.server.protocols.ruby.shared.ruby_gem.services.RubyGemService
 import io.repsy.os.server.protocols.ruby.shared.storage.services.RubyStorageService;
 import io.repsy.protocols.ruby.protocol.facades.AbstractRubyProtocolFacade;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
-@NullMarked
 @Component
 public class RubyProtocolFacade extends AbstractRubyProtocolFacade<UUID> {
 

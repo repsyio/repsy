@@ -18,12 +18,10 @@ package io.repsy.os.server.protocols.ruby.protocol.pre_processors;
 import io.repsy.os.server.protocols.ruby.shared.auth.services.RubyAuthenticator;
 import io.repsy.os.server.shared.auth.BasicOrBearerAuthPreProcessor;
 import io.repsy.protocols.ruby.protocol.RubyProtocolProvider;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
 /** RubyGems: Basic or Bearer; {@code gem push} sends its API key without a scheme. */
 @Component
-@NullMarked
 public class RubyAuthPreProcessor extends BasicOrBearerAuthPreProcessor<RubyAuthenticator> {
 
   public RubyAuthPreProcessor(

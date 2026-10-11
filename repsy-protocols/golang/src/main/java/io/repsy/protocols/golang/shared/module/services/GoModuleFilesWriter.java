@@ -17,14 +17,12 @@ package io.repsy.protocols.golang.shared.module.services;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import java.io.IOException;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * Writes the files of a Go module version. Run by {@link GoModuleService#publishModule} while the
  * version's row is written but not yet committed: a failure rolls the row back.
  */
 @FunctionalInterface
-@NullMarked
 public interface GoModuleFilesWriter {
 
   /**

@@ -25,7 +25,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.stream.Collectors;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * Encodes gem version lists as Ruby Marshal 4.8 streams for specs.4.8.gz, latest_specs.4.8.gz, and
@@ -33,7 +32,6 @@ import org.jspecify.annotations.NullMarked;
  * must compress the returned bytes with zlib deflate before serving.
  */
 @UtilityClass
-@NullMarked
 public class RubySpecsIndexWriter {
 
   private static final int MARSHAL_MAJOR = 0x04;

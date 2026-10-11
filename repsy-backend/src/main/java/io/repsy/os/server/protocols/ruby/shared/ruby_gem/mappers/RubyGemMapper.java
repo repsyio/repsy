@@ -23,12 +23,10 @@ import io.repsy.os.server.protocols.ruby.shared.ruby_gem.entities.RubyGemDepende
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.entities.RubyGemVersion;
 import io.repsy.os.shared.repo.entities.Repo;
 import java.util.List;
-import org.jspecify.annotations.NullMarked;
 import org.mapstruct.Mapper;
 import org.mapstruct.MappingConstants;
 
 @Mapper(componentModel = MappingConstants.ComponentModel.SPRING)
-@NullMarked
 public interface RubyGemMapper {
 
   io.repsy.os.generated.model.GemListItem toGemListItemDto(GemListItem source);

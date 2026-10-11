@@ -25,7 +25,6 @@ import io.repsy.os.server.protocols.shared.services.ProtocolApiFacade;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
@@ -36,37 +35,33 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class GoApiFacade implements ProtocolApiFacade {
 
-  private final @NonNull GoStorageService golangStorageService;
-  private final @NonNull GoModuleService goModuleService;
+  private final GoStorageService golangStorageService;
+  private final GoModuleService goModuleService;
 
   @Transactional
   @Override
-  public void createRepo(final @NonNull UUID repoId) {
+  public void createRepo(final UUID repoId) {
     this.golangStorageService.createRepo(repoId);
   }
 
   @Transactional
   @Override
-  public void deleteRepo(final @NonNull RepoInfo repoInfo) {
+  public void deleteRepo(final RepoInfo repoInfo) {
 
     this.golangStorageService.deleteRepo(repoInfo.getStorageKey());
   }
 
-  public @NonNull Page<GoModuleListItem> searchModules(
-      final @NonNull UUID repoId, final @NonNull String search, final @NonNull Pageable pageable) {
+  public Page<GoModuleListItem> searchModules(
+      final UUID repoId, final String search, final Pageable pageable) {
     return this.goModuleService.getModulesContainsPath(repoId, search, pageable);
   }
 
-  public @NonNull Page<GoModuleVersionListItem> getModuleVersions(
-      final @NonNull UUID repoId,
-      final @NonNull String modulePath,
-      final @NonNull String search,
-      final @NonNull Pageable pageable) {
+  public Page<GoModuleVersionListItem> getModuleVersions(
+      final UUID repoId, final String modulePath, final String search, final Pageable pageable) {
     return this.goModuleService.getModuleVersions(repoId, modulePath, search, pageable);
   }
 
-  public @NonNull GoModuleInfo getModuleInfo(
-      final @NonNull UUID repoId, final @NonNull String modulePath) {
+  public GoModuleInfo getModuleInfo(final UUID repoId, final String modulePath) {
     return this.goModuleService.getModuleInfo(repoId, modulePath);
   }
 
@@ -77,8 +72,7 @@ public class GoApiFacade implements ProtocolApiFacade {
    * @return the usage the deletion frees, to be given back to the repo
    */
   @Transactional
-  public @NonNull BaseUsages deleteModule(
-      final @NonNull RepoInfo repoInfo, final @NonNull String modulePath) {
+  public BaseUsages deleteModule(final RepoInfo repoInfo, final String modulePath) {
     return this.goModuleService.deleteModule(repoInfo, modulePath);
   }
 
@@ -88,10 +82,8 @@ public class GoApiFacade implements ProtocolApiFacade {
    * @return the usage the deletion frees, to be given back to the repo
    */
   @Transactional
-  public @NonNull BaseUsages deleteModuleVersion(
-      final @NonNull RepoInfo repoInfo,
-      final @NonNull String modulePath,
-      final @NonNull String version) {
+  public BaseUsages deleteModuleVersion(
+      final RepoInfo repoInfo, final String modulePath, final String version) {
     return this.goModuleService.deleteModuleVersion(repoInfo, modulePath, version);
   }
 }

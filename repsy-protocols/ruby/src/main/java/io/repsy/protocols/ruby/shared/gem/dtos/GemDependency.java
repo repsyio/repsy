@@ -17,11 +17,9 @@ package io.repsy.protocols.ruby.shared.gem.dtos;
 
 import lombok.Builder;
 import lombok.Value;
-import org.jspecify.annotations.NullMarked;
 
 @Value
 @Builder
-@NullMarked
 public class GemDependency {
 
   String name;

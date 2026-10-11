@@ -24,9 +24,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import org.jspecify.annotations.NullMarked;
 
-@NullMarked
 public interface RubyGemProtocolService<ID> {
 
   List<String> getGemNames(BaseRepoInfo<ID> repoInfo);

@@ -18,7 +18,6 @@ package io.repsy.protocols.golang.protocol.handlers;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.shared.http.ResourceResponses;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -29,7 +28,6 @@ import org.springframework.http.ResponseEntity;
  * The headers a Go proxy path answers with, shared by the {@code GET} and the {@code HEAD} handler
  * so the two cannot drift (RPS-1465).
  */
-@NullMarked
 final class GoDownloadResponses {
 
   private GoDownloadResponses() {

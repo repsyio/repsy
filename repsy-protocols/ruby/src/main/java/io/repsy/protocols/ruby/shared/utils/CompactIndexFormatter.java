@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import lombok.experimental.UtilityClass;
 import org.apache.commons.codec.digest.DigestUtils;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * Generates Compact Index response bodies for /versions, /info/&lt;gem&gt;, and /names.
@@ -33,7 +32,6 @@ import org.jspecify.annotations.NullMarked;
  * <p>All responses include a preamble: {@code created_at: <ISO8601>\n---\n}.
  */
 @UtilityClass
-@NullMarked
 public class CompactIndexFormatter {
 
   private static final String SEPARATOR = "---";

@@ -16,11 +16,9 @@
 package io.repsy.protocols.ruby.protocol;
 
 import io.repsy.libs.protocol.router.ProtocolProvider;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
 @Component
-@NullMarked
 public class RubyProtocolProvider extends ProtocolProvider {
 
   @Override

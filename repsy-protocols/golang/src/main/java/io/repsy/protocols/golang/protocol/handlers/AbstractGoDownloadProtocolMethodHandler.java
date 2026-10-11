@@ -25,11 +25,9 @@ import io.repsy.protocols.shared.handlers.HandlerRoute;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 
-@NullMarked
 public abstract class AbstractGoDownloadProtocolMethodHandler<ID>
     extends AbstractFacadeProtocolMethodHandler<GoProtocolFacade<ID>> {
 

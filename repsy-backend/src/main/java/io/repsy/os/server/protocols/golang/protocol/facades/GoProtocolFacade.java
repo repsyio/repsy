@@ -19,13 +19,11 @@ import io.repsy.os.server.protocols.golang.shared.go_module.services.GoModuleSer
 import io.repsy.os.server.protocols.golang.shared.storage.services.GoStorageService;
 import io.repsy.protocols.golang.protocol.facades.AbstractGoProtocolFacade;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.util.unit.DataSize;
 
 @Component
-@NullMarked
 public class GoProtocolFacade extends AbstractGoProtocolFacade<UUID> {
 
   public GoProtocolFacade(

@@ -23,11 +23,9 @@ import java.io.InputStream;
 import java.util.zip.ZipInputStream;
 import lombok.SneakyThrows;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 
 /** Reads the {@code go.mod} out of an uploaded module zip. */
 @UtilityClass
-@NullMarked
 public class GoModuleZipReader {
 
   /**

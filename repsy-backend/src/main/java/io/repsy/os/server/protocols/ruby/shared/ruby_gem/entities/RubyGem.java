@@ -38,7 +38,6 @@ import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 @Data
@@ -73,5 +72,5 @@ public class RubyGem {
   private Instant createdAt;
 
   @OneToMany(mappedBy = "gem", cascade = CascadeType.ALL, orphanRemoval = true)
-  private @NonNull Set<RubyGemVersion> versions = new HashSet<>();
+  private Set<RubyGemVersion> versions = new HashSet<>();
 }

@@ -19,11 +19,9 @@ import java.time.Instant;
 import java.util.UUID;
 import lombok.Builder;
 import lombok.Value;
-import org.jspecify.annotations.NullMarked;
 
 @Value
 @Builder
-@NullMarked
 public class GemInfo {
   UUID id;
   String repoName;

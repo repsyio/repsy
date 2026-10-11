@@ -37,7 +37,6 @@ import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 @Data
@@ -86,7 +85,7 @@ public class RubyGemVersion {
   private Instant createdAt;
 
   @OneToMany(mappedBy = "gemVersion", cascade = CascadeType.ALL, orphanRemoval = true)
-  private @NonNull Set<RubyGemDependency> dependencies = new HashSet<>();
+  private Set<RubyGemDependency> dependencies = new HashSet<>();
 
   /**
    * Identifier-based equality: two ruby gem versions are equal when they are the same instance or

@@ -23,10 +23,8 @@ import io.repsy.protocols.shared.storage.AbstractArtifactStorageService;
 import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.InputStream;
 import java.nio.file.Paths;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 
-@NullMarked
 public abstract class AbstractRubyStorageService extends AbstractArtifactStorageService
     implements RubyStorageService {
 

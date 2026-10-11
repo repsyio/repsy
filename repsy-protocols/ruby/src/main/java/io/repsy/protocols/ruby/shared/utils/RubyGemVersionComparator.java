@@ -21,7 +21,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * Orders RubyGems version strings the way {@code Gem::Version#<=>} does (RPS-1688, the RubyGems
@@ -40,7 +39,6 @@ import org.jspecify.annotations.NullMarked;
  * {@code "1.0.0"} it precedes: comparing their third segment, {@code "rc"} against the implicit
  * {@code 0}, a string always loses to a number).
  */
-@NullMarked
 public class RubyGemVersionComparator implements Comparator<String> {
 
   private static final Pattern SEGMENT_PATTERN = Pattern.compile("[0-9]+|[A-Za-z]+");

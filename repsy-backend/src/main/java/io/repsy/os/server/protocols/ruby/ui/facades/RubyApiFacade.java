@@ -28,7 +28,6 @@ import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.shared.storage.RepoRef;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -37,7 +36,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Component
 @RequiredArgsConstructor
-@NullMarked
 public class RubyApiFacade implements ProtocolApiFacade {
 
   private final RubyGemService gemService;

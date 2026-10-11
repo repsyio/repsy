@@ -20,12 +20,10 @@ import io.repsy.protocols.shared.repo.dtos.RepoType;
 import io.repsy.protocols.shared.storage.StorageStrategyRegistry;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Service;
 
 @Slf4j
 @Service
-@NullMarked
 public class GoStorageService extends AbstractGoStorageService<UUID> {
 
   public GoStorageService(final StorageStrategyRegistry storageStrategyRegistry) {

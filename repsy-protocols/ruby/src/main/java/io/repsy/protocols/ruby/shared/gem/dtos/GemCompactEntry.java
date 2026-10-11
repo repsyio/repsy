@@ -19,12 +19,10 @@ import java.time.Instant;
 import java.util.List;
 import lombok.Builder;
 import lombok.Value;
-import org.jspecify.annotations.NullMarked;
 
 /** One version row for compact index /info/<gem> and /versions responses. */
 @Value
 @Builder
-@NullMarked
 public class GemCompactEntry {
 
   String gemName;

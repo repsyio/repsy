@@ -18,7 +18,6 @@ package io.repsy.protocols.ruby.shared.utils;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * Every plausible {@code (name, version, platform)} reading of a {@code <name>-<version>[-
@@ -31,7 +30,6 @@ import org.jspecify.annotations.NullMarked;
  * stored rows and keep the first (i.e. longest-name) match.
  */
 @UtilityClass
-@NullMarked
 public class GemFilenameCandidates {
 
   private static final String GEM_EXTENSION = ".gem";

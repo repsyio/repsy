@@ -39,7 +39,6 @@ import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.composer.Composer;
@@ -60,7 +59,6 @@ import org.yaml.snakeyaml.resolver.Resolver;
  */
 @Slf4j
 @UtilityClass
-@NullMarked
 public class GemspecParser {
 
   private static final String METADATA_ENTRY = "metadata.gz";
