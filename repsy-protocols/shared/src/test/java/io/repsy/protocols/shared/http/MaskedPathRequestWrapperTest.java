@@ -36,11 +36,11 @@ class MaskedPathRequestWrapperTest {
   }
 
   @Test
-  @DisplayName("masks the segment after a marker in the URI and the URL")
+  @DisplayName("masks every segment after a marker in the URI and the URL")
   void masksUriAndUrl() {
     final var wrapped = new MaskedPathRequestWrapper(request("/a/download-token/" + SECRET + "/b"));
 
-    assertThat(wrapped.getRequestURI()).isEqualTo("/a/download-token/***/b");
+    assertThat(wrapped.getRequestURI()).isEqualTo("/a/download-token/***/***");
     assertThat(wrapped.getRequestURL().toString())
         .doesNotContain(SECRET)
         .startsWith("http://repo.example.com");

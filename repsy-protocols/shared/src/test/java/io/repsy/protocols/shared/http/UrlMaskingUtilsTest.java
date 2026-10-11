@@ -164,12 +164,30 @@ class UrlMaskingUtilsTest {
   @ParameterizedTest
   @CsvSource({
     "/-/user/token/s3cr3t-token-value, /-/user/token/***",
-    "/api/repos/o/r/download-token/s3cr3t-token-value/x, /api/repos/o/r/download-token/***/x",
+    "/api/repos/o/r/download-token/s3cr3t-token-value/x, /api/repos/o/r/download-token/***/***",
     "/files/signed/s3cr3t-token-value, /files/signed/***",
     "/api/profile/access-tokens/42, /api/profile/access-tokens/42",
     "/api/surveys/7, /api/surveys/7"
   })
   void secretPathSegmentsAreMasked(final String path, final String expected) {
+    assertThat(UrlMaskingUtils.maskPath(path)).isEqualTo(expected);
+  }
+
+  // The container normalises the path before routing, the log keeps the raw URI (RPS-2203): every
+  // segment after a marker is masked, so a dot, empty or parameter segment cannot expose the
+  // secret.
+  @ParameterizedTest
+  @CsvSource({
+    "/-/user/token/./s3cr3t-token-value, /-/user/token/***/***",
+    "/token/x/../s3cr3t-token-value, /token/***/***/***",
+    "/token//s3cr3t-token-value, /token/***/***",
+    "/token/;a=1/s3cr3t-token-value, /token/***/***",
+    "/token/%2e/s3cr3t-token-value, /token/***/***",
+    "/token/%2E%2e/s3cr3t-token-value, /token/***/***",
+    "/token/, /token/***",
+    "/a/b/c, /a/b/c"
+  })
+  void everySegmentAfterAMarkerIsMasked(final String path, final String expected) {
     assertThat(UrlMaskingUtils.maskPath(path)).isEqualTo(expected);
   }
 

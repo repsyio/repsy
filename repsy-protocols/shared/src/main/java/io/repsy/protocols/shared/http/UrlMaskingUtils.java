@@ -76,10 +76,11 @@ public final class UrlMaskingUtils {
   }
 
   /**
-   * A request path made safe to log: the segment that follows a secret-bearing one ({@code
-   * /token/<secret>}) is replaced, URLs and control characters are handled as in {@link
-   * #mask(String)}, and the result is cut to a sane length. The query string is not part of a path
-   * and is never expected here.
+   * A request path made safe to log: every segment that follows a secret-bearing one ({@code
+   * /token/<secret>}) is replaced, because the container normalises {@code .}, {@code ..}, empty
+   * and {@code ;param} segments before routing and the secret need not be the next literal segment.
+   * URLs and control characters are handled as in {@link #mask(String)}, and the result is cut to a
+   * sane length. The query string is not part of a path and is never expected here.
    */
   public static @Nullable String maskPath(final @Nullable String path) {
     if (path == null || path.isEmpty()) {
@@ -88,9 +89,16 @@ public final class UrlMaskingUtils {
 
     final var segments = path.split("/", -1);
 
-    for (int i = 0; i < segments.length - 1; i++) {
-      if (SECRET_MARKERS.contains(markerForm(segments[i]))) {
-        segments[i + 1] = MASKED_SEGMENT;
+    // Fail closed: the container normalises the path before routing ('.', '..', empty and
+    // ';params' segments), so the secret is not always the literal next segment. Everything after
+    // a marker is masked.
+    boolean afterMarker = false;
+
+    for (int i = 0; i < segments.length; i++) {
+      if (afterMarker) {
+        segments[i] = MASKED_SEGMENT;
+      } else if (SECRET_MARKERS.contains(markerForm(segments[i]))) {
+        afterMarker = true;
       }
     }
 
