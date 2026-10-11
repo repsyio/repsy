@@ -21,11 +21,9 @@ import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
 import io.repsy.protocols.cargo.protocol.handlers.AbstractCargoMeProtocolMethodHandler;
 import java.util.Optional;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
 @Component
-@NullMarked
 public class CargoMeProtocolMethodHandler extends AbstractCargoMeProtocolMethodHandler {
 
   public CargoMeProtocolMethodHandler(

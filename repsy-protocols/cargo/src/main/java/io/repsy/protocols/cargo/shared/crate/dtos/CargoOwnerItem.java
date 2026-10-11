@@ -15,8 +15,6 @@
  */
 package io.repsy.protocols.cargo.shared.crate.dtos;
 
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
-@NullMarked
 public record CargoOwnerItem(long id, String login, @Nullable String name) {}

@@ -28,10 +28,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 
-@NullMarked
 public abstract class AbstractCargoStorageService extends AbstractArtifactStorageService
     implements CargoStorageService {
 

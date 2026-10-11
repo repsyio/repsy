@@ -39,7 +39,6 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 @Data
@@ -93,31 +92,31 @@ public class CargoCrate {
   private Instant lastUpdatedAt;
 
   @OneToMany(mappedBy = "crate", cascade = CascadeType.ALL, orphanRemoval = true)
-  private @NonNull Set<CargoCrateIndex> crateIndexes = new HashSet<>();
+  private Set<CargoCrateIndex> crateIndexes = new HashSet<>();
 
   @OneToMany(mappedBy = "crate", cascade = CascadeType.ALL, orphanRemoval = true)
-  private @NonNull Set<CargoCrateMeta> crateMetas = new HashSet<>();
+  private Set<CargoCrateMeta> crateMetas = new HashSet<>();
 
   @ManyToMany(cascade = {CascadeType.PERSIST, CascadeType.MERGE})
   @JoinTable(
       name = "cargo_crate_author",
       joinColumns = @JoinColumn(name = "crate_id"),
       inverseJoinColumns = @JoinColumn(name = "author_id"))
-  private @NonNull Set<CargoAuthor> authors = new HashSet<>();
+  private Set<CargoAuthor> authors = new HashSet<>();
 
   @ManyToMany(cascade = {CascadeType.PERSIST, CascadeType.MERGE})
   @JoinTable(
       name = "cargo_crate_keyword",
       joinColumns = @JoinColumn(name = "crate_id"),
       inverseJoinColumns = @JoinColumn(name = "keyword_id"))
-  private @NonNull Set<CargoKeyword> keywords = new HashSet<>();
+  private Set<CargoKeyword> keywords = new HashSet<>();
 
   @ManyToMany(cascade = {CascadeType.PERSIST, CascadeType.MERGE})
   @JoinTable(
       name = "cargo_crate_category",
       joinColumns = @JoinColumn(name = "crate_id"),
       inverseJoinColumns = @JoinColumn(name = "category_id"))
-  private @NonNull Set<CargoCategory> categories = new HashSet<>();
+  private Set<CargoCategory> categories = new HashSet<>();
 
   /**
    * Identifier-based equality: two cargo crates are equal when they are the same instance or carry

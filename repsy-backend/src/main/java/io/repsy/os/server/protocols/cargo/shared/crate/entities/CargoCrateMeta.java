@@ -32,6 +32,7 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
+import org.jspecify.annotations.Nullable;
 
 @Data
 @Entity
@@ -54,21 +55,27 @@ public class CargoCrateMeta {
   private String version;
 
   @Column(name = "readme", columnDefinition = "text")
+  @Nullable
   private String readme;
 
   @Column(name = "license", length = CrateUtils.MAX_LICENSE_LENGTH)
+  @Nullable
   private String license;
 
   @Column(name = "license_file", length = CrateUtils.MAX_LICENSE_FILE_LENGTH)
+  @Nullable
   private String licenseFile;
 
   @Column(name = "documentation", length = CrateUtils.MAX_DOCUMENTATION_LENGTH)
+  @Nullable
   private String documentation;
 
   @Column(name = "edition", length = 10)
+  @Nullable
   private String edition;
 
   @Column(name = "rust_version", length = CrateUtils.MAX_RUST_VERSION_LENGTH)
+  @Nullable
   private String rustVersion;
 
   @Column(name = "downloads", nullable = false)

@@ -38,11 +38,9 @@ import io.repsy.protocols.shared.auth.VerifiedPasswordCache;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.Credentials;
 import java.util.Optional;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
 @Component
-@NullMarked
 public class CargoAuthenticator extends ProtocolAuthService {
 
   public CargoAuthenticator(

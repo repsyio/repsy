@@ -15,11 +15,8 @@
  */
 package io.repsy.protocols.cargo.shared.crate.services;
 
-import org.jspecify.annotations.NullMarked;
-
 /**
  * Base of the backend implementation of {@link CargoCrateService}; the abstract methods are
  * inherited from the contract.
  */
-@NullMarked
 public abstract class AbstractCargoCrateService<ID> implements CargoCrateService<ID> {}

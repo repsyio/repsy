@@ -18,11 +18,9 @@ package io.repsy.os.server.protocols.pypi.protocol.handlers;
 import io.repsy.os.server.protocols.shared.handlers.AbstractRepoPathParser;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
 @Component("osPypiPathParser")
-@NullMarked
 public class PypiPathParser extends AbstractRepoPathParser {
 
   public PypiPathParser(final RepoTxService repoTxService) {

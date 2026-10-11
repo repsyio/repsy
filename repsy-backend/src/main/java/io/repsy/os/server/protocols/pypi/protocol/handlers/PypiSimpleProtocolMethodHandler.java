@@ -24,13 +24,11 @@ import io.repsy.protocols.pypi.shared.utils.UriUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 @Component
-@NullMarked
 public class PypiSimpleProtocolMethodHandler extends AbstractPypiSimpleProtocolMethodHandler<UUID> {
 
   public PypiSimpleProtocolMethodHandler(

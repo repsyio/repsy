@@ -18,10 +18,8 @@ package io.repsy.protocols.cargo.shared.crate.dtos;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
-@NullMarked
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record CrateIndexDep(
     String name,

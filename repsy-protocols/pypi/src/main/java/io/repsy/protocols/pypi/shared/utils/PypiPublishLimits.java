@@ -22,7 +22,6 @@ import io.repsy.protocols.shared.limits.FieldLimits;
 import java.util.ArrayList;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -68,7 +67,6 @@ import org.jspecify.annotations.Nullable;
  * pypi_release.version} (see that migration's comment), so no PyPI-side cap below 255 is needed to
  * keep every accepted version inside the shared scan column.
  */
-@NullMarked
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class PypiPublishLimits {
 

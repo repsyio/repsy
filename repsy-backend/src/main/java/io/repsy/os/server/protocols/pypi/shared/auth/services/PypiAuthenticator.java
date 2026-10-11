@@ -28,11 +28,9 @@ import io.repsy.protocols.shared.auth.VerifiedPasswordCache;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Service;
 
 @Service
-@NullMarked
 public class PypiAuthenticator extends ProtocolAuthService {
 
   public PypiAuthenticator(

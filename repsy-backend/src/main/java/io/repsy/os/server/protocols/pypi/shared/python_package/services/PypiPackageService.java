@@ -59,7 +59,6 @@ import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.core.convert.ConversionService;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.data.domain.Page;
@@ -73,7 +72,6 @@ import org.springframework.web.util.UriComponentsBuilder;
 @Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
-@NullMarked
 public class PypiPackageService extends AbstractPypiPackageService<UUID> {
 
   private final RepoTxService repoTxService;

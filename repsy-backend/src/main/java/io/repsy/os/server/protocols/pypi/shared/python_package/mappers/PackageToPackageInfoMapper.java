@@ -17,13 +17,11 @@ package io.repsy.os.server.protocols.pypi.shared.python_package.mappers;
 
 import io.repsy.os.server.protocols.pypi.shared.python_package.dtos.PypiPackageInfo;
 import io.repsy.os.server.protocols.pypi.shared.python_package.entities.PypiPackage;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.core.convert.support.GenericConversionService;
 import org.springframework.stereotype.Component;
 
 @Component
-@NullMarked
 public class PackageToPackageInfoMapper implements Converter<PypiPackage, PypiPackageInfo> {
   PackageToPackageInfoMapper(final GenericConversionService conversionService) {
     conversionService.addConverter(this);

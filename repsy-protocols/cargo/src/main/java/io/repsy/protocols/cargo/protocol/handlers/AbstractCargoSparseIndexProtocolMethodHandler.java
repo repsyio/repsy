@@ -29,7 +29,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -38,7 +37,6 @@ import org.springframework.http.ResponseEntity;
 import tools.jackson.databind.ObjectMapper;
 
 @Slf4j
-@NullMarked
 public abstract class AbstractCargoSparseIndexProtocolMethodHandler
     extends AbstractFacadeProtocolMethodHandler<CargoProtocolFacade> {
 

@@ -17,8 +17,6 @@ package io.repsy.protocols.cargo.shared.crate.dtos;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import java.util.List;
-import org.jspecify.annotations.NullMarked;
 
-@NullMarked
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record CargoOwnersRequest(List<String> users) {}

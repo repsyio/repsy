@@ -21,12 +21,10 @@ import io.repsy.protocols.cargo.shared.crate.dtos.CrateListItem;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
-@NullMarked
 public interface CargoProtocolFacade {
 
   List<CrateIndexEntry> getIndexEntries(ProtocolContext context);

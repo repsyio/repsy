@@ -22,10 +22,11 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.experimental.SuperBuilder;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
-@NullMarked
+// The no-args constructor (Jackson, MapStruct) leaves the required fields to be set afterwards;
+// every reader gets them populated.
+@SuppressWarnings("NullAway.Init")
 @Getter
 @Setter
 @SuperBuilder

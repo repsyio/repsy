@@ -42,7 +42,6 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NullMarked;
 import org.slf4j.event.Level;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
@@ -50,7 +49,6 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.util.HtmlUtils;
 
 @Slf4j
-@NullMarked
 @RequiredArgsConstructor
 public abstract class AbstractPypiProtocolFacade<ID> implements PypiProtocolFacade<ID> {
 

@@ -19,13 +19,11 @@ import io.repsy.protocols.cargo.protocol.facades.AbstractCargoProtocolFacade;
 import io.repsy.protocols.cargo.shared.crate.services.CargoCrateService;
 import io.repsy.protocols.cargo.shared.storage.services.CargoStorageService;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.util.unit.DataSize;
 import tools.jackson.databind.ObjectMapper;
 
-@NullMarked
 @Component
 public class CargoProtocolFacade extends AbstractCargoProtocolFacade<UUID> {
 

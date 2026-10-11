@@ -24,12 +24,10 @@ import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
 /** PyPI: Basic (whose password may be a token, as twine sends it) or Bearer. */
 @Component
-@NullMarked
 public class PypiAuthPreProcessor extends BasicOrBearerAuthPreProcessor<PypiAuthenticator> {
 
   public PypiAuthPreProcessor(

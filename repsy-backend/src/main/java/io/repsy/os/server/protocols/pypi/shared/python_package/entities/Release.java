@@ -37,7 +37,7 @@ import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
-import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 @Data
 @Entity
@@ -78,15 +78,19 @@ public class Release {
   private String summary;
 
   @Column(name = "home_page", length = PypiPublishLimits.MAX_HOME_PAGE_LENGTH)
+  @Nullable
   private String homePage;
 
   @Column(name = "author", length = PypiPublishLimits.MAX_AUTHOR_LENGTH)
+  @Nullable
   private String author;
 
   @Column(name = "author_email", length = PypiPublishLimits.MAX_AUTHOR_EMAIL_LENGTH)
+  @Nullable
   private String authorEmail;
 
   @Column(name = "license", length = PypiPublishLimits.MAX_LICENSE_LENGTH)
+  @Nullable
   private String license;
 
   // Unbounded (text) in both PostgreSQL and H2, so no length guard applies (RPS-1137).
@@ -96,6 +100,7 @@ public class Release {
   @Column(
       name = "description_content_type",
       length = PypiPublishLimits.MAX_DESCRIPTION_CONTENT_TYPE_LENGTH)
+  @Nullable
   private String descriptionContentType;
 
   @CreationTimestamp
@@ -103,10 +108,10 @@ public class Release {
   private Instant createdAt;
 
   @OneToMany(mappedBy = "release", cascade = CascadeType.ALL, orphanRemoval = true)
-  private @NonNull Set<ReleaseClassifier> releaseClassifiers = new HashSet<>();
+  private Set<ReleaseClassifier> releaseClassifiers = new HashSet<>();
 
   @OneToMany(mappedBy = "release", cascade = CascadeType.ALL, orphanRemoval = true)
-  private @NonNull Set<ReleaseProjectUrl> releaseProjectURLS = new HashSet<>();
+  private Set<ReleaseProjectUrl> releaseProjectURLS = new HashSet<>();
 
   /**
    * Identifier-based equality: two releases are equal when they are the same instance or carry the

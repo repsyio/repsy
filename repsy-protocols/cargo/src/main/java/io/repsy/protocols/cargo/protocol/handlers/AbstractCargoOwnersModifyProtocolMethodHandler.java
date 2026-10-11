@@ -24,7 +24,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.Map;
 import java.util.regex.Pattern;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -37,7 +36,6 @@ import org.springframework.http.ResponseEntity;
  * {@code CargoAuthPreProcessor} authenticates them even on a public repo instead of letting a
  * mutating request through unauthenticated.
  */
-@NullMarked
 public abstract class AbstractCargoOwnersModifyProtocolMethodHandler
     extends AbstractRoutedProtocolMethodHandler {
 

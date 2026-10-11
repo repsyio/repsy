@@ -34,6 +34,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.type.SqlTypes;
+import org.jspecify.annotations.Nullable;
 
 @Data
 @Entity
@@ -60,6 +61,7 @@ public class CargoCrateIndex {
 
   @JdbcTypeCode(SqlTypes.JSON)
   @Column(name = "deps", columnDefinition = "jsonb")
+  @Nullable
   private String deps;
 
   @Column(name = "cksum", nullable = false, columnDefinition = "text")
@@ -67,10 +69,12 @@ public class CargoCrateIndex {
 
   @JdbcTypeCode(SqlTypes.JSON)
   @Column(name = "features", columnDefinition = "jsonb")
+  @Nullable
   private String features;
 
   @JdbcTypeCode(SqlTypes.JSON)
   @Column(name = "features2", columnDefinition = "jsonb")
+  @Nullable
   private String features2;
 
   @Column(name = "yanked", nullable = false)
@@ -78,12 +82,14 @@ public class CargoCrateIndex {
 
   // text in PostgreSQL, varchar(255) in H2: no length is stated, see CrateUtils.MAX_LINKS_LENGTH.
   @Column(name = "links", columnDefinition = "text")
+  @Nullable
   private String links;
 
   @Column(name = "v", nullable = false)
   private int v = 1;
 
   @Column(name = "rust_version", length = CrateUtils.MAX_RUST_VERSION_LENGTH)
+  @Nullable
   private String rustVersion;
 
   /**

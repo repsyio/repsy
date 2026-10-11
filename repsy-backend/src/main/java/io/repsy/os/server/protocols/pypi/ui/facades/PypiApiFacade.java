@@ -28,7 +28,6 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
@@ -37,12 +36,12 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class PypiApiFacade implements ProtocolApiFacade {
 
-  private final @NonNull PypiStorageService pypiStorageService;
-  private final @NonNull PypiPackageService pypiPackageService;
-  private final @NonNull ApplicationEventPublisher eventPublisher;
+  private final PypiStorageService pypiStorageService;
+  private final PypiPackageService pypiPackageService;
+  private final ApplicationEventPublisher eventPublisher;
 
   @Override
-  public void deleteRepo(final @NonNull RepoInfo repoInfo) {
+  public void deleteRepo(final RepoInfo repoInfo) {
 
     this.pypiStorageService.deleteRepo(repoInfo.getStorageKey());
   }
@@ -52,8 +51,7 @@ public class PypiApiFacade implements ProtocolApiFacade {
    * lock, see {@link PypiPackageService#deletePackage}. The events follow the commit, so a delete
    * that rolled back reports nothing.
    */
-  public @NonNull BaseUsages deletePackage(
-      final @NonNull RepoInfo repoInfo, final @NonNull String packageName) {
+  public BaseUsages deletePackage(final RepoInfo repoInfo, final String packageName) {
 
     final var normalizedName = PypiPackageUtils.normalizePackageName(packageName);
 
@@ -66,10 +64,8 @@ public class PypiApiFacade implements ProtocolApiFacade {
   }
 
   /** Deletes the release, and the package with it when it was the last one, like the above. */
-  public @NonNull BaseUsages deleteRelease(
-      final @NonNull RepoInfo repoInfo,
-      final @NonNull String packageName,
-      final @NonNull String version) {
+  public BaseUsages deleteRelease(
+      final RepoInfo repoInfo, final String packageName, final String version) {
 
     final var normalizedName = PypiPackageUtils.normalizePackageName(packageName);
 
@@ -82,9 +78,7 @@ public class PypiApiFacade implements ProtocolApiFacade {
   }
 
   private void publishVersionDeleted(
-      final @NonNull RepoInfo repoInfo,
-      final @NonNull String normalizedPackageName,
-      final @NonNull String version) {
+      final RepoInfo repoInfo, final String normalizedPackageName, final String version) {
 
     this.eventPublisher.publishEvent(
         new ArtifactVersionDeletedEvent(
@@ -96,9 +90,7 @@ public class PypiApiFacade implements ProtocolApiFacade {
   }
 
   private void publishVersionsDeleted(
-      final @NonNull RepoInfo repoInfo,
-      final @NonNull String normalizedPackageName,
-      final @NonNull List<String> versions) {
+      final RepoInfo repoInfo, final String normalizedPackageName, final List<String> versions) {
 
     for (final var version : versions) {
       this.publishVersionDeleted(repoInfo, normalizedPackageName, version);
@@ -106,8 +98,7 @@ public class PypiApiFacade implements ProtocolApiFacade {
   }
 
   /** The package's summary: its name and the versions it points at. */
-  public @NonNull PypiPackageInfo getPackage(
-      final @NonNull UUID repoId, final @NonNull String packageName) {
+  public PypiPackageInfo getPackage(final UUID repoId, final String packageName) {
 
     final var packageInfo =
         this.pypiPackageService.getPackage(
@@ -121,10 +112,8 @@ public class PypiApiFacade implements ProtocolApiFacade {
         .build();
   }
 
-  public @NonNull ReleaseDetail getReleaseDetail(
-      final @NonNull UUID repoId,
-      final @NonNull String packageName,
-      final @NonNull String releaseVersion) {
+  public ReleaseDetail getReleaseDetail(
+      final UUID repoId, final String packageName, final String releaseVersion) {
 
     final var packageInfo =
         this.pypiPackageService.getPackage(
@@ -140,7 +129,7 @@ public class PypiApiFacade implements ProtocolApiFacade {
   }
 
   @Override
-  public void createRepo(final @NonNull UUID repoId) {
+  public void createRepo(final UUID repoId) {
 
     this.pypiStorageService.createRepo(repoId);
   }

@@ -16,12 +16,10 @@
 package io.repsy.protocols.cargo.shared.crate.dtos;
 
 import java.util.List;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * Body of a {@code GET /api/v1/crates/{name}/owners} response. {@code cargo owner --list} models
  * this as a struct with a required {@code users} array, so the field must always be present, even
  * when empty.
  */
-@NullMarked
 public record CargoOwnersResponse(List<CargoOwnerUser> users) {}

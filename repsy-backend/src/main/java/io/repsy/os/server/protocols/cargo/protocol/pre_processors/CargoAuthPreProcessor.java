@@ -18,12 +18,10 @@ package io.repsy.os.server.protocols.cargo.protocol.pre_processors;
 import io.repsy.os.server.protocols.cargo.shared.auth.services.CargoAuthenticator;
 import io.repsy.os.server.shared.auth.BasicOrBearerAuthPreProcessor;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
 /** Cargo: Basic or Bearer; the Cargo CLI sends its token without a scheme. */
 @Component
-@NullMarked
 public class CargoAuthPreProcessor extends BasicOrBearerAuthPreProcessor<CargoAuthenticator> {
 
   public CargoAuthPreProcessor(

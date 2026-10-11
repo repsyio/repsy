@@ -24,7 +24,6 @@ import java.util.Map;
 import java.util.Set;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 import tools.jackson.databind.DeserializationFeature;
 import tools.jackson.databind.cfg.DateTimeFeature;
@@ -32,7 +31,6 @@ import tools.jackson.databind.json.JsonMapper;
 
 @Slf4j
 @UtilityClass
-@NullMarked
 public final class PypiPackageUtils {
   private static final String MINIMUM_REQUIRED_PYTHON_VERSION = ">=2.4";
 

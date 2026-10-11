@@ -43,14 +43,12 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Predicate;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.ui.freemarker.FreeMarkerTemplateUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 @Slf4j
-@NullMarked
 public abstract class AbstractPypiStorageService<ID> extends AbstractArtifactStorageService
     implements PypiStorageService<ID> {
 

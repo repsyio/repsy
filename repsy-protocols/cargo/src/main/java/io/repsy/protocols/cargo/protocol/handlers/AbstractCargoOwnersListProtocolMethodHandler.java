@@ -27,7 +27,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
 import java.util.regex.Pattern;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -40,7 +39,6 @@ import org.springframework.http.ResponseEntity;
  * the response as a struct with a required {@code users: Vec<User>} field, so it must always be
  * present and an array, even though there is nothing finer to report.
  */
-@NullMarked
 public abstract class AbstractCargoOwnersListProtocolMethodHandler
     extends AbstractRoutedProtocolMethodHandler {
 

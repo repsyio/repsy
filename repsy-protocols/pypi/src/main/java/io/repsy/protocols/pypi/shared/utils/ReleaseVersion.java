@@ -22,32 +22,33 @@ import java.util.Objects;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import lombok.Getter;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
+// Instances are only built by of(), which sets version on every path before returning.
+@SuppressWarnings("NullAway.Init")
 @Getter
 public class ReleaseVersion {
   // https://www.python.org/dev/peps/pep-0440/#appendix-b-parsing-version-strings-with-regular-expressions
-  private static final @NonNull Pattern VERSION_PATTERN =
+  private static final Pattern VERSION_PATTERN =
       Pattern.compile(
           "^v?(?:(?:(?<epoch>[0-9]+)!)?"
               + "(?<release>[0-9]+(?:\\.[0-9]+)*)"
               + "(?<pre>[-_.]?(?<preSignifier>(?:alpha|a|beta|b|rc|c|preview|pre))[-_.]?(?<preNumeral>[0-9]+)?)?"
               + "(?<post>(?:-(?<postNumeral1>[0-9]+))|(?:[-_.]?(post|rev|r)[-_.]?(?<postNumeral2>[0-9]+)?))?"
               + "(?<dev>[-_.]?(dev)[-_.]?(?<devNumeral>[0-9]+)?)?)(?:\\+(?<local>[a-z0-9]+(?:[-_.][a-z0-9]+)*))?$");
-  private static final @NonNull Pattern NORMALIZED_VERSION_PATTERN =
+  private static final Pattern NORMALIZED_VERSION_PATTERN =
       Pattern.compile(
           "^([1-9][0-9]*!)?(0|[1-9][0-9]*)"
               + "(\\.(0|[1-9][0-9]*))*(?<pre>(a|b|rc)(0|[1-9][0-9]*))?(?<post>\\.post(0|[1-9][0-9]*))?"
               + "(?<dev>\\.dev(0|[1-9][0-9]*))?(?:\\+(?<local>[a-z0-9]+(?:\\.[a-z0-9]+)*))?$");
-  private static final @NonNull Pattern LOCAL_SEPARATOR = Pattern.compile("[-_.]");
+  private static final Pattern LOCAL_SEPARATOR = Pattern.compile("[-_.]");
 
   private boolean preRelease;
   private boolean postRelease;
   private boolean developmentRelease;
   private String version;
 
-  public static @NonNull ReleaseVersion of(final @NonNull String releaseVersion) {
+  public static ReleaseVersion of(final String releaseVersion) {
 
     // Bound the input before either pattern runs: both nest quantifiers, so a long dotted version
     // overflows the regex engine's stack (a 500) instead of failing as a 400.
@@ -104,11 +105,11 @@ public class ReleaseVersion {
    * The PEP 440 normal form of a local version: {@code -} and {@code _} become {@code .}, and a
    * segment that is only digits loses its leading zeros. The text was lower-cased before.
    */
-  private static @NonNull String localSuffix(final @Nullable String local) {
+  private static String localSuffix(final @Nullable String local) {
     return local == null ? "" : "+" + normalizeLocal(local);
   }
 
-  private static @NonNull String normalizeLocal(final @NonNull String local) {
+  private static String normalizeLocal(final String local) {
 
     return LOCAL_SEPARATOR
         .splitAsStream(local)
@@ -118,7 +119,7 @@ public class ReleaseVersion {
         .collect(Collectors.joining("."));
   }
 
-  private static @NonNull String stripLeadingZeros(final @NonNull String digits) {
+  private static String stripLeadingZeros(final String digits) {
 
     final var stripped = digits.replaceFirst("^0+", "");
 
@@ -169,7 +170,7 @@ public class ReleaseVersion {
     this.version = normalizedVersionBuilder.toString();
   }
 
-  private @NonNull String resolvePreSignifier(final @NonNull String preSignifier) {
+  private String resolvePreSignifier(final String preSignifier) {
 
     if (preSignifier.equals("a") || preSignifier.equals("alpha")) {
       return "a";

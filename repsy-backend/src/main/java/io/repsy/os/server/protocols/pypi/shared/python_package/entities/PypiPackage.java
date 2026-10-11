@@ -38,7 +38,7 @@ import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
-import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 @Data
 @Entity
@@ -64,6 +64,7 @@ public class PypiPackage {
   private String normalizedName;
 
   @Column(name = "stable_version", length = PypiPublishLimits.MAX_VERSION_LENGTH)
+  @Nullable
   private String stableVersion;
 
   @Column(name = "latest_version", length = PypiPublishLimits.MAX_VERSION_LENGTH)
@@ -74,5 +75,5 @@ public class PypiPackage {
   private Instant createdAt;
 
   @OneToMany(mappedBy = "pypiPackage", cascade = CascadeType.ALL, orphanRemoval = true)
-  private @NonNull Set<Release> releases = new HashSet<>();
+  private Set<Release> releases = new HashSet<>();
 }
