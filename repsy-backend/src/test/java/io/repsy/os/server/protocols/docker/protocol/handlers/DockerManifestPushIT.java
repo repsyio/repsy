@@ -450,14 +450,12 @@ class DockerManifestPushIT extends AbstractIT {
     assertThat(stored.getPlatform()).isEqualTo(DockerConstants.UNKNOWN_PLATFORM);
   }
 
-  @Test
+  @ParameterizedTest(name = "{0}")
+  @ValueSource(strings = {OCI_INDEX, DOCKER_LIST})
   @DisplayName(
-      "RPS-2140 pin of a defect: an index without a body-level mediaType (optional per the OCI"
-          + " image-spec) is answered with a 500, because ManifestTxService#createIndex reads the"
-          + " missing field into the NOT NULL docker_manifest.media_type instead of falling back"
-          + " to the Content-Type as the image manifest path does (RPS-1731); the fix flips this"
-          + " to 201")
-  void indexWithoutBodyMediaTypeIsPinned() throws Exception {
+      "an index or manifest list without a body-level mediaType (optional per the OCI image-spec)"
+          + " is stored with the pushed Content-Type as its media type, not a 500 (RPS-2184)")
+  void indexWithoutBodyMediaTypeIsStored(final String contentType) throws Exception {
     final var repo = this.dockerRepo();
     final var token = this.adminProtocolBearerToken();
     final var config =
@@ -474,9 +472,37 @@ class DockerManifestPushIT extends AbstractIT {
         "{\"schemaVersion\":2,\"manifests\":[{\"mediaType\":\"%s\",\"digest\":\"%s\",\"size\":%d,\"platform\":{\"architecture\":\"amd64\",\"os\":\"linux\"}}]}"
             .formatted(OCI_MANIFEST, manifestDigest, manifest.length());
 
-    final var indexPush = this.putManifest(repo, "multi", OCI_INDEX, index);
+    final var indexPush = this.putManifest(repo, "multi", contentType, index);
 
-    assertThat(indexPush.getStatus()).as(indexPush.getContentAsString()).isEqualTo(500);
+    assertThat(indexPush.getStatus()).as(indexPush.getContentAsString()).isEqualTo(201);
+    final var image = this.imageRepository.findByRepoIdAndName(repo.getId(), IMAGE).orElseThrow();
+    final var indexDigest = sha256(index.getBytes(StandardCharsets.UTF_8));
+    final var stored =
+        this.manifestRepository.findByImageIdAndDigest(image.getId(), indexDigest).orElseThrow();
+    assertThat(stored.getMediaType()).isEqualTo(contentType);
+    assertThat(stored.getPlatform()).isEqualTo("Multiplatform");
+  }
+
+  @Test
+  @DisplayName(
+      "an index pushed without a Content-Type is refused with a 400, so the body-level mediaType"
+          + " fallback never needs a second default (RPS-2184)")
+  void indexWithoutContentTypeIsRefused() throws Exception {
+    final var repo = this.dockerRepo();
+    final var index = "{\"schemaVersion\":2,\"manifests\":[]}";
+
+    final var response =
+        MockMvcBuilders.webAppContextSetup(this.webApplicationContext)
+            .build()
+            .perform(
+                put("/v2/{repo}/{image}/manifests/{reference}", repo.getName(), IMAGE, "multi")
+                    .content(index.getBytes(StandardCharsets.UTF_8))
+                    .header(AUTHORIZATION, this.adminProtocolBearerToken())
+                    .with(protocolPort()))
+            .andReturn()
+            .getResponse();
+
+    this.assertRejected(response, "manifestContentTypeMissing", repo);
   }
 
   @Test
