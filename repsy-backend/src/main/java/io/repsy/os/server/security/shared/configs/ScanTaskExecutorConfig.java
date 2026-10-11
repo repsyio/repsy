@@ -17,7 +17,6 @@ package io.repsy.os.server.security.shared.configs;
 
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadPoolExecutor;
-import org.jspecify.annotations.NonNull;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
@@ -30,7 +29,7 @@ public class ScanTaskExecutorConfig {
   private static final int QUEUE_CAPACITY = 200;
 
   @Bean("scanTaskExecutor")
-  public @NonNull Executor scanTaskExecutor() {
+  public Executor scanTaskExecutor() {
 
     final var executor = new ThreadPoolTaskExecutor();
     executor.setCorePoolSize(CORE_POOL_SIZE);

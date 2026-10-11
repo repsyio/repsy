@@ -23,27 +23,24 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
 @Component
-@NullMarked
 @RequiredArgsConstructor
 public class RubyArtifactStorageResolver implements ArtifactStorageResolver {
 
   private static final Set<String> SUPPORTED_REPO_TYPES = Set.of("RUBY");
 
-  private final @NonNull RubyGemRepository rubyGemRepository;
-  private final @NonNull RubyGemVersionRepository rubyGemVersionRepository;
-  private final @NonNull RubyStorageService rubyStorageService;
+  private final RubyGemRepository rubyGemRepository;
+  private final RubyGemVersionRepository rubyGemVersionRepository;
+  private final RubyStorageService rubyStorageService;
 
   @Override
-  public @NonNull Optional<String> resolve(
-      final @NonNull UUID repoId,
-      final @NonNull String repoName,
-      final @NonNull String artifactName,
-      final @NonNull String artifactVersion) {
+  public Optional<String> resolve(
+      final UUID repoId,
+      final String repoName,
+      final String artifactName,
+      final String artifactVersion) {
 
     return this.rubyGemRepository
         .findByRepoIdAndName(repoId, artifactName)
@@ -60,7 +57,7 @@ public class RubyArtifactStorageResolver implements ArtifactStorageResolver {
   }
 
   @Override
-  public @NonNull Set<String> getSupportedRepoTypes() {
+  public Set<String> getSupportedRepoTypes() {
     return SUPPORTED_REPO_TYPES;
   }
 }

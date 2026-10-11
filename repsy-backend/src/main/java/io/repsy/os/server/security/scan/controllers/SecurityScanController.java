@@ -30,7 +30,6 @@ import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.List;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -51,18 +50,18 @@ final class SecurityScanController {
 
   private static final Set<String> SCAN_SORT_PROPERTIES = Set.of("createdAt");
 
-  private final @NonNull PanelAuthHelper panelAuthHelper;
-  private final @NonNull VulnerabilityScanTxService scanTxService;
-  private final @NonNull VulnerabilityScannerRegistry scannerRegistry;
+  private final PanelAuthHelper panelAuthHelper;
+  private final VulnerabilityScanTxService scanTxService;
+  private final VulnerabilityScannerRegistry scannerRegistry;
 
   @GetMapping("/scans")
-  public @NonNull ResponseEntity<PagedModel<VulnerabilityScanInfo>> listScans(
-      @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
+  public ResponseEntity<PagedModel<VulnerabilityScanInfo>> listScans(
+      @RequestHeader(AUTHORIZATION) final String authHeader,
       @RequestParam(required = false) final @Nullable Severity severity,
       @RequestParam(required = false) final @Nullable RepoType repoType,
       @RequestParam(required = false) final @Nullable String repoName,
       @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC)
-          final @NonNull Pageable pageable) {
+          final Pageable pageable) {
 
     this.panelAuthHelper.requireAdmin(this.panelAuthHelper.authenticate(authHeader));
 
@@ -74,8 +73,8 @@ final class SecurityScanController {
   }
 
   @GetMapping("/scans/summary")
-  public @NonNull ResponseEntity<SecurityScansSummary> getScansSummary(
-      @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
+  public ResponseEntity<SecurityScansSummary> getScansSummary(
+      @RequestHeader(AUTHORIZATION) final String authHeader,
       @RequestParam(required = false) final @Nullable RepoType repoType,
       @RequestParam(required = false) final @Nullable String repoName) {
 
@@ -87,7 +86,7 @@ final class SecurityScanController {
   }
 
   @GetMapping("/supported-repo-types")
-  public @NonNull ResponseEntity<List<String>> getSupportedRepoTypes() {
+  public ResponseEntity<List<String>> getSupportedRepoTypes() {
     return ResponseEntity.ok(List.copyOf(this.scannerRegistry.getSupportedRepoTypes()));
   }
 }

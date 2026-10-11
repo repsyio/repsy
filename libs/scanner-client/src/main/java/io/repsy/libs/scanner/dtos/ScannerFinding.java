@@ -15,17 +15,16 @@
  */
 package io.repsy.libs.scanner.dtos;
 
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 public record ScannerFinding(
-    @NonNull String cveId,
-    @NonNull Severity severity,
-    @NonNull String packageName,
-    @NonNull String packageVersion,
+    String cveId,
+    Severity severity,
+    String packageName,
+    String packageVersion,
     @Nullable String fixedVersion,
     @Nullable String description,
     @Nullable String referenceUrl,
-    @NonNull FixStatus fixStatus,
+    FixStatus fixStatus,
     @Nullable Double cvssScore,
     @Nullable String cvssVector) {}

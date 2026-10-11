@@ -29,7 +29,6 @@ import io.repsy.protocols.shared.auth.PasswordHasher;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -42,14 +41,13 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 class AuthController {
 
-  private final @NonNull AuthUserService authUserService;
-  private final @NonNull JwtUtils jwtUtils;
-  private final @NonNull RefreshTokenService refreshTokenService;
+  private final AuthUserService authUserService;
+  private final JwtUtils jwtUtils;
+  private final RefreshTokenService refreshTokenService;
 
   @PostMapping("/login")
-  public @NonNull LoginInfo login(
-      @RequestBody @Valid final @NonNull LoginForm form,
-      final @NonNull HttpServletResponse response) {
+  public LoginInfo login(
+      @RequestBody @Valid final LoginForm form, final HttpServletResponse response) {
 
     // The form only limits the characters; BCrypt reads bytes. No account has a longer password.
     PasswordHasher.requireFitsBcrypt(form.getPassword());
@@ -62,9 +60,8 @@ class AuthController {
   }
 
   @PostMapping("/tokens/refresh")
-  public @NonNull LoginInfo refreshToken(
-      @RequestBody @Valid final @NonNull RefreshTokenForm form,
-      final @NonNull HttpServletResponse response) {
+  public LoginInfo refreshToken(
+      @RequestBody @Valid final RefreshTokenForm form, final HttpServletResponse response) {
 
     final var claims = this.jwtUtils.verifyRefreshToken(form.getRefreshToken());
 
@@ -86,8 +83,7 @@ class AuthController {
    * call this and get a clean 204 on logout.
    */
   @PostMapping("/logout")
-  public @NonNull ResponseEntity<Void> logout(
-      @RequestBody @Valid final @NonNull RefreshTokenForm form) {
+  public ResponseEntity<Void> logout(@RequestBody @Valid final RefreshTokenForm form) {
 
     final var claims = this.jwtUtils.verifyRefreshToken(form.getRefreshToken());
 

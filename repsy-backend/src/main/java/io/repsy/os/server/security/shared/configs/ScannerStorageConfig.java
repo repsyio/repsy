@@ -19,7 +19,6 @@ import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.protocols.shared.storage.StorageStrategyRegistry;
 import java.util.HashMap;
 import java.util.Map;
-import org.jspecify.annotations.NonNull;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -28,8 +27,8 @@ public class ScannerStorageConfig {
 
   /** The strategies keyed by the name of the repo type, for the code that has only an event. */
   @Bean("storageStrategiesByRepoType")
-  public @NonNull Map<String, StorageStrategy> storageStrategiesByRepoType(
-      final @NonNull StorageStrategyRegistry registry) {
+  public Map<String, StorageStrategy> storageStrategiesByRepoType(
+      final StorageStrategyRegistry registry) {
     final var byName = new HashMap<String, StorageStrategy>();
     registry.asMap().forEach((type, strategy) -> byName.put(type.name(), strategy));
 

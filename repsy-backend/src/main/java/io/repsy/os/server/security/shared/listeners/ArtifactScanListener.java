@@ -42,7 +42,6 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.RejectedExecutionException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.event.EventListener;
@@ -61,21 +60,21 @@ public class ArtifactScanListener {
   private static final String HELM_REPO_TYPE = "HELM";
   private static final String NO_SCANNER_NAME = "none";
 
-  private final @NonNull VulnerabilityScannerRegistry scannerRegistry;
-  private final @NonNull VulnerabilityScanTxService scanTxService;
-  private final @NonNull RepoTxService repoTxService;
-  private final @NonNull DockerScanTokenIssuer dockerScanTokenIssuer;
-  private final @NonNull TaskScheduler taskScheduler;
-  private final @NonNull TrivyScannerClientProperties scannerProperties;
+  private final VulnerabilityScannerRegistry scannerRegistry;
+  private final VulnerabilityScanTxService scanTxService;
+  private final RepoTxService repoTxService;
+  private final DockerScanTokenIssuer dockerScanTokenIssuer;
+  private final TaskScheduler taskScheduler;
+  private final TrivyScannerClientProperties scannerProperties;
 
   @Qualifier("scanTaskExecutor")
-  private final @NonNull Executor scanTaskExecutor;
+  private final Executor scanTaskExecutor;
 
   @Qualifier("storageStrategiesByRepoType")
-  private final @NonNull Map<String, StorageStrategy> storageStrategiesByRepoType;
+  private final Map<String, StorageStrategy> storageStrategiesByRepoType;
 
   @EventListener
-  public void onArtifactPushed(final @NonNull ArtifactPushedEvent event) {
+  public void onArtifactPushed(final ArtifactPushedEvent event) {
 
     if (isArtifactCoordinateMissing(event)) {
       log.debug(
@@ -105,13 +104,12 @@ public class ArtifactScanListener {
   }
 
   @EventListener
-  public void onArtifactVersionDeleted(final @NonNull ArtifactVersionDeletedEvent event) {
+  public void onArtifactVersionDeleted(final ArtifactVersionDeletedEvent event) {
     this.scanTxService.deleteScansForVersion(
         event.repoId(), event.artifactName(), event.artifactVersion());
   }
 
-  public void executeManualScan(
-      final @NonNull UUID scanId, final @NonNull ArtifactPushedEvent event) {
+  public void executeManualScan(final UUID scanId, final ArtifactPushedEvent event) {
     this.submitScan(
         event,
         scanId,
@@ -122,9 +120,7 @@ public class ArtifactScanListener {
   }
 
   private void submitScan(
-      final @NonNull ArtifactPushedEvent event,
-      final @NonNull UUID scanId,
-      final @NonNull Runnable rejectionAction) {
+      final ArtifactPushedEvent event, final UUID scanId, final Runnable rejectionAction) {
     try {
       this.scanTaskExecutor.execute(() -> this.executeScan(event, scanId));
     } catch (final RejectedExecutionException exception) {
@@ -132,7 +128,7 @@ public class ArtifactScanListener {
     }
   }
 
-  private void executeScan(final @NonNull ArtifactPushedEvent event, final @NonNull UUID scanId) {
+  private void executeScan(final ArtifactPushedEvent event, final UUID scanId) {
 
     final var scanner = this.resolveScanner(event, scanId);
 
@@ -143,10 +139,13 @@ public class ArtifactScanListener {
     this.runScan(event, scanId, scanner, 1);
   }
 
+  // onArtifactPushed returns before the scan when the coordinate is missing, and a manual scan is
+  // built from a stored scan row, so the name and version are set here.
+  @SuppressWarnings("NullAway")
   private void runScan(
-      final @NonNull ArtifactPushedEvent event,
-      final @NonNull UUID scanId,
-      final @NonNull VulnerabilityScanner scanner,
+      final ArtifactPushedEvent event,
+      final UUID scanId,
+      final VulnerabilityScanner scanner,
       final int attempt) {
 
     try {
@@ -188,9 +187,7 @@ public class ArtifactScanListener {
    * ItemNotFoundException} is treated as a genuine failure.
    */
   private void handleScanRowGone(
-      final @NonNull ArtifactPushedEvent event,
-      final @NonNull UUID scanId,
-      final @NonNull ItemNotFoundException exception) {
+      final ArtifactPushedEvent event, final UUID scanId, final ItemNotFoundException exception) {
 
     if (!ProtocolErrorCodes.VULNERABILITY_SCAN_NOT_FOUND.equals(exception.getMessage())) {
       this.handleScanFailure(event, scanId, exception);
@@ -208,9 +205,7 @@ public class ArtifactScanListener {
    * genuine one and is recorded and logged at ERROR.
    */
   private void handleScanWriteConflict(
-      final @NonNull ArtifactPushedEvent event,
-      final @NonNull UUID scanId,
-      final @NonNull RuntimeException exception) {
+      final ArtifactPushedEvent event, final UUID scanId, final RuntimeException exception) {
 
     if (isOtherIntegrityViolation(exception) || this.scanTxService.scanExists(scanId)) {
       this.handleScanFailure(event, scanId, exception);
@@ -220,7 +215,7 @@ public class ArtifactScanListener {
     this.logScanRowGone(event);
   }
 
-  private void logScanRowGone(final @NonNull ArtifactPushedEvent event) {
+  private void logScanRowGone(final ArtifactPushedEvent event) {
     log.info(
         "Skipping vulnerability scan outcome for {}@{} (repo={}): the scan row no longer exists,"
             + " most likely because the repo was deleted while the scan was in flight",
@@ -233,7 +228,7 @@ public class ArtifactScanListener {
    * A data integrity violation is the deleted-scan race only when it is a foreign key violation
    * (the finding's scan is gone); any other one is unexpected and stays a failure.
    */
-  private static boolean isOtherIntegrityViolation(final @NonNull RuntimeException exception) {
+  private static boolean isOtherIntegrityViolation(final RuntimeException exception) {
     return exception instanceof DataIntegrityViolationException violation
         && !ConstraintViolations.isForeignKeyViolation(violation);
   }
@@ -264,11 +259,11 @@ public class ArtifactScanListener {
    * that.
    */
   private void handleScannerUnreachable(
-      final @NonNull ArtifactPushedEvent event,
-      final @NonNull UUID scanId,
-      final @NonNull VulnerabilityScanner scanner,
+      final ArtifactPushedEvent event,
+      final UUID scanId,
+      final VulnerabilityScanner scanner,
       final int attempt,
-      final @NonNull ResourceAccessException exception) {
+      final ResourceAccessException exception) {
 
     final var maxAttempts = this.scannerProperties.submitMaxAttempts();
 
@@ -302,9 +297,9 @@ public class ArtifactScanListener {
 
   /** Runs on the scheduler thread, so it only hands the retry to the scan executor. */
   private void requeueScan(
-      final @NonNull ArtifactPushedEvent event,
-      final @NonNull UUID scanId,
-      final @NonNull VulnerabilityScanner scanner,
+      final ArtifactPushedEvent event,
+      final UUID scanId,
+      final VulnerabilityScanner scanner,
       final int attempt) {
 
     try {
@@ -321,9 +316,9 @@ public class ArtifactScanListener {
   }
 
   private void retryScan(
-      final @NonNull ArtifactPushedEvent event,
-      final @NonNull UUID scanId,
-      final @NonNull VulnerabilityScanner scanner,
+      final ArtifactPushedEvent event,
+      final UUID scanId,
+      final VulnerabilityScanner scanner,
       final int attempt) {
 
     if (!this.scanTxService.scanExists(scanId)) {
@@ -335,18 +330,16 @@ public class ArtifactScanListener {
   }
 
   private void handleScanFailure(
-      final @NonNull ArtifactPushedEvent event,
-      final @NonNull UUID scanId,
-      final @NonNull Exception exception) {
+      final ArtifactPushedEvent event, final UUID scanId, final Exception exception) {
 
     this.handleScanFailure(event, scanId, exception, "");
   }
 
   private void handleScanFailure(
-      final @NonNull ArtifactPushedEvent event,
-      final @NonNull UUID scanId,
-      final @NonNull Exception exception,
-      final @NonNull String messageSuffix) {
+      final ArtifactPushedEvent event,
+      final UUID scanId,
+      final Exception exception,
+      final String messageSuffix) {
 
     log.error(
         "Vulnerability scan failed for {}@{}",
@@ -357,7 +350,7 @@ public class ArtifactScanListener {
   }
 
   private @Nullable ScanInputs resolveScanInputs(
-      final @NonNull ArtifactPushedEvent event, final @NonNull UUID scanId) {
+      final ArtifactPushedEvent event, final UUID scanId) {
 
     if (DOCKER_REPO_TYPE.equals(event.repoType())) {
       return this.resolveDockerScanInputs(event);
@@ -372,7 +365,7 @@ public class ArtifactScanListener {
     return new ScanInputs(artifactContent, null, null);
   }
 
-  private @Nullable ScanInputs resolveDockerScanInputs(final @NonNull ArtifactPushedEvent event) {
+  private @Nullable ScanInputs resolveDockerScanInputs(final ArtifactPushedEvent event) {
     final var repoInfo = this.findRepoOrNull(event);
 
     if (repoInfo == null) {
@@ -387,7 +380,7 @@ public class ArtifactScanListener {
     return new ScanInputs(null, buildDockerRegistryReference(event), authToken);
   }
 
-  private @Nullable RepoInfo findRepoOrNull(final @NonNull ArtifactPushedEvent event) {
+  private @Nullable RepoInfo findRepoOrNull(final ArtifactPushedEvent event) {
     try {
       return this.repoTxService.getRepo(event.repoId());
     } catch (final ItemNotFoundException _) {
@@ -409,7 +402,7 @@ public class ArtifactScanListener {
       @Nullable String registryAuthToken) {}
 
   private @Nullable ArtifactContent resolveArtifactContent(
-      final @NonNull ArtifactPushedEvent event, final @NonNull UUID scanId) {
+      final ArtifactPushedEvent event, final UUID scanId) {
 
     final var storageStrategy = this.storageStrategiesByRepoType.get(event.repoType());
 
@@ -430,7 +423,10 @@ public class ArtifactScanListener {
     return new ResourceArtifactContent(resource.get(), scanFileName(event));
   }
 
-  private @Nullable UUID createPendingScanOrNull(final @NonNull ArtifactPushedEvent event) {
+  // onArtifactPushed returns before the scan when the coordinate is missing, and a manual scan is
+  // built from a stored scan row, so the name and version are set here.
+  @SuppressWarnings("NullAway")
+  private @Nullable UUID createPendingScanOrNull(final ArtifactPushedEvent event) {
     final var scannerName =
         this.scannerRegistry
             .findScanner(event.repoType())
@@ -459,7 +455,7 @@ public class ArtifactScanListener {
   }
 
   private @Nullable VulnerabilityScanner resolveScanner(
-      final @NonNull ArtifactPushedEvent event, final @NonNull UUID scanId) {
+      final ArtifactPushedEvent event, final UUID scanId) {
 
     final var scannerOpt = this.scannerRegistry.findScanner(event.repoType());
 
@@ -472,12 +468,14 @@ public class ArtifactScanListener {
     return scannerOpt.get();
   }
 
-  private static boolean isArtifactCoordinateMissing(final @NonNull ArtifactPushedEvent event) {
+  private static boolean isArtifactCoordinateMissing(final ArtifactPushedEvent event) {
     return event.artifactName() == null || event.artifactVersion() == null;
   }
 
-  private static @NonNull String buildDockerRegistryReference(
-      final @NonNull ArtifactPushedEvent event) {
+  // onArtifactPushed returns before the scan when the coordinate is missing, and a manual scan is
+  // built from a stored scan row, so the name and version are set here.
+  @SuppressWarnings("NullAway")
+  private static String buildDockerRegistryReference(final ArtifactPushedEvent event) {
 
     final var version = event.artifactVersion();
     final var separator = BlobDigests.startsWithDigestPrefix(version) ? "@" : ":";
@@ -485,7 +483,7 @@ public class ArtifactScanListener {
     return event.repoName() + "/" + event.artifactName() + separator + version;
   }
 
-  private static @NonNull String resolveFailureMessage(final @NonNull Exception exception) {
+  private static String resolveFailureMessage(final Exception exception) {
     return exception.getMessage() != null
         ? exception.getMessage()
         : exception.getClass().getSimpleName();
@@ -496,7 +494,7 @@ public class ArtifactScanListener {
    * chart published through OCI is stored as a bare digest ({@code oci/blobs/sha256:...}), so that
    * one is named like the classic archive, {@code <name>-<version>.tgz} (RPS-1736).
    */
-  private static @NonNull String scanFileName(final @NonNull ArtifactPushedEvent event) {
+  private static String scanFileName(final ArtifactPushedEvent event) {
     if (HELM_REPO_TYPE.equals(event.repoType())
         && event.storagePath().startsWith(HelmConstants.OCI_BLOBS_PATH + "/")
         && event.artifactName() != null
@@ -507,7 +505,7 @@ public class ArtifactScanListener {
     return extractFileName(event.storagePath());
   }
 
-  private static @NonNull String extractFileName(final @NonNull String storagePath) {
+  private static String extractFileName(final String storagePath) {
     return storagePath.substring(storagePath.lastIndexOf('/') + 1);
   }
 }

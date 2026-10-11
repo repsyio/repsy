@@ -31,7 +31,6 @@ import io.repsy.os.shared.utils.MultiPortNames;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -47,12 +46,12 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/profile")
 class ProfileController {
 
-  private final @NonNull PanelAuthHelper panelAuthHelper;
-  private final @NonNull ProfileService profileService;
-  private final @NonNull UserTxService userTxService;
+  private final PanelAuthHelper panelAuthHelper;
+  private final ProfileService profileService;
+  private final UserTxService userTxService;
 
   @GetMapping
-  public @NonNull ProfileInfo get(@RequestHeader(AUTHORIZATION) final @NonNull String authHeader) {
+  public ProfileInfo get(@RequestHeader(AUTHORIZATION) final String authHeader) {
 
     final var userId = this.panelAuthHelper.authenticate(authHeader).getId();
 
@@ -62,10 +61,10 @@ class ProfileController {
   }
 
   @PatchMapping("/username")
-  public @NonNull LoginInfo updateUsername(
-      @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
-      @RequestBody @Valid final @NonNull UpdateUsernameForm form,
-      final @NonNull HttpServletResponse response) {
+  public LoginInfo updateUsername(
+      @RequestHeader(AUTHORIZATION) final String authHeader,
+      @RequestBody @Valid final UpdateUsernameForm form,
+      final HttpServletResponse response) {
 
     final var session = this.panelAuthHelper.authenticateSession(authHeader);
 
@@ -79,10 +78,10 @@ class ProfileController {
   }
 
   @PatchMapping("/password")
-  public @NonNull LoginInfo updatePassword(
-      @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
-      @RequestBody @Valid final @NonNull PasswordForm form,
-      final @NonNull HttpServletResponse response) {
+  public LoginInfo updatePassword(
+      @RequestHeader(AUTHORIZATION) final String authHeader,
+      @RequestBody @Valid final PasswordForm form,
+      final HttpServletResponse response) {
 
     final var session = this.panelAuthHelper.authenticateSession(authHeader);
 
@@ -95,8 +94,7 @@ class ProfileController {
   }
 
   @DeleteMapping
-  public @NonNull ResponseEntity<Void> deleteProfile(
-      @RequestHeader(AUTHORIZATION) final @NonNull String authHeader) {
+  public ResponseEntity<Void> deleteProfile(@RequestHeader(AUTHORIZATION) final String authHeader) {
 
     final var userId = this.panelAuthHelper.authenticate(authHeader).getId();
 

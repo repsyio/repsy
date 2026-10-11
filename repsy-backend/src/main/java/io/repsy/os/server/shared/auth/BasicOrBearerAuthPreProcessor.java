@@ -33,8 +33,8 @@ import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -70,7 +70,6 @@ import org.springframework.http.ResponseEntity;
  *
  * @param <A> the authenticator of the format
  */
-@NullMarked
 public abstract class BasicOrBearerAuthPreProcessor<A extends ProtocolAuthService>
     extends ProtocolProcessor {
 
@@ -105,7 +104,8 @@ public abstract class BasicOrBearerAuthPreProcessor<A extends ProtocolAuthServic
       return ProcessorResult.next();
     }
 
-    final var permission = (Permission) properties.get(HandlerPropertyKeys.PERMISSION);
+    final var permission =
+        Objects.requireNonNull((Permission) properties.get(HandlerPropertyKeys.PERMISSION));
     final var credential = this.credential(request);
 
     try {

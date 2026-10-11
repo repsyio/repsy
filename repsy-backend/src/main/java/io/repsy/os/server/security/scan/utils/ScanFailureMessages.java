@@ -16,7 +16,6 @@
 package io.repsy.os.server.security.scan.utils;
 
 import java.util.regex.Pattern;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -31,7 +30,6 @@ import org.jspecify.annotations.Nullable;
  * can run both when the message is recorded and when it is read (rows recorded before this existed
  * are cleaned on the way out).
  */
-@NullMarked
 public final class ScanFailureMessages {
 
   /** The longest text shown, ellipsis included. */

@@ -20,9 +20,13 @@ import java.time.Instant;
 import java.util.UUID;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.jspecify.annotations.Nullable;
 
 @Data
 @NoArgsConstructor
+// The no-args constructor (Jackson, MapStruct) leaves the fields to be set afterwards; every reader
+// gets them populated.
+@SuppressWarnings("NullAway.Init")
 public class DeployTokenInfo {
   private UUID id;
 
@@ -31,15 +35,15 @@ public class DeployTokenInfo {
   private String name;
 
   @JsonInclude(JsonInclude.Include.NON_EMPTY)
-  private String username;
+  private @Nullable String username;
 
   @JsonInclude(JsonInclude.Include.NON_EMPTY)
-  private String description;
+  private @Nullable String description;
 
   private boolean readOnly;
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
-  private Instant expirationDate;
+  private @Nullable Instant expirationDate;
 
   private Instant createdAt;
 

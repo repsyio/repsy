@@ -28,30 +28,27 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
 @Component
-@NullMarked
 public class PypiArtifactStorageResolver implements ArtifactStorageResolver {
 
   private static final Set<String> SUPPORTED_REPO_TYPES = Set.of("PYPI");
   private static final String SDIST_SUFFIX = ".tar.gz";
   private static final String DIGEST_SUFFIX = PackageStorageUtils.HASH_ALGORITHM;
 
-  private final @NonNull StorageStrategy pypiStorageStrategy;
+  private final StorageStrategy pypiStorageStrategy;
 
   public PypiArtifactStorageResolver(final StorageStrategyRegistry storageStrategyRegistry) {
     this.pypiStorageStrategy = storageStrategyRegistry.get(RepoType.PYPI);
   }
 
   @Override
-  public @NonNull Optional<String> resolve(
-      final @NonNull UUID repoId,
-      final @NonNull String repoName,
-      final @NonNull String artifactName,
-      final @NonNull String artifactVersion) {
+  public Optional<String> resolve(
+      final UUID repoId,
+      final String repoName,
+      final String artifactName,
+      final String artifactVersion) {
 
     final var packagePath = artifactName.endsWith("/") ? artifactName : artifactName + "/";
     final var storagePath = StoragePath.of(repoId, packagePath);
@@ -70,8 +67,8 @@ public class PypiArtifactStorageResolver implements ArtifactStorageResolver {
     return chosen.map(filename -> Paths.get(artifactName, filename).toString());
   }
 
-  private static @NonNull List<@NonNull String> filterMatchingFilenames(
-      final @NonNull List<@NonNull StorageItemInfo> items, final @NonNull String artifactVersion) {
+  private static List<String> filterMatchingFilenames(
+      final List<StorageItemInfo> items, final String artifactVersion) {
 
     return items.stream()
         .filter(item -> !item.isDirectory())
@@ -81,8 +78,7 @@ public class PypiArtifactStorageResolver implements ArtifactStorageResolver {
         .toList();
   }
 
-  private static @NonNull Optional<String> pickPreferredFilename(
-      final @NonNull List<@NonNull String> candidates) {
+  private static Optional<String> pickPreferredFilename(final List<String> candidates) {
 
     return candidates.stream()
         .filter(filename -> filename.endsWith(SDIST_SUFFIX))
@@ -91,7 +87,7 @@ public class PypiArtifactStorageResolver implements ArtifactStorageResolver {
   }
 
   @Override
-  public @NonNull Set<String> getSupportedRepoTypes() {
+  public Set<String> getSupportedRepoTypes() {
     return SUPPORTED_REPO_TYPES;
   }
 }

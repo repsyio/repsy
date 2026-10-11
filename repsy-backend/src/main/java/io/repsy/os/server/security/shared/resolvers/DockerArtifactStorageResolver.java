@@ -26,8 +26,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
 /**
@@ -35,23 +33,22 @@ import org.springframework.stereotype.Component;
  * path to hand over: an existing image reference resolves to an empty path.
  */
 @Component
-@NullMarked
 @RequiredArgsConstructor
 public class DockerArtifactStorageResolver implements ArtifactStorageResolver {
 
   private static final Set<String> SUPPORTED_REPO_TYPES = Set.of("DOCKER");
   private static final String NO_STORAGE_PATH = "";
 
-  private final @NonNull ImageRepository imageRepository;
-  private final @NonNull TagRepository tagRepository;
-  private final @NonNull ManifestRepository manifestRepository;
+  private final ImageRepository imageRepository;
+  private final TagRepository tagRepository;
+  private final ManifestRepository manifestRepository;
 
   @Override
-  public @NonNull Optional<String> resolve(
-      final @NonNull UUID repoId,
-      final @NonNull String repoName,
-      final @NonNull String artifactName,
-      final @NonNull String artifactVersion) {
+  public Optional<String> resolve(
+      final UUID repoId,
+      final String repoName,
+      final String artifactName,
+      final String artifactVersion) {
 
     final var exists =
         BlobDigests.startsWithDigestPrefix(artifactVersion)
@@ -63,8 +60,7 @@ public class DockerArtifactStorageResolver implements ArtifactStorageResolver {
     return exists ? Optional.of(NO_STORAGE_PATH) : Optional.empty();
   }
 
-  private boolean digestExists(
-      final @NonNull UUID repoId, final @NonNull String imageName, final @NonNull String digest) {
+  private boolean digestExists(final UUID repoId, final String imageName, final String digest) {
 
     return this.imageRepository
         .findByRepoIdAndName(repoId, imageName)
@@ -72,7 +68,7 @@ public class DockerArtifactStorageResolver implements ArtifactStorageResolver {
         .orElse(false);
   }
 
-  private boolean imageHasDigest(final @NonNull Image image, final @NonNull String digest) {
+  private boolean imageHasDigest(final Image image, final String digest) {
 
     return this.manifestRepository
         .findByImageIdAndAnyDigest(image.getId(), DockerDigestCalculator.normalize(digest))
@@ -80,7 +76,7 @@ public class DockerArtifactStorageResolver implements ArtifactStorageResolver {
   }
 
   @Override
-  public @NonNull Set<String> getSupportedRepoTypes() {
+  public Set<String> getSupportedRepoTypes() {
     return SUPPORTED_REPO_TYPES;
   }
 }

@@ -17,11 +17,10 @@ package io.repsy.libs.scanner;
 
 import java.io.IOException;
 import java.io.InputStream;
-import org.jspecify.annotations.NonNull;
 
 public interface ArtifactContent {
 
-  @NonNull String fileName();
+  String fileName();
 
-  @NonNull InputStream openStream() throws IOException;
+  InputStream openStream() throws IOException;
 }

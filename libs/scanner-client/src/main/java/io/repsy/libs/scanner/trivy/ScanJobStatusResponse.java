@@ -17,11 +17,10 @@ package io.repsy.libs.scanner.trivy;
 
 import io.repsy.libs.scanner.dtos.ScanOutcome;
 import java.util.UUID;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 public record ScanJobStatusResponse(
-    @NonNull UUID scanId,
-    @NonNull ScanJobStatus status,
+    UUID scanId,
+    ScanJobStatus status,
     @Nullable ScanOutcome result,
     @Nullable String errorMessage) {}

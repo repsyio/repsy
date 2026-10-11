@@ -20,7 +20,6 @@ import io.repsy.os.server.security.scan.services.VulnerabilityScanTxService;
 import io.repsy.os.server.security.scanner.noop.NoOpScanCompletedEvent;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
@@ -29,10 +28,10 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class NoOpScanListener {
 
-  private final @NonNull VulnerabilityScanTxService scanTxService;
+  private final VulnerabilityScanTxService scanTxService;
 
   @EventListener
-  public void onNoOpScanCompleted(final @NonNull NoOpScanCompletedEvent event) {
+  public void onNoOpScanCompleted(final NoOpScanCompletedEvent event) {
     this.scanTxService.recordScanOutcome(event.scanId(), new ScanOutcome(List.of(), null));
   }
 }

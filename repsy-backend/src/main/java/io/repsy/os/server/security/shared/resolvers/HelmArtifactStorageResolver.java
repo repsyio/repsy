@@ -27,27 +27,24 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
-@NullMarked
 @RequiredArgsConstructor
 public class HelmArtifactStorageResolver implements ArtifactStorageResolver {
 
   private static final Set<String> SUPPORTED_REPO_TYPES = Set.of("HELM");
 
-  private final @NonNull HelmStorageService<?> helmStorageService;
-  private final @NonNull HelmChartService helmChartService;
+  private final HelmStorageService<?> helmStorageService;
+  private final HelmChartService helmChartService;
 
   @Override
-  public @NonNull Optional<String> resolve(
-      final @NonNull UUID repoId,
-      final @NonNull String repoName,
-      final @NonNull String artifactName,
-      final @NonNull String artifactVersion) {
+  public Optional<String> resolve(
+      final UUID repoId,
+      final String repoName,
+      final String artifactName,
+      final String artifactVersion) {
 
     final var relativePath =
         this.helmStorageService.getChartRelativePath(artifactName, artifactVersion);
@@ -75,7 +72,7 @@ public class HelmArtifactStorageResolver implements ArtifactStorageResolver {
   }
 
   @Override
-  public @NonNull Set<String> getSupportedRepoTypes() {
+  public Set<String> getSupportedRepoTypes() {
     return SUPPORTED_REPO_TYPES;
   }
 }

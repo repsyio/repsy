@@ -16,11 +16,10 @@
 package io.repsy.libs.scanner.trivy;
 
 import java.util.UUID;
-import org.jspecify.annotations.NonNull;
 
 public final class ScanJobNotFoundException extends RuntimeException {
 
-  public ScanJobNotFoundException(final @NonNull UUID scanId) {
+  public ScanJobNotFoundException(final UUID scanId) {
     super("Scanner has no job for scanId: " + scanId);
   }
 }

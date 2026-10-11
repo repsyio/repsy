@@ -28,8 +28,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
@@ -41,11 +41,10 @@ public class UsagePostProcessor extends ProtocolProcessor {
   // own write, so that write is checkpointed too.
   private static final int PRIORITY = Integer.MAX_VALUE - 1;
 
-  private final @NonNull UsageUpdateService usageUpdateService;
+  private final UsageUpdateService usageUpdateService;
 
   public UsagePostProcessor(
-      final @NonNull UsageUpdateService usageUpdateService,
-      final @NonNull List<ProtocolProvider> protocolProviders) {
+      final UsageUpdateService usageUpdateService, final List<ProtocolProvider> protocolProviders) {
 
     this.usageUpdateService = usageUpdateService;
 
@@ -70,19 +69,21 @@ public class UsagePostProcessor extends ProtocolProcessor {
   }
 
   @Override
-  protected @NonNull ProcessorResult process(
-      final @NonNull ProtocolContext context,
-      final @NonNull HttpServletRequest request,
-      final @NonNull HttpServletResponse response,
-      final @NonNull Map<@NonNull String, @NonNull Object> properties) {
+  protected ProcessorResult process(
+      final ProtocolContext context,
+      final HttpServletRequest request,
+      final HttpServletResponse response,
+      final Map<String, Object> properties) {
 
     final var usages = this.getUsages(context);
 
-    if (this.shouldSkip(properties) || !this.hasUsage(usages)) {
+    if (this.shouldSkip(properties) || usages == null || !this.hasUsage(usages)) {
       return ProcessorResult.next();
     }
 
-    final var repoInfo = context.<UrlParserProperties>getProperty("urlProperties").getRepoInfo();
+    final var repoInfo =
+        Objects.requireNonNull(context.<UrlParserProperties>getProperty("urlProperties"))
+            .getRepoInfo();
     final var usageChangedInfo = new UsageChangedInfo(repoInfo.getStorageKey(), usages);
 
     log.debug(
@@ -93,20 +94,16 @@ public class UsagePostProcessor extends ProtocolProcessor {
     return ProcessorResult.next();
   }
 
-  private boolean hasUsage(final @Nullable BaseUsages usages) {
-    if (usages == null) {
-      return false;
-    }
-
+  private boolean hasUsage(final BaseUsages usages) {
     return usages.getDiskUsage() != 0;
   }
 
-  private @Nullable BaseUsages getUsages(final @NonNull ProtocolContext context) {
+  private @Nullable BaseUsages getUsages(final ProtocolContext context) {
     final var usagesMap = context.getContextMap();
     return (BaseUsages) usagesMap.get("usages");
   }
 
-  private boolean shouldSkip(final @NonNull Map<@NonNull String, @NonNull Object> properties) {
+  private boolean shouldSkip(final Map<String, Object> properties) {
     return (boolean) properties.getOrDefault(HandlerPropertyKeys.SKIP_USAGE_POST_PROCESSOR, false);
   }
 }

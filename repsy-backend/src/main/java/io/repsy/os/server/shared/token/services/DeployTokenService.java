@@ -38,7 +38,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -50,45 +49,43 @@ import org.springframework.transaction.annotation.Transactional;
 public class DeployTokenService {
 
   /** The token info and id of a newly created token. */
-  public record NewTokenInfo(@NonNull TokenInfo tokenInfo, @NonNull UUID tokenId) {}
+  public record NewTokenInfo(TokenInfo tokenInfo, UUID tokenId) {}
 
   private static final Duration DEFAULT_EXPIRATION_DURATION = Duration.of(365, ChronoUnit.DAYS);
 
-  private final @NonNull RepoTxService repoTxService;
-  private final @NonNull RepoDeployTokenRepository deployTokenRepository;
-  private final @NonNull DeployTokenMapper deployTokenConverter;
+  private final RepoTxService repoTxService;
+  private final RepoDeployTokenRepository deployTokenRepository;
+  private final DeployTokenMapper deployTokenConverter;
 
-  public @NonNull Page<DeployTokenInfoListItem> getDeployTokensByRepoInfo(
-      final @NonNull UUID repoId, final @NonNull Pageable pageable) {
+  public Page<DeployTokenInfoListItem> getDeployTokensByRepoInfo(
+      final UUID repoId, final Pageable pageable) {
 
     return this.deployTokenRepository.findAllByRepoId(repoId, pageable);
   }
 
-  public @NonNull Optional<DeployTokenInfo> findByTokenAndRepoType(
-      final @NonNull String token, final @NonNull RepoType repoType) {
+  public Optional<DeployTokenInfo> findByTokenAndRepoType(
+      final String token, final RepoType repoType) {
 
     return this.deployTokenRepository
         .findByTokenAndRepoType(DeployTokenHash.hash(token), repoType)
         .map(this.deployTokenConverter::toDeployTokenInfo);
   }
 
-  public @NonNull Optional<DeployTokenInfo> findByToken(final @NonNull String token) {
+  public Optional<DeployTokenInfo> findByToken(final String token) {
 
     return this.deployTokenRepository
         .findByToken(DeployTokenHash.hash(token))
         .map(this.deployTokenConverter::toDeployTokenInfo);
   }
 
-  public @NonNull Optional<DeployTokenInfo> findByRepoIdAndToken(
-      final @NonNull UUID repoId, final @NonNull String token) {
+  public Optional<DeployTokenInfo> findByRepoIdAndToken(final UUID repoId, final String token) {
 
     return this.deployTokenRepository
         .findByRepoIdAndToken(repoId, DeployTokenHash.hash(token))
         .map(this.deployTokenConverter::toDeployTokenInfo);
   }
 
-  public @NonNull Optional<DeployTokenInfo> findByRepoIdAndTokenId(
-      final @NonNull UUID repoId, final @NonNull UUID tokenId) {
+  public Optional<DeployTokenInfo> findByRepoIdAndTokenId(final UUID repoId, final UUID tokenId) {
 
     return this.deployTokenRepository
         .findByRepoIdAndId(repoId, tokenId)
@@ -96,8 +93,7 @@ public class DeployTokenService {
   }
 
   @Transactional
-  public @NonNull NewTokenInfo createDeployToken(
-      final @NonNull UUID repoId, final @NonNull DeployTokenForm deployTokenForm) {
+  public NewTokenInfo createDeployToken(final UUID repoId, final DeployTokenForm deployTokenForm) {
 
     final var repo = this.repoTxService.requireRepo(repoId);
     final var now = Instant.now();
@@ -148,7 +144,7 @@ public class DeployTokenService {
    * maximum by a few milliseconds.
    */
   private static boolean isBeyondMaximumExpiration(
-      final @NonNull Instant expirationDate, final @NonNull Instant now) {
+      final Instant expirationDate, final Instant now) {
 
     final var lastDay = now.plus(DEFAULT_EXPIRATION_DURATION).atZone(ZoneOffset.UTC).toLocalDate();
 
@@ -156,7 +152,7 @@ public class DeployTokenService {
   }
 
   @Transactional
-  public void revokeDeployToken(final @NonNull UUID repoId, final @NonNull UUID tokenId) {
+  public void revokeDeployToken(final UUID repoId, final UUID tokenId) {
 
     final var repoDeployToken = this.getRepoDeployTokenByRepoAndTokenId(repoId, tokenId);
 
@@ -164,8 +160,7 @@ public class DeployTokenService {
   }
 
   @Transactional
-  public @NonNull String rotateDeployToken(
-      final @NonNull UUID repoId, final @NonNull UUID tokenId) {
+  public String rotateDeployToken(final UUID repoId, final UUID tokenId) {
 
     final var repoDeployToken = this.getRepoDeployTokenByRepoAndTokenId(repoId, tokenId);
     final var newToken = TokenFactory.deployToken();
@@ -184,13 +179,13 @@ public class DeployTokenService {
   }
 
   @Transactional
-  public void updateLastUsedTime(final @NonNull UUID tokenId) {
+  public void updateLastUsedTime(final UUID tokenId) {
 
     this.deployTokenRepository.updateLastUsedTime(tokenId, Instant.now());
   }
 
-  private @NonNull RepoDeployToken getRepoDeployTokenByRepoAndTokenId(
-      final @NonNull UUID repoId, final @NonNull UUID tokenId) {
+  private RepoDeployToken getRepoDeployTokenByRepoAndTokenId(
+      final UUID repoId, final UUID tokenId) {
 
     return this.deployTokenRepository
         .findByRepoIdAndId(repoId, tokenId)

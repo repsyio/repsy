@@ -19,7 +19,6 @@ import io.repsy.protocols.shared.http.PublicUrls;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
@@ -27,11 +26,11 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 @UtilityClass
 public class RequestBaseUrlUtils {
 
-  public static @NonNull String resolveBaseUrl(final @NonNull HttpServletRequest request) {
+  public static String resolveBaseUrl(final HttpServletRequest request) {
     return PublicUrls.origin(request);
   }
 
-  public static @NonNull String resolveBaseUrl() {
+  public static String resolveBaseUrl() {
     try {
       final var requestAttributes = RequestContextHolder.getRequestAttributes();
       if (requestAttributes instanceof final ServletRequestAttributes servletRequestAttributes) {

@@ -28,7 +28,6 @@ import io.repsy.protocols.shared.auth.PasswordHasher;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,15 +36,13 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ProfileService {
 
-  private final @NonNull LoginInfoFactory loginInfoFactory;
-  private final @NonNull ReservedUsernameService reservedUsernameService;
-  private final @NonNull UserTxService userTxService;
+  private final LoginInfoFactory loginInfoFactory;
+  private final ReservedUsernameService reservedUsernameService;
+  private final UserTxService userTxService;
 
   @Transactional
-  public @NonNull LoginInfo updateUsername(
-      final @NonNull UUID userId,
-      final @NonNull String newUsername,
-      final @NonNull Instant sessionStart) {
+  public LoginInfo updateUsername(
+      final UUID userId, final String newUsername, final Instant sessionStart) {
 
     this.userTxService.getAuthenticatedUserById(userId);
 
@@ -58,7 +55,7 @@ public class ProfileService {
         this.userTxService.getAuthenticatedUserById(userId), sessionStart);
   }
 
-  public ProfileInfo getProfile(final @NonNull UUID userId) {
+  public ProfileInfo getProfile(final UUID userId) {
     final var user = this.userTxService.getAuthenticatedUserById(userId);
 
     return ProfileInfo.builder()
@@ -71,10 +68,8 @@ public class ProfileService {
   }
 
   @Transactional
-  public @NonNull LoginInfo updatePassword(
-      final @NonNull UUID userId,
-      final @NonNull PasswordForm form,
-      final @NonNull Instant sessionStart) {
+  public LoginInfo updatePassword(
+      final UUID userId, final PasswordForm form, final Instant sessionStart) {
 
     final var user = this.userTxService.getAuthenticatedUserById(userId);
 
@@ -84,7 +79,7 @@ public class ProfileService {
     return this.loginInfoFactory.create(this.userTxService.getUserById(userId), sessionStart);
   }
 
-  private void validateUsernameAvailability(final @NonNull String newUsername) {
+  private void validateUsernameAvailability(final String newUsername) {
 
     this.reservedUsernameService.requireNotReserved(newUsername);
 

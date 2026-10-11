@@ -18,7 +18,6 @@ package io.repsy.libs.scanner.trivy;
 import io.repsy.core.web.http.ResponseSizeLimitInterceptor;
 import java.net.http.HttpClient;
 import java.time.Duration;
-import org.jspecify.annotations.NonNull;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
@@ -44,12 +43,11 @@ import org.springframework.web.client.RestClient;
 @Configuration
 public class TrivyScannerRestClientConfig {
 
-  private static final @NonNull Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
+  private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
   private static final int MAX_RESPONSE_BYTES = 10 * 1024 * 1024;
 
   @Bean
-  public @NonNull RestClient trivyScannerRestClient(
-      final @NonNull TrivyScannerClientProperties properties) {
+  public RestClient trivyScannerRestClient(final TrivyScannerClientProperties properties) {
 
     return build(Duration.ofSeconds(properties.requestTimeoutSeconds()))
         .requestInterceptor(new ResponseSizeLimitInterceptor(MAX_RESPONSE_BYTES))
@@ -57,15 +55,14 @@ public class TrivyScannerRestClientConfig {
   }
 
   @Bean
-  public @NonNull RestClient trivyScannerUploadRestClient(
-      final @NonNull TrivyScannerClientProperties properties) {
+  public RestClient trivyScannerUploadRestClient(final TrivyScannerClientProperties properties) {
 
     // No interceptor here: any interceptor makes RestClient buffer the whole request body, and the
     // artifact must be streamed. The answer is bodiless, so there is nothing to cap either.
     return build(Duration.ofSeconds(properties.maxScanDurationSeconds())).build();
   }
 
-  private static RestClient.@NonNull Builder build(final @NonNull Duration requestTimeout) {
+  private static RestClient.Builder build(final Duration requestTimeout) {
 
     // HTTP/1.1 and no redirects, as the Reactor Netty client this replaced.
     final var httpClient =

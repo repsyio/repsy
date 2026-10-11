@@ -52,10 +52,10 @@ import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -65,11 +65,11 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class ProtocolAuthService {
 
-  protected final @NonNull UserTxService userTxService;
-  protected final @NonNull JwtUtils jwtUtils;
-  protected final @NonNull DeployTokenService deployTokenService;
-  protected final @NonNull VerifiedPasswordCache verifiedPasswordCache;
-  protected final @NonNull AuthFailureThrottle authFailureThrottle;
+  protected final UserTxService userTxService;
+  protected final JwtUtils jwtUtils;
+  protected final DeployTokenService deployTokenService;
+  protected final VerifiedPasswordCache verifiedPasswordCache;
+  protected final AuthFailureThrottle authFailureThrottle;
 
   private @Nullable RevokedProtocolTokenService revokedTokens;
   private @Nullable PersonalAccessTokenService personalAccessTokens;
@@ -102,7 +102,7 @@ public class ProtocolAuthService {
    * package manager sends one; a browser navigation that cannot set the header uses the single-path
    * download token instead (RPS-980).
    */
-  public @Nullable String emulateAuthHeader(final @NonNull HttpServletRequest request) {
+  public @Nullable String emulateAuthHeader(final HttpServletRequest request) {
 
     return request.getHeader(HttpHeaders.AUTHORIZATION);
   }
@@ -126,9 +126,7 @@ public class ProtocolAuthService {
    * counted.
    */
   public void handleBearerAuth(
-      final @NonNull String authHeader,
-      final @NonNull UUID repoId,
-      final @NonNull Permission permission) {
+      final String authHeader, final UUID repoId, final Permission permission) {
 
     final var bearerToken = authHeader.substring(AUTH_BEARER.length());
 
@@ -149,10 +147,10 @@ public class ProtocolAuthService {
   }
 
   private void authorizeByAuthenticationType(
-      final @NonNull AuthenticationType authenticationType,
-      final @NonNull String authHeader,
-      final @NonNull UUID repoId,
-      final @NonNull Permission permission) {
+      final AuthenticationType authenticationType,
+      final String authHeader,
+      final UUID repoId,
+      final Permission permission) {
 
     switch (authenticationType) {
       case DEPLOY_TOKEN ->
@@ -182,7 +180,7 @@ public class ProtocolAuthService {
    *
    * @param token The JWT without its {@code Bearer} prefix
    */
-  protected void rejectRevokedToken(final @NonNull String token) {
+  protected void rejectRevokedToken(final String token) {
     final var registry = this.revokedTokens;
 
     if (registry != null && registry.isRevoked(token)) {
@@ -206,9 +204,7 @@ public class ProtocolAuthService {
    * keeps this default of refusing it.
    */
   protected void authorizeScannerBearer(
-      final @NonNull String authHeader,
-      final @NonNull UUID repoId,
-      final @NonNull Permission permission) {
+      final String authHeader, final UUID repoId, final Permission permission) {
     throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
   }
 
@@ -232,7 +228,7 @@ public class ProtocolAuthService {
    * like a remembered password (RPS-1092). What Repsy recognized but refuses (a revoked or
    * read-only deploy token, no ADMIN for MANAGE) is decided later and does not count either.
    */
-  private @NonNull AuthenticationType verifiedAuthenticationType(final @NonNull String authHeader) {
+  private AuthenticationType verifiedAuthenticationType(final String authHeader) {
     try {
       return this.jwtUtils.extractAuthenticationType(authHeader, TokenRealm.PROTOCOL);
     } catch (final UnAuthorizedException ex) {
@@ -246,7 +242,7 @@ public class ProtocolAuthService {
   }
 
   /** Counts one failed credential against the client and returns the answer to give for it. */
-  private @NonNull UnAuthorizedException countedUnAuthorized() {
+  private UnAuthorizedException countedUnAuthorized() {
     this.authFailureThrottle.checkAllowed();
     this.authFailureThrottle.recordFailure();
     return new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
@@ -258,10 +254,7 @@ public class ProtocolAuthService {
    * reads only; the caller was authorized when it asked for the token.
    */
   public void handleDownloadToken(
-      final @NonNull String token,
-      final @NonNull UUID repoId,
-      final @NonNull String path,
-      final @NonNull Permission permission) {
+      final String token, final UUID repoId, final String path, final Permission permission) {
 
     if (permission != Permission.READ) {
       throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
@@ -271,9 +264,7 @@ public class ProtocolAuthService {
   }
 
   public void handleBasicAuth(
-      final @NonNull String authHeader,
-      final @NonNull Permission permission,
-      final @NonNull UUID repoId) {
+      final String authHeader, final Permission permission, final UUID repoId) {
 
     final var basicToken = removeBasicPrefix(authHeader);
     final var credentials = extractCredentialsFromBasicToken(basicToken);
@@ -298,8 +289,8 @@ public class ProtocolAuthService {
    * permission is answered {@code unAuthorized} (401), which is the answer package managers expect
    * and act on. The web UI API uses {@link #authorizePanelUser} instead.
    */
-  public @NonNull PermissionInfo authorizeUser(
-      final @Nullable UserInfo userInfo, final @NonNull Permission permission) {
+  public PermissionInfo authorizeUser(
+      final @Nullable UserInfo userInfo, final Permission permission) {
 
     if (userInfo == null) {
       throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
@@ -320,8 +311,8 @@ public class ProtocolAuthService {
    * credential is a 401 there, so the SPA can tell a lost session from a refused action (RPS-1284).
    * A {@code null} user is still a 401.
    */
-  public @NonNull PermissionInfo authorizePanelUser(
-      final @Nullable UserInfo userInfo, final @NonNull Permission permission) {
+  public PermissionInfo authorizePanelUser(
+      final @Nullable UserInfo userInfo, final Permission permission) {
 
     if (userInfo != null
         && permission == Permission.MANAGE
@@ -333,10 +324,8 @@ public class ProtocolAuthService {
   }
 
   /** Authorizes a web UI API request to one repo, see {@link #authorizePanelUser}. */
-  public @NonNull RepoPermissionInfo authorizeUserRequest(
-      final @NonNull RepoInfo repoInfo,
-      final @Nullable String authHeader,
-      final @NonNull Permission permission) {
+  public RepoPermissionInfo authorizeUserRequest(
+      final RepoInfo repoInfo, final @Nullable String authHeader, final Permission permission) {
 
     if (authHeader != null) {
       return this.authorizeRepoUser(repoInfo, authHeader, permission);
@@ -363,8 +352,7 @@ public class ProtocolAuthService {
    * token is treated as on an existing repo, so its owner gets the same answer for a missing repo
    * as for any other.
    */
-  public void authorizeUnknownRepoRequest(
-      final @NonNull String authHeader, final @NonNull Permission permission) {
+  public void authorizeUnknownRepoRequest(final String authHeader, final Permission permission) {
 
     final var secret = AuthUtils.personalAccessTokenSecretOf(authHeader);
 
@@ -383,8 +371,8 @@ public class ProtocolAuthService {
    * (403), not {@code unAuthorized}: only a missing or invalid credential is a 401 there
    * (RPS-1284).
    */
-  private @NonNull PermissionInfo authorizePanelPersonalAccessToken(
-      final @NonNull String secret, final @NonNull Permission permission) {
+  private PermissionInfo authorizePanelPersonalAccessToken(
+      final String secret, final Permission permission) {
 
     final var token = this.authenticateWithPat(secret);
     final var isAdmin =
@@ -406,8 +394,7 @@ public class ProtocolAuthService {
     return permissionInfo;
   }
 
-  private static boolean grants(
-      final @NonNull PermissionInfo permissionInfo, final @NonNull Permission permission) {
+  private static boolean grants(final PermissionInfo permissionInfo, final Permission permission) {
 
     return switch (permission) {
       case READ -> permissionInfo.isCanRead();
@@ -418,7 +405,7 @@ public class ProtocolAuthService {
   }
 
   /** Authenticates a web UI API request, so a bearer token has to be a panel access token. */
-  public @NonNull UserInfo authenticateUser(final @Nullable String authHeader) {
+  public UserInfo authenticateUser(final @Nullable String authHeader) {
 
     if (authHeader == null) {
       throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
@@ -431,8 +418,7 @@ public class ProtocolAuthService {
     };
   }
 
-  protected boolean isPublicReadAccess(
-      final @NonNull RepoInfo repoInfo, final @NonNull Permission permission) {
+  protected boolean isPublicReadAccess(final RepoInfo repoInfo, final Permission permission) {
 
     return !repoInfo.isPrivateRepo() && Permission.READ.equals(permission);
   }
@@ -454,9 +440,7 @@ public class ProtocolAuthService {
    * @return {@code false} only when the secret is not a personal access token
    */
   protected boolean tryAuthorizeWithPat(
-      final @NonNull UUID repoId,
-      final @NonNull String secret,
-      final @NonNull Permission permission) {
+      final UUID repoId, final String secret, final Permission permission) {
 
     if (!TokenType.REPSY_USER_TOKEN.matches(secret)) {
       return false;
@@ -468,9 +452,7 @@ public class ProtocolAuthService {
   }
 
   private boolean tryAuthorizeWithPatBearer(
-      final @NonNull UUID repoId,
-      final @NonNull String bearerToken,
-      final @NonNull Permission permission) {
+      final UUID repoId, final String bearerToken, final Permission permission) {
 
     if (!TokenType.REPSY_USER_TOKEN.matches(bearerToken)) {
       return false;
@@ -489,7 +471,7 @@ public class ProtocolAuthService {
    * Finds the live token a {@code rut-} secret belongs to. An unknown or expired one is a failed
    * credential: it is counted, and is answered like a wrong password.
    */
-  protected @NonNull PersonalAccessTokenInfo authenticateWithPat(final @NonNull String secret) {
+  protected PersonalAccessTokenInfo authenticateWithPat(final String secret) {
 
     final var service = this.personalAccessTokens;
     final Optional<PersonalAccessTokenInfo> found =
@@ -509,7 +491,7 @@ public class ProtocolAuthService {
    * {@code repo:manage} on a user without the role is refused.
    */
   protected void authorizePersonalAccessToken(
-      final @NonNull PersonalAccessTokenInfo token, final @NonNull Permission permission) {
+      final PersonalAccessTokenInfo token, final Permission permission) {
 
     if (!TokenScope.permits(token.scopes(), permission)) {
       throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
@@ -529,8 +511,8 @@ public class ProtocolAuthService {
    * JWT never outlives the token. It is a protocol token: no personal access token is ever turned
    * into a panel one.
    */
-  protected @NonNull String createPersonalAccessTokenJwt(
-      final @NonNull PersonalAccessTokenInfo token, final @NonNull Duration maxTimeout) {
+  protected String createPersonalAccessTokenJwt(
+      final PersonalAccessTokenInfo token, final Duration maxTimeout) {
 
     final var untilExpiry = Duration.between(Instant.now(), token.expirationDate());
     final var timeout = untilExpiry.compareTo(maxTimeout) < 0 ? untilExpiry : maxTimeout;
@@ -539,7 +521,7 @@ public class ProtocolAuthService {
         token.id(), token.username(), timeout, AuthenticationType.PERSONAL_ACCESS_TOKEN);
   }
 
-  protected void touchPersonalAccessToken(final @NonNull PersonalAccessTokenInfo token) {
+  protected void touchPersonalAccessToken(final PersonalAccessTokenInfo token) {
 
     final var service = this.personalAccessTokens;
 
@@ -555,7 +537,7 @@ public class ProtocolAuthService {
    * answered {@code unAuthorized} and is not counted: the JWT is one Repsy signed, not a guess.
    */
   private void authorizePersonalAccessTokenJwt(
-      final @NonNull String authHeader, final @NonNull Permission permission) {
+      final String authHeader, final Permission permission) {
 
     final var tokenId = this.jwtUtils.extractUserId(authHeader, TokenRealm.PROTOCOL);
 
@@ -566,8 +548,7 @@ public class ProtocolAuthService {
   }
 
   /** The token with this id if it exists and has not expired, for a JWT minted from it. */
-  protected @NonNull Optional<PersonalAccessTokenInfo> findLivePersonalAccessToken(
-      final @NonNull UUID tokenId) {
+  protected Optional<PersonalAccessTokenInfo> findLivePersonalAccessToken(final UUID tokenId) {
 
     final var service = this.personalAccessTokens;
 
@@ -579,9 +560,7 @@ public class ProtocolAuthService {
   }
 
   protected boolean tryAuthorizeWithDeployToken(
-      final @NonNull UUID repoId,
-      final @NonNull String token,
-      final @NonNull Permission permission) {
+      final UUID repoId, final String token, final Permission permission) {
 
     final var deployTokenInfoOpt = this.deployTokenService.findByRepoIdAndToken(repoId, token);
 
@@ -595,9 +574,7 @@ public class ProtocolAuthService {
   }
 
   public void authorizeTokenRequestTokenId(
-      final @NonNull UUID repoId,
-      final @NonNull UUID tokenId,
-      final @NonNull Permission permission) {
+      final UUID repoId, final UUID tokenId, final Permission permission) {
 
     // A deploy token never manages, whatever its read-only flag says (RPS-1424).
     if (permission == Permission.MANAGE) {
@@ -623,13 +600,13 @@ public class ProtocolAuthService {
     this.deployTokenService.updateLastUsedTime(deployToken.getId());
   }
 
-  protected boolean isWritePermissionRequired(final @NonNull Permission permission) {
+  protected boolean isWritePermissionRequired(final Permission permission) {
 
     return permission == Permission.MANAGE || permission == Permission.WRITE;
   }
 
   private void authorizeDeployTokenRequest(
-      final @NonNull DeployTokenInfo deployTokenInfo, final @NonNull Permission permission) {
+      final DeployTokenInfo deployTokenInfo, final Permission permission) {
 
     if (deployTokenInfo.isExpired()) {
       throw new UnAuthorizedException(ProtocolErrorCodes.DEPLOY_TOKEN_EXPIRED);
@@ -646,7 +623,7 @@ public class ProtocolAuthService {
    * panel offers those operations to admins only.
    */
   private void authorizeDeployToken(
-      final @NonNull DeployTokenInfo deployTokenInfo, final @NonNull Permission permission) {
+      final DeployTokenInfo deployTokenInfo, final Permission permission) {
 
     if (permission == Permission.MANAGE) {
       throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
@@ -657,8 +634,7 @@ public class ProtocolAuthService {
     }
   }
 
-  private void authorizeJWTRequest(
-      final @NonNull String authHeader, final @NonNull Permission permission) {
+  private void authorizeJWTRequest(final String authHeader, final Permission permission) {
 
     this.authorizeUser(this.authenticateJwtUser(authHeader), permission);
   }
@@ -679,7 +655,7 @@ public class ProtocolAuthService {
    * as its subject, the ones of the releases before the version claim too, so the grace for those
    * is kept.
    */
-  protected @NonNull UserInfo authenticateJwtUser(final @NonNull String authHeader) {
+  protected UserInfo authenticateJwtUser(final String authHeader) {
 
     final var claims = this.jwtUtils.extractProtocolUserClaims(authHeader);
     final var userInfo = this.userTxService.getAuthenticatedUserByUsername(claims.username());
@@ -692,7 +668,7 @@ public class ProtocolAuthService {
   }
 
   protected void handleUsernamePasswordAuthentication(
-      final @NonNull Credentials credentials, final @NonNull Permission permission) {
+      final Credentials credentials, final Permission permission) {
 
     this.authorizeUser(this.authenticateWithPassword(credentials), permission);
   }
@@ -702,7 +678,7 @@ public class ProtocolAuthService {
    * a wrong password all fail with the same {@code unAuthorized} error, so the response does not
    * reveal which usernames exist.
    */
-  protected @NonNull UserInfo authenticateWithPassword(final @NonNull Credentials credentials) {
+  protected UserInfo authenticateWithPassword(final Credentials credentials) {
 
     final var username = credentials.getUsername();
     final var password = credentials.getPassword();
@@ -725,14 +701,14 @@ public class ProtocolAuthService {
     }
 
     // Hashes from an older algorithm or work factor are replaced now that the password is known.
-    if (PasswordHasher.needsUpgrade(userInfo.getHash(), password)) {
+    if (PasswordHasher.needsUpgrade(Objects.requireNonNull(userInfo).getHash(), password)) {
       this.userTxService.upgradePasswordHash(userInfo, password);
     }
 
     return userInfo;
   }
 
-  private void rejectPersonalAccessTokenAsPassword(final @NonNull String password) {
+  private void rejectPersonalAccessTokenAsPassword(final String password) {
 
     if (TokenType.REPSY_USER_TOKEN.matches(password)) {
       throw this.countedUnAuthorized();
@@ -744,7 +720,7 @@ public class ProtocolAuthService {
    * it has used up its failures for the window (RPS-1092), and a failed check counts against it. An
    * unknown username is counted like a wrong password, so the two stay indistinguishable (RPS-906).
    */
-  private void checkPassword(final @Nullable UserInfo userInfo, final @NonNull String password) {
+  private void checkPassword(final @Nullable UserInfo userInfo, final String password) {
 
     this.authFailureThrottle.checkAllowed();
 
@@ -764,16 +740,14 @@ public class ProtocolAuthService {
     }
   }
 
-  private boolean isRemembered(final @NonNull UserInfo userInfo, final @NonNull String password) {
+  private boolean isRemembered(final UserInfo userInfo, final String password) {
 
     return !this.authFailureThrottle.isSaturated()
         && this.verifiedPasswordCache.isRemembered(userInfo, password);
   }
 
-  private @NonNull RepoPermissionInfo authorizeRepoUser(
-      final @NonNull RepoInfo repoInfo,
-      final @NonNull String authHeader,
-      final @NonNull Permission permission) {
+  private RepoPermissionInfo authorizeRepoUser(
+      final RepoInfo repoInfo, final String authHeader, final Permission permission) {
 
     final var secret = AuthUtils.personalAccessTokenSecretOf(authHeader);
     final var permissionInfo =
@@ -791,7 +765,7 @@ public class ProtocolAuthService {
         .build();
   }
 
-  private @NonNull UserInfo authenticateWithBasic(final @NonNull String authHeader) {
+  private UserInfo authenticateWithBasic(final String authHeader) {
 
     final var credentials = extractCredentialsFromAuthHeader(authHeader);
 
@@ -802,7 +776,7 @@ public class ProtocolAuthService {
     return this.authenticateWithPassword(credentials);
   }
 
-  private @NonNull UserInfo authenticateWithBearer(final @NonNull String authHeader) {
+  private UserInfo authenticateWithBearer(final String authHeader) {
 
     return this.authenticatePanelBearer(authHeader);
   }
@@ -815,7 +789,7 @@ public class ProtocolAuthService {
    * answers {@code sessionExpired}, which makes the SPA swap the token through its refresh token,
    * and does not count against {@link AuthFailureThrottle}.
    */
-  protected @NonNull UserInfo authenticatePanelBearer(final @NonNull String authHeader) {
+  protected UserInfo authenticatePanelBearer(final String authHeader) {
 
     final var claims = this.jwtUtils.extractPanelClaims(authHeader);
     final var userInfo = this.userTxService.getAuthenticatedUserByUsername(claims.username());
@@ -833,8 +807,7 @@ public class ProtocolAuthService {
    * ADMIN role. The README documents this model (RPS-939), and {@code ProtocolAuthServiceTest} pins
    * it.
    */
-  private void checkPermission(
-      final @NonNull UserInfo userInfo, final @NonNull Permission permission) {
+  private void checkPermission(final UserInfo userInfo, final Permission permission) {
 
     switch (permission) {
       case READ, WRITE -> {
@@ -845,7 +818,7 @@ public class ProtocolAuthService {
     }
   }
 
-  private void checkManage(final @NonNull UserInfo userInfo) {
+  private void checkManage(final UserInfo userInfo) {
 
     if (userInfo.getRole() != UserRole.ADMIN) {
       throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);

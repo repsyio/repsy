@@ -40,15 +40,12 @@ import org.apache.maven.artifact.repository.metadata.SnapshotVersion;
 import org.apache.maven.artifact.repository.metadata.Versioning;
 import org.apache.maven.index.artifact.Gav;
 import org.apache.maven.index.artifact.M2GavCalculator;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
-@NullMarked
 public class MavenArtifactStorageResolver implements ArtifactStorageResolver {
 
   private static final Set<String> SUPPORTED_REPO_TYPES = Set.of("MAVEN");
@@ -66,13 +63,13 @@ public class MavenArtifactStorageResolver implements ArtifactStorageResolver {
           "pom", "pom",
           "jar", "jar");
 
-  private final @NonNull ArtifactRepository artifactRepository;
-  private final @NonNull ArtifactVersionRepository artifactVersionRepository;
-  private final @NonNull StorageStrategy mavenStorageStrategy;
+  private final ArtifactRepository artifactRepository;
+  private final ArtifactVersionRepository artifactVersionRepository;
+  private final StorageStrategy mavenStorageStrategy;
 
   public MavenArtifactStorageResolver(
-      final @NonNull ArtifactRepository artifactRepository,
-      final @NonNull ArtifactVersionRepository artifactVersionRepository,
+      final ArtifactRepository artifactRepository,
+      final ArtifactVersionRepository artifactVersionRepository,
       final StorageStrategyRegistry storageStrategyRegistry) {
     this.artifactRepository = artifactRepository;
     this.artifactVersionRepository = artifactVersionRepository;
@@ -80,11 +77,11 @@ public class MavenArtifactStorageResolver implements ArtifactStorageResolver {
   }
 
   @Override
-  public @NonNull Optional<String> resolve(
-      final @NonNull UUID repoId,
-      final @NonNull String repoName,
-      final @NonNull String artifactName,
-      final @NonNull String artifactVersion) {
+  public Optional<String> resolve(
+      final UUID repoId,
+      final String repoName,
+      final String artifactName,
+      final String artifactVersion) {
 
     final var separatorIndex = artifactName.indexOf(':');
 
@@ -172,12 +169,12 @@ public class MavenArtifactStorageResolver implements ArtifactStorageResolver {
   }
 
   private @Nullable String resolveSnapshotBuildVersion(
-      final @NonNull UUID repoId,
-      final @NonNull String repoName,
-      final @NonNull String groupId,
-      final @NonNull String artifactId,
-      final @NonNull String artifactVersion,
-      final @NonNull String extension) {
+      final UUID repoId,
+      final String repoName,
+      final String groupId,
+      final String artifactId,
+      final String artifactVersion,
+      final String extension) {
 
     final var groupPath = groupId.replace('.', '/');
     final var metadataPath =
@@ -246,7 +243,7 @@ public class MavenArtifactStorageResolver implements ArtifactStorageResolver {
         : Optional.empty();
   }
 
-  private static @Nullable Metadata readMetadataQuietly(final @NonNull Resource resource) {
+  private static @Nullable Metadata readMetadataQuietly(final Resource resource) {
     try (final var inputStream = resource.getInputStream()) {
       return MavenMetadataUtils.readMetadata(inputStream.readAllBytes());
     } catch (final IOException | BadRequestException exception) {
@@ -258,13 +255,13 @@ public class MavenArtifactStorageResolver implements ArtifactStorageResolver {
     }
   }
 
-  private static @Nullable Versioning readVersioning(final @NonNull Resource resource) {
+  private static @Nullable Versioning readVersioning(final Resource resource) {
     final var metadata = readMetadataQuietly(resource);
     return metadata == null ? null : metadata.getVersioning();
   }
 
-  private static @NonNull Optional<String> findSnapshotVersionForExtension(
-      final @NonNull Versioning versioning, final @NonNull String extension) {
+  private static Optional<String> findSnapshotVersionForExtension(
+      final Versioning versioning, final String extension) {
 
     return versioning.getSnapshotVersions().stream()
         .filter(snapshotVersion -> extension.equals(snapshotVersion.getExtension()))
@@ -276,8 +273,8 @@ public class MavenArtifactStorageResolver implements ArtifactStorageResolver {
         .findFirst();
   }
 
-  private static @NonNull Optional<String> buildFromSnapshotTimestamp(
-      final @NonNull Versioning versioning, final @NonNull String artifactVersion) {
+  private static Optional<String> buildFromSnapshotTimestamp(
+      final Versioning versioning, final String artifactVersion) {
 
     final var snapshot = versioning.getSnapshot();
 
@@ -292,10 +289,10 @@ public class MavenArtifactStorageResolver implements ArtifactStorageResolver {
   }
 
   private @Nullable String findPackaging(
-      final @NonNull UUID repoId,
-      final @NonNull String groupId,
-      final @NonNull String artifactId,
-      final @NonNull String artifactVersion) {
+      final UUID repoId,
+      final String groupId,
+      final String artifactId,
+      final String artifactVersion) {
 
     return this.artifactRepository
         .findByRepoIdAndGroupNameAndArtifactName(repoId, groupId, artifactId)
@@ -307,7 +304,7 @@ public class MavenArtifactStorageResolver implements ArtifactStorageResolver {
         .orElse(null);
   }
 
-  private static @NonNull String resolveExtension(final @Nullable String packaging) {
+  private static String resolveExtension(final @Nullable String packaging) {
 
     if (packaging == null || packaging.isBlank()) {
       return DEFAULT_EXTENSION;
@@ -317,7 +314,7 @@ public class MavenArtifactStorageResolver implements ArtifactStorageResolver {
   }
 
   @Override
-  public @NonNull Set<String> getSupportedRepoTypes() {
+  public Set<String> getSupportedRepoTypes() {
     return SUPPORTED_REPO_TYPES;
   }
 }

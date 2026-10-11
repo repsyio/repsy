@@ -17,7 +17,6 @@ package io.repsy.libs.scanner.trivy;
 
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
@@ -33,12 +32,12 @@ public class TrivyScannerStatusClient {
   private static final String SCAN_PATH = "/scan/";
   private static final String API_KEY_HEADER = "X-Scanner-Api-Key";
 
-  private final @NonNull TrivyScannerClientProperties properties;
+  private final TrivyScannerClientProperties properties;
 
   @Qualifier("trivyScannerRestClient")
-  private final @NonNull RestClient restClient;
+  private final RestClient restClient;
 
-  public @NonNull ScanJobStatusResponse fetchStatus(final @NonNull UUID scanId) {
+  public ScanJobStatusResponse fetchStatus(final UUID scanId) {
     try {
       final var response =
           this.restClient

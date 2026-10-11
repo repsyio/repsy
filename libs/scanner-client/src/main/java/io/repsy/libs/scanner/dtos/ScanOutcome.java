@@ -16,8 +16,6 @@
 package io.repsy.libs.scanner.dtos;
 
 import java.util.List;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-public record ScanOutcome(
-    @NonNull List<@NonNull ScannerFinding> findings, @Nullable String scannerVersion) {}
+public record ScanOutcome(List<ScannerFinding> findings, @Nullable String scannerVersion) {}

@@ -28,7 +28,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.List;
 import java.util.Map;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
@@ -44,13 +43,13 @@ public class ArtifactPushedEventPostProcessor extends ProtocolProcessor {
   private static final String ARTIFACT_VERSION = "artifactVersion";
   private static final String STORAGE_PATH = "storagePath";
 
-  private final @NonNull ApplicationEventPublisher eventPublisher;
-  private final @NonNull VulnerabilityScannerRegistry scannerRegistry;
+  private final ApplicationEventPublisher eventPublisher;
+  private final VulnerabilityScannerRegistry scannerRegistry;
 
   public ArtifactPushedEventPostProcessor(
-      final @NonNull ApplicationEventPublisher eventPublisher,
-      final @NonNull VulnerabilityScannerRegistry scannerRegistry,
-      final @NonNull List<ProtocolProvider> protocolProviders) {
+      final ApplicationEventPublisher eventPublisher,
+      final VulnerabilityScannerRegistry scannerRegistry,
+      final List<ProtocolProvider> protocolProviders) {
 
     this.eventPublisher = eventPublisher;
     this.scannerRegistry = scannerRegistry;
@@ -66,11 +65,11 @@ public class ArtifactPushedEventPostProcessor extends ProtocolProcessor {
   }
 
   @Override
-  protected @NonNull ProcessorResult process(
-      final @NonNull ProtocolContext context,
-      final @NonNull HttpServletRequest request,
-      final @NonNull HttpServletResponse response,
-      final @NonNull Map<@NonNull String, @NonNull Object> properties) {
+  protected ProcessorResult process(
+      final ProtocolContext context,
+      final HttpServletRequest request,
+      final HttpServletResponse response,
+      final Map<String, Object> properties) {
 
     if (!this.isWriteOperation(properties)) {
       return ProcessorResult.next();
@@ -112,8 +111,7 @@ public class ArtifactPushedEventPostProcessor extends ProtocolProcessor {
     return ProcessorResult.next();
   }
 
-  private boolean isWriteOperation(
-      final @NonNull Map<@NonNull String, @NonNull Object> properties) {
+  private boolean isWriteOperation(final Map<String, Object> properties) {
     return (boolean) properties.getOrDefault(HandlerPropertyKeys.WRITE_OPERATION, false);
   }
 

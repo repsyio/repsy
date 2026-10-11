@@ -17,7 +17,6 @@ package io.repsy.libs.scanner.trivy;
 
 import java.time.Duration;
 import java.util.Set;
-import org.jspecify.annotations.NonNull;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
@@ -39,16 +38,15 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  */
 @ConfigurationProperties(prefix = "repsy.security.trivy")
 public record TrivyScannerClientProperties(
-    @NonNull String scannerBaseUrl,
-    @NonNull String apiKey,
+    String scannerBaseUrl,
+    String apiKey,
     long requestTimeoutSeconds,
     long pollIntervalMs,
     long maxScanDurationSeconds,
     @DefaultValue("3") int submitMaxAttempts,
     @DefaultValue("15") long submitRetryInitialDelaySeconds,
     @DefaultValue("60") long submitRetryMaxDelaySeconds,
-    @DefaultValue({"MAVEN", "NPM", "PYPI", "DOCKER", "HELM"})
-        @NonNull Set<String> supportedRepoTypes) {
+    @DefaultValue({"MAVEN", "NPM", "PYPI", "DOCKER", "HELM"}) Set<String> supportedRepoTypes) {
 
   public static final Set<String> DEFAULT_SUPPORTED_REPO_TYPES =
       Set.of("MAVEN", "NPM", "PYPI", "DOCKER", "HELM");
@@ -78,7 +76,7 @@ public record TrivyScannerClientProperties(
   }
 
   private static void requireBetween(
-      final @NonNull String setting, final long value, final long min, final long max) {
+      final String setting, final long value, final long min, final long max) {
     if (value < min || value > max) {
       throw new IllegalArgumentException(
           "repsy.security.trivy."
@@ -97,7 +95,7 @@ public record TrivyScannerClientProperties(
    *
    * @param retryNumber the retry, counted from 1
    */
-  public @NonNull Duration submitRetryDelay(final int retryNumber) {
+  public Duration submitRetryDelay(final int retryNumber) {
     var seconds = this.submitRetryInitialDelaySeconds;
 
     for (var step = 1; step < retryNumber && seconds < this.submitRetryMaxDelaySeconds; step++) {

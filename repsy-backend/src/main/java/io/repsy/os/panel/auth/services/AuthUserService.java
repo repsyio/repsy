@@ -33,7 +33,6 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -45,12 +44,12 @@ import org.springframework.transaction.support.TransactionOperations;
 @RequiredArgsConstructor
 public class AuthUserService {
 
-  private final @NonNull UserTxService userTxService;
-  private final @NonNull LoginInfoFactory loginInfoFactory;
-  private final @NonNull RefreshTokenService refreshTokenService;
-  private final @NonNull ApplicationEventPublisher eventPublisher;
-  private final @NonNull AuthFailureThrottle authFailureThrottle;
-  private final @NonNull TransactionOperations transactionOperations;
+  private final UserTxService userTxService;
+  private final LoginInfoFactory loginInfoFactory;
+  private final RefreshTokenService refreshTokenService;
+  private final ApplicationEventPublisher eventPublisher;
+  private final AuthFailureThrottle authFailureThrottle;
+  private final TransactionOperations transactionOperations;
 
   // RPS-2176: no transaction around the whole login. The hash upgrade runs in a transaction of its
   // own (REQUIRES_NEW, a protocol facade may call it from a read-only one), which needs a second
@@ -59,7 +58,7 @@ public class AuthUserService {
   // is checked and the hash upgraded before any transaction is open; the user row lock and the
   // refresh token write, which must be one transaction (RPS-1152), are the one below.
   @Transactional(propagation = Propagation.SUPPORTS)
-  public @NonNull LoginInfo login(final @NonNull LoginForm form) {
+  public LoginInfo login(final LoginForm form) {
 
     // Before the user lookup: a blocked client learns nothing about a username, whichever it sends
     // (RPS-906). A refused login costs no BCrypt (RPS-1092).
@@ -111,7 +110,7 @@ public class AuthUserService {
   // once the UnAuthorizedException it rethrows reaches this method's transactional advice
   // (RPS-1682).
   @Transactional(noRollbackFor = UnAuthorizedException.class)
-  public @NonNull LoginInfo refreshToken(final @NonNull RefreshTokenClaims claims) {
+  public LoginInfo refreshToken(final RefreshTokenClaims claims) {
 
     this.refreshTokenService.consume(claims);
 

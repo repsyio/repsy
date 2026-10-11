@@ -17,7 +17,6 @@ package io.repsy.libs.scanner.dtos;
 
 import java.time.Instant;
 import java.util.List;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -26,5 +25,4 @@ import org.jspecify.annotations.Nullable;
  * @param dbUpdatedAt when the database was published, null when the scanner did not say
  * @param findings the advisories, one per package version and vulnerability
  */
-public record AdvisoryLookupResult(
-    @Nullable Instant dbUpdatedAt, @NonNull List<@NonNull ScannerFinding> findings) {}
+public record AdvisoryLookupResult(@Nullable Instant dbUpdatedAt, List<ScannerFinding> findings) {}
