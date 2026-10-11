@@ -19,7 +19,6 @@ import io.repsy.protocols.shared.utils.BlobDigests;
 import java.util.List;
 import lombok.Builder;
 import lombok.Data;
-import org.jspecify.annotations.Nullable;
 
 @Data
 @Builder
@@ -77,16 +76,21 @@ public class TagForm {
     return this.manifestList.getManifests().stream().map(ManifestListManifest::getDigest).toList();
   }
 
-  private @Nullable String getManifestListMediaType() {
+  /**
+   * The media type stored for the manifest and its tag. An index's own {@code mediaType} field is
+   * OPTIONAL per the OCI image-spec, so an index without it falls back to the pushed {@code
+   * Content-Type} (RPS-2184), as an image manifest does (RPS-1731). The Content-Type is always one
+   * the registry stores: the push is refused before this point otherwise.
+   */
+  public String getCalculatedMediaType() {
 
-    return this.manifestList.getMediaType();
-  }
+    if (!this.isMultiPlatformByName()) {
+      return this.getMediaType();
+    }
 
-  public @Nullable String getCalculatedMediaType() {
+    final var indexMediaType = this.manifestList.getMediaType();
 
-    final var isMultiPlatform = this.getPlatform().equals(MULTIPLATFORM);
-
-    return isMultiPlatform ? this.getManifestListMediaType() : this.getMediaType();
+    return indexMediaType != null ? indexMediaType : this.getMediaType();
   }
 
   /**

@@ -469,7 +469,7 @@ public class ManifestTxService implements ManifestService<UUID> {
   private Manifest createIndex(final Image image, final TagForm form) {
 
     final var manifest = this.newManifest(image, form);
-    manifest.setMediaType(form.getManifestList().getMediaType());
+    manifest.setMediaType(form.getCalculatedMediaType());
     manifest.setSchemaVersion(form.getManifestList().getSchemaVersion());
     manifest.setLayers(new HashSet<>());
     manifest.setPlatform(MULTIPLATFORM);
