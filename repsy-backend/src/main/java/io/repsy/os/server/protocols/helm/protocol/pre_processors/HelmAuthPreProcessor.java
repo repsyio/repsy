@@ -22,7 +22,6 @@ import io.repsy.os.server.shared.auth.BasicOrBearerAuthPreProcessor;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
 import io.repsy.protocols.oci.utils.OciErrors;
 import jakarta.servlet.http.HttpServletRequest;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
 /**
@@ -30,7 +29,6 @@ import org.springframework.stereotype.Component;
  * error format on the OCI routes.
  */
 @Component
-@NullMarked
 public class HelmAuthPreProcessor extends BasicOrBearerAuthPreProcessor<HelmAuthenticator> {
 
   private final RestResponseFactory resp;

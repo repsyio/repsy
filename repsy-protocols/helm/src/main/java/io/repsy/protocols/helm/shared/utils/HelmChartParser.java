@@ -31,7 +31,6 @@ import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 import lombok.experimental.UtilityClass;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
@@ -42,7 +41,6 @@ import tools.jackson.databind.ObjectMapper;
 
 /** Parses Chart.yaml from a .tgz stream without extracting to disk. */
 @UtilityClass
-@NullMarked
 public class HelmChartParser {
 
   /** The fields of a Chart.yaml dependency that Helm defines (the {@code Dependency} struct). */

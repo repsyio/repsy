@@ -19,11 +19,9 @@ import io.repsy.protocols.helm.shared.storage.services.AbstractHelmStorageServic
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import io.repsy.protocols.shared.storage.StorageStrategyRegistry;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Service;
 
 @Service
-@NullMarked
 public class HelmStorageService extends AbstractHelmStorageService<UUID> {
 
   public HelmStorageService(final StorageStrategyRegistry storageStrategyRegistry) {

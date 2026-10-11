@@ -25,11 +25,9 @@ import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
 
 /** Handles PATCH /v2/{repo}/{name}/blobs/uploads/{uuid} — uploads a blob chunk. */
-@NullMarked
 public abstract class AbstractHelmOciBlobUploadChunkProtocolMethodHandler<ID>
     extends AbstractOciUploadChunkProtocolMethodHandler<HelmProtocolFacade<ID>> {
 

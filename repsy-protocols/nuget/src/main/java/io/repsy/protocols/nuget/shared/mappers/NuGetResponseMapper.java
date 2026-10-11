@@ -35,10 +35,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
-@NullMarked
 @UtilityClass
 public final class NuGetResponseMapper {
 

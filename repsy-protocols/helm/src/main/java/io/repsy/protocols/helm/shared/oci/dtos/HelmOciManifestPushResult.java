@@ -16,7 +16,6 @@
 package io.repsy.protocols.helm.shared.oci.dtos;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * The outcome of an OCI manifest push.
@@ -26,5 +25,4 @@ import org.jspecify.annotations.NullMarked;
  *     and not while it runs, because a push that lost a race is repeated and would charge its file
  *     twice.
  */
-@NullMarked
 public record HelmOciManifestPushResult(HelmOciManifestInfo manifest, BaseUsages usages) {}

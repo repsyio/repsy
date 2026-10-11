@@ -26,7 +26,6 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
@@ -35,7 +34,6 @@ import org.springframework.web.server.ResponseStatusException;
  * The column limits of the NuGet package tables, the paging parameter and package path readers of
  * the protocol handlers, and the repo gate and stream copy of a publish.
  */
-@NullMarked
 @UtilityClass
 public final class NuGetPackageUtils {
 

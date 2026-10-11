@@ -16,7 +16,6 @@
 package io.repsy.os.server.protocols.helm.shared.oci.repositories;
 
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * A {@code helm_oci_manifest} row stored under a name that differs from the name of the chart its
@@ -31,7 +30,6 @@ import org.jspecify.annotations.NullMarked;
  * @param chartName the name of the chart the manifest belongs to, which is also the name it is
  *     re-keyed to
  */
-@NullMarked
 public record HelmOciManifestMismatch(
     UUID id,
     UUID repoId,

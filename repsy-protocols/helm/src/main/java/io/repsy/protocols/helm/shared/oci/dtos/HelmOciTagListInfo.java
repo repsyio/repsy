@@ -18,11 +18,9 @@ package io.repsy.protocols.helm.shared.oci.dtos;
 import java.util.List;
 import lombok.Builder;
 import lombok.Value;
-import org.jspecify.annotations.NullMarked;
 
 @Value
 @Builder
-@NullMarked
 public class HelmOciTagListInfo {
 
   String name;

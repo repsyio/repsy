@@ -28,11 +28,9 @@ import java.util.Optional;
 import java.util.UUID;
 import lombok.Builder;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-@NullMarked
 @Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
@@ -95,7 +93,6 @@ public class HelmOciBlobService implements OciBlobService<UUID> {
   }
 
   @Builder
-  @NullMarked
   private record BlobDetail(UUID id, String digest, long size, String mediaType)
       implements HelmOciBlobInfo {}
 }

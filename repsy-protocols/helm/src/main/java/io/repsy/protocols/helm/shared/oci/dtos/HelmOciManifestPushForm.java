@@ -18,7 +18,6 @@ package io.repsy.protocols.helm.shared.oci.dtos;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartForm;
 import lombok.Builder;
 import lombok.Value;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * What an OCI manifest push writes: the chart version the manifest describes and the manifest (the
@@ -27,7 +26,6 @@ import org.jspecify.annotations.NullMarked;
  */
 @Value
 @Builder
-@NullMarked
 public class HelmOciManifestPushForm {
 
   HelmChartForm chart;

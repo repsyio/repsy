@@ -16,7 +16,6 @@
 package io.repsy.protocols.helm.shared.utils;
 
 import java.util.Comparator;
-import org.jspecify.annotations.NullMarked;
 import org.semver4j.Semver;
 
 /**
@@ -26,7 +25,6 @@ import org.semver4j.Semver;
  * comparator breaks that tie on the version string, and one that is not SemVer at all (a row that
  * predates the check) sorts by its string, so the order is total and the same on every call.
  */
-@NullMarked
 public final class HelmVersionComparator implements Comparator<String> {
 
   /** Lowest version first. Use {@link Comparator#reversed()} for the newest first. */

@@ -18,9 +18,7 @@ package io.repsy.protocols.helm.shared.oci.services;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciBlobForm;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciBlobInfo;
 import java.util.Optional;
-import org.jspecify.annotations.NullMarked;
 
-@NullMarked
 public interface OciBlobService<ID> {
 
   HelmOciBlobInfo getOrCreate(HelmOciBlobForm form, ID repoId);

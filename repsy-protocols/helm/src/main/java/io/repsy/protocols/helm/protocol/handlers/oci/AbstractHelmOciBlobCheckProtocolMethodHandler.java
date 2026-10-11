@@ -24,11 +24,9 @@ import io.repsy.protocols.oci.handlers.AbstractOciBlobCheckProtocolMethodHandler
 import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.util.Optional;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
 
 /** Handles HEAD /v2/{repo}/{name}/blobs/{digest} — checks if a blob exists. */
-@NullMarked
 public abstract class AbstractHelmOciBlobCheckProtocolMethodHandler<ID>
     extends AbstractOciBlobCheckProtocolMethodHandler<HelmProtocolFacade<ID>> {
 

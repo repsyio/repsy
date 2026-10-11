@@ -18,7 +18,6 @@ package io.repsy.os.server.protocols.nuget.protocol.handlers;
 import io.repsy.protocols.nuget.shared.utils.NuGetBaseUrlResolver;
 import io.repsy.protocols.nuget.shared.utils.NuGetUrlBuilder;
 import jakarta.servlet.http.HttpServletRequest;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -31,7 +30,6 @@ import org.springframework.stereotype.Component;
  * X-Forwarded-*} (RPS-1432, as {@code repsy.npm.public-url} does for npm in RPS-1333).
  */
 @Component
-@NullMarked
 public class NuGetPublicUrlResolver implements NuGetBaseUrlResolver {
 
   private final @Nullable String publicUrl;

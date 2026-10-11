@@ -15,9 +15,7 @@
  */
 package io.repsy.protocols.nuget.shared.packages.dtos;
 
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
-@NullMarked
 public record NuGetDependencyInfo(
     String packageId, String versionRange, @Nullable String targetFramework) {}

@@ -18,9 +18,7 @@ package io.repsy.protocols.nuget.shared.utils;
 import io.repsy.protocols.shared.http.PublicUrls;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 
-@NullMarked
 @UtilityClass
 public final class NuGetUrlBuilder {
 

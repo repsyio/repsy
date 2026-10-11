@@ -25,11 +25,9 @@ import io.repsy.protocols.shared.http.PublicUrls;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
 
 /** Handles POST /v2/{repo}/{name}/blobs/uploads/ — starts a blob upload session. */
-@NullMarked
 public abstract class AbstractHelmOciBlobUploadStartProtocolMethodHandler<ID>
     extends AbstractOciUploadStartProtocolMethodHandler {
 

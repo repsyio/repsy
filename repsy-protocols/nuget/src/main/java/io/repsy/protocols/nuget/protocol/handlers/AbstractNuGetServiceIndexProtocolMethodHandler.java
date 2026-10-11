@@ -26,12 +26,10 @@ import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.Locale;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
-@NullMarked
 public abstract class AbstractNuGetServiceIndexProtocolMethodHandler
     extends AbstractFacadeProtocolMethodHandler<NuGetProtocolFacade> {
 

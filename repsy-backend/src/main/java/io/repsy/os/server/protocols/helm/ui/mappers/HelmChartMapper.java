@@ -20,11 +20,9 @@ import io.repsy.os.generated.model.HelmChartListItem;
 import io.repsy.os.generated.model.HelmChartSummary;
 import io.repsy.os.generated.model.HelmChartVersionItem;
 import io.repsy.protocols.helm.shared.chart.dtos.HelmChartInfo;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
 @Component
-@NullMarked
 public class HelmChartMapper {
 
   public HelmChartListItem toListItem(final HelmChartInfo info) {

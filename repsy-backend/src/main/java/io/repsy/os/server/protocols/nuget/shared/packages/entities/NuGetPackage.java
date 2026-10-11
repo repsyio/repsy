@@ -39,7 +39,6 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.annotations.UpdateTimestamp;
-import org.jspecify.annotations.NonNull;
 
 @Data
 @Entity
@@ -71,5 +70,5 @@ public class NuGetPackage {
   private Instant updatedAt;
 
   @OneToMany(mappedBy = "nugetPackage", cascade = CascadeType.ALL, orphanRemoval = true)
-  private @NonNull Set<NuGetPackageVersion> versions = new HashSet<>();
+  private Set<NuGetPackageVersion> versions = new HashSet<>();
 }

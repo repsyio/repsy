@@ -17,8 +17,6 @@ package io.repsy.protocols.nuget.shared.dtos;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
-import org.jspecify.annotations.NullMarked;
 
-@NullMarked
 public record NuGetSearchResponse(
     @JsonProperty("totalHits") int totalHits, @JsonProperty("data") List<NuGetSearchData> data) {}

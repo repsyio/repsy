@@ -32,7 +32,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
@@ -40,7 +39,6 @@ import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
 
 /** Handles GET /{repo}/index.yaml — generates and returns the Helm chart index. */
-@NullMarked
 public abstract class AbstractHelmIndexPullProtocolMethodHandler<ID>
     extends AbstractFacadeProtocolMethodHandler<HelmProtocolFacade<ID>> {
 

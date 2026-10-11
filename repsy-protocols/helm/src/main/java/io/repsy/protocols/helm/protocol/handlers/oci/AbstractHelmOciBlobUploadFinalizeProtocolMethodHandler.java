@@ -30,12 +30,10 @@ import io.repsy.protocols.shared.utils.BlobDigests;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpMethod;
 
 /** Handles PUT /v2/{repo}/{name}/blobs/uploads/{uuid}?digest= — finalizes a blob upload. */
-@NullMarked
 public abstract class AbstractHelmOciBlobUploadFinalizeProtocolMethodHandler<ID>
     extends AbstractOciUploadFinalizeProtocolMethodHandler<HelmProtocolFacade<ID>> {
 

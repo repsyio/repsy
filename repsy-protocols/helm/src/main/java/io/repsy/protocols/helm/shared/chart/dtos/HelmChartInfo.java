@@ -17,10 +17,8 @@ package io.repsy.protocols.helm.shared.chart.dtos;
 
 import java.time.Instant;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
-@NullMarked
 public interface HelmChartInfo {
 
   UUID id();

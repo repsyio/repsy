@@ -28,11 +28,9 @@ import java.util.UUID;
 import java.util.stream.Stream;
 import lombok.Builder;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-@NullMarked
 @Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
@@ -140,7 +138,6 @@ public class HelmOciManifestService implements OciManifestService<UUID> {
   }
 
   @Builder
-  @NullMarked
   private record ManifestDetail(
       UUID id,
       UUID chartId,

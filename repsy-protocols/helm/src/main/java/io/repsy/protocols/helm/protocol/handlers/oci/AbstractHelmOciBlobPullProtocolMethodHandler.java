@@ -24,12 +24,10 @@ import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpMethod;
 
 /** Handles GET /v2/{repo}/{name}/blobs/{digest} — downloads a blob. */
-@NullMarked
 public abstract class AbstractHelmOciBlobPullProtocolMethodHandler<ID>
     extends AbstractOciBlobPullProtocolMethodHandler<HelmProtocolFacade<ID>> {
 

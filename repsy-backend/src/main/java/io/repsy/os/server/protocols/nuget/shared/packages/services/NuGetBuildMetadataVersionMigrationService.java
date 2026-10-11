@@ -27,7 +27,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -52,7 +51,6 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>A file move keeps the repo disk usage as it is: the same bytes are stored under another path.
  */
 @Slf4j
-@NullMarked
 @Service
 public class NuGetBuildMetadataVersionMigrationService {
 

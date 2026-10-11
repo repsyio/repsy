@@ -16,9 +16,7 @@
 package io.repsy.protocols.helm.shared.oci.dtos;
 
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 
-@NullMarked
 public interface HelmOciManifestInfo {
 
   UUID id();

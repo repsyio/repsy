@@ -30,14 +30,12 @@ import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.regex.Pattern;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 /** Handles GET /{repo}/charts/{filename} — streams a .tgz chart archive. */
-@NullMarked
 public abstract class AbstractHelmChartPullProtocolMethodHandler<ID>
     extends AbstractFacadeProtocolMethodHandler<HelmProtocolFacade<ID>> {
 

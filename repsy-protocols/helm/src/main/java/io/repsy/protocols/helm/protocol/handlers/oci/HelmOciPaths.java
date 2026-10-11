@@ -20,11 +20,9 @@ import io.repsy.protocols.shared.http.PublicUrls;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.regex.Pattern;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 
 /** The Helm OCI blob path (sha256 digests only) and the Location Helm reports for a session. */
 @UtilityClass
-@NullMarked
 final class HelmOciPaths {
 
   static final Pattern BLOB = OciPathUtils.blob("sha256:[0-9a-fA-F]{64}");

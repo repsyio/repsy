@@ -21,10 +21,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 
 /** Builds the registration pages of the NuGet registration index. */
-@NullMarked
 @UtilityClass
 public final class NuGetRegistrationPageUtils {
 

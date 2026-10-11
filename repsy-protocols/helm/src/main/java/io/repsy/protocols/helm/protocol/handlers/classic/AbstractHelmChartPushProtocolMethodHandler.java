@@ -34,14 +34,12 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.Part;
 import java.io.IOException;
 import java.util.regex.Pattern;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 /** Handles POST /{repo}/api/charts — accepts a multipart/form-data upload of a .tgz chart. */
-@NullMarked
 public abstract class AbstractHelmChartPushProtocolMethodHandler<ID>
     extends AbstractFacadeProtocolMethodHandler<HelmProtocolFacade<ID>> {
 

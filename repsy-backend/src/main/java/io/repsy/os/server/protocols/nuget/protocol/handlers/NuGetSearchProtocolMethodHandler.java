@@ -19,12 +19,10 @@ import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.protocols.nuget.protocol.NuGetProtocolProvider;
 import io.repsy.protocols.nuget.protocol.facades.contracts.NuGetProtocolFacade;
 import io.repsy.protocols.nuget.protocol.handlers.AbstractNuGetSearchProtocolMethodHandler;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 @Component
-@NullMarked
 public class NuGetSearchProtocolMethodHandler extends AbstractNuGetSearchProtocolMethodHandler {
 
   public NuGetSearchProtocolMethodHandler(

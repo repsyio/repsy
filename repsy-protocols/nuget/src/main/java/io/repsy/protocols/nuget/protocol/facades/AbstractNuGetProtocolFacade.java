@@ -54,14 +54,12 @@ import java.util.List;
 import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 @Slf4j
-@NullMarked
 @RequiredArgsConstructor
 public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFacade {
 

@@ -16,10 +16,8 @@
 package io.repsy.protocols.nuget.shared.packages.dtos;
 
 import java.util.List;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
-@NullMarked
 public record NuGetPackageSearchResult(
     String packageId,
     String latestVersion,

@@ -24,11 +24,9 @@ import io.repsy.protocols.nuget.shared.dtos.NuGetServiceIndexResponse;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 
-@NullMarked
 public interface NuGetProtocolFacade {
 
   void publish(ProtocolContext context, InputStream inputStream) throws IOException;

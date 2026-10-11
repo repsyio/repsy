@@ -17,11 +17,9 @@ package io.repsy.protocols.helm.shared.oci.dtos;
 
 import lombok.Builder;
 import lombok.Value;
-import org.jspecify.annotations.NullMarked;
 
 @Value
 @Builder
-@NullMarked
 public class HelmOciBlobForm {
 
   String digest;

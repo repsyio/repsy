@@ -29,13 +29,11 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.util.Map;
 import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 @Slf4j
-@NullMarked
 public abstract class AbstractNuGetPackageVersionsProtocolMethodHandler
     extends AbstractFacadeProtocolMethodHandler<NuGetProtocolFacade> {
 

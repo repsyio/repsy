@@ -26,7 +26,6 @@ import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.regex.Pattern;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -38,7 +37,6 @@ import org.springframework.http.ResponseEntity;
  * client calls it whenever a pull's {@code --version} is empty or a semver constraint, so without
  * this route any non-pinned OCI pull fails (RPS-1219).
  */
-@NullMarked
 public abstract class AbstractHelmOciTagsListProtocolMethodHandler<ID>
     extends AbstractFacadeProtocolMethodHandler<HelmProtocolFacade<ID>> {
 

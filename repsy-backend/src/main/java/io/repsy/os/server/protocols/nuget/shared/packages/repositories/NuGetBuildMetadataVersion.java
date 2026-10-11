@@ -16,7 +16,6 @@
 package io.repsy.os.server.protocols.nuget.shared.packages.repositories;
 
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * A {@code nuget_package_version} row whose version still carries build metadata ({@code
@@ -29,6 +28,5 @@ import org.jspecify.annotations.NullMarked;
  * @param packageId the package id, as stored
  * @param version the version, as stored
  */
-@NullMarked
 public record NuGetBuildMetadataVersion(
     UUID id, UUID packageRowId, UUID repoId, String repoName, String packageId, String version) {}

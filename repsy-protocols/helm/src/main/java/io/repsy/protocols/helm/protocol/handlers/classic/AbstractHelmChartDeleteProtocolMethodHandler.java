@@ -26,7 +26,6 @@ import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.regex.Pattern;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -36,7 +35,6 @@ import org.springframework.http.ResponseEntity;
  * removes stored files, so it needs {@link Permission#MANAGE} like the panel's delete, and a deploy
  * token never has it (RPS-1424).
  */
-@NullMarked
 public abstract class AbstractHelmChartDeleteProtocolMethodHandler<ID>
     extends AbstractFacadeProtocolMethodHandler<HelmProtocolFacade<ID>> {
 

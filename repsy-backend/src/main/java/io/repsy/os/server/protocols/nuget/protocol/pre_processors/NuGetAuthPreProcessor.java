@@ -29,7 +29,6 @@ import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Map;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
@@ -39,7 +38,6 @@ import org.springframework.stereotype.Component;
  * challenge and no body, which the NuGet client answers by asking for credentials.
  */
 @Component
-@NullMarked
 public class NuGetAuthPreProcessor extends BasicOrBearerAuthPreProcessor<NuGetAuthenticator> {
 
   private static final String X_NUGET_API_KEY = "X-NuGet-ApiKey";

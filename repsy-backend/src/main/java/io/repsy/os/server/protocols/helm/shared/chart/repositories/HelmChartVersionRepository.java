@@ -20,7 +20,6 @@ import io.repsy.os.server.protocols.helm.shared.chart.entities.HelmChartVersion;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -29,7 +28,6 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 @Repository
-@NullMarked
 public interface HelmChartVersionRepository extends JpaRepository<HelmChartVersion, UUID> {
 
   Optional<HelmChartVersion> findByChartAndVersion(HelmChart chart, String version);

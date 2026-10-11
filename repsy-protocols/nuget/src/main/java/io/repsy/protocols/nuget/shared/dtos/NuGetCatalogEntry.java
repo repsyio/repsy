@@ -20,10 +20,8 @@ import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Instant;
 import java.util.List;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
-@NullMarked
 @JsonInclude(Include.NON_NULL)
 public record NuGetCatalogEntry(
     @JsonProperty("@id") String id,

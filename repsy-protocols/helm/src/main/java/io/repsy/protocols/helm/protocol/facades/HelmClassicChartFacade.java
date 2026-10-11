@@ -40,7 +40,6 @@ import java.util.List;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.event.Level;
 import org.springframework.core.io.Resource;
@@ -51,7 +50,6 @@ import org.springframework.core.io.Resource;
  * and manifest sides are {@link HelmOciBlobFacade} and {@link HelmOciManifestFacade}.
  */
 @Slf4j
-@NullMarked
 @RequiredArgsConstructor
 final class HelmClassicChartFacade<ID> {
 

@@ -20,10 +20,8 @@ import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 
-@NullMarked
 public interface NuGetStorageService {
 
   BaseUsages writePackage(

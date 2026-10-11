@@ -35,7 +35,6 @@ import java.util.Optional;
 import java.util.UUID;
 import lombok.Builder;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -46,7 +45,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
-@NullMarked
 public class HelmChartService implements ChartService<UUID> {
 
   private static final String VERSION_UNIQUE_CONSTRAINT = "ux_helm_chart_version__chart_id_version";
@@ -343,7 +341,6 @@ public class HelmChartService implements ChartService<UUID> {
   }
 
   @Builder
-  @NullMarked
   private record ChartDetail(
       UUID id,
       String name,

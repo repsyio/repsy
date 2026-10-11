@@ -16,8 +16,6 @@
 package io.repsy.protocols.nuget.shared.dtos;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import org.jspecify.annotations.NullMarked;
 
-@NullMarked
 public record NuGetSearchVersionData(
     @JsonProperty("@id") String id, String version, long downloads) {}

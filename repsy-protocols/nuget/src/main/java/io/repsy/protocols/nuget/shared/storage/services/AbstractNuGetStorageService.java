@@ -29,10 +29,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Locale;
 import java.util.Optional;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 
-@NullMarked
 public abstract class AbstractNuGetStorageService extends AbstractArtifactStorageService
     implements NuGetStorageService {
 

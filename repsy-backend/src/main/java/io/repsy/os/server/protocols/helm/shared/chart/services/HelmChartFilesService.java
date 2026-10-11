@@ -21,11 +21,9 @@ import io.repsy.protocols.helm.shared.oci.services.OciBlobService;
 import io.repsy.protocols.helm.shared.oci.services.OciManifestService;
 import io.repsy.protocols.helm.shared.storage.services.HelmStorageService;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Service;
 
 @Service
-@NullMarked
 public class HelmChartFilesService extends AbstractHelmChartFilesService<UUID> {
 
   public HelmChartFilesService(
