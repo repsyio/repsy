@@ -22,6 +22,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -57,7 +58,7 @@ public interface RubyGemVersionRepository extends JpaRepository<RubyGemVersion, 
       where gv.gem.id = :gemId
         and (:version is null or lower(gv.version) like :version escape '\\')
       """)
-  Page<GemVersionListItem> findAllByGemId(UUID gemId, String version, Pageable pageable);
+  Page<GemVersionListItem> findAllByGemId(UUID gemId, @Nullable String version, Pageable pageable);
 
   @Query(
       """
