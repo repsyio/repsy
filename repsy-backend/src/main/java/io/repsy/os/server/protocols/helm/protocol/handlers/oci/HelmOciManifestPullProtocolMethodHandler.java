@@ -21,6 +21,7 @@ import io.repsy.protocols.helm.protocol.facades.HelmProtocolFacade;
 import io.repsy.protocols.helm.protocol.handlers.oci.AbstractHelmOciManifestPullProtocolMethodHandler;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -30,7 +31,8 @@ public class HelmOciManifestPullProtocolMethodHandler
   public HelmOciManifestPullProtocolMethodHandler(
       @Qualifier("osHelmOciPathParser") final PathParser basePathParser,
       final HelmProtocolFacade<UUID> helmProtocolTxFacade,
-      final HelmProtocolProvider provider) {
-    super(basePathParser, helmProtocolTxFacade, provider);
+      final HelmProtocolProvider provider,
+      @Value("${repsy.helm.oci.strict-wire:true}") final boolean strictWire) {
+    super(basePathParser, helmProtocolTxFacade, provider, strictWire);
   }
 }

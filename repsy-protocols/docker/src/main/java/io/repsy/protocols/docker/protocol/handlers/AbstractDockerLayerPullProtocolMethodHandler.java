@@ -15,7 +15,7 @@
  */
 package io.repsy.protocols.docker.protocol.handlers;
 
-import static io.repsy.protocols.docker.shared.utils.MediaTypes.DOCKER_CONFIG_JSON;
+import static io.repsy.protocols.oci.utils.OciMediaTypeUtils.DOCKER_CONFIG_JSON;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;

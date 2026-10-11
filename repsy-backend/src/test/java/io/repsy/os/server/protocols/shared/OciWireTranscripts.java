@@ -26,6 +26,11 @@ package io.repsy.os.server.protocols.shared;
  * and could not see the uncommitted layer row. The script now commits the uploads first, and the
  * pull is the 200 a real registry answers. The pull's {@code Content-Type} stays the config type
  * for every Docker blob, while the blob check reports the layer's own type.
+ *
+ * <p>RPS-2164 changed the Helm transcript, on purpose, in these places (each now equals Docker's):
+ * the manifest pull with an Accept header naming no manifest type (200 to 406), the tag listing
+ * with {@code n=1} (paged, with a {@code Link}) and with {@code n=-1} (200 to 400), and the five
+ * refused manifest pushes at the end of the script, which both formats record.
  */
 final class OciWireTranscripts {
 
@@ -315,6 +320,31 @@ final class OciWireTranscripts {
       < 404
       < Content-Type: application/json
       < body: {"errors":[{"code":"NAME_UNKNOWN","message":"Image not found.","detail":"imageNotFound"}]}
+      ## manifest push with a tag the grammar refuses
+      > PUT /v2/{repo}/app/manifests/.hidden
+      < 400
+      < Content-Type: application/json
+      < body: {"errors":[{"code":"TAG_INVALID","message":"The tag in the manifest path is invalid, or longer than 128 characters.","detail":"dockerReferenceInvalid"}]}
+      ## manifest push by a digest that is not the manifest's
+      > PUT /v2/{repo}/app/manifests/{digest-7}
+      < 400
+      < Content-Type: application/json
+      < body: {"errors":[{"code":"DIGEST_INVALID","message":"digestMismatch","detail":"digestMismatch"}]}
+      ## manifest push with a Content-Type the registry does not store
+      > PUT /v2/{repo}/app/manifests/2.0.0
+      < 400
+      < Content-Type: application/json
+      < body: {"errors":[{"code":"MANIFEST_INVALID","message":"This registry does not store manifests of this Content-Type.","detail":"manifestMediaTypeUnsupported"}]}
+      ## manifest push whose schemaVersion is 1
+      > PUT /v2/{repo}/app/manifests/2.0.0
+      < 400
+      < Content-Type: application/json
+      < body: {"errors":[{"code":"MANIFEST_INVALID","message":"The schemaVersion does not match what this manifest's media type requires.","detail":"manifestSchemaVersionInvalid"}]}
+      ## manifest push without a config
+      > PUT /v2/{repo}/app/manifests/2.0.0
+      < 400
+      < Content-Type: application/json
+      < body: {"errors":[{"code":"MANIFEST_INVALID","message":"The manifest must have a config object with a digest.","detail":"manifestConfigMissing"}]}
       """;
 
   static final String HELM =
@@ -545,11 +575,9 @@ final class OciWireTranscripts {
       < body: {"schemaVersion":2,"mediaType":"application/vnd.oci.image.manifest.v1+json","config":{"mediaType":"application/vnd.cncf.helm.config.v1+json","digest":"{digest-3}","size":2},"layers":[{"mediaType":"application/vnd.cncf.helm.chart.content.v1.tar+gzip","digest":"{digest-4}","size":136}]}
       ## manifest pull with an Accept header naming no manifest type
       > GET /v2/{repo}/app/manifests/1.0.0
-      < 200
-      < Docker-Content-Digest: {digest-5}
-      < Content-Type: application/vnd.oci.image.manifest.v1+json
-      < Content-Length: 407
-      < body: {"schemaVersion":2,"mediaType":"application/vnd.oci.image.manifest.v1+json","config":{"mediaType":"application/vnd.cncf.helm.config.v1+json","digest":"{digest-3}","size":2},"layers":[{"mediaType":"application/vnd.cncf.helm.chart.content.v1.tar+gzip","digest":"{digest-4}","size":136}]}
+      < 406
+      < Content-Type: application/json
+      < body: {"errors":[{"code":"UNSUPPORTED","message":"None of the requested media types can be produced.","detail":"notAcceptable"}]}
       ## manifest pull accepting the OCI manifest type
       > GET /v2/{repo}/app/manifests/1.0.0
       < 200
@@ -569,12 +597,13 @@ final class OciWireTranscripts {
       > GET /v2/{repo}/app/tags/list
       < 200
       < Content-Type: application/json
-      < body: {"name":"{repo}/app","tags":["1.0.0","latest"]}
+      < Link: </v2/{repo}/app/tags/list?n=1&last=1.0.0>; rel="next"
+      < body: {"name":"{repo}/app","tags":["1.0.0"]}
       ## tags list with n=-1
       > GET /v2/{repo}/app/tags/list
-      < 200
+      < 400
       < Content-Type: application/json
-      < body: {"name":"{repo}/app","tags":["1.0.0","latest"]}
+      < body: {"errors":[{"code":"PAGINATION_NUMBER_INVALID","message":"The n of a tag listing must be a non-negative integer.","detail":"paginationNumberInvalid"}]}
       ## tags list of an unknown name
       > GET /v2/{repo}/nothing/tags/list
       < 200
@@ -602,6 +631,31 @@ final class OciWireTranscripts {
       < Content-Type: application/vnd.oci.image.manifest.v1+json
       < Content-Length: 407
       < body: {"schemaVersion":2,"mediaType":"application/vnd.oci.image.manifest.v1+json","config":{"mediaType":"application/vnd.cncf.helm.config.v1+json","digest":"{digest-3}","size":2},"layers":[{"mediaType":"application/vnd.cncf.helm.chart.content.v1.tar+gzip","digest":"{digest-4}","size":136}]}
+      ## manifest push with a tag the grammar refuses
+      > PUT /v2/{repo}/app/manifests/.hidden
+      < 400
+      < Content-Type: application/json
+      < body: {"errors":[{"code":"TAG_INVALID","message":"The tag in the manifest path is invalid, or longer than 128 characters.","detail":"dockerReferenceInvalid"}]}
+      ## manifest push by a digest that is not the manifest's
+      > PUT /v2/{repo}/app/manifests/{digest-6}
+      < 400
+      < Content-Type: application/json
+      < body: {"errors":[{"code":"DIGEST_INVALID","message":"digestMismatch","detail":"digestMismatch"}]}
+      ## manifest push with a Content-Type the registry does not store
+      > PUT /v2/{repo}/app/manifests/2.0.0
+      < 400
+      < Content-Type: application/json
+      < body: {"errors":[{"code":"MANIFEST_INVALID","message":"This registry does not store manifests of this Content-Type.","detail":"manifestMediaTypeUnsupported"}]}
+      ## manifest push whose schemaVersion is 1
+      > PUT /v2/{repo}/app/manifests/2.0.0
+      < 400
+      < Content-Type: application/json
+      < body: {"errors":[{"code":"MANIFEST_INVALID","message":"The schemaVersion does not match what this manifest's media type requires.","detail":"manifestSchemaVersionInvalid"}]}
+      ## manifest push without a config
+      > PUT /v2/{repo}/app/manifests/2.0.0
+      < 400
+      < Content-Type: application/json
+      < body: {"errors":[{"code":"MANIFEST_INVALID","message":"The manifest must have a config object with a digest.","detail":"manifestConfigMissing"}]}
       """;
 
   private OciWireTranscripts() {}

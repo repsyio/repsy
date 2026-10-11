@@ -30,7 +30,7 @@ import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import io.repsy.protocols.docker.protocol.facades.DockerProtocolFacade;
 import io.repsy.protocols.docker.shared.tag.dtos.TagListResponse;
-import io.repsy.protocols.docker.shared.tag.dtos.TagPage;
+import io.repsy.protocols.oci.dtos.OciTagPage;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
@@ -160,7 +160,7 @@ class AbstractDockerTagsListProtocolMethodHandlerTest {
   void answersTheTags() {
     final var context = contextFor("/app/tags/list");
     when(this.dockerFacade.listTags(context, "app", null, null))
-        .thenReturn(new TagPage(List.of("latest", "v1"), false));
+        .thenReturn(new OciTagPage(List.of("latest", "v1"), false));
 
     final var response =
         this.handler().handle(context, requestWith(), new MockHttpServletResponse());
@@ -184,7 +184,7 @@ class AbstractDockerTagsListProtocolMethodHandlerTest {
                 .relativePath(new RelativePath("/app/tags/list"))
                 .repoInfo(new BaseRepoInfo<UUID>())));
     when(this.dockerFacade.listTags(context, "app", null, null))
-        .thenReturn(new TagPage(List.of("v1"), false));
+        .thenReturn(new OciTagPage(List.of("v1"), false));
 
     final var response =
         this.handler().handle(context, requestWith(), new MockHttpServletResponse());
@@ -212,7 +212,7 @@ class AbstractDockerTagsListProtocolMethodHandlerTest {
   void linksToTheNextPage() {
     final var context = contextFor("/app/tags/list");
     when(this.dockerFacade.listTags(context, "app", 2, "a"))
-        .thenReturn(new TagPage(List.of("b", "c.d"), true));
+        .thenReturn(new OciTagPage(List.of("b", "c.d"), true));
 
     final var response =
         this.handler()
@@ -227,7 +227,7 @@ class AbstractDockerTagsListProtocolMethodHandlerTest {
   void zeroIsAnEmptyPage() {
     final var context = contextFor("/app/tags/list");
     when(this.dockerFacade.listTags(context, "app", 0, null))
-        .thenReturn(new TagPage(List.of(), false));
+        .thenReturn(new OciTagPage(List.of(), false));
 
     final var response =
         this.handler().handle(context, requestWith("n", "0"), new MockHttpServletResponse());

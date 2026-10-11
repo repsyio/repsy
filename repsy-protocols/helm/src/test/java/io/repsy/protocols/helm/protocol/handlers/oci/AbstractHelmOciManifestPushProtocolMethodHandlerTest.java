@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -38,6 +39,7 @@ import io.repsy.protocols.helm.shared.constants.HelmConstants;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestInfo;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestPushForm;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestPushResult;
+import io.repsy.protocols.oci.utils.OciDigestUtils;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
 import java.io.ByteArrayOutputStream;
@@ -89,7 +91,7 @@ class AbstractHelmOciManifestPushProtocolMethodHandlerTest {
 
   @BeforeEach
   void setUp() {
-    this.handler = new TestHandler(this.basePathParser, this.facade, this.provider);
+    this.handler = new TestHandler(this.basePathParser, this.facade, this.provider, false);
   }
 
   @AfterEach
@@ -100,8 +102,11 @@ class AbstractHelmOciManifestPushProtocolMethodHandlerTest {
   static class TestHandler extends AbstractHelmOciManifestPushProtocolMethodHandler<UUID> {
 
     TestHandler(
-        final PathParser p, final HelmProtocolFacade<UUID> f, final HelmProtocolProvider pr) {
-      super(p, f, pr);
+        final PathParser p,
+        final HelmProtocolFacade<UUID> f,
+        final HelmProtocolProvider pr,
+        final boolean strictWire) {
+      super(p, f, pr, strictWire);
     }
   }
 
@@ -393,6 +398,121 @@ class AbstractHelmOciManifestPushProtocolMethodHandlerTest {
         arguments(layer("null", "10"), "manifestLayerInvalid"),
         arguments(layer("\"sha256:abc\"", "10"), "manifestLayerInvalid"),
         arguments(layer("\"../../etc/passwd\"", "10"), "manifestLayerInvalid"));
+  }
+
+  private static final String CONFIG_DIGEST = "sha256:" + "d".repeat(64);
+  private static final String STRICT_MANIFEST =
+      "{\"schemaVersion\":2,\"mediaType\":\""
+          + MANIFEST_TYPE
+          + "\",\"config\":{\"mediaType\":"
+          + "\"application/vnd.cncf.helm.config.v1+json\",\"digest\":\""
+          + CONFIG_DIGEST
+          + "\",\"size\":2},\"layers\":[{\"mediaType\":\""
+          + HelmConstants.CHART_CONTENT_MEDIA_TYPE
+          + "\",\"digest\":\""
+          + LAYER_DIGEST
+          + "\",\"size\":10}]}";
+
+  private void strict() {
+    this.handler = new TestHandler(this.basePathParser, this.facade, this.provider, true);
+  }
+
+  @Test
+  @DisplayName("strict wire refuses a Content-Type other than the OCI manifest before the chart")
+  void strictRejectsUnsupportedContentType() throws Exception {
+    this.strict();
+    final var context = context("/payments/manifests/1.0.0");
+
+    assertThatThrownBy(() -> this.push(context, STRICT_MANIFEST, "application/octet-stream"))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("manifestMediaTypeUnsupported");
+    verify(this.facade, never()).getBlob(any(ProtocolContext.class), any());
+  }
+
+  @Test
+  @DisplayName("strict wire refuses a manifest whose schemaVersion is not 2")
+  void strictRejectsWrongSchemaVersion() throws Exception {
+    this.strict();
+    final var context = context("/payments/manifests/1.0.0");
+
+    assertThatThrownBy(
+            () ->
+                this.push(
+                    context, STRICT_MANIFEST.replace("\"schemaVersion\":2", "\"schemaVersion\":1")))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("manifestSchemaVersionInvalid");
+    verify(this.facade, never()).getBlob(any(ProtocolContext.class), any());
+  }
+
+  @Test
+  @DisplayName("strict wire refuses a manifest without a config digest")
+  void strictRejectsMissingConfig() {
+    this.strict();
+    final var context = context("/payments/manifests/1.0.0");
+
+    assertThatThrownBy(
+            () ->
+                this.push(
+                    context,
+                    "{\"schemaVersion\":2,\"layers\":[{\"digest\":\""
+                        + LAYER_DIGEST
+                        + "\",\"size\":10}]}"))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("manifestConfigMissing");
+  }
+
+  @Test
+  @DisplayName("strict wire refuses a tag the distribution grammar does not allow, before lookups")
+  void strictRejectsInvalidTag() {
+    this.strict();
+    final var context = context("/payments/manifests/.hidden");
+
+    assertThatThrownBy(() -> this.push(context, STRICT_MANIFEST))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("dockerReferenceInvalid");
+    verifyNoInteractions(this.facade);
+  }
+
+  @Test
+  @DisplayName("strict wire refuses a digest reference that is not the manifest's digest")
+  void strictRejectsDigestMismatch() throws Exception {
+    this.strict();
+    final var context = context("/payments/manifests/sha256:" + "0".repeat(64));
+
+    assertThatThrownBy(() -> this.push(context, STRICT_MANIFEST))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("digestMismatch");
+    verify(this.facade, never()).getBlob(any(ProtocolContext.class), any());
+  }
+
+  @Test
+  @DisplayName("lenient wire still stores a manifest the strict wire refuses")
+  void lenientAcceptsBareManifest() throws Exception {
+    final var context = context("/payments/manifests/1.0.0");
+    this.stubChartLayer("payments", "1.0.0");
+    this.stubPush();
+
+    final var response =
+        this.push(context, layer("\"" + LAYER_DIGEST + "\"", "10"), "application/json");
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+  }
+
+  @Test
+  @DisplayName("a push by a sha512 digest reference is answered in sha512, as Docker does")
+  void shaPushBySha512ReferenceAnswersInSha512() throws Exception {
+    this.strict();
+    final var sha512 =
+        OciDigestUtils.calculateSha512Digest(STRICT_MANIFEST.getBytes(StandardCharsets.UTF_8));
+    final var context = context("/payments/manifests/" + sha512);
+    this.stubChartLayer("payments", "1.0.0");
+    this.stubPush();
+
+    final var response = this.push(context, STRICT_MANIFEST);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    assertThat(response.getHeaders().getFirst("Docker-Content-Digest")).isEqualTo(sha512);
+    assertThat(response.getHeaders().getFirst("Location")).endsWith("/manifests/" + sha512);
   }
 
   private static String layer(final String digest, final String size) {

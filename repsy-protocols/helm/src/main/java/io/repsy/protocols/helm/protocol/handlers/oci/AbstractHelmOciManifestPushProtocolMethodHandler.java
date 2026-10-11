@@ -31,6 +31,9 @@ import io.repsy.protocols.helm.shared.constants.HelmConstants;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestPushForm;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestPushResult;
 import io.repsy.protocols.helm.shared.utils.HelmChartParser;
+import io.repsy.protocols.helm.shared.utils.HelmOciManifestUtils;
+import io.repsy.protocols.oci.utils.OciDigestUtils;
+import io.repsy.protocols.oci.utils.OciPushGuardUtils;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
 import io.repsy.protocols.shared.handlers.HandlerRoute;
@@ -42,6 +45,7 @@ import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.nio.charset.StandardCharsets;
+import java.security.NoSuchAlgorithmException;
 import java.util.regex.Pattern;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -69,10 +73,18 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
   private static final Pattern SHA256_DIGEST_PATTERN = Pattern.compile("^sha256:[0-9a-fA-F]{64}$");
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
+  private final boolean strictWire;
+
+  /**
+   * @param strictWire whether the push is checked the way the Docker registry checks one (the
+   *     reference grammar, the manifest's media type, schema version and config, and a digest
+   *     reference against the bytes); {@code repsy.helm.oci.strict-wire}
+   */
   public AbstractHelmOciManifestPushProtocolMethodHandler(
       final PathParser basePathParser,
       final HelmProtocolFacade<ID> helmFacade,
-      final HelmProtocolProvider provider) {
+      final HelmProtocolProvider provider,
+      final boolean strictWire) {
     super(
         HandlerRoute.of(Permission.WRITE, HttpMethod.PUT)
             .skipHeaderPreProcessor(true)
@@ -81,6 +93,7 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
         basePathParser,
         helmFacade,
         provider);
+    this.strictWire = strictWire;
   }
 
   @Override
@@ -106,6 +119,7 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
     }
 
     rejectOverLongIdentifiers(name, reference, mediaType);
+    this.guardReference(reference);
 
     final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
     final var existingManifest = this.facade.checkManifest(context, name, reference);
@@ -117,11 +131,14 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
     final var contentBytes = request.getInputStream().readAllBytes();
     final var manifestJson = new String(contentBytes, StandardCharsets.UTF_8);
 
-    final var chartLayer = this.parseChartLayer(manifestJson);
+    final var manifest = this.parseManifest(manifestJson);
+    final var digest = OciDigestUtils.calculateDigest(contentBytes);
+
+    this.guardManifest(reference, mediaType, manifest, contentBytes, digest);
+
+    final var chartLayer = this.parseChartLayer(manifest);
     final var layerDigest = chartLayer.digest();
     final var layerSize = chartLayer.size();
-
-    final var digest = this.calculateDigest(contentBytes);
 
     final var blobResource = this.facade.getBlob(context, layerDigest);
     final var metadata = HelmChartParser.parseChartYaml(blobResource.getInputStream());
@@ -158,7 +175,7 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
     // that lost a race is repeated, and its file would be charged once per run.
     ProtocolContextUtils.addUsages(context, pushed.usages());
 
-    if (!reference.startsWith(HelmConstants.SHA256_PREFIX)) {
+    if (!BlobDigests.startsWithDigestPrefix(reference)) {
       context.addProperty(ARTIFACT_NAME, metadata.getName());
       context.addProperty(ARTIFACT_VERSION, metadata.getVersion());
       // The chart archive of an OCI push is its chart layer blob, so that is what a scan reads
@@ -168,14 +185,40 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
 
     final var requestPath = request.getRequestURI();
     final var manifestsBasePath = requestPath.substring(0, requestPath.lastIndexOf('/') + 1);
-    final var location =
-        PublicUrls.currentContextRoot() + manifestsBasePath + manifestInfo.digest();
+    // A push by a digest reference is answered in that reference's algorithm, a tag push with the
+    // manifest's sha256 digest, as the Docker registry does (RPS-1244).
+    final var reportedDigest = OciDigestUtils.reportedDigest(reference, manifestInfo.digest());
+    final var location = PublicUrls.currentContextRoot() + manifestsBasePath + reportedDigest;
 
     return ResponseEntity.status(HttpStatus.CREATED)
         .header(LOCATION, location)
-        .header(DOCKER_CONTENT_DIGEST, manifestInfo.digest())
+        .header(DOCKER_CONTENT_DIGEST, reportedDigest)
         .header(CONTENT_TYPE, mediaType)
         .build();
+  }
+
+  /** The reference grammar of the Docker registry's push, while the strict wire is on. */
+  private void guardReference(final String reference) {
+    if (this.strictWire) {
+      OciPushGuardUtils.rejectInvalidReference(
+          reference, HelmConstants.MAX_OCI_MANIFEST_REFERENCE_LENGTH);
+    }
+  }
+
+  /** The manifest checks of the Docker registry's push, while the strict wire is on. */
+  private void guardManifest(
+      final String reference,
+      final String mediaType,
+      final JsonNode manifest,
+      final byte[] contentBytes,
+      final String sha256Digest)
+      throws NoSuchAlgorithmException {
+
+    if (this.strictWire) {
+      HelmOciManifestUtils.validate(mediaType, manifest);
+      HelmOciManifestUtils.verifyDigestReference(
+          reference, sha256Digest, OciDigestUtils.calculateSha512Digest(contentBytes));
+    }
   }
 
   /**
@@ -253,8 +296,8 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
    * 500) whenever the {@code .prov} layer's digest happened to sort before the chart layer's --
    * roughly half the time, confirmed live with the real client against both orderings.
    */
-  private ChartLayer parseChartLayer(final String manifestJson) {
-    final var layers = this.parseManifest(manifestJson).get("layers");
+  private ChartLayer parseChartLayer(final JsonNode manifest) {
+    final var layers = manifest.get("layers");
     if (layers == null || !layers.isArray() || layers.isEmpty()) {
       throw new BadRequestException(ProtocolErrorCodes.MANIFEST_LAYERS_MISSING);
     }
@@ -318,10 +361,6 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
     if (!pathName.equals(chartName)) {
       throw new BadRequestException(ProtocolErrorCodes.CHART_NAME_MISMATCH);
     }
-  }
-
-  private String calculateDigest(final byte[] contentBytes) {
-    return HelmConstants.SHA256_PREFIX + BlobDigests.sha256Hex(contentBytes);
   }
 
   /**

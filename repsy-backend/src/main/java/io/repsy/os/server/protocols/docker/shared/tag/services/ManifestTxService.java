@@ -39,9 +39,9 @@ import io.repsy.protocols.docker.shared.tag.dtos.BaseTagDetail;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestListManifest;
 import io.repsy.protocols.docker.shared.tag.dtos.TagForm;
 import io.repsy.protocols.docker.shared.tag.services.ManifestService;
-import io.repsy.protocols.docker.shared.utils.DockerDigestCalculator;
 import io.repsy.protocols.docker.shared.utils.ManifestNameGenerator;
-import io.repsy.protocols.docker.shared.utils.MediaTypes;
+import io.repsy.protocols.oci.utils.OciDigestUtils;
+import io.repsy.protocols.oci.utils.OciMediaTypeUtils;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.utils.BlobDigests;
 import java.util.ArrayList;
@@ -196,7 +196,7 @@ public class ManifestTxService implements ManifestService<UUID> {
 
     if (BlobDigests.startsWithDigestPrefix(reference)) {
       return this.manifestRepository
-          .findByImageIdAndAnyDigest(image.getId(), DockerDigestCalculator.normalize(reference))
+          .findByImageIdAndAnyDigest(image.getId(), OciDigestUtils.normalize(reference))
           .map(found -> this.fileNamesOf(repoId, imageName, found))
           .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.MANIFEST_NOT_FOUND));
     }
@@ -313,7 +313,7 @@ public class ManifestTxService implements ManifestService<UUID> {
   private Manifest findManifest(final UUID imageId, final String digest) {
 
     return this.manifestRepository
-        .findByImageIdAndAnyDigest(imageId, DockerDigestCalculator.normalize(digest))
+        .findByImageIdAndAnyDigest(imageId, OciDigestUtils.normalize(digest))
         .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.MANIFEST_NOT_FOUND));
   }
 
@@ -392,7 +392,7 @@ public class ManifestTxService implements ManifestService<UUID> {
   private TagDetail mapToTagDetailWithConfigDigest(final Tag tag) {
 
     final var configDigest =
-        MediaTypes.isIndex(tag.getMediaType()) ? null : tag.getManifest().getConfigDigest();
+        OciMediaTypeUtils.isIndex(tag.getMediaType()) ? null : tag.getManifest().getConfigDigest();
 
     return TagDetail.of(tag, configDigest);
   }

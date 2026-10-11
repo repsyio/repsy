@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.protocols.docker.shared.tag.dtos;
+package io.repsy.protocols.oci.dtos;
 
 import java.util.List;
 
@@ -24,4 +24,4 @@ import java.util.List;
  * @param hasMore whether tags come after the last one of the page, so a {@code Link} to the next
  *     page is due
  */
-public record TagPage(List<String> tags, boolean hasMore) {}
+public record OciTagPage(List<String> tags, boolean hasMore) {}

@@ -99,6 +99,14 @@ class HelmHandlerRoutesTest {
         withSettings().useConstructor(BASE, FACADE, PROVIDER).defaultAnswer(CALLS_REAL_METHODS));
   }
 
+  private static <T extends ProtocolMethodHandler> T strictWireHandler(final Class<T> type) {
+    return mock(
+        type,
+        withSettings()
+            .useConstructor(BASE, FACADE, PROVIDER, true)
+            .defaultAnswer(CALLS_REAL_METHODS));
+  }
+
   private static Optional<ProtocolContext> parse(
       final ProtocolMethodHandler handler, final String method, final String path) {
     final var request = new MockHttpServletRequest(method, path);
@@ -189,7 +197,7 @@ class HelmHandlerRoutesTest {
     assertThat(parse(check, "HEAD", "/img/manifests/1.0.0")).isPresent();
     assertThat(parse(check, "GET", "/img/manifests/1.0.0")).isEmpty();
 
-    final var pull = handler(AbstractHelmOciManifestPullProtocolMethodHandler.class);
+    final var pull = strictWireHandler(AbstractHelmOciManifestPullProtocolMethodHandler.class);
     assertRoute(
         pull,
         List.of(HttpMethod.GET),
@@ -197,7 +205,7 @@ class HelmHandlerRoutesTest {
     assertThat(parse(pull, "GET", "/img/manifests/1.0.0")).isPresent();
     assertThat(parse(pull, "GET", "/img/tags/list")).isEmpty();
 
-    final var push = handler(AbstractHelmOciManifestPushProtocolMethodHandler.class);
+    final var push = strictWireHandler(AbstractHelmOciManifestPushProtocolMethodHandler.class);
     assertRoute(
         push,
         List.of(HttpMethod.PUT),

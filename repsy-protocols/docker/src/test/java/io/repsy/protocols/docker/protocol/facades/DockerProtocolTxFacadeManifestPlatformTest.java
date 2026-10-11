@@ -38,7 +38,7 @@ import io.repsy.protocols.docker.shared.tag.dtos.ManifestForm;
 import io.repsy.protocols.docker.shared.tag.dtos.TagForm;
 import io.repsy.protocols.docker.shared.tag.services.ManifestService;
 import io.repsy.protocols.docker.shared.utils.BaseParsedPath;
-import io.repsy.protocols.docker.shared.utils.DockerDigestCalculator;
+import io.repsy.protocols.oci.utils.OciDigestUtils;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
 import java.nio.charset.StandardCharsets;
@@ -145,8 +145,8 @@ class DockerProtocolTxFacadeManifestPlatformTest {
           .tagName("latest")
           .contentType(contentType)
           .manifestJson(json)
-          .digest(DockerDigestCalculator.calculateDigest(bytes))
-          .digestSha512(DockerDigestCalculator.calculateSha512Digest(bytes))
+          .digest(OciDigestUtils.calculateDigest(bytes))
+          .digestSha512(OciDigestUtils.calculateSha512Digest(bytes))
           .manifestBytes(bytes)
           .relativePath(new RelativePath("manifests/x"))
           .build();

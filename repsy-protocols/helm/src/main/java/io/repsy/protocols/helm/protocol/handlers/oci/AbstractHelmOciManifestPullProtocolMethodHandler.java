@@ -15,34 +15,66 @@
  */
 package io.repsy.protocols.helm.protocol.handlers.oci;
 
+import static io.repsy.protocols.oci.utils.OciMediaTypeUtils.OCI_MANIFEST_SCHEMA1;
+
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
 import io.repsy.protocols.helm.protocol.facades.HelmProtocolFacade;
 import io.repsy.protocols.oci.dtos.OciManifestInfo;
 import io.repsy.protocols.oci.handlers.AbstractOciManifestPullProtocolMethodHandler;
+import io.repsy.protocols.oci.utils.OciAcceptHeaderUtils;
+import io.repsy.protocols.oci.utils.OciMediaTypeUtils;
 import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
+import java.util.List;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.web.HttpMediaTypeNotAcceptableException;
 
 /**
- * Handles GET /v2/{repo}/{name}/manifests/{reference} — downloads a manifest. The {@code Accept}
- * header is not negotiated.
+ * Handles GET /v2/{repo}/{name}/manifests/{reference} — downloads a manifest. With {@code
+ * repsy.helm.oci.strict-wire} on, the {@code Accept} header is negotiated as the Docker registry
+ * does (RPS-2164): a header that names no manifest type this registry serves is a 406 before the
+ * manifest is read.
  */
 public abstract class AbstractHelmOciManifestPullProtocolMethodHandler<ID>
     extends AbstractOciManifestPullProtocolMethodHandler<HelmProtocolFacade<ID>> {
 
+  private static final List<String> DEFAULT_ACCEPT_TYPES = List.of(OCI_MANIFEST_SCHEMA1);
+
+  private final boolean strictWire;
+
   public AbstractHelmOciManifestPullProtocolMethodHandler(
       final PathParser basePathParser,
       final HelmProtocolFacade<ID> helmFacade,
-      final HelmProtocolProvider provider) {
+      final HelmProtocolProvider provider,
+      final boolean strictWire) {
     super(
         HandlerRoute.of(Permission.READ, HttpMethod.GET).writeOperation(false),
         basePathParser,
         helmFacade,
         provider);
+    this.strictWire = strictWire;
+  }
+
+  @Override
+  protected void checkAcceptable(final HttpServletRequest request)
+      throws HttpMediaTypeNotAcceptableException {
+
+    if (!this.strictWire) {
+      return;
+    }
+
+    final var acceptHeaders =
+        OciAcceptHeaderUtils.parse(request.getHeader(HttpHeaders.ACCEPT), DEFAULT_ACCEPT_TYPES);
+
+    if (OciMediaTypeUtils.getPreferredMediaType(acceptHeaders) == null) {
+      throw new HttpMediaTypeNotAcceptableException(
+          "The Accept header names no manifest media type this repository serves.");
+    }
   }
 
   @Override

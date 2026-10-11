@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.protocols.docker.shared.utils;
+package io.repsy.protocols.oci.utils;
 
 import java.util.Arrays;
 import java.util.List;
@@ -23,7 +23,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.util.StringUtils;
 
 @UtilityClass
-public final class AcceptHeaderParser {
+public final class OciAcceptHeaderUtils {
 
   public static List<String> parse(
       final @Nullable String acceptHeader, final List<String> defaultTypes) {
@@ -37,7 +37,7 @@ public final class AcceptHeaderParser {
     return Arrays.stream(acceptHeader.split(","))
         .map(String::trim)
         .filter(StringUtils::hasText)
-        .map(AcceptHeaderParser::removeQualityValue)
+        .map(OciAcceptHeaderUtils::removeQualityValue)
         .filter(StringUtils::hasText)
         .distinct()
         .toList();

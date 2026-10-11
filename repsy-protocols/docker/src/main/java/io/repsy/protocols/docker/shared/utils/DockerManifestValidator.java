@@ -15,11 +15,11 @@
  */
 package io.repsy.protocols.docker.shared.utils;
 
-import static io.repsy.protocols.docker.shared.utils.MediaTypes.DOCKER_MANIFEST_LIST;
-import static io.repsy.protocols.docker.shared.utils.MediaTypes.DOCKER_MANIFEST_SCHEMA1;
-import static io.repsy.protocols.docker.shared.utils.MediaTypes.DOCKER_MANIFEST_SCHEMA2;
-import static io.repsy.protocols.docker.shared.utils.MediaTypes.OCI_IMAGE_INDEX;
-import static io.repsy.protocols.docker.shared.utils.MediaTypes.OCI_MANIFEST_SCHEMA1;
+import static io.repsy.protocols.oci.utils.OciMediaTypeUtils.DOCKER_MANIFEST_LIST;
+import static io.repsy.protocols.oci.utils.OciMediaTypeUtils.DOCKER_MANIFEST_SCHEMA1;
+import static io.repsy.protocols.oci.utils.OciMediaTypeUtils.DOCKER_MANIFEST_SCHEMA2;
+import static io.repsy.protocols.oci.utils.OciMediaTypeUtils.OCI_IMAGE_INDEX;
+import static io.repsy.protocols.oci.utils.OciMediaTypeUtils.OCI_MANIFEST_SCHEMA1;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestInfo;

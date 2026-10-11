@@ -27,7 +27,7 @@ import io.repsy.os.server.protocols.docker.shared.tag.repositories.TagRepository
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
-import io.repsy.protocols.docker.shared.utils.DockerDigestCalculator;
+import io.repsy.protocols.oci.utils.OciDigestUtils;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.IOException;
 import java.nio.file.Paths;
@@ -379,7 +379,7 @@ public class DockerManifestLayoutRepairService {
   private static String sha256(final byte[] bytes) {
 
     try {
-      return DockerDigestCalculator.calculateDigest(bytes);
+      return OciDigestUtils.calculateDigest(bytes);
     } catch (final NoSuchAlgorithmException e) {
       throw new IllegalStateException(e);
     }
@@ -388,7 +388,7 @@ public class DockerManifestLayoutRepairService {
   private static String sha512(final byte[] bytes) {
 
     try {
-      return DockerDigestCalculator.calculateSha512Digest(bytes);
+      return OciDigestUtils.calculateSha512Digest(bytes);
     } catch (final NoSuchAlgorithmException e) {
       throw new IllegalStateException(e);
     }

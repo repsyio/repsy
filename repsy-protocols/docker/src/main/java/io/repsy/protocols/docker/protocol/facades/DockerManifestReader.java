@@ -25,7 +25,7 @@ import io.repsy.protocols.docker.shared.tag.dtos.BaseManifestDetail;
 import io.repsy.protocols.docker.shared.tag.dtos.BaseTagDetail;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestDetails;
 import io.repsy.protocols.docker.shared.tag.services.ManifestService;
-import io.repsy.protocols.docker.shared.utils.DockerDigestCalculator;
+import io.repsy.protocols.oci.utils.OciDigestUtils;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.BlobDigests;
@@ -70,7 +70,7 @@ final class DockerManifestReader<ID> {
     // the sha512 digest back, a tag or a sha256 reference the canonical sha256 one (RPS-1244).
     return new ManifestDetails(
         manifest.getMediaType(),
-        DockerDigestCalculator.reportedDigest(manifestReference, manifest.getDigest()),
+        OciDigestUtils.reportedDigest(manifestReference, manifest.getDigest()),
         manifestStr);
   }
 
@@ -106,7 +106,7 @@ final class DockerManifestReader<ID> {
       final BaseRepoInfo<ID> repoInfo, final String imageName, final String reference) {
 
     if (BlobDigests.startsWithDigestPrefix(reference)) {
-      return DockerDigestCalculator.normalize(reference);
+      return OciDigestUtils.normalize(reference);
     }
 
     return this.manifestService

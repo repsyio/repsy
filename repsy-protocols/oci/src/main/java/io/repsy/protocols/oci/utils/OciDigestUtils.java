@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.protocols.docker.shared.utils;
+package io.repsy.protocols.oci.utils;
 
 import static java.security.MessageDigest.getInstance;
 
@@ -22,7 +22,6 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import java.util.Locale;
 import lombok.experimental.UtilityClass;
-import org.apache.commons.codec.digest.MessageDigestAlgorithms;
 
 /**
  * Calculates the OCI digests of a manifest. A manifest is stored under its {@code sha256} digest
@@ -30,7 +29,7 @@ import org.apache.commons.codec.digest.MessageDigestAlgorithms;
  * it.
  */
 @UtilityClass
-public class DockerDigestCalculator {
+public class OciDigestUtils {
 
   public static final String SHA256_PREFIX = "sha256:";
   public static final String SHA512_PREFIX = "sha512:";
@@ -42,8 +41,7 @@ public class DockerDigestCalculator {
 
   public static String calculateSha512Digest(final byte[] bytes) throws NoSuchAlgorithmException {
 
-    return SHA512_PREFIX
-        + HexFormat.of().formatHex(getInstance(MessageDigestAlgorithms.SHA_512).digest(bytes));
+    return SHA512_PREFIX + HexFormat.of().formatHex(getInstance("SHA-512").digest(bytes));
   }
 
   /**

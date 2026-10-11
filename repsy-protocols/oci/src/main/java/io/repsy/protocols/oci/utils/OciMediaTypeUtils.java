@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.protocols.docker.shared.utils;
+package io.repsy.protocols.oci.utils;
 
 import java.util.List;
 import lombok.experimental.UtilityClass;
@@ -21,7 +21,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.util.CollectionUtils;
 
 @UtilityClass
-public final class MediaTypes {
+public final class OciMediaTypeUtils {
 
   // OCI Media Types
   public static final String OCI_IMAGE_INDEX = "application/vnd.oci.image.index.v1+json";
@@ -59,20 +59,20 @@ public final class MediaTypes {
   public static @Nullable String getPreferredMediaType(final @Nullable List<String> acceptHeaders) {
 
     if (CollectionUtils.isEmpty(acceptHeaders)) {
-      return MediaTypes.DOCKER_MANIFEST_SCHEMA2;
+      return OciMediaTypeUtils.DOCKER_MANIFEST_SCHEMA2;
     }
 
-    final var distributableType = MediaTypes.findDistributableType(acceptHeaders);
+    final var distributableType = OciMediaTypeUtils.findDistributableType(acceptHeaders);
     if (distributableType != null) {
       return distributableType;
     }
 
-    final var manifestType = MediaTypes.findManifestType(acceptHeaders);
+    final var manifestType = OciMediaTypeUtils.findManifestType(acceptHeaders);
     if (manifestType != null) {
       return manifestType;
     }
 
-    return MediaTypes.findJsonFallback(acceptHeaders);
+    return OciMediaTypeUtils.findJsonFallback(acceptHeaders);
   }
 
   public static boolean isIndex(final String type) {
@@ -86,7 +86,7 @@ public final class MediaTypes {
   private static @Nullable String findDistributableType(final List<String> acceptHeaders) {
 
     for (final var accept : acceptHeaders) {
-      if (MediaTypes.isDistributable(accept)) {
+      if (OciMediaTypeUtils.isDistributable(accept)) {
         return accept;
       }
     }
@@ -96,7 +96,7 @@ public final class MediaTypes {
   private static @Nullable String findManifestType(final List<String> acceptHeaders) {
 
     for (final var accept : acceptHeaders) {
-      if (MediaTypes.isManifestType(accept)) {
+      if (OciMediaTypeUtils.isManifestType(accept)) {
         return accept;
       }
     }
@@ -108,7 +108,7 @@ public final class MediaTypes {
 
     for (final var accept : acceptHeaders) {
       if (APPLICATION_JSON.equals(accept) || WILDCARD.equals(accept)) {
-        return MediaTypes.DOCKER_MANIFEST_SCHEMA2;
+        return OciMediaTypeUtils.DOCKER_MANIFEST_SCHEMA2;
       }
     }
     return null;

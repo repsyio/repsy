@@ -20,7 +20,7 @@ import io.repsy.os.server.protocols.docker.shared.image.repositories.ImageReposi
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.TagRepository;
 import io.repsy.os.server.security.shared.ArtifactStorageResolver;
-import io.repsy.protocols.docker.shared.utils.DockerDigestCalculator;
+import io.repsy.protocols.oci.utils.OciDigestUtils;
 import io.repsy.protocols.shared.utils.BlobDigests;
 import java.util.Optional;
 import java.util.Set;
@@ -71,7 +71,7 @@ public class DockerArtifactStorageResolver implements ArtifactStorageResolver {
   private boolean imageHasDigest(final Image image, final String digest) {
 
     return this.manifestRepository
-        .findByImageIdAndAnyDigest(image.getId(), DockerDigestCalculator.normalize(digest))
+        .findByImageIdAndAnyDigest(image.getId(), OciDigestUtils.normalize(digest))
         .isPresent();
   }
 

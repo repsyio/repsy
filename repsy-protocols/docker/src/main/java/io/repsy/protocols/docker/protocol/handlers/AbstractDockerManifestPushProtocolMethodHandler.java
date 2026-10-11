@@ -15,9 +15,9 @@
  */
 package io.repsy.protocols.docker.protocol.handlers;
 
-import static io.repsy.protocols.docker.shared.utils.MediaTypes.DOCKER_MANIFEST_LIST;
-import static io.repsy.protocols.docker.shared.utils.MediaTypes.OCI_IMAGE_INDEX;
 import static io.repsy.protocols.oci.constants.OciConstants.DOCKER_CONTENT_DIGEST;
+import static io.repsy.protocols.oci.utils.OciMediaTypeUtils.DOCKER_MANIFEST_LIST;
+import static io.repsy.protocols.oci.utils.OciMediaTypeUtils.OCI_IMAGE_INDEX;
 import static org.springframework.http.HttpHeaders.CONTENT_TYPE;
 import static org.springframework.http.HttpHeaders.LOCATION;
 
@@ -32,9 +32,9 @@ import io.repsy.protocols.docker.shared.image.services.ImageService;
 import io.repsy.protocols.docker.shared.layer.services.AbstractDockerLayerRenamer;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestForm;
 import io.repsy.protocols.docker.shared.tag.dtos.SavedManifest;
-import io.repsy.protocols.docker.shared.utils.DockerDigestCalculator;
 import io.repsy.protocols.docker.shared.utils.DockerManifestValidator;
 import io.repsy.protocols.docker.shared.utils.DockerPushGuards;
+import io.repsy.protocols.oci.utils.OciDigestUtils;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
 import io.repsy.protocols.shared.handlers.HandlerRoute;
@@ -124,7 +124,7 @@ public abstract class AbstractDockerManifestPushProtocolMethodHandler<ID>
     DockerManifestValidator.validate(contentType, manifestJson);
 
     final var manifestBytes = manifestJson.getBytes(StandardCharsets.UTF_8);
-    final var digest = DockerDigestCalculator.calculateDigest(manifestBytes);
+    final var digest = OciDigestUtils.calculateDigest(manifestBytes);
 
     // A manifest is stored once per digest, whatever it was pushed under, so an override or a
     // second tag never rewrites the file of the manifest it replaces (RPS-1216).
@@ -138,7 +138,7 @@ public abstract class AbstractDockerManifestPushProtocolMethodHandler<ID>
             .relativePath(parsedManifestPath.getRelativePath())
             .servletPath(request.getServletPath())
             .digest(digest)
-            .digestSha512(DockerDigestCalculator.calculateSha512Digest(manifestBytes))
+            .digestSha512(OciDigestUtils.calculateSha512Digest(manifestBytes))
             .manifestBytes(manifestBytes)
             .build();
 
@@ -160,7 +160,7 @@ public abstract class AbstractDockerManifestPushProtocolMethodHandler<ID>
 
     // A push by a digest reference is answered in that reference's algorithm (RPS-1244): the
     // stored manifest is addressable by both, the client verifies against the one it named.
-    final var reportedDigest = DockerDigestCalculator.reportedDigest(reference, manifestDigest);
+    final var reportedDigest = OciDigestUtils.reportedDigest(reference, manifestDigest);
     final var location = this.getServletURILocation(context, imageName, reportedDigest);
 
     return ResponseEntity.status(HttpStatus.CREATED)

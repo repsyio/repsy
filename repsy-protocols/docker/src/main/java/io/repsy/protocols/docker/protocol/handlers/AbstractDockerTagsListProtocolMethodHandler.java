@@ -15,23 +15,19 @@
  */
 package io.repsy.protocols.docker.protocol.handlers;
 
-import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import io.repsy.protocols.docker.protocol.facades.DockerProtocolFacade;
 import io.repsy.protocols.docker.shared.tag.dtos.TagListResponse;
-import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
+import io.repsy.protocols.oci.utils.OciTagPagingUtils;
 import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
 import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.regex.Pattern;
-import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -52,8 +48,6 @@ public abstract class AbstractDockerTagsListProtocolMethodHandler<ID>
     extends AbstractFacadeProtocolMethodHandler<DockerProtocolFacade<ID>> {
 
   private static final Pattern TAGS_LIST_PATTERN = Pattern.compile("^/([^/]+)/tags/list$");
-  private static final String LIMIT_PARAMETER = "n";
-  private static final String LAST_PARAMETER = "last";
 
   public AbstractDockerTagsListProtocolMethodHandler(
       final PathParser basePathParser,
@@ -82,8 +76,9 @@ public abstract class AbstractDockerTagsListProtocolMethodHandler<ID>
     }
 
     final var imageName = matcher.group(1);
-    final var limit = parseLimit(request.getParameter(LIMIT_PARAMETER));
-    final var last = request.getParameter(LAST_PARAMETER);
+    final var limit =
+        OciTagPagingUtils.parseLimit(request.getParameter(OciTagPagingUtils.LIMIT_PARAMETER));
+    final var last = request.getParameter(OciTagPagingUtils.LAST_PARAMETER);
 
     final var page = this.facade.listTags(context, imageName, limit, last);
 
@@ -96,49 +91,10 @@ public abstract class AbstractDockerTagsListProtocolMethodHandler<ID>
     if (page.hasMore() && limit != null) {
       answer.header(
           HttpHeaders.LINK,
-          nextLink(request.getRequestURI(), limit, page.tags().get(page.tags().size() - 1)));
+          OciTagPagingUtils.nextLink(
+              request.getRequestURI(), limit, page.tags().get(page.tags().size() - 1)));
     }
 
     return answer.body(body);
-  }
-
-  /**
-   * A relative reference, as the distribution spec allows: the client resolves it against the URL
-   * it called, so a proxy in front of the registry cannot make it point at an address the client
-   * cannot reach.
-   */
-  private static String nextLink(final String requestUri, final int limit, final String last) {
-
-    return "<%s?%s=%d&%s=%s>; rel=\"next\""
-        .formatted(
-            requestUri,
-            LIMIT_PARAMETER,
-            limit,
-            LAST_PARAMETER,
-            URLEncoder.encode(last, StandardCharsets.UTF_8));
-  }
-
-  /**
-   * Reads {@code n}: a non-negative integer, or absent for every tag. Anything else names no number
-   * of results, which the distribution reference registry answers with 400 {@code
-   * PAGINATION_NUMBER_INVALID}.
-   */
-  private static @Nullable Integer parseLimit(final @Nullable String value) {
-
-    if (value == null) {
-      return null;
-    }
-
-    try {
-      final var limit = Integer.parseInt(value);
-
-      if (limit < 0) {
-        throw new BadRequestException(ProtocolErrorCodes.PAGINATION_NUMBER_INVALID);
-      }
-
-      return limit;
-    } catch (final NumberFormatException e) {
-      throw new BadRequestException(ProtocolErrorCodes.PAGINATION_NUMBER_INVALID);
-    }
   }
 }

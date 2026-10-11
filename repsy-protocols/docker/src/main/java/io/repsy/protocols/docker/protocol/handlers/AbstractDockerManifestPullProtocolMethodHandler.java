@@ -15,19 +15,19 @@
  */
 package io.repsy.protocols.docker.protocol.handlers;
 
-import static io.repsy.protocols.docker.shared.utils.MediaTypes.DOCKER_MANIFEST_LIST;
-import static io.repsy.protocols.docker.shared.utils.MediaTypes.DOCKER_MANIFEST_SCHEMA2;
-import static io.repsy.protocols.docker.shared.utils.MediaTypes.OCI_IMAGE_INDEX;
-import static io.repsy.protocols.docker.shared.utils.MediaTypes.OCI_MANIFEST_SCHEMA1;
+import static io.repsy.protocols.oci.utils.OciMediaTypeUtils.DOCKER_MANIFEST_LIST;
+import static io.repsy.protocols.oci.utils.OciMediaTypeUtils.DOCKER_MANIFEST_SCHEMA2;
+import static io.repsy.protocols.oci.utils.OciMediaTypeUtils.OCI_IMAGE_INDEX;
+import static io.repsy.protocols.oci.utils.OciMediaTypeUtils.OCI_MANIFEST_SCHEMA1;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import io.repsy.protocols.docker.protocol.facades.DockerProtocolFacade;
-import io.repsy.protocols.docker.shared.utils.AcceptHeaderParser;
-import io.repsy.protocols.docker.shared.utils.MediaTypes;
 import io.repsy.protocols.oci.dtos.OciManifestInfo;
 import io.repsy.protocols.oci.handlers.AbstractOciManifestPullProtocolMethodHandler;
+import io.repsy.protocols.oci.utils.OciAcceptHeaderUtils;
+import io.repsy.protocols.oci.utils.OciMediaTypeUtils;
 import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
@@ -57,9 +57,9 @@ public abstract class AbstractDockerManifestPullProtocolMethodHandler<ID>
       throws HttpMediaTypeNotAcceptableException {
 
     final var acceptHeaders =
-        AcceptHeaderParser.parse(request.getHeader("Accept"), DEFAULT_DOCKER_ACCEPT_TYPES);
+        OciAcceptHeaderUtils.parse(request.getHeader("Accept"), DEFAULT_DOCKER_ACCEPT_TYPES);
 
-    if (MediaTypes.getPreferredMediaType(acceptHeaders) == null) {
+    if (OciMediaTypeUtils.getPreferredMediaType(acceptHeaders) == null) {
       throw new HttpMediaTypeNotAcceptableException(
           "The Accept header names no manifest media type this repository serves.");
     }

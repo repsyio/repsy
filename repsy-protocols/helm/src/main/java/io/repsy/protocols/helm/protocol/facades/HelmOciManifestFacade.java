@@ -18,7 +18,6 @@ package io.repsy.protocols.helm.protocol.facades;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.helm.shared.chart.services.ChartService;
-import io.repsy.protocols.helm.shared.constants.HelmConstants;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestForm;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestInfo;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciManifestPushForm;
@@ -29,6 +28,7 @@ import io.repsy.protocols.helm.shared.storage.services.HelmStorageService;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.storage.RepoRef;
+import io.repsy.protocols.shared.utils.BlobDigests;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import io.repsy.protocols.shared.utils.StoredUpload;
 import java.io.IOException;
@@ -229,7 +229,7 @@ final class HelmOciManifestFacade<ID> {
     // createdAt-desc output (see HelmOciManifestNameRepairServiceIT).
     final var tags =
         this.ociManifestService.listTagsByName(repoInfo.getId(), name).stream()
-            .filter(reference -> !reference.startsWith(HelmConstants.SHA256_PREFIX))
+            .filter(reference -> !BlobDigests.startsWithDigestPrefix(reference))
             .sorted()
             .toList();
     // The distribution spec's name is the whole repository name, <repo>/<chart> here, as the

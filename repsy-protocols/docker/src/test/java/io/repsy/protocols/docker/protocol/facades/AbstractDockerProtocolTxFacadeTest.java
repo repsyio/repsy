@@ -42,8 +42,8 @@ import io.repsy.protocols.docker.shared.tag.dtos.BaseTagDetail;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestForm;
 import io.repsy.protocols.docker.shared.tag.services.ManifestService;
 import io.repsy.protocols.docker.shared.utils.BaseParsedPath;
-import io.repsy.protocols.docker.shared.utils.DockerDigestCalculator;
 import io.repsy.protocols.docker.shared.utils.ManifestNameGenerator;
+import io.repsy.protocols.oci.utils.OciDigestUtils;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.BaseUrlParserProperties;
 import java.io.ByteArrayInputStream;
@@ -420,8 +420,8 @@ class AbstractDockerProtocolTxFacadeTest {
         .tagName(reference)
         .contentType("application/vnd.oci.image.manifest.v1+json")
         .manifestJson(new String(bytes, StandardCharsets.UTF_8))
-        .digest(DockerDigestCalculator.calculateDigest(bytes))
-        .digestSha512(DockerDigestCalculator.calculateSha512Digest(bytes))
+        .digest(OciDigestUtils.calculateDigest(bytes))
+        .digestSha512(OciDigestUtils.calculateSha512Digest(bytes))
         .manifestBytes(bytes)
         .relativePath(new RelativePath("manifests/x"))
         .build();
@@ -483,7 +483,7 @@ class AbstractDockerProtocolTxFacadeTest {
   /** Runs saveManifest up to the layer check and returns the digests it asked the layers for. */
   private List<String> digestsAskedFor(final String manifestJson) throws Exception {
     final var bytes = manifestJson.getBytes(StandardCharsets.UTF_8);
-    final var digest = DockerDigestCalculator.calculateDigest(bytes);
+    final var digest = OciDigestUtils.calculateDigest(bytes);
     when(this.imageService.getOrCreateImage(REPO_ID, IMAGE_NAME))
         .thenReturn(BaseImageInfo.<UUID>builder().id(UUID.randomUUID()).name(IMAGE_NAME).build());
     doThrow(new ItemNotFoundException("stop"))

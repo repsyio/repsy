@@ -17,8 +17,8 @@ package io.repsy.protocols.docker.shared.utils;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.protocols.docker.shared.constants.DockerConstants;
+import io.repsy.protocols.oci.utils.OciPushGuardUtils;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
-import io.repsy.protocols.shared.utils.BlobDigests;
 import java.util.regex.Pattern;
 import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.Nullable;
@@ -33,14 +33,6 @@ import org.jspecify.annotations.Nullable;
  */
 @UtilityClass
 public final class DockerPushGuards {
-
-  /**
-   * The OCI distribution specification's tag grammar
-   * (github.com/opencontainers/distribution-spec/blob/main/spec.md#pulling-manifests): a tag never
-   * starts with {@code .} or {@code -}, and is at most 128 characters, well inside {@link
-   * DockerConstants#MAX_REFERENCE_LENGTH}.
-   */
-  private static final Pattern TAG_PATTERN = Pattern.compile("^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$");
 
   /** The single-path-component grammar this registry has always parsed an image name with. */
   private static final Pattern IMAGE_NAME_PATTERN =
@@ -74,25 +66,7 @@ public final class DockerPushGuards {
    */
   public static void rejectInvalidReference(final String reference) {
 
-    final var isDigestShaped = reference.indexOf(':') >= 0;
-
-    if (reference.length() > DockerConstants.MAX_REFERENCE_LENGTH) {
-      throw new BadRequestException(
-          isDigestShaped
-              ? ProtocolErrorCodes.DOCKER_DIGEST_INVALID
-              : ProtocolErrorCodes.DOCKER_REFERENCE_INVALID);
-    }
-
-    if (isDigestShaped) {
-      if (!BlobDigests.isSupported(reference)) {
-        throw new BadRequestException(ProtocolErrorCodes.DOCKER_DIGEST_INVALID);
-      }
-      return;
-    }
-
-    if (!TAG_PATTERN.matcher(reference).matches()) {
-      throw new BadRequestException(ProtocolErrorCodes.DOCKER_REFERENCE_INVALID);
-    }
+    OciPushGuardUtils.rejectInvalidReference(reference, DockerConstants.MAX_REFERENCE_LENGTH);
   }
 
   /**

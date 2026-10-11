@@ -105,6 +105,15 @@ multiport:
     9443: ""
 
 repsy:
+  helm:
+    oci:
+      # Whether the Helm OCI routes keep to the wire of the Docker registry (RPS-2164): a manifest
+      # push is refused when its tag breaks the distribution grammar, its Content-Type is not the OCI
+      # image manifest, its schemaVersion is not 2, it has no config digest, or a digest reference is
+      # not the manifest's own digest; and a manifest pull whose Accept header names no manifest type
+      # is answered 406. Set it to false to fall back to the earlier, lenient wire without a new
+      # release.
+      strict-wire: ${HELM_OCI_STRICT_WIRE:true}
   npm:
     # The address the npm registry names itself with in the `dist.tarball` of every version it serves
     # or stores, e.g. https://repo.example.com (a path prefix is fine). Empty (the default) derives it

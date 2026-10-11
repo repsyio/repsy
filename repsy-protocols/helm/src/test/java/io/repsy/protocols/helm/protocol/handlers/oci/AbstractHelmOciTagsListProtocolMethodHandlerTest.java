@@ -16,6 +16,7 @@
 package io.repsy.protocols.helm.protocol.handlers.oci;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
 import io.repsy.libs.protocol.router.PathParser;
@@ -142,7 +143,42 @@ class AbstractHelmOciTagsListProtocolMethodHandlerTest {
             new MockHttpServletResponse());
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-    assertThat(response.getBody()).isSameAs(dto);
+    assertThat(response.getBody()).isEqualTo(dto);
+  }
+
+  @Test
+  @DisplayName("handle() pages with n and last and links the next page (RPS-2164)")
+  void handlePagesTheTagList() throws Exception {
+    final var context = context("/payments/tags/list");
+    when(this.facade.listTags(context, "payments"))
+        .thenReturn(
+            HelmOciTagListInfo.builder()
+                .name("helm/payments")
+                .tags(List.of("0.9.0", "1.0.0", "2.0.0"))
+                .build());
+    final var request = new MockHttpServletRequest("GET", "/v2/helm/payments/tags/list");
+    request.setParameter("n", "1");
+    request.setParameter("last", "0.9.0");
+
+    final var response = this.handler.handle(context, request, new MockHttpServletResponse());
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(response.getBody())
+        .isEqualTo(
+            HelmOciTagListInfo.builder().name("helm/payments").tags(List.of("1.0.0")).build());
+    assertThat(response.getHeaders().getFirst("Link"))
+        .isEqualTo("</v2/helm/payments/tags/list?n=1&last=1.0.0>; rel=\"next\"");
+  }
+
+  @Test
+  @DisplayName("handle() answers 400 for a negative n (RPS-2164)")
+  void handleRefusesNegativeLimit() {
+    final var context = context("/payments/tags/list");
+    final var request = new MockHttpServletRequest("GET", "/v2/helm/payments/tags/list");
+    request.setParameter("n", "-1");
+
+    assertThatThrownBy(() -> this.handler.handle(context, request, new MockHttpServletResponse()))
+        .hasMessage("paginationNumberInvalid");
   }
 
   @Test

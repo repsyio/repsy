@@ -24,7 +24,7 @@ import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestRepos
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.TagRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.services.ManifestFileService.ManifestFileRef;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
-import io.repsy.protocols.docker.shared.utils.DockerDigestCalculator;
+import io.repsy.protocols.oci.utils.OciDigestUtils;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.utils.BlobDigests;
 import java.util.List;
@@ -73,7 +73,7 @@ public class ManifestDeleter {
       return 0L;
     }
 
-    return this.deleteByDigest(repoInfo, imageName, DockerDigestCalculator.normalize(reference));
+    return this.deleteByDigest(repoInfo, imageName, OciDigestUtils.normalize(reference));
   }
 
   private long deleteByDigest(

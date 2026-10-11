@@ -29,9 +29,9 @@ import io.repsy.protocols.docker.shared.storage.services.DockerStorageService;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestDetails;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestForm;
 import io.repsy.protocols.docker.shared.tag.dtos.SavedManifest;
-import io.repsy.protocols.docker.shared.tag.dtos.TagPage;
 import io.repsy.protocols.docker.shared.tag.services.ManifestService;
-import io.repsy.protocols.docker.shared.utils.DockerTagPaging;
+import io.repsy.protocols.oci.dtos.OciTagPage;
+import io.repsy.protocols.oci.utils.OciTagPagingUtils;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.utils.BlobDigests;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
@@ -179,7 +179,7 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
   }
 
   @Override
-  public TagPage listTags(
+  public OciTagPage listTags(
       final ProtocolContext context,
       final String imageName,
       final @Nullable Integer limit,
@@ -190,7 +190,7 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
     final var imageInfo =
         this.imageService.getImageInfoByRepoIdAndName(repoInfo.getId(), imageName);
 
-    return DockerTagPaging.page(
+    return OciTagPagingUtils.page(
         this.manifestService.findTagNamesByImageId(imageInfo.getId()), limit, last);
   }
 }

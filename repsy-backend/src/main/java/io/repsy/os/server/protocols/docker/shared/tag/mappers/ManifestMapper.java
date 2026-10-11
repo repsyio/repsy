@@ -46,7 +46,7 @@ public interface ManifestMapper {
 
     final var tagDetail = this.toTagDetailBase(tag);
 
-    if (!io.repsy.protocols.docker.shared.utils.MediaTypes.isIndex(tag.getMediaType())) {
+    if (!io.repsy.protocols.oci.utils.OciMediaTypeUtils.isIndex(tag.getMediaType())) {
       tagDetail.setConfigDigest(tag.getManifest().getConfigDigest());
     }
 

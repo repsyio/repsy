@@ -333,6 +333,28 @@ class OciWireCharacterizationIT extends AbstractIT {
     wire.call("manifest delete by digest", delete(base + "/manifests/" + manifestDigest));
     wire.call("manifest pull after the delete", get(base + "/manifests/" + manifestDigest));
 
+    // RPS-2164: what both registries refuse before anything is stored.
+    final var wrongDigest = "sha256:" + "1".repeat(64);
+    wire.unfiltered(
+        "manifest push with a tag the grammar refuses",
+        put(base + "/manifests/.hidden").contentType(OCI_MANIFEST).content(bytes(manifest)));
+    wire.unfiltered(
+        "manifest push by a digest that is not the manifest's",
+        put(base + "/manifests/" + wrongDigest).contentType(OCI_MANIFEST).content(bytes(manifest)));
+    wire.unfiltered(
+        "manifest push with a Content-Type the registry does not store",
+        put(base + "/manifests/2.0.0").contentType("text/plain").content(bytes(manifest)));
+    wire.unfiltered(
+        "manifest push whose schemaVersion is 1",
+        put(base + "/manifests/2.0.0")
+            .contentType(OCI_MANIFEST)
+            .content(bytes(manifest.replace("\"schemaVersion\":2", "\"schemaVersion\":1"))));
+    wire.unfiltered(
+        "manifest push without a config",
+        put(base + "/manifests/2.0.0")
+            .contentType(OCI_MANIFEST)
+            .content(bytes("{\"schemaVersion\":2,\"layers\":[]}")));
+
     return wire.transcript();
   }
 

@@ -21,7 +21,7 @@ import io.repsy.protocols.docker.shared.layer.dtos.LayerInfo;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestDetails;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestForm;
 import io.repsy.protocols.docker.shared.tag.dtos.SavedManifest;
-import io.repsy.protocols.docker.shared.tag.dtos.TagPage;
+import io.repsy.protocols.oci.dtos.OciTagPage;
 import java.io.IOException;
 import java.io.InputStream;
 import org.jspecify.annotations.Nullable;
@@ -99,6 +99,6 @@ public interface DockerProtocolFacade<ID> {
    * @param last the {@code last} of the request: the tag to start after, or {@code null}
    * @throws io.repsy.core.error_handling.exceptions.ItemNotFoundException {@code imageNotFound}
    */
-  TagPage listTags(
+  OciTagPage listTags(
       ProtocolContext context, String imageName, @Nullable Integer limit, @Nullable String last);
 }

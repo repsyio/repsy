@@ -15,11 +15,11 @@
  */
 package io.repsy.protocols.docker.protocol.facades;
 
-import static io.repsy.protocols.docker.shared.utils.MediaTypes.DOCKER_MANIFEST_LIST;
-import static io.repsy.protocols.docker.shared.utils.MediaTypes.DOCKER_MANIFEST_SCHEMA1;
-import static io.repsy.protocols.docker.shared.utils.MediaTypes.DOCKER_MANIFEST_SCHEMA2;
-import static io.repsy.protocols.docker.shared.utils.MediaTypes.OCI_IMAGE_INDEX;
-import static io.repsy.protocols.docker.shared.utils.MediaTypes.OCI_MANIFEST_SCHEMA1;
+import static io.repsy.protocols.oci.utils.OciMediaTypeUtils.DOCKER_MANIFEST_LIST;
+import static io.repsy.protocols.oci.utils.OciMediaTypeUtils.DOCKER_MANIFEST_SCHEMA1;
+import static io.repsy.protocols.oci.utils.OciMediaTypeUtils.DOCKER_MANIFEST_SCHEMA2;
+import static io.repsy.protocols.oci.utils.OciMediaTypeUtils.OCI_IMAGE_INDEX;
+import static io.repsy.protocols.oci.utils.OciMediaTypeUtils.OCI_MANIFEST_SCHEMA1;
 
 import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
@@ -39,7 +39,7 @@ import io.repsy.protocols.docker.shared.tag.dtos.OciImageConfig;
 import io.repsy.protocols.docker.shared.tag.dtos.SavedManifest;
 import io.repsy.protocols.docker.shared.tag.dtos.TagForm;
 import io.repsy.protocols.docker.shared.tag.services.ManifestService;
-import io.repsy.protocols.docker.shared.utils.DockerDigestCalculator;
+import io.repsy.protocols.oci.utils.OciDigestUtils;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.BlobDigests;
@@ -222,7 +222,7 @@ final class DockerManifestWriter<ID> {
       return;
     }
 
-    final var digest = DockerDigestCalculator.normalize(reference);
+    final var digest = OciDigestUtils.normalize(reference);
 
     if (!digest.equals(form.getDigest()) && !digest.equals(form.getDigestSha512())) {
       throw new BadRequestException(ProtocolErrorCodes.DIGEST_MISMATCH);

@@ -15,9 +15,9 @@
  */
 package io.repsy.protocols.docker.protocol.facades;
 
-import static io.repsy.protocols.docker.shared.utils.MediaTypes.DOCKER_CONFIG_JSON;
-import static io.repsy.protocols.docker.shared.utils.MediaTypes.OCI_CONFIG_JSON;
-import static io.repsy.protocols.docker.shared.utils.MediaTypes.OCI_EMPTY;
+import static io.repsy.protocols.oci.utils.OciMediaTypeUtils.DOCKER_CONFIG_JSON;
+import static io.repsy.protocols.oci.utils.OciMediaTypeUtils.OCI_CONFIG_JSON;
+import static io.repsy.protocols.oci.utils.OciMediaTypeUtils.OCI_EMPTY;
 
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestInfo;

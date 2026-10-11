@@ -27,7 +27,7 @@ import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestRepos
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.protocols.docker.shared.constants.DockerConstants;
-import io.repsy.protocols.docker.shared.utils.MediaTypes;
+import io.repsy.protocols.oci.utils.OciMediaTypeUtils;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -433,7 +433,7 @@ class DockerManifestPushIT extends AbstractIT {
     // class builds.
     final var manifest =
         "{\"schemaVersion\":2,\"config\":{\"mediaType\":\"%s\",\"digest\":\"%s\",\"size\":%d},\"layers\":[],\"annotations\":{\"vnd.docker.reference.type\":\"attestation-manifest\"}}"
-            .formatted(MediaTypes.OCI_EMPTY, sha256(emptyConfig), emptyConfig.length);
+            .formatted(OciMediaTypeUtils.OCI_EMPTY, sha256(emptyConfig), emptyConfig.length);
 
     // Pushed by digest only, as BuildKit does: reachable through an index's manifests[], not a tag.
     final var manifestDigest = sha256(manifest.getBytes(StandardCharsets.UTF_8));
@@ -446,7 +446,7 @@ class DockerManifestPushIT extends AbstractIT {
     // docker_manifest.media_type is NOT NULL: the missing body field is not persisted as null, it
     // falls back to the pushed Content-Type header.
     assertThat(stored.getMediaType()).isEqualTo(OCI_MANIFEST);
-    assertThat(stored.getConfigMediaType()).isEqualTo(MediaTypes.OCI_EMPTY);
+    assertThat(stored.getConfigMediaType()).isEqualTo(OciMediaTypeUtils.OCI_EMPTY);
     assertThat(stored.getPlatform()).isEqualTo(DockerConstants.UNKNOWN_PLATFORM);
   }
 

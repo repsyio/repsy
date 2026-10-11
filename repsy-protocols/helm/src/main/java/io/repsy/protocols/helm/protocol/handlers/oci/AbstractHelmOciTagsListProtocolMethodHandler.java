@@ -19,6 +19,8 @@ import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
 import io.repsy.protocols.helm.protocol.facades.HelmProtocolFacade;
+import io.repsy.protocols.helm.shared.oci.dtos.HelmOciTagListInfo;
+import io.repsy.protocols.oci.utils.OciTagPagingUtils;
 import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
 import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
@@ -35,7 +37,8 @@ import org.springframework.http.ResponseEntity;
 /**
  * Handles {@code GET /v2/{repo}/{name}/tags/list} — the distribution spec's tag listing. Helm's own
  * client calls it whenever a pull's {@code --version} is empty or a semver constraint, so without
- * this route any non-pinned OCI pull fails (RPS-1219).
+ * this route any non-pinned OCI pull fails (RPS-1219). {@code n} and {@code last} page the answer
+ * as the Docker registry pages it (RPS-2164).
  */
 public abstract class AbstractHelmOciTagsListProtocolMethodHandler<ID>
     extends AbstractFacadeProtocolMethodHandler<HelmProtocolFacade<ID>> {
@@ -69,10 +72,23 @@ public abstract class AbstractHelmOciTagsListProtocolMethodHandler<ID>
     }
 
     final var name = matcher.group(1);
-    final var tags = this.facade.listTags(context, name);
+    final var limit =
+        OciTagPagingUtils.parseLimit(request.getParameter(OciTagPagingUtils.LIMIT_PARAMETER));
+    final var last = request.getParameter(OciTagPagingUtils.LAST_PARAMETER);
 
-    return ResponseEntity.ok()
-        .header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-        .body(tags);
+    final var all = this.facade.listTags(context, name);
+    final var page = OciTagPagingUtils.page(all.getTags(), limit, last);
+
+    final var answer =
+        ResponseEntity.ok().header(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE);
+
+    if (page.hasMore() && limit != null) {
+      answer.header(
+          HttpHeaders.LINK,
+          OciTagPagingUtils.nextLink(
+              request.getRequestURI(), limit, page.tags().get(page.tags().size() - 1)));
+    }
+
+    return answer.body(HelmOciTagListInfo.builder().name(all.getName()).tags(page.tags()).build());
   }
 }
