@@ -277,6 +277,25 @@ class NpmPublishLimitsTest {
     }
 
     @Test
+    @DisplayName("nulls a non-string maintainer email or url, keeping the entry (RPS-2199)")
+    void nullsNonStringMaintainerEmailOrUrl() {
+      final var version = this.version();
+      final Map<String, Object> maintainer = new HashMap<>();
+      maintainer.put("name", "ok-maintainer");
+      maintainer.put("email", 42);
+      maintainer.put("url", Map.of("href", "https://example.test"));
+      final List<Map<String, Object>> maintainers = new ArrayList<>(List.of(maintainer));
+      version.put("maintainers", maintainers);
+
+      NpmPublishLimits.dropOverLongFields(version);
+
+      assertThat(maintainers).hasSize(1);
+      assertThat(maintainer.get("name")).isEqualTo("ok-maintainer");
+      assertThat(maintainer.get("email")).isNull();
+      assertThat(maintainer.get("url")).isNull();
+    }
+
+    @Test
     @SuppressWarnings("unchecked")
     @DisplayName("does nothing to a version with no over-long fields")
     void leavesShortFieldsUntouched() {

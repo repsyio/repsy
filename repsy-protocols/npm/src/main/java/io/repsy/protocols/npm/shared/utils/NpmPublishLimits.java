@@ -42,8 +42,8 @@ import org.jspecify.annotations.Nullable;
  *       store something under the wrong identity.
  *   <li><b>Drop</b> the value (set it to {@code null}) and keep the rest of the publish: author,
  *       bugs, homepage and repository URLs and emails, license, repository type, and a maintainer's
- *       email or url. These are descriptive only; a value cut to fit would point somewhere wrong,
- *       which is worse than a blank field.
+ *       email or url (also when it is not a string at all, RPS-2199). These are descriptive only; a
+ *       value cut to fit would point somewhere wrong, which is worse than a blank field.
  *   <li><b>Drop the entry</b> and keep the rest of the array: an over-long keyword, or an over-long
  *       maintainer name, or a maintainer without a name (RPS-2186) &mdash; {@code
  *       npm_package_maintainer.name} is {@code NOT NULL}, so unlike its email and url it cannot be
@@ -254,9 +254,18 @@ public final class NpmPublishLimits {
           final var map = (Map<String, Object>) maintainer;
           dropStringField(map, NpmConstants.EMAIL, MAX_MAINTAINER_EMAIL_LENGTH);
           dropStringField(map, NpmConstants.URL, MAX_MAINTAINER_URL_LENGTH);
+          nullIfNotString(map, NpmConstants.EMAIL);
+          nullIfNotString(map, NpmConstants.URL);
 
           return false;
         });
+  }
+
+  /** A present value that is not a string (number, object, list) is nulled, like an absent one. */
+  private static void nullIfNotString(final Map<String, Object> map, final String field) {
+    if (map.get(field) != null && !(map.get(field) instanceof String)) {
+      map.put(field, null);
+    }
   }
 
   private static void dropStringField(
