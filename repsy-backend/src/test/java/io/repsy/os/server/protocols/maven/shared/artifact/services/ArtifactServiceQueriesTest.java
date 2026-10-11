@@ -117,9 +117,6 @@ class ArtifactServiceQueriesTest {
     final var rowWriteService =
         new ArtifactRowWriteService(
             this.artifactRepository,
-            this.artifactVersionRepository,
-            this.versionDeveloperRepository,
-            this.versionLicenseRepository,
             this.artifactUpsertHelper,
             this.artifactVersionWriteService,
             this.artifactQueryService,

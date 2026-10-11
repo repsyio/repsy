@@ -34,6 +34,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.transaction.support.TransactionOperations;
 
 @DisplayName("AuthUserService")
 class AuthUserServiceTest {
@@ -45,7 +46,8 @@ class AuthUserServiceTest {
           Mockito.mock(LoginInfoFactory.class),
           Mockito.mock(RefreshTokenService.class),
           Mockito.mock(ApplicationEventPublisher.class),
-          new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()));
+          new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()),
+          TransactionOperations.withoutTransaction());
 
   /** RPS-962: a refresh token of a deleted user is an authentication failure, not a 404. */
   @Test

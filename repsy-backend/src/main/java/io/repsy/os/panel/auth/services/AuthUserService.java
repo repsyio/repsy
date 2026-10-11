@@ -31,11 +31,14 @@ import io.repsy.protocols.shared.auth.AuthFailureThrottle;
 import io.repsy.protocols.shared.auth.PasswordHasher;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.NonNull;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionOperations;
 
 @Service
 @Transactional(readOnly = true)
@@ -47,8 +50,15 @@ public class AuthUserService {
   private final @NonNull RefreshTokenService refreshTokenService;
   private final @NonNull ApplicationEventPublisher eventPublisher;
   private final @NonNull AuthFailureThrottle authFailureThrottle;
+  private final @NonNull TransactionOperations transactionOperations;
 
-  @Transactional
+  // RPS-2176: no transaction around the whole login. The hash upgrade runs in a transaction of its
+  // own (REQUIRES_NEW, a protocol facade may call it from a read-only one), which needs a second
+  // pooled connection while the login's transaction held the first: as many concurrent logins as
+  // the pool has connections waited on each other until Hikari's connection timeout. The password
+  // is checked and the hash upgraded before any transaction is open; the user row lock and the
+  // refresh token write, which must be one transaction (RPS-1152), are the one below.
+  @Transactional(propagation = Propagation.SUPPORTS)
   public @NonNull LoginInfo login(final @NonNull LoginForm form) {
 
     // Before the user lookup: a blocked client learns nothing about a username, whichever it sends
@@ -78,14 +88,19 @@ public class AuthUserService {
     // Publish login event for lastLoginAt update
     this.eventPublisher.publishEvent(new UserLoginEvent(user.getUsername()));
 
-    // Locks the user row so a deletion racing this request either waits for the refresh token to
-    // be written, or has already committed and is caught here, instead of a foreign-key violation
-    // surfacing from the insert (RPS-1152).
-    if (!this.userTxService.lockUserExists(user.getId())) {
-      throw new UnAuthorizedException(ErrorConstants.INVALID_CREDENTIALS);
-    }
+    return Objects.requireNonNull(
+        this.transactionOperations.execute(
+            status -> {
+              // Locks the user row so a deletion racing this request either waits for the refresh
+              // token to be written, or has already committed and is caught here, instead of a
+              // foreign-key violation surfacing from the insert (RPS-1152).
+              if (!this.userTxService.lockUserExists(user.getId())) {
+                throw new UnAuthorizedException(ErrorConstants.INVALID_CREDENTIALS);
+              }
 
-    return this.loginInfoFactory.create(user, Instant.now().truncatedTo(ChronoUnit.SECONDS));
+              return this.loginInfoFactory.create(
+                  user, Instant.now().truncatedTo(ChronoUnit.SECONDS));
+            }));
   }
 
   // consume() joins this method's transaction (both @Transactional, REQUIRED), so it is this

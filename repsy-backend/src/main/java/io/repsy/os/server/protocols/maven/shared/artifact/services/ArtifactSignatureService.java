@@ -438,40 +438,42 @@ public class ArtifactSignatureService {
   /**
    * A signable file was stored into a repo that verifies every signature (RPS-1188). The signature
    * that arrived before it, if any, is checked now and recorded ({@link
-   * PendingSignatureService#reconcileFile}); otherwise its bytes are new, so the verified signature
-   * of the previous ones is forgotten. Whether the version is signed is recomputed either way. A
-   * file of a version that is not registered yet (a jar before its POM) is left to the POM's
-   * registration.
+   * PendingSignatureService#reconcileFile}); the caller then passes the result to {@link
+   * #updateSignedForFile}, which, when nothing was recorded, forgets the verified signature of the
+   * previous bytes, and recomputes whether the version is signed either way. A file of a version
+   * that is not registered yet (a jar before its POM) is left to the POM's registration.
    *
-   * <p>Known window, accepted (RPS-1335): whether the repo verifies every signature is taken from
-   * {@code repoInfo}, which is from the start of the request, and a repo for which it says no
-   * returns before any lock or query. A toggle-on that commits while such a file is being uploaded
-   * starts its recomputation, and if that has already passed the file's version, the version keeps
-   * a {@code signed} that was computed without the new file until the next upload into it or the
-   * next toggle. It is bounded (one version per upload that raced the toggle), heals itself, and
-   * needs an upload and a toggle within the same moment. Closing it needs the setting read for
-   * every signable file of a flag-off repo, which is the query per file that RPS-1179 removed; a
-   * plain {@code mvn deploy} uploads many of them.
+   * @return whether the signature of the file was verified and recorded
+   *     <p>Known window, accepted (RPS-1335): whether the repo verifies every signature is taken
+   *     from {@code repoInfo}, which is from the start of the request, and a repo for which it says
+   *     no returns before any lock or query. A toggle-on that commits while such a file is being
+   *     uploaded starts its recomputation, and if that has already passed the file's version, the
+   *     version keeps a {@code signed} that was computed without the new file until the next upload
+   *     into it or the next toggle. It is bounded (one version per upload that raced the toggle),
+   *     heals itself, and needs an upload and a toggle within the same moment. Closing it needs the
+   *     setting read for every signable file of a flag-off repo, which is the query per file that
+   *     RPS-1179 removed; a plain {@code mvn deploy} uploads many of them.
    */
-  public void refreshSignedForFile(
-      final BaseRepoInfo<UUID> repoInfo, final StoragePath storagePath) {
+  // RPS-2176: no transaction of its own. The check of the parked signature runs in a transaction of
+  // its own (REQUIRES_NEW), which needs a second pooled connection while a transaction here held
+  // the first one. The caller then calls updateSignedForFile, which is the transaction that locks
+  // the version and recomputes it.
+  @Transactional(propagation = Propagation.SUPPORTS)
+  public boolean reconcileFile(final BaseRepoInfo<UUID> repoInfo, final StoragePath storagePath) {
 
     if (!this.isSignableInVerifyAllRepo(repoInfo, storagePath)) {
-      return;
+      return false;
     }
 
-    final var recorded =
-        this.pendingSignatureService.reconcileFile(
-            repoInfo, PendingSignatureService.pathOf(storagePath));
-
-    this.updateSignedForFile(repoInfo, storagePath, recorded);
+    return this.pendingSignatureService.reconcileFile(
+        repoInfo, PendingSignatureService.pathOf(storagePath));
   }
 
   /**
    * From the setting as {@code repoInfo} has it, so a request that began before a toggle is decided
    * by the old value. When that says on, {@link #updateSignedForFile} reads the setting again under
    * the version's lock; when it says off nothing is read, and that is the accepted window of {@link
-   * #refreshSignedForFile} (RPS-1335).
+   * #reconcileFile} (RPS-1335).
    */
   private boolean isSignableInVerifyAllRepo(
       final BaseRepoInfo<UUID> repoInfo, final StoragePath storagePath) {

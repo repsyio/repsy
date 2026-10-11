@@ -161,9 +161,17 @@ public class ArtifactDeploymentService extends AbstractArtifactService<UUID> {
    * loses the verified signature of its previous bytes, so {@code signed} is recomputed after every
    * upload into a registered version. On any other repo nothing of that is done: no query is made
    * for a file that registers nothing.
+   *
+   * <p>RPS-2176: no transaction of its own (SUPPORTS joins one a caller already has). The inserts
+   * of the artifact and version rows and the checks of the parked signatures run in transactions of
+   * their own ({@code REQUIRES_NEW}) that need a second pooled connection; a read write transaction
+   * here held the first one for the whole upload, so as many concurrent uploads as the pool has
+   * connections waited on each other until Hikari's connection timeout. Each write below is a
+   * transaction of its own, and the ones that belong together are one method of the service that
+   * writes them.
    */
   @Override
-  @Transactional
+  @Transactional(propagation = Propagation.SUPPORTS)
   public void createOrUpdateArtifact(
       final BaseRepoInfo<UUID> repoInfo, final StoragePath storagePath, final Resource resource) {
 
@@ -178,9 +186,11 @@ public class ArtifactDeploymentService extends AbstractArtifactService<UUID> {
 
     // A jar, a classifier file, a checksum or a metadata file registers nothing. Nothing below is
     // loaded for them, so a normal `mvn deploy` does not pay a repo query per file (RPS-1179). A
-    // repo that verifies every signature does look at a signable one, see refreshSignedForFile.
+    // repo that verifies every signature does look at a signable one, see reconcileFile.
     if (!PomModelUtils.isPomToParse(storagePath)) {
-      this.artifactSignatureService.refreshSignedForFile(repoInfo, storagePath);
+      final var recorded = this.artifactSignatureService.reconcileFile(repoInfo, storagePath);
+
+      this.artifactSignatureService.updateSignedForFile(repoInfo, storagePath, recorded);
       return;
     }
 

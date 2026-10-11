@@ -51,7 +51,8 @@ class ArtifactServicesTransactionsTest {
 
   private static final Map<String, String> EXPECTED =
       Map.ofEntries(
-          // The upload path and the deletes write.
+          // The upload path and the deletes write (the upload in transactions of its own, SUPPORTS,
+          // since RPS-2176: read write here only says it is not read only).
           Map.entry("createOrUpdateArtifact", READ_WRITE),
           Map.entry("refreshPluginPrefixFromJar", READ_WRITE),
           Map.entry("deleteArtifact", READ_WRITE),

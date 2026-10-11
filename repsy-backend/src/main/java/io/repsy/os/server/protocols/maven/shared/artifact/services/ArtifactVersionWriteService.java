@@ -35,8 +35,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Shared version-dependent write operations (developer/license rows, latest/release update) used by
- * both {@link ArtifactDeploymentService} (outer-transaction "already exists" update path) and
- * {@link ArtifactUpsertHelper} (REQUIRES_NEW "newly inserted" path).
+ * both {@link ArtifactRowWriteService} ("already exists" update path) and {@link
+ * ArtifactUpsertHelper} (REQUIRES_NEW "newly inserted" path).
  *
  * <p>Depends only on repositories, not on either of those two classes, so both can depend on this
  * one without forming a circular bean dependency. Its write methods use plain
@@ -53,6 +53,24 @@ class ArtifactVersionWriteService {
   private final VersionLicenseRepository versionLicenseRepository;
   private final ArtifactVersionRepository artifactVersionRepository;
   private final ArtifactRepository artifactRepository;
+
+  /**
+   * Replaces the developer and license rows of an existing version and saves the version, as one
+   * transaction (RPS-2176): the "already exists" update path has no outer transaction to group
+   * them, since the upload no longer holds one across the {@code REQUIRES_NEW} inserts.
+   */
+  @Transactional
+  void replaceVersionDetails(
+      final @Nullable Model pomModel, final ArtifactVersion artifactVersion) {
+
+    this.versionDeveloperRepository.deleteAllByArtifactVersionId(artifactVersion.getId());
+    this.versionLicenseRepository.deleteAllByArtifactVersionId(artifactVersion.getId());
+
+    this.createVersionDevelopers(pomModel, artifactVersion);
+    this.createVersionLicenses(pomModel, artifactVersion);
+
+    this.artifactVersionRepository.save(artifactVersion);
+  }
 
   @Transactional
   void createVersionDevelopers(
