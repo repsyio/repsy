@@ -84,8 +84,9 @@ public interface RepoRepository extends JpaRepository<Repo, UUID> {
 
   Optional<Repo> findByName(@NonNull String name);
 
+  /** The sum is {@code null} when there is no repo, so the type is {@code @Nullable} (RPS-2077). */
   @Query("select sum(r.diskUsage) from Repo r")
-  Long getTotalDiskUsage();
+  @Nullable Long getTotalDiskUsage();
 
   @Query("select r.name from Repo r")
   @NonNull List<String> findAllRepoNames();
