@@ -33,11 +33,9 @@ import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 
 /** The manifest read of the Docker facade: a reference to a digest to the manifest's file. */
-@NullMarked
 @RequiredArgsConstructor
 final class DockerManifestReader<ID> {
 

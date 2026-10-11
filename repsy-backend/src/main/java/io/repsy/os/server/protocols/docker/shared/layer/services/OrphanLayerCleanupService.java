@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
@@ -44,12 +43,11 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class OrphanLayerCleanupService {
 
-  private final @NonNull DockerStorageService dockerStorageService;
-  private final @NonNull UsageUpdateService usageUpdateService;
+  private final DockerStorageService dockerStorageService;
+  private final UsageUpdateService usageUpdateService;
 
   @Async(MaintenanceTaskExecutorConfig.BEAN_NAME)
-  public void cleanupBlobs(
-      final @NonNull UUID repoId, final @NonNull List<OrphanLayerInfo> orphans) {
+  public void cleanupBlobs(final UUID repoId, final List<OrphanLayerInfo> orphans) {
 
     var deleted = 0;
     var failed = 0;

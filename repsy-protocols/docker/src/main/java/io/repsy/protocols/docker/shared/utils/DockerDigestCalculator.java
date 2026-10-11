@@ -23,7 +23,6 @@ import java.util.HexFormat;
 import java.util.Locale;
 import lombok.experimental.UtilityClass;
 import org.apache.commons.codec.digest.MessageDigestAlgorithms;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * Calculates the OCI digests of a manifest. A manifest is stored under its {@code sha256} digest
@@ -31,7 +30,6 @@ import org.jspecify.annotations.NullMarked;
  * it.
  */
 @UtilityClass
-@NullMarked
 public class DockerDigestCalculator {
 
   public static final String SHA256_PREFIX = "sha256:";

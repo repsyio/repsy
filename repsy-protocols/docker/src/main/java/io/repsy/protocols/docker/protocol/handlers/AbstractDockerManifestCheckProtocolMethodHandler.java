@@ -25,14 +25,12 @@ import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Optional;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
 
 /**
  * The Docker manifest check: a missing image or manifest is the facade's exception, so the 404
  * carries the OCI error body.
  */
-@NullMarked
 public abstract class AbstractDockerManifestCheckProtocolMethodHandler<ID>
     extends AbstractOciManifestCheckProtocolMethodHandler<DockerProtocolFacade<ID>> {
 

@@ -19,7 +19,6 @@ import io.repsy.core.events.ArtifactVersionDeletedEvent;
 import io.repsy.os.server.protocols.docker.shared.image.services.ImageTxService;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,7 +30,6 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Component
 @RequiredArgsConstructor
-@NullMarked
 public class TagDeleter {
 
   private final ImageTxService imageService;

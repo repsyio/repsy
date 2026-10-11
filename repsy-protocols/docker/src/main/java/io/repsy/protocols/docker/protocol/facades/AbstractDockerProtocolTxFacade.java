@@ -37,7 +37,6 @@ import io.repsy.protocols.shared.utils.BlobDigests;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import java.io.IOException;
 import java.io.InputStream;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 import tools.jackson.databind.ObjectMapper;
@@ -49,7 +48,6 @@ import tools.jackson.databind.ObjectMapper;
  * (files and layer rows), and this class keeps the layer upload and the tag list. The constructor
  * and the protected collaborators are the contract of a subclass.
  */
-@NullMarked
 public abstract class AbstractDockerProtocolTxFacade<ID>
     implements DockerProtocolFacade<ID>, DockerPathParserLayer, DockerPathParserManifest {
 

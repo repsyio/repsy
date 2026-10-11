@@ -20,12 +20,10 @@ import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import io.repsy.protocols.docker.protocol.handlers.AbstractDockerLayerCheckProtocolMethodHandler;
 import io.repsy.protocols.docker.shared.layer.services.LayerService;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 @Component
-@NullMarked
 public class DockerLayerCheckProtocolMethodHandler
     extends AbstractDockerLayerCheckProtocolMethodHandler<UUID> {
 

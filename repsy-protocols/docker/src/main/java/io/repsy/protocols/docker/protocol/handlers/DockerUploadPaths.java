@@ -20,11 +20,9 @@ import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.protocols.shared.http.PublicUrls;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 
 /** Where a Docker upload session is stored and the URLs Docker reports for it. */
 @UtilityClass
-@NullMarked
 final class DockerUploadPaths {
 
   /** The storage path of the session's bytes. */

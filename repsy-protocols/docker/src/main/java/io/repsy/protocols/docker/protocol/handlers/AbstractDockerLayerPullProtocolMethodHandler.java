@@ -28,12 +28,10 @@ import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.BlobDigests;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpMethod;
 
 /** The OCI blob pull of a Docker layer, served as {@code DOCKER_CONFIG_JSON}. */
-@NullMarked
 public abstract class AbstractDockerLayerPullProtocolMethodHandler<ID>
     extends AbstractOciBlobPullProtocolMethodHandler<DockerProtocolFacade<ID>> {
 

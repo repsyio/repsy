@@ -17,11 +17,9 @@ package io.repsy.protocols.oci.utils;
 
 import java.util.OptionalLong;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 
 /** The {@code Range} and {@code Content-Range} values of a blob upload session. */
 @UtilityClass
-@NullMarked
 public final class OciUploadUtils {
 
   /**

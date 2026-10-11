@@ -21,7 +21,6 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 
@@ -39,7 +38,6 @@ import org.springframework.stereotype.Service;
  * found it (it now has a digest), and a run that finds nothing costs one query.
  */
 @Slf4j
-@NullMarked
 @Service
 @RequiredArgsConstructor
 public class DockerImageStatsBackfillService {

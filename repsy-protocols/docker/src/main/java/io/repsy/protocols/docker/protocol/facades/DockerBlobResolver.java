@@ -29,14 +29,12 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 
 /**
  * Finds the files of a repo and the layer rows behind them: a blob by path, the config blob of a
  * layer (stored by digest, or by uuid before the rename), and whether a layer's file exists.
  */
-@NullMarked
 @RequiredArgsConstructor
 final class DockerBlobResolver<ID> {
 

@@ -16,9 +16,7 @@
 package io.repsy.protocols.docker.protocol.parser;
 
 import io.repsy.protocols.docker.shared.utils.BaseParsedPath;
-import org.jspecify.annotations.NullMarked;
 
-@NullMarked
 public interface DockerPathParserManifest {
 
   BaseParsedPath parseForManifest(String servletPath, String fileName);

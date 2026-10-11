@@ -15,11 +15,9 @@
  */
 package io.repsy.os.server.protocols.docker.shared.tag.repositories;
 
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /** The digest of a manifest and the legacy reference its file name was generated from, if any. */
-@NullMarked
 public interface ManifestFileView {
 
   String getDigest();

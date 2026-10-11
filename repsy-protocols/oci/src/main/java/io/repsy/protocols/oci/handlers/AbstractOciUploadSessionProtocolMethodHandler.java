@@ -23,7 +23,6 @@ import io.repsy.protocols.shared.handlers.AbstractFacadeProtocolMethodHandler;
 import io.repsy.protocols.shared.handlers.HandlerRoute;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * A route on one upload session, {@code /v2/<repo>/<name>/blobs/uploads/<id>}: what the chunk,
@@ -31,7 +30,6 @@ import org.jspecify.annotations.NullMarked;
  *
  * @param <F> the format's facade
  */
-@NullMarked
 public abstract class AbstractOciUploadSessionProtocolMethodHandler<F>
     extends AbstractFacadeProtocolMethodHandler<F> {
 

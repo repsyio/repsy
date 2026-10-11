@@ -16,14 +16,13 @@
 package io.repsy.protocols.docker.protocol;
 
 import io.repsy.libs.protocol.router.ProtocolProvider;
-import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Component;
 
 @Component
 public class DockerProtocolProvider extends ProtocolProvider {
 
   @Override
-  public @NonNull String getProtocolType() {
+  public String getProtocolType() {
     return "docker";
   }
 }

@@ -43,7 +43,6 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.core.io.Resource;
@@ -58,17 +57,17 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class DockerApiFacade implements ProtocolApiFacade {
 
-  private static final @NonNull String BLOBS_PATH = "blobs";
-  private static final @NonNull String MANIFESTS_PATH = "manifests";
+  private static final String BLOBS_PATH = "blobs";
+  private static final String MANIFESTS_PATH = "manifests";
 
-  private final @NonNull ImageTxService imageTxService;
-  private final @NonNull LayerTxService layerTxService;
-  private final @NonNull ManifestTxService manifestService;
-  private final @NonNull ManifestFileService manifestFileService;
-  private final @NonNull DockerStorageService dockerStorageService;
-  private final @NonNull OrphanLayerService orphanLayerService;
-  private final @NonNull UntaggedManifestCleanupService untaggedManifestCleanupService;
-  private final @NonNull ApplicationEventPublisher eventPublisher;
+  private final ImageTxService imageTxService;
+  private final LayerTxService layerTxService;
+  private final ManifestTxService manifestService;
+  private final ManifestFileService manifestFileService;
+  private final DockerStorageService dockerStorageService;
+  private final OrphanLayerService orphanLayerService;
+  private final UntaggedManifestCleanupService untaggedManifestCleanupService;
+  private final ApplicationEventPublisher eventPublisher;
 
   /**
    * Deletes the rows of the repo, then its files. Not one transaction (RPS-2114): a repo with many
@@ -83,7 +82,7 @@ public class DockerApiFacade implements ProtocolApiFacade {
    */
   @Override
   @Transactional(propagation = Propagation.NOT_SUPPORTED)
-  public void deleteRepo(final @NonNull RepoInfo repoInfo) {
+  public void deleteRepo(final RepoInfo repoInfo) {
 
     RepoUtils.validateRepoName(repoInfo.getName());
 
@@ -106,8 +105,7 @@ public class DockerApiFacade implements ProtocolApiFacade {
   // (DockerDeleteStorageFailureIT), and the usage is only updated by the caller once this returns.
   // The storage call deletes the manifest files of one image only, so the transaction stays short.
   @Transactional
-  public @NonNull BaseUsages deleteImage(
-      final @NonNull RepoInfo repoInfo, final @NonNull String imageName) {
+  public BaseUsages deleteImage(final RepoInfo repoInfo, final String imageName) {
 
     final var imageInfo =
         this.imageTxService.getImageInfoByRepoIdAndName(repoInfo.getStorageKey(), imageName);
@@ -134,9 +132,7 @@ public class DockerApiFacade implements ProtocolApiFacade {
   }
 
   private void publishVersionsDeleted(
-      final @NonNull RepoInfo repoInfo,
-      final @NonNull String imageName,
-      final @NonNull List<Tag> tags) {
+      final RepoInfo repoInfo, final String imageName, final List<Tag> tags) {
 
     for (final var tag : tags) {
       this.eventPublisher.publishEvent(
@@ -150,10 +146,8 @@ public class DockerApiFacade implements ProtocolApiFacade {
   }
 
   @Transactional(readOnly = true)
-  public @NonNull LayerInfo getConfigLayerByImageAndDigest(
-      final @NonNull RepoInfo repoInfo,
-      final @NonNull String imageName,
-      final @NonNull String configDigest) {
+  public LayerInfo getConfigLayerByImageAndDigest(
+      final RepoInfo repoInfo, final String imageName, final String configDigest) {
 
     final var imageInfo =
         this.imageTxService.getImageInfoByRepoIdAndName(repoInfo.getStorageKey(), imageName);
@@ -168,8 +162,7 @@ public class DockerApiFacade implements ProtocolApiFacade {
   }
 
   // No transaction: it only reads storage, so it must not hold a connection while it does.
-  public @NonNull String getConfig(final @NonNull RepoInfo repoInfo, final @NonNull String fileName)
-      throws IOException {
+  public String getConfig(final RepoInfo repoInfo, final String fileName) throws IOException {
 
     final var storagePath =
         StoragePath.of(repoInfo.getStorageKey(), Paths.get(BLOBS_PATH, fileName).toString());
@@ -183,8 +176,8 @@ public class DockerApiFacade implements ProtocolApiFacade {
    * Reads the manifest from the first of the file names that exists (see {@link
    * ManifestTxService#findManifestFileNamesByReference}).
    */
-  public @NonNull String getManifest(
-      final @NonNull RepoInfo repoInfo, final @NonNull List<String> fileNames) throws IOException {
+  public String getManifest(final RepoInfo repoInfo, final List<String> fileNames)
+      throws IOException {
 
     for (final var fileName : fileNames) {
       final var storagePath =
@@ -200,8 +193,7 @@ public class DockerApiFacade implements ProtocolApiFacade {
   }
 
   @Transactional(readOnly = true)
-  public @NonNull TagDetail getTagDetail(
-      final @NonNull UUID repoId, final @NonNull String imageName, final @NonNull String tagName) {
+  public TagDetail getTagDetail(final UUID repoId, final String imageName, final String tagName) {
 
     final var imageInfo = this.imageTxService.getImageInfoByRepoIdAndName(repoId, imageName);
 
@@ -212,12 +204,12 @@ public class DockerApiFacade implements ProtocolApiFacade {
   }
 
   @Transactional(readOnly = true)
-  public @NonNull Page<ManifestListItem> getTagManifestsLikeName(
-      final @NonNull RepoInfo repoInfo,
-      final @NonNull String imageName,
-      final @NonNull String tagName,
-      final @NonNull String name,
-      final @NonNull Pageable pageable) {
+  public Page<ManifestListItem> getTagManifestsLikeName(
+      final RepoInfo repoInfo,
+      final String imageName,
+      final String tagName,
+      final String name,
+      final Pageable pageable) {
 
     final var imageInfo =
         this.imageTxService.getImageInfoByRepoIdAndName(repoInfo.getStorageKey(), imageName);
@@ -227,8 +219,7 @@ public class DockerApiFacade implements ProtocolApiFacade {
     return this.manifestService.findManifestsByTagContainsName(tag, name, pageable);
   }
 
-  private @NonNull Resource getResource(
-      final @NonNull RepoInfo repoInfo, final @NonNull RelativePath relativePath) {
+  private Resource getResource(final RepoInfo repoInfo, final RelativePath relativePath) {
 
     final var storagePath = StoragePath.of(repoInfo.getStorageKey(), relativePath.getPath());
 
@@ -242,7 +233,7 @@ public class DockerApiFacade implements ProtocolApiFacade {
    * refunds the returned bytes and then sweeps the layers those manifests kept alive.
    */
   public UntaggedManifestCleanupService.Result deleteUntaggedManifests(
-      final @NonNull RepoInfo repoInfo, final @Nullable String imageName) {
+      final RepoInfo repoInfo, final @Nullable String imageName) {
 
     return this.untaggedManifestCleanupService.deleteUntagged(repoInfo, imageName);
   }
@@ -252,12 +243,12 @@ public class DockerApiFacade implements ProtocolApiFacade {
    *
    * @return The layers whose rows are gone and whose blobs are being deleted in the background
    */
-  public @NonNull List<OrphanLayerInfo> deleteOrphanLayers(final @NonNull RepoInfo repoInfo) {
+  public List<OrphanLayerInfo> deleteOrphanLayers(final RepoInfo repoInfo) {
     return this.orphanLayerService.deleteOrphanLayers(repoInfo);
   }
 
   @Override
-  public void createRepo(final @NonNull UUID repoId) {
+  public void createRepo(final UUID repoId) {
     this.dockerStorageService.createRepo(repoId);
   }
 }

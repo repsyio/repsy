@@ -452,6 +452,35 @@ class DockerManifestPushIT extends AbstractIT {
 
   @Test
   @DisplayName(
+      "RPS-2140 pin of a defect: an index without a body-level mediaType (optional per the OCI"
+          + " image-spec) is answered with a 500, because ManifestTxService#createIndex reads the"
+          + " missing field into the NOT NULL docker_manifest.media_type instead of falling back"
+          + " to the Content-Type as the image manifest path does (RPS-1731); the fix flips this"
+          + " to 201")
+  void indexWithoutBodyMediaTypeIsPinned() throws Exception {
+    final var repo = this.dockerRepo();
+    final var token = this.adminProtocolBearerToken();
+    final var config =
+        "{\"architecture\":\"amd64\",\"os\":\"linux\"}".getBytes(StandardCharsets.UTF_8);
+    final var layer = "layer-content".getBytes(StandardCharsets.UTF_8);
+    this.pushBlob(repo, config, token);
+    this.pushBlob(repo, layer, token);
+    final var manifest = this.imageManifest(config, layer, OCI_CONFIG);
+    final var manifestDigest = sha256(manifest.getBytes(StandardCharsets.UTF_8));
+    final var childPush = this.putManifest(repo, manifestDigest, OCI_MANIFEST, manifest);
+    assertThat(childPush.getStatus()).as(childPush.getContentAsString()).isEqualTo(201);
+
+    final var index =
+        "{\"schemaVersion\":2,\"manifests\":[{\"mediaType\":\"%s\",\"digest\":\"%s\",\"size\":%d,\"platform\":{\"architecture\":\"amd64\",\"os\":\"linux\"}}]}"
+            .formatted(OCI_MANIFEST, manifestDigest, manifest.length());
+
+    final var indexPush = this.putManifest(repo, "multi", OCI_INDEX, index);
+
+    assertThat(indexPush.getStatus()).as(indexPush.getContentAsString()).isEqualTo(500);
+  }
+
+  @Test
+  @DisplayName(
       "an index entry without a platform is accepted, not refused (RPS-1117): an index can group"
           + " an artifact and its referrers, not only per-platform images")
   void indexEntryWithoutPlatformIsAccepted() throws Exception {

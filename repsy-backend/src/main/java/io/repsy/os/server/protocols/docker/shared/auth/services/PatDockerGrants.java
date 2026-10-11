@@ -22,7 +22,6 @@ import java.util.Collection;
 import java.util.List;
 import lombok.experimental.UtilityClass;
 import org.apache.commons.lang3.StringUtils;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * Narrows what a Docker client asked for at {@code /v2/token} to what a personal access token may
@@ -37,7 +36,6 @@ import org.jspecify.annotations.NullMarked;
  * these three is never granted. A grant left without an action is dropped.
  */
 @UtilityClass
-@NullMarked
 final class PatDockerGrants {
 
   private static final String ALL_ACTIONS = "*";

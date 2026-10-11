@@ -18,13 +18,14 @@ package io.repsy.protocols.docker.shared.tag.dtos;
 import java.time.Instant;
 import lombok.Data;
 import lombok.experimental.SuperBuilder;
+import org.jspecify.annotations.Nullable;
 
 @Data
 @SuperBuilder
 public class BaseTagDetail<ID> {
   private ID id;
   private String digest;
-  private String configDigest;
+  @Nullable private String configDigest;
   private String imageName;
   private String name;
   private String platform;

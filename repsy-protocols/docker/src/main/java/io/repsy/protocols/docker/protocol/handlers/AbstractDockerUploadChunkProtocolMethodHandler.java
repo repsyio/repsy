@@ -24,11 +24,9 @@ import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
 
 /** The Docker upload chunk; the session lives at {@code /blobs/<id>} of the repo's storage. */
-@NullMarked
 public abstract class AbstractDockerUploadChunkProtocolMethodHandler<ID>
     extends AbstractOciUploadChunkProtocolMethodHandler<DockerProtocolFacade<ID>> {
 

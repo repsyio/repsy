@@ -41,7 +41,6 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -71,7 +70,6 @@ import org.springframework.transaction.support.TransactionTemplate;
  * finds work, and a run that finds nothing costs one query. A failed run is retried by the next.
  */
 @Slf4j
-@NullMarked
 @Service
 public class DockerManifestLayoutRepairService {
 
@@ -313,13 +311,13 @@ public class DockerManifestLayoutRepairService {
     return this.dockerStorageService
         .findResource(storagePath, repo.getName())
         .filter(Resource::exists)
-        .map(
+        .flatMap(
             resource -> {
               try {
-                return resource.getContentAsByteArray();
+                return Optional.of(resource.getContentAsByteArray());
               } catch (final IOException e) {
                 log.warn("Could not read manifest file {} of repo {}", name, repo.getName(), e);
-                return null;
+                return Optional.empty();
               }
             });
   }

@@ -42,7 +42,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.annotations.UpdateTimestamp;
-import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 @Data
 @Entity
@@ -82,12 +82,14 @@ public class Manifest {
    * The repair service renames the file and clears it.
    */
   @Column(name = "storage_name", length = DockerConstants.MAX_REFERENCE_LENGTH)
+  @Nullable
   private String storageName;
 
   @Column(name = "media_type", nullable = false, length = DockerConstants.MAX_MEDIA_TYPE_LENGTH)
   private String mediaType;
 
   @Column(name = "config_media_type", length = DockerConstants.MAX_MEDIA_TYPE_LENGTH)
+  @Nullable
   private String configMediaType;
 
   @Column(name = "config_digest")
@@ -112,7 +114,7 @@ public class Manifest {
       name = "docker_manifest_layer",
       joinColumns = @JoinColumn(name = "manifest_id"),
       inverseJoinColumns = @JoinColumn(name = "layer_id"))
-  private @NonNull Set<Layer> layers = new HashSet<>();
+  private Set<Layer> layers = new HashSet<>();
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "image_id", nullable = false)

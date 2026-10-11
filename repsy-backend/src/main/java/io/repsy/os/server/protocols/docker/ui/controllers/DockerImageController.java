@@ -36,7 +36,6 @@ import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.io.IOException;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -64,11 +63,11 @@ public class DockerImageController {
 
   private static final Set<String> MANIFEST_SORT_PROPERTIES = Set.of("id", "name", "createdAt");
 
-  private final @NonNull ImageTxService imageService;
-  private final @NonNull ManifestTxService manifestService;
-  private final @NonNull DockerApiFacade dockerApiFacade;
-  private final @NonNull TagDeleter tagDeleter;
-  private final @NonNull UsageUpdateService usageUpdateService;
+  private final ImageTxService imageService;
+  private final ManifestTxService manifestService;
+  private final DockerApiFacade dockerApiFacade;
+  private final TagDeleter tagDeleter;
+  private final UsageUpdateService usageUpdateService;
 
   /**
    * The image a nested route addresses: the {@code image} query parameter when given (a name with

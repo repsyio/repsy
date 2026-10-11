@@ -16,10 +16,8 @@
 package io.repsy.os.server.protocols.docker.shared.tag.repositories;
 
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 
 /** An edge from an index manifest to one of the manifests it lists. */
-@NullMarked
 public interface ManifestEdgeView {
 
   UUID getParentId();

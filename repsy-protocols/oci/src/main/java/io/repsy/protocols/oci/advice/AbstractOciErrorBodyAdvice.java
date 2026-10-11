@@ -18,7 +18,6 @@ package io.repsy.protocols.oci.advice;
 import io.repsy.core.response.dtos.ResponseType;
 import io.repsy.core.response.dtos.RestResponse;
 import io.repsy.protocols.oci.utils.OciErrors;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.MediaType;
@@ -39,7 +38,6 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
  * exception the OCI handlers throw is covered without a second set of exception handlers. Each
  * product registers one concrete subclass as its {@code @ControllerAdvice}.
  */
-@NullMarked
 public abstract class AbstractOciErrorBodyAdvice implements ResponseBodyAdvice<Object> {
 
   @Override

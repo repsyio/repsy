@@ -21,11 +21,9 @@ import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import io.repsy.protocols.docker.protocol.handlers.AbstractDockerRegistryCheckProtocolMethodHandler;
 import java.util.Optional;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
 @Component
-@NullMarked
 public class DockerRegistryCheckProtocolMethodHandler
     extends AbstractDockerRegistryCheckProtocolMethodHandler {
 

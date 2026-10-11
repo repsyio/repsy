@@ -19,19 +19,16 @@ import io.repsy.protocols.docker.shared.layer.dtos.LayerForm;
 import io.repsy.protocols.docker.shared.layer.dtos.LayerInfo;
 import java.util.List;
 import java.util.Optional;
-import org.jspecify.annotations.NonNull;
 
 public interface LayerService<ID> {
 
-  @NonNull LayerInfo getOrCreate(@NonNull LayerForm form, @NonNull ID repoId);
+  LayerInfo getOrCreate(LayerForm form, ID repoId);
 
-  void update(@NonNull LayerInfo layerInfo, @NonNull ID repoId);
+  void update(LayerInfo layerInfo, ID repoId);
 
-  @NonNull Optional<LayerInfo> findLayerInfoByRepoIdAndDigest(
-      @NonNull ID repoId, @NonNull String digest);
+  Optional<LayerInfo> findLayerInfoByRepoIdAndDigest(ID repoId, String digest);
 
-  void isAllExistsByRepoIdAndDigests(@NonNull ID repoId, @NonNull List<String> digests);
+  void isAllExistsByRepoIdAndDigests(ID repoId, List<String> digests);
 
-  @NonNull List<LayerInfo> findAllLayerInfoByRepoIdAndDigests(
-      @NonNull ID repoId, @NonNull List<String> layerDigests);
+  List<LayerInfo> findAllLayerInfoByRepoIdAndDigests(ID repoId, List<String> layerDigests);
 }

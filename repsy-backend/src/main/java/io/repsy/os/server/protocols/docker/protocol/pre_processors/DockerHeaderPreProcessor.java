@@ -30,12 +30,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
-@NullMarked
 public class DockerHeaderPreProcessor extends ProtocolProcessor {
 
   private static final int PRIORITY = 50;

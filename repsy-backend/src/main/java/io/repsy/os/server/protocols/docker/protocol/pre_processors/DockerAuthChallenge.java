@@ -25,7 +25,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.util.Map;
 import lombok.experimental.UtilityClass;
 import org.apache.commons.lang3.StringUtils;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -34,7 +33,6 @@ import org.jspecify.annotations.Nullable;
  * credentials as well as one whose credentials were rejected.
  */
 @UtilityClass
-@NullMarked
 final class DockerAuthChallenge {
 
   /**

@@ -20,12 +20,10 @@ import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import io.repsy.protocols.docker.protocol.facades.DockerProtocolFacade;
 import io.repsy.protocols.docker.protocol.handlers.AbstractDockerUploadStatusProtocolMethodHandler;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 @Component
-@NullMarked
 public class DockerUploadStatusProtocolMethodHandler
     extends AbstractDockerUploadStatusProtocolMethodHandler<UUID> {
 

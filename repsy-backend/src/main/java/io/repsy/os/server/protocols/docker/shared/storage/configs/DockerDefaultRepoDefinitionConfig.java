@@ -18,7 +18,6 @@ package io.repsy.os.server.protocols.docker.shared.storage.configs;
 import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
 import io.repsy.os.shared.repo.dtos.DefaultRepoDefinition;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -28,7 +27,6 @@ import org.springframework.context.annotation.Configuration;
  * shared {@code DefaultRepoDefinitionsConfig} names no concrete protocol of this backend.
  */
 @Configuration(proxyBeanMethods = false)
-@NullMarked
 public class DockerDefaultRepoDefinitionConfig {
 
   @Bean

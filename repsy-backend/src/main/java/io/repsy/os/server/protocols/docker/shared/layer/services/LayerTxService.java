@@ -32,7 +32,6 @@ import java.util.Optional;
 import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,13 +41,12 @@ import org.springframework.transaction.annotation.Transactional;
 @AllArgsConstructor
 public class LayerTxService implements LayerService<UUID> {
 
-  private final @NonNull LayerMapper layerConverter;
-  private final @NonNull LayerRepository layerRepository;
+  private final LayerMapper layerConverter;
+  private final LayerRepository layerRepository;
 
   @Override
   @Transactional
-  public @NonNull LayerInfo getOrCreate(
-      final @NonNull LayerForm layerForm, final @NonNull UUID repoId) {
+  public LayerInfo getOrCreate(final LayerForm layerForm, final UUID repoId) {
 
     final var layerOpt = this.findLayerInfoByRepoIdAndDigest(repoId, layerForm.getDigest());
 
@@ -70,7 +68,7 @@ public class LayerTxService implements LayerService<UUID> {
 
   @Override
   @Transactional
-  public void update(final @NonNull LayerInfo layerInfo, final @NonNull UUID repoId) {
+  public void update(final LayerInfo layerInfo, final UUID repoId) {
 
     final var layer = this.getLayer(repoId, layerInfo.getDigest());
 
@@ -82,8 +80,8 @@ public class LayerTxService implements LayerService<UUID> {
   }
 
   @Override
-  public @NonNull Optional<LayerInfo> findLayerInfoByRepoIdAndDigest(
-      final @NonNull UUID repoId, final @NonNull String digest) {
+  public Optional<LayerInfo> findLayerInfoByRepoIdAndDigest(
+      final UUID repoId, final String digest) {
 
     final var layerOpt = this.layerRepository.findByRepoIdAndDigest(repoId, digest);
 
@@ -91,8 +89,7 @@ public class LayerTxService implements LayerService<UUID> {
   }
 
   @Override
-  public void isAllExistsByRepoIdAndDigests(
-      final @NonNull UUID repoId, final @NonNull List<String> digests) {
+  public void isAllExistsByRepoIdAndDigests(final UUID repoId, final List<String> digests) {
 
     // The count is of stored rows, one per digest, so it is compared with the distinct digests: a
     // manifest may name one blob twice (RPS-1490).
@@ -105,8 +102,8 @@ public class LayerTxService implements LayerService<UUID> {
   }
 
   @Override
-  public @NonNull List<LayerInfo> findAllLayerInfoByRepoIdAndDigests(
-      final @NonNull UUID repoId, final @NonNull List<String> layerDigests) {
+  public List<LayerInfo> findAllLayerInfoByRepoIdAndDigests(
+      final UUID repoId, final List<String> layerDigests) {
 
     // This method should return mutable list.
     final var layers = new ArrayList<LayerInfo>();
@@ -120,7 +117,7 @@ public class LayerTxService implements LayerService<UUID> {
 
   @Transactional
   @SuppressWarnings("all")
-  public void deleteAllLayers(final @NonNull UUID repoId) {
+  public void deleteAllLayers(final UUID repoId) {
 
     final var layers = this.layerRepository.findAllByRepoId(repoId);
 
@@ -131,7 +128,7 @@ public class LayerTxService implements LayerService<UUID> {
   }
 
   @Transactional
-  public @NonNull List<OrphanLayerInfo> deleteOrphanLayers(final @NonNull UUID repoId) {
+  public List<OrphanLayerInfo> deleteOrphanLayers(final UUID repoId) {
 
     final var orphans = this.layerRepository.findOrphansByRepoId(repoId);
 
@@ -147,7 +144,7 @@ public class LayerTxService implements LayerService<UUID> {
     return result;
   }
 
-  private @NonNull Layer getLayer(final @NonNull UUID repoId, final @NonNull String digest) {
+  private Layer getLayer(final UUID repoId, final String digest) {
 
     return this.layerRepository
         .findByRepoIdAndDigest(repoId, digest)

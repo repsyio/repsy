@@ -47,12 +47,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import org.apache.commons.lang3.StringUtils;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 
-@NullMarked
 public abstract class AbstractDockerTokenProtocolMethodHandler<ID>
     extends AbstractRoutedProtocolMethodHandler {
 
@@ -236,7 +234,7 @@ public abstract class AbstractDockerTokenProtocolMethodHandler<ID>
   /**
    * A 401 that keeps the token endpoint's own Basic challenge and names its cause by message id.
    */
-  private static UnAuthorizedException challenge(final String msgId) {
+  private static UnAuthorizedException challenge(final @Nullable String msgId) {
     return new UnAuthorizedException(msgId, Map.of(WWW_AUTHENTICATE, BasicAuthChallenge.REPSY));
   }
 

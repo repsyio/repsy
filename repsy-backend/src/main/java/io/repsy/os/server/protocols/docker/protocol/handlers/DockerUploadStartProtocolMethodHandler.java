@@ -20,12 +20,10 @@ import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
 import io.repsy.protocols.docker.protocol.handlers.AbstractDockerUploadStartProtocolMethodHandler;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 @Component
-@NullMarked
 public class DockerUploadStartProtocolMethodHandler
     extends AbstractDockerUploadStartProtocolMethodHandler {
 

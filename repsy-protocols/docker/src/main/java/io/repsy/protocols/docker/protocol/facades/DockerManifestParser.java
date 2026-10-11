@@ -26,11 +26,9 @@ import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import org.apache.commons.lang3.StringUtils;
 import org.json.JSONException;
 import org.json.JSONObject;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /** Reads the platform a pushed image manifest is stored under out of its config blob. */
-@NullMarked
 final class DockerManifestParser {
 
   private DockerManifestParser() {}

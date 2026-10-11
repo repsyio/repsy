@@ -22,7 +22,6 @@ import java.util.List;
 import java.util.Locale;
 import lombok.experimental.UtilityClass;
 import org.apache.commons.lang3.StringUtils;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -31,7 +30,6 @@ import org.jspecify.annotations.Nullable;
  * lower-case name, for example {@code repo/app:pull,push}; it is what the token carries.
  */
 @UtilityClass
-@NullMarked
 public final class DockerScopes {
 
   private static final String REPOSITORY_TYPE = "repository:";

@@ -20,16 +20,20 @@ import java.util.Map;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.jspecify.annotations.Nullable;
 
+// Bound by Jackson; DockerManifestValidator rejects a push that lacks the non-null fields.
+@SuppressWarnings("NullAway.Init")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class ManifestListManifest {
   @JsonInclude(JsonInclude.Include.NON_NULL)
+  @Nullable
   private Map<String, String> annotations;
 
   private String digest;
-  private String mediaType;
-  private Platform platform;
+  @Nullable private String mediaType;
+  @Nullable private Platform platform;
   private int size;
 }

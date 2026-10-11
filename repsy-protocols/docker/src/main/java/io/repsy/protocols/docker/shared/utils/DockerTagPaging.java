@@ -19,7 +19,6 @@ import io.repsy.protocols.docker.shared.tag.dtos.TagPage;
 import java.util.Collection;
 import java.util.List;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -33,7 +32,6 @@ import org.jspecify.annotations.Nullable;
  * than the list is sorted under would skip or repeat tags between two pages.
  */
 @UtilityClass
-@NullMarked
 public final class DockerTagPaging {
 
   /**

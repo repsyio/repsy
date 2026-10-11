@@ -16,11 +16,9 @@
 package io.repsy.protocols.oci.constants;
 
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 
 /** The header names and media types of the OCI distribution wire, shared by Docker and Helm. */
 @UtilityClass
-@NullMarked
 public final class OciConstants {
 
   public static final String DOCKER_UPLOAD_UUID = "Docker-Upload-UUID";

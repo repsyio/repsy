@@ -23,12 +23,10 @@ import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
-@NullMarked
 public class DefaultDockerScopeParser implements DockerScopeParser<UUID> {
 
   private static final int MIN_SCOPE_ARGS = 2;

@@ -27,7 +27,6 @@ import io.repsy.protocols.shared.handlers.HandlerRoute;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.http.ResponseEntity;
 
 /**
@@ -40,7 +39,6 @@ import org.springframework.http.ResponseEntity;
  * like a plain start, a 202 with a new session, which the OCI distribution spec allows and every
  * client follows by uploading the blob.
  */
-@NullMarked
 public abstract class AbstractOciUploadStartProtocolMethodHandler
     extends AbstractRoutedProtocolMethodHandler {
 

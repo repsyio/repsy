@@ -19,13 +19,11 @@ import io.repsy.os.server.protocols.docker.shared.tag.entities.ManifestChild;
 import io.repsy.os.server.protocols.docker.shared.tag.entities.ManifestChildId;
 import java.util.List;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 @Repository
-@NullMarked
 public interface ManifestChildRepository extends JpaRepository<ManifestChild, ManifestChildId> {
 
   @Query("select c from ManifestChild c join fetch c.child where c.parent.id = :parentId")

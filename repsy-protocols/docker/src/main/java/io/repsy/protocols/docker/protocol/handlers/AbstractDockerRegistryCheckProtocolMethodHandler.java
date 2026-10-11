@@ -23,7 +23,6 @@ import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.Optional;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 
@@ -32,7 +31,6 @@ import org.springframework.http.ResponseEntity;
  * the ping carries no repo. It answers {@code Docker-Distribution-API-Version: registry/2.0}, the
  * header that tells a client the endpoint implements the Registry HTTP API V2 (RPS-2103).
  */
-@NullMarked
 public abstract class AbstractDockerRegistryCheckProtocolMethodHandler
     extends AbstractRoutedProtocolMethodHandler {
 

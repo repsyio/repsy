@@ -15,11 +15,8 @@
  */
 package io.repsy.protocols.oci.dtos;
 
-import org.jspecify.annotations.NullMarked;
-
 /**
  * A stored manifest as a check or pull answers it: the media type, the manifest text and the digest
  * the response reports.
  */
-@NullMarked
 public record OciManifestInfo(String mediaType, String content, String digest) {}

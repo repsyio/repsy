@@ -34,7 +34,6 @@ import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -43,7 +42,6 @@ import tools.jackson.databind.ObjectMapper;
 
 @Component
 @Transactional(readOnly = true)
-@NullMarked
 public class DockerProtocolTxFacade extends AbstractDockerProtocolTxFacade<UUID> {
 
   private final ManifestDeleter manifestDeleter;

@@ -24,11 +24,9 @@ import io.repsy.protocols.docker.protocol.parser.DockerScopeParser;
 import io.repsy.protocols.docker.shared.auth.services.DockerAuthService;
 import java.util.Optional;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
 @Component
-@NullMarked
 public class DockerTokenProtocolMethodHandler
     extends AbstractDockerTokenProtocolMethodHandler<UUID> {
 

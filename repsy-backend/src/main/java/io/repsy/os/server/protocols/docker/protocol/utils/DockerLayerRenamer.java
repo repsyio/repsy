@@ -19,12 +19,10 @@ import io.repsy.os.server.protocols.docker.shared.layer.services.LayerTxService;
 import io.repsy.protocols.docker.shared.layer.services.AbstractDockerLayerRenamer;
 import io.repsy.protocols.docker.shared.storage.services.DockerStorageService;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
 @Component
-@NullMarked
 public class DockerLayerRenamer extends AbstractDockerLayerRenamer<UUID> {
 
   public DockerLayerRenamer(

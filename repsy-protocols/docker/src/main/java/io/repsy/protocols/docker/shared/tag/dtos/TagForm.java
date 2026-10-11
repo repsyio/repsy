@@ -19,6 +19,7 @@ import io.repsy.protocols.shared.utils.BlobDigests;
 import java.util.List;
 import lombok.Builder;
 import lombok.Data;
+import org.jspecify.annotations.Nullable;
 
 @Data
 @Builder
@@ -76,12 +77,12 @@ public class TagForm {
     return this.manifestList.getManifests().stream().map(ManifestListManifest::getDigest).toList();
   }
 
-  private String getManifestListMediaType() {
+  private @Nullable String getManifestListMediaType() {
 
     return this.manifestList.getMediaType();
   }
 
-  public String getCalculatedMediaType() {
+  public @Nullable String getCalculatedMediaType() {
 
     final var isMultiPlatform = this.getPlatform().equals(MULTIPLATFORM);
 

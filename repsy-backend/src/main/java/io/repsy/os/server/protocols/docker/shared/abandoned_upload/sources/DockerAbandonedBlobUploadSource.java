@@ -27,7 +27,6 @@ import java.util.List;
 import java.util.UUID;
 import java.util.function.Predicate;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Component;
 
 /**
@@ -39,22 +38,21 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class DockerAbandonedBlobUploadSource implements AbandonedBlobUploadSource {
 
-  private final @NonNull LayerRepository layerRepository;
-  private final @NonNull DockerStorageService dockerStorageService;
+  private final LayerRepository layerRepository;
+  private final DockerStorageService dockerStorageService;
 
   @Override
-  public @NonNull RepoType repoType() {
+  public RepoType repoType() {
     return RepoType.DOCKER;
   }
 
   @Override
-  public @NonNull List<StaleFile> listStaleBlobFiles(
-      final @NonNull UUID repoId, final @NonNull Instant notModifiedSince) {
+  public List<StaleFile> listStaleBlobFiles(final UUID repoId, final Instant notModifiedSince) {
     return this.dockerStorageService.listStaleBlobFiles(repoId, notModifiedSince);
   }
 
   @Override
-  public @NonNull Predicate<StaleFile> collectableIn(final @NonNull UUID repoId) {
+  public Predicate<StaleFile> collectableIn(final UUID repoId) {
     return file ->
         UPLOAD_SESSION_NAME.matcher(file.name()).matches()
             ? !this.layerRepository.existsByIdAndRepoId(UUID.fromString(file.name()), repoId)
@@ -62,8 +60,7 @@ public class DockerAbandonedBlobUploadSource implements AbandonedBlobUploadSourc
   }
 
   @Override
-  public long deleteBlobFile(
-      final @NonNull UUID repoId, final @NonNull String repoName, final @NonNull String fileName)
+  public long deleteBlobFile(final UUID repoId, final String repoName, final String fileName)
       throws IOException {
     return this.dockerStorageService.deleteBlobFile(new RepoRef(repoId, repoName), fileName);
   }

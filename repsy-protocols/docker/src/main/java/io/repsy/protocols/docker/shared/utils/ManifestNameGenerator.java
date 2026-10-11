@@ -20,7 +20,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.UUID;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -31,7 +30,6 @@ import org.jspecify.annotations.Nullable;
  * docker_manifest.storage_name}).
  */
 @UtilityClass
-@NullMarked
 public final class ManifestNameGenerator {
 
   private static final int SHORT_HASH_LENGTH = 12;

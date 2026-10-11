@@ -24,7 +24,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.util.Map;
 import java.util.Set;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -35,7 +34,6 @@ import org.springframework.http.ResponseEntity;
  * Docker and Helm {@code /v2/} endpoints.
  */
 @UtilityClass
-@NullMarked
 public final class OciErrors {
 
   private static final String OCI_ROOT = "/v2";

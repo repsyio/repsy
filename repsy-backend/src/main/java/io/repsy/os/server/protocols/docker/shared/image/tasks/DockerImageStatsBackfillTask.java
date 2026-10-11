@@ -19,7 +19,6 @@ import io.repsy.os.config.async.MaintenanceTaskExecutorConfig;
 import io.repsy.os.server.protocols.docker.shared.image.services.DockerImageStatsBackfillService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -40,7 +39,6 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-@NullMarked
 @ConditionalOnProperty(
     name = "repsy.docker.image-stats-backfill.enabled",
     havingValue = "true",

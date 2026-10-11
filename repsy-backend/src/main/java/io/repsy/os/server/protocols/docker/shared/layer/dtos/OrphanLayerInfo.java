@@ -15,6 +15,4 @@
  */
 package io.repsy.os.server.protocols.docker.shared.layer.dtos;
 
-import org.jspecify.annotations.NonNull;
-
-public record OrphanLayerInfo(@NonNull String digest, long size) {}
+public record OrphanLayerInfo(String digest, long size) {}

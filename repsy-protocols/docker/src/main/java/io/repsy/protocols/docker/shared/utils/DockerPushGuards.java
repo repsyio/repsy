@@ -21,7 +21,6 @@ import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.utils.BlobDigests;
 import java.util.regex.Pattern;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -33,7 +32,6 @@ import org.jspecify.annotations.Nullable;
  * possibly non-conforming value is never checked by this class: only a push must conform.
  */
 @UtilityClass
-@NullMarked
 public final class DockerPushGuards {
 
   /**

@@ -36,6 +36,7 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The cleanup policy of a Docker repo (RPS-1882, ported from Repsy Cloud). One row per repo,
@@ -82,6 +83,7 @@ public class CleanupPolicy {
   private Instant lastRunAt;
 
   @Column(name = "next_run_at")
+  @Nullable
   private Instant nextRunAt;
 
   @CreationTimestamp
