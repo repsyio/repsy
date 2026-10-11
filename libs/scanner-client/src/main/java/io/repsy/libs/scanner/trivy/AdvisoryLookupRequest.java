@@ -16,7 +16,6 @@
 package io.repsy.libs.scanner.trivy;
 
 import java.util.List;
-import org.jspecify.annotations.NonNull;
 
 /** The body of {@code POST /advisories} of the scanner. */
-record AdvisoryLookupRequest(@NonNull String ecosystem, @NonNull List<AdvisoryPackage> packages) {}
+record AdvisoryLookupRequest(String ecosystem, List<AdvisoryPackage> packages) {}

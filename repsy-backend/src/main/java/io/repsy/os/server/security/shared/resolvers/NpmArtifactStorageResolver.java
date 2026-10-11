@@ -25,27 +25,24 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
 @Component
-@NullMarked
 @RequiredArgsConstructor
 public class NpmArtifactStorageResolver implements ArtifactStorageResolver {
 
   private static final Set<String> SUPPORTED_REPO_TYPES = Set.of("NPM");
 
-  private final @NonNull NpmStorageService npmStorageService;
+  private final NpmStorageService npmStorageService;
 
-  private final @NonNull StorageStrategyRegistry storageStrategyRegistry;
+  private final StorageStrategyRegistry storageStrategyRegistry;
 
   @Override
-  public @NonNull Optional<String> resolve(
-      final @NonNull UUID repoId,
-      final @NonNull String repoName,
-      final @NonNull String artifactName,
-      final @NonNull String artifactVersion) {
+  public Optional<String> resolve(
+      final UUID repoId,
+      final String repoName,
+      final String artifactName,
+      final String artifactVersion) {
 
     final var scopeSlashIndex = artifactName.indexOf('/');
     final String scopeName;
@@ -71,7 +68,7 @@ public class NpmArtifactStorageResolver implements ArtifactStorageResolver {
   }
 
   @Override
-  public @NonNull Set<String> getSupportedRepoTypes() {
+  public Set<String> getSupportedRepoTypes() {
     return SUPPORTED_REPO_TYPES;
   }
 }

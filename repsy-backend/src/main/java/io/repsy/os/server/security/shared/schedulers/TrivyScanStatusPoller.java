@@ -29,7 +29,6 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -43,10 +42,10 @@ public class TrivyScanStatusPoller {
   private static final List<ScanStatus> ACTIVE_STATUSES =
       List.of(ScanStatus.PENDING, ScanStatus.QUEUED, ScanStatus.RUNNING);
 
-  private final @NonNull VulnerabilityScanRepository vulnerabilityScanRepository;
-  private final @NonNull VulnerabilityScanTxService scanTxService;
-  private final @NonNull TrivyScannerStatusClient statusClient;
-  private final @NonNull TrivyScannerClientProperties properties;
+  private final VulnerabilityScanRepository vulnerabilityScanRepository;
+  private final VulnerabilityScanTxService scanTxService;
+  private final TrivyScannerStatusClient statusClient;
+  private final TrivyScannerClientProperties properties;
 
   @Scheduled(fixedDelayString = "${repsy.security.trivy.poll-interval-ms:3000}")
   public void pollActiveScans() {
@@ -62,7 +61,7 @@ public class TrivyScanStatusPoller {
    * scans after it in {@link #pollActiveScans()}. {@code recordScanFailure} is an update by id, so
    * it does not throw for a vanished row, but nothing else it might throw may stop the loop.
    */
-  private void pollScan(final @NonNull VulnerabilityScan scan) {
+  private void pollScan(final VulnerabilityScan scan) {
     try {
       if (this.hasExceededMaxDuration(scan)) {
         this.scanTxService.recordScanFailure(scan.getId(), "Scan exceeded maximum duration");
@@ -78,7 +77,7 @@ public class TrivyScanStatusPoller {
     }
   }
 
-  private void handleJobNotFound(final @NonNull VulnerabilityScan scan) {
+  private void handleJobNotFound(final VulnerabilityScan scan) {
     if (scan.getStatus() == ScanStatus.PENDING) {
       log.debug("Scan {} not yet submitted to scanner, will retry next tick", scan.getId());
       return;
@@ -87,8 +86,7 @@ public class TrivyScanStatusPoller {
     this.scanTxService.recordScanFailure(scan.getId(), "Scanner restarted, job lost, please retry");
   }
 
-  private void applyStatus(
-      final @NonNull VulnerabilityScan scan, final @NonNull ScanJobStatusResponse status) {
+  private void applyStatus(final VulnerabilityScan scan, final ScanJobStatusResponse status) {
 
     switch (status.status()) {
       case COMPLETED -> this.recordCompleted(scan.getId(), status);
@@ -100,20 +98,19 @@ public class TrivyScanStatusPoller {
     }
   }
 
-  private void applyQueued(final @NonNull VulnerabilityScan scan) {
+  private void applyQueued(final VulnerabilityScan scan) {
     if (scan.getStatus() == ScanStatus.PENDING) {
       this.scanTxService.markQueued(scan.getId());
     }
   }
 
-  private void applyRunning(final @NonNull VulnerabilityScan scan) {
+  private void applyRunning(final VulnerabilityScan scan) {
     if (scan.getStatus() != ScanStatus.RUNNING) {
       this.scanTxService.markRunning(scan.getId());
     }
   }
 
-  private void recordCompleted(
-      final @NonNull UUID scanId, final @NonNull ScanJobStatusResponse status) {
+  private void recordCompleted(final UUID scanId, final ScanJobStatusResponse status) {
 
     final var result = status.result();
 
@@ -125,7 +122,7 @@ public class TrivyScanStatusPoller {
     this.scanTxService.recordScanOutcome(scanId, result);
   }
 
-  private boolean hasExceededMaxDuration(final @NonNull VulnerabilityScan scan) {
+  private boolean hasExceededMaxDuration(final VulnerabilityScan scan) {
     final var referenceTime =
         scan.getStartedAt() != null ? scan.getStartedAt() : scan.getCreatedAt();
     final var maxDuration = Duration.ofSeconds(this.properties.maxScanDurationSeconds());

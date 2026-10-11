@@ -20,25 +20,24 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
 public class ArtifactStorageResolverRegistry {
 
-  private final @NonNull Map<String, ArtifactStorageResolver> resolversByRepoType;
+  private final Map<String, ArtifactStorageResolver> resolversByRepoType;
 
-  public ArtifactStorageResolverRegistry(final @NonNull List<ArtifactStorageResolver> resolvers) {
+  public ArtifactStorageResolverRegistry(final List<ArtifactStorageResolver> resolvers) {
     this.resolversByRepoType = buildRegistry(resolvers);
   }
 
-  public @NonNull Optional<ArtifactStorageResolver> findResolver(final @NonNull String repoType) {
+  public Optional<ArtifactStorageResolver> findResolver(final String repoType) {
     return Optional.ofNullable(this.resolversByRepoType.get(repoType));
   }
 
-  private static @NonNull Map<String, ArtifactStorageResolver> buildRegistry(
-      final @NonNull List<ArtifactStorageResolver> resolvers) {
+  private static Map<String, ArtifactStorageResolver> buildRegistry(
+      final List<ArtifactStorageResolver> resolvers) {
 
     final var registry = new HashMap<String, ArtifactStorageResolver>();
 
@@ -52,9 +51,9 @@ public class ArtifactStorageResolverRegistry {
   }
 
   private static void registerIfAbsent(
-      final @NonNull Map<String, ArtifactStorageResolver> registry,
-      final @NonNull String repoType,
-      final @NonNull ArtifactStorageResolver resolver) {
+      final Map<String, ArtifactStorageResolver> registry,
+      final String repoType,
+      final ArtifactStorageResolver resolver) {
 
     final var existing = registry.get(repoType);
     if (existing != null) {

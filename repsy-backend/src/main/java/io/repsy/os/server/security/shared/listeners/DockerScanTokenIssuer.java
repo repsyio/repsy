@@ -19,19 +19,17 @@ import io.repsy.os.shared.auth.utils.JwtUtils;
 import java.time.Duration;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
 class DockerScanTokenIssuer {
 
-  private static final @NonNull Duration TOKEN_DURATION = Duration.ofMinutes(5);
+  private static final Duration TOKEN_DURATION = Duration.ofMinutes(5);
 
-  private final @NonNull JwtUtils jwtUtils;
+  private final JwtUtils jwtUtils;
 
-  @NonNull String mintReadOnlyPullToken(
-      final @NonNull UUID repoId, final @NonNull String repoName) {
+  String mintReadOnlyPullToken(final UUID repoId, final String repoName) {
     final var scope = "repository:%s:pull".formatted(repoName);
 
     return this.jwtUtils.createRepoScopedToken(repoId, scope, TOKEN_DURATION);

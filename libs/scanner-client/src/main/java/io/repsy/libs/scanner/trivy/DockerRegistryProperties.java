@@ -16,11 +16,10 @@
 package io.repsy.libs.scanner.trivy;
 
 import java.net.URI;
-import org.jspecify.annotations.NonNull;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 @ConfigurationProperties(prefix = "repsy.security.docker")
-public record DockerRegistryProperties(@NonNull String internalRegistryBaseUrl) {
+public record DockerRegistryProperties(String internalRegistryBaseUrl) {
 
   public boolean insecureRegistry() {
     final var scheme = URI.create(this.internalRegistryBaseUrl).getScheme();

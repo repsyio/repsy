@@ -20,32 +20,31 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.os.server.core.UrlParserProperties;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
+import java.util.Objects;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NonNull;
 
 @UtilityClass
 public class UrlPropertiesUtils {
 
-  private static final @NonNull String URL_PROPERTIES = "urlProperties";
+  private static final String URL_PROPERTIES = "urlProperties";
 
-  public static @NonNull RepoInfo getRepoInfo(final @NonNull ProtocolContext context) {
+  public static RepoInfo getRepoInfo(final ProtocolContext context) {
 
     return getUrlProperties(context).getRepoInfo();
   }
 
-  public static @NonNull RelativePath getRelativePath(final @NonNull ProtocolContext context) {
+  public static RelativePath getRelativePath(final ProtocolContext context) {
 
     return getUrlProperties(context).getRelativePath();
   }
 
-  public static @NonNull UrlParserProperties getUrlProperties(
-      final @NonNull ProtocolContext context) {
+  public static UrlParserProperties getUrlProperties(final ProtocolContext context) {
 
-    return context.getProperty(URL_PROPERTIES);
+    return Objects.requireNonNull(context.<UrlParserProperties>getProperty(URL_PROPERTIES));
   }
 
-  public static @NonNull ProtocolContext createWithEmptyRepo(
-      final @NonNull String repoName, final @NonNull RelativePath relativePath) {
+  public static ProtocolContext createWithEmptyRepo(
+      final String repoName, final RelativePath relativePath) {
 
     final var context = new ProtocolContext();
 

@@ -46,7 +46,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 class ProjectionNullabilityIT extends AbstractIT {
 
   /** {@code Projection#getter} that is not derivable and not null, with the proof. */
-  private static final Map<String, String> FROZEN =
+  private static final Map<String, String> FROZEN_BASE =
       Map.of(
           "io.repsy.os.server.protocols.docker.shared.image.repositories.ImageRepository$"
               + "UntaggedStats#getImageId",
@@ -65,6 +65,38 @@ class ProjectionNullabilityIT extends AbstractIT {
           "io.repsy.os.server.protocols.ruby.shared.ruby_gem.dtos.GemListItem#getUpdatedAt",
           "max(gv.createdAt) over the inner join of the gem with its latest version, grouped by"
               + " the gem: every group has a row with a NOT NULL created_at");
+
+  private static final String SCAN_COUNTER_PROOF =
+      "sum(case ... else 0 end) in a query grouped by repo or artifact: every group has a row and the"
+          + " case is never null";
+
+  private static final Map<String, String> SCAN_COUNTERS =
+      Map.of(
+          "io.repsy.os.server.security.scan.dtos.ArtifactScanSummary#getRescanFailedCount",
+          SCAN_COUNTER_PROOF,
+          "io.repsy.os.server.security.scan.dtos.ArtifactScanSummary#getRescanInProgressCount",
+          SCAN_COUNTER_PROOF,
+          "io.repsy.os.server.security.scan.dtos.ArtifactUnscannedCount#getUnscannedFailedCount",
+          SCAN_COUNTER_PROOF,
+          "io.repsy.os.server.security.scan.dtos.ArtifactUnscannedCount#getUnscannedInProgressCount",
+          SCAN_COUNTER_PROOF,
+          "io.repsy.os.server.security.scan.dtos.RepoSeverityRank#getRescanFailedCount",
+          SCAN_COUNTER_PROOF,
+          "io.repsy.os.server.security.scan.dtos.RepoSeverityRank#getRescanInProgressCount",
+          SCAN_COUNTER_PROOF,
+          "io.repsy.os.server.security.scan.dtos.RepoUnscannedCount#getUnscannedFailedCount",
+          SCAN_COUNTER_PROOF,
+          "io.repsy.os.server.security.scan.dtos.RepoUnscannedCount#getUnscannedInProgressCount",
+          SCAN_COUNTER_PROOF);
+
+  private static final Map<String, String> FROZEN = merge(FROZEN_BASE, SCAN_COUNTERS);
+
+  private static Map<String, String> merge(
+      final Map<String, String> first, final Map<String, String> second) {
+    final var merged = new java.util.HashMap<>(first);
+    merged.putAll(second);
+    return Map.copyOf(merged);
+  }
 
   @Autowired private EntityManagerFactory entityManagerFactory;
   @Autowired private JdbcTemplate jdbcTemplate;

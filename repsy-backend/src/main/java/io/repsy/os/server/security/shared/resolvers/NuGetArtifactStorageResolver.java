@@ -24,27 +24,24 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
 @Component
-@NullMarked
 @RequiredArgsConstructor
 public class NuGetArtifactStorageResolver implements ArtifactStorageResolver {
 
   private static final Set<String> SUPPORTED_REPO_TYPES = Set.of("NUGET");
 
-  private final @NonNull NuGetStorageService nuGetStorageService;
+  private final NuGetStorageService nuGetStorageService;
 
-  private final @NonNull StorageStrategyRegistry storageStrategyRegistry;
+  private final StorageStrategyRegistry storageStrategyRegistry;
 
   @Override
-  public @NonNull Optional<String> resolve(
-      final @NonNull UUID repoId,
-      final @NonNull String repoName,
-      final @NonNull String artifactName,
-      final @NonNull String artifactVersion) {
+  public Optional<String> resolve(
+      final UUID repoId,
+      final String repoName,
+      final String artifactName,
+      final String artifactVersion) {
 
     final var nupkgPath =
         this.nuGetStorageService.getNupkgRelativePath(artifactName, artifactVersion);
@@ -56,7 +53,7 @@ public class NuGetArtifactStorageResolver implements ArtifactStorageResolver {
   }
 
   @Override
-  public @NonNull Set<String> getSupportedRepoTypes() {
+  public Set<String> getSupportedRepoTypes() {
     return SUPPORTED_REPO_TYPES;
   }
 }

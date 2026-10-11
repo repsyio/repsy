@@ -18,7 +18,6 @@ package io.repsy.os.server.security.shared;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import org.jspecify.annotations.NonNull;
 
 public interface ArtifactStorageResolver {
 
@@ -28,11 +27,8 @@ public interface ArtifactStorageResolver {
    * @return the path, or empty when the artifact version does not exist in the repository, so that
    *     a manual scan of it can be refused before a scan is created
    */
-  @NonNull Optional<String> resolve(
-      @NonNull UUID repoId,
-      @NonNull String repoName,
-      @NonNull String artifactName,
-      @NonNull String artifactVersion);
+  Optional<String> resolve(
+      UUID repoId, String repoName, String artifactName, String artifactVersion);
 
-  @NonNull Set<String> getSupportedRepoTypes();
+  Set<String> getSupportedRepoTypes();
 }

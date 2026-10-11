@@ -17,11 +17,10 @@ package io.repsy.os.server.security.scan.dtos;
 
 import io.repsy.os.generated.model.VulnerabilityScanInfo;
 import java.util.UUID;
-import org.jspecify.annotations.NonNull;
 
 public record ManualScanTrigger(
-    @NonNull UUID scanId,
-    @NonNull String repoType,
-    @NonNull String repoName,
-    @NonNull String storagePath,
-    @NonNull VulnerabilityScanInfo scanInfo) {}
+    UUID scanId,
+    String repoType,
+    String repoName,
+    String storagePath,
+    VulnerabilityScanInfo scanInfo) {}

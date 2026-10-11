@@ -21,26 +21,24 @@ import io.repsy.os.server.shared.token.dtos.TokenUsernameType;
 import java.security.SecureRandom;
 import java.util.Locale;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NonNull;
 
 @UtilityClass
 public class TokenUsernameGenerator {
 
-  private static final @NonNull SecureRandom SECURE_RANDOM = new SecureRandom();
+  private static final SecureRandom SECURE_RANDOM = new SecureRandom();
   private static final int TOKEN_USERNAME_LENGTH = 7;
 
-  private static @NonNull String of(final @NonNull TokenUsernameType tokenUsernameType) {
+  private static String of(final TokenUsernameType tokenUsernameType) {
 
     return generateTokenUsername(tokenUsernameType);
   }
 
-  public static @NonNull String deployTokenUsername() {
+  public static String deployTokenUsername() {
 
     return of(TokenUsernameType.REPO_DEPLOY_TOKEN_USERNAME);
   }
 
-  private static @NonNull String generateTokenUsername(
-      final @NonNull TokenUsernameType tokenUsernameType) {
+  private static String generateTokenUsername(final TokenUsernameType tokenUsernameType) {
 
     final var randomString = random(TOKEN_USERNAME_LENGTH, 0, 0, true, true, null, SECURE_RANDOM);
 

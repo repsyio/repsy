@@ -15,7 +15,5 @@
  */
 package io.repsy.libs.scanner.trivy;
 
-import org.jspecify.annotations.NonNull;
-
 /** A name and version of {@code POST /advisories} of the scanner. */
-record AdvisoryPackage(@NonNull String name, @NonNull String version) {}
+record AdvisoryPackage(String name, String version) {}

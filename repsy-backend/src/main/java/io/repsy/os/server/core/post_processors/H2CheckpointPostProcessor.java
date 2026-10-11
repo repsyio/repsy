@@ -30,7 +30,6 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import javax.sql.DataSource;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -71,13 +70,13 @@ public class H2CheckpointPostProcessor extends ProtocolProcessor {
   private static final int PRIORITY = Integer.MAX_VALUE;
   private static final String CHECKPOINT_SQL = "CHECKPOINT SYNC";
 
-  private final @NonNull DataSource dataSource;
+  private final DataSource dataSource;
   private final boolean enabled;
 
   public H2CheckpointPostProcessor(
-      final @NonNull DataSource dataSource,
-      @Value("${spring.datasource.url:}") final @NonNull String datasourceUrl,
-      final @NonNull List<ProtocolProvider> protocolProviders) {
+      final DataSource dataSource,
+      @Value("${spring.datasource.url:}") final String datasourceUrl,
+      final List<ProtocolProvider> protocolProviders) {
 
     this.dataSource = dataSource;
     this.enabled = datasourceUrl.startsWith("jdbc:h2:");
@@ -94,11 +93,11 @@ public class H2CheckpointPostProcessor extends ProtocolProcessor {
   }
 
   @Override
-  protected @NonNull ProcessorResult process(
-      final @NonNull ProtocolContext context,
-      final @NonNull HttpServletRequest request,
-      final @NonNull HttpServletResponse response,
-      final @NonNull Map<@NonNull String, @NonNull Object> properties) {
+  protected ProcessorResult process(
+      final ProtocolContext context,
+      final HttpServletRequest request,
+      final HttpServletResponse response,
+      final Map<String, Object> properties) {
 
     if (this.enabled && this.isWriteOperation(properties)) {
       final long started = System.nanoTime();
@@ -131,8 +130,7 @@ public class H2CheckpointPostProcessor extends ProtocolProcessor {
     }
   }
 
-  private boolean isWriteOperation(
-      final @NonNull Map<@NonNull String, @NonNull Object> properties) {
+  private boolean isWriteOperation(final Map<String, Object> properties) {
     return (boolean) properties.getOrDefault(HandlerPropertyKeys.WRITE_OPERATION, false);
   }
 }

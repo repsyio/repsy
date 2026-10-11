@@ -18,7 +18,6 @@ package io.repsy.os.panel.shared.config.configs;
 import io.repsy.os.generated.model.DeployTokenForm;
 import java.util.Collection;
 import java.util.List;
-import org.jspecify.annotations.NonNull;
 import org.springframework.boot.jackson.autoconfigure.JsonMapperBuilderCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -44,7 +43,7 @@ public class StrictRequestBodyConfig {
   private static final List<Class<?>> STRICT_BODIES = List.of(DeployTokenForm.class);
 
   @Bean
-  public @NonNull JsonMapperBuilderCustomizer strictRequestBodyCustomizer() {
+  public JsonMapperBuilderCustomizer strictRequestBodyCustomizer() {
 
     return builder ->
         builder.addHandler(

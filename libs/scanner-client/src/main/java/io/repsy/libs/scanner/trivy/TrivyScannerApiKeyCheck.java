@@ -16,7 +16,6 @@
 package io.repsy.libs.scanner.trivy;
 
 import java.util.regex.Pattern;
-import org.jspecify.annotations.NonNull;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
@@ -36,7 +35,7 @@ public class TrivyScannerApiKeyCheck {
 
   private static final Pattern PLACEHOLDER = Pattern.compile("\\$\\{.*}", Pattern.DOTALL);
 
-  public TrivyScannerApiKeyCheck(final @NonNull TrivyScannerClientProperties properties) {
+  public TrivyScannerApiKeyCheck(final TrivyScannerClientProperties properties) {
     final var apiKey = properties.apiKey();
 
     if (apiKey.isBlank() || PLACEHOLDER.matcher(apiKey).find()) {

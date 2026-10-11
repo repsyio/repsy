@@ -21,7 +21,6 @@ import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
-import org.jspecify.annotations.NonNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -32,20 +31,17 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface RepoDeployTokenRepository extends JpaRepository<RepoDeployToken, UUID> {
 
-  @NonNull Optional<RepoDeployToken> findByRepoIdAndToken(
-      @NonNull UUID repoId, @NonNull String token);
+  Optional<RepoDeployToken> findByRepoIdAndToken(UUID repoId, String token);
 
-  @NonNull Optional<RepoDeployToken> findByRepoIdAndId(@NonNull UUID repoId, @NonNull UUID id);
+  Optional<RepoDeployToken> findByRepoIdAndId(UUID repoId, UUID id);
 
-  @NonNull Optional<RepoDeployToken> findByTokenAndRepoType(
-      @NonNull String token, @NonNull RepoType repoType);
+  Optional<RepoDeployToken> findByTokenAndRepoType(String token, RepoType repoType);
 
-  @NonNull Optional<RepoDeployToken> findByToken(@NonNull String token);
+  Optional<RepoDeployToken> findByToken(String token);
 
-  @NonNull Page<DeployTokenInfoListItem> findAllByRepoId(
-      @NonNull UUID repoId, @NonNull Pageable pageable);
+  Page<DeployTokenInfoListItem> findAllByRepoId(UUID repoId, Pageable pageable);
 
   @Modifying
   @Query("update RepoDeployToken rdt set rdt.lastUsedAt = :now where rdt.id = :tokenId")
-  void updateLastUsedTime(@NonNull UUID tokenId, @NonNull Instant now);
+  void updateLastUsedTime(UUID tokenId, Instant now);
 }

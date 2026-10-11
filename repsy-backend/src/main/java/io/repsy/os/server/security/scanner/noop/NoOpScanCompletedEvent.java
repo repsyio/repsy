@@ -16,7 +16,6 @@
 package io.repsy.os.server.security.scanner.noop;
 
 import java.util.UUID;
-import org.jspecify.annotations.NonNull;
 
 /**
  * Published by {@link NoOpVulnerabilityScanner} when it "scans": the scanner is disabled, so there
@@ -25,4 +24,4 @@ import org.jspecify.annotations.NonNull;
  *
  * @param scanId The scan row to complete with no findings
  */
-public record NoOpScanCompletedEvent(@NonNull UUID scanId) {}
+public record NoOpScanCompletedEvent(UUID scanId) {}

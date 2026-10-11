@@ -17,14 +17,13 @@ package io.repsy.libs.scanner;
 
 import java.io.IOException;
 import java.io.InputStream;
-import org.jspecify.annotations.NonNull;
 import org.springframework.core.io.Resource;
 
-public record ResourceArtifactContent(@NonNull Resource resource, @NonNull String fileName)
+public record ResourceArtifactContent(Resource resource, String fileName)
     implements ArtifactContent {
 
   @Override
-  public @NonNull InputStream openStream() throws IOException {
+  public InputStream openStream() throws IOException {
     return this.resource.getInputStream();
   }
 }
