@@ -36,8 +36,6 @@ import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
-import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -50,12 +48,11 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class UserTxService {
 
-  private final @NonNull UserRepository userRepository;
-  private final @NonNull UserMapper userConverter;
+  private final UserRepository userRepository;
+  private final UserMapper userConverter;
 
   @Transactional
-  public @NonNull UserInfo create(
-      final @NonNull String username, final @NonNull UserRole role, final @Nullable String hash) {
+  public UserInfo create(final String username, final UserRole role, final String hash) {
 
     if (this.userRepository.existsByUsername(username)) {
       throw new BadRequestException(ErrorConstants.USERNAME_IN_USE);
@@ -73,11 +70,11 @@ public class UserTxService {
     return this.userConverter.toUserInfo(savedUser);
   }
 
-  public @NonNull UserInfo getUserByUsername(final @NonNull String username) {
+  public UserInfo getUserByUsername(final String username) {
     return this.userConverter.toUserInfo(this.findUserByUsername(username));
   }
 
-  public @NonNull UserInfo getUserById(final @NonNull UUID userId) {
+  public UserInfo getUserById(final UUID userId) {
     return this.userConverter.toUserInfo(this.findUserById(userId));
   }
 
@@ -86,24 +83,24 @@ public class UserTxService {
    * exists (deleted, or never existed) is an authentication failure, not a missing resource, so it
    * fails with {@code unAuthorized} and the client re-authenticates.
    */
-  public @NonNull UserInfo getAuthenticatedUserByUsername(final @NonNull String username) {
+  public UserInfo getAuthenticatedUserByUsername(final String username) {
     return this.findUserInfoByUsername(username)
         .orElseThrow(() -> new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED));
   }
 
   /** Same as {@link #getAuthenticatedUserByUsername(String)}, for tokens that carry a user id. */
-  public @NonNull UserInfo getAuthenticatedUserById(final @NonNull UUID userId) {
+  public UserInfo getAuthenticatedUserById(final UUID userId) {
     return this.userRepository
         .findById(userId)
         .map(this.userConverter::toUserInfo)
         .orElseThrow(() -> new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED));
   }
 
-  public @NonNull Optional<UserInfo> findUserInfoByUsername(final @NonNull String username) {
+  public Optional<UserInfo> findUserInfoByUsername(final String username) {
     return this.userRepository.findByUsername(username).map(this.userConverter::toUserInfo);
   }
 
-  public boolean existsByUsername(final @NonNull String username) {
+  public boolean existsByUsername(final String username) {
     return this.userRepository.existsByUsername(username);
   }
 
@@ -115,12 +112,12 @@ public class UserTxService {
    * committed and leaves nothing here to find.
    */
   @Transactional
-  public boolean lockUserExists(final @NonNull UUID userId) {
+  public boolean lockUserExists(final UUID userId) {
     return this.userRepository.lockUserId(userId).isPresent();
   }
 
   @Transactional
-  public void updateUsername(final @NonNull UUID userId, final @NonNull String newUsername) {
+  public void updateUsername(final UUID userId, final String newUsername) {
     final var user = this.findUserById(userId);
     user.setUsername(newUsername);
     user.revokeRefreshTokens();
@@ -128,7 +125,7 @@ public class UserTxService {
   }
 
   @Transactional
-  public void updatePassword(final @NonNull UUID userId, final @NonNull String newHash) {
+  public void updatePassword(final UUID userId, final String newHash) {
 
     final var user = this.findUserById(userId);
     user.setHash(newHash);
@@ -137,8 +134,7 @@ public class UserTxService {
     this.userRepository.save(user);
   }
 
-  public @NonNull Page<UserResponse> getAllUsers(
-      final @NonNull String search, final @NonNull Pageable pageable) {
+  public Page<UserResponse> getAllUsers(final String search, final Pageable pageable) {
 
     return this.userRepository
         .findAllWithSearch(
@@ -151,7 +147,7 @@ public class UserTxService {
   }
 
   @Transactional
-  public @NonNull UserResponse createUserWithRole(final @NonNull UserCreateForm dto) {
+  public UserResponse createUserWithRole(final UserCreateForm dto) {
     if (this.userRepository.existsByUsername(dto.getUsername())) {
       throw new BadRequestException(ErrorConstants.USERNAME_IN_USE);
     }
@@ -170,8 +166,7 @@ public class UserTxService {
   }
 
   @Transactional
-  public @NonNull UserResponse updateUserDetails(
-      final @NonNull UUID userId, final @NonNull UserUpdateForm dto) {
+  public UserResponse updateUserDetails(final UUID userId, final UserUpdateForm dto) {
 
     final var newRole = UserRole.valueOf(dto.getRole().name());
 
@@ -191,7 +186,7 @@ public class UserTxService {
   }
 
   @Transactional
-  public @NonNull String resetUserPassword(final @NonNull UUID userId) {
+  public String resetUserPassword(final UUID userId) {
     final var user = this.findUserById(userId);
     final var newPassword = PasswordGeneratorUtils.generatePassword();
 
@@ -204,7 +199,7 @@ public class UserTxService {
   }
 
   @Transactional
-  public void deleteUserById(final @NonNull UUID userId) {
+  public void deleteUserById(final UUID userId) {
     // The admin rows are locked before the user is read and counted, so two requests that each
     // remove one of the last two admins run one after the other instead of both seeing two
     // (RPS-1101).
@@ -232,7 +227,7 @@ public class UserTxService {
    * @param password the password that was just verified against {@code user}'s hash
    */
   @Transactional(propagation = Propagation.REQUIRES_NEW)
-  public void upgradePasswordHash(final @NonNull UserInfo user, final @NonNull String password) {
+  public void upgradePasswordHash(final UserInfo user, final String password) {
 
     this.userRepository.replaceHash(user.getId(), user.getHash(), PasswordHasher.hash(password));
   }
@@ -245,7 +240,7 @@ public class UserTxService {
    * @throws ItemNotFoundException if no user has {@code username}
    */
   @Transactional
-  public void updateLastLoginAt(final @NonNull String username) {
+  public void updateLastLoginAt(final String username) {
     if (this.userRepository.updateLastLoginAt(username, Instant.now()) == 0) {
       throw new ItemNotFoundException(ErrorConstants.USER_NOT_FOUND);
     }
@@ -260,8 +255,7 @@ public class UserTxService {
    * demoted or deleted while this one waited is read as it is now. A request that keeps the role
    * ADMIN can only add admins, so it does not have to queue behind the others (RPS-1101).
    */
-  private @NonNull User findUserForRoleChange(
-      final @NonNull UUID userId, final @NonNull UserRole newRole) {
+  private User findUserForRoleChange(final UUID userId, final UserRole newRole) {
 
     final var mayDemote = newRole != UserRole.ADMIN;
     final var adminCount = mayDemote ? this.userRepository.lockIdsByRole(UserRole.ADMIN).size() : 0;
@@ -274,13 +268,13 @@ public class UserTxService {
     return user;
   }
 
-  private @NonNull User findUserById(final @NonNull UUID id) {
+  private User findUserById(final UUID id) {
     return this.userRepository
         .findById(id)
         .orElseThrow(() -> new ItemNotFoundException(ErrorConstants.USER_NOT_FOUND));
   }
 
-  private @NonNull User findUserByUsername(final @NonNull String username) {
+  private User findUserByUsername(final String username) {
     return this.userRepository
         .findByUsername(username)
         .orElseThrow(() -> new ItemNotFoundException(ErrorConstants.USER_NOT_FOUND));

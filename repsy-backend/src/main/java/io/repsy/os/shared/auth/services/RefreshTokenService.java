@@ -24,7 +24,6 @@ import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,15 +32,12 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class RefreshTokenService {
 
-  private final @NonNull RefreshTokenRepository repository;
-  private final @NonNull EntityManager entityManager;
+  private final RefreshTokenRepository repository;
+  private final EntityManager entityManager;
 
   @Transactional
   public void register(
-      final @NonNull UUID tokenId,
-      final @NonNull UUID userId,
-      final @NonNull UUID familyId,
-      final @NonNull Instant expiresAt) {
+      final UUID tokenId, final UUID userId, final UUID familyId, final Instant expiresAt) {
     final var token = new RefreshToken();
     token.setId(tokenId);
     token.setUserId(userId);
@@ -60,7 +56,7 @@ public class RefreshTokenService {
   // noRollbackFor is needed there too, or this annotation alone only stops this method from
   // marking the shared transaction rollback-only, not from the caller rolling it back anyway.
   @Transactional(noRollbackFor = UnAuthorizedException.class)
-  public void consume(final @NonNull RefreshTokenClaims claims) {
+  public void consume(final RefreshTokenClaims claims) {
     final var now = Instant.now();
     if (this.repository.markUsed(claims.tokenId(), now) == 1) {
       return;
@@ -82,7 +78,7 @@ public class RefreshTokenService {
    * already-revoked or unknown family updates nothing and never fails).
    */
   @Transactional
-  public void revoke(final @NonNull UUID familyId) {
+  public void revoke(final UUID familyId) {
     this.repository.revokeFamily(familyId, Instant.now());
   }
 

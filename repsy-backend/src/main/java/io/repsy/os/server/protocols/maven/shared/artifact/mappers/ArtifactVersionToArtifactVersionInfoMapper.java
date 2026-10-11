@@ -24,7 +24,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class ArtifactVersionToArtifactVersionInfoMapper
-    implements Converter<ArtifactVersion, ArtifactVersionInfo> {
+    implements Converter<ArtifactVersion, @Nullable ArtifactVersionInfo> {
 
   ArtifactVersionToArtifactVersionInfoMapper(final GenericConversionService conversionService) {
 
@@ -32,7 +32,7 @@ public class ArtifactVersionToArtifactVersionInfoMapper
   }
 
   @Override
-  public ArtifactVersionInfo convert(final @Nullable ArtifactVersion source) {
+  public @Nullable ArtifactVersionInfo convert(final @Nullable ArtifactVersion source) {
 
     if (source == null) {
       return null;

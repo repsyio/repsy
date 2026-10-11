@@ -20,7 +20,6 @@ import io.repsy.os.shared.usage.dtos.UsageChangedInfo;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -30,11 +29,11 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class UsageUpdateService {
 
-  private final @NonNull RepoTxService repoTxService;
+  private final RepoTxService repoTxService;
 
   @Async
   @Transactional
-  public void updateUsage(final @NonNull UsageChangedInfo info) {
+  public void updateUsage(final UsageChangedInfo info) {
     this.updateRepoUsage(info.repoId(), info.usages().getDiskUsage());
   }
 
@@ -52,7 +51,7 @@ public class UsageUpdateService {
    * left and the drift is logged instead. The row is locked while it is read, so a concurrent
    * update cannot change the usage between the read and the write.
    */
-  private void updateRepoUsage(final @NonNull UUID repoId, final long diskUsageDiff) {
+  private void updateRepoUsage(final UUID repoId, final long diskUsageDiff) {
     if (this.repoTxService.tryAddDiskUsage(repoId, diskUsageDiff)) {
       return;
     }
@@ -67,7 +66,7 @@ public class UsageUpdateService {
     this.clampRepoUsage(repoId, diskUsageDiff);
   }
 
-  private void clampRepoUsage(final @NonNull UUID repoId, final long diskUsageDiff) {
+  private void clampRepoUsage(final UUID repoId, final long diskUsageDiff) {
     final var currentDiskUsage = this.repoTxService.findDiskUsageForUpdate(repoId);
 
     if (currentDiskUsage.isEmpty()) {

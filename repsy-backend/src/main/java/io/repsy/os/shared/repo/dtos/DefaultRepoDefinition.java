@@ -18,11 +18,9 @@ package io.repsy.os.shared.repo.dtos;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.UUID;
 import java.util.function.Consumer;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * The default repository of one protocol: its name, its type and how its storage directory is
  * created from the storage key.
  */
-@NullMarked
 public record DefaultRepoDefinition(String name, RepoType type, Consumer<UUID> storageCreator) {}

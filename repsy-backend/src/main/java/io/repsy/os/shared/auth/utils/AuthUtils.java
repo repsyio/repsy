@@ -25,7 +25,6 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import lombok.experimental.UtilityClass;
 import org.apache.commons.lang3.StringUtils;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 @UtilityClass
@@ -47,8 +46,7 @@ public class AuthUtils {
    * @param sessionStart when the session's login happened
    * @return {@code timeout}, or the time left until the session ends if that is shorter
    */
-  public static @NonNull Duration boundBySession(
-      final @NonNull Duration timeout, final @NonNull Instant sessionStart) {
+  public static Duration boundBySession(final Duration timeout, final Instant sessionStart) {
 
     final var untilSessionEnd = Duration.between(Instant.now(), sessionStart.plus(TIMEOUT_SESSION));
 
@@ -67,8 +65,7 @@ public class AuthUtils {
    * @param authHeader Authorization HTTP header from request
    * @return request Credentials, or null if the token is invalid
    */
-  public static @Nullable Credentials extractCredentialsFromBasicToken(
-      final @NonNull String authHeader) {
+  public static @Nullable Credentials extractCredentialsFromBasicToken(final String authHeader) {
 
     final var credentials = new String(decodeBase64(authHeader), UTF_8).split(":", 2);
 
@@ -85,12 +82,12 @@ public class AuthUtils {
     return Credentials.builder().username(username).password(credentials[1]).build();
   }
 
-  public static @NonNull String removeBasicPrefix(final @NonNull String authHeader) {
+  public static String removeBasicPrefix(final String authHeader) {
 
     return authHeader.substring(AUTH_BASIC.length());
   }
 
-  public static @NonNull String removeBearerHeader(final @NonNull String authHeader) {
+  public static String removeBearerHeader(final String authHeader) {
 
     return authHeader.substring(AUTH_BEARER.length());
   }
@@ -100,7 +97,7 @@ public class AuthUtils {
    * header. A header is a personal access token by its {@code rut-} prefix and nothing else, which
    * is what keeps it away from the JWT and the password checks.
    */
-  public static @Nullable String personalAccessTokenSecretOf(final @NonNull String authHeader) {
+  public static @Nullable String personalAccessTokenSecretOf(final String authHeader) {
 
     if (!isBearerToken(authHeader)) {
       return null;
@@ -111,12 +108,12 @@ public class AuthUtils {
     return TokenType.REPSY_USER_TOKEN.matches(bearerToken) ? bearerToken : null;
   }
 
-  public static boolean isBearerToken(final @NonNull String authHeader) {
+  public static boolean isBearerToken(final String authHeader) {
 
     return authHeader.startsWith(AUTH_BEARER);
   }
 
-  public static boolean isBasicToken(final @NonNull String authHeader) {
+  public static boolean isBasicToken(final String authHeader) {
 
     return authHeader.startsWith(AUTH_BASIC);
   }
@@ -127,15 +124,14 @@ public class AuthUtils {
    * to add it (Cargo's {@code registry-authentication.html}). A header that already carries a
    * scheme is returned unchanged.
    */
-  public static @NonNull String normalizeToBearer(final @NonNull String authHeader) {
+  public static String normalizeToBearer(final String authHeader) {
 
     return (isBasicToken(authHeader) || isBearerToken(authHeader))
         ? authHeader
         : AUTH_BEARER + authHeader;
   }
 
-  public static @Nullable Credentials extractCredentialsFromAuthHeader(
-      final @NonNull String authHeader) {
+  public static @Nullable Credentials extractCredentialsFromAuthHeader(final String authHeader) {
 
     final var basicToken = removeBasicPrefix(authHeader);
 

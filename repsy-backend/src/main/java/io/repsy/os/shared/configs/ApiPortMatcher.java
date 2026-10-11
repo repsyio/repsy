@@ -18,7 +18,6 @@ package io.repsy.os.shared.configs;
 import io.repsy.libs.multiport.configs.props.MultiPortProperties;
 import io.repsy.os.shared.utils.MultiPortNames;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Component;
 
 /**
@@ -30,7 +29,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class ApiPortMatcher {
 
-  private final @NonNull MultiPortProperties multiPortProperties;
+  private final MultiPortProperties multiPortProperties;
 
   public boolean isApiPort(final int localPort) {
 

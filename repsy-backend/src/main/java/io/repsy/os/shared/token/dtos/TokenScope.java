@@ -22,7 +22,6 @@ import java.util.Collection;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
-import org.jspecify.annotations.NonNull;
 
 /**
  * What a personal access token may do. A token holds a set of these and can only narrow what its
@@ -54,16 +53,16 @@ public enum TokenScope {
   private static final List<Permission> LADDER =
       List.of(Permission.NONE, Permission.READ, Permission.WRITE, Permission.MANAGE);
 
-  private final @NonNull String value;
-  private final @NonNull Permission permission;
+  private final String value;
+  private final Permission permission;
 
-  TokenScope(final @NonNull String value, final @NonNull Permission permission) {
+  TokenScope(final String value, final Permission permission) {
     this.value = value;
     this.permission = permission;
   }
 
   @JsonValue
-  public @NonNull String getValue() {
+  public String getValue() {
     return this.value;
   }
 
@@ -71,12 +70,12 @@ public enum TokenScope {
    * The highest repo permission this scope grants on its own, or {@link Permission#NONE} for a
    * scope that is not about repos.
    */
-  public @NonNull Permission getPermission() {
+  public Permission getPermission() {
     return this.permission;
   }
 
   /** The scope whose wire value is {@code value}, exactly; there is no case folding. */
-  public static @NonNull Optional<TokenScope> fromValue(final String value) {
+  public static Optional<TokenScope> fromValue(final String value) {
     for (final var scope : values()) {
       if (scope.value.equals(value)) {
         return Optional.of(scope);
@@ -87,7 +86,7 @@ public enum TokenScope {
   }
 
   @JsonCreator(mode = JsonCreator.Mode.DELEGATING)
-  public static @NonNull TokenScope fromJson(final String value) {
+  public static TokenScope fromJson(final String value) {
     return fromValue(value)
         .orElseThrow(() -> new IllegalArgumentException("Unknown token scope: " + value));
   }
@@ -96,8 +95,7 @@ public enum TokenScope {
    * The scopes a token is created with: the requested ones plus the implicit {@link #PROFILE_READ},
    * as a set in canonical order.
    */
-  public static @NonNull EnumSet<TokenScope> withImplicit(
-      final @NonNull Collection<TokenScope> requested) {
+  public static EnumSet<TokenScope> withImplicit(final Collection<TokenScope> requested) {
     final var scopes = EnumSet.of(PROFILE_READ);
 
     scopes.addAll(requested);
@@ -112,7 +110,7 @@ public enum TokenScope {
    * grants write and read, a write scope grants read, and a scope that is not about repos grants
    * only {@link Permission#NONE}, which asks for nothing.
    */
-  public boolean grants(final @NonNull Permission required) {
+  public boolean grants(final Permission required) {
     return LADDER.indexOf(required) <= LADDER.indexOf(this.permission);
   }
 
@@ -120,8 +118,7 @@ public enum TokenScope {
    * Whether {@code scopes} grant {@code required}: any one of them does (see {@link #grants}), and
    * {@link Permission#NONE} asks for nothing, so even no scope at all grants it.
    */
-  public static boolean permits(
-      final @NonNull Collection<TokenScope> scopes, final @NonNull Permission required) {
+  public static boolean permits(final Collection<TokenScope> scopes, final Permission required) {
     return required == Permission.NONE || scopes.stream().anyMatch(scope -> scope.grants(required));
   }
 }

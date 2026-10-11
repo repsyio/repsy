@@ -18,13 +18,11 @@ package io.repsy.os.shared.user.mappers;
 import io.repsy.os.generated.model.UserResponse;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.User;
-import org.jspecify.annotations.NullMarked;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingConstants;
 import org.mapstruct.Mappings;
 
-@NullMarked
 @Mapper(componentModel = MappingConstants.ComponentModel.SPRING)
 public interface UserMapper {
 

@@ -26,7 +26,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.ValidationException;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.Ordered;
@@ -67,10 +66,10 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 @Order(Ordered.LOWEST_PRECEDENCE - 1)
 public class PanelProblemDetailAdvice {
 
-  private final @NonNull ErrorResponseService errors;
+  private final ErrorResponseService errors;
 
   @Autowired
-  public PanelProblemDetailAdvice(final @NonNull ErrorResponseService errors) {
+  public PanelProblemDetailAdvice(final ErrorResponseService errors) {
     this.errors = errors;
   }
 
@@ -89,8 +88,8 @@ public class PanelProblemDetailAdvice {
     MissingServletRequestPartException.class
   })
   @Nullable ResponseEntity<Object> handleMissingRequestValue(
-      final @NonNull Exception ex,
-      final @NonNull HttpServletRequest request,
+      final Exception ex,
+      final HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
@@ -109,8 +108,8 @@ public class PanelProblemDetailAdvice {
 
   @ExceptionHandler(ConversionFailedException.class)
   @Nullable ResponseEntity<Object> handleConversionFailed(
-      final @NonNull ConversionFailedException ex,
-      final @NonNull HttpServletRequest request,
+      final ConversionFailedException ex,
+      final HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
@@ -130,8 +129,8 @@ public class PanelProblemDetailAdvice {
 
   @ExceptionHandler(MethodArgumentTypeMismatchException.class)
   @Nullable ResponseEntity<Object> handleMethodArgumentTypeMismatch(
-      final @NonNull MethodArgumentTypeMismatchException ex,
-      final @NonNull HttpServletRequest request,
+      final MethodArgumentTypeMismatchException ex,
+      final HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
@@ -161,8 +160,8 @@ public class PanelProblemDetailAdvice {
    */
   @ExceptionHandler(HandlerMethodValidationException.class)
   @Nullable ResponseEntity<Object> handleHandlerMethodValidation(
-      final @NonNull HandlerMethodValidationException ex,
-      final @NonNull HttpServletRequest request,
+      final HandlerMethodValidationException ex,
+      final HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
@@ -198,8 +197,8 @@ public class PanelProblemDetailAdvice {
    */
   @ExceptionHandler(InvalidPagingParameterException.class)
   @Nullable ResponseEntity<Object> handleInvalidPagingParameter(
-      final @NonNull InvalidPagingParameterException ex,
-      final @NonNull HttpServletRequest request,
+      final InvalidPagingParameterException ex,
+      final HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
@@ -221,8 +220,8 @@ public class PanelProblemDetailAdvice {
 
   @ExceptionHandler(HttpMessageNotReadableException.class)
   @Nullable ResponseEntity<Object> handleMessageNotReadable(
-      final @NonNull HttpMessageNotReadableException ex,
-      final @NonNull HttpServletRequest request,
+      final HttpMessageNotReadableException ex,
+      final HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
@@ -249,8 +248,8 @@ public class PanelProblemDetailAdvice {
    */
   @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
   @Nullable ResponseEntity<Object> handleRequestMethodNotSupported(
-      final @NonNull HttpRequestMethodNotSupportedException ex,
-      final @NonNull HttpServletRequest request,
+      final HttpRequestMethodNotSupportedException ex,
+      final HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
@@ -271,8 +270,8 @@ public class PanelProblemDetailAdvice {
 
   @ExceptionHandler(NoResourceFoundException.class)
   @Nullable ResponseEntity<Object> handleNoResourceFound(
-      final @NonNull NoResourceFoundException ex,
-      final @NonNull HttpServletRequest request,
+      final NoResourceFoundException ex,
+      final HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
@@ -290,8 +289,8 @@ public class PanelProblemDetailAdvice {
 
   @ExceptionHandler(MethodArgumentNotValidException.class)
   @Nullable ResponseEntity<Object> handleMethodArgumentNotValid(
-      final @NonNull MethodArgumentNotValidException ex,
-      final @NonNull HttpServletRequest request,
+      final MethodArgumentNotValidException ex,
+      final HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
@@ -315,8 +314,8 @@ public class PanelProblemDetailAdvice {
 
   @ExceptionHandler(MissingServletRequestParameterException.class)
   @Nullable ResponseEntity<Object> handleMissingServletRequestParameter(
-      final @NonNull MissingServletRequestParameterException ex,
-      final @NonNull HttpServletRequest request,
+      final MissingServletRequestParameterException ex,
+      final HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
@@ -346,8 +345,8 @@ public class PanelProblemDetailAdvice {
    */
   @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
   @Nullable ResponseEntity<Object> handleMediaTypeNotSupported(
-      final @NonNull HttpMediaTypeNotSupportedException ex,
-      final @NonNull HttpServletRequest request,
+      final HttpMediaTypeNotSupportedException ex,
+      final HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
@@ -378,8 +377,8 @@ public class PanelProblemDetailAdvice {
    */
   @ExceptionHandler(HttpMediaTypeNotAcceptableException.class)
   @Nullable ResponseEntity<Object> handleMediaTypeNotAcceptable(
-      final @NonNull HttpMediaTypeNotAcceptableException ex,
-      final @NonNull HttpServletRequest request,
+      final HttpMediaTypeNotAcceptableException ex,
+      final HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
@@ -407,8 +406,8 @@ public class PanelProblemDetailAdvice {
    */
   @ExceptionHandler(MaxUploadSizeExceededException.class)
   @Nullable ResponseEntity<Object> handleMaxUploadSizeExceeded(
-      final @NonNull MaxUploadSizeExceededException ex,
-      final @NonNull HttpServletRequest request,
+      final MaxUploadSizeExceededException ex,
+      final HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
@@ -435,8 +434,8 @@ public class PanelProblemDetailAdvice {
    */
   @ExceptionHandler(UnsatisfiedServletRequestParameterException.class)
   @Nullable ResponseEntity<Object> handleUnsatisfiedServletRequestParameter(
-      final @NonNull UnsatisfiedServletRequestParameterException ex,
-      final @NonNull HttpServletRequest request,
+      final UnsatisfiedServletRequestParameterException ex,
+      final HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
@@ -460,8 +459,8 @@ public class PanelProblemDetailAdvice {
    */
   @ExceptionHandler(ValidationException.class)
   @Nullable ResponseEntity<Object> handleValidation(
-      final @NonNull ValidationException ex,
-      final @NonNull HttpServletRequest request,
+      final ValidationException ex,
+      final HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
@@ -485,8 +484,8 @@ public class PanelProblemDetailAdvice {
 
   @ExceptionHandler(MfaException.class)
   @Nullable ResponseEntity<Object> handleMfa(
-      final @NonNull MfaException ex,
-      final @NonNull HttpServletRequest request,
+      final MfaException ex,
+      final HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
@@ -516,8 +515,8 @@ public class PanelProblemDetailAdvice {
    */
   @ExceptionHandler(MissingRequestHeaderException.class)
   @Nullable ResponseEntity<Object> handleMissingRequestHeader(
-      final @NonNull MissingRequestHeaderException ex,
-      final @NonNull HttpServletRequest request,
+      final MissingRequestHeaderException ex,
+      final HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
@@ -543,7 +542,7 @@ public class PanelProblemDetailAdvice {
   }
 
   /** The name of the missing value, never the framework text (RPS-2162). */
-  private static @NonNull String missingName(final @NonNull Exception ex) {
+  private static String missingName(final Exception ex) {
     return switch (ex) {
       case final MissingRequestCookieException cookie -> cookie.getCookieName();
       case final MissingMatrixVariableException variable -> variable.getVariableName();

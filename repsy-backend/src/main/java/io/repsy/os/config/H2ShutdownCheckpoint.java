@@ -21,7 +21,6 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import javax.sql.DataSource;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -49,12 +48,11 @@ public class H2ShutdownCheckpoint {
 
   private static final String CHECKPOINT_SQL = "CHECKPOINT SYNC";
 
-  private final @NonNull DataSource dataSource;
+  private final DataSource dataSource;
   private final boolean enabled;
 
   public H2ShutdownCheckpoint(
-      final @NonNull DataSource dataSource,
-      @Value("${spring.datasource.url:}") final @NonNull String datasourceUrl) {
+      final DataSource dataSource, @Value("${spring.datasource.url:}") final String datasourceUrl) {
 
     this.dataSource = dataSource;
     this.enabled = datasourceUrl.startsWith("jdbc:h2:");

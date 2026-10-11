@@ -40,6 +40,7 @@ import org.bouncycastle.openpgp.PGPSignatureSubpacketGenerator;
 import org.bouncycastle.openpgp.operator.jcajce.JcaKeyFingerprintCalculator;
 import org.bouncycastle.openpgp.operator.jcajce.JcaPGPContentSignerBuilder;
 import org.bouncycastle.openpgp.operator.jcajce.JcaPGPKeyPair;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A throw-away RSA key pair for tests that need a real OpenPGP signature without a key server or a
@@ -63,13 +64,13 @@ public final class PgpTestKeys {
    * subkey does), and this is the ring's primary key, placed first when {@link #armoredPublicKey()}
    * encodes the two-key ring.
    */
-  private final PGPPublicKey ringPrimaryKey;
+  private final @Nullable PGPPublicKey ringPrimaryKey;
 
   private PgpTestKeys(final PGPKeyPair keyPair) {
     this(keyPair, null);
   }
 
-  private PgpTestKeys(final PGPKeyPair keyPair, final PGPPublicKey ringPrimaryKey) {
+  private PgpTestKeys(final PGPKeyPair keyPair, final @Nullable PGPPublicKey ringPrimaryKey) {
     this.keyPair = keyPair;
     this.ringPrimaryKey = ringPrimaryKey;
   }

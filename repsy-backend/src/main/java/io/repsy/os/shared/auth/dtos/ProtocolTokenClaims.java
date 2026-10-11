@@ -17,7 +17,6 @@ package io.repsy.os.shared.auth.dtos;
 
 import java.time.Instant;
 import java.util.UUID;
-import org.jspecify.annotations.NonNull;
 
 /**
  * What a verified protocol token says.
@@ -27,6 +26,4 @@ import org.jspecify.annotations.NonNull;
  * @param expiresAt When the token stops working on its own
  */
 public record ProtocolTokenClaims(
-    @NonNull UUID subject,
-    @NonNull AuthenticationType authenticationType,
-    @NonNull Instant expiresAt) {}
+    UUID subject, AuthenticationType authenticationType, Instant expiresAt) {}

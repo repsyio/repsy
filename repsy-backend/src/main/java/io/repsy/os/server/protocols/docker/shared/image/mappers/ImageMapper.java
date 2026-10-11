@@ -19,6 +19,7 @@ import io.repsy.os.server.protocols.docker.shared.image.dtos.ImageInfo;
 import io.repsy.os.server.protocols.docker.shared.image.entities.Image;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import org.jspecify.annotations.Nullable;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.Mappings;
@@ -26,7 +27,7 @@ import org.mapstruct.Mappings;
 @Mapper(componentModel = "spring")
 public interface ImageMapper {
 
-  default Instant resolveUpdatedAt(
+  default @Nullable Instant resolveUpdatedAt(
       final io.repsy.os.server.protocols.docker.shared.image.dtos.ImageListItem source) {
     final var lastTagPushedAt = source.getUpdatedAt();
     return lastTagPushedAt == null

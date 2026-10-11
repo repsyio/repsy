@@ -16,7 +16,6 @@
 package io.repsy.os.shared.configs;
 
 import io.repsy.protocols.shared.repo.dtos.RepoType;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
@@ -36,15 +35,15 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 public class RepoTypeConversionConfig implements WebMvcConfigurer {
 
   @Override
-  public void addFormatters(final @NonNull FormatterRegistry registry) {
+  public void addFormatters(final FormatterRegistry registry) {
     registry.addConverter(String.class, RepoType.class, new StringToRepoTypeConverter());
   }
 
   /** {@code null} for a blank value (the parameter is absent), the type otherwise. */
-  static final class StringToRepoTypeConverter implements Converter<String, RepoType> {
+  static final class StringToRepoTypeConverter implements Converter<String, @Nullable RepoType> {
 
     @Override
-    public @Nullable RepoType convert(final @NonNull String source) {
+    public @Nullable RepoType convert(final String source) {
       if (source.isBlank()) {
         return null;
       }

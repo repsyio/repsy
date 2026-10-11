@@ -17,7 +17,6 @@ package io.repsy.os.config.async;
 
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadPoolExecutor;
-import org.jspecify.annotations.NonNull;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
@@ -48,7 +47,7 @@ public class SignedRecomputeExecutorConfig {
   private static final int AWAIT_TERMINATION_SECONDS = 30;
 
   @Bean(BEAN_NAME)
-  public @NonNull Executor signedRecomputeExecutor() {
+  public Executor signedRecomputeExecutor() {
 
     final var executor = new ThreadPoolTaskExecutor();
     executor.setCorePoolSize(POOL_SIZE);

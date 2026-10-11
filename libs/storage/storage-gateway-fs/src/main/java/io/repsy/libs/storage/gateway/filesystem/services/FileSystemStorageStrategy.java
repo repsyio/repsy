@@ -67,6 +67,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Stream;
 import lombok.SneakyThrows;
+import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.scheduling.annotation.Async;
@@ -338,7 +339,7 @@ public class FileSystemStorageStrategy implements StorageStrategy {
 
   /** A step of a write that touches the storage itself. */
   @FunctionalInterface
-  private interface StorageWrite<T> {
+  private interface StorageWrite<T extends @Nullable Object> {
     T run() throws IOException;
   }
 
@@ -354,7 +355,7 @@ public class FileSystemStorageStrategy implements StorageStrategy {
    * (RPS-2104). Reads of the client's request body are not run through here: their failure is the
    * client's, not the storage's.
    */
-  private static <T> T storageWrite(final StorageWrite<T> step) {
+  private static <T extends @Nullable Object> T storageWrite(final StorageWrite<T> step) {
     try {
       return step.run();
     } catch (final IOException e) {
@@ -461,7 +462,9 @@ public class FileSystemStorageStrategy implements StorageStrategy {
       final String repoName, final StoragePath storagePath, final byte[] data) {
 
     final Path physicalPath = this.toPhysicalPath(storagePath);
-    createDirectories(physicalPath.getParent());
+    createDirectories(
+        Objects.requireNonNull(
+            physicalPath.getParent(), "The storage path has no parent directory"));
 
     try (final var os = openForWrite(physicalPath, CREATE, APPEND)) {
       os.write(data);
@@ -476,7 +479,9 @@ public class FileSystemStorageStrategy implements StorageStrategy {
       final String repoName, final StoragePath storagePath, final InputStream inputStream) {
 
     final Path physicalPath = this.toPhysicalPath(storagePath);
-    createDirectories(physicalPath.getParent());
+    createDirectories(
+        Objects.requireNonNull(
+            physicalPath.getParent(), "The storage path has no parent directory"));
 
     final long lengthBefore = Files.exists(physicalPath) ? Files.size(physicalPath) : 0;
     final long bytesAppended;

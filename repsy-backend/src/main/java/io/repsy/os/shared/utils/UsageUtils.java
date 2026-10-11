@@ -17,7 +17,6 @@ package io.repsy.os.shared.utils;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import org.jspecify.annotations.NonNull;
 
 public final class UsageUtils {
   private static final long KILOBYTE = 1024L;
@@ -32,7 +31,7 @@ public final class UsageUtils {
     throw new UnsupportedOperationException("Utility class");
   }
 
-  public static @NonNull String humanReadable(final long usage) {
+  public static String humanReadable(final long usage) {
     if (usage < KILOBYTE) {
       return usage + " B";
     }

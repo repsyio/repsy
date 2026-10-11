@@ -17,7 +17,6 @@ package io.repsy.os.shared.user.repositories;
 
 import io.repsy.os.shared.user.entities.ReservedUsername;
 import java.util.UUID;
-import org.jspecify.annotations.NonNull;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -27,5 +26,5 @@ public interface ReservedUsernameRepository extends JpaRepository<ReservedUserna
   /**
    * Matches regardless of case, so {@code Repsy} and {@code REPSY} hit the seeded {@code repsy}.
    */
-  boolean existsByUsernameIgnoreCase(@NonNull String username);
+  boolean existsByUsernameIgnoreCase(String username);
 }

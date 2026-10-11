@@ -16,14 +16,12 @@
 package io.repsy.os.shared.constants;
 
 import lombok.NoArgsConstructor;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * The error codes only the panel and the backend emit. The codes the protocol libraries and the
  * shared backend code emit are in {@code ProtocolErrorCodes}. The strings are the wire contract;
  * see {@code ErrorConstantsTest}.
  */
-@NullMarked
 @NoArgsConstructor
 public final class ErrorConstants {
 

@@ -41,7 +41,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -70,16 +69,16 @@ public class PersonalAccessTokenService {
   /** The expiry of a token created without a date, and the furthest a date can be set. */
   private static final Duration DEFAULT_EXPIRATION_DURATION = Duration.ofDays(365);
 
-  private final @NonNull PersonalAccessTokenRepository tokenRepository;
-  private final @NonNull UserRepository userRepository;
-  private final @NonNull PersonalAccessTokenMapper converter;
-  private final @NonNull Clock clock;
+  private final PersonalAccessTokenRepository tokenRepository;
+  private final UserRepository userRepository;
+  private final PersonalAccessTokenMapper converter;
+  private final Clock clock;
 
   @Autowired
   public PersonalAccessTokenService(
-      final @NonNull PersonalAccessTokenRepository tokenRepository,
-      final @NonNull UserRepository userRepository,
-      final @NonNull PersonalAccessTokenMapper converter) {
+      final PersonalAccessTokenRepository tokenRepository,
+      final UserRepository userRepository,
+      final PersonalAccessTokenMapper converter) {
     this(tokenRepository, userRepository, converter, Clock.systemUTC());
   }
 
@@ -88,18 +87,17 @@ public class PersonalAccessTokenService {
    * either side of midnight UTC, where the last day of the expiration date changes.
    */
   PersonalAccessTokenService(
-      final @NonNull PersonalAccessTokenRepository tokenRepository,
-      final @NonNull UserRepository userRepository,
-      final @NonNull PersonalAccessTokenMapper converter,
-      final @NonNull Clock clock) {
+      final PersonalAccessTokenRepository tokenRepository,
+      final UserRepository userRepository,
+      final PersonalAccessTokenMapper converter,
+      final Clock clock) {
     this.tokenRepository = tokenRepository;
     this.userRepository = userRepository;
     this.converter = converter;
     this.clock = clock;
   }
 
-  public @NonNull Page<PersonalAccessTokenListItem> getTokens(
-      final @NonNull UUID userId, final @NonNull Pageable pageable) {
+  public Page<PersonalAccessTokenListItem> getTokens(final UUID userId, final Pageable pageable) {
 
     return this.tokenRepository.findAllByUserId(userId, pageable);
   }
@@ -108,7 +106,7 @@ public class PersonalAccessTokenService {
    * The token whose secret is {@code token}, expired or not: the caller decides what an expired one
    * means ({@link PersonalAccessTokenInfo#isExpired()}).
    */
-  public @NonNull Optional<PersonalAccessTokenInfo> findByToken(final @NonNull String token) {
+  public Optional<PersonalAccessTokenInfo> findByToken(final String token) {
 
     return this.tokenRepository.findByTokenHash(TokenHash.hash(token)).map(this.converter::toInfo);
   }
@@ -117,7 +115,7 @@ public class PersonalAccessTokenService {
    * The token with this id, expired or not, for a request that carries a JWT minted from it: the
    * row is read again on every request, so a revoked token stops working at once.
    */
-  public @NonNull Optional<PersonalAccessTokenInfo> findById(final @NonNull UUID tokenId) {
+  public Optional<PersonalAccessTokenInfo> findById(final UUID tokenId) {
 
     return this.tokenRepository.findById(tokenId).map(this.converter::toInfo);
   }
@@ -127,7 +125,7 @@ public class PersonalAccessTokenService {
    *
    * @throws ItemNotFoundException if there is no such token
    */
-  public @NonNull AccessTokenWhoAmI getWhoAmI(final @NonNull UUID tokenId) {
+  public AccessTokenWhoAmI getWhoAmI(final UUID tokenId) {
 
     final var token =
         this.tokenRepository
@@ -145,8 +143,7 @@ public class PersonalAccessTokenService {
    *     or the user already holds {@link #MAX_TOKENS_PER_USER} tokens
    */
   @Transactional
-  public @NonNull AccessTokenCreated createToken(
-      final @NonNull UUID userId, final @NonNull AccessTokenForm form) {
+  public AccessTokenCreated createToken(final UUID userId, final AccessTokenForm form) {
 
     final var now = this.now();
     final var scopes = requestedScopes(form);
@@ -178,7 +175,7 @@ public class PersonalAccessTokenService {
    * @throws ItemNotFoundException if the user holds no such token
    */
   @Transactional
-  public void revokeToken(final @NonNull UUID userId, final @NonNull UUID tokenId) {
+  public void revokeToken(final UUID userId, final UUID tokenId) {
 
     final var token =
         this.tokenRepository
@@ -189,7 +186,7 @@ public class PersonalAccessTokenService {
   }
 
   @Transactional
-  public void updateLastUsedTime(final @NonNull UUID tokenId) {
+  public void updateLastUsedTime(final UUID tokenId) {
 
     this.tokenRepository.updateLastUsedTime(tokenId, this.clock.instant());
   }
@@ -199,12 +196,12 @@ public class PersonalAccessTokenService {
    * database rounds a finer value, and that would make the answer differ from the stored date in
    * its last digits, and round the very last instant of a day into the next day.
    */
-  private @NonNull Instant now() {
+  private Instant now() {
 
     return this.clock.instant().truncatedTo(ChronoUnit.MICROS);
   }
 
-  private static @NonNull Set<TokenScope> requestedScopes(final @NonNull AccessTokenForm form) {
+  private static Set<TokenScope> requestedScopes(final AccessTokenForm form) {
 
     final var scopes = form.getScopes();
 
@@ -220,8 +217,8 @@ public class PersonalAccessTokenService {
    * future and not beyond the last day the panel offers, and 365 days from {@code now} if none was
    * asked for.
    */
-  private static @NonNull Instant resolveExpirationDate(
-      final @Nullable Instant requested, final @NonNull Instant now) {
+  private static Instant resolveExpirationDate(
+      final @Nullable Instant requested, final Instant now) {
 
     if (requested == null) {
       return now.plus(DEFAULT_EXPIRATION_DURATION);
@@ -250,7 +247,7 @@ public class PersonalAccessTokenService {
    * maximum by a few milliseconds.
    */
   private static boolean isBeyondMaximumExpiration(
-      final @NonNull Instant expirationDate, final @NonNull Instant now) {
+      final Instant expirationDate, final Instant now) {
 
     final var lastDay = now.plus(DEFAULT_EXPIRATION_DURATION).atZone(ZoneOffset.UTC).toLocalDate();
 
@@ -263,14 +260,14 @@ public class PersonalAccessTokenService {
    * user that races this request either waits for the insert, or has already committed and is
    * caught here, instead of a foreign-key violation surfacing from the insert.
    */
-  private void lockUser(final @NonNull UUID userId) {
+  private void lockUser(final UUID userId) {
 
     if (this.userRepository.lockUserIdForUpdate(userId).isEmpty()) {
       throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
   }
 
-  private void requireRoom(final @NonNull UUID userId, final @NonNull Instant now) {
+  private void requireRoom(final UUID userId, final Instant now) {
 
     if (this.tokenRepository.countByUserIdAndExpirationDateAfter(userId, now)
         >= MAX_TOKENS_PER_USER) {

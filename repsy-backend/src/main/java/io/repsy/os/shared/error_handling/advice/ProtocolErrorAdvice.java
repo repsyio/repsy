@@ -38,7 +38,6 @@ import jakarta.persistence.PessimisticLockException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.Ordered;
@@ -70,17 +69,17 @@ public class ProtocolErrorAdvice {
 
   private static final HttpStatusCode UNPROCESSABLE_ENTITY = HttpStatusCode.valueOf(422);
 
-  private final @NonNull ErrorResponseService errors;
+  private final ErrorResponseService errors;
 
   @Autowired
-  public ProtocolErrorAdvice(final @NonNull ErrorResponseService errors) {
+  public ProtocolErrorAdvice(final ErrorResponseService errors) {
     this.errors = errors;
   }
 
   @ExceptionHandler(AccessNotAllowedException.class)
   @Nullable ResponseEntity<Object> handleAccessNotAllowed(
-      final @NonNull AccessNotAllowedException ex,
-      final @NonNull HttpServletRequest request,
+      final AccessNotAllowedException ex,
+      final HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
@@ -102,8 +101,8 @@ public class ProtocolErrorAdvice {
 
   @ExceptionHandler(InvalidStoragePathException.class)
   @Nullable ResponseEntity<Object> handleInvalidStoragePath(
-      final @NonNull InvalidStoragePathException ex,
-      final @NonNull HttpServletRequest request,
+      final InvalidStoragePathException ex,
+      final HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
@@ -125,8 +124,8 @@ public class ProtocolErrorAdvice {
 
   @ExceptionHandler(BadRequestException.class)
   @Nullable ResponseEntity<Object> handleBadRequest(
-      final @NonNull BadRequestException ex,
-      final @NonNull HttpServletRequest request,
+      final BadRequestException ex,
+      final HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
@@ -148,8 +147,8 @@ public class ProtocolErrorAdvice {
 
   @ExceptionHandler(SignatureNotVerifiedException.class)
   @Nullable ResponseEntity<Object> handleSignatureNotVerified(
-      final @NonNull SignatureNotVerifiedException ex,
-      final @NonNull HttpServletRequest request,
+      final SignatureNotVerifiedException ex,
+      final HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
@@ -173,8 +172,8 @@ public class ProtocolErrorAdvice {
 
   @ExceptionHandler(ErrorOccurredException.class)
   @Nullable ResponseEntity<Object> handleErrorOccurred(
-      final @NonNull ErrorOccurredException ex,
-      final @NonNull HttpServletRequest request,
+      final ErrorOccurredException ex,
+      final HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
@@ -198,8 +197,8 @@ public class ProtocolErrorAdvice {
 
   @ExceptionHandler(RedirectToPathException.class)
   @Nullable ResponseEntity<Object> handleRedirectToPath(
-      final @NonNull RedirectToPathException ex,
-      final @NonNull HttpServletRequest request,
+      final RedirectToPathException ex,
+      final HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
@@ -223,8 +222,8 @@ public class ProtocolErrorAdvice {
 
   @ExceptionHandler(ItemNotFoundException.class)
   @Nullable ResponseEntity<Object> handleItemNotFound(
-      final @NonNull ItemNotFoundException ex,
-      final @NonNull HttpServletRequest request,
+      final ItemNotFoundException ex,
+      final HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
@@ -246,8 +245,8 @@ public class ProtocolErrorAdvice {
 
   @ExceptionHandler(UnAuthorizedException.class)
   @Nullable ResponseEntity<Object> handleUnAuthorized(
-      final @NonNull UnAuthorizedException ex,
-      final @NonNull HttpServletRequest request,
+      final UnAuthorizedException ex,
+      final HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
@@ -277,7 +276,7 @@ public class ProtocolErrorAdvice {
    * unAuthorized} id, stay as they are.
    */
   private ResponseEntity<Object> unauthorizedBody(
-      final @NonNull HttpServletRequest request, final @NonNull UnAuthorizedException ex) {
+      final HttpServletRequest request, final UnAuthorizedException ex) {
 
     final var exceptionMessage = ex.getMessage();
 
@@ -312,8 +311,8 @@ public class ProtocolErrorAdvice {
    */
   @ExceptionHandler(TooManyRequestsException.class)
   @Nullable ResponseEntity<Object> handleTooManyRequests(
-      final @NonNull TooManyRequestsException ex,
-      final @NonNull HttpServletRequest request,
+      final TooManyRequestsException ex,
+      final HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
@@ -333,8 +332,8 @@ public class ProtocolErrorAdvice {
 
   @ExceptionHandler(ItemAlreadyExistException.class)
   @Nullable ResponseEntity<Object> handleItemAlreadyExist(
-      final @NonNull ItemAlreadyExistException ex,
-      final @NonNull HttpServletRequest request,
+      final ItemAlreadyExistException ex,
+      final HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
@@ -379,8 +378,8 @@ public class ProtocolErrorAdvice {
    */
   @ExceptionHandler(DataIntegrityViolationException.class)
   @Nullable ResponseEntity<Object> handleDataIntegrityViolation(
-      final @NonNull DataIntegrityViolationException ex,
-      final @NonNull HttpServletRequest request,
+      final DataIntegrityViolationException ex,
+      final HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
@@ -441,8 +440,8 @@ public class ProtocolErrorAdvice {
    */
   @ExceptionHandler({OptimisticLockingFailureException.class, OptimisticLockException.class})
   @Nullable ResponseEntity<Object> handleOptimisticLockFailure(
-      final @NonNull Exception ex,
-      final @NonNull HttpServletRequest request,
+      final Exception ex,
+      final HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
@@ -494,8 +493,8 @@ public class ProtocolErrorAdvice {
     LockTimeoutException.class
   })
   @Nullable ResponseEntity<Object> handleLockUnavailable(
-      final @NonNull Exception ex,
-      final @NonNull HttpServletRequest request,
+      final Exception ex,
+      final HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
@@ -526,8 +525,8 @@ public class ProtocolErrorAdvice {
    */
   @ExceptionHandler(StorageUnavailableException.class)
   @Nullable ResponseEntity<Object> handleStorageUnavailable(
-      final @NonNull StorageUnavailableException ex,
-      final @NonNull HttpServletRequest request,
+      final StorageUnavailableException ex,
+      final HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
@@ -552,8 +551,8 @@ public class ProtocolErrorAdvice {
 
   @ExceptionHandler(RetryableException.class)
   @Nullable ResponseEntity<Object> handleRetryable(
-      final @NonNull RetryableException ex,
-      final @NonNull HttpServletRequest request,
+      final RetryableException ex,
+      final HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
@@ -580,8 +579,8 @@ public class ProtocolErrorAdvice {
    */
   @ExceptionHandler(Throwable.class)
   @Nullable ResponseEntity<Object> handleUnexpectedException(
-      final @NonNull Throwable ex,
-      final @NonNull HttpServletRequest request,
+      final Throwable ex,
+      final HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
 
     return this.errors.fallback(ex, request, response);

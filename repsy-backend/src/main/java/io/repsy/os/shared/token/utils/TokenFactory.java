@@ -18,22 +18,21 @@ package io.repsy.os.shared.token.utils;
 import io.repsy.os.shared.token.dtos.TokenType;
 import io.repsy.protocols.shared.token.TokenGenerator;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NonNull;
 
 @UtilityClass
 public class TokenFactory {
 
-  public static @NonNull String of(final @NonNull TokenType tokenType) {
+  public static String of(final TokenType tokenType) {
 
     return TokenGenerator.generate(tokenType.getPrefix());
   }
 
-  public static @NonNull String deployToken() {
+  public static String deployToken() {
 
     return of(TokenType.REPSY_DEPLOY_TOKEN);
   }
 
-  public static @NonNull String personalAccessToken() {
+  public static String personalAccessToken() {
 
     return of(TokenType.REPSY_USER_TOKEN);
   }

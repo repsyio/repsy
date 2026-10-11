@@ -20,14 +20,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 @Slf4j
-@NullMarked
 @Component
 @RequiredArgsConstructor
 public class SslConfigurationValidator implements ApplicationRunner {

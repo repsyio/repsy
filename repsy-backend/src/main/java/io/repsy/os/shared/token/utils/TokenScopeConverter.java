@@ -21,7 +21,6 @@ import jakarta.persistence.Converter;
 import java.util.EnumSet;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -40,10 +39,10 @@ import org.jspecify.annotations.Nullable;
 @Converter
 public class TokenScopeConverter implements AttributeConverter<EnumSet<TokenScope>, String> {
 
-  private static final @NonNull String SEPARATOR = ",";
+  private static final String SEPARATOR = ",";
 
   @Override
-  public @NonNull String convertToDatabaseColumn(final @Nullable EnumSet<TokenScope> scopes) {
+  public String convertToDatabaseColumn(final @Nullable EnumSet<TokenScope> scopes) {
     if (scopes == null) {
       return "";
     }
@@ -52,7 +51,7 @@ public class TokenScopeConverter implements AttributeConverter<EnumSet<TokenScop
   }
 
   @Override
-  public @NonNull EnumSet<TokenScope> convertToEntityAttribute(final @Nullable String column) {
+  public EnumSet<TokenScope> convertToEntityAttribute(final @Nullable String column) {
     final var scopes = EnumSet.noneOf(TokenScope.class);
 
     if (column == null || column.isBlank()) {

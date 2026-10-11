@@ -22,7 +22,6 @@ import io.repsy.os.shared.user.dtos.UserInfo;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Component;
 
 /** Issues the access and refresh token of a panel session. */
@@ -30,23 +29,20 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class LoginInfoFactory {
 
-  private final @NonNull JwtUtils jwtUtils;
-  private final @NonNull RefreshTokenService refreshTokenService;
+  private final JwtUtils jwtUtils;
+  private final RefreshTokenService refreshTokenService;
 
   /**
    * Issues a token pair for {@code user}. Neither token outlives {@link AuthUtils#TIMEOUT_SESSION}
    * after {@code sessionStart}, so refreshing cannot extend a session past that point.
    */
-  public @NonNull LoginInfo create(
-      final @NonNull UserInfo user, final @NonNull Instant sessionStart) {
+  public LoginInfo create(final UserInfo user, final Instant sessionStart) {
     return this.create(user, sessionStart, UUID.randomUUID());
   }
 
   /** Issues a token pair in an existing refresh-token family. */
-  public @NonNull LoginInfo create(
-      final @NonNull UserInfo user,
-      final @NonNull Instant sessionStart,
-      final @NonNull UUID refreshTokenFamilyId) {
+  public LoginInfo create(
+      final UserInfo user, final Instant sessionStart, final UUID refreshTokenFamilyId) {
 
     final var accessToken =
         this.jwtUtils.createSessionAccessToken(

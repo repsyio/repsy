@@ -21,7 +21,6 @@ import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -35,11 +34,11 @@ import org.springframework.stereotype.Repository;
 public interface RepoRepository extends JpaRepository<Repo, UUID> {
 
   @Override
-  @NonNull Optional<Repo> findById(@NonNull UUID repoId);
+  Optional<Repo> findById(UUID repoId);
 
-  boolean existsByName(@NonNull String name);
+  boolean existsByName(String name);
 
-  @NonNull List<Repo> findAllByTypeOrderByCreatedAtDescNameAsc(@NonNull RepoType type);
+  List<Repo> findAllByTypeOrderByCreatedAtDescNameAsc(RepoType type);
 
   @Modifying
   @Query(
@@ -47,7 +46,7 @@ public interface RepoRepository extends JpaRepository<Repo, UUID> {
       update Repo r
       set r.diskUsage = r.diskUsage + :diskUsageDiff
       where r.id = :repoId""")
-  int updateDiskUsage(@NonNull UUID repoId, long diskUsageDiff);
+  int updateDiskUsage(UUID repoId, long diskUsageDiff);
 
   /**
    * Adds the diff in one statement, unless that would take the usage below zero (RPS-2113).
@@ -64,7 +63,7 @@ public interface RepoRepository extends JpaRepository<Repo, UUID> {
       update Repo r
       set r.diskUsage = r.diskUsage + :diskUsageDiff
       where r.id = :repoId and r.diskUsage + :diskUsageDiff >= 0""")
-  int addDiskUsageUnlessNegative(@NonNull UUID repoId, long diskUsageDiff);
+  int addDiskUsageUnlessNegative(UUID repoId, long diskUsageDiff);
 
   /**
    * Reads the disk usage and locks the row until the surrounding transaction ends, so a concurrent
@@ -72,26 +71,26 @@ public interface RepoRepository extends JpaRepository<Repo, UUID> {
    */
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("select r.diskUsage from Repo r where r.id = :repoId")
-  @NonNull Optional<Long> findDiskUsageByIdForUpdate(@NonNull UUID repoId);
+  Optional<Long> findDiskUsageByIdForUpdate(UUID repoId);
 
   /**
    * The committed value of the repo's {@code pgpVerifyAllSignaturesEnabled}, empty if it is gone.
    */
   @Query("select r.pgpVerifyAllSignaturesEnabled from Repo r where r.id = :repoId")
-  @NonNull Optional<Boolean> findPgpVerifyAllSignaturesEnabledById(@NonNull UUID repoId);
+  Optional<Boolean> findPgpVerifyAllSignaturesEnabledById(UUID repoId);
 
-  @NonNull Optional<Repo> findByNameAndType(@NonNull String name, @NonNull RepoType type);
+  Optional<Repo> findByNameAndType(String name, RepoType type);
 
-  Optional<Repo> findByName(@NonNull String name);
+  Optional<Repo> findByName(String name);
 
   /** The sum is {@code null} when there is no repo, so the type is {@code @Nullable} (RPS-2077). */
   @Query("select sum(r.diskUsage) from Repo r")
   @Nullable Long getTotalDiskUsage();
 
   @Query("select r.name from Repo r")
-  @NonNull List<String> findAllRepoNames();
+  List<String> findAllRepoNames();
 
-  long countAllByType(@NonNull RepoType type);
+  long countAllByType(RepoType type);
 
   /**
    * The repos whose name matches {@code pattern}, a lower-cased {@code LIKE} pattern that escapes
@@ -104,10 +103,9 @@ public interface RepoRepository extends JpaRepository<Repo, UUID> {
       where (:type is null or r.type = :type)
         and lower(r.name) like :pattern escape '\\'
       """)
-  @NonNull Page<Repo> search(
-      @Nullable RepoType type, @NonNull String pattern, @NonNull Pageable pageable);
+  Page<Repo> search(@Nullable RepoType type, String pattern, Pageable pageable);
 
   /** The number of repos of each type, as {@code [RepoType, Long]} rows. */
   @Query("select r.type, count(r) from Repo r group by r.type")
-  @NonNull List<Object[]> countGroupedByType();
+  List<Object[]> countGroupedByType();
 }

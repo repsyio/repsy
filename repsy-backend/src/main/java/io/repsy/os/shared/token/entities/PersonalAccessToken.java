@@ -35,6 +35,7 @@ import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A personal access token: a long-lived credential of a user, for CI and the Repsy CLI. Unlike a
@@ -77,7 +78,7 @@ public class PersonalAccessToken {
   private Instant expirationDate;
 
   @Column(name = "last_used_at")
-  private Instant lastUsedAt;
+  private @Nullable Instant lastUsedAt;
 
   @CreationTimestamp
   @Column(name = "created_at", nullable = false)

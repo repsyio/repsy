@@ -24,7 +24,6 @@ import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.shared.auth.PasswordHasher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -50,13 +49,13 @@ public class AdminUserInitializer implements ApplicationRunner {
   @Value("${admin.initial-password:}")
   private String adminInitialPassword;
 
-  private final @NonNull UserTxService userTxService;
-  private final @NonNull UserRepository userRepository;
-  private final @NonNull ApplicationEventPublisher eventPublisher;
+  private final UserTxService userTxService;
+  private final UserRepository userRepository;
+  private final ApplicationEventPublisher eventPublisher;
 
   @Override
   @Transactional
-  public void run(final @NonNull ApplicationArguments args) {
+  public void run(final ApplicationArguments args) {
     final var adminUsers = this.userRepository.findAllByRole(UserRole.ADMIN);
 
     if (adminUsers.isEmpty()) {
@@ -73,11 +72,11 @@ public class AdminUserInitializer implements ApplicationRunner {
         .forEach(this::resetAdminPassword);
   }
 
-  private static boolean isPasswordReset(final @NonNull User adminUser) {
+  private static boolean isPasswordReset(final User adminUser) {
     return adminUser.getHash() == null || adminUser.getHash().isEmpty();
   }
 
-  private void resetAdminPassword(final @NonNull User adminUser) {
+  private void resetAdminPassword(final User adminUser) {
     log.debug("Admin user {} has an empty password hash, resetting...", adminUser.getUsername());
 
     final var newPassword = PasswordGeneratorUtils.generatePassword();

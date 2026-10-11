@@ -21,7 +21,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.util.Collections;
 import java.util.List;
 import java.util.regex.Pattern;
-import org.jspecify.annotations.NonNull;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.InvalidMediaTypeException;
@@ -59,7 +58,7 @@ public class SpaController {
    * The extensions of the files the panel build and its assets directory emit (scripts, styles,
    * source maps, fonts, images, text and manifest files).
    */
-  private static final @NonNull Pattern ASSET_EXTENSION =
+  private static final Pattern ASSET_EXTENSION =
       Pattern.compile(
           "\\.(?:js|mjs|cjs|css|map|json|txt|xml|webmanifest|woff2?|ttf|otf|eot|svg|png|jpe?g|gif"
               + "|webp|avif|ico|wasm)$",
@@ -71,9 +70,8 @@ public class SpaController {
         "/{path:^(?!api|assets|favicon\\.ico)[^\\.]*$}",
         "/{path:^(?!api|assets|favicon\\.ico)[^\\.]*$}/**"
       })
-  public @NonNull String forward(
-      @PathVariable(required = false) final @NonNull String path,
-      final @NonNull HttpServletRequest request)
+  public String forward(
+      @PathVariable(required = false) final String path, final HttpServletRequest request)
       throws NoResourceFoundException {
 
     final var pathWithinApplication =
@@ -88,7 +86,7 @@ public class SpaController {
     return "forward:/index.html";
   }
 
-  private static @NonNull String lastSegment(final @NonNull PathContainer path) {
+  private static String lastSegment(final PathContainer path) {
 
     final List<PathContainer.Element> elements = path.elements();
 
@@ -102,7 +100,7 @@ public class SpaController {
   }
 
   /** True when the client asked for a page: {@code Accept} names {@code text/html} explicitly. */
-  private static boolean isNavigation(final @NonNull HttpServletRequest request) {
+  private static boolean isNavigation(final HttpServletRequest request) {
 
     try {
       return MediaType.parseMediaTypes(Collections.list(request.getHeaders(HttpHeaders.ACCEPT)))

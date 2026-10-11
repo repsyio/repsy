@@ -17,7 +17,6 @@ package io.repsy.os.shared.token.utils;
 
 import lombok.experimental.UtilityClass;
 import org.apache.commons.codec.digest.DigestUtils;
-import org.jspecify.annotations.NonNull;
 
 /**
  * The hash a token is stored and looked up by: SHA-256 of the whole token, as lower-case hex (64
@@ -32,7 +31,7 @@ import org.jspecify.annotations.NonNull;
 @UtilityClass
 public class TokenHash {
 
-  public static @NonNull String hash(final @NonNull String token) {
+  public static String hash(final String token) {
     return DigestUtils.sha256Hex(token);
   }
 }

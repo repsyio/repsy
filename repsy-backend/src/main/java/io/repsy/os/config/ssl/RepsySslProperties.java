@@ -15,15 +15,12 @@
  */
 package io.repsy.os.config.ssl;
 
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-@NullMarked
 @ConfigurationProperties(prefix = "repsy.ssl")
 public record RepsySslProperties(PortSslProperties api, PortSslProperties repo) {
 
-  @NullMarked
   public record PortSslProperties(
       boolean enabled,
       int port,

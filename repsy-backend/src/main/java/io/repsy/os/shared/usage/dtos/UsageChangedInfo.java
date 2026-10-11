@@ -17,6 +17,5 @@ package io.repsy.os.shared.usage.dtos;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import java.util.UUID;
-import org.jspecify.annotations.NonNull;
 
-public record UsageChangedInfo(@NonNull UUID repoId, @NonNull BaseUsages usages) {}
+public record UsageChangedInfo(UUID repoId, BaseUsages usages) {}
