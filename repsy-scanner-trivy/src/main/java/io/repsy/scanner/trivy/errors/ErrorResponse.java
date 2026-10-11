@@ -15,6 +15,6 @@
  */
 package io.repsy.scanner.trivy.errors;
 
-import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
-public record ErrorResponse(@NonNull String message) {}
+public record ErrorResponse(@Nullable String message) {}

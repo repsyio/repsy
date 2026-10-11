@@ -16,7 +16,6 @@
 package io.repsy.scanner.trivy.config;
 
 import java.util.regex.Pattern;
-import org.jspecify.annotations.NonNull;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
@@ -31,7 +30,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param apiKey the key a client must send
  */
 @ConfigurationProperties(prefix = "scanner.security")
-public record ScannerSecurityProperties(@NonNull String apiKey) {
+public record ScannerSecurityProperties(String apiKey) {
 
   private static final Pattern PLACEHOLDER = Pattern.compile("\\$\\{.*}", Pattern.DOTALL);
 

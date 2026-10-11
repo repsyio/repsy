@@ -22,7 +22,6 @@ import io.repsy.scanner.trivy.errors.ScanJobNotFoundException;
 import io.repsy.scanner.trivy.services.TrivyScanService;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.MediaType;
 import org.springframework.validation.annotation.Validated;
@@ -38,10 +37,10 @@ import org.springframework.web.multipart.MultipartFile;
 @RequiredArgsConstructor
 public class ScanController {
 
-  private final @NonNull TrivyScanService trivyScanService;
+  private final TrivyScanService trivyScanService;
 
   @PostMapping(path = "/scan", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-  public @NonNull ScanSubmissionResponse scan(
+  public ScanSubmissionResponse scan(
       @RequestParam("scanId") final @NotBlank String scanId,
       @RequestParam(value = "file", required = false) final @Nullable MultipartFile file,
       @RequestParam("repoType") final @NotBlank String repoType,
@@ -77,7 +76,7 @@ public class ScanController {
   }
 
   @GetMapping("/scan/{scanId}")
-  public @NonNull ScanJobStatusResponse getStatus(@PathVariable final @NonNull String scanId) {
+  public ScanJobStatusResponse getStatus(@PathVariable final String scanId) {
     return this.trivyScanService
         .findStatus(scanId)
         .map(ScanJobStatusResponse::from)

@@ -16,7 +16,6 @@
 package io.repsy.scanner.trivy.services;
 
 import java.util.List;
-import org.jspecify.annotations.NonNull;
 
 /** Runs one trivy command line and returns its standard output. Tests replace it by a fake. */
 public interface TrivyCommandRunner {
@@ -27,5 +26,5 @@ public interface TrivyCommandRunner {
    * @throws io.repsy.scanner.trivy.errors.TrivyScanException when the command cannot be started or
    *     exits with a non-zero code
    */
-  @NonNull String run(@NonNull List<String> command, long timeoutSeconds);
+  String run(List<String> command, long timeoutSeconds);
 }

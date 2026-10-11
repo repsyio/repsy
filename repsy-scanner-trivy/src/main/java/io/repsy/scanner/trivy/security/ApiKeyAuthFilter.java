@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -38,13 +37,13 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
   private static final String ACTUATOR_HEALTH_PATH = "/actuator/health";
   private static final String ACTUATOR_HEALTH_PATH_PREFIX = "/actuator/health/";
 
-  private final @NonNull ScannerSecurityProperties properties;
+  private final ScannerSecurityProperties properties;
 
   @Override
   protected void doFilterInternal(
-      final @NonNull HttpServletRequest request,
-      final @NonNull HttpServletResponse response,
-      final @NonNull FilterChain filterChain)
+      final HttpServletRequest request,
+      final HttpServletResponse response,
+      final FilterChain filterChain)
       throws ServletException, IOException {
 
     if (isUnauthenticatedPath(request.getServletPath())) {
@@ -62,13 +61,13 @@ public class ApiKeyAuthFilter extends OncePerRequestFilter {
     filterChain.doFilter(request, response);
   }
 
-  private static boolean isUnauthenticatedPath(final @NonNull String servletPath) {
+  private static boolean isUnauthenticatedPath(final String servletPath) {
     return HEALTH_PATH.equals(servletPath)
         || ACTUATOR_HEALTH_PATH.equals(servletPath)
         || servletPath.startsWith(ACTUATOR_HEALTH_PATH_PREFIX);
   }
 
-  private boolean isAuthorized(final @NonNull HttpServletRequest request) {
+  private boolean isAuthorized(final HttpServletRequest request) {
     final var providedKey = request.getHeader(API_KEY_HEADER);
 
     if (providedKey == null) {

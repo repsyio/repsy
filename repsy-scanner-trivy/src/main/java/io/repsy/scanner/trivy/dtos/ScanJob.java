@@ -18,31 +18,30 @@ package io.repsy.scanner.trivy.dtos;
 import io.repsy.libs.scanner.dtos.ScanOutcome;
 import io.repsy.libs.scanner.trivy.ScanJobStatus;
 import java.time.Instant;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 public record ScanJob(
-    @NonNull String scanId,
-    @NonNull ScanJobStatus status,
+    String scanId,
+    ScanJobStatus status,
     @Nullable ScanOutcome result,
     @Nullable String errorMessage,
-    @NonNull Instant enqueuedAt,
+    Instant enqueuedAt,
     @Nullable Instant terminalAt) {
 
-  public static @NonNull ScanJob queued(final @NonNull String scanId) {
+  public static ScanJob queued(final String scanId) {
     return new ScanJob(scanId, ScanJobStatus.QUEUED, null, null, Instant.now(), null);
   }
 
-  public @NonNull ScanJob toRunning() {
+  public ScanJob toRunning() {
     return new ScanJob(this.scanId, ScanJobStatus.RUNNING, null, null, this.enqueuedAt, null);
   }
 
-  public @NonNull ScanJob toCompleted(final @NonNull ScanOutcome outcome) {
+  public ScanJob toCompleted(final ScanOutcome outcome) {
     return new ScanJob(
         this.scanId, ScanJobStatus.COMPLETED, outcome, null, this.enqueuedAt, Instant.now());
   }
 
-  public @NonNull ScanJob toFailed(final @NonNull String message) {
+  public ScanJob toFailed(final String message) {
     return new ScanJob(
         this.scanId, ScanJobStatus.FAILED, null, message, this.enqueuedAt, Instant.now());
   }

@@ -20,7 +20,6 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -29,8 +28,8 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class JobStoreCleanupTask {
 
-  private final @NonNull JobStore jobStore;
-  private final @NonNull ScannerJobProperties properties;
+  private final JobStore jobStore;
+  private final ScannerJobProperties properties;
 
   @Scheduled(fixedDelayString = "${scanner.job-retention-check-interval-ms:600000}")
   public void purgeExpiredJobs() {

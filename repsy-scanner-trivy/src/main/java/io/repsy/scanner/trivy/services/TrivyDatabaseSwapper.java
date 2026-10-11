@@ -23,7 +23,6 @@ import java.nio.file.StandardCopyOption;
 import java.util.Comparator;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
 
 /** Moves freshly downloaded Trivy databases from a staging cache directory into the live one. */
 @Slf4j
@@ -38,7 +37,7 @@ final class TrivyDatabaseSwapper {
   private TrivyDatabaseSwapper() {}
 
   /** An empty {@code staging} directory (what an earlier, interrupted refresh left is removed). */
-  static void recreate(final @NonNull Path staging) throws IOException {
+  static void recreate(final Path staging) throws IOException {
     deleteRecursively(staging);
     Files.createDirectories(staging);
   }
@@ -49,7 +48,7 @@ final class TrivyDatabaseSwapper {
    * Nothing is touched unless both databases are complete, so an unfinished download changes
    * nothing. The caller holds {@link TrivyDatabaseAccess#enterRefresh()}.
    */
-  static void swap(final @NonNull Path staging, final @NonNull Path live) throws IOException {
+  static void swap(final Path staging, final Path live) throws IOException {
     for (final var database : DATABASES) {
       final var dir = staging.resolve(database[0]);
 
@@ -72,7 +71,7 @@ final class TrivyDatabaseSwapper {
     }
   }
 
-  static void deleteRecursivelyQuietly(final @NonNull Path directory) {
+  static void deleteRecursivelyQuietly(final Path directory) {
     try {
       deleteRecursively(directory);
     } catch (final IOException exception) {
@@ -80,7 +79,7 @@ final class TrivyDatabaseSwapper {
     }
   }
 
-  private static void deleteRecursively(final @NonNull Path directory) throws IOException {
+  private static void deleteRecursively(final Path directory) throws IOException {
     if (!Files.exists(directory)) {
       return;
     }

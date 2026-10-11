@@ -26,7 +26,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 final class TrivyFindingMapper {
@@ -35,7 +34,7 @@ final class TrivyFindingMapper {
 
   private TrivyFindingMapper() {}
 
-  static @NonNull List<ScannerFinding> toFindings(final @Nullable List<TrivyResult> results) {
+  static List<ScannerFinding> toFindings(final @Nullable List<TrivyResult> results) {
     if (results == null) {
       return List.of();
     }
@@ -48,8 +47,7 @@ final class TrivyFindingMapper {
         .toList();
   }
 
-  private static @NonNull ScannerFinding toFinding(
-      final @NonNull TrivyVulnerability vulnerability) {
+  private static ScannerFinding toFinding(final TrivyVulnerability vulnerability) {
     final var cvss = selectCvss(vulnerability.cvss());
 
     return new ScannerFinding(
@@ -65,7 +63,7 @@ final class TrivyFindingMapper {
         cvss.map(SelectedCvss::vector).orElse(null));
   }
 
-  private static @NonNull Severity toSeverity(final @Nullable String severity) {
+  private static Severity toSeverity(final @Nullable String severity) {
     if (severity == null) {
       return Severity.UNKNOWN;
     }
@@ -77,7 +75,7 @@ final class TrivyFindingMapper {
     }
   }
 
-  private static @NonNull FixStatus toFixStatus(final @Nullable String status) {
+  private static FixStatus toFixStatus(final @Nullable String status) {
     if (status == null) {
       return FixStatus.UNKNOWN;
     }
@@ -89,8 +87,7 @@ final class TrivyFindingMapper {
     }
   }
 
-  private static @NonNull Optional<SelectedCvss> selectCvss(
-      final @Nullable Map<String, TrivyCvss> cvssMap) {
+  private static Optional<SelectedCvss> selectCvss(final @Nullable Map<String, TrivyCvss> cvssMap) {
 
     if (cvssMap == null || cvssMap.isEmpty()) {
       return Optional.empty();
@@ -106,7 +103,7 @@ final class TrivyFindingMapper {
     return cvssMap.values().stream().findFirst().map(TrivyFindingMapper::pickScore);
   }
 
-  private static @NonNull SelectedCvss pickScore(final @NonNull TrivyCvss cvss) {
+  private static SelectedCvss pickScore(final TrivyCvss cvss) {
     if (cvss.v3Score() != null) {
       return new SelectedCvss(cvss.v3Score(), cvss.v3Vector());
     }

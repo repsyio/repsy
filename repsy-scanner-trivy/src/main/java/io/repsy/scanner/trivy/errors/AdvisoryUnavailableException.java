@@ -15,12 +15,10 @@
  */
 package io.repsy.scanner.trivy.errors;
 
-import org.jspecify.annotations.NonNull;
-
 // The lookup cannot be served now (busy, no database yet, or the database is in use): 503.
 public final class AdvisoryUnavailableException extends RuntimeException {
 
-  public AdvisoryUnavailableException(final @NonNull String message) {
+  public AdvisoryUnavailableException(final String message) {
     super(message);
   }
 }

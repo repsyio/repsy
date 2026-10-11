@@ -20,7 +20,6 @@ import io.repsy.scanner.trivy.dtos.trivy.TrivyDbMetadata;
 import io.repsy.scanner.trivy.services.TrivyDatabaseMetadata;
 import io.repsy.scanner.trivy.services.TrivyScanService;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -30,11 +29,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class StatusController {
 
-  private final @NonNull TrivyScanService trivyScanService;
-  private final @NonNull TrivyDatabaseMetadata databaseMetadata;
+  private final TrivyScanService trivyScanService;
+  private final TrivyDatabaseMetadata databaseMetadata;
 
   @GetMapping("/status")
-  public @NonNull ScannerStatus status() {
+  public ScannerStatus status() {
     final var vulnerabilityDb = this.databaseMetadata.vulnerabilityDb();
     final var javaDb = this.databaseMetadata.javaDb();
 

@@ -17,16 +17,15 @@ package io.repsy.scanner.trivy.dtos;
 
 import io.repsy.libs.scanner.dtos.ScanOutcome;
 import io.repsy.libs.scanner.trivy.ScanJobStatus;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 public record ScanJobStatusResponse(
-    @NonNull String scanId,
-    @NonNull ScanJobStatus status,
+    String scanId,
+    ScanJobStatus status,
     @Nullable ScanOutcome result,
     @Nullable String errorMessage) {
 
-  public static @NonNull ScanJobStatusResponse from(final @NonNull ScanJob job) {
+  public static ScanJobStatusResponse from(final ScanJob job) {
     return new ScanJobStatusResponse(job.scanId(), job.status(), job.result(), job.errorMessage());
   }
 }

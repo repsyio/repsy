@@ -23,18 +23,17 @@ import java.util.Locale;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
 
 @Slf4j
 final class WheelExtractor {
 
   private WheelExtractor() {}
 
-  static boolean isWheel(final @NonNull String fileName) {
+  static boolean isWheel(final String fileName) {
     return fileName.toLowerCase(Locale.ROOT).endsWith(".whl");
   }
 
-  static @NonNull Path extract(final @NonNull Path archivePath) throws IOException {
+  static Path extract(final Path archivePath) throws IOException {
     final var extractDir = Files.createTempDirectory("scan-extracted-");
 
     try (final var fileIn = Files.newInputStream(archivePath);
@@ -50,10 +49,7 @@ final class WheelExtractor {
   }
 
   private static void extractEntry(
-      final @NonNull Path extractDir,
-      final @NonNull ZipEntry entry,
-      final @NonNull ZipInputStream zipIn)
-      throws IOException {
+      final Path extractDir, final ZipEntry entry, final ZipInputStream zipIn) throws IOException {
 
     final var target = extractDir.resolve(entry.getName()).normalize();
 

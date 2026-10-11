@@ -20,7 +20,6 @@ import java.time.Duration;
 import java.util.Optional;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
-import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Component;
 
 /**
@@ -66,7 +65,7 @@ public class TrivyDatabaseAccess {
   }
 
   /** Waits for the database (lookups, a refresh) and returns the permit of a scan. */
-  public @NonNull Permit enterScan() {
+  public Permit enterScan() {
     this.lock.lock();
     try {
       this.waitingScans++;
@@ -91,7 +90,7 @@ public class TrivyDatabaseAccess {
   }
 
   /** Waits for everything else to finish and returns the permit of a refresh. */
-  public @NonNull Permit enterRefresh() {
+  public Permit enterRefresh() {
     this.lock.lock();
     try {
       this.waitingRefreshes++;
@@ -116,7 +115,7 @@ public class TrivyDatabaseAccess {
   }
 
   /** The permit of a lookup, or empty when a scan or a refresh keeps the database for too long. */
-  public @NonNull Optional<Permit> tryEnterLookup(final @NonNull Duration maxWait) {
+  public Optional<Permit> tryEnterLookup(final Duration maxWait) {
     var remainingNanos = maxWait.toNanos();
 
     this.lock.lock();
@@ -155,7 +154,7 @@ public class TrivyDatabaseAccess {
         || this.waitingRefreshes > 0;
   }
 
-  private @NonNull Permit permit(final @NonNull Runnable release) {
+  private Permit permit(final Runnable release) {
     return new Permit() {
       private boolean closed;
 

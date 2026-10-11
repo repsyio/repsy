@@ -34,7 +34,6 @@ import java.util.function.UnaryOperator;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
@@ -70,24 +69,24 @@ public class TrivyScanService {
           "unexpected status code",
           "failed to fetch the layer");
 
-  private final @NonNull TrivyScannerProperties properties;
-  private final @NonNull ObjectMapper objectMapper;
-  private final @NonNull JobStore jobStore;
-  private final @NonNull TrivyCommandRunner runner;
-  private final @NonNull TrivyDatabaseAccess databaseAccess;
+  private final TrivyScannerProperties properties;
+  private final ObjectMapper objectMapper;
+  private final JobStore jobStore;
+  private final TrivyCommandRunner runner;
+  private final TrivyDatabaseAccess databaseAccess;
 
   @Qualifier("scanWorkerExecutor")
-  private final @NonNull Executor scanWorkerExecutor;
+  private final Executor scanWorkerExecutor;
 
   // The version of the Trivy binary, read once (a failed read is not cached, so it is retried).
   private volatile @Nullable String trivyVersion;
 
   public void submitScan(
-      final @NonNull String scanId,
-      final @NonNull MultipartFile file,
-      final @NonNull String repoType,
-      final @NonNull String artifactName,
-      final @NonNull String artifactVersion) {
+      final String scanId,
+      final MultipartFile file,
+      final String repoType,
+      final String artifactName,
+      final String artifactVersion) {
 
     log.info(
         "Queuing scan {} for {}@{} (repoType={}, file={})",
@@ -110,13 +109,13 @@ public class TrivyScanService {
   }
 
   public void submitDockerScan(
-      final @NonNull String scanId,
-      final @NonNull String imageReference,
+      final String scanId,
+      final String imageReference,
       final @Nullable String registryAuthToken,
       final boolean registryInsecure,
-      final @NonNull String repoType,
-      final @NonNull String artifactName,
-      final @NonNull String artifactVersion) {
+      final String repoType,
+      final String artifactName,
+      final String artifactVersion) {
 
     log.info(
         "Queuing docker scan {} for image {} ({}@{}, repoType={}, insecure={})",
@@ -138,7 +137,7 @@ public class TrivyScanService {
         () -> this.runDockerScan(scanId, imageReference, registryAuthToken, registryInsecure));
   }
 
-  public @NonNull Optional<ScanJob> findStatus(final @NonNull String scanId) {
+  public Optional<ScanJob> findStatus(final String scanId) {
     return this.jobStore.get(scanId);
   }
 
@@ -175,14 +174,12 @@ public class TrivyScanService {
     }
   }
 
-  private @NonNull String cacheDir() {
+  private String cacheDir() {
     return this.properties.cacheDir();
   }
 
   private void enqueue(
-      final @NonNull String scanId,
-      final @Nullable Path artifactPath,
-      final @NonNull Runnable task) {
+      final String scanId, final @Nullable Path artifactPath, final Runnable task) {
 
     try {
       this.scanWorkerExecutor.execute(task);
@@ -197,9 +194,7 @@ public class TrivyScanService {
   }
 
   private void runFileScan(
-      final @NonNull String scanId,
-      final @NonNull Path artifactPath,
-      final @Nullable String fileName) {
+      final String scanId, final Path artifactPath, final @Nullable String fileName) {
 
     this.updateStatus(scanId, ScanJob::toRunning);
 
@@ -224,8 +219,8 @@ public class TrivyScanService {
   }
 
   private void runDockerScan(
-      final @NonNull String scanId,
-      final @NonNull String imageReference,
+      final String scanId,
+      final String imageReference,
       final @Nullable String registryAuthToken,
       final boolean registryInsecure) {
 
@@ -243,7 +238,7 @@ public class TrivyScanService {
     }
   }
 
-  private @NonNull ScanOutcome runAndParse(final @NonNull List<String> command) {
+  private ScanOutcome runAndParse(final List<String> command) {
     final String stdout;
 
     try (var ignored = this.databaseAccess.enterScan()) {
@@ -258,7 +253,7 @@ public class TrivyScanService {
 
   // Trivy 0.66's JSON report has no "Trivy" key, so the version comes from the binary itself; a
   // report that does carry one (an older or newer Trivy) wins.
-  private @Nullable String resolveScannerVersion(final @NonNull TrivyReport report) {
+  private @Nullable String resolveScannerVersion(final TrivyReport report) {
     if (report.trivy() != null && StringUtils.isNotBlank(report.trivy().version())) {
       return report.trivy().version();
     }
@@ -289,14 +284,13 @@ public class TrivyScanService {
     return this.trivyVersion;
   }
 
-  private void updateStatus(
-      final @NonNull String scanId, final @NonNull UnaryOperator<ScanJob> transition) {
+  private void updateStatus(final String scanId, final UnaryOperator<ScanJob> transition) {
 
     this.jobStore.get(scanId).ifPresent(job -> this.jobStore.update(scanId, transition.apply(job)));
   }
 
   private @Nullable Path extractIfArchive(
-      final @NonNull Path artifactPath, final @Nullable String fileName) {
+      final Path artifactPath, final @Nullable String fileName) {
 
     if (fileName == null) {
       return null;
@@ -313,7 +307,7 @@ public class TrivyScanService {
     return null;
   }
 
-  private @NonNull Path extractTarGz(final @NonNull Path artifactPath) {
+  private Path extractTarGz(final Path artifactPath) {
     try {
       return TarGzExtractor.extract(artifactPath);
     } catch (final IOException exception) {
@@ -321,7 +315,7 @@ public class TrivyScanService {
     }
   }
 
-  private @NonNull Path extractWheel(final @NonNull Path artifactPath) {
+  private Path extractWheel(final Path artifactPath) {
     try {
       return WheelExtractor.extract(artifactPath);
     } catch (final IOException exception) {
@@ -329,7 +323,7 @@ public class TrivyScanService {
     }
   }
 
-  private @NonNull Path writeToTempFile(final @NonNull MultipartFile file) {
+  private Path writeToTempFile(final MultipartFile file) {
     try {
       final var tempFile = Files.createTempFile("scan-", "." + extractExtension(file));
       file.transferTo(tempFile);
@@ -339,7 +333,7 @@ public class TrivyScanService {
     }
   }
 
-  private @NonNull List<String> buildRootfsCommand(final @NonNull Path artifactPath) {
+  private List<String> buildRootfsCommand(final Path artifactPath) {
     final var command = new ArrayList<String>();
     command.add(this.properties.binaryPath());
     command.add("rootfs");
@@ -354,8 +348,8 @@ public class TrivyScanService {
     return command;
   }
 
-  private @NonNull List<String> buildImageCommand(
-      final @NonNull String imageReference,
+  private List<String> buildImageCommand(
+      final String imageReference,
       final @Nullable String registryAuthToken,
       final boolean registryInsecure) {
 
@@ -384,12 +378,12 @@ public class TrivyScanService {
     return command;
   }
 
-  private @NonNull List<String> buildVersionCommand() {
+  private List<String> buildVersionCommand() {
     return List.of(this.properties.binaryPath(), VERSION_COMMAND, "--format", "json");
   }
 
-  private @NonNull List<String> buildDownloadOnlyCommand(
-      final @NonNull String downloadOnlyFlag, final @NonNull String cacheDir) {
+  private List<String> buildDownloadOnlyCommand(
+      final String downloadOnlyFlag, final String cacheDir) {
     final var command = new ArrayList<String>();
     command.add(this.properties.binaryPath());
     command.add("rootfs");
@@ -402,14 +396,14 @@ public class TrivyScanService {
     return command;
   }
 
-  private void addDbRepositoryFlags(final @NonNull List<String> command) {
+  private void addDbRepositoryFlags(final List<String> command) {
     command.add("--db-repository");
     command.add(this.properties.dbRepository());
     command.add("--java-db-repository");
     command.add(this.properties.javaDbRepository());
   }
 
-  private @NonNull String runTrivy(final @NonNull List<String> command) {
+  private String runTrivy(final List<String> command) {
     for (var attempt = 1; ; attempt++) {
       try {
         return this.runner.run(command, this.properties.timeoutSeconds());
@@ -452,7 +446,7 @@ public class TrivyScanService {
     }
   }
 
-  private @NonNull TrivyReport parseReport(final @NonNull String json) {
+  private TrivyReport parseReport(final String json) {
     try {
       return this.objectMapper.readValue(json, TrivyReport.class);
     } catch (final JacksonException exception) {
@@ -460,7 +454,7 @@ public class TrivyScanService {
     }
   }
 
-  private void deleteQuietly(final @NonNull Path path) {
+  private void deleteQuietly(final Path path) {
     try {
       Files.deleteIfExists(path);
     } catch (final IOException exception) {
@@ -468,7 +462,7 @@ public class TrivyScanService {
     }
   }
 
-  private static @NonNull String extractExtension(final @NonNull MultipartFile file) {
+  private static String extractExtension(final MultipartFile file) {
     final var fileName = file.getOriginalFilename();
 
     if (fileName == null) {
@@ -480,7 +474,7 @@ public class TrivyScanService {
     return dotIndex >= 0 ? fileName.substring(dotIndex + 1) : DEFAULT_EXTENSION;
   }
 
-  private static @NonNull String resolveFailureMessage(final @NonNull Exception exception) {
+  private static String resolveFailureMessage(final Exception exception) {
     final var message =
         exception.getMessage() != null
             ? exception.getMessage()
@@ -489,7 +483,7 @@ public class TrivyScanService {
     return truncateErrorMessage(message);
   }
 
-  private static @NonNull String truncateErrorMessage(final @NonNull String message) {
+  private static String truncateErrorMessage(final String message) {
     if (message.length() <= MAX_ERROR_MESSAGE_LENGTH) {
       return message;
     }

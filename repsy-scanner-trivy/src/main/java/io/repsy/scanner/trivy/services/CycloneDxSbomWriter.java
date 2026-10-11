@@ -24,7 +24,6 @@ import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
@@ -41,10 +40,9 @@ public class CycloneDxSbomWriter {
   private static final HexFormat HEX = HexFormat.of().withUpperCase();
   private static final String UNRESERVED_MARKS = "-._~";
 
-  private final @NonNull ObjectMapper objectMapper;
+  private final ObjectMapper objectMapper;
 
-  public void writeNpm(final @NonNull Path file, final @NonNull List<AdvisoryPackage> packages)
-      throws IOException {
+  public void writeNpm(final Path file, final List<AdvisoryPackage> packages) throws IOException {
 
     try {
       this.objectMapper.writeValue(file.toFile(), buildNpm(packages));
@@ -53,7 +51,7 @@ public class CycloneDxSbomWriter {
     }
   }
 
-  static @NonNull Bom buildNpm(final @NonNull List<AdvisoryPackage> packages) {
+  static Bom buildNpm(final List<AdvisoryPackage> packages) {
     final var components = new ArrayList<BomComponent>(packages.size());
 
     for (var index = 0; index < packages.size(); index++) {
@@ -76,7 +74,7 @@ public class CycloneDxSbomWriter {
    * an unreserved one is percent-encoded (UTF-8), so a "+" of a build tag or a "/" cannot change
    * the meaning of the URL.
    */
-  static @NonNull String npmPurl(final @NonNull String name, final @NonNull String version) {
+  static String npmPurl(final String name, final String version) {
     final var slash = name.indexOf('/');
     final var purl = new StringBuilder("pkg:npm/");
 
@@ -91,7 +89,7 @@ public class CycloneDxSbomWriter {
     return purl.append('@').append(encode(version)).toString();
   }
 
-  private static @NonNull String encode(final @NonNull String value) {
+  private static String encode(final String value) {
     final var encoded = new StringBuilder(value.length());
 
     for (final var octet : value.getBytes(StandardCharsets.UTF_8)) {
@@ -110,16 +108,12 @@ public class CycloneDxSbomWriter {
     return octet >= 0 && (Character.isLetterOrDigit(octet) || UNRESERVED_MARKS.indexOf(octet) >= 0);
   }
 
-  record Bom(
-      @NonNull String bomFormat,
-      @NonNull String specVersion,
-      int version,
-      @NonNull List<BomComponent> components) {}
+  record Bom(String bomFormat, String specVersion, int version, List<BomComponent> components) {}
 
   record BomComponent(
-      @NonNull String type,
-      @JsonProperty("bom-ref") @NonNull String bomRef,
-      @NonNull String name,
-      @NonNull String version,
-      @NonNull String purl) {}
+      String type,
+      @JsonProperty("bom-ref") String bomRef,
+      String name,
+      String version,
+      String purl) {}
 }

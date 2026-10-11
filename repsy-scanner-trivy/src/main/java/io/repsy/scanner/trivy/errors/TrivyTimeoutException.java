@@ -15,11 +15,9 @@
  */
 package io.repsy.scanner.trivy.errors;
 
-import org.jspecify.annotations.NonNull;
-
 public final class TrivyTimeoutException extends TrivyScanException {
 
-  public TrivyTimeoutException(final @NonNull String message) {
+  public TrivyTimeoutException(final String message) {
     super(message);
   }
 }

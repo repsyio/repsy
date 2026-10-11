@@ -17,7 +17,6 @@ package io.repsy.scanner.trivy.config;
 
 import java.util.concurrent.Executor;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
@@ -28,11 +27,11 @@ public class ScanWorkerExecutorConfig {
 
   private static final int QUEUE_CAPACITY = 500;
 
-  private final @NonNull ScannerJobProperties jobProperties;
-  private final @NonNull TrivyScannerProperties trivyProperties;
+  private final ScannerJobProperties jobProperties;
+  private final TrivyScannerProperties trivyProperties;
 
   @Bean("scanWorkerExecutor")
-  public @NonNull Executor scanWorkerExecutor() {
+  public Executor scanWorkerExecutor() {
 
     final var executor = new ThreadPoolTaskExecutor();
     executor.setCorePoolSize(this.jobProperties.workerCount());

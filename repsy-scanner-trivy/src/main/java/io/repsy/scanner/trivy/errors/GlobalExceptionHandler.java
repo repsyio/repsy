@@ -17,7 +17,6 @@ package io.repsy.scanner.trivy.errors;
 
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -30,37 +29,36 @@ import org.springframework.web.multipart.support.MissingServletRequestPartExcept
 public class GlobalExceptionHandler {
 
   @ExceptionHandler(AdvisoryUnavailableException.class)
-  public @NonNull ResponseEntity<ErrorResponse> handleAdvisoryUnavailable(
-      final @NonNull AdvisoryUnavailableException exception) {
+  public ResponseEntity<ErrorResponse> handleAdvisoryUnavailable(
+      final AdvisoryUnavailableException exception) {
     return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
         .body(new ErrorResponse(exception.getMessage()));
   }
 
   @ExceptionHandler(AdvisoryTimeoutException.class)
-  public @NonNull ResponseEntity<ErrorResponse> handleAdvisoryTimeout(
-      final @NonNull AdvisoryTimeoutException exception) {
+  public ResponseEntity<ErrorResponse> handleAdvisoryTimeout(
+      final AdvisoryTimeoutException exception) {
     return ResponseEntity.status(HttpStatus.GATEWAY_TIMEOUT)
         .body(new ErrorResponse(exception.getMessage()));
   }
 
   @ExceptionHandler(AdvisoryTooLargeException.class)
-  public @NonNull ResponseEntity<ErrorResponse> handleAdvisoryTooLarge(
-      final @NonNull AdvisoryTooLargeException exception) {
+  public ResponseEntity<ErrorResponse> handleAdvisoryTooLarge(
+      final AdvisoryTooLargeException exception) {
     return ResponseEntity.status(HttpStatus.CONTENT_TOO_LARGE)
         .body(new ErrorResponse(exception.getMessage()));
   }
 
   @ExceptionHandler(TrivyScanException.class)
-  public @NonNull ResponseEntity<ErrorResponse> handleScanException(
-      final @NonNull TrivyScanException exception) {
+  public ResponseEntity<ErrorResponse> handleScanException(final TrivyScanException exception) {
     log.error("Trivy scan failed", exception);
     return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
         .body(new ErrorResponse(exception.getMessage()));
   }
 
   @ExceptionHandler(ScanJobNotFoundException.class)
-  public @NonNull ResponseEntity<ErrorResponse> handleScanJobNotFound(
-      final @NonNull ScanJobNotFoundException exception) {
+  public ResponseEntity<ErrorResponse> handleScanJobNotFound(
+      final ScanJobNotFoundException exception) {
     return ResponseEntity.status(HttpStatus.NOT_FOUND)
         .body(new ErrorResponse(exception.getMessage()));
   }
@@ -71,8 +69,7 @@ public class GlobalExceptionHandler {
     MissingServletRequestPartException.class,
     MaxUploadSizeExceededException.class
   })
-  public @NonNull ResponseEntity<ErrorResponse> handleBadRequest(
-      final @NonNull Exception exception) {
+  public ResponseEntity<ErrorResponse> handleBadRequest(final Exception exception) {
     return ResponseEntity.badRequest().body(new ErrorResponse(exception.getMessage()));
   }
 }

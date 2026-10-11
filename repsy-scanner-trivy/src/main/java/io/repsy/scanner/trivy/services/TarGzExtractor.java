@@ -25,19 +25,18 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
-import org.jspecify.annotations.NonNull;
 
 @Slf4j
 final class TarGzExtractor {
 
   private TarGzExtractor() {}
 
-  static boolean isTarGz(final @NonNull String fileName) {
+  static boolean isTarGz(final String fileName) {
     final var lower = fileName.toLowerCase(Locale.ROOT);
     return lower.endsWith(".tgz") || lower.endsWith(".tar.gz");
   }
 
-  static @NonNull Path extract(final @NonNull Path archivePath) throws IOException {
+  static Path extract(final Path archivePath) throws IOException {
     final var extractDir = Files.createTempDirectory("scan-extracted-");
 
     try (final var fileIn = Files.newInputStream(archivePath);
@@ -53,7 +52,7 @@ final class TarGzExtractor {
     return extractDir;
   }
 
-  static void deleteRecursivelyQuietly(final @NonNull Path dir) {
+  static void deleteRecursivelyQuietly(final Path dir) {
     try (final var walk = Files.walk(dir)) {
       walk.sorted(Comparator.reverseOrder()).forEach(TarGzExtractor::deleteQuietly);
     } catch (final IOException exception) {
@@ -62,9 +61,7 @@ final class TarGzExtractor {
   }
 
   private static void extractEntry(
-      final @NonNull Path extractDir,
-      final @NonNull TarArchiveEntry entry,
-      final @NonNull TarArchiveInputStream tarIn)
+      final Path extractDir, final TarArchiveEntry entry, final TarArchiveInputStream tarIn)
       throws IOException {
 
     final var target = extractDir.resolve(entry.getName()).normalize();
@@ -88,7 +85,7 @@ final class TarGzExtractor {
     Files.copy(tarIn, target, StandardCopyOption.REPLACE_EXISTING);
   }
 
-  private static void deleteQuietly(final @NonNull Path path) {
+  private static void deleteQuietly(final Path path) {
     try {
       Files.deleteIfExists(path);
     } catch (final IOException exception) {

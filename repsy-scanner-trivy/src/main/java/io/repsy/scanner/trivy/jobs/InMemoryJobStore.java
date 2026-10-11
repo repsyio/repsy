@@ -21,7 +21,6 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -33,26 +32,26 @@ public class InMemoryJobStore implements JobStore {
   private final ConcurrentHashMap<String, ScanJob> jobs = new ConcurrentHashMap<>();
 
   @Override
-  public boolean putIfAbsent(final @NonNull String scanId, final @NonNull ScanJob job) {
+  public boolean putIfAbsent(final String scanId, final ScanJob job) {
     return this.jobs.putIfAbsent(scanId, job) == null;
   }
 
   @Override
-  public @NonNull Optional<ScanJob> get(final @NonNull String scanId) {
+  public Optional<ScanJob> get(final String scanId) {
     return Optional.ofNullable(this.jobs.get(scanId));
   }
 
   @Override
-  public void update(final @NonNull String scanId, final @NonNull ScanJob updated) {
+  public void update(final String scanId, final ScanJob updated) {
     this.jobs.put(scanId, updated);
   }
 
   @Override
-  public void removeCompletedBefore(final @NonNull Instant threshold) {
+  public void removeCompletedBefore(final Instant threshold) {
     this.jobs.entrySet().removeIf(entry -> isExpired(entry.getValue(), threshold));
   }
 
-  private static boolean isExpired(final @NonNull ScanJob job, final @NonNull Instant threshold) {
+  private static boolean isExpired(final ScanJob job, final Instant threshold) {
     return TERMINAL_STATUSES.contains(job.status())
         && job.terminalAt() != null
         && job.terminalAt().isBefore(threshold);

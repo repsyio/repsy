@@ -20,7 +20,6 @@ import io.repsy.scanner.trivy.services.TrivyScanService;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -34,8 +33,8 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class TrivyDatabaseRefreshTask {
 
-  private final @NonNull TrivyScanService trivyScanService;
-  private final @NonNull TrivyDatabaseMetadata databaseMetadata;
+  private final TrivyScanService trivyScanService;
+  private final TrivyDatabaseMetadata databaseMetadata;
 
   // The startup warm-up has just refreshed them, so the first run is one interval away.
   @Scheduled(

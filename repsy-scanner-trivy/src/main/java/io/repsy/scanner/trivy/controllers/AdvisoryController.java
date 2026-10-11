@@ -23,7 +23,6 @@ import io.repsy.scanner.trivy.services.AdvisoryLookupService;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -34,14 +33,13 @@ import tools.jackson.databind.ObjectMapper;
 @RequiredArgsConstructor
 public class AdvisoryController {
 
-  private final @NonNull AdvisoryLookupService advisoryLookupService;
-  private final @NonNull AdvisoryProperties properties;
-  private final @NonNull ObjectMapper objectMapper;
+  private final AdvisoryLookupService advisoryLookupService;
+  private final AdvisoryProperties properties;
+  private final ObjectMapper objectMapper;
 
   // The body is read here, not bound by Spring, so that its size is bounded before it is parsed.
   @PostMapping(path = "/advisories", consumes = MediaType.APPLICATION_JSON_VALUE)
-  public @NonNull AdvisoryLookupResponse lookup(final @NonNull HttpServletRequest request)
-      throws IOException {
+  public AdvisoryLookupResponse lookup(final HttpServletRequest request) throws IOException {
 
     final var limit = this.properties.maxBodyBytes();
 
@@ -70,7 +68,7 @@ public class AdvisoryController {
     return this.advisoryLookupService.lookup(advisoryRequest);
   }
 
-  private @NonNull AdvisoryTooLargeException tooLarge() {
+  private AdvisoryTooLargeException tooLarge() {
     return new AdvisoryTooLargeException(
         "The body must not be larger than " + this.properties.maxBodyBytes() + " bytes");
   }

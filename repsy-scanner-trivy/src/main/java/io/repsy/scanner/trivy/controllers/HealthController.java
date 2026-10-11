@@ -16,7 +16,6 @@
 package io.repsy.scanner.trivy.controllers;
 
 import java.util.Map;
-import org.jspecify.annotations.NonNull;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -24,7 +23,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class HealthController {
 
   @GetMapping("/health")
-  public @NonNull Map<@NonNull String, @NonNull String> health() {
+  public Map<String, String> health() {
     return Map.of("status", "ok");
   }
 }

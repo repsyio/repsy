@@ -15,11 +15,9 @@
  */
 package io.repsy.scanner.trivy.errors;
 
-import org.jspecify.annotations.NonNull;
-
 public final class ScanJobNotFoundException extends RuntimeException {
 
-  public ScanJobNotFoundException(final @NonNull String scanId) {
+  public ScanJobNotFoundException(final String scanId) {
     super("No scan job found for scanId: " + scanId);
   }
 }

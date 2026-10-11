@@ -35,7 +35,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.concurrent.Semaphore;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
@@ -60,27 +60,27 @@ public class AdvisoryLookupService {
           "--skip-db-update cannot be specified on the first run",
           "may be in use by another process");
 
-  private final @NonNull TrivyScannerProperties trivyProperties;
-  private final @NonNull AdvisoryProperties properties;
-  private final @NonNull ObjectMapper objectMapper;
-  private final @NonNull TrivyCommandRunner runner;
-  private final @NonNull TrivyDatabaseAccess access;
-  private final @NonNull TrivyDatabaseMetadata metadata;
-  private final @NonNull CycloneDxSbomWriter sbomWriter;
-  private final @NonNull TrivyScanService scanService;
+  private final TrivyScannerProperties trivyProperties;
+  private final AdvisoryProperties properties;
+  private final ObjectMapper objectMapper;
+  private final TrivyCommandRunner runner;
+  private final TrivyDatabaseAccess access;
+  private final TrivyDatabaseMetadata metadata;
+  private final CycloneDxSbomWriter sbomWriter;
+  private final TrivyScanService scanService;
 
   // Lookups that run or wait for the database at once; the rest are refused.
-  private final @NonNull Semaphore admission;
+  private final Semaphore admission;
 
   public AdvisoryLookupService(
-      final @NonNull TrivyScannerProperties trivyProperties,
-      final @NonNull AdvisoryProperties properties,
-      final @NonNull ObjectMapper objectMapper,
-      final @NonNull TrivyCommandRunner runner,
-      final @NonNull TrivyDatabaseAccess access,
-      final @NonNull TrivyDatabaseMetadata metadata,
-      final @NonNull CycloneDxSbomWriter sbomWriter,
-      final @NonNull TrivyScanService scanService) {
+      final TrivyScannerProperties trivyProperties,
+      final AdvisoryProperties properties,
+      final ObjectMapper objectMapper,
+      final TrivyCommandRunner runner,
+      final TrivyDatabaseAccess access,
+      final TrivyDatabaseMetadata metadata,
+      final CycloneDxSbomWriter sbomWriter,
+      final TrivyScanService scanService) {
 
     this.trivyProperties = trivyProperties;
     this.properties = properties;
@@ -93,7 +93,7 @@ public class AdvisoryLookupService {
     this.admission = new Semaphore(properties.concurrency());
   }
 
-  public @NonNull AdvisoryLookupResponse lookup(final @NonNull AdvisoryLookupRequest request) {
+  public AdvisoryLookupResponse lookup(final AdvisoryLookupRequest request) {
     final var packages = this.validate(request);
 
     if (packages.isEmpty()) {
@@ -114,8 +114,7 @@ public class AdvisoryLookupService {
     }
   }
 
-  private @NonNull AdvisoryLookupResponse lookupUnderAdmission(
-      final @NonNull List<AdvisoryPackage> packages) {
+  private AdvisoryLookupResponse lookupUnderAdmission(final List<AdvisoryPackage> packages) {
 
     final var maxWait = Duration.ofSeconds(this.properties.maxWaitSeconds());
 
@@ -143,7 +142,7 @@ public class AdvisoryLookupService {
     }
   }
 
-  private @NonNull TrivyReport runLookup(final @NonNull List<AdvisoryPackage> packages) {
+  private TrivyReport runLookup(final List<AdvisoryPackage> packages) {
     Path sbom = null;
 
     try {
@@ -174,7 +173,7 @@ public class AdvisoryLookupService {
     }
   }
 
-  private @NonNull List<String> buildCommand(final @NonNull Path sbom) {
+  private List<String> buildCommand(final Path sbom) {
     return List.of(
         this.trivyProperties.binaryPath(),
         "sbom",
@@ -191,7 +190,7 @@ public class AdvisoryLookupService {
 
   // The pairs to look up, without repeats. A malformed request is refused as a whole (400): the
   // caller sends what a registry knows, so a bad pair is a bug over there.
-  private @NonNull List<AdvisoryPackage> validate(final @NonNull AdvisoryLookupRequest request) {
+  private List<AdvisoryPackage> validate(final AdvisoryLookupRequest request) {
     if (!NPM.equals(request.ecosystem())) {
       throw new IllegalArgumentException("ecosystem must be \"" + NPM + "\"");
     }
@@ -252,11 +251,11 @@ public class AdvisoryLookupService {
     return value.chars().anyMatch(Character::isISOControl) ? "(control characters)" : value;
   }
 
-  private static boolean isDatabaseUnusable(final String message) {
+  private static boolean isDatabaseUnusable(final @Nullable String message) {
     return message != null && DATABASE_UNUSABLE_MARKERS.stream().anyMatch(message::contains);
   }
 
-  private static void deleteQuietly(final Path path) {
+  private static void deleteQuietly(final @Nullable Path path) {
     if (path == null) {
       return;
     }

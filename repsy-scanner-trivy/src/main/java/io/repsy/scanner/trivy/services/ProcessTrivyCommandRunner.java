@@ -25,7 +25,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Component;
 
 @Slf4j
@@ -36,7 +35,7 @@ public class ProcessTrivyCommandRunner implements TrivyCommandRunner {
   private static final String TRUNCATION_SUFFIX = "... [truncated]";
 
   @Override
-  public @NonNull String run(final @NonNull List<String> command, final long timeoutSeconds) {
+  public String run(final List<String> command, final long timeoutSeconds) {
     final Process process;
 
     try {
@@ -77,7 +76,7 @@ public class ProcessTrivyCommandRunner implements TrivyCommandRunner {
     return stdout;
   }
 
-  private static boolean waitForProcess(final @NonNull Process process, final long timeoutSeconds) {
+  private static boolean waitForProcess(final Process process, final long timeoutSeconds) {
     try {
       return process.waitFor(timeoutSeconds, TimeUnit.SECONDS);
     } catch (final InterruptedException exception) {
@@ -87,7 +86,7 @@ public class ProcessTrivyCommandRunner implements TrivyCommandRunner {
     }
   }
 
-  private static @NonNull String readFully(final @NonNull InputStream inputStream) {
+  private static String readFully(final InputStream inputStream) {
     try {
       return new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
     } catch (final IOException exception) {
@@ -95,7 +94,7 @@ public class ProcessTrivyCommandRunner implements TrivyCommandRunner {
     }
   }
 
-  private static @NonNull String truncate(final @NonNull String message) {
+  private static String truncate(final String message) {
     if (message.length() <= MAX_ERROR_MESSAGE_LENGTH) {
       return message;
     }

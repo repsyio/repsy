@@ -23,7 +23,6 @@ import java.time.Instant;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.ObjectMapper;
@@ -39,11 +38,11 @@ public class TrivyDatabaseMetadata {
   private static final String VULNERABILITY_DB_FILE = "trivy.db";
   private static final String JAVA_DB_DIR = "java-db";
 
-  private final @NonNull TrivyScannerProperties properties;
-  private final @NonNull ObjectMapper objectMapper;
+  private final TrivyScannerProperties properties;
+  private final ObjectMapper objectMapper;
 
   /** The vulnerability database, or empty when there is none (or it is being replaced). */
-  public @NonNull Optional<TrivyDbMetadata> vulnerabilityDb() {
+  public Optional<TrivyDbMetadata> vulnerabilityDb() {
     final var dir = Path.of(this.properties.cacheDir()).resolve(VULNERABILITY_DB_DIR);
 
     if (!Files.isRegularFile(dir.resolve(VULNERABILITY_DB_FILE))) {
@@ -53,13 +52,13 @@ public class TrivyDatabaseMetadata {
     return this.read(dir.resolve(METADATA_FILE));
   }
 
-  public @NonNull Optional<TrivyDbMetadata> javaDb() {
+  public Optional<TrivyDbMetadata> javaDb() {
     return this.read(
         Path.of(this.properties.cacheDir()).resolve(JAVA_DB_DIR).resolve(METADATA_FILE));
   }
 
   /** The {@code UpdatedAt} of the vulnerability database: when its content was published. */
-  public @NonNull Optional<Instant> vulnerabilityDbUpdatedAt() {
+  public Optional<Instant> vulnerabilityDbUpdatedAt() {
     return this.vulnerabilityDb().map(TrivyDbMetadata::updatedAt);
   }
 
@@ -69,16 +68,15 @@ public class TrivyDatabaseMetadata {
    * {@code --download-db-only} does nothing before that. Asking first spares a refresh that changes
    * nothing from waiting for running scans.)
    */
-  public boolean isRefreshDue(final @NonNull Instant now) {
+  public boolean isRefreshDue(final Instant now) {
     return isDue(this.vulnerabilityDb(), now) || isDue(this.javaDb(), now);
   }
 
-  private static boolean isDue(
-      final @NonNull Optional<TrivyDbMetadata> metadata, final @NonNull Instant now) {
+  private static boolean isDue(final Optional<TrivyDbMetadata> metadata, final Instant now) {
     return metadata.map(TrivyDbMetadata::nextUpdate).map(next -> !next.isAfter(now)).orElse(true);
   }
 
-  private @NonNull Optional<TrivyDbMetadata> read(final @NonNull Path file) {
+  private Optional<TrivyDbMetadata> read(final Path file) {
     if (!Files.isRegularFile(file)) {
       return Optional.empty();
     }

@@ -18,7 +18,6 @@ package io.repsy.scanner.trivy.listeners;
 import io.repsy.scanner.trivy.services.TrivyScanService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.availability.AvailabilityChangeEvent;
@@ -35,11 +34,11 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class TrivyDatabaseWarmupRunner implements ApplicationRunner {
 
-  private final @NonNull TrivyScanService trivyScanService;
-  private final @NonNull ApplicationContext applicationContext;
+  private final TrivyScanService trivyScanService;
+  private final ApplicationContext applicationContext;
 
   @Override
-  public void run(final @NonNull ApplicationArguments args) {
+  public void run(final ApplicationArguments args) {
     this.publishReadiness(ReadinessState.REFUSING_TRAFFIC);
 
     this.trivyScanService.trivyVersion();
@@ -58,7 +57,7 @@ public class TrivyDatabaseWarmupRunner implements ApplicationRunner {
     }
   }
 
-  private void publishReadiness(final @NonNull ReadinessState state) {
+  private void publishReadiness(final ReadinessState state) {
     AvailabilityChangeEvent.publish(this.applicationContext, state);
   }
 }
