@@ -17,11 +17,9 @@ package io.repsy.protocols.maven.shared.utils;
 
 import java.nio.file.Path;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 
 /** Where the files of a group and of an artifact sit inside a repo's storage directory. */
 @UtilityClass
-@NullMarked
 public class MavenStoragePathUtils {
 
   /**

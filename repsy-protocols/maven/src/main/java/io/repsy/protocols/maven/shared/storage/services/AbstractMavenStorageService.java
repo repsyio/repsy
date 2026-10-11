@@ -44,12 +44,10 @@ import java.util.UUID;
 import java.util.function.Supplier;
 import lombok.SneakyThrows;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.ui.freemarker.FreeMarkerTemplateUtils;
 
-@NullMarked
 public abstract class AbstractMavenStorageService<ID> extends AbstractArtifactStorageService
     implements MavenStorageService<ID> {
 

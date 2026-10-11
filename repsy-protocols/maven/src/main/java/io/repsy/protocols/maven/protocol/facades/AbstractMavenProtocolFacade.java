@@ -50,14 +50,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.maven.index.artifact.Gav;
 import org.apache.maven.model.Model;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 
 @Slf4j
 @RequiredArgsConstructor
-@NullMarked
 public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFacade<ID> {
 
   private static final String USAGES = "usages";
@@ -587,7 +585,7 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
       throws IOException {
 
     try (final var pom = SpooledUpload.spool(inputStream, MavenUploadLimits.MAX_POM_BYTES)) {
-      final @Nullable Model model;
+      final Model model;
 
       try (final var pomStream = pom.openStream()) {
         model = PomModelUtils.readModel(pomStream);

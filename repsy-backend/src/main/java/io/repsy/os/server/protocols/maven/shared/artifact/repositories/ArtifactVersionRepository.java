@@ -21,7 +21,6 @@ import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredVersion;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.jspecify.annotations.NonNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -44,8 +43,7 @@ public interface ArtifactVersionRepository extends JpaRepository<ArtifactVersion
         a.groupName = :groupName
         and
         a.artifactName = :artifactName""")
-  long countByRepoIdAndGroupNameAndArtifactName(
-      UUID repoId, @NonNull String groupName, @NonNull String artifactName);
+  long countByRepoIdAndGroupNameAndArtifactName(UUID repoId, String groupName, String artifactName);
 
   /** The versions of every artifact of a group, which is what deleting the group removes. */
   @Query(
@@ -55,7 +53,7 @@ public interface ArtifactVersionRepository extends JpaRepository<ArtifactVersion
         join av.artifact a
         where a.repo.id = :repoId
         and a.groupName = :groupName""")
-  long countByRepoIdAndGroupName(UUID repoId, @NonNull String groupName);
+  long countByRepoIdAndGroupName(UUID repoId, String groupName);
 
   /**
    * The versions of the artifact whose name contains {@code versionName}. Pass {@link
@@ -73,13 +71,8 @@ public interface ArtifactVersionRepository extends JpaRepository<ArtifactVersion
         and a.artifactName = :artifactName
         and av.versionName like %:versionName%
       """)
-  @NonNull Page<ArtifactVersionListItem>
-      findAllByRepoIdAndGroupNameAndArtifactNameContainsVersionName(
-          @NonNull UUID repoId,
-          @NonNull String groupName,
-          @NonNull String artifactName,
-          @NonNull String versionName,
-          @NonNull Pageable pageable);
+  Page<ArtifactVersionListItem> findAllByRepoIdAndGroupNameAndArtifactNameContainsVersionName(
+      UUID repoId, String groupName, String artifactName, String versionName, Pageable pageable);
 
   /**
    * The versions of the artifact; {@link Pageable#unpaged()} returns them all (see the note on
@@ -94,11 +87,8 @@ public interface ArtifactVersionRepository extends JpaRepository<ArtifactVersion
         and a.groupName = :groupName
         and a.artifactName = :artifactName
       """)
-  @NonNull Page<ArtifactVersionListItem> findAllByRepoIdAndGroupNameAndArtifactName(
-      UUID repoId,
-      @NonNull String groupName,
-      @NonNull String artifactName,
-      @NonNull Pageable pageable);
+  Page<ArtifactVersionListItem> findAllByRepoIdAndGroupNameAndArtifactName(
+      UUID repoId, String groupName, String artifactName, Pageable pageable);
 
   /**
    * Every version of an artifact with the time it was last registered, which is all the generated
@@ -116,13 +106,12 @@ public interface ArtifactVersionRepository extends JpaRepository<ArtifactVersion
         and a.groupName = :groupName
         and a.artifactName = :artifactName
       """)
-  @NonNull List<RegisteredVersion> findRegisteredVersions(
-      UUID repoId, @NonNull String groupName, @NonNull String artifactName);
+  List<RegisteredVersion> findRegisteredVersions(
+      UUID repoId, String groupName, String artifactName);
 
-  @NonNull List<ArtifactVersion> findByArtifactId(UUID artifactId);
+  List<ArtifactVersion> findByArtifactId(UUID artifactId);
 
-  @NonNull Optional<ArtifactVersion> findByArtifactIdAndVersionName(
-      @NonNull UUID artifactId, @NonNull String versionName);
+  Optional<ArtifactVersion> findByArtifactIdAndVersionName(UUID artifactId, String versionName);
 
   /**
    * The ids of the versions of a repo after {@code after}, in id order and at most a page of them:
@@ -135,7 +124,7 @@ public interface ArtifactVersionRepository extends JpaRepository<ArtifactVersion
         where v.artifact.repo.id = :repoId and v.id > :after
         order by v.id
       """)
-  @NonNull List<UUID> findIdsByRepoIdAfter(UUID repoId, UUID after, Pageable pageable);
+  List<UUID> findIdsByRepoIdAfter(UUID repoId, UUID after, Pageable pageable);
 
   /**
    * Takes the row lock of a version without changing it: the statement is an update, so the lock is
@@ -162,5 +151,5 @@ public interface ArtifactVersionRepository extends JpaRepository<ArtifactVersion
         from ArtifactVersion v join v.artifact a join a.repo r
         where v.id = :versionId
       """)
-  @NonNull Optional<Boolean> findVerifyAllSignaturesEnabledByVersionId(UUID versionId);
+  Optional<Boolean> findVerifyAllSignaturesEnabledByVersionId(UUID versionId);
 }

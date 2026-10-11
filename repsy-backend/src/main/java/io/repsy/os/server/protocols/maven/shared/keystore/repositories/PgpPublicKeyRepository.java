@@ -19,7 +19,6 @@ import io.repsy.os.server.protocols.maven.shared.keystore.entities.PgpPublicKey;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.jspecify.annotations.NonNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -30,15 +29,15 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface PgpPublicKeyRepository extends JpaRepository<PgpPublicKey, UUID> {
 
-  boolean existsByRepoIdAndFingerprint(@NonNull UUID repoId, @NonNull String fingerprint);
+  boolean existsByRepoIdAndFingerprint(UUID repoId, String fingerprint);
 
   @Query("select count(k) from PgpPublicKey k where k.repo.id = :repoId")
-  long countByRepoId(@Param("repoId") @NonNull UUID repoId);
+  long countByRepoId(@Param("repoId") UUID repoId);
 
-  @NonNull Optional<PgpPublicKey> findByIdAndRepoId(@NonNull UUID id, @NonNull UUID repoId);
+  Optional<PgpPublicKey> findByIdAndRepoId(UUID id, UUID repoId);
 
-  @NonNull Page<PgpPublicKey> findAllByRepoId(@NonNull UUID repoId, @NonNull Pageable pageable);
+  Page<PgpPublicKey> findAllByRepoId(UUID repoId, Pageable pageable);
 
   @Query("select k.armoredKey from PgpPublicKey k where k.repo.id = :repoId")
-  @NonNull List<String> findArmoredKeysByRepoId(@Param("repoId") @NonNull UUID repoId);
+  List<String> findArmoredKeysByRepoId(@Param("repoId") UUID repoId);
 }

@@ -20,7 +20,6 @@ import io.repsy.os.server.protocols.maven.shared.keystore.entities.KeyStore;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.jspecify.annotations.NonNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -30,10 +29,9 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface KeyStoreRepository extends JpaRepository<KeyStore, UUID> {
 
-  boolean existsByAllowedKeyserverIdAndRepoId(
-      @NonNull UUID allowedKeyserverId, @NonNull UUID repoId);
+  boolean existsByAllowedKeyserverIdAndRepoId(UUID allowedKeyserverId, UUID repoId);
 
-  @NonNull Optional<KeyStore> findByIdAndRepoId(@NonNull UUID id, @NonNull UUID repoId);
+  Optional<KeyStore> findByIdAndRepoId(UUID id, UUID repoId);
 
   @Query(
       """
@@ -46,7 +44,7 @@ public interface KeyStoreRepository extends JpaRepository<KeyStore, UUID> {
       WHERE ks.repo.id = :repoId
         AND ak.active = true
       """)
-  @NonNull Page<KeyStoreItem> findAllByRepoId(@NonNull UUID repoId, @NonNull Pageable pageable);
+  Page<KeyStoreItem> findAllByRepoId(UUID repoId, Pageable pageable);
 
   /**
    * The key-server hosts a Maven signature of the repo is looked up on: only the active ones, so a
@@ -65,5 +63,5 @@ public interface KeyStoreRepository extends JpaRepository<KeyStore, UUID> {
         AND ak.active = true
       ORDER BY ak.host, ks.id
       """)
-  @NonNull List<KeyStoreItem> findAllByRepoId(@NonNull UUID repoId);
+  List<KeyStoreItem> findAllByRepoId(UUID repoId);
 }

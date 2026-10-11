@@ -33,6 +33,7 @@ import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
+import org.jspecify.annotations.Nullable;
 
 /**
  * An armored OpenPGP public key registered directly on a repo's Maven key store (RPS-1189),
@@ -64,7 +65,7 @@ public class PgpPublicKey {
   private String fingerprint;
 
   @Column(name = "user_id")
-  private String userId;
+  private @Nullable String userId;
 
   @Column(name = "armored_key", nullable = false, columnDefinition = "text")
   private String armoredKey;

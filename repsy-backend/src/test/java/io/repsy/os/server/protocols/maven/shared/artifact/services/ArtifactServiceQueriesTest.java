@@ -349,6 +349,32 @@ class ArtifactServiceQueriesTest {
   }
 
   @Test
+  @DisplayName(
+      "the detail of an artifact without a latest version is artifactVersionNotFound, with no"
+          + " lookup of a null name (RPS-2143)")
+  void versionDetailWithoutALatest() {
+    this.stubArtifact(null);
+
+    assertThatThrownBy(
+            () -> this.artifactQueryService.getArtifactVersion(REPO_ID, "com.acme", "lib", null))
+        .isInstanceOf(ItemNotFoundException.class)
+        .hasMessage("artifactVersionNotFound");
+    verify(this.artifactVersionRepository, never()).findByArtifactIdAndVersionName(any(), any());
+  }
+
+  @Test
+  @DisplayName("a version without a type has no POM name lookup: it throws NullPointerException")
+  void pomFileNameOfAVersionWithoutATypeThrows() {
+    final var repoInfo = RepoInfo.builder().id(REPO_ID).storageKey(REPO_ID).name("mvn").build();
+
+    assertThatThrownBy(
+            () ->
+                this.artifactQueryService.getArtifactVersionPomFilename(
+                    repoInfo, Path.of("/com/acme/lib"), null, "lib", "1.0"))
+        .isInstanceOf(NullPointerException.class);
+  }
+
+  @Test
   @DisplayName("a release's POM is named by its artifactId and version, other types have none")
   void pomFileNameOfAReleaseAndOfAPlugin() throws Exception {
     final var repoInfo = RepoInfo.builder().id(REPO_ID).storageKey(REPO_ID).name("mvn").build();

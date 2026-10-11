@@ -64,7 +64,9 @@ public class MavenPgpCaps {
   @Getter private final long maxBytesPerRepo;
   private final boolean postgres;
 
-  @PersistenceContext private EntityManager entityManager;
+  @SuppressWarnings("NullAway.Init") // injected by the container
+  @PersistenceContext
+  private EntityManager entityManager;
 
   public MavenPgpCaps(
       @Value("${repsy.maven.pgp.max-public-keys-per-repo:20}") final int maxPublicKeysPerRepo,

@@ -23,12 +23,10 @@ import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.protocols.maven.protocol.MavenProtocolProvider;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
 /** Maven: Basic or Bearer, or the single-path download token of the web UI. */
 @Component
-@NullMarked
 public class MavenAuthPreProcessor extends BasicOrBearerAuthPreProcessor<MavenAuthenticator> {
 
   /**

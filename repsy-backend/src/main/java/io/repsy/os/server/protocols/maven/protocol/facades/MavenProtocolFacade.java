@@ -19,11 +19,9 @@ import io.repsy.protocols.maven.protocol.facades.AbstractMavenProtocolFacade;
 import io.repsy.protocols.maven.shared.artifact.services.contracts.ArtifactService;
 import io.repsy.protocols.maven.shared.storage.services.MavenStorageService;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
 @Component
-@NullMarked
 public class MavenProtocolFacade extends AbstractMavenProtocolFacade<UUID> {
 
   public MavenProtocolFacade(

@@ -15,7 +15,6 @@
  */
 package io.repsy.protocols.maven.shared.artifact.dtos;
 
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -27,5 +26,4 @@ import org.jspecify.annotations.Nullable;
  * @param name the {@code <name>} of its POM, or {@code null} when it has none
  * @param prefix the goal prefix the plugin is addressed by
  */
-@NullMarked
 public record RegisteredPlugin(String artifactId, @Nullable String name, String prefix) {}

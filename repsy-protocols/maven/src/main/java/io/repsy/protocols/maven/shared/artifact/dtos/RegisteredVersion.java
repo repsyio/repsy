@@ -16,7 +16,6 @@
 package io.repsy.protocols.maven.shared.artifact.dtos;
 
 import java.time.Instant;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -28,5 +27,4 @@ import org.jspecify.annotations.Nullable;
  * @param lastUpdatedAt when the version was last registered or re-registered, or {@code null} when
  *     the repository recorded no time for it
  */
-@NullMarked
 public record RegisteredVersion(String versionName, @Nullable Instant lastUpdatedAt) {}

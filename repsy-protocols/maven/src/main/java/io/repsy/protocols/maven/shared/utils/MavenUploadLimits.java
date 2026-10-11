@@ -16,7 +16,6 @@
 package io.repsy.protocols.maven.shared.utils;
 
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * Caps how much of an upload the Maven protocol facade buffers in memory (or spools to disk) before
@@ -25,7 +24,6 @@ import org.jspecify.annotations.NullMarked;
  * these limits leave generous headroom above that (RPS-1121).
  */
 @UtilityClass
-@NullMarked
 public class MavenUploadLimits {
 
   private static final long MEBIBYTE = 1024L * 1024L;

@@ -35,7 +35,6 @@ import org.apache.maven.artifact.repository.metadata.Metadata;
 import org.apache.maven.artifact.repository.metadata.Plugin;
 import org.apache.maven.artifact.repository.metadata.Versioning;
 import org.apache.maven.artifact.repository.metadata.io.xpp3.MetadataXpp3Writer;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -52,7 +51,6 @@ import org.jspecify.annotations.Nullable;
  * all, so it holds that too.
  */
 @UtilityClass
-@NullMarked
 public class ArtifactMetadataSynthesizer {
 
   private static final String METADATA_FILENAME = "maven-metadata.xml";

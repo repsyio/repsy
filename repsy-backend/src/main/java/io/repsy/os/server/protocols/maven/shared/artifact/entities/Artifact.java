@@ -37,7 +37,7 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
-import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 @Data
 @Entity
@@ -66,16 +66,16 @@ public class Artifact {
   private String artifactName;
 
   @Column(name = "latest", length = MavenPublishLimits.MAX_VERSION_LENGTH)
-  private String latest;
+  private @Nullable String latest;
 
   @Column(name = "release", length = MavenPublishLimits.MAX_VERSION_LENGTH)
-  private String release;
+  private @Nullable String release;
 
   @Column(name = "name", length = MavenPublishLimits.MAX_NAME_LENGTH)
   private String name;
 
   @Column(name = "prefix", length = MavenPublishLimits.MAX_PREFIX_LENGTH)
-  private String prefix;
+  private @Nullable String prefix;
 
   @Column(name = "plugin", nullable = false)
   private boolean plugin;
@@ -90,5 +90,5 @@ public class Artifact {
   private Instant lastUpdatedAt;
 
   @OneToMany(mappedBy = "artifact", cascade = CascadeType.ALL, orphanRemoval = true)
-  private @NonNull Set<ArtifactVersion> artifactVersions = new HashSet<>();
+  private Set<ArtifactVersion> artifactVersions = new HashSet<>();
 }

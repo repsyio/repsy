@@ -53,7 +53,6 @@ import org.bouncycastle.openpgp.PGPSignatureList;
 import org.bouncycastle.openpgp.operator.jcajce.JcaKeyFingerprintCalculator;
 import org.bouncycastle.openpgp.operator.jcajce.JcaPGPContentVerifierBuilderProvider;
 import org.bouncycastle.util.encoders.Hex;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -71,7 +70,7 @@ public class PgpVerifierService {
   private static final String PRIVATE_KEY_ARMOR_HEADER = "-----BEGIN PGP PRIVATE KEY BLOCK-----";
   private static final int MAX_USER_ID_LENGTH = 255;
   // Order matters (RPS-1194): tried in this order, ubuntu's keyserver first, then openpgp.org.
-  private static final @NonNull List<String> KEY_SERVERS =
+  private static final List<String> KEY_SERVERS =
       List.of(
           "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x%s",
           "https://keys.openpgp.org/pks/lookup?op=get&search=0x%s");
@@ -91,20 +90,19 @@ public class PgpVerifierService {
   // is deleted.
   private static final long PARSED_KEY_CACHE_SIZE = 500;
 
-  private final @NonNull RestClient restClient;
+  private final RestClient restClient;
   private final Cache<String, String> keyBlocksByUrl;
   private final Cache<String, PGPPublicKeyRingCollection> parsedRegisteredKeys =
       CacheBuilder.newBuilder().maximumSize(PARSED_KEY_CACHE_SIZE).recordStats().build();
 
   @Autowired
-  public PgpVerifierService(
-      final @Qualifier("pgpVerifierRestClient") @NonNull RestClient restClient) {
+  public PgpVerifierService(final @Qualifier("pgpVerifierRestClient") RestClient restClient) {
 
     this(restClient, Ticker.systemTicker());
   }
 
   @VisibleForTesting
-  PgpVerifierService(final @NonNull RestClient restClient, final @NonNull Ticker ticker) {
+  PgpVerifierService(final RestClient restClient, final Ticker ticker) {
 
     this.restClient = restClient;
     this.keyBlocksByUrl =
@@ -133,9 +131,7 @@ public class PgpVerifierService {
    */
   @SneakyThrows
   public void verify(
-      final @NonNull Resource file,
-      final @NonNull Resource signedFile,
-      final @Nullable PublicKeySources sources) {
+      final Resource file, final Resource signedFile, final @Nullable PublicKeySources sources) {
 
     try (final var dataStream = file.getInputStream();
         final var signatureStream = signedFile.getInputStream()) {
@@ -201,7 +197,7 @@ public class PgpVerifierService {
    * @throws SignatureNotVerifiedException {@code artifactSignatureNotVerified} when {@code
    *     signature} holds no parseable OpenPGP signature
    */
-  public @NonNull String readSignerKeyId(final @NonNull Resource signature) {
+  public String readSignerKeyId(final Resource signature) {
 
     ensureBouncyCastleProvider();
 
@@ -213,7 +209,7 @@ public class PgpVerifierService {
     }
   }
 
-  private @NonNull Optional<MatchedKey> getPublicKey(
+  private Optional<MatchedKey> getPublicKey(
       final long keyId, @Nullable final PublicKeySources sources) {
 
     final var keyIdHex = String.format(KEY_ID_FORMAT, keyId);
@@ -233,8 +229,8 @@ public class PgpVerifierService {
   }
 
   /** The repo's own key-server hosts first, then the two default key servers. */
-  private @NonNull Optional<MatchedKey> findOnKeyServers(
-      final @Nullable PublicKeySources sources, final @NonNull String keyIdHex, final long keyId) {
+  private Optional<MatchedKey> findOnKeyServers(
+      final @Nullable PublicKeySources sources, final String keyIdHex, final long keyId) {
 
     final var customHosts = sources != null ? sources.keyServerHosts() : null;
 
@@ -259,7 +255,7 @@ public class PgpVerifierService {
    * before any key server is asked. A key that fails to parse is a stored row that was valid at
    * registration time, so it is logged and skipped rather than allowed to break the whole lookup.
    */
-  private @NonNull Optional<MatchedKey> findInRegisteredKeys(
+  private Optional<MatchedKey> findInRegisteredKeys(
       @Nullable final PublicKeySources sources, final long keyId) {
 
     if (sources == null || sources.registeredArmoredKeys().isEmpty()) {
@@ -284,7 +280,7 @@ public class PgpVerifierService {
   }
 
   /** The parsed form of a registered armored key: parsed once, then served from the cache. */
-  private @NonNull PGPPublicKeyRingCollection parseRegisteredKey(final @NonNull String armoredKey)
+  private PGPPublicKeyRingCollection parseRegisteredKey(final String armoredKey)
       throws PGPException, IOException {
 
     try {
@@ -304,7 +300,7 @@ public class PgpVerifierService {
    * Forgets the parsed form of a registered armored key that was deleted (RPS-1814), so a deleted
    * key does not sit in memory until it is evicted by size.
    */
-  public void evictRegisteredKey(final @NonNull String armoredKey) {
+  public void evictRegisteredKey(final String armoredKey) {
 
     this.parsedRegisteredKeys.invalidate(cacheKey(armoredKey));
   }
@@ -323,7 +319,7 @@ public class PgpVerifierService {
     return this.parsedRegisteredKeys.size();
   }
 
-  private static @NonNull String cacheKey(final @NonNull String armoredKey) {
+  private static String cacheKey(final String armoredKey) {
 
     try {
       return Hex.toHexString(
@@ -333,8 +329,8 @@ public class PgpVerifierService {
     }
   }
 
-  private @NonNull Optional<MatchedKey> findInCustomHosts(
-      final @Nullable List<String> hosts, final @NonNull String keyIdHex, final long keyId) {
+  private Optional<MatchedKey> findInCustomHosts(
+      final @Nullable List<String> hosts, final String keyIdHex, final long keyId) {
 
     if (hosts == null || hosts.isEmpty()) {
       return Optional.empty();
@@ -352,13 +348,13 @@ public class PgpVerifierService {
     return Optional.empty();
   }
 
-  private @NonNull String buildUrl(final @NonNull String host, final @NonNull String keyIdHex) {
+  private String buildUrl(final String host, final String keyIdHex) {
 
     final var normalizedHost = host.trim().replaceFirst("^https?://", "").split("[/?#]", 2)[0];
     return "https://" + normalizedHost + "/pks/lookup?op=get&search=0x" + keyIdHex;
   }
 
-  private @NonNull PGPSignature extractSignature(final @NonNull InputStream signatureStream)
+  private PGPSignature extractSignature(final InputStream signatureStream)
       throws IOException, PGPException {
 
     final var factory =
@@ -367,11 +363,11 @@ public class PgpVerifierService {
     Object object;
 
     while ((object = factory.nextObject()) != null) {
-      if (object instanceof @NonNull final PGPSignatureList sl && !sl.isEmpty()) {
+      if (object instanceof final PGPSignatureList sl && !sl.isEmpty()) {
         return sl.get(0);
       }
 
-      if (object instanceof @NonNull final PGPSignature s) {
+      if (object instanceof final PGPSignature s) {
         return s;
       }
     }
@@ -379,8 +375,7 @@ public class PgpVerifierService {
     throw new PGPException("PGPSignature is not found");
   }
 
-  private @NonNull Optional<MatchedKey> fetchKeyFromServer(
-      final @NonNull String serverUrl, final long keyId) {
+  private Optional<MatchedKey> fetchKeyFromServer(final String serverUrl, final long keyId) {
 
     final var cachedKeyData = this.keyBlocksByUrl.getIfPresent(serverUrl);
 
@@ -403,8 +398,8 @@ public class PgpVerifierService {
     return key;
   }
 
-  private @NonNull Optional<MatchedKey> parseKeyData(
-      final @NonNull String keyData, final @NonNull String serverUrl, final long keyId) {
+  private Optional<MatchedKey> parseKeyData(
+      final String keyData, final String serverUrl, final long keyId) {
 
     if (!keyData.contains("-----BEGIN PGP PUBLIC KEY BLOCK-----")) {
       return Optional.empty();
@@ -424,7 +419,7 @@ public class PgpVerifierService {
     }
   }
 
-  private @Nullable String downloadKeyData(final @NonNull String serverUrl) {
+  private @Nullable String downloadKeyData(final String serverUrl) {
 
     try {
       return this.restClient.get().uri(serverUrl).retrieve().body(String.class);
@@ -435,13 +430,13 @@ public class PgpVerifierService {
     }
   }
 
-  private @NonNull Optional<MatchedKey> parsePublicKey(
-      final @NonNull String keyData, final long keyId) throws PGPException, IOException {
+  private Optional<MatchedKey> parsePublicKey(final String keyData, final long keyId)
+      throws PGPException, IOException {
 
     return matchKey(parseCollection(keyData), keyId);
   }
 
-  private static @NonNull PGPPublicKeyRingCollection parseCollection(final @NonNull String keyData)
+  private static PGPPublicKeyRingCollection parseCollection(final String keyData)
       throws PGPException, IOException {
 
     try (final var ds = getDecoderStream(new ByteArrayInputStream(keyData.getBytes(UTF_8)))) {
@@ -449,8 +444,8 @@ public class PgpVerifierService {
     }
   }
 
-  private static @NonNull Optional<MatchedKey> matchKey(
-      final @NonNull PGPPublicKeyRingCollection collection, final long keyId) throws PGPException {
+  private static Optional<MatchedKey> matchKey(
+      final PGPPublicKeyRingCollection collection, final long keyId) throws PGPException {
 
     final var key = collection.getPublicKey(keyId);
 
@@ -470,7 +465,7 @@ public class PgpVerifierService {
    * of the ring {@code signingKey} is a subkey of. Both are checked for revocation, since a subkey
    * can be revoked directly or through its primary key being revoked.
    */
-  private record MatchedKey(@NonNull PGPPublicKey signingKey, @NonNull PGPPublicKey primaryKey) {}
+  private record MatchedKey(PGPPublicKey signingKey, PGPPublicKey primaryKey) {}
 
   /**
    * Refuses a signature made with, or verified against, a key that is revoked or was expired at
@@ -483,14 +478,13 @@ public class PgpVerifierService {
    * packet is present, not that the packet is itself a genuine signature by the key's owner; a
    * known limitation, see the PR description.
    */
-  private void checkKeyValidity(
-      final @NonNull MatchedKey matchedKey, final @NonNull Date signatureCreationTime) {
+  private void checkKeyValidity(final MatchedKey matchedKey, final Date signatureCreationTime) {
 
     this.checkNotRevoked(matchedKey);
     checkNotExpired(matchedKey.signingKey(), signatureCreationTime);
   }
 
-  private void checkNotRevoked(final @NonNull MatchedKey matchedKey) {
+  private void checkNotRevoked(final MatchedKey matchedKey) {
 
     final var signingKey = matchedKey.signingKey();
     final var primaryKey = matchedKey.primaryKey();
@@ -510,7 +504,7 @@ public class PgpVerifierService {
   }
 
   private static void checkNotExpired(
-      final @NonNull PGPPublicKey signingKey, final @NonNull Date signatureCreationTime) {
+      final PGPPublicKey signingKey, final Date signatureCreationTime) {
 
     final var validSeconds = signingKey.getValidSeconds();
     if (validSeconds <= 0) {
@@ -531,7 +525,7 @@ public class PgpVerifierService {
     }
   }
 
-  private static @NonNull String keyIdHex(final @NonNull PGPPublicKey key) {
+  private static String keyIdHex(final PGPPublicKey key) {
     return String.format(KEY_ID_FORMAT, key.getKeyID());
   }
 
@@ -544,7 +538,7 @@ public class PgpVerifierService {
    *     armored OpenPGP public key ring (a private key block, plain text, a signature, several
    *     rings, ...)
    */
-  public static @NonNull ParsedPublicKey parseArmoredPublicKey(final @NonNull String armored) {
+  public static ParsedPublicKey parseArmoredPublicKey(final String armored) {
 
     final var trimmed = armored.trim();
 
@@ -582,8 +576,7 @@ public class PgpVerifierService {
    * The one ring's primary key {@code parseArmoredPublicKey} requires, or {@code
    * pgpPublicKeyInvalid}.
    */
-  private static @NonNull PGPPublicKey requireSinglePrimaryKey(
-      final @NonNull PGPPublicKeyRingCollection collection) {
+  private static PGPPublicKey requireSinglePrimaryKey(final PGPPublicKeyRingCollection collection) {
 
     if (collection.size() != 1) {
       throw new BadRequestException(ProtocolErrorCodes.PGP_PUBLIC_KEY_INVALID);
@@ -595,7 +588,7 @@ public class PgpVerifierService {
   /**
    * The first user id of {@code primary}, truncated defensively, or {@code null} when it has none.
    */
-  private static @Nullable String firstUserId(final @NonNull PGPPublicKey primary) {
+  private static @Nullable String firstUserId(final PGPPublicKey primary) {
 
     final var userIds = primary.getUserIDs();
 

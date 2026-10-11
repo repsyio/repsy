@@ -25,7 +25,6 @@ import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
 /**
@@ -35,7 +34,6 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @RequiredArgsConstructor
-@NullMarked
 class ArtifactRowDeleteService {
 
   private final RepoTxService repoTxService;

@@ -17,7 +17,6 @@ package io.repsy.os.server.protocols.maven.shared.artifact.mappers;
 
 import io.repsy.os.generated.model.ArtifactVersionInfo;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.ArtifactVersion;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.convert.converter.Converter;
 import org.springframework.core.convert.support.GenericConversionService;
@@ -27,8 +26,7 @@ import org.springframework.stereotype.Component;
 public class ArtifactVersionToArtifactVersionInfoMapper
     implements Converter<ArtifactVersion, ArtifactVersionInfo> {
 
-  ArtifactVersionToArtifactVersionInfoMapper(
-      final @NonNull GenericConversionService conversionService) {
+  ArtifactVersionToArtifactVersionInfoMapper(final GenericConversionService conversionService) {
 
     conversionService.addConverter(this);
   }

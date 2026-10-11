@@ -39,7 +39,7 @@ import lombok.NoArgsConstructor;
 import lombok.ToString;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
-import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 @Data
 @Entity
@@ -71,7 +71,7 @@ public class ArtifactVersion {
   private String description;
 
   @Column(name = "prefix", length = MavenPublishLimits.MAX_PREFIX_LENGTH)
-  private String prefix;
+  private @Nullable String prefix;
 
   @Column(name = "url", length = MavenPublishLimits.MAX_URL_LENGTH)
   private String url;
@@ -115,10 +115,10 @@ public class ArtifactVersion {
   private Instant lastUpdatedAt;
 
   @OneToMany(mappedBy = "artifactVersion", cascade = CascadeType.ALL, orphanRemoval = true)
-  private @NonNull Set<VersionLicense> versionLicenses = new HashSet<>();
+  private Set<VersionLicense> versionLicenses = new HashSet<>();
 
   @OneToMany(mappedBy = "artifactVersion", cascade = CascadeType.ALL, orphanRemoval = true)
-  private @NonNull Set<VersionDeveloper> versionDevelopers = new HashSet<>();
+  private Set<VersionDeveloper> versionDevelopers = new HashSet<>();
 
   /**
    * Identifier-based equality: two artifact versions are equal when they are the same instance or

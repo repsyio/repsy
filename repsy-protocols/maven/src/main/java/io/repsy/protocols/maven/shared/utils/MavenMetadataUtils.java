@@ -25,11 +25,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.maven.artifact.repository.metadata.Metadata;
 import org.apache.maven.artifact.repository.metadata.io.xpp3.MetadataXpp3Reader;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
-import org.jspecify.annotations.NullMarked;
 
 @Slf4j
 @UtilityClass
-@NullMarked
 public class MavenMetadataUtils {
 
   /**

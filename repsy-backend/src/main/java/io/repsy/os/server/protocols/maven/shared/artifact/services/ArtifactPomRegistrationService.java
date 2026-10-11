@@ -28,7 +28,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.maven.index.artifact.Gav;
 import org.apache.maven.model.Model;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
@@ -46,7 +45,6 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-@NullMarked
 class ArtifactPomRegistrationService {
 
   private final RepoTxService repoTxService;
@@ -64,8 +62,10 @@ class ArtifactPomRegistrationService {
     final var gav = MavenGavUtils.convertPathToGav(storagePath.getRelativePath().getPath());
     final var pomModel = PomModelUtils.readModel(resource);
 
-    if (this.checkExtractedInfos(pomModel, gav, storagePath, repo)) {
-      assert gav != null;
+    // gav and pomModel are non-null whenever the check passes; the null tests are for the compiler.
+    if (this.checkExtractedInfos(pomModel, gav, storagePath, repo)
+        && gav != null
+        && pomModel != null) {
       // After the checks above, which read the parent: an over-long descriptive value is dropped
       // rather than failing the row insert (RPS-1138).
       MavenPublishLimits.dropOverLongFields(pomModel);
@@ -115,13 +115,13 @@ class ArtifactPomRegistrationService {
       final StoragePath storagePath,
       final Repo repo) {
 
-    if (this.isInvalidGav(gav)) {
+    if (gav == null || gav.isHash()) {
       log.error(
           "Maven Gav could not be calculated for repo {} for file {}",
           repo.getName(),
           storagePath.getPath());
       return false;
-    } else if (this.isInvalidPomModel(pomModel)) {
+    } else if (pomModel == null) {
       log.error(
           "Maven Pom model could not be calculated for repo {} for file {}",
           repo.getName(),
@@ -144,15 +144,5 @@ class ArtifactPomRegistrationService {
     }
 
     return true;
-  }
-
-  private boolean isInvalidGav(final @Nullable Gav gav) {
-
-    return gav == null || gav.isHash();
-  }
-
-  private boolean isInvalidPomModel(final @Nullable Model model) {
-
-    return model == null;
   }
 }

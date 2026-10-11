@@ -17,10 +17,8 @@ package io.repsy.protocols.maven.shared.artifact.services;
 
 import java.util.Comparator;
 import org.apache.maven.artifact.versioning.ComparableVersion;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
-@NullMarked
 public class VersionComparator implements Comparator<String> {
 
   @Override

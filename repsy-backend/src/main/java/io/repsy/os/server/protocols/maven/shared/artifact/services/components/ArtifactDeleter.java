@@ -29,14 +29,12 @@ import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.util.Pair;
 import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
-@NullMarked
 public class ArtifactDeleter {
 
   private final MavenStorageService mavenStorageService;

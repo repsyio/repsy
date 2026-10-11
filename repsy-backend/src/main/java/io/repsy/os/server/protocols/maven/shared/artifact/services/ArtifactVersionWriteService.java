@@ -28,7 +28,6 @@ import io.repsy.protocols.maven.shared.utils.SnapshotNameUtils;
 import java.util.ArrayList;
 import lombok.RequiredArgsConstructor;
 import org.apache.maven.model.Model;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,7 +45,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
-@NullMarked
 class ArtifactVersionWriteService {
 
   private final VersionDeveloperRepository versionDeveloperRepository;

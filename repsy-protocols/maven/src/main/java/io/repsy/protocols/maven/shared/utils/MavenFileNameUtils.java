@@ -17,10 +17,8 @@ package io.repsy.protocols.maven.shared.utils;
 
 import java.util.Set;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 
 @UtilityClass
-@NullMarked
 public class MavenFileNameUtils {
 
   private static final String METADATA_FILENAME = "maven-metadata.xml";
