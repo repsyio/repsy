@@ -15,9 +15,9 @@
  */
 package io.repsy.scanner.trivy.services;
 
-import io.repsy.scanner.trivy.dtos.FixStatus;
-import io.repsy.scanner.trivy.dtos.ScannerFinding;
-import io.repsy.scanner.trivy.dtos.Severity;
+import io.repsy.libs.scanner.dtos.FixStatus;
+import io.repsy.libs.scanner.dtos.ScannerFinding;
+import io.repsy.libs.scanner.dtos.Severity;
 import io.repsy.scanner.trivy.dtos.trivy.TrivyCvss;
 import io.repsy.scanner.trivy.dtos.trivy.TrivyResult;
 import io.repsy.scanner.trivy.dtos.trivy.TrivyVulnerability;

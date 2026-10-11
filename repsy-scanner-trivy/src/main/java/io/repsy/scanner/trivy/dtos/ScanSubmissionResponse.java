@@ -15,6 +15,7 @@
  */
 package io.repsy.scanner.trivy.dtos;
 
+import io.repsy.libs.scanner.trivy.ScanJobStatus;
 import org.jspecify.annotations.NonNull;
 
 public record ScanSubmissionResponse(@NonNull String scanId, @NonNull ScanJobStatus status) {}

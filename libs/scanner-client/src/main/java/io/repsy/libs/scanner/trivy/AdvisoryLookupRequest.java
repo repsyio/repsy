@@ -18,4 +18,4 @@ package io.repsy.libs.scanner.trivy;
 import java.util.List;
 
 /** The body of {@code POST /advisories} of the scanner. */
-record AdvisoryLookupRequest(String ecosystem, List<AdvisoryPackage> packages) {}
+public record AdvisoryLookupRequest(String ecosystem, List<AdvisoryPackage> packages) {}

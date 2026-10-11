@@ -51,7 +51,8 @@ A scan covers what the submitted artifact **contains**; it does not resolve what
 ## Local build & run
 
 ```bash
-docker build -t repsy-scanner-trivy:local repsy-scanner-trivy
+# from the repository root: the image shares the wire records of libs/scanner-client (RPS-2170)
+docker build -f repsy-scanner-trivy/Dockerfile -t repsy-scanner-trivy:local .
 
 docker run -p 8090:8090 \
   -e SCANNER_API_KEY=<key> \
@@ -212,5 +213,8 @@ tests. They need no Docker and no network (a fake trivy script and a fake comman
 
 ```bash
 git submodule update --init      # the Checkstyle configuration lives in core/
+# the wire records come from libs/scanner-client (RPS-2170), which is not on a remote repository
+mvn install -f core/pom.xml -DskipTests -Drat.skip=true -Dcheckstyle.skip=true
+mvn install -pl libs/scanner-client -am -DskipTests
 mvn -f repsy-scanner-trivy/pom.xml verify
 ```

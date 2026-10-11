@@ -19,12 +19,12 @@ import static io.repsy.scanner.trivy.services.TrivyTestFiles.FAR_AHEAD;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.repsy.libs.scanner.dtos.FixStatus;
+import io.repsy.libs.scanner.dtos.Severity;
+import io.repsy.libs.scanner.trivy.AdvisoryLookupRequest;
+import io.repsy.libs.scanner.trivy.AdvisoryPackage;
 import io.repsy.scanner.trivy.config.AdvisoryProperties;
 import io.repsy.scanner.trivy.config.TrivyScannerProperties;
-import io.repsy.scanner.trivy.dtos.AdvisoryPackage;
-import io.repsy.scanner.trivy.dtos.AdvisoryRequest;
-import io.repsy.scanner.trivy.dtos.FixStatus;
-import io.repsy.scanner.trivy.dtos.Severity;
 import io.repsy.scanner.trivy.errors.AdvisoryTimeoutException;
 import io.repsy.scanner.trivy.errors.AdvisoryTooLargeException;
 import io.repsy.scanner.trivy.errors.AdvisoryUnavailableException;
@@ -115,8 +115,8 @@ class AdvisoryLookupServiceTest {
         scanService);
   }
 
-  private static AdvisoryRequest npm(final AdvisoryPackage... packages) {
-    return new AdvisoryRequest("npm", List.of(packages));
+  private static AdvisoryLookupRequest npm(final AdvisoryPackage... packages) {
+    return new AdvisoryLookupRequest("npm", List.of(packages));
   }
 
   @Test
@@ -199,12 +199,12 @@ class AdvisoryLookupServiceTest {
     assertThatThrownBy(
             () ->
                 this.service.lookup(
-                    new AdvisoryRequest("maven", List.of(new AdvisoryPackage("a", "1")))))
+                    new AdvisoryLookupRequest("maven", List.of(new AdvisoryPackage("a", "1")))))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("ecosystem");
-    assertThatThrownBy(() -> this.service.lookup(new AdvisoryRequest(null, List.of())))
+    assertThatThrownBy(() -> this.service.lookup(new AdvisoryLookupRequest(null, List.of())))
         .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(() -> this.service.lookup(new AdvisoryRequest("npm", null)))
+    assertThatThrownBy(() -> this.service.lookup(new AdvisoryLookupRequest("npm", null)))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("packages");
   }
@@ -232,7 +232,7 @@ class AdvisoryLookupServiceTest {
 
     final var withNull = new ArrayList<AdvisoryPackage>();
     withNull.add(null);
-    assertThatThrownBy(() -> this.service.lookup(new AdvisoryRequest("npm", withNull)))
+    assertThatThrownBy(() -> this.service.lookup(new AdvisoryLookupRequest("npm", withNull)))
         .isInstanceOf(IllegalArgumentException.class);
     assertThat(this.commands).isEmpty();
   }
@@ -255,11 +255,11 @@ class AdvisoryLookupServiceTest {
       pairs.add(new AdvisoryPackage("p" + i, "1.0.0"));
     }
 
-    this.service.lookup(new AdvisoryRequest("npm", pairs));
+    this.service.lookup(new AdvisoryLookupRequest("npm", pairs));
     assertThat(this.commands).hasSize(1);
 
     pairs.add(new AdvisoryPackage("one-more", "1.0.0"));
-    assertThatThrownBy(() -> this.service.lookup(new AdvisoryRequest("npm", pairs)))
+    assertThatThrownBy(() -> this.service.lookup(new AdvisoryLookupRequest("npm", pairs)))
         .isInstanceOf(AdvisoryTooLargeException.class);
     assertThat(this.commands).hasSize(1);
   }

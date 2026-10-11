@@ -17,7 +17,7 @@ package io.repsy.scanner.trivy.services;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import io.repsy.scanner.trivy.dtos.AdvisoryPackage;
+import io.repsy.libs.scanner.trivy.AdvisoryPackage;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;

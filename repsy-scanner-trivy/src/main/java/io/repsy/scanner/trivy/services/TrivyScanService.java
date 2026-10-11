@@ -15,9 +15,9 @@
  */
 package io.repsy.scanner.trivy.services;
 
+import io.repsy.libs.scanner.dtos.ScanOutcome;
 import io.repsy.scanner.trivy.config.TrivyScannerProperties;
 import io.repsy.scanner.trivy.dtos.ScanJob;
-import io.repsy.scanner.trivy.dtos.ScanOutcome;
 import io.repsy.scanner.trivy.dtos.trivy.TrivyReport;
 import io.repsy.scanner.trivy.dtos.trivy.TrivyVersion;
 import io.repsy.scanner.trivy.errors.TrivyScanException;

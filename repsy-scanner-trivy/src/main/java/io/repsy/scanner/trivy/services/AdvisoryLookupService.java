@@ -15,11 +15,11 @@
  */
 package io.repsy.scanner.trivy.services;
 
+import io.repsy.libs.scanner.trivy.AdvisoryLookupRequest;
+import io.repsy.libs.scanner.trivy.AdvisoryLookupResponse;
+import io.repsy.libs.scanner.trivy.AdvisoryPackage;
 import io.repsy.scanner.trivy.config.AdvisoryProperties;
 import io.repsy.scanner.trivy.config.TrivyScannerProperties;
-import io.repsy.scanner.trivy.dtos.AdvisoryLookupResponse;
-import io.repsy.scanner.trivy.dtos.AdvisoryPackage;
-import io.repsy.scanner.trivy.dtos.AdvisoryRequest;
 import io.repsy.scanner.trivy.dtos.trivy.TrivyReport;
 import io.repsy.scanner.trivy.errors.AdvisoryTimeoutException;
 import io.repsy.scanner.trivy.errors.AdvisoryTooLargeException;
@@ -93,7 +93,7 @@ public class AdvisoryLookupService {
     this.admission = new Semaphore(properties.concurrency());
   }
 
-  public @NonNull AdvisoryLookupResponse lookup(final @NonNull AdvisoryRequest request) {
+  public @NonNull AdvisoryLookupResponse lookup(final @NonNull AdvisoryLookupRequest request) {
     final var packages = this.validate(request);
 
     if (packages.isEmpty()) {
@@ -191,7 +191,7 @@ public class AdvisoryLookupService {
 
   // The pairs to look up, without repeats. A malformed request is refused as a whole (400): the
   // caller sends what a registry knows, so a bad pair is a bug over there.
-  private @NonNull List<AdvisoryPackage> validate(final @NonNull AdvisoryRequest request) {
+  private @NonNull List<AdvisoryPackage> validate(final @NonNull AdvisoryLookupRequest request) {
     if (!NPM.equals(request.ecosystem())) {
       throw new IllegalArgumentException("ecosystem must be \"" + NPM + "\"");
     }

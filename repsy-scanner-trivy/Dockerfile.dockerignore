@@ -12,8 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-target/
-.git/
-.idea/
-*.iml
-*.md
+# RPS-2170: the build context is the repository root, so this is an allow-list (BuildKit reads
+# <Dockerfile>.dockerignore before the root .dockerignore): the core submodule, the root and libs
+# POMs, .mvn (the compiler flags), libs/scanner-client and the service itself, nothing else.
+*
+!core
+!.mvn
+!pom.xml
+!libs/pom.xml
+!libs/scanner-client
+!repsy-scanner-trivy
+
+**/target
+**/.git
+**/*.iml

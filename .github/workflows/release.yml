@@ -84,14 +84,17 @@ jobs:
   # two images of one release (the backend-to-scanner HTTP contract is not versioned: see README.md
   # "Vulnerability Scanning"). It is a job of its own so the application job above is unchanged, and
   # it does not gate helm-update, which deploys only the application image. Its build context is the
-  # module's own directory: it is not part of the Maven reactor and needs neither the core submodule
-  # nor the OpenAPI generator cache.
+  # repository root (RPS-2170), because the service shares the wire records of libs/scanner-client
+  # and so needs the core submodule; repsy-scanner-trivy/Dockerfile.dockerignore keeps the context
+  # to the files it uses. It does not need the OpenAPI generator cache.
   build-and-push-scanner:
     runs-on: hetzner-md
     timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          submodules: recursive
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
@@ -114,7 +117,7 @@ jobs:
       - name: Build and push repsy-scanner-trivy
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
-          context: repsy-scanner-trivy
+          context: .
           file: repsy-scanner-trivy/Dockerfile
           push: true
           tags: |

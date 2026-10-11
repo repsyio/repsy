@@ -16,4 +16,4 @@
 package io.repsy.libs.scanner.trivy;
 
 /** A name and version of {@code POST /advisories} of the scanner. */
-record AdvisoryPackage(String name, String version) {}
+public record AdvisoryPackage(String name, String version) {}

@@ -15,8 +15,8 @@
  */
 package io.repsy.scanner.trivy.jobs;
 
+import io.repsy.libs.scanner.trivy.ScanJobStatus;
 import io.repsy.scanner.trivy.dtos.ScanJob;
-import io.repsy.scanner.trivy.dtos.ScanJobStatus;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;

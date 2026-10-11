@@ -16,7 +16,7 @@
 package io.repsy.scanner.trivy.services;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import io.repsy.scanner.trivy.dtos.AdvisoryPackage;
+import io.repsy.libs.scanner.trivy.AdvisoryPackage;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;

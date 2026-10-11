@@ -83,7 +83,7 @@ e2e/
   docker-compose.stack.yml     # postgres profile: postgres:18 + Repsy, `run.sh local up|down`
   docker-compose.stack-h2.yml  # H2 profile: Repsy alone (embedded H2, no postgres service), `run.sh local up|down --h2`
   docker-compose.stack-scanner.yml  # OPT-IN overlay on either stack: a stub scanner + Repsy with the scanner enabled, `run.sh local up|down --scanner`, see "Scanner stack"
-  docker-compose.stack-trivy.yml  # OPT-IN overlay on either stack: the REAL repsy-scanner-trivy (built from ../repsy-scanner-trivy) + Repsy with the scanner enabled, `run.sh local up|down --trivy`, see "Real scanner stack"
+  docker-compose.stack-trivy.yml  # OPT-IN overlay on either stack: the REAL repsy-scanner-trivy (built from the repository root, `repsy-scanner-trivy/Dockerfile`) + Repsy with the scanner enabled, `run.sh local up|down --trivy`, see "Real scanner stack"
   docker-compose.stack-limits.yml  # OPT-IN overlay on either stack: every configurable upload limit at 64 KiB, `run.sh local up|down --limits`, see "Size-limit leg"
   docker-compose.stack-upload-ttl.yml  # OPT-IN overlay on either stack: short ABANDONED_UPLOAD_TTL (5 s) and cleanup intervals for testing abandoned upload cleanup, `run.sh local up|down --upload-ttl`, see "Abandoned upload cleanup"
   docker-compose.stack-cors.yml    # OPT-IN overlay on either stack: APP_ALLOWED_ORIGINS set to two origins, `run.sh local up|down --cors`, see "CORS leg"
@@ -7080,7 +7080,7 @@ its step "Check the opt-in specs ran" fails a runner that skipped or ran nothing
 
 The stub scanner above stands in for `repsy-scanner-trivy`, so nothing but a mirror of its contract keeps the two
 alike. `./run.sh local up --trivy` (or `REPSY_E2E_TRIVY=1`, `docker-compose.stack-trivy.yml`) runs the REAL
-service instead: the image built from `../repsy-scanner-trivy` (Trivy 0.66 inside), started with
+service instead: the image built from the repository root with `repsy-scanner-trivy/Dockerfile` (Trivy 0.66 inside), started with
 `SCANNER_API_KEY` (`REPSY_SCANNER_API_KEY`, default `e2e-scanner-key`, the same value the backend gets as
 `TRIVY_SCANNER_API_KEY`), and Repsy with `SECURITY_SCANNER=enabled`, `TRIVY_SCANNER_BASE_URL=http://scanner-trivy:8090`,
 `DOCKER_INTERNAL_REGISTRY_BASE_URL=http://repsy:9090` (so the scanner can pull a Docker image from Repsy over the

@@ -15,7 +15,7 @@
  */
 package io.repsy.scanner.trivy.controllers;
 
-import io.repsy.scanner.trivy.dtos.ScanJobStatus;
+import io.repsy.libs.scanner.trivy.ScanJobStatus;
 import io.repsy.scanner.trivy.dtos.ScanJobStatusResponse;
 import io.repsy.scanner.trivy.dtos.ScanSubmissionResponse;
 import io.repsy.scanner.trivy.errors.ScanJobNotFoundException;

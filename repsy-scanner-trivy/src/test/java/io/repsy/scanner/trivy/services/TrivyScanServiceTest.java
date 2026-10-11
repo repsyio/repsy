@@ -17,8 +17,8 @@ package io.repsy.scanner.trivy.services;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.repsy.libs.scanner.trivy.ScanJobStatus;
 import io.repsy.scanner.trivy.config.TrivyScannerProperties;
-import io.repsy.scanner.trivy.dtos.ScanJobStatus;
 import io.repsy.scanner.trivy.jobs.InMemoryJobStore;
 import java.io.IOException;
 import java.nio.file.Files;

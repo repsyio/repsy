@@ -55,6 +55,29 @@
       <version>1.28.0</version>
     </dependency>
 
+    <!--
+      RPS-2170: the wire records (findings, outcome, job status, advisory lookup) live once, in
+      libs/scanner-client, which the backend's Trivy client also uses. Only these records are used
+      here, so the client's own dependencies (core-web, spring-retry) are not wanted at runtime.
+      Not in the Maven reactor and not on a remote repository: install it first, see README.md
+      ("Tests"); the Dockerfile does that and has the repository root as its build context.
+    -->
+    <dependency>
+      <groupId>io.repsy.libs</groupId>
+      <artifactId>scanner-client</artifactId>
+      <version>1.0.0-SNAPSHOT</version>
+      <exclusions>
+        <exclusion>
+          <groupId>io.repsy.core</groupId>
+          <artifactId>core-web</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.springframework.retry</groupId>
+          <artifactId>spring-retry</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+
     <dependency>
       <groupId>org.projectlombok</groupId>
       <artifactId>lombok</artifactId>

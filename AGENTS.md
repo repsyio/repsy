@@ -374,9 +374,12 @@ them in both repositories together.
 - The backend side of the scanner contract lives once, in `libs/scanner-client` (`io.repsy.libs.scanner`,
   RPS-2065); OS and Cloud both consume it, so the Trivy client is not copied between the products. The
   wire records keep their names and shape, because the HTTP and JSON contract is pinned by
-  `e2e/src/stubs/scanner/contract.ts` and `ScannerWireContractTest`. `repsy-scanner-trivy` is built from its
-  own directory (standalone parent, no core submodule), so it still holds its server-side copy of the wire
-  records; name a class there after its side and keep it in step with the library's records.
+  `e2e/src/stubs/scanner/contract.ts` and `ScannerWireContractTest`. `repsy-scanner-trivy` is a standalone
+  Spring Boot project (own parent, outside the reactor) that depends on `libs/scanner-client` for the wire
+  records it shares with the backend (RPS-2170), so its image is built from the repository root
+  (`docker build -f repsy-scanner-trivy/Dockerfile .`) and `libs/scanner-client` must be installed before
+  `mvn -f repsy-scanner-trivy/pom.xml verify`. Only `ScanJobStatusResponse` and `ScanSubmissionResponse` stay
+  there: the service takes any string as a scan id, the backend's record has a UUID.
 
 ### Methods and fields
 

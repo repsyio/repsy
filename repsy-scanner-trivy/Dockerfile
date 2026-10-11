@@ -21,6 +21,12 @@ FROM aquasec/trivy:${TRIVY_VERSION} AS trivy
 
 # ─────────────────────────────────────────
 # Stage 2: Build the Spring Boot app
+#
+# RPS-2170: the build context is the repository root (docker build -f repsy-scanner-trivy/Dockerfile .),
+# because the service shares the wire records of libs/scanner-client. The library and its parents
+# (core submodule, root and libs POM) are installed into the local repository first, then the
+# service is built against them. Dockerfile.dockerignore next to this file keeps the rest of the
+# repository out of the context.
 # ─────────────────────────────────────────
 FROM eclipse-temurin:25-jdk-alpine AS builder
 
@@ -28,11 +34,29 @@ RUN apk add --no-cache maven
 
 WORKDIR /app
 
-COPY pom.xml ./
-RUN mvn dependency:go-offline -Dcheckstyle.skip=true -Dfmt.skip=true -B
+COPY core/config/ ./config/
+COPY core/ ./core/
 
-COPY src ./src
-RUN mvn package -DskipTests -Dcheckstyle.skip=true -Dfmt.skip=true -B
+WORKDIR /app/core
+RUN mvn install -DskipTests -B
+
+WORKDIR /app
+
+# Error Prone (the root POM) needs the compiler --add-exports of the root .mvn/jvm.config.
+COPY .mvn/ ./.mvn/
+COPY pom.xml ./pom.xml
+COPY libs/pom.xml ./libs/pom.xml
+COPY libs/scanner-client/ ./libs/scanner-client/
+
+RUN mvn -f pom.xml install -N -DskipTests -Dcheckstyle.skip=true -Dfmt.skip=true -B && \
+    mvn -f libs/pom.xml install -N -DskipTests -Dcheckstyle.skip=true -Dfmt.skip=true -B && \
+    mvn -f libs/scanner-client/pom.xml install -Dmaven.test.skip=true -Dcheckstyle.skip=true -Dfmt.skip=true -B
+
+COPY repsy-scanner-trivy/pom.xml ./repsy-scanner-trivy/pom.xml
+RUN mvn -f repsy-scanner-trivy/pom.xml dependency:go-offline -Dcheckstyle.skip=true -Dfmt.skip=true -B
+
+COPY repsy-scanner-trivy/src ./repsy-scanner-trivy/src
+RUN mvn -f repsy-scanner-trivy/pom.xml package -DskipTests -Dcheckstyle.skip=true -Dfmt.skip=true -B
 
 # ─────────────────────────────────────────
 # Stage 3: Runtime
@@ -47,7 +71,7 @@ COPY --from=trivy /usr/local/bin/trivy /usr/local/bin/trivy
 
 WORKDIR /app
 
-COPY --from=builder /app/target/repsy-scanner-trivy.jar app.jar
+COPY --from=builder /app/repsy-scanner-trivy/target/repsy-scanner-trivy.jar app.jar
 
 # Trivy's default cache dir is $HOME/.cache/trivy (verified via `trivy --help`), which resolves to
 # /home/appuser/.cache/trivy for this user — pre-create it with appuser ownership so a mounted

@@ -20,8 +20,8 @@ import static io.repsy.scanner.trivy.services.TrivyTestFiles.LONG_AGO;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import io.repsy.libs.scanner.trivy.ScanJobStatus;
 import io.repsy.scanner.trivy.config.TrivyScannerProperties;
-import io.repsy.scanner.trivy.dtos.ScanJobStatus;
 import io.repsy.scanner.trivy.errors.TrivyScanException;
 import io.repsy.scanner.trivy.jobs.InMemoryJobStore;
 import io.repsy.scanner.trivy.jobs.TrivyDatabaseRefreshTask;

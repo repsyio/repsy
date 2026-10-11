@@ -13,8 +13,8 @@
 # limitations under the License.
 
 # OPT-IN overlay that runs the REAL vulnerability scanner in the e2e stack (RPS-1484): the
-# repsy-scanner-trivy service, built from ../repsy-scanner-trivy with the Trivy binary in it, and Repsy
-# started with SECURITY_SCANNER=enabled pointed at it. tests/api/trivy-contract.spec.ts drives it with
+# repsy-scanner-trivy service, built from the repository root (repsy-scanner-trivy/Dockerfile, RPS-2170)
+# with the Trivy binary in it, and Repsy started with SECURITY_SCANNER=enabled pointed at it. tests/api/trivy-contract.spec.ts drives it with
 # the raw contract calls the stub scanner (docker-compose.stack-scanner.yml) mimics, and with one real
 # scan, so the stub cannot drift from the real contract (README.md "Real scanner stack").
 #
@@ -36,7 +36,9 @@ services:
   scanner-trivy:
     image: ${REPSY_TRIVY_IMAGE:-repsy-e2e-scanner-trivy:${REPSY_E2E_IMAGE_TAG:-local}}
     build:
-      context: ../repsy-scanner-trivy
+      # The repository root (RPS-2170): the service shares the wire records of libs/scanner-client.
+      context: ..
+      dockerfile: repsy-scanner-trivy/Dockerfile
     ports:
       - '127.0.0.1:${REPSY_E2E_SCANNER_PORT:-8090}:8090'
     environment:

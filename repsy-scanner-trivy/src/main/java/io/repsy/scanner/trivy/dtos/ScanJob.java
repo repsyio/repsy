@@ -15,6 +15,8 @@
  */
 package io.repsy.scanner.trivy.dtos;
 
+import io.repsy.libs.scanner.dtos.ScanOutcome;
+import io.repsy.libs.scanner.trivy.ScanJobStatus;
 import java.time.Instant;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;

@@ -15,9 +15,9 @@
  */
 package io.repsy.scanner.trivy.controllers;
 
+import io.repsy.libs.scanner.trivy.AdvisoryLookupRequest;
+import io.repsy.libs.scanner.trivy.AdvisoryLookupResponse;
 import io.repsy.scanner.trivy.config.AdvisoryProperties;
-import io.repsy.scanner.trivy.dtos.AdvisoryLookupResponse;
-import io.repsy.scanner.trivy.dtos.AdvisoryRequest;
 import io.repsy.scanner.trivy.errors.AdvisoryTooLargeException;
 import io.repsy.scanner.trivy.services.AdvisoryLookupService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -55,10 +55,10 @@ public class AdvisoryController {
       throw this.tooLarge();
     }
 
-    final AdvisoryRequest advisoryRequest;
+    final AdvisoryLookupRequest advisoryRequest;
 
     try {
-      advisoryRequest = this.objectMapper.readValue(body, AdvisoryRequest.class);
+      advisoryRequest = this.objectMapper.readValue(body, AdvisoryLookupRequest.class);
     } catch (final JacksonException exception) {
       throw new IllegalArgumentException("The body is not a valid advisory request", exception);
     }

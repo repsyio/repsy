@@ -21,7 +21,7 @@ import java.util.List;
 import org.jspecify.annotations.Nullable;
 
 /** The {@code 200} answer of {@code POST /advisories} of the scanner. */
-record AdvisoryLookupResponse(
+public record AdvisoryLookupResponse(
     @Nullable Instant dbUpdatedAt,
     @Nullable String scannerVersion,
     @Nullable List<ScannerFinding> findings) {}
