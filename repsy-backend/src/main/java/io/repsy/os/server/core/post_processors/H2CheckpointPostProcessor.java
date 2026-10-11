@@ -20,6 +20,7 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.libs.protocol.router.ProtocolProvider;
 import io.repsy.protocols.shared.handlers.HandlerPropertyKeys;
+import io.repsy.protocols.shared.http.UrlMaskingUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.sql.Connection;
@@ -106,7 +107,7 @@ public class H2CheckpointPostProcessor extends ProtocolProcessor {
           "{} after {} {} took {} ms",
           CHECKPOINT_SQL,
           request.getMethod(),
-          request.getRequestURI(),
+          UrlMaskingUtils.maskPath(request.getRequestURI()),
           TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
     }
 

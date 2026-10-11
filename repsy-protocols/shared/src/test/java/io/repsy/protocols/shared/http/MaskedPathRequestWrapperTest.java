@@ -47,6 +47,18 @@ class MaskedPathRequestWrapperTest {
   }
 
   @Test
+  @DisplayName("masks the servlet path and the path info (RPS-2202)")
+  void masksServletPathAndPathInfo() {
+    final var request = request("/a/token/" + SECRET);
+    request.setServletPath("/a/token/" + SECRET);
+    request.setPathInfo("/token/" + SECRET);
+    final var wrapped = new MaskedPathRequestWrapper(request);
+
+    assertThat(wrapped.getServletPath()).isEqualTo("/a/token/***");
+    assertThat(wrapped.getPathInfo()).isEqualTo("/token/***");
+  }
+
+  @Test
   @DisplayName("leaves a path without a marker untouched")
   void plainPath() {
     final var wrapped = MaskedPathRequestWrapper.of(request("/maven/releases/a/b.jar"));

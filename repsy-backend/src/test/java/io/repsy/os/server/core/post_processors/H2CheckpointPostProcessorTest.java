@@ -22,6 +22,10 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -34,6 +38,7 @@ import javax.sql.DataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 
 /**
  * RPS-1556: {@link H2CheckpointPostProcessor} must run a synchronous {@code CHECKPOINT SYNC} after
@@ -126,5 +131,32 @@ class H2CheckpointPostProcessorTest {
         processor.process(new ProtocolContext(), this.request, this.response, properties(true));
 
     assertThat(result.isEmpty()).isTrue();
+  }
+
+  @Test
+  @DisplayName("RPS-2202: the debug line masks the secret segment of the request path")
+  void masksTheRequestPathInTheDebugLine() {
+    final var logger = (Logger) LoggerFactory.getLogger(H2CheckpointPostProcessor.class);
+    final var previousLevel = logger.getLevel();
+    final var appender = new ListAppender<ILoggingEvent>();
+    appender.start();
+    logger.addAppender(appender);
+    logger.setLevel(Level.DEBUG);
+
+    try {
+      when(this.request.getMethod()).thenReturn("DELETE");
+      when(this.request.getRequestURI()).thenReturn("/-/user/token/s3cr3t-token-value");
+
+      this.processorFor(H2_URL)
+          .process(new ProtocolContext(), this.request, this.response, properties(true));
+
+      assertThat(appender.list)
+          .extracting(ILoggingEvent::getFormattedMessage)
+          .anyMatch(message -> message.contains("/-/user/token/***"))
+          .noneMatch(message -> message.contains("s3cr3t-token-value"));
+    } finally {
+      logger.detachAppender(appender);
+      logger.setLevel(previousLevel);
+    }
   }
 }

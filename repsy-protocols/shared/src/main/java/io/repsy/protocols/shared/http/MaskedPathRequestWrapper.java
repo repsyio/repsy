@@ -20,9 +20,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletRequestWrapper;
 
 /**
- * A request whose URI and URL are safe to log (RPS-2174): the secret-bearing segments of the path
- * are masked ({@link UrlMaskingUtils#maskPath(String)}). Handed to {@code exceptionToString}, whose
- * report prints the path of the request.
+ * A request whose URI, URL, servlet path and path info are safe to log (RPS-2174): the
+ * secret-bearing segments of the path are masked ({@link UrlMaskingUtils#maskPath(String)}). Handed
+ * to {@code exceptionToString}, whose report prints the path of the request.
  */
 public class MaskedPathRequestWrapper extends HttpServletRequestWrapper {
 
@@ -40,6 +40,16 @@ public class MaskedPathRequestWrapper extends HttpServletRequestWrapper {
   @Override
   public String getRequestURI() {
     return UrlMaskingUtils.maskPath(super.getRequestURI());
+  }
+
+  @Override
+  public String getServletPath() {
+    return UrlMaskingUtils.maskPath(super.getServletPath());
+  }
+
+  @Override
+  public String getPathInfo() {
+    return UrlMaskingUtils.maskPath(super.getPathInfo());
   }
 
   @Override
