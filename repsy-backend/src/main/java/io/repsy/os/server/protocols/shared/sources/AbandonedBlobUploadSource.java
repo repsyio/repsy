@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.UUID;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
-import org.jspecify.annotations.NonNull;
 
 /**
  * What a protocol that writes blobs through an upload session tells the abandoned blob upload
@@ -40,24 +39,22 @@ public interface AbandonedBlobUploadSource {
           "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
 
   /** The type of the repos this source sweeps. */
-  @NonNull RepoType repoType();
+  RepoType repoType();
 
   /** The blob files of the repo last written before {@code notModifiedSince}. */
-  @NonNull List<StaleFile> listStaleBlobFiles(
-      @NonNull UUID repoId, @NonNull Instant notModifiedSince);
+  List<StaleFile> listStaleBlobFiles(UUID repoId, Instant notModifiedSince);
 
   /**
    * Decides, for a stale file of the repo, whether nothing references it any more. Called once per
    * repo and pass, only when the repo has at least one stale file, so an implementation may load
    * what it needs to decide up front.
    */
-  @NonNull Predicate<StaleFile> collectableIn(@NonNull UUID repoId);
+  Predicate<StaleFile> collectableIn(UUID repoId);
 
   /**
    * Deletes the blob file, and any row that only that file owned.
    *
    * @return the bytes released
    */
-  long deleteBlobFile(@NonNull UUID repoId, @NonNull String repoName, @NonNull String fileName)
-      throws IOException;
+  long deleteBlobFile(UUID repoId, String repoName, String fileName) throws IOException;
 }

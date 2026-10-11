@@ -30,7 +30,6 @@ import java.util.List;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Predicate;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -75,18 +74,18 @@ import org.springframework.stereotype.Service;
 @Service
 public class AbandonedBlobUploadCleanupService {
 
-  private final @NonNull RepoTxService repoTxService;
-  private final @NonNull List<AbandonedBlobUploadSource> sources;
-  private final @NonNull UsageUpdateService usageUpdateService;
-  private final @NonNull Duration ttl;
+  private final RepoTxService repoTxService;
+  private final List<AbandonedBlobUploadSource> sources;
+  private final UsageUpdateService usageUpdateService;
+  private final Duration ttl;
 
   private final ReentrantLock passLock = new ReentrantLock();
 
   public AbandonedBlobUploadCleanupService(
-      final @NonNull RepoTxService repoTxService,
-      final @NonNull List<AbandonedBlobUploadSource> sources,
-      final @NonNull UsageUpdateService usageUpdateService,
-      final @Value("${repsy.storage.abandoned-upload-cleanup.ttl:PT24H}") @NonNull Duration ttl) {
+      final RepoTxService repoTxService,
+      final List<AbandonedBlobUploadSource> sources,
+      final UsageUpdateService usageUpdateService,
+      final @Value("${repsy.storage.abandoned-upload-cleanup.ttl:PT24H}") Duration ttl) {
     this.repoTxService = repoTxService;
     this.sources =
         sources.stream()
@@ -108,7 +107,7 @@ public class AbandonedBlobUploadCleanupService {
    * @param notModifiedSince an upload last written at or after this instant is still in progress
    * @return the bytes released from the repos' disk usage, {@code 0} when another pass is running
    */
-  public long cleanupAbandonedUploads(final @NonNull Instant notModifiedSince) {
+  public long cleanupAbandonedUploads(final Instant notModifiedSince) {
 
     if (!this.passLock.tryLock()) {
       log.debug("An abandoned blob upload cleanup is already running, skipping this one");
@@ -133,7 +132,7 @@ public class AbandonedBlobUploadCleanupService {
   }
 
   private long cleanupRepos(
-      final @NonNull AbandonedBlobUploadSource source, final @NonNull Instant notModifiedSince) {
+      final AbandonedBlobUploadSource source, final Instant notModifiedSince) {
 
     var released = 0L;
 
@@ -149,9 +148,7 @@ public class AbandonedBlobUploadCleanupService {
   }
 
   private long cleanupRepo(
-      final @NonNull AbandonedBlobUploadSource source,
-      final @NonNull Repo repo,
-      final @NonNull Instant notModifiedSince) {
+      final AbandonedBlobUploadSource source, final Repo repo, final Instant notModifiedSince) {
 
     final var files = source.listStaleBlobFiles(repo.getId(), notModifiedSince);
 
@@ -175,10 +172,10 @@ public class AbandonedBlobUploadCleanupService {
   }
 
   private long collectIfNeeded(
-      final @NonNull AbandonedBlobUploadSource source,
-      final @NonNull Repo repo,
-      final @NonNull StaleFile file,
-      final @NonNull Predicate<StaleFile> collectable) {
+      final AbandonedBlobUploadSource source,
+      final Repo repo,
+      final StaleFile file,
+      final Predicate<StaleFile> collectable) {
 
     if (!collectable.test(file)) {
       return 0L;

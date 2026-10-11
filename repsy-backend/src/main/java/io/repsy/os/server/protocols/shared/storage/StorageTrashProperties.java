@@ -16,7 +16,6 @@
 package io.repsy.os.server.protocols.shared.storage;
 
 import java.time.Duration;
-import org.jspecify.annotations.NonNull;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
@@ -33,7 +32,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param trashRetention how long deleted items are kept, {@code P7D} unless configured
  */
 @ConfigurationProperties(prefix = "os.app.storage.file-system")
-public record StorageTrashProperties(@DefaultValue("P7D") @NonNull Duration trashRetention) {
+public record StorageTrashProperties(@DefaultValue("P7D") Duration trashRetention) {
 
   public static final Duration MIN_TRASH_RETENTION = Duration.ofDays(1);
 

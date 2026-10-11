@@ -21,7 +21,6 @@ import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import java.io.IOException;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 
 /**
@@ -38,7 +37,6 @@ import org.springframework.core.io.Resource;
  * and nothing is deleted. A strategy that is unavailable throws its own unchecked exception (503)
  * from the delete, which passes through unchanged.
  */
-@NullMarked
 public abstract class AbstractArtifactStorageService {
 
   protected final StorageStrategy storageStrategy;

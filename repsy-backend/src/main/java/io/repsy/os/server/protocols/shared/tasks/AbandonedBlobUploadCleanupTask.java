@@ -18,7 +18,6 @@ package io.repsy.os.server.protocols.shared.tasks;
 import io.repsy.os.config.async.MaintenanceTaskExecutorConfig;
 import io.repsy.os.server.protocols.shared.services.AbandonedBlobUploadCleanupService;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -41,7 +40,7 @@ import org.springframework.stereotype.Component;
     matchIfMissing = true)
 public class AbandonedBlobUploadCleanupTask {
 
-  private final @NonNull AbandonedBlobUploadCleanupService cleanupService;
+  private final AbandonedBlobUploadCleanupService cleanupService;
 
   @Async(MaintenanceTaskExecutorConfig.BEAN_NAME)
   @Scheduled(

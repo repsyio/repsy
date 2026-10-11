@@ -18,7 +18,6 @@ package io.repsy.protocols.shared.dtos;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -28,7 +27,6 @@ import org.jspecify.annotations.Nullable;
  * of them and the wire bodies are the ones the two former twin records produced. A missing text is
  * written as {@code null}, as the records did.
  */
-@NullMarked
 public record ProtocolErrorBody(List<Map<String, @Nullable String>> errors) {
 
   private static final String DETAIL = "detail";

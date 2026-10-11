@@ -16,7 +16,6 @@
 package io.repsy.protocols.shared.auth;
 
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * The {@code WWW-Authenticate} challenge that the Basic-auth protocols (Maven, Cargo, NuGet, PyPI,
@@ -25,7 +24,6 @@ import org.jspecify.annotations.NullMarked;
  * sbt's {@code Credentials(realm, host, ...)}) has a single, short string to remember.
  */
 @UtilityClass
-@NullMarked
 public final class BasicAuthChallenge {
 
   /** The name of the Basic authentication realm of every repository. */

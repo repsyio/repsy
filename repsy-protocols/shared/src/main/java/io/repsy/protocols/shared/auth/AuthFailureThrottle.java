@@ -30,7 +30,6 @@ import java.util.HexFormat;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -90,9 +89,9 @@ public class AuthFailureThrottle {
   static final String WOULD_BLOCK_METRIC = "repsy.auth.throttle_would_block";
 
   private final @Nullable Cache<String, Window> windows;
-  private final @NonNull AuthThrottleMode mode;
-  private final @NonNull Supplier<@Nullable MeterRegistry> meterRegistry;
-  private final @NonNull Ticker ticker;
+  private final AuthThrottleMode mode;
+  private final Supplier<@Nullable MeterRegistry> meterRegistry;
+  private final Ticker ticker;
   private final long maxFailures;
   private final long saturationLimit;
   private final long windowNanos;
@@ -103,32 +102,30 @@ public class AuthFailureThrottle {
    */
   @Autowired
   public AuthFailureThrottle(
-      final @NonNull AuthThrottleProperties properties,
-      final @NonNull ObjectProvider<MeterRegistry> meterRegistry) {
+      final AuthThrottleProperties properties, final ObjectProvider<MeterRegistry> meterRegistry) {
 
     this(properties, meterRegistry::getIfAvailable, Ticker.systemTicker());
   }
 
   public AuthFailureThrottle(
-      final @NonNull AuthThrottleProperties properties,
-      final @NonNull MeterRegistry meterRegistry) {
+      final AuthThrottleProperties properties, final MeterRegistry meterRegistry) {
 
     this(properties, () -> meterRegistry, Ticker.systemTicker());
   }
 
   @VisibleForTesting
   AuthFailureThrottle(
-      final @NonNull AuthThrottleProperties properties,
-      final @NonNull MeterRegistry meterRegistry,
-      final @NonNull Ticker ticker) {
+      final AuthThrottleProperties properties,
+      final MeterRegistry meterRegistry,
+      final Ticker ticker) {
 
     this(properties, () -> meterRegistry, ticker);
   }
 
   private AuthFailureThrottle(
-      final @NonNull AuthThrottleProperties properties,
-      final @NonNull Supplier<@Nullable MeterRegistry> meterRegistry,
-      final @NonNull Ticker ticker) {
+      final AuthThrottleProperties properties,
+      final Supplier<@Nullable MeterRegistry> meterRegistry,
+      final Ticker ticker) {
 
     this.ticker = ticker;
     this.mode = properties.mode();
@@ -186,7 +183,7 @@ public class AuthFailureThrottle {
     throw new TooManyRequestsException(this.secondsLeft(window, now));
   }
 
-  private void countWouldBlock(final @NonNull String client) {
+  private void countWouldBlock(final String client) {
 
     final var registry = this.meterRegistry.get();
 
@@ -268,18 +265,18 @@ public class AuthFailureThrottle {
     return this.ticker.read();
   }
 
-  private boolean isOpen(final @NonNull Window window, final long now) {
+  private boolean isOpen(final Window window, final long now) {
 
     return this.expired(window, now) || window.failures() < this.maxFailures;
   }
 
-  private boolean expired(final @NonNull Window window, final long now) {
+  private boolean expired(final Window window, final long now) {
 
     return now - window.startNanos() >= this.windowNanos;
   }
 
   /** The window after one more attempt, or a new window when the old one has ended. */
-  private @NonNull Window next(final @Nullable Window current, final long now) {
+  private Window next(final @Nullable Window current, final long now) {
 
     if (current == null || this.expired(current, now)) {
       return new Window(now, 1);
@@ -288,7 +285,7 @@ public class AuthFailureThrottle {
     return new Window(current.startNanos(), Math.min(current.failures() + 1, this.saturationLimit));
   }
 
-  private long secondsLeft(final @NonNull Window window, final long now) {
+  private long secondsLeft(final Window window, final long now) {
 
     final var leftNanos = this.windowNanos - (now - window.startNanos());
 
@@ -318,7 +315,7 @@ public class AuthFailureThrottle {
    * own literal text, which only happens for a remote address Tomcat did not hand us as a literal
    * IP in the first place.
    */
-  private static @NonNull String throttleKey(final @NonNull String remoteAddr) {
+  private static String throttleKey(final String remoteAddr) {
 
     final InetAddress address;
 

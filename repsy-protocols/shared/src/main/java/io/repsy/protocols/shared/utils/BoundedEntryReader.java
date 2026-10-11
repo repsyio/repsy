@@ -18,7 +18,6 @@ package io.repsy.protocols.shared.utils;
 import java.io.IOException;
 import java.io.InputStream;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * Reads one entry of an uploaded archive (a {@code .crate}, {@code .nupkg}, module zip, ...) into
@@ -27,7 +26,6 @@ import org.jspecify.annotations.NullMarked;
  * exhaust the heap of the whole instance with a small upload.
  */
 @UtilityClass
-@NullMarked
 public class BoundedEntryReader {
 
   /** The longest array the JVM reliably allocates, which the one extra byte read must still fit. */

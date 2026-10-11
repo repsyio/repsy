@@ -22,11 +22,9 @@ import io.repsy.os.shared.repo.dtos.RepoInfo;
 import java.util.Map;
 import java.util.Objects;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.web.context.request.NativeWebRequest;
 
-@NullMarked
 @UtilityClass
 public class ResolverUtils {
 

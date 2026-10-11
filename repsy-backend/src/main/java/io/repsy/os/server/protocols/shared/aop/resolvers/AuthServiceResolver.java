@@ -19,8 +19,8 @@ import io.repsy.os.server.protocols.shared.aop.utils.ResolverUtils;
 import io.repsy.os.server.shared.auth.ProtocolAuthService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.Map;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.MethodParameter;
 import org.springframework.stereotype.Component;
@@ -30,7 +30,6 @@ import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
 
 @Component
-@NullMarked
 @RequiredArgsConstructor
 public class AuthServiceResolver implements HandlerMethodArgumentResolver {
 
@@ -49,7 +48,7 @@ public class AuthServiceResolver implements HandlerMethodArgumentResolver {
       final NativeWebRequest webRequest,
       final @Nullable WebDataBinderFactory binderFactory) {
 
-    final var repoInfo = ResolverUtils.extractRepoInfo(webRequest);
+    final var repoInfo = Objects.requireNonNull(ResolverUtils.extractRepoInfo(webRequest));
 
     return this.authServiceMap.get(repoInfo.getType());
   }

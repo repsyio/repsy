@@ -15,13 +15,10 @@
  */
 package io.repsy.protocols.shared.utils;
 
-import org.jspecify.annotations.NullMarked;
-
 /**
  * Thrown by {@link BoundedEntryReader} when an archive entry inflates past the allowed size, and by
  * {@link SpooledUpload} when an upload is larger than the allowed size.
  */
-@NullMarked
 public class EntryTooLargeException extends RuntimeException {
 
   private static final long serialVersionUID = 1L;

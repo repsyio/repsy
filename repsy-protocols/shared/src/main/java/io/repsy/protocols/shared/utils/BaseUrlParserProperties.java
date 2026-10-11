@@ -19,14 +19,13 @@ import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import lombok.Data;
 import lombok.experimental.SuperBuilder;
-import org.jspecify.annotations.NonNull;
 
 @Data
 @SuperBuilder
 public class BaseUrlParserProperties<ID, T extends BaseRepoInfo<ID>> {
-  private final @NonNull String repoName;
-  private final @NonNull RelativePath relativePath;
-  private final @NonNull T repoInfo;
+  private final String repoName;
+  private final RelativePath relativePath;
+  private final T repoInfo;
 
   /**
    * The repository as the request URL names it, without the image: {@code <repo>} here, and {@code
@@ -34,7 +33,7 @@ public class BaseUrlParserProperties<ID, T extends BaseRepoInfo<ID>> {
    * it). The distribution spec wants the {@code name} of a {@code tags/list} answer to be what the
    * client addressed, so it is built from this and not from {@link #getRepoName()}.
    */
-  public @NonNull String getRepoPath() {
+  public String getRepoPath() {
     return this.repoName;
   }
 }

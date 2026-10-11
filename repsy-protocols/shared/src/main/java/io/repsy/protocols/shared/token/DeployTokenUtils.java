@@ -17,11 +17,10 @@ package io.repsy.protocols.shared.token;
 
 import java.time.Instant;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NonNull;
 
 @UtilityClass
 public class DeployTokenUtils {
-  public static boolean isExpired(final @NonNull Instant expirationDate) {
+  public static boolean isExpired(final Instant expirationDate) {
     return Instant.now().isAfter(expirationDate);
   }
 }

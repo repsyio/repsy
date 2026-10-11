@@ -21,14 +21,12 @@ import io.repsy.os.server.protocols.shared.aop.resolvers.AuthServiceResolver;
 import io.repsy.os.server.protocols.shared.aop.resolvers.RepoInfoResolver;
 import io.repsy.os.server.protocols.shared.aop.resolvers.RepoPermissionInfoResolver;
 import java.util.List;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-@NullMarked
 @Configuration
 public class ProtocolEndpointDispatcher implements WebMvcConfigurer {
 

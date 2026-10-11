@@ -17,7 +17,6 @@ package io.repsy.protocols.shared.limits;
 
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -25,7 +24,6 @@ import org.jspecify.annotations.Nullable;
  * URL would point elsewhere), so an over-long value is dropped whole and the publish goes through.
  */
 @Slf4j
-@NullMarked
 public final class FieldLimits {
 
   private FieldLimits() {

@@ -20,7 +20,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpMethod;
 
@@ -37,7 +36,6 @@ import org.springframework.http.HttpMethod;
  * @param path accepts the relative path (the part after the repository), or {@code null} when the
  *     path parser the handler is built with already decides
  */
-@NullMarked
 public record HandlerRoute(
     List<HttpMethod> methods,
     Map<String, Object> properties,

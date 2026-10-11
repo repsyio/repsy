@@ -16,6 +16,7 @@
 package io.repsy.protocols.shared.auth;
 
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
@@ -37,7 +38,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "repsy.security.auth-throttle")
 public record AuthThrottleProperties(
     AuthThrottleMode mode,
-    Boolean enabled,
+    @Nullable Boolean enabled,
     Integer maxFailures,
     Long windowSeconds,
     Long maxClients) {

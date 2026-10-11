@@ -19,12 +19,11 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import java.util.Objects;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 @UtilityClass
-@NullMarked
 public class ProtocolContextUtils {
 
   private static final String URL_PROPERTIES = "urlProperties";
@@ -32,12 +31,11 @@ public class ProtocolContextUtils {
 
   @SuppressWarnings("unchecked")
   public static <ID> BaseRepoInfo<ID> getRepoInfo(final ProtocolContext context) {
-    return (BaseRepoInfo<ID>)
-        context.<BaseUrlParserProperties<?, ?>>getProperty(URL_PROPERTIES).getRepoInfo();
+    return (BaseRepoInfo<ID>) urlProperties(context).getRepoInfo();
   }
 
   public static RelativePath getRelativePath(final ProtocolContext context) {
-    return context.<BaseUrlParserProperties<?, ?>>getProperty(URL_PROPERTIES).getRelativePath();
+    return urlProperties(context).getRelativePath();
   }
 
   /**
@@ -56,7 +54,11 @@ public class ProtocolContextUtils {
   public static <ID, REPO_INFO extends BaseRepoInfo<ID>>
       BaseUrlParserProperties<ID, REPO_INFO> getUrlProperties(final ProtocolContext context) {
 
-    return (BaseUrlParserProperties<ID, REPO_INFO>)
-        context.<BaseUrlParserProperties<?, ?>>getProperty(URL_PROPERTIES);
+    return (BaseUrlParserProperties<ID, REPO_INFO>) urlProperties(context);
+  }
+
+  private static BaseUrlParserProperties<?, ?> urlProperties(final ProtocolContext context) {
+    return Objects.requireNonNull(
+        context.<BaseUrlParserProperties<?, ?>>getProperty(URL_PROPERTIES));
   }
 }

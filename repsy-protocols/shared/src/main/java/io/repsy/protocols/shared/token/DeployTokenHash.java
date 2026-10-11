@@ -17,12 +17,11 @@ package io.repsy.protocols.shared.token;
 
 import lombok.experimental.UtilityClass;
 import org.apache.commons.codec.digest.DigestUtils;
-import org.jspecify.annotations.NonNull;
 
 @UtilityClass
 public class DeployTokenHash {
 
-  public static @NonNull String hash(final @NonNull String token) {
+  public static String hash(final String token) {
     return DigestUtils.sha256Hex(token);
   }
 }
