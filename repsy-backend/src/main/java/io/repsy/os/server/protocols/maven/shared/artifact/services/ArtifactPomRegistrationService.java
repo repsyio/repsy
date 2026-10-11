@@ -36,8 +36,12 @@ import org.springframework.stereotype.Component;
 /**
  * Registers a stored POM (RPS-2167, split out of {@link ArtifactDeploymentService}): reads it,
  * checks that it may be registered, and has the rows written around the verification of the
- * signatures that arrived before it. It has no transaction of its own: {@link
- * ArtifactDeploymentService#createOrUpdateArtifact} calls it inside its read write one.
+ * signatures that arrived before it. It has no transaction of its own, and neither has {@link
+ * ArtifactDeploymentService#createOrUpdateArtifact} that calls it (RPS-2176): the checks of the
+ * parked signatures and the row inserts run in transactions of their own ({@code REQUIRES_NEW}), so
+ * a transaction around them held a pooled connection while they needed a second one. The version
+ * lock and the recomputation of {@code signed} are the transaction of {@link
+ * ArtifactSignatureService#updateSignedForFile}.
  */
 @Slf4j
 @Component

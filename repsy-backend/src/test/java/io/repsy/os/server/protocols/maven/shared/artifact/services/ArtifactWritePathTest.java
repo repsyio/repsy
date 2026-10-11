@@ -19,6 +19,7 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
@@ -126,9 +127,6 @@ class ArtifactWritePathTest {
     final var rowWriteService =
         new ArtifactRowWriteService(
             this.artifactRepository,
-            this.artifactVersionRepository,
-            this.versionDeveloperRepository,
-            this.versionLicenseRepository,
             this.artifactUpsertHelper,
             this.artifactVersionWriteService,
             queryService,
@@ -259,11 +257,8 @@ class ArtifactWritePathTest {
 
     this.registerPom();
 
-    verify(this.versionDeveloperRepository).deleteAllByArtifactVersionId(existingVersion.getId());
-    verify(this.versionLicenseRepository).deleteAllByArtifactVersionId(existingVersion.getId());
-    verify(this.artifactVersionWriteService).createVersionDevelopers(any(), any());
-    verify(this.artifactVersionWriteService).createVersionLicenses(any(), any());
-    verify(this.artifactVersionRepository).save(existingVersion);
+    // One transaction of the version write service: the rows of the version are replaced together.
+    verify(this.artifactVersionWriteService).replaceVersionDetails(any(), eq(existingVersion));
     assertThat(existingVersion.getName()).isEqualTo("Lib");
   }
 
@@ -303,11 +298,8 @@ class ArtifactWritePathTest {
 
     this.registerPom();
 
-    verify(this.versionDeveloperRepository).deleteAllByArtifactVersionId(existingVersion.getId());
-    verify(this.versionLicenseRepository).deleteAllByArtifactVersionId(existingVersion.getId());
-    verify(this.artifactVersionWriteService).createVersionDevelopers(any(), any());
-    verify(this.artifactVersionWriteService).createVersionLicenses(any(), any());
-    verify(this.artifactVersionRepository).save(existingVersion);
+    // One transaction of the version write service: the rows of the version are replaced together.
+    verify(this.artifactVersionWriteService).replaceVersionDetails(any(), eq(existingVersion));
     verify(this.artifactUpsertHelper, never()).insertArtifactVersion(any(), any(), any());
     verify(this.artifactUpsertHelper, never()).insertArtifact(any());
     assertThat(existingVersion.getName()).isEqualTo("Lib");

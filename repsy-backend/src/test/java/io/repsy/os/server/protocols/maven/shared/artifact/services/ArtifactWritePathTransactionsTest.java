@@ -32,8 +32,8 @@ import org.springframework.transaction.annotation.Transactional;
  * ArtifactServicesTransactionsTest} does not see because it only lists public operations by their
  * read only or read write mode: the two row inserts run in a transaction of their own so a unique
  * violation of a concurrent upload rolls back only that insert, and every other write joins the
- * transaction of the upload. The split of the write path into several services must not change
- * either.
+ * transaction it is called in (the upload has none since RPS-2176). The split of the write path
+ * into several services must not change either.
  */
 @DisplayName("Maven write path keeps its transaction propagation (RPS-2167)")
 class ArtifactWritePathTransactionsTest {
@@ -65,7 +65,10 @@ class ArtifactWritePathTransactionsTest {
   void theDependentWritesJoinTheCallersTransaction() {
     for (final var name :
         List.of(
-            "createVersionDevelopers", "createVersionLicenses", "updateReleaseAndLatestVersion")) {
+            "createVersionDevelopers",
+            "createVersionLicenses",
+            "updateReleaseAndLatestVersion",
+            "replaceVersionDetails")) {
       final var attribute = attribute(ArtifactVersionWriteService.class, name);
 
       assertThat(attribute).as(name).isNotNull();
@@ -75,10 +78,26 @@ class ArtifactWritePathTransactionsTest {
   }
 
   @Test
-  @DisplayName("the uploads and deletes join an outer transaction, and the judgements read only")
+  @DisplayName("the upload opens no transaction around its REQUIRES_NEW work (RPS-2176)")
+  void theUploadHoldsNoConnectionAcrossTheNewTransactions() {
+    // RPS-2176: a read write transaction around the whole upload held a pooled connection while the
+    // inserts and the checks of the parked signatures asked for a second one.
+    for (final var target :
+        List.of(
+            Map.entry(ArtifactDeploymentService.class, "createOrUpdateArtifact"),
+            Map.entry(ArtifactSignatureService.class, "reconcileFile"))) {
+      final var attribute = attribute(target.getKey(), target.getValue());
+
+      assertThat(attribute).as(target.getValue()).isNotNull();
+      assertThat(attribute.propagation()).as(target.getValue()).isEqualTo(Propagation.SUPPORTS);
+      assertThat(attribute.readOnly()).as(target.getValue()).isFalse();
+    }
+  }
+
+  @Test
+  @DisplayName("the deletes join an outer transaction, and the judgements read only")
   void theEntryPointsKeepTheirPropagation() {
-    final var writes =
-        List.of("createOrUpdateArtifact", "deleteArtifact", "deleteArtifactVersion", "deleteGroup");
+    final var writes = List.of("deleteArtifact", "deleteArtifactVersion", "deleteGroup");
     final var wrong = new ArrayList<String>();
 
     for (final var name : writes) {

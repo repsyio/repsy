@@ -25,9 +25,6 @@ import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.Artifact;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.ArtifactVersion;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactRepository;
-import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactVersionRepository;
-import io.repsy.os.server.protocols.maven.shared.artifact.repositories.VersionDeveloperRepository;
-import io.repsy.os.server.protocols.maven.shared.artifact.repositories.VersionLicenseRepository;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.protocols.maven.shared.utils.MavenGavUtils;
 import io.repsy.protocols.maven.shared.utils.PomModelUtils;
@@ -49,9 +46,12 @@ import org.springframework.stereotype.Component;
 /**
  * Writes the artifact and version rows of a registered POM (RPS-2167, split out of {@link
  * ArtifactDeploymentService}): creates them, or updates the ones that exist, and recovers from a
- * concurrent upload that inserted the same row first. It has no transaction of its own: it runs in
- * the transaction of the upload it is called from, and the two inserts go through {@link
- * ArtifactUpsertHelper}, whose {@code REQUIRES_NEW} transactions are unchanged.
+ * concurrent upload that inserted the same row first. It has no transaction of its own, and neither
+ * has the upload that calls it (RPS-2176): a transaction held across the two inserts, which go
+ * through {@link ArtifactUpsertHelper} and run in transactions of their own ({@code REQUIRES_NEW},
+ * unchanged), needed a second pooled connection while it held the first. Each write below is a
+ * transaction of its own, and the ones that belong together are one method of {@link
+ * ArtifactVersionWriteService}.
  */
 @Slf4j
 @Component
@@ -67,9 +67,6 @@ class ArtifactRowWriteService {
       "ux_maven_artifact_version__artifact_id_version_name";
 
   private final ArtifactRepository artifactRepository;
-  private final ArtifactVersionRepository artifactVersionRepository;
-  private final VersionDeveloperRepository versionDeveloperRepository;
-  private final VersionLicenseRepository versionLicenseRepository;
   private final ArtifactUpsertHelper artifactUpsertHelper;
   private final ArtifactVersionWriteService artifactVersionWriteService;
   private final ArtifactQueryService artifactQueryService;
@@ -260,13 +257,7 @@ class ArtifactRowWriteService {
         pluginPrefix,
         artifactVersion);
 
-    this.versionDeveloperRepository.deleteAllByArtifactVersionId(artifactVersion.getId());
-    this.versionLicenseRepository.deleteAllByArtifactVersionId(artifactVersion.getId());
-
-    this.artifactVersionWriteService.createVersionDevelopers(pomModel, artifactVersion);
-    this.artifactVersionWriteService.createVersionLicenses(pomModel, artifactVersion);
-
-    this.artifactVersionRepository.save(artifactVersion);
+    this.artifactVersionWriteService.replaceVersionDetails(pomModel, artifactVersion);
 
     log.info("Artifact version updated for repo {} ", repo.getId());
   }

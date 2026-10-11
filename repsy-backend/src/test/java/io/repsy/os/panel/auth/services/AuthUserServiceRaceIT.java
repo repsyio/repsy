@@ -30,11 +30,15 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * RPS-1152: a user deleted between the password/refresh-token check and the moment the new refresh
@@ -65,6 +69,7 @@ import org.springframework.transaction.annotation.Transactional;
 class AuthUserServiceRaceIT extends AbstractIT {
 
   @MockitoSpyBean private UserTxService userTxServiceSpy;
+  @Autowired private PlatformTransactionManager transactionManager;
 
   private final List<UUID> createdUserIds = new ArrayList<>();
 
@@ -95,7 +100,14 @@ class AuthUserServiceRaceIT extends AbstractIT {
     Mockito.doAnswer(
             invocation -> {
               final var result = invocation.callRealMethod();
-              this.jdbcTemplate.update("delete from users where id = ?", user.getId());
+              // RPS-2176: the login has no transaction of its own around its reads any more, so
+              // this runs inside the read only one of the lookup: the delete goes in a transaction
+              // of its own.
+              final var deletion = new TransactionTemplate(this.transactionManager);
+              deletion.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+              deletion.executeWithoutResult(
+                  status ->
+                      this.jdbcTemplate.update("delete from users where id = ?", user.getId()));
               return result;
             })
         .when(this.userTxServiceSpy)
