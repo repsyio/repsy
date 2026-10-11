@@ -29,6 +29,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.context.support.StaticMessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -52,6 +53,9 @@ class OciErrorsTest {
     final var messageSource = new StaticMessageSource();
     messageSource.addMessage("manifestNotFound", Locale.ROOT, "Manifest not found.");
     messageSource.addMessage("manifestNotFound", Locale.ENGLISH, "Manifest not found.");
+    // StaticMessageSource matches the exact locale only; the factory asks for the current one
+    messageSource.addMessage(
+        "manifestNotFound", LocaleContextHolder.getLocale(), "Manifest not found.");
     return new RestResponseFactory(messageSource);
   }
 
