@@ -17,6 +17,7 @@ package io.repsy.os.server.security.scan.dtos;
 
 import io.repsy.libs.scanner.dtos.Severity;
 import java.time.Instant;
+import org.jspecify.annotations.Nullable;
 
 public interface RecentVersionScan {
   String getArtifactName();
@@ -25,9 +26,9 @@ public interface RecentVersionScan {
 
   ScanStatus getStatus();
 
-  Severity getSeverity();
+  @Nullable Severity getSeverity();
 
   Instant getScannedAt();
 
-  Instant getLastCompletedAt();
+  @Nullable Instant getLastCompletedAt();
 }

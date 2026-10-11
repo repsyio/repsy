@@ -17,6 +17,7 @@ package io.repsy.os.server.shared.token.dtos;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import java.time.Instant;
+import org.jspecify.annotations.Nullable;
 
 public interface DeployTokenInfoListItem {
 
@@ -28,12 +29,12 @@ public interface DeployTokenInfoListItem {
   String getUsername();
 
   @JsonInclude(JsonInclude.Include.NON_EMPTY)
-  String getDescription();
+  @Nullable String getDescription();
 
   boolean isReadOnly();
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
-  Instant getExpirationDate();
+  @Nullable Instant getExpirationDate();
 
   Instant getCreatedAt();
 }

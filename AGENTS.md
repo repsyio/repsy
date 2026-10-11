@@ -304,6 +304,13 @@ for SonarCloud.
   that holds repositories. `RepositoryNullabilityTest` checks every repository signature, marked or
   not, and names the method and the fix; its `FROZEN` map may only shrink. `NullMarkedRepositoryIT`
   shows the behaviour with a null-marked probe repository.
+  The same marking guards the getters of an interface projection (RPS-2077, found by the Docker
+  `ImageListItem#getDigest` of an image without tags, which answered 500): a getter that is not
+  `@Nullable` and reads a nullable column, a `left join` or an aggregate throws "Return value is
+  null but must not be null". Annotate it `@Nullable` before marking the package;
+  `ProjectionNullabilityIT` derives the column from the HQL select clause and the Flyway schema
+  and fails in the marked packages (it cannot derive native queries, `case`/`coalesce`
+  expressions or `select new` DTOs: those need `@Nullable` or a reasoned `FROZEN` entry).
 - Frontend: follow the Angular Style Guide and the "JavaScript and TypeScript naming" rules below, and run
   `pnpm lint` in `repsy-frontend/` (and in `e2e/` for the Playwright suite).
 - Commit messages: conventional commits, prefixed with the Jira key where there is one
