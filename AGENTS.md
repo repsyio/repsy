@@ -295,6 +295,15 @@ for SonarCloud.
 - Lombok and MapStruct annotation processors are available via `core-parent`.
 - New source files need the Apache 2.0 licence header (see any existing file), or RAT fails
   the build.
+- Spring Data repositories under `@NullMarked` (RPS-2077): Spring Data enforces the nullability of
+  the signature. A query that tolerates null (`:x is null or ...`, `coalesce(:x, ...)`,
+  `cast(:x as ...)`) needs `@Nullable` on that parameter, or a null argument throws
+  `IllegalArgumentException` (the Ruby `findAllByGemId` failure, found in #1088); a method that can
+  return null (an aggregate such as `select sum(...)`, a bare entity) must return `Optional` or
+  `@Nullable`, or null throws `EmptyResultDataAccessException`. Do this before marking a package
+  that holds repositories. `RepositoryNullabilityTest` checks every repository signature, marked or
+  not, and names the method and the fix; its `FROZEN` map may only shrink. `NullMarkedRepositoryIT`
+  shows the behaviour with a null-marked probe repository.
 - Frontend: follow the Angular Style Guide and the "JavaScript and TypeScript naming" rules below, and run
   `pnpm lint` in `repsy-frontend/` (and in `e2e/` for the Playwright suite).
 - Commit messages: conventional commits, prefixed with the Jira key where there is one
