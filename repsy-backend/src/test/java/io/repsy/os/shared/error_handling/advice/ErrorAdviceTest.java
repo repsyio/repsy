@@ -786,14 +786,19 @@ class ErrorAdviceTest {
     panel.handleNoResourceFound(
         new NoResourceFoundException(HttpMethod.GET, "/missing", "missing"), request, null);
 
-    assertThat(this.logEvents.list)
-        .filteredOn(event -> event.getLevel() == Level.DEBUG)
-        .extracting(ILoggingEvent::getFormattedMessage)
-        .containsExactly(
-            "Method argument not valid",
-            "Missing request parameter",
-            "Unauthorized request",
-            "Resource not found");
+    // The message is "<what happened>: <exception report>" since RPS-2174: the report describes
+    // the exception without the request values, so only the leading description is pinned here.
+    final var messages =
+        this.logEvents.list.stream()
+            .filter(event -> event.getLevel() == Level.DEBUG)
+            .map(ILoggingEvent::getFormattedMessage)
+            .toList();
+
+    assertThat(messages).hasSize(4);
+    assertThat(messages.get(0)).startsWith("Method argument not valid: ");
+    assertThat(messages.get(1)).startsWith("Missing request parameter: ");
+    assertThat(messages.get(2)).startsWith("Unauthorized request: ");
+    assertThat(messages.get(3)).startsWith("Resource not found: ");
   }
 
   @RestController

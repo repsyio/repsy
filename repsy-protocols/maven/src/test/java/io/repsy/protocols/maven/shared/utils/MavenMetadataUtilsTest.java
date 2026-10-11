@@ -19,10 +19,14 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import org.apache.maven.artifact.repository.metadata.Metadata;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 
 @DisplayName("MavenMetadataUtils")
 class MavenMetadataUtilsTest {
@@ -117,5 +121,28 @@ class MavenMetadataUtilsTest {
     assertThat(none.getVersioning()).isNull();
     assertThat(empty.getVersioning().getLatest()).isNull();
     assertThat(empty.getVersioning().getRelease()).isNull();
+  }
+
+  @Test
+  @DisplayName("does not log the content of a malformed file (RPS-2174)")
+  void malformedMetadataDoesNotLogTheContent() {
+    final var logs = new ListAppender<ILoggingEvent>();
+    final var logger = (Logger) LoggerFactory.getLogger(MavenMetadataUtils.class);
+    logs.start();
+    logger.addAppender(logs);
+
+    try {
+      assertThatThrownBy(
+              () ->
+                  MavenMetadataUtils.readMetadata(
+                      "<metadata><s3cr3t-token-value></metadata>".getBytes(UTF_8)))
+          .isInstanceOf(BadRequestException.class);
+    } finally {
+      logger.detachAppender(logs);
+    }
+
+    assertThat(logs.list).isNotEmpty();
+    assertThat(logs.list)
+        .noneMatch(event -> event.getFormattedMessage().contains("s3cr3t-token-value"));
   }
 }
