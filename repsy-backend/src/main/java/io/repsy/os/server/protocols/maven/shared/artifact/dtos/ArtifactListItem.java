@@ -16,17 +16,16 @@
 package io.repsy.os.server.protocols.maven.shared.artifact.dtos;
 
 import java.time.Instant;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 public interface ArtifactListItem {
-  @NonNull String getGroupName();
+  String getGroupName();
 
-  @NonNull String getArtifactName();
+  String getArtifactName();
 
   @Nullable String getPackaging();
 
   @Nullable Instant getLastUpdatedAt();
 
-  @NonNull String getLatest();
+  String getLatest();
 }

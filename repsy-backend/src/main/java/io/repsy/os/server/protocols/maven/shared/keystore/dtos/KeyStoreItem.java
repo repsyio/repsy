@@ -16,15 +16,14 @@
 package io.repsy.os.server.protocols.maven.shared.keystore.dtos;
 
 import java.util.UUID;
-import org.jspecify.annotations.NonNull;
 
 public interface KeyStoreItem {
 
-  @NonNull UUID getId();
+  UUID getId();
 
-  @NonNull UUID getAllowedKeyserverId();
+  UUID getAllowedKeyserverId();
 
-  @NonNull String getHost();
+  String getHost();
 
-  @NonNull String getDisplayName();
+  String getDisplayName();
 }

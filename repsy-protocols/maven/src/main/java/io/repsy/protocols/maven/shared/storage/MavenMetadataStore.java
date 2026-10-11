@@ -50,7 +50,6 @@ import org.apache.maven.artifact.repository.metadata.Metadata;
 import org.apache.maven.artifact.repository.metadata.Plugin;
 import org.apache.maven.artifact.repository.metadata.io.xpp3.MetadataXpp3Writer;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 
@@ -64,7 +63,6 @@ import org.springframework.core.io.Resource;
  * <p>The state is the lock table, so one instance belongs to one storage service: the locks only
  * serialize the callers that share it.
  */
-@NullMarked
 public class MavenMetadataStore<ID> {
 
   private static final String METADATA_FILENAME = "maven-metadata.xml";

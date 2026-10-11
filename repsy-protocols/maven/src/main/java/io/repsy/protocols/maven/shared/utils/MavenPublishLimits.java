@@ -25,7 +25,6 @@ import org.apache.maven.index.artifact.Gav;
 import org.apache.maven.model.Developer;
 import org.apache.maven.model.License;
 import org.apache.maven.model.Model;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -59,7 +58,6 @@ import org.jspecify.annotations.Nullable;
  * release version are also copied into {@code maven_artifact.latest} and {@code release}, which are
  * {@code varchar(255)}: a longer version could be inserted and then fail that update.
  */
-@NullMarked
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class MavenPublishLimits {
 

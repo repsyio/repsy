@@ -16,11 +16,9 @@
 package io.repsy.protocols.maven.protocol;
 
 import io.repsy.libs.protocol.router.ProtocolProvider;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
 @Component
-@NullMarked
 public class MavenProtocolProvider extends ProtocolProvider {
 
   @Override

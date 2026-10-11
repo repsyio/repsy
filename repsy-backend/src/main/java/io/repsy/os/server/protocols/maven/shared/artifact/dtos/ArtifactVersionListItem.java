@@ -16,12 +16,11 @@
 package io.repsy.os.server.protocols.maven.shared.artifact.dtos;
 
 import java.time.LocalDateTime;
-import org.jspecify.annotations.NonNull;
 
 public interface ArtifactVersionListItem {
-  @NonNull String getVersionName();
+  String getVersionName();
 
-  @NonNull LocalDateTime getLastUpdatedAt();
+  LocalDateTime getLastUpdatedAt();
 
   boolean isSigned();
 }

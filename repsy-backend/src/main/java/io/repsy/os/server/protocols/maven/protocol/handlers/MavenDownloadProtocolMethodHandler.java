@@ -20,12 +20,10 @@ import io.repsy.protocols.maven.protocol.MavenProtocolProvider;
 import io.repsy.protocols.maven.protocol.facades.contracts.MavenProtocolFacade;
 import io.repsy.protocols.maven.protocol.handlers.AbstractMavenDownloadProtocolMethodHandler;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 @Component
-@NullMarked
 public class MavenDownloadProtocolMethodHandler
     extends AbstractMavenDownloadProtocolMethodHandler<UUID> {
 

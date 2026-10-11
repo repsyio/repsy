@@ -18,7 +18,6 @@ package io.repsy.protocols.maven.shared.keystore.configs;
 import io.repsy.core.web.http.ResponseSizeLimitInterceptor;
 import java.net.http.HttpClient;
 import java.time.Duration;
-import org.jspecify.annotations.NonNull;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
@@ -27,12 +26,12 @@ import org.springframework.web.client.RestClient;
 @Configuration
 public class PgpVerifierRestClientConfig {
 
-  private static final @NonNull Duration CONNECT_TIMEOUT = Duration.ofSeconds(3);
-  private static final @NonNull Duration RESPONSE_TIMEOUT = Duration.ofSeconds(5);
+  private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(3);
+  private static final Duration RESPONSE_TIMEOUT = Duration.ofSeconds(5);
   private static final int MAX_RESPONSE_BYTES = 512 * 1024;
 
   @Bean
-  public @NonNull RestClient pgpVerifierRestClient() {
+  public RestClient pgpVerifierRestClient() {
 
     // HTTP/1.1 and no redirects, as the Reactor Netty client this replaced: the JDK client would
     // otherwise offer an h2c upgrade.

@@ -15,8 +15,6 @@
  */
 package io.repsy.protocols.maven.shared.artifact.dtos;
 
-import org.jspecify.annotations.NullMarked;
-
 /**
  * A plugin whose registered goal prefix was corrected once its jar arrived: the POM of {@code mvn
  * deploy} is stored before the jar, so the prefix it registered was the one derived from the
@@ -26,5 +24,4 @@ import org.jspecify.annotations.NullMarked;
  * @param from the prefix that was registered
  * @param to the prefix the jar's {@code plugin.xml} names, now registered
  */
-@NullMarked
 public record PluginPrefixChange(String artifactId, String from, String to) {}

@@ -29,7 +29,6 @@ import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Component;
@@ -55,7 +54,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
-@NullMarked
 public class ArtifactDeploymentService extends AbstractArtifactService<UUID> {
 
   private final ArtifactQueryService artifactQueryService;

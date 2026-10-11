@@ -33,11 +33,11 @@ import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,20 +48,19 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 public class MavenApiFacade implements ProtocolApiFacadeMavenAdapter {
 
-  private final @NonNull RepoTxService repoTxService;
-  private final @NonNull ArtifactQueryService artifactQueryService;
-  private final @NonNull MavenStorageService mavenStorageService;
+  private final RepoTxService repoTxService;
+  private final ArtifactQueryService artifactQueryService;
+  private final MavenStorageService mavenStorageService;
 
   @Transactional
   @Override
-  public void deleteRepo(final @NonNull RepoInfo repoInfo) {
+  public void deleteRepo(final RepoInfo repoInfo) {
 
     this.mavenStorageService.deleteRepo(repoInfo.getStorageKey());
   }
 
   @Override
-  public @NonNull List<StorageItemInfo> getItems(
-      final @NonNull RepoInfo repoInfo, final @NonNull RelativePath relativePath) {
+  public List<StorageItemInfo> getItems(final RepoInfo repoInfo, final RelativePath relativePath) {
 
     this.validateParams(repoInfo.getName(), relativePath.getPath());
 
@@ -72,7 +71,7 @@ public class MavenApiFacade implements ProtocolApiFacadeMavenAdapter {
     return this.mavenStorageService.getItems(storagePath);
   }
 
-  public @NonNull RepoSettingsInfo getSettings(final @NonNull String repoName) {
+  public RepoSettingsInfo getSettings(final String repoName) {
 
     final var repoInfo = this.repoTxService.getRepo(repoName, RepoType.MAVEN);
 
@@ -85,13 +84,12 @@ public class MavenApiFacade implements ProtocolApiFacadeMavenAdapter {
   }
 
   @Transactional
-  public void updateSettings(
-      final @NonNull RepoInfo repoInfo, final @NonNull RepoSettingsForm settings) {
+  public void updateSettings(final RepoInfo repoInfo, final RepoSettingsForm settings) {
 
     this.repoTxService.updateSettings(repoInfo.getStorageKey(), settings);
   }
 
-  private void validateParams(final @NonNull String repoName, final @NonNull String path) {
+  private void validateParams(final String repoName, final String path) {
 
     RepoUtils.validateRepoName(repoName);
 
@@ -104,10 +102,10 @@ public class MavenApiFacade implements ProtocolApiFacadeMavenAdapter {
     }
   }
 
-  public @NonNull ArtifactVersionInfo getArtifactVersion(
-      final @NonNull RepoInfo repoInfo,
-      final @NonNull String groupName,
-      final @NonNull String artifactName,
+  public ArtifactVersionInfo getArtifactVersion(
+      final RepoInfo repoInfo,
+      final String groupName,
+      final String artifactName,
       final @Nullable String versionName)
       throws IOException, XmlPullParserException {
 
@@ -124,10 +122,8 @@ public class MavenApiFacade implements ProtocolApiFacadeMavenAdapter {
         this.artifactQueryService.getArtifactVersionPomFilename(
             repoInfo,
             artifactBasePath,
-            artifactVersionInfo.getType() != null
-                ? io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType.valueOf(
-                    artifactVersionInfo.getType().name())
-                : null,
+            io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType.valueOf(
+                Objects.requireNonNull(artifactVersionInfo.getType()).name()),
             artifactVersionInfo.getArtifactName(),
             artifactVersionInfo.getVersionName());
 
@@ -149,7 +145,7 @@ public class MavenApiFacade implements ProtocolApiFacadeMavenAdapter {
 
   @Transactional
   @Override
-  public void createRepo(final @NonNull UUID repoId) {
+  public void createRepo(final UUID repoId) {
     this.mavenStorageService.createRepo(repoId);
   }
 }

@@ -20,12 +20,10 @@ import io.repsy.os.server.protocols.maven.protocol.facades.MavenProtocolFacade;
 import io.repsy.protocols.maven.protocol.MavenProtocolProvider;
 import io.repsy.protocols.maven.protocol.handlers.AbstractMavenUploadProtocolMethodHandler;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 @Component
-@NullMarked
 public class MavenUploadProtocolMethodHandler
     extends AbstractMavenUploadProtocolMethodHandler<UUID> {
 

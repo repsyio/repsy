@@ -30,17 +30,18 @@ import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import org.jspecify.annotations.Nullable;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
 @Mapper(componentModel = "spring")
 public interface ArtifactMapper {
 
-  default Instant map(final LocalDateTime localDateTime) {
+  default @Nullable Instant map(final @Nullable LocalDateTime localDateTime) {
     return localDateTime != null ? localDateTime.toInstant(ZoneOffset.UTC) : null;
   }
 
-  default ArtifactVersionInfo.TypeEnum map(final ArtifactVersionType type) {
+  default ArtifactVersionInfo.@Nullable TypeEnum map(final @Nullable ArtifactVersionType type) {
     return type != null ? ArtifactVersionInfo.TypeEnum.valueOf(type.name()) : null;
   }
 

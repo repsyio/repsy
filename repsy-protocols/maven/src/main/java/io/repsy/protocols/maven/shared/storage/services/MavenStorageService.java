@@ -29,10 +29,8 @@ import java.util.List;
 import java.util.UUID;
 import java.util.function.Supplier;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 
-@NullMarked
 public interface MavenStorageService<ID> {
 
   void createRepo(UUID repoId);

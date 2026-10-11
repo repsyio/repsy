@@ -21,11 +21,9 @@ import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.shared.auth.AuthFailureThrottle;
 import io.repsy.protocols.shared.auth.VerifiedPasswordCache;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Service;
 
 @Service
-@NullMarked
 public class MavenAuthenticator extends ProtocolAuthService {
 
   public MavenAuthenticator(

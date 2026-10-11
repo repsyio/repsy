@@ -25,11 +25,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 @UtilityClass
-@NullMarked
 public class SnapshotNameUtils {
 
   static final String SNAPSHOT_SUFFIX = "SNAPSHOT";

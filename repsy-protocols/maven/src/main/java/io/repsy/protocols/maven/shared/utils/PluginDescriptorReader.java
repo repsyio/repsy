@@ -28,7 +28,6 @@ import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamReader;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -48,7 +47,6 @@ import org.jspecify.annotations.Nullable;
  */
 @Slf4j
 @UtilityClass
-@NullMarked
 public class PluginDescriptorReader {
 
   public static final String DESCRIPTOR_ENTRY = "META-INF/maven/plugin.xml";

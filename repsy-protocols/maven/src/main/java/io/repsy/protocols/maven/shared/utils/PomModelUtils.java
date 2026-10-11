@@ -28,13 +28,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.maven.model.Model;
 import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 
 @Slf4j
 @UtilityClass
-@NullMarked
 public class PomModelUtils {
 
   private static final String MAVEN_PLUGIN = "maven-plugin";
@@ -63,7 +61,6 @@ public class PomModelUtils {
     }
   }
 
-  @Nullable
   public static Model readModel(final Resource pomResource) {
 
     try (final var inputStream = pomResource.getInputStream()) {
@@ -80,7 +77,6 @@ public class PomModelUtils {
    * @throws BadRequestException With the fixed {@code malformedPomFile} id if the POM cannot be
    *     read or parsed
    */
-  @Nullable
   public static Model readModel(final InputStream pomStream) {
 
     final var reader = new MavenXpp3Reader();

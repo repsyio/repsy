@@ -26,13 +26,11 @@ import io.repsy.protocols.shared.handlers.HandlerRoute;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.net.URI;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
-@NullMarked
 public abstract class AbstractMavenDownloadProtocolMethodHandler<ID>
     extends AbstractFacadeProtocolMethodHandler<MavenProtocolFacade<ID>> {
 

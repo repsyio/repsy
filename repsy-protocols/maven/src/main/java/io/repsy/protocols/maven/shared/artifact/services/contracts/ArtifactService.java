@@ -24,11 +24,9 @@ import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredVersion;
 import io.repsy.protocols.maven.shared.artifact.dtos.SignatureOutcome;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.util.List;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 
-@NullMarked
 public interface ArtifactService<ID> {
 
   /**

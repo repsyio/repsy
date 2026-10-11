@@ -15,11 +15,8 @@
  */
 package io.repsy.protocols.maven.shared.artifact.services.contracts;
 
-import org.jspecify.annotations.NullMarked;
-
 /**
  * Base of the backend implementation of {@link ArtifactService}; the abstract methods are inherited
  * from the contract.
  */
-@NullMarked
 public abstract class AbstractArtifactService<ID> implements ArtifactService<ID> {}

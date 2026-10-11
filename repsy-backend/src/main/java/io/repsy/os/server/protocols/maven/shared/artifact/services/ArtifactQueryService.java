@@ -54,7 +54,6 @@ import org.apache.maven.artifact.repository.metadata.Metadata;
 import org.apache.maven.artifact.repository.metadata.SnapshotVersion;
 import org.apache.maven.index.artifact.Gav;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
@@ -75,7 +74,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
-@NullMarked
 public class ArtifactQueryService {
 
   private static final String METADATA_FILENAME = "maven-metadata.xml";
@@ -199,9 +197,15 @@ public class ArtifactQueryService {
     final ArtifactVersion version;
 
     if (versionName == null) {
+      // No latest (the last version was deleted): no row has a null name, so it is not found. The
+      // repository takes no null parameter under @NullMarked.
+      final var latest = artifact.getLatest();
+
       version =
-          this.artifactVersionRepository
-              .findByArtifactIdAndVersionName(artifact.getId(), artifact.getLatest())
+          (latest == null
+                  ? Optional.<ArtifactVersion>empty()
+                  : this.artifactVersionRepository.findByArtifactIdAndVersionName(
+                      artifact.getId(), latest))
               .orElseThrow(
                   () -> new ItemNotFoundException(ProtocolErrorCodes.ARTIFACT_VERSION_NOT_FOUND));
     } else {

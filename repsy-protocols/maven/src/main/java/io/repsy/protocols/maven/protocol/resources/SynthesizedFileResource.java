@@ -16,7 +16,7 @@
 package io.repsy.protocols.maven.protocol.resources;
 
 import java.util.Objects;
-import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.ByteArrayResource;
 
 /**
@@ -25,7 +25,6 @@ import org.springframework.core.io.ByteArrayResource;
  * file: it has a name, and it is served as an attachment, not as {@code text/html}, so a response
  * has to tell the two apart by this type.
  */
-@NullMarked
 public class SynthesizedFileResource extends ByteArrayResource {
 
   private final String filename;
@@ -42,7 +41,7 @@ public class SynthesizedFileResource extends ByteArrayResource {
   }
 
   @Override
-  public boolean equals(final Object other) {
+  public boolean equals(final @Nullable Object other) {
     return other instanceof SynthesizedFileResource that
         && this.filename.equals(that.filename)
         && super.equals(that);

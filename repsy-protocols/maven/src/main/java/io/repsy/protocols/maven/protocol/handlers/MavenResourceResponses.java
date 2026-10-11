@@ -17,7 +17,6 @@ package io.repsy.protocols.maven.protocol.handlers;
 
 import io.repsy.protocols.maven.protocol.resources.SynthesizedFileResource;
 import io.repsy.protocols.shared.http.ResourceResponses;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -30,7 +29,6 @@ import org.springframework.http.ResponseEntity;
  * attachment of {@code application/octet-stream}. A generated file ({@link
  * SynthesizedFileResource}) is held in memory like a listing, but it is a file (RPS-1369).
  */
-@NullMarked
 final class MavenResourceResponses {
 
   private MavenResourceResponses() {}

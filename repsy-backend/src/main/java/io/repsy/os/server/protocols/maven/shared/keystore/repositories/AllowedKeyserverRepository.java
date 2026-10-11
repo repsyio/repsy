@@ -19,14 +19,13 @@ import io.repsy.os.server.protocols.maven.shared.keystore.entities.AllowedKeyser
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.jspecify.annotations.NonNull;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 @Repository
 public interface AllowedKeyserverRepository extends JpaRepository<AllowedKeyserver, UUID> {
 
-  @NonNull List<AllowedKeyserver> findAllByActiveTrueOrderByDisplayNameAscIdAsc();
+  List<AllowedKeyserver> findAllByActiveTrueOrderByDisplayNameAscIdAsc();
 
-  @NonNull Optional<AllowedKeyserver> findByIdAndActiveTrue(@NonNull UUID id);
+  Optional<AllowedKeyserver> findByIdAndActiveTrue(UUID id);
 }

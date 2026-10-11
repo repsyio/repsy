@@ -17,10 +17,8 @@ package io.repsy.protocols.maven.shared.utils;
 
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 
 @UtilityClass
-@NullMarked
 public class SignatureFileUtils {
 
   private static final String SIGNATURE_SUFFIX = ".asc";
