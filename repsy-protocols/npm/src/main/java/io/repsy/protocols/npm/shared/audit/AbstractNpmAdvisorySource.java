@@ -15,11 +15,8 @@
  */
 package io.repsy.protocols.npm.shared.audit;
 
-import org.jspecify.annotations.NullMarked;
-
 /**
  * Base of the backend implementation of {@link NpmAdvisorySource}; the abstract methods are
  * inherited from the contract.
  */
-@NullMarked
 public abstract class AbstractNpmAdvisorySource<ID> implements NpmAdvisorySource<ID> {}

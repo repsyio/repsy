@@ -17,10 +17,8 @@ package io.repsy.protocols.npm.shared.audit;
 
 import com.fasterxml.jackson.annotation.JsonValue;
 import java.util.Locale;
-import org.jspecify.annotations.NullMarked;
 
 /** The severities of the npm audit report, written in lowercase as the npm registry does. */
-@NullMarked
 public enum NpmSeverity {
   INFO,
   LOW,

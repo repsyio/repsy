@@ -26,7 +26,6 @@ import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.regex.Pattern;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -37,7 +36,6 @@ import org.springframework.http.ResponseEntity;
  * tarball, that is the repo itself and the registry endpoints below {@code /-/}, is answered 200 as
  * before.
  */
-@NullMarked
 public abstract class AbstractNpmHeadProtocolMethodHandler
     extends AbstractFacadeProtocolMethodHandler<NpmProtocolFacade> {
 

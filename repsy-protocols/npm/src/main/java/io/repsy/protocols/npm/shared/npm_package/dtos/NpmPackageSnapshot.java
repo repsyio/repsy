@@ -18,7 +18,6 @@ package io.repsy.protocols.npm.shared.npm_package.dtos;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -36,7 +35,6 @@ import org.jspecify.annotations.Nullable;
  * @param versions the versions, oldest first
  * @param distTags the dist-tags, as tag to version name
  */
-@NullMarked
 public record NpmPackageSnapshot(
     @Nullable String scope,
     String name,

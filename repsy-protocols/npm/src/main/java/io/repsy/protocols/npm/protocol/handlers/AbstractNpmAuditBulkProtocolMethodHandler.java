@@ -21,7 +21,6 @@ import io.repsy.protocols.npm.shared.audit.NpmAdvisorySource;
 import io.repsy.protocols.npm.shared.audit.NpmAuditReportBuilder;
 import io.repsy.protocols.npm.shared.audit.NpmAuditRequestReader;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import tools.jackson.databind.JsonNode;
 
@@ -30,7 +29,6 @@ import tools.jackson.databind.JsonNode;
  * pnpm 11 call for {@code audit}. The body maps package names to the versions in use, and the
  * answer maps the packages that have advisories to those.
  */
-@NullMarked
 public abstract class AbstractNpmAuditBulkProtocolMethodHandler<ID>
     extends AbstractNpmAuditProtocolMethodHandler<ID> {
 

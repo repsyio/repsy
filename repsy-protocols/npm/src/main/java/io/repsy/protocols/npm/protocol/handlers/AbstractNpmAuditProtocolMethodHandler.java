@@ -29,7 +29,6 @@ import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.Map;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -44,7 +43,6 @@ import tools.jackson.databind.JsonNode;
  * here and not thrown, so that the npm client, which falls back to another endpoint on an error,
  * gets a plain JSON error.
  */
-@NullMarked
 public abstract class AbstractNpmAuditProtocolMethodHandler<ID>
     extends AbstractRoutedProtocolMethodHandler {
 

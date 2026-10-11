@@ -16,15 +16,14 @@
 package io.repsy.os.server.protocols.npm.shared.npm_package.dtos;
 
 import java.time.LocalDateTime;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 public interface NpmPackageListItem {
   @Nullable String getScope();
 
-  @NonNull String getName();
+  String getName();
 
-  @NonNull String getLatest();
+  String getLatest();
 
-  @NonNull LocalDateTime getUpdatedAt();
+  LocalDateTime getUpdatedAt();
 }

@@ -26,13 +26,11 @@ import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.regex.Pattern;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
-@NullMarked
 public abstract class AbstractNpmDistTagsGetProtocolMethodHandler
     extends AbstractFacadeProtocolMethodHandler<NpmProtocolFacade> {
 

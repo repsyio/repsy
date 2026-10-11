@@ -20,12 +20,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 import java.util.Map;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /** The two audit reports as they are written on the wire. */
 @UtilityClass
-@NullMarked
 public class NpmAuditReports {
 
   /**

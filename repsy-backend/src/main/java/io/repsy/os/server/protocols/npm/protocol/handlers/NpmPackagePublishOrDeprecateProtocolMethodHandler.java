@@ -19,14 +19,12 @@ import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.os.server.protocols.npm.protocol.facades.NpmProtocolFacade;
 import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
 import io.repsy.protocols.npm.protocol.handlers.AbstractNpmPackagePublishOrDeprecateProtocolMethodHandler;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.util.unit.DataSize;
 
 @Component
-@NullMarked
 public class NpmPackagePublishOrDeprecateProtocolMethodHandler
     extends AbstractNpmPackagePublishOrDeprecateProtocolMethodHandler {
 

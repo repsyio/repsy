@@ -38,7 +38,6 @@ import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
-import org.jspecify.annotations.NonNull;
 
 @Data
 @Entity
@@ -73,5 +72,5 @@ public class NpmPackage {
   private Instant createdAt;
 
   @OneToMany(mappedBy = "npmPackage", cascade = CascadeType.ALL, orphanRemoval = true)
-  private @NonNull Set<PackageVersion> packageVersions = new HashSet<>();
+  private Set<PackageVersion> packageVersions = new HashSet<>();
 }

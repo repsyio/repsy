@@ -15,10 +15,12 @@
  */
 package io.repsy.os.server.protocols.npm.shared.npm_package.dtos;
 
+import org.jspecify.annotations.Nullable;
+
 public interface PackageMaintainerListItem {
-  String getEmail();
+  @Nullable String getEmail();
 
   String getName();
 
-  String getUrl();
+  @Nullable String getUrl();
 }

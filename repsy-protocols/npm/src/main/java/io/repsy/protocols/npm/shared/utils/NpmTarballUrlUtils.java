@@ -19,13 +19,12 @@ import io.repsy.protocols.npm.shared.constants.NpmConstants;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Map;
+import java.util.Objects;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 @SuppressWarnings("unchecked")
 @UtilityClass
-@NullMarked
 /** The {@code dist.tarball} address of a version: normalizing, building and rewriting it. */
 public final class NpmTarballUrlUtils {
   /**
@@ -40,8 +39,8 @@ public final class NpmTarballUrlUtils {
    */
   public static void fixTarballUrl(final Map<String, Object> version) throws URISyntaxException {
 
-    final var dist = (Map<String, String>) version.get("dist");
-    final var uri = new URI(dist.get("tarball"));
+    final var dist = Objects.requireNonNull((Map<String, String>) version.get("dist"));
+    final var uri = new URI(Objects.requireNonNull(dist.get("tarball")));
     final var rawPath = uri.getRawPath();
 
     final var idx = rawPath.lastIndexOf("/-/");
@@ -52,7 +51,9 @@ public final class NpmTarballUrlUtils {
 
     final var packageName = (String) version.get("name");
     final var versionName = (String) version.get("version");
-    final var fileName = NpmPackageUtils.getTarballFilename(bareName(packageName), versionName);
+    final var fileName =
+        NpmPackageUtils.getTarballFilename(
+            bareName(Objects.requireNonNull(packageName)), String.valueOf(versionName));
 
     dist.put(
         "tarball",

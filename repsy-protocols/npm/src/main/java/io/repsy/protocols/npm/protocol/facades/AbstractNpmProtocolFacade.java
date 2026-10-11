@@ -47,14 +47,12 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.event.Level;
 import org.springframework.core.io.Resource;
 
 @Slf4j
 @RequiredArgsConstructor
-@NullMarked
 public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade {
 
   private static final String USAGES = "usages";

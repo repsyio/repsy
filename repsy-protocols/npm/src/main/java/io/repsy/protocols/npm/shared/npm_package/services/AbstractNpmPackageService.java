@@ -15,11 +15,8 @@
  */
 package io.repsy.protocols.npm.shared.npm_package.services;
 
-import org.jspecify.annotations.NullMarked;
-
 /**
  * Base of the backend implementation of {@link NpmPackageService}; the abstract methods are
  * inherited from the contract.
  */
-@NullMarked
 public abstract class AbstractNpmPackageService<ID> implements NpmPackageService<ID> {}

@@ -37,7 +37,6 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 
@@ -55,7 +54,6 @@ import org.springframework.stereotype.Service;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-@NullMarked
 public class NpmAdvisorySource extends AbstractNpmAdvisorySource<UUID> {
 
   private static final String LOOKUP_SCANNER_NAME = "trivy";

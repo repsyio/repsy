@@ -19,12 +19,10 @@ import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.os.server.protocols.npm.protocol.facades.NpmProtocolFacade;
 import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
 import io.repsy.protocols.npm.protocol.handlers.AbstractNpmPackageDeleteProtocolMethodHandler;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 @Component
-@NullMarked
 public class NpmPackageDeleteProtocolMethodHandler
     extends AbstractNpmPackageDeleteProtocolMethodHandler {
 

@@ -16,10 +16,8 @@
 package io.repsy.protocols.npm.shared.audit;
 
 import java.io.Serial;
-import org.jspecify.annotations.NullMarked;
 
 /** Thrown when the body of an audit request cannot be used, and answered with 400. */
-@NullMarked
 public class InvalidAuditRequestException extends RuntimeException {
 
   @Serial private static final long serialVersionUID = 1L;

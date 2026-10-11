@@ -19,11 +19,9 @@ import io.repsy.os.server.protocols.npm.shared.storage.services.NpmStorageServic
 import io.repsy.protocols.npm.protocol.facades.AbstractNpmProtocolFacade;
 import io.repsy.protocols.npm.shared.npm_package.services.NpmPackageService;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
 @Component
-@NullMarked
 public class NpmProtocolFacade extends AbstractNpmProtocolFacade<UUID> {
 
   public NpmProtocolFacade(

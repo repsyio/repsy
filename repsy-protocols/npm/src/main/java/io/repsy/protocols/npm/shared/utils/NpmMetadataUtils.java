@@ -29,9 +29,9 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import lombok.experimental.UtilityClass;
 import org.apache.commons.codec.digest.DigestUtils;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 import tools.jackson.core.type.TypeReference;
@@ -39,7 +39,6 @@ import tools.jackson.databind.ObjectMapper;
 
 @SuppressWarnings("unchecked")
 @UtilityClass
-@NullMarked
 /**
  * The stored and served packument: cleanup, validators, the abbreviated document's accept header.
  */
@@ -198,7 +197,7 @@ public final class NpmMetadataUtils {
   public static void removeAllTagsPointingToVersion(
       final Map<String, Object> metadata, final String versionName) {
 
-    final var distTags = (Map<String, String>) metadata.get("dist-tags");
+    final var distTags = Objects.requireNonNull((Map<String, String>) metadata.get("dist-tags"));
 
     distTags.entrySet().removeIf(entry -> entry.getValue().equals(versionName));
   }

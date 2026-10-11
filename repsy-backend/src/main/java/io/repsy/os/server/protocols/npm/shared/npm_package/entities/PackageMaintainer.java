@@ -33,6 +33,7 @@ import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
+import org.jspecify.annotations.Nullable;
 
 @Data
 @Entity
@@ -51,12 +52,15 @@ public class PackageMaintainer {
   private PackageVersion packageVersion;
 
   @Column(name = "name", nullable = false, length = NpmPublishLimits.MAX_MAINTAINER_NAME_LENGTH)
+  @Nullable
   private String name;
 
   @Column(name = "email", length = NpmPublishLimits.MAX_MAINTAINER_EMAIL_LENGTH)
+  @Nullable
   private String email;
 
   @Column(name = "url", length = NpmPublishLimits.MAX_MAINTAINER_URL_LENGTH)
+  @Nullable
   private String url;
 
   @CreationTimestamp

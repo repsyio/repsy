@@ -18,7 +18,6 @@ package io.repsy.protocols.npm.shared.utils;
 import java.util.Optional;
 import java.util.regex.Pattern;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -38,7 +37,6 @@ import org.jspecify.annotations.Nullable;
  * plain {@code /}.
  */
 @UtilityClass
-@NullMarked
 public class NpmRevPath {
 
   /**

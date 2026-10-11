@@ -19,7 +19,6 @@ import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.math.BigInteger;
 import java.util.regex.Pattern;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * A semantic version parsed and compared the way real npm (built on node-semver) does, unlike
@@ -37,7 +36,6 @@ import org.jspecify.annotations.NullMarked;
  * numerically and always sort before alphanumeric ones, and a larger set of fields has higher
  * precedence when all the shared fields are equal. Build metadata plays no part in precedence.
  */
-@NullMarked
 public final class NpmSemver implements Comparable<NpmSemver> {
 
   private static final Pattern SEMVER_PATTERN =

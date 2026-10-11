@@ -21,15 +21,14 @@ import io.repsy.protocols.npm.protocol.handlers.AbstractNpmTokenRevokeProtocolMe
 import io.repsy.protocols.npm.shared.auth.services.NpmTokenRevoker;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Component;
 
 @Component
-@NullMarked
 public class NpmTokenRevokeProtocolMethodHandler
     extends AbstractNpmTokenRevokeProtocolMethodHandler<UUID> {
 
@@ -50,6 +49,7 @@ public class NpmTokenRevokeProtocolMethodHandler
   protected String forbiddenText(final @Nullable String msgId) {
     final var id = msgId == null ? ProtocolErrorCodes.ACCESS_NOT_ALLOWED : msgId;
 
-    return this.messageSource.getMessage(id, null, id, Locale.getDefault());
+    return Objects.requireNonNullElse(
+        this.messageSource.getMessage(id, null, id, Locale.getDefault()), id);
   }
 }

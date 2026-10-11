@@ -35,11 +35,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 
 /** Builds the two audit reports from the advisories that a {@link NpmAdvisorySource} found. */
 @UtilityClass
-@NullMarked
 public class NpmAuditReportBuilder {
 
   /** The most paths one advisory lists, so that a huge tree cannot make a huge report. */

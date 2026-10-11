@@ -26,13 +26,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Supplier;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 import org.springframework.data.util.Pair;
 import tools.jackson.core.JacksonException;
 
-@NullMarked
 public interface NpmStorageService {
   void deleteRepo(UUID repoId);
 

@@ -16,10 +16,8 @@
 package io.repsy.protocols.npm.shared.search;
 
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
-import org.jspecify.annotations.NullMarked;
 
 /** Searches the packages of one npm repository, for {@code GET /-/v1/search}. */
-@NullMarked
 public interface NpmSearchService<ID> {
 
   /** Returns the requested page of the packages of {@code repoInfo} that match {@code query}. */

@@ -23,7 +23,6 @@ import io.repsy.protocols.shared.handlers.HandlerRoute;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.Map;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -34,7 +33,6 @@ import org.springframework.http.ResponseEntity;
  * empty JSON object; the client reads it with a fallback, so its content does not matter. The
  * request needs read access to the repository like every other registry read.
  */
-@NullMarked
 public abstract class AbstractNpmPingProtocolMethodHandler
     extends AbstractRoutedProtocolMethodHandler {
 

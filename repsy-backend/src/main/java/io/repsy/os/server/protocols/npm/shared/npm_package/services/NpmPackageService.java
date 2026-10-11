@@ -61,7 +61,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -74,7 +73,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
 @SuppressWarnings("unchecked")
-@NullMarked
 public class NpmPackageService extends AbstractNpmPackageService<UUID> {
 
   private static final String VERSION_UNIQUE_CONSTRAINT =
@@ -577,9 +575,9 @@ public class NpmPackageService extends AbstractNpmPackageService<UUID> {
    * The list search matches the {@code scope/name} key, in which the scope is stored without its
    * {@code @}, so a term typed as {@code @scope/name} loses the leading {@code @}.
    */
-  private static @Nullable String withoutAtSign(final @Nullable String term) {
+  private static String withoutAtSign(final String term) {
 
-    return term != null && term.startsWith("@") ? term.substring(1) : term;
+    return term.startsWith("@") ? term.substring(1) : term;
   }
 
   public PackageVersionInfo getPackageVersion(final UUID packageId, final String versionName) {

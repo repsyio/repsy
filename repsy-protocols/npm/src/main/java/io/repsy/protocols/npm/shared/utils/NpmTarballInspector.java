@@ -28,7 +28,6 @@ import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorInputStream;
-import org.jspecify.annotations.NullMarked;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
@@ -38,7 +37,6 @@ import tools.jackson.databind.ObjectMapper;
  * survive) and the digests that {@code dist} carries.
  */
 @UtilityClass
-@NullMarked
 public final class NpmTarballInspector {
 
   /** {@code <top directory>/package.json}, whatever the top directory is called. */

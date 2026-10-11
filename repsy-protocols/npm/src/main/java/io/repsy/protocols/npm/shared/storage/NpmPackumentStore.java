@@ -29,7 +29,6 @@ import java.nio.file.Path;
 import java.util.Map;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 import tools.jackson.core.JacksonException;
@@ -42,7 +41,6 @@ import tools.jackson.databind.ObjectMapper;
  * it from the rows) is {@link NpmPackumentRebuilder}'s.
  */
 @Slf4j
-@NullMarked
 public final class NpmPackumentStore {
 
   private static final ObjectMapper METADATA_MAPPER = new ObjectMapper();

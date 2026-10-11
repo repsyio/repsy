@@ -40,11 +40,11 @@ import java.nio.file.Paths;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Supplier;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.binary.Base64;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 import org.springframework.data.util.Pair;
@@ -59,7 +59,6 @@ import tools.jackson.core.JacksonException;
  */
 @Slf4j
 @SuppressWarnings("unchecked")
-@NullMarked
 public abstract class AbstractNpmStorageService extends AbstractArtifactStorageService
     implements NpmStorageService {
 
@@ -85,7 +84,8 @@ public abstract class AbstractNpmStorageService extends AbstractArtifactStorageS
 
     final var oldMetadataLength = NpmPayloadUtils.getMetadataLength(metadata);
 
-    final var distTags = (Map<String, String>) metadata.get(NpmConstants.DIST_TAGS);
+    final var distTags =
+        Objects.requireNonNull((Map<String, String>) metadata.get(NpmConstants.DIST_TAGS));
 
     distTags.remove(tagName);
 
@@ -117,13 +117,15 @@ public abstract class AbstractNpmStorageService extends AbstractArtifactStorageS
     final var metadata = this.getMetadata(metadataStoragePath, repo.name());
     final var oldMetadataLength = NpmPayloadUtils.getMetadataLength(metadata);
 
-    final var versions = (Map<String, Object>) metadata.get(NpmConstants.VERSIONS);
+    final var versions =
+        Objects.requireNonNull((Map<String, Object>) metadata.get(NpmConstants.VERSIONS));
 
     if (!versions.containsKey(versionName)) {
       throw new BadRequestException(ProtocolErrorCodes.PACKAGE_VERSION_NOT_FOUND);
     }
 
-    final var distTags = (Map<String, String>) metadata.get(NpmConstants.DIST_TAGS);
+    final var distTags =
+        Objects.requireNonNull((Map<String, String>) metadata.get(NpmConstants.DIST_TAGS));
 
     distTags.put(tagName, versionName);
 
@@ -141,7 +143,8 @@ public abstract class AbstractNpmStorageService extends AbstractArtifactStorageS
 
     this.fixTarballUrl(versionPair.getSecond(), repoName);
 
-    final var distributionTags = (Map<String, String>) payload.get(NpmConstants.DIST_TAGS);
+    final var distributionTags =
+        Objects.requireNonNull((Map<String, String>) payload.get(NpmConstants.DIST_TAGS));
 
     distributionTags.put(NpmConstants.LATEST, versionPair.getFirst());
 
@@ -205,10 +208,13 @@ public abstract class AbstractNpmStorageService extends AbstractArtifactStorageS
     final var currentMetadataLength = NpmPayloadUtils.getMetadataLength(fullMetadata);
 
     final var distTag = NpmPayloadUtils.extractFirstDistTagFromPayload(payload);
-    final var oldVersions = (Map<String, Object>) fullMetadata.get(NpmConstants.VERSIONS);
-    final var newVersions = ((Map<String, Object>) payload.get(NpmConstants.VERSIONS));
-    final var oldDistributionTags = (Map<String, String>) fullMetadata.get(NpmConstants.DIST_TAGS);
-    final var timeField = (Map<String, String>) fullMetadata.get("time");
+    final var oldVersions =
+        Objects.requireNonNull((Map<String, Object>) fullMetadata.get(NpmConstants.VERSIONS));
+    final var newVersions =
+        (Objects.requireNonNull((Map<String, Object>) payload.get(NpmConstants.VERSIONS)));
+    final var oldDistributionTags =
+        Objects.requireNonNull((Map<String, String>) fullMetadata.get(NpmConstants.DIST_TAGS));
+    final var timeField = Objects.requireNonNull((Map<String, String>) fullMetadata.get("time"));
     final var versionPair = NpmPayloadUtils.extractVersionFromPayload(payload);
 
     timeField.put(versionPair.getFirst(), NpmPackageUtils.getFormattedCurrentTime());
@@ -227,7 +233,8 @@ public abstract class AbstractNpmStorageService extends AbstractArtifactStorageS
       payload.put(NpmConstants.VERSIONS, oldVersions);
       payload.put("time", timeField);
 
-      final var newDistributionTags = (Map<String, String>) payload.get(NpmConstants.DIST_TAGS);
+      final var newDistributionTags =
+          Objects.requireNonNull((Map<String, String>) payload.get(NpmConstants.DIST_TAGS));
       oldDistributionTags.remove(NpmConstants.LATEST);
 
       newDistributionTags.putAll(oldDistributionTags);
@@ -440,8 +447,9 @@ public abstract class AbstractNpmStorageService extends AbstractArtifactStorageS
 
     final var metadata = this.getMetadata(storagePath, repo.name());
 
-    final var versions = (Map<String, Object>) metadata.get(NpmConstants.VERSIONS);
-    final var time = (Map<String, String>) metadata.get("time");
+    final var versions =
+        Objects.requireNonNull((Map<String, Object>) metadata.get(NpmConstants.VERSIONS));
+    final var time = Objects.requireNonNull((Map<String, String>) metadata.get("time"));
 
     versions.remove(versionName);
     time.remove(versionName);
@@ -449,7 +457,8 @@ public abstract class AbstractNpmStorageService extends AbstractArtifactStorageS
     if (newLatest != null) {
       NpmPayloadUtils.liftFieldsToTopLevel(metadata, newLatest);
 
-      final var distTags = (Map<String, String>) metadata.get(NpmConstants.DIST_TAGS);
+      final var distTags =
+          Objects.requireNonNull((Map<String, String>) metadata.get(NpmConstants.DIST_TAGS));
 
       distTags.put(NpmConstants.LATEST, newLatest);
     }
@@ -467,7 +476,8 @@ public abstract class AbstractNpmStorageService extends AbstractArtifactStorageS
     final var storagePath = NpmPackumentStore.storagePath(repo.id(), packageBasePath);
 
     final var metadata = this.getMetadata(storagePath, repo.name());
-    final var versions = (Map<String, Object>) metadata.get(NpmConstants.VERSIONS);
+    final var versions =
+        Objects.requireNonNull((Map<String, Object>) metadata.get(NpmConstants.VERSIONS));
 
     // Applied to the metadata as it is now, not replaced by what the client sent: the client read
     // its copy earlier, and a version published since would be dropped by that replacement.

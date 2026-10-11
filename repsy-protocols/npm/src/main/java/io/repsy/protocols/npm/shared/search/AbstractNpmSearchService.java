@@ -15,11 +15,8 @@
  */
 package io.repsy.protocols.npm.shared.search;
 
-import org.jspecify.annotations.NullMarked;
-
 /**
  * Base of the backend implementation of {@link NpmSearchService}; the abstract methods are
  * inherited from the contract.
  */
-@NullMarked
 public abstract class AbstractNpmSearchService<ID> implements NpmSearchService<ID> {}

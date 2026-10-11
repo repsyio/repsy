@@ -23,7 +23,6 @@ import io.repsy.protocols.npm.shared.audit.NpmAuditReportBuilder;
 import io.repsy.protocols.npm.shared.audit.NpmAuditTree;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.util.List;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import tools.jackson.databind.JsonNode;
 
@@ -32,7 +31,6 @@ import tools.jackson.databind.JsonNode;
  * (as its fallback) and pnpm 9 and 10 call for {@code audit}. The body is the dependency tree of
  * the project and the answer is the legacy report of the advisories found in it.
  */
-@NullMarked
 public abstract class AbstractNpmAuditLegacyProtocolMethodHandler<ID>
     extends AbstractNpmAuditProtocolMethodHandler<ID> {
 

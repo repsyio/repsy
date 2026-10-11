@@ -37,7 +37,7 @@ import lombok.ToString;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
-import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 @Data
 @Entity
@@ -61,39 +61,50 @@ public class PackageVersion {
   private String version;
 
   @Column(name = "author_name", length = NpmPublishLimits.MAX_AUTHOR_NAME_LENGTH)
+  @Nullable
   private String authorName;
 
   @Column(name = "author_email", length = NpmPublishLimits.MAX_AUTHOR_EMAIL_LENGTH)
+  @Nullable
   private String authorEmail;
 
   @Column(name = "author_url", length = NpmPublishLimits.MAX_AUTHOR_URL_LENGTH)
+  @Nullable
   private String authorUrl;
 
   @Column(name = "bugs_url", length = NpmPublishLimits.MAX_BUGS_URL_LENGTH)
+  @Nullable
   private String bugsUrl;
 
   @Column(name = "bugs_email", length = NpmPublishLimits.MAX_BUGS_EMAIL_LENGTH)
+  @Nullable
   private String bugsEmail;
 
   @Column(name = "description", columnDefinition = "text")
+  @Nullable
   private String description;
 
   @Column(name = "homepage", length = NpmPublishLimits.MAX_HOMEPAGE_LENGTH)
+  @Nullable
   private String homepage;
 
   @Column(name = "license", length = NpmPublishLimits.MAX_LICENSE_LENGTH)
+  @Nullable
   private String license;
 
   @Column(name = "repository_type", length = NpmPublishLimits.MAX_REPOSITORY_TYPE_LENGTH)
+  @Nullable
   private String repositoryType;
 
   @Column(name = "repository_url", length = NpmPublishLimits.MAX_REPOSITORY_URL_LENGTH)
+  @Nullable
   private String repositoryUrl;
 
   @Column(name = "deprecated")
   private boolean deprecated;
 
   @Column(name = "deprecation_message", columnDefinition = "text")
+  @Nullable
   private String deprecationMessage;
 
   @CreationTimestamp
@@ -101,13 +112,13 @@ public class PackageVersion {
   private Instant createdAt;
 
   @OneToMany(mappedBy = "packageVersion", cascade = CascadeType.ALL, orphanRemoval = true)
-  private @NonNull Set<PackageKeyword> packageKeywords = new HashSet<>();
+  private Set<PackageKeyword> packageKeywords = new HashSet<>();
 
   @OneToMany(mappedBy = "packageVersion", cascade = CascadeType.ALL, orphanRemoval = true)
-  private @NonNull Set<PackageDistTag> packageDistTags = new HashSet<>();
+  private Set<PackageDistTag> packageDistTags = new HashSet<>();
 
   @OneToMany(mappedBy = "packageVersion", cascade = CascadeType.ALL, orphanRemoval = true)
-  private @NonNull Set<PackageMaintainer> packageMaintainers = new HashSet<>();
+  private Set<PackageMaintainer> packageMaintainers = new HashSet<>();
 
   /**
    * Identifier-based equality: two package versions are equal when they are the same instance or

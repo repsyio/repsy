@@ -21,13 +21,12 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Collection;
 import java.util.Map;
+import java.util.Objects;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 @SuppressWarnings("unchecked")
 @UtilityClass
-@NullMarked
 /** Names, file names, the clock and the latest version of an npm package. */
 public final class NpmPackageUtils {
   private static final String TARBALL_EXTENSION = "tgz";
@@ -46,10 +45,10 @@ public final class NpmPackageUtils {
     return formatter.format(now);
   }
 
-  public static String getLatestVersion(final Map<String, Object> payload)
+  public static @Nullable String getLatestVersion(final Map<String, Object> payload)
       throws ClassCastException {
 
-    final var distTags = (Map<String, String>) payload.get("dist-tags");
+    final var distTags = Objects.requireNonNull((Map<String, String>) payload.get("dist-tags"));
 
     return distTags.get("latest");
   }
@@ -61,7 +60,8 @@ public final class NpmPackageUtils {
 
   public static String resolveLatestVersion(final Map<String, Object> metadata) {
 
-    final var versions = (Map<String, Object>) metadata.get(NpmConstants.VERSIONS);
+    final var versions =
+        Objects.requireNonNull((Map<String, Object>) metadata.get(NpmConstants.VERSIONS));
 
     return resolveLatestVersion(versions.keySet());
   }
@@ -73,13 +73,15 @@ public final class NpmPackageUtils {
       return "";
     }
 
-    String latestVersion = null;
-    NpmSemver latestSemver = null;
+    final var names = versionNames.iterator();
+    var latestVersion = names.next();
+    var latestSemver = NpmSemver.parse(latestVersion);
 
-    for (final var key : versionNames) {
+    while (names.hasNext()) {
+      final var key = names.next();
       final var semver = NpmSemver.parse(key);
 
-      if (latestSemver == null || semver.compareTo(latestSemver) > 0) {
+      if (semver.compareTo(latestSemver) > 0) {
         latestSemver = semver;
         latestVersion = key;
       }

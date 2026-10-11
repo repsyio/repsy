@@ -27,14 +27,12 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
  * Builds the packument of a package from its rows, reading the tarball of each version for what the
  * rows do not keep (see {@link NpmPackumentBuilder}). Writes nothing.
  */
-@NullMarked
 public final class NpmPackumentRebuilder {
 
   private final NpmTarballStore tarballStore;

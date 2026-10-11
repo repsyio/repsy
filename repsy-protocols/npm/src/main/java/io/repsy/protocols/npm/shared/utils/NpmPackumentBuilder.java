@@ -26,8 +26,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -50,7 +50,6 @@ import org.jspecify.annotations.Nullable;
  * rebuilt from its row alone: no dependencies and no digests.
  */
 @UtilityClass
-@NullMarked
 public final class NpmPackumentBuilder {
 
   private static final DateTimeFormatter TIME_FORMAT =
@@ -118,7 +117,9 @@ public final class NpmPackumentBuilder {
 
     final var latest = distTagsOf(snapshot).get(NpmConstants.LATEST);
 
-    if (latest != null && ((Map<?, ?>) packument.get(NpmConstants.VERSIONS)).containsKey(latest)) {
+    if (latest != null
+        && Objects.requireNonNull((Map<?, ?>) packument.get(NpmConstants.VERSIONS))
+            .containsKey(latest)) {
       NpmPayloadUtils.liftFieldsToTopLevel(packument, latest);
     }
   }

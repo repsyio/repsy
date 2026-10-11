@@ -20,7 +20,6 @@ import io.repsy.protocols.npm.shared.storage.services.AbstractNpmStorageService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import io.repsy.protocols.shared.storage.StorageStrategyRegistry;
 import jakarta.servlet.http.HttpServletRequest;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -28,7 +27,6 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 @Service
-@NullMarked
 public class NpmStorageService extends AbstractNpmStorageService {
 
   private final int repoPort;

@@ -26,7 +26,6 @@ import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.regex.Pattern;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -37,7 +36,6 @@ import org.springframework.http.ResponseEntity;
  * {@code DELETE /{repo}/-/package/{package}/dist-tags/{tag}}, which {@code npm dist-tag rm} calls.
  * It answers the JSON of {@code NpmDistTagsResponse}, as the add does (RPS-1362).
  */
-@NullMarked
 public abstract class AbstractNpmDistTagsRemoveProtocolMethodHandler
     extends AbstractFacadeProtocolMethodHandler<NpmProtocolFacade> {
 

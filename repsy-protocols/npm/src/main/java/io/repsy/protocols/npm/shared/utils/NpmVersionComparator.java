@@ -16,7 +16,6 @@
 package io.repsy.protocols.npm.shared.utils;
 
 import java.util.Comparator;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * Orders npm version strings by semver precedence ({@link NpmSemver}) instead of as plain text
@@ -25,7 +24,6 @@ import org.jspecify.annotations.NullMarked;
  * {@code NpmPayloadUtils} already refuses a publish whose version does not parse as semver, so
  * every stored version is one {@link NpmSemver#parse(String)} accepts.
  */
-@NullMarked
 public class NpmVersionComparator implements Comparator<String> {
 
   @Override

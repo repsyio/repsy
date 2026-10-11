@@ -27,7 +27,6 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 
 /**
@@ -35,7 +34,6 @@ import org.springframework.core.io.Resource;
  * rebuild a packument, and removed with a version. It knows nothing of the packument that goes with
  * them.
  */
-@NullMarked
 public final class NpmTarballStore {
 
   private final StorageStrategy storageStrategy;

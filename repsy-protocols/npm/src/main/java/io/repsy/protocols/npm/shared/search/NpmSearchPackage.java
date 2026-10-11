@@ -17,7 +17,6 @@ package io.repsy.protocols.npm.shared.search;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import java.util.List;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -29,7 +28,6 @@ import org.jspecify.annotations.Nullable;
  * @param date The publication time of {@code version}, ISO-8601
  * @param publisher Who published it; Repsy keeps no publisher, so this is the first maintainer
  */
-@NullMarked
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record NpmSearchPackage(
     String name,

@@ -20,12 +20,10 @@ import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
 import io.repsy.protocols.npm.protocol.handlers.AbstractNpmSearchProtocolMethodHandler;
 import io.repsy.protocols.npm.shared.search.NpmSearchService;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 @Component
-@NullMarked
 public class NpmSearchProtocolMethodHandler extends AbstractNpmSearchProtocolMethodHandler<UUID> {
 
   public NpmSearchProtocolMethodHandler(

@@ -22,7 +22,6 @@ import java.util.Collection;
 import java.util.Map;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -56,7 +55,6 @@ import org.jspecify.annotations.Nullable;
  * here; RPS-1140 is free to widen it independently.
  */
 @SuppressWarnings("unchecked")
-@NullMarked
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class NpmPublishLimits {
 

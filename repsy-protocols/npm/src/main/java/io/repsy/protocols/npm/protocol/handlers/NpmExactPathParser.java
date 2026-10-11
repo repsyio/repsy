@@ -21,7 +21,6 @@ import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Optional;
 import java.util.regex.Pattern;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
 
 /**
@@ -34,7 +33,6 @@ import org.springframework.http.HttpMethod;
  * repository up in the database and an unrelated npm request must not pay for that once more per
  * handler.
  */
-@NullMarked
 final class NpmExactPathParser implements PathParser {
 
   private final PathParser basePathParser;

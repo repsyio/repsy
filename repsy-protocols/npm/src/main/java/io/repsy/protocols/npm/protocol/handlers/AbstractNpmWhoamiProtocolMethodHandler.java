@@ -31,7 +31,6 @@ import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.Map;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -43,7 +42,6 @@ import org.springframework.http.ResponseEntity;
  * request. It needs credentials on a public repository too, so the handler asks the pre-processor
  * to authenticate ({@code requireAuthentication}) and still verifies everything itself.
  */
-@NullMarked
 public abstract class AbstractNpmWhoamiProtocolMethodHandler<ID>
     extends AbstractRoutedProtocolMethodHandler {
 

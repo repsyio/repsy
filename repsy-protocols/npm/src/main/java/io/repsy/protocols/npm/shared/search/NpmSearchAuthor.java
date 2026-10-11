@@ -16,11 +16,9 @@
 package io.repsy.protocols.npm.shared.search;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /** The author a package's {@code package.json} names. */
-@NullMarked
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record NpmSearchAuthor(
     @Nullable String name, @Nullable String email, @Nullable String url) {}

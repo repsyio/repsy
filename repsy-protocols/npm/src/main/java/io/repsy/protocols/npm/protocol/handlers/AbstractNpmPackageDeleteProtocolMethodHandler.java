@@ -26,7 +26,6 @@ import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -38,7 +37,6 @@ import org.springframework.http.ResponseEntity;
  * They remove stored files, so they need {@link Permission#MANAGE}, like the panel's delete and the
  * packument PUT of the same command (RPS-1424).
  */
-@NullMarked
 public abstract class AbstractNpmPackageDeleteProtocolMethodHandler
     extends AbstractFacadeProtocolMethodHandler<NpmProtocolFacade> {
 
