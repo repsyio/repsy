@@ -18,6 +18,7 @@ package io.repsy.os.shared.token.dtos;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import java.time.Instant;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One row of the token list: what the owner sees of a token, never its secret or its hash. A closed
@@ -34,7 +35,7 @@ public interface PersonalAccessTokenListItem {
   Instant getExpirationDate();
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
-  Instant getLastUsedAt();
+  @Nullable Instant getLastUsedAt();
 
   Instant getCreatedAt();
 }

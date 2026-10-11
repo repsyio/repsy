@@ -15,12 +15,14 @@
  */
 package io.repsy.os.server.security.scan.dtos;
 
+import org.jspecify.annotations.Nullable;
+
 public interface ArtifactScanSummary {
   String getArtifactName();
 
-  Integer getSeverityRank();
+  @Nullable Integer getSeverityRank();
 
-  Long getFindingCount();
+  @Nullable Long getFindingCount();
 
   Long getRescanInProgressCount();
 

@@ -27,5 +27,5 @@ public interface ArtifactListItem {
 
   @Nullable Instant getLastUpdatedAt();
 
-  String getLatest();
+  @Nullable String getLatest();
 }

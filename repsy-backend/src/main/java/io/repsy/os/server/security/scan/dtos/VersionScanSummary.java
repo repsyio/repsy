@@ -16,13 +16,14 @@
 package io.repsy.os.server.security.scan.dtos;
 
 import io.repsy.libs.scanner.dtos.Severity;
+import org.jspecify.annotations.Nullable;
 
 public interface VersionScanSummary {
   String getArtifactVersion();
 
-  Severity getSeverity();
+  @Nullable Severity getSeverity();
 
-  Long getFindingCount();
+  @Nullable Long getFindingCount();
 
-  ScanStatus getLatestScanStatus();
+  @Nullable ScanStatus getLatestScanStatus();
 }

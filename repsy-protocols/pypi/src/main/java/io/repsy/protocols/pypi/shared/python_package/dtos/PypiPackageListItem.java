@@ -16,13 +16,14 @@
 package io.repsy.protocols.pypi.shared.python_package.dtos;
 
 import java.time.LocalDateTime;
+import org.jspecify.annotations.Nullable;
 
 public interface PypiPackageListItem {
   String getName();
 
   String getLatestVersion();
 
-  String getStableVersion();
+  @Nullable String getStableVersion();
 
   LocalDateTime getUpdatedAt();
 }

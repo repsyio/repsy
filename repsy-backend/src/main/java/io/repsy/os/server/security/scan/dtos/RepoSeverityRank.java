@@ -15,10 +15,12 @@
  */
 package io.repsy.os.server.security.scan.dtos;
 
+import org.jspecify.annotations.Nullable;
+
 public interface RepoSeverityRank {
   String getRepoName();
 
-  Integer getSeverityRank();
+  @Nullable Integer getSeverityRank();
 
   Long getRescanInProgressCount();
 

@@ -110,7 +110,7 @@ class RepositoryNullabilityTest {
         List.of(), RepositoryNullabilityRules.check(NullabilityViolations.OkRepository.class));
   }
 
-  private static List<Class<?>> repositories() {
+  static List<Class<?>> repositories() {
     final var scanner =
         new ClassPathScanningCandidateComponentProvider(false) {
           @Override
