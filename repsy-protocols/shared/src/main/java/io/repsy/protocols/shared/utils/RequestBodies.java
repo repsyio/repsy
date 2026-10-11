@@ -19,10 +19,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.PushbackInputStream;
 import java.util.Optional;
-import org.jspecify.annotations.NullMarked;
 
 /** What the upload handlers of the wire protocols share about the body they are sent (RPS-1466). */
-@NullMarked
 public final class RequestBodies {
 
   private RequestBodies() {

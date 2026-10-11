@@ -18,7 +18,6 @@ package io.repsy.os.server.protocols.shared.aop.resolvers;
 import io.repsy.os.generated.model.RepoPermissionInfo;
 import io.repsy.os.server.protocols.shared.aop.utils.ResolverUtils;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.MethodParameter;
 import org.springframework.stereotype.Component;
@@ -28,7 +27,6 @@ import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
 
 @Component
-@NullMarked
 @RequiredArgsConstructor
 public class RepoPermissionInfoResolver implements HandlerMethodArgumentResolver {
 

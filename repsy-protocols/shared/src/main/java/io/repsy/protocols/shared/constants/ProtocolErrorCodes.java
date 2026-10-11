@@ -16,7 +16,6 @@
 package io.repsy.protocols.shared.constants;
 
 import lombok.NoArgsConstructor;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * The error codes (the {@code msgId} of a failure, the {@code code} of a problem document) that the
@@ -28,7 +27,6 @@ import org.jspecify.annotations.NullMarked;
  * named after its value in {@code UPPER_SNAKE_CASE}; the pin test {@code ProtocolErrorCodesTest}
  * fails on a changed, added or removed value.
  */
-@NullMarked
 @NoArgsConstructor
 public final class ProtocolErrorCodes {
 

@@ -29,9 +29,9 @@ import io.repsy.os.shared.utils.MultiPortNames;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import jakarta.validation.Valid;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -60,7 +60,6 @@ import org.springframework.web.util.UriComponentsBuilder;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/repos")
-@NullMarked
 @SuppressWarnings("java:S6856")
 public class RepoCollectionController {
 
@@ -111,7 +110,7 @@ public class RepoCollectionController {
             !Boolean.FALSE.equals(form.getPrivateRepo()),
             form.getDescription());
 
-    this.apiFacadeMap.get(repoType).createRepo(repoInfo.getStorageKey());
+    Objects.requireNonNull(this.apiFacadeMap.get(repoType)).createRepo(repoInfo.getStorageKey());
 
     final var created = this.repoTxService.getRepoListInfo(repoInfo.getStorageKey());
 

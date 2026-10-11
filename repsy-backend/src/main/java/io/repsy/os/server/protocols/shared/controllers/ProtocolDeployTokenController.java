@@ -35,7 +35,6 @@ import java.net.URI;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.data.web.PagedModel;
@@ -52,7 +51,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/repos/{repoName}/deploy-tokens")
-@NullMarked
 @SuppressWarnings("java:S6856")
 public class ProtocolDeployTokenController {
 

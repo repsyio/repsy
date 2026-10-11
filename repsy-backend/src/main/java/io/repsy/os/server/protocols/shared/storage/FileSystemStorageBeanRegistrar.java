@@ -20,7 +20,7 @@ import io.repsy.libs.storage.gateway.filesystem.services.FileSystemStorageStrate
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.EnumMap;
 import java.util.Locale;
-import org.jspecify.annotations.NonNull;
+import java.util.Objects;
 import org.springframework.beans.factory.BeanRegistrar;
 import org.springframework.beans.factory.BeanRegistry;
 import org.springframework.boot.context.properties.bind.Binder;
@@ -53,17 +53,17 @@ public class FileSystemStorageBeanRegistrar implements BeanRegistrar {
   }
 
   /** The bean name of the strategy of {@code repoType}; tests spy the strategy by this name. */
-  public static @NonNull String beanName(final @NonNull RepoType repoType) {
-    return BEAN_NAMES.get(repoType);
+  public static String beanName(final RepoType repoType) {
+    return Objects.requireNonNull(BEAN_NAMES.get(repoType));
   }
 
   /** The configuration key prefix of {@code repoType}, without a trailing dot. */
-  public static @NonNull String keyPrefix(final @NonNull RepoType repoType) {
+  public static String keyPrefix(final RepoType repoType) {
     return KEY_PREFIX + repoType.name().toLowerCase(Locale.ROOT);
   }
 
   @Override
-  public void register(final @NonNull BeanRegistry registry, final @NonNull Environment env) {
+  public void register(final BeanRegistry registry, final Environment env) {
     final var binder = Binder.get(env);
 
     for (final var repoType : RepoType.values()) {
@@ -90,5 +90,5 @@ public class FileSystemStorageBeanRegistrar implements BeanRegistrar {
   }
 
   /** The two locations of one repo type, as the configuration names them. */
-  record StoragePaths(@NonNull String basePath, @NonNull String trashPath) {}
+  record StoragePaths(String basePath, String trashPath) {}
 }

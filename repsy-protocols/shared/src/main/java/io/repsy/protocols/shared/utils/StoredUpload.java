@@ -16,7 +16,7 @@
 package io.repsy.protocols.shared.utils;
 
 import java.io.IOException;
-import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.event.Level;
 
@@ -27,12 +27,11 @@ import org.slf4j.event.Level;
  * the rows back, so a file left behind would be one no row describes. Every format used to
  * hand-write that step; this is the one copy.
  */
-@NullMarked
 public final class StoredUpload {
 
   /** A write that may fail with {@code E}. */
   @FunctionalInterface
-  public interface Write<T, E extends Exception> {
+  public interface Write<T extends @Nullable Object, E extends Exception> {
     T run() throws E;
   }
 
@@ -73,7 +72,7 @@ public final class StoredUpload {
   }
 
   /** Same as the full overload, logging a failed removal at debug. */
-  public static <T, E extends Exception> T storeOrDiscard(
+  public static <T extends @Nullable Object, E extends Exception> T storeOrDiscard(
       final Write<T, E> write,
       final Discard discard,
       final boolean keepOnFailure,
@@ -101,7 +100,7 @@ public final class StoredUpload {
    * @param level The level of the line logged when the removal fails
    * @param what What was being stored, for the log line
    */
-  public static <T, E extends Exception> T storeOrDiscard(
+  public static <T extends @Nullable Object, E extends Exception> T storeOrDiscard(
       final Write<T, E> write,
       final Discard discard,
       final boolean keepOnFailure,

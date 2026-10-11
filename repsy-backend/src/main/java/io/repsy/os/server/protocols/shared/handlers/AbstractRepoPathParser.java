@@ -29,7 +29,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -42,7 +41,6 @@ import org.jspecify.annotations.Nullable;
  * pattern matches the paths that belong to no repository (the Docker {@code /v2/}, Cargo {@code
  * /}); those get {@link #registryLevelContext(String)} without any lookup.
  */
-@NullMarked
 public abstract class AbstractRepoPathParser implements PathParser {
 
   protected static final String REPO_NAME_GROUP = "repoName";

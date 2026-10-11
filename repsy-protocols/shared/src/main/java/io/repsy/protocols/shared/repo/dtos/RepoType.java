@@ -19,7 +19,6 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Optional;
-import org.jspecify.annotations.NonNull;
 
 public enum RepoType {
   MAVEN("mvn__"),
@@ -32,17 +31,17 @@ public enum RepoType {
   NUGET("nuget__"),
   RUBY("ruby__");
 
-  private final @NonNull String prefix;
+  private final String prefix;
 
-  RepoType(final @NonNull String prefix) {
+  RepoType(final String prefix) {
     this.prefix = prefix;
   }
 
-  public @NonNull String getPrefix() {
+  public String getPrefix() {
     return this.prefix;
   }
 
-  public @NonNull String withPrefix(final @NonNull String repoName) {
+  public String withPrefix(final String repoName) {
     return this.prefix + repoName;
   }
 

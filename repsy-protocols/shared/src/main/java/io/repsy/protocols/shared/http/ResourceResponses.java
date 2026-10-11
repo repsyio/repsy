@@ -15,7 +15,6 @@
  */
 package io.repsy.protocols.shared.http;
 
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -28,7 +27,6 @@ import org.springframework.http.ResponseEntity;
  * header. Without a header of its own Spring names a download after a path suffix ({@code f.txt}),
  * which is why a download sets one (RPS-1389).
  */
-@NullMarked
 public final class ResourceResponses {
 
   private ResourceResponses() {

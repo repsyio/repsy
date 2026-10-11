@@ -22,17 +22,19 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 @Data
 @SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
+// The no-args constructor (Jackson, MapStruct) leaves id, storageKey, name and type to be set
+// afterwards; every reader gets them populated.
+@SuppressWarnings("NullAway.Init")
 public class BaseRepoInfo<ID> {
   private @JsonIgnore ID id;
   private UUID storageKey;
-  private @NonNull String name;
+  private String name;
   private @Nullable String description;
   private long diskUsage;
   private boolean privateRepo;

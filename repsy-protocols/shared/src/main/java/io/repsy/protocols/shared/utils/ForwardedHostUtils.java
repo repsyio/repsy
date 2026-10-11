@@ -16,7 +16,6 @@
 package io.repsy.protocols.shared.utils;
 
 import java.net.URI;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -29,7 +28,6 @@ import org.jspecify.annotations.Nullable;
  * parsed out and discarded there, never fed into {@code HttpServletRequest#getServerPort()}. This
  * utility re-derives it from the raw header value, which the valve leaves untouched on the request.
  */
-@NullMarked
 public final class ForwardedHostUtils {
 
   /** The name of the header a reverse proxy names the host (and, sometimes, port) it received. */

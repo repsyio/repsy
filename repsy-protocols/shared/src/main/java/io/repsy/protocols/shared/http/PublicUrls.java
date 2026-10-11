@@ -17,7 +17,6 @@ package io.repsy.protocols.shared.http;
 
 import io.repsy.protocols.shared.utils.ForwardedHostUtils;
 import jakarta.servlet.http.HttpServletRequest;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
@@ -27,7 +26,6 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  * of the request (after the proxy headers Tomcat applies), and a port that also honours a port
  * embedded in {@code X-Forwarded-Host} (RPS-1515); the default port of the scheme is left out.
  */
-@NullMarked
 public final class PublicUrls {
 
   private static final int PORT_HTTP = 80;

@@ -25,7 +25,6 @@ import java.util.Objects;
 import lombok.experimental.UtilityClass;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.DelegatingPasswordEncoder;
@@ -78,7 +77,7 @@ public class PasswordHasher {
    *
    * @throws BadRequestException if the password is longer than {@link #MAX_PASSWORD_BYTES}
    */
-  public static @NonNull String hash(final @NonNull String password) {
+  public static String hash(final String password) {
 
     requireFitsBcrypt(password);
 
@@ -92,7 +91,7 @@ public class PasswordHasher {
    *
    * @throws BadRequestException if the password is longer than {@link #MAX_PASSWORD_BYTES}
    */
-  public static void requireFitsBcrypt(final @NonNull String password) {
+  public static void requireFitsBcrypt(final String password) {
 
     if (!fitsBcrypt(password)) {
       throw new BadRequestException(ProtocolErrorCodes.PASSWORD_TOO_LONG);
@@ -110,7 +109,7 @@ public class PasswordHasher {
    * @return whether the password is the one the hash was made from
    */
   public static boolean matches(
-      final @NonNull String password, final @Nullable String hash, final @Nullable String salt) {
+      final String password, final @Nullable String hash, final @Nullable String salt) {
 
     if (hash == null || hash.isEmpty()) {
       verifyDummy(password);
@@ -142,7 +141,7 @@ public class PasswordHasher {
    * Whether the hash should be replaced, given the password that was just verified against it.
    * False for a legacy hash whose password BCrypt cannot take, since that one cannot be upgraded.
    */
-  public static boolean needsUpgrade(final @NonNull String hash, final @NonNull String password) {
+  public static boolean needsUpgrade(final String hash, final String password) {
 
     if (hash.isEmpty()) {
       return false;
@@ -159,19 +158,19 @@ public class PasswordHasher {
    * Spends the time of one hash check on nothing. Call it where a password is checked against no
    * user, so an unknown username answers as slowly as a wrong password.
    */
-  public static void verifyDummy(final @NonNull String password) {
+  public static void verifyDummy(final String password) {
 
     ENCODER.matches(password, DUMMY_HASH);
   }
 
   /** {@link PasswordEncoder#encode} is nullable in the signature, but BCrypt always returns. */
-  private static @NonNull String encode(final @NonNull String password) {
+  private static String encode(final String password) {
 
     return Objects.requireNonNull(ENCODER.encode(password), "the encoder returned no hash");
   }
 
   private static boolean matchesLegacy(
-      final @NonNull String password, final @NonNull String hash, final @Nullable String salt) {
+      final String password, final String hash, final @Nullable String salt) {
 
     if (salt == null) {
       verifyDummy(password);
@@ -191,12 +190,12 @@ public class PasswordHasher {
   /**
    * A hash without an algorithm id is a salted SHA-256 from before RPS-961, or the empty marker.
    */
-  private static boolean isLegacy(final @NonNull String hash) {
+  private static boolean isLegacy(final String hash) {
 
     return !hash.startsWith(ID_PREFIX);
   }
 
-  private static boolean fitsBcrypt(final @NonNull String password) {
+  private static boolean fitsBcrypt(final String password) {
 
     return password.getBytes(UTF_8).length <= MAX_PASSWORD_BYTES;
   }

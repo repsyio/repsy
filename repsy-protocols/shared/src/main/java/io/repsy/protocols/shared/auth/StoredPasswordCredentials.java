@@ -15,7 +15,6 @@
  */
 package io.repsy.protocols.shared.auth;
 
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -23,7 +22,6 @@ import org.jspecify.annotations.Nullable;
  * username and the stored hash and salt. Each product's user DTO implements it, so the cache does
  * not depend on any user model.
  */
-@NullMarked
 public interface StoredPasswordCredentials {
 
   String getUsername();

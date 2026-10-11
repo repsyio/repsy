@@ -17,7 +17,6 @@ package io.repsy.protocols.shared.storage;
 
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * The repo a storage service works in: the storage key that names its directory and the repo name
@@ -31,7 +30,6 @@ import org.jspecify.annotations.NullMarked;
  * @param id the storage key, the name of the repo's directory
  * @param name the repo name
  */
-@NullMarked
 public record RepoRef(UUID id, String name) {
 
   public static RepoRef of(final BaseRepoInfo<?> repoInfo) {

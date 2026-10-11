@@ -19,7 +19,6 @@ import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import java.util.HashMap;
 import java.util.Map;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpHeaders;
 
 /**
@@ -29,7 +28,6 @@ import org.springframework.http.HttpHeaders;
  * challenge when a request carries no credentials at all; this covers the credentials they refuse.
  */
 @UtilityClass
-@NullMarked
 public final class AuthChallenges {
 
   /**

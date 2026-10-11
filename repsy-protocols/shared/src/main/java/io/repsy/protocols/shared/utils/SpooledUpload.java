@@ -25,7 +25,6 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -37,7 +36,6 @@ import org.jspecify.annotations.Nullable;
  * store it. {@link #close()} deletes the file, so use it in a try-with-resources block.
  */
 @Slf4j
-@NullMarked
 public final class SpooledUpload implements Closeable {
 
   private static final int BUFFER_SIZE = 64 * 1024;

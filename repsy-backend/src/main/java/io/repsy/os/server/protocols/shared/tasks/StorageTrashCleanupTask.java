@@ -19,7 +19,6 @@ import io.repsy.libs.storage.core.dtos.TrashCleanupResult;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -54,10 +53,10 @@ import org.springframework.stereotype.Component;
     matchIfMissing = true)
 public class StorageTrashCleanupTask {
 
-  private final @NonNull Map<String, StorageStrategy> storageStrategiesByRepoType;
+  private final Map<String, StorageStrategy> storageStrategiesByRepoType;
 
   public StorageTrashCleanupTask(
-      final @Qualifier("storageStrategiesByRepoType") @NonNull Map<String, StorageStrategy>
+      final @Qualifier("storageStrategiesByRepoType") Map<String, StorageStrategy>
               storageStrategiesByRepoType) {
 
     this.storageStrategiesByRepoType = storageStrategiesByRepoType;
@@ -85,9 +84,7 @@ public class StorageTrashCleanupTask {
   }
 
   private void report(
-      final @NonNull String repoType,
-      final @NonNull TrashCleanupResult result,
-      final Throwable error) {
+      final String repoType, final TrashCleanupResult result, final Throwable error) {
     if (error != null) {
       log.warn("trash cleanup of {} storage failed", repoType, error);
       return;

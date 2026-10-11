@@ -17,7 +17,6 @@ package io.repsy.protocols.shared.utils;
 
 import java.io.IOException;
 import java.io.InputStream;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * Reads at most {@code maxBytes} from {@code delegate}, then reports end-of-stream whatever the
@@ -27,7 +26,6 @@ import org.jspecify.annotations.NullMarked;
  * out shorter than the declared length. The delegate is not closed here: it is the protocol's own
  * request stream, which the caller owns.
  */
-@NullMarked
 public final class BoundedLengthInputStream extends InputStream {
 
   private final InputStream delegate;

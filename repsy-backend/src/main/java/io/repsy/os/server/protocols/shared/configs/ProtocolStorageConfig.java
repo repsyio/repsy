@@ -20,7 +20,6 @@ import io.repsy.os.server.protocols.shared.storage.FileSystemStorageBeanRegistra
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import io.repsy.protocols.shared.storage.StorageStrategyRegistry;
 import java.util.EnumMap;
-import org.jspecify.annotations.NonNull;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -32,8 +31,7 @@ import org.springframework.context.annotation.Import;
 public class ProtocolStorageConfig {
 
   @Bean
-  public @NonNull StorageStrategyRegistry storageStrategyRegistry(
-      final @NonNull ApplicationContext context) {
+  public StorageStrategyRegistry storageStrategyRegistry(final ApplicationContext context) {
     final var strategies = new EnumMap<RepoType, StorageStrategy>(RepoType.class);
 
     for (final var repoType : RepoType.values()) {

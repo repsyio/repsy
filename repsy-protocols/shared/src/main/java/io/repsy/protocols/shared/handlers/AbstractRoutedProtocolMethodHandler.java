@@ -26,7 +26,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpMethod;
 
@@ -46,7 +45,6 @@ import org.springframework.http.HttpMethod;
  * #additionalProperties()} instead of overriding {@link #getProperties()}; it cannot replace any
  * other route property.
  */
-@NullMarked
 public abstract class AbstractRoutedProtocolMethodHandler implements ProtocolMethodHandler {
 
   private final HandlerRoute route;

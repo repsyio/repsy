@@ -17,14 +17,12 @@ package io.repsy.protocols.shared.handlers;
 
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolProvider;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * An {@link AbstractRoutedProtocolMethodHandler} that works with one facade.
  *
  * @param <F> the facade (or other collaborator) the handler delegates to
  */
-@NullMarked
 public abstract class AbstractFacadeProtocolMethodHandler<F>
     extends AbstractRoutedProtocolMethodHandler {
 

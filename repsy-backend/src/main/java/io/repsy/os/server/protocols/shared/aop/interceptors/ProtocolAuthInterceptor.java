@@ -34,9 +34,9 @@ import io.repsy.protocols.shared.repo.dtos.RepoType;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.Map;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Component;
 import org.springframework.web.method.HandlerMethod;
@@ -44,7 +44,6 @@ import org.springframework.web.servlet.HandlerInterceptor;
 
 @Slf4j
 @Component
-@NullMarked
 @RequiredArgsConstructor
 public class ProtocolAuthInterceptor implements HandlerInterceptor {
 
@@ -78,7 +77,7 @@ public class ProtocolAuthInterceptor implements HandlerInterceptor {
 
     final var repoInfo = repoInfoOpt.get();
     final var authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
-    final var authenticator = this.authComponents.get(repoInfo.getType());
+    final var authenticator = Objects.requireNonNull(this.authComponents.get(repoInfo.getType()));
 
     request.setAttribute(REPO_INFO, repoInfo);
 
@@ -119,7 +118,7 @@ public class ProtocolAuthInterceptor implements HandlerInterceptor {
     // other protocol's generic authentication otherwise.
     final var scopeType = RepoType.fromString(this.getRepoScope(methodHandler).name());
 
-    return this.authComponents.get(scopeType.orElse(RepoType.MAVEN));
+    return Objects.requireNonNull(this.authComponents.get(scopeType.orElse(RepoType.MAVEN)));
   }
 
   @SuppressWarnings("unchecked")

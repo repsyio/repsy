@@ -28,7 +28,6 @@ import java.time.Duration;
 import java.util.Base64;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -60,17 +59,16 @@ public class VerifiedPasswordCache {
   private static final int KEY_BYTES = 32;
 
   private final @Nullable Cache<String, Boolean> verified;
-  private final @NonNull SecretKeySpec macKey;
+  private final SecretKeySpec macKey;
 
   @Autowired
-  public VerifiedPasswordCache(final @NonNull BasicAuthCacheProperties properties) {
+  public VerifiedPasswordCache(final BasicAuthCacheProperties properties) {
 
     this(properties, Ticker.systemTicker());
   }
 
   @VisibleForTesting
-  VerifiedPasswordCache(
-      final @NonNull BasicAuthCacheProperties properties, final @NonNull Ticker ticker) {
+  VerifiedPasswordCache(final BasicAuthCacheProperties properties, final Ticker ticker) {
 
     final var keyBytes = new byte[KEY_BYTES];
     new SecureRandom().nextBytes(keyBytes);
@@ -93,8 +91,7 @@ public class VerifiedPasswordCache {
    *
    * @see PasswordHasher#matches
    */
-  public boolean matches(
-      final @NonNull StoredPasswordCredentials user, final @NonNull String password) {
+  public boolean matches(final StoredPasswordCredentials user, final String password) {
 
     if (this.verified == null || user.getHash() == null) {
       return PasswordHasher.matches(password, user.getHash(), user.getSalt());
@@ -119,8 +116,7 @@ public class VerifiedPasswordCache {
    * Tells whether this password already matched the stored hash of {@code user} a moment ago, which
    * costs a lookup and never a hash check.
    */
-  public boolean isRemembered(
-      final @NonNull StoredPasswordCredentials user, final @NonNull String password) {
+  public boolean isRemembered(final StoredPasswordCredentials user, final String password) {
 
     return this.verified != null
         && user.getHash() != null
@@ -133,8 +129,7 @@ public class VerifiedPasswordCache {
     return this.verified == null ? 0 : this.verified.stats().hitCount();
   }
 
-  private @NonNull String keyOf(
-      final @NonNull StoredPasswordCredentials user, final @NonNull String password) {
+  private String keyOf(final StoredPasswordCredentials user, final String password) {
 
     final var mac = this.newMac();
 
@@ -147,7 +142,7 @@ public class VerifiedPasswordCache {
   }
 
   /** Each part is length-prefixed, so ("ab", "c") and ("a", "bc") make different keys. */
-  private static void update(final @NonNull Mac mac, final @Nullable String part) {
+  private static void update(final Mac mac, final @Nullable String part) {
 
     if (part == null) {
       mac.update((byte) 0);
@@ -161,7 +156,7 @@ public class VerifiedPasswordCache {
     mac.update(bytes);
   }
 
-  private @NonNull Mac newMac() {
+  private Mac newMac() {
 
     try {
       final var mac = Mac.getInstance(HMAC_ALGORITHM);

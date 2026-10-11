@@ -19,7 +19,7 @@ import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.EnumMap;
 import java.util.Map;
-import org.jspecify.annotations.NonNull;
+import java.util.Objects;
 
 /**
  * The storage strategy of every repo type, looked up by {@link RepoType} instead of by a bean name.
@@ -27,9 +27,9 @@ import org.jspecify.annotations.NonNull;
  * RepoType} cannot be added without its storage.
  */
 public final class StorageStrategyRegistry {
-  private final @NonNull Map<RepoType, StorageStrategy> strategies;
+  private final Map<RepoType, StorageStrategy> strategies;
 
-  public StorageStrategyRegistry(final @NonNull Map<RepoType, StorageStrategy> strategies) {
+  public StorageStrategyRegistry(final Map<RepoType, StorageStrategy> strategies) {
     final var copy = new EnumMap<RepoType, StorageStrategy>(RepoType.class);
     copy.putAll(strategies);
 
@@ -42,12 +42,12 @@ public final class StorageStrategyRegistry {
     this.strategies = Map.copyOf(copy);
   }
 
-  public @NonNull StorageStrategy get(final @NonNull RepoType repoType) {
-    return this.strategies.get(repoType);
+  public StorageStrategy get(final RepoType repoType) {
+    return Objects.requireNonNull(this.strategies.get(repoType));
   }
 
   /** All strategies, one per repo type. */
-  public @NonNull Map<RepoType, StorageStrategy> asMap() {
+  public Map<RepoType, StorageStrategy> asMap() {
     return this.strategies;
   }
 }

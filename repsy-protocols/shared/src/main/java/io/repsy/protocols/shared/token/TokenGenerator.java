@@ -24,16 +24,15 @@ import java.time.Instant;
 import java.util.Base64;
 import lombok.experimental.UtilityClass;
 import org.apache.commons.lang3.RandomStringUtils;
-import org.jspecify.annotations.NonNull;
 
 @UtilityClass
 public final class TokenGenerator {
 
-  private static final @NonNull SecureRandom SECURE_RANDOM = new SecureRandom();
-  private static final @NonNull String ALGORITHM = "SHA-256";
+  private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+  private static final String ALGORITHM = "SHA-256";
   private static final int TOKEN_LENGTH = 32;
 
-  public static @NonNull String generate(final @NonNull String prefix) {
+  public static String generate(final String prefix) {
 
     try {
       return createToken(prefix);
@@ -43,7 +42,7 @@ public final class TokenGenerator {
     }
   }
 
-  private static @NonNull String createToken(final String prefix) throws NoSuchAlgorithmException {
+  private static String createToken(final String prefix) throws NoSuchAlgorithmException {
 
     final var randomString =
         RandomStringUtils.random(TOKEN_LENGTH, 0, 0, true, true, null, SECURE_RANDOM);

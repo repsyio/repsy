@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * Checks a blob against the digest a registry client names for it. The digest is an OCI digest,
@@ -33,7 +32,6 @@ import org.jspecify.annotations.NullMarked;
  * and {@code sha512}) are supported.
  */
 @UtilityClass
-@NullMarked
 public class BlobDigests {
 
   private static final int BUFFER_SIZE = 64 * 1024;
