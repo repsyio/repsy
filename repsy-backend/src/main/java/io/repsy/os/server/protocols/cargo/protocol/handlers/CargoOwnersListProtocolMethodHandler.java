@@ -18,12 +18,10 @@ package io.repsy.os.server.protocols.cargo.protocol.handlers;
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.protocols.cargo.protocol.CargoProtocolProvider;
 import io.repsy.protocols.cargo.protocol.handlers.AbstractCargoOwnersListProtocolMethodHandler;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 @Component
-@NullMarked
 public class CargoOwnersListProtocolMethodHandler
     extends AbstractCargoOwnersListProtocolMethodHandler {
 

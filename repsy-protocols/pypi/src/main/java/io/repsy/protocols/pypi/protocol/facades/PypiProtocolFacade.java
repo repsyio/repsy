@@ -20,12 +20,10 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.IOException;
 import java.util.Map;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.web.multipart.MultipartFile;
 
-@NullMarked
 public interface PypiProtocolFacade<ID> {
 
   void uploadPackage(ProtocolContext context, Map<String, Object> parameterMap, MultipartFile file)

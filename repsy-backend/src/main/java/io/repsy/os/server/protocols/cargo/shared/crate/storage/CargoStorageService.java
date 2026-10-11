@@ -18,11 +18,9 @@ package io.repsy.os.server.protocols.cargo.shared.crate.storage;
 import io.repsy.protocols.cargo.shared.storage.services.AbstractCargoStorageService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import io.repsy.protocols.shared.storage.StorageStrategyRegistry;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Service;
 
 @Service
-@NullMarked
 public class CargoStorageService extends AbstractCargoStorageService {
 
   public CargoStorageService(final StorageStrategyRegistry storageStrategyRegistry) {

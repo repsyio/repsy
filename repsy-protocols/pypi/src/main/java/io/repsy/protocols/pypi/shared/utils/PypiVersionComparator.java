@@ -16,7 +16,6 @@
 package io.repsy.protocols.pypi.shared.utils;
 
 import java.util.Comparator;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * Orders PyPI release versions by PEP 440 precedence ({@link Pep440Version}) instead of as plain
@@ -24,7 +23,6 @@ import org.jspecify.annotations.NullMarked;
  * "10.0"} above {@code "9.0"}, and a pre-release like {@code "2.0.0a1"} after the final release
  * {@code "2.0.0"} it precedes.
  */
-@NullMarked
 public class PypiVersionComparator implements Comparator<String> {
 
   @Override

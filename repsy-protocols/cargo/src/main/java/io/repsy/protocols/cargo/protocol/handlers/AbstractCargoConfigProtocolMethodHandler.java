@@ -26,7 +26,6 @@ import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -40,7 +39,6 @@ import org.springframework.http.ResponseEntity;
  * the {@code auth-required} flag, which confirm that the registry exists; they do not reveal
  * contents or grant any write access. RPS-2109: documented and pinned (keep open on purpose).
  */
-@NullMarked
 public abstract class AbstractCargoConfigProtocolMethodHandler
     extends AbstractRoutedProtocolMethodHandler {
 

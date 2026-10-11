@@ -16,10 +16,8 @@
 package io.repsy.protocols.cargo.shared.crate.services;
 
 import java.util.Comparator;
-import org.jspecify.annotations.NullMarked;
 import org.semver4j.Semver;
 
-@NullMarked
 public class SemverComparator implements Comparator<String> {
 
   @Override

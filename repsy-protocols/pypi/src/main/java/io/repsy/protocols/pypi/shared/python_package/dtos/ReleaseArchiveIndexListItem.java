@@ -17,11 +17,12 @@ package io.repsy.protocols.pypi.shared.python_package.dtos;
 
 import lombok.Builder;
 import lombok.Data;
+import org.jspecify.annotations.Nullable;
 
 @Data
 @Builder
 public class ReleaseArchiveIndexListItem {
   private String filename;
   private String fileHash;
-  private String requiresPython;
+  @Nullable private String requiresPython;
 }

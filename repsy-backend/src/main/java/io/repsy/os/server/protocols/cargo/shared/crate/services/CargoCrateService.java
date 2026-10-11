@@ -52,11 +52,11 @@ import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -71,7 +71,6 @@ import tools.jackson.databind.ObjectMapper;
 @Component
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
-@NullMarked
 public class CargoCrateService extends AbstractCargoCrateService<UUID> {
 
   private static final String VERSION_UNIQUE_CONSTRAINT = "ux_cargo_crate_index__crate_id_vers";
@@ -157,7 +156,7 @@ public class CargoCrateService extends AbstractCargoCrateService<UUID> {
       crate = this.insertCrate(repoInfo.getId(), request, normalizedName);
     }
 
-    crate.setHasLib(request.hasLib());
+    crate.setHasLib(Objects.requireNonNull(request.hasLib()));
 
     this.updateCrateMaxVersion(crate, request.vers());
     this.syncAuthors(crate, request.authors());
@@ -372,7 +371,7 @@ public class CargoCrateService extends AbstractCargoCrateService<UUID> {
             request.description(),
             request.homepage(),
             request.repository(),
-            request.hasLib(),
+            Objects.requireNonNull(request.hasLib()),
             Instant.now());
 
     final var crate =
@@ -396,7 +395,7 @@ public class CargoCrateService extends AbstractCargoCrateService<UUID> {
     index.setName(crate.getName());
     index.setVers(request.vers());
     index.setDeps(this.toJson(this.mapDeps(request.deps())));
-    index.setCksum(request.cksum());
+    index.setCksum(Objects.requireNonNull(request.cksum()));
     index.setFeatures(this.toJson(request.features()));
     index.setFeatures2(this.toJson(request.features2()));
     index.setYanked(false);
@@ -419,10 +418,10 @@ public class CargoCrateService extends AbstractCargoCrateService<UUID> {
 
   private CrateIndexDep toIndexDep(final CratePublishDep dep) {
 
-    final boolean hasAlias = dep.explicitNameInToml() != null;
+    final var explicitName = dep.explicitNameInToml();
 
     return new CrateIndexDep(
-        hasAlias ? dep.explicitNameInToml() : dep.name(),
+        explicitName != null ? explicitName : dep.name(),
         dep.versionReq(),
         dep.features(),
         dep.optional(),
@@ -430,7 +429,7 @@ public class CargoCrateService extends AbstractCargoCrateService<UUID> {
         dep.target(),
         dep.kind(),
         dep.registry(),
-        hasAlias ? dep.name() : null);
+        explicitName != null ? dep.name() : null);
   }
 
   private void createCrateMeta(

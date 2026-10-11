@@ -24,13 +24,11 @@ import java.util.List;
 import java.util.Objects;
 import java.util.regex.Pattern;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 @UtilityClass
-@NullMarked
 public final class PackageStorageUtils {
   public static final String HASH_ALGORITHM = "sha256";
 

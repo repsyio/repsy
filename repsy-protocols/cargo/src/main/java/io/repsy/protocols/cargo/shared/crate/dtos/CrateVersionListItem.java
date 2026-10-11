@@ -17,8 +17,6 @@ package io.repsy.protocols.cargo.shared.crate.dtos;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Instant;
-import org.jspecify.annotations.NullMarked;
 
-@NullMarked
 public record CrateVersionListItem(
     String version, boolean yanked, @JsonProperty("created_at") Instant createdAt) {}

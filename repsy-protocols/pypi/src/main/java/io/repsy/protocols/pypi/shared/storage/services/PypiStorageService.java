@@ -23,12 +23,10 @@ import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.IOException;
 import java.util.Map;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.web.multipart.MultipartFile;
 
-@NullMarked
 public interface PypiStorageService<ID> {
   long deletePackage(UUID repoId, String packageNormalizedName);
 

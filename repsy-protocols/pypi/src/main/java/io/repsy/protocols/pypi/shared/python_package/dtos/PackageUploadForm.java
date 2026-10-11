@@ -18,10 +18,13 @@ package io.repsy.protocols.pypi.shared.python_package.dtos;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.jspecify.annotations.Nullable;
 
+// The no-args constructor (Spring binding of the multipart form) leaves the fields to be set
+// afterwards; the required ones are validated by the handler before they are read.
 @Data
 @NoArgsConstructor
-@SuppressWarnings("MemberName")
+@SuppressWarnings({"MemberName", "NullAway.Init"})
 public class PackageUploadForm {
   // fields provided by twine
   private String name;
@@ -30,12 +33,12 @@ public class PackageUploadForm {
   private String pyversion;
   private String metadata_version;
   private String summary;
-  private String home_page;
-  private String author;
-  private String author_email;
+  @Nullable private String home_page;
+  @Nullable private String author;
+  @Nullable private String author_email;
   private String maintainer;
   private String maintainer_email;
-  private String license;
+  @Nullable private String license;
   private String description;
   private String[] keywords;
   private String[] platform;
@@ -56,7 +59,7 @@ public class PackageUploadForm {
   private String[] requires_external;
   private String requires_python;
   private String[] provides_extras;
-  private String description_content_type;
+  @Nullable private String description_content_type;
   private String protocol_version;
 
   // fields used by repsy

@@ -15,7 +15,6 @@
  */
 package io.repsy.protocols.cargo.shared.crate.dtos;
 
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -23,5 +22,4 @@ import org.jspecify.annotations.Nullable;
  * id: u32, login: String, name: Option<String>}. Unknown extra fields are ignored by the real
  * client, but these three are read.
  */
-@NullMarked
 public record CargoOwnerUser(int id, String login, @Nullable String name) {}

@@ -18,12 +18,10 @@ package io.repsy.protocols.pypi.shared.utils;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.web.util.UriComponentsBuilder;
 
 @UtilityClass
-@NullMarked
 public class UriUtils {
 
   @Nullable

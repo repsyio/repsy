@@ -22,9 +22,7 @@ import io.repsy.protocols.pypi.shared.python_package.dtos.ReleaseVersionRequires
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.IOException;
 import java.util.List;
-import org.jspecify.annotations.NullMarked;
 
-@NullMarked
 public interface PypiPackageService<ID> {
 
   /**

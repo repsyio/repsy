@@ -39,7 +39,6 @@ import java.io.InputStream;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -47,7 +46,6 @@ import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import tools.jackson.databind.ObjectMapper;
 
 @Slf4j
-@NullMarked
 @RequiredArgsConstructor
 public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFacade {
 

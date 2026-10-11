@@ -18,14 +18,12 @@ package io.repsy.os.server.protocols.cargo.shared.crate.repositories;
 import io.repsy.os.server.protocols.cargo.shared.crate.entities.CargoCategory;
 import java.util.Optional;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 @Repository
-@NullMarked
 public interface CargoCategoryRepository extends JpaRepository<CargoCategory, UUID> {
 
   Optional<CargoCategory> findByCategory(String category);

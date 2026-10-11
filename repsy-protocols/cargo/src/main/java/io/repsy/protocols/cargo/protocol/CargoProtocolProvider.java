@@ -16,11 +16,9 @@
 package io.repsy.protocols.cargo.protocol;
 
 import io.repsy.libs.protocol.router.ProtocolProvider;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
 @Component
-@NullMarked
 public class CargoProtocolProvider extends ProtocolProvider {
 
   @Override

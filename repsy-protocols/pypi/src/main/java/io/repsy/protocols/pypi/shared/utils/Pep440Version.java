@@ -20,9 +20,9 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -42,7 +42,6 @@ import org.jspecify.annotations.Nullable;
  * sorts after the same version without one, and same-position segments compare numeric-to-numeric
  * and string-to-string, with a numeric segment always outranking a string one.
  */
-@NullMarked
 public final class Pep440Version implements Comparable<Pep440Version> {
 
   // The official `packaging` library's VERSION_PATTERN (PEP 440 Appendix B), reproduced
@@ -294,7 +293,7 @@ public final class Pep440Version implements Comparable<Pep440Version> {
       if (other.number != null) {
         return -1;
       }
-      return this.text.compareTo(other.text);
+      return Objects.requireNonNull(this.text).compareTo(Objects.requireNonNull(other.text));
     }
   }
 }

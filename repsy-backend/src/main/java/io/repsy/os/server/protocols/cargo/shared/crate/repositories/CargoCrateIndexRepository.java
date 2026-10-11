@@ -19,12 +19,10 @@ import io.repsy.os.server.protocols.cargo.shared.crate.entities.CargoCrateIndex;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 @Repository
-@NullMarked
 public interface CargoCrateIndexRepository extends JpaRepository<CargoCrateIndex, UUID> {
 
   /** The versions in publish order: the order of the sparse index. */

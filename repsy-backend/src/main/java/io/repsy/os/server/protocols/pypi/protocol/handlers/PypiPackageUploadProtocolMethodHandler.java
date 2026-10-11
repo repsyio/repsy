@@ -20,12 +20,10 @@ import io.repsy.os.server.protocols.pypi.protocol.facades.PypiProtocolFacade;
 import io.repsy.protocols.pypi.protocol.PypiProtocolProvider;
 import io.repsy.protocols.pypi.protocol.handlers.AbstractPypiPackageUploadProtocolMethodHandler;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 @Component
-@NullMarked
 public class PypiPackageUploadProtocolMethodHandler
     extends AbstractPypiPackageUploadProtocolMethodHandler<UUID> {
 

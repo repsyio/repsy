@@ -28,7 +28,6 @@ import java.util.UUID;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
-import org.jspecify.annotations.NonNull;
 
 @Data
 @Entity
@@ -46,7 +45,7 @@ public class CargoKeyword {
   private String keyword;
 
   @ManyToMany(mappedBy = "keywords")
-  private @NonNull Set<CargoCrate> crates = new HashSet<>();
+  private Set<CargoCrate> crates = new HashSet<>();
 
   /**
    * Identifier-based equality: two cargo keywords are equal when they are the same instance or

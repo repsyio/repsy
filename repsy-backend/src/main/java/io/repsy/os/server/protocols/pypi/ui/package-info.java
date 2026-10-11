@@ -13,7 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@NullMarked
 @ApplicationModule(displayName = "Pypi UI")
 package io.repsy.os.server.protocols.pypi.ui;
 
+import org.jspecify.annotations.NullMarked;
 import org.springframework.modulith.ApplicationModule;

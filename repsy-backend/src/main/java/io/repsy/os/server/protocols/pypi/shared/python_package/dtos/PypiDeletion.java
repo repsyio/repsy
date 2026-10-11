@@ -16,7 +16,6 @@
 package io.repsy.os.server.protocols.pypi.shared.python_package.dtos;
 
 import java.util.List;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * What a delete of a package or a release removed.
@@ -24,5 +23,4 @@ import org.jspecify.annotations.NullMarked;
  * @param versions the normalized versions whose releases were removed
  * @param freedBytes the storage usage of the archives that were removed
  */
-@NullMarked
 public record PypiDeletion(List<String> versions, long freedBytes) {}

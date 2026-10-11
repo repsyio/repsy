@@ -25,12 +25,10 @@ import io.repsy.protocols.shared.handlers.HandlerRoute;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.regex.Pattern;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
-@NullMarked
 public abstract class AbstractPypiPackageUploadProtocolMethodHandler<ID>
     extends AbstractFacadeProtocolMethodHandler<PypiProtocolFacade<ID>> {
 

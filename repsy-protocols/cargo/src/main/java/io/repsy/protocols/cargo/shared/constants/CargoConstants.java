@@ -15,9 +15,6 @@
  */
 package io.repsy.protocols.cargo.shared.constants;
 
-import org.jspecify.annotations.NullMarked;
-
-@NullMarked
 public final class CargoConstants {
 
   private CargoConstants() {}
