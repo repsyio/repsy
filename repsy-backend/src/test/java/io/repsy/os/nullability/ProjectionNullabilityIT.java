@@ -59,6 +59,9 @@ class ProjectionNullabilityIT extends AbstractIT {
           "native: coalesce(sum(...), 0)",
           "io.repsy.protocols.pypi.shared.python_package.dtos.PypiPackageListItem#getLatestVersion",
           "the query joins on p.latestVersion = r.version, which no null satisfies",
+          "io.repsy.os.server.protocols.npm.shared.npm_package.dtos.NpmPackageListItem#getLatest",
+          "the queries join on p.latest = pv.version, which no null satisfies"
+              + " (NpmProjectionNullIT)",
           "io.repsy.os.server.protocols.ruby.shared.ruby_gem.dtos.GemListItem#getUpdatedAt",
           "max(gv.createdAt) over the inner join of the gem with its latest version, grouped by"
               + " the gem: every group has a row with a NOT NULL created_at");
