@@ -133,4 +133,22 @@ class PypiNullableProjectionIT extends AbstractIT {
     assertThat(releases.get(0).getVersion()).isEqualTo("1.0.0a1");
     assertThat(releases.get(0).getRequiresPython()).isNull();
   }
+
+  @Test
+  @DisplayName(
+      "the simple index renders a release with a null requires_python without the attribute")
+  void simpleIndexRendersNullRequiresPython() throws Exception {
+    final var repo = this.publishPreReleaseWithoutRequiresPython("index-no-requires");
+
+    this.jdbcTemplate.update(
+        "update pypi_release set requires_python = null where package_id = ?",
+        this.packageId(repo));
+    this.entityManager.clear();
+
+    final var index = this.pypiProtocolFacade.fetchFromLocalStorage(repo, "index-no-requires");
+    final var html = new String(index.getByteArray(), StandardCharsets.UTF_8);
+
+    assertThat(html).contains("index_no_requires-1.0.0a1-py3-none-any.whl");
+    assertThat(html).doesNotContain("data-requires-python");
+  }
 }

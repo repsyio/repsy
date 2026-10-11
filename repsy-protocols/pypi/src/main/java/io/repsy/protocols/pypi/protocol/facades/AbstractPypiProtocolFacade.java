@@ -23,7 +23,6 @@ import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.protocols.pypi.shared.python_package.dtos.PackageUploadForm;
-import io.repsy.protocols.pypi.shared.python_package.dtos.ReleaseVersionRequiresPython;
 import io.repsy.protocols.pypi.shared.python_package.services.PypiPackageService;
 import io.repsy.protocols.pypi.shared.storage.services.PypiStorageService;
 import io.repsy.protocols.pypi.shared.utils.PackageStorageUtils;
@@ -37,9 +36,9 @@ import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import io.repsy.protocols.shared.utils.StoredUpload;
 import java.io.IOException;
 import java.nio.file.Paths;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.event.Level;
@@ -136,12 +135,19 @@ public abstract class AbstractPypiProtocolFacade<ID> implements PypiProtocolFaca
     final var packageInfo =
         this.pypiPackageService.getPackage(repoInfo.getId(), packageNormalizedName);
 
-    final var requiresPythonMap =
-        this.pypiPackageService.getReleaseIndexListItemInfos(packageInfo.getId()).stream()
-            .collect(
-                Collectors.toMap(
-                    ReleaseVersionRequiresPython::getVersion,
-                    r -> HtmlUtils.htmlEscape(r.getRequiresPython())));
+    // PEP 503: data-requires-python is omitted when a release has none, so a null value
+    // (legacy rows, other writers) is left out of the map instead of failing the index.
+    final var requiresPythonMap = new HashMap<String, String>();
+
+    for (final var release :
+        this.pypiPackageService.getReleaseIndexListItemInfos(packageInfo.getId())) {
+      final var version = release.getVersion();
+      final var requiresPython = release.getRequiresPython();
+
+      if (version != null && requiresPython != null) {
+        requiresPythonMap.put(version, HtmlUtils.htmlEscape(requiresPython));
+      }
+    }
 
     return this.pypiStorageService.getPackageArchiveFileList(
         repoInfo, packageNormalizedName, requiresPythonMap);

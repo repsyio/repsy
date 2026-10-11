@@ -45,8 +45,10 @@ import org.jspecify.annotations.Nullable;
  *       email or url. These are descriptive only; a value cut to fit would point somewhere wrong,
  *       which is worse than a blank field.
  *   <li><b>Drop the entry</b> and keep the rest of the array: an over-long keyword, or an over-long
- *       maintainer name &mdash; {@code npm_package_maintainer.name} is {@code NOT NULL}, so unlike
- *       its email and url it cannot be nulled, and the maintainer entry is dropped whole instead.
+ *       maintainer name, or a maintainer without a name (RPS-2186) &mdash; {@code
+ *       npm_package_maintainer.name} is {@code NOT NULL}, so unlike its email and url it cannot be
+ *       nulled, and the maintainer entry is dropped whole instead. Maintainers are optional
+ *       metadata, so a nameless one is no reason to refuse the publish.
  * </ul>
  *
  * <p>{@code npm_package_version.version} is capped at {@link #MAX_VERSION_LENGTH} (128), below the
@@ -178,7 +180,7 @@ public final class NpmPublishLimits {
     dropBugs(version);
     dropRepository(version);
     dropOverLongKeywords(version);
-    dropOverLongMaintainers(version);
+    dropInvalidMaintainers(version);
   }
 
   private static void dropLicense(final Map<String, Object> version) {
@@ -231,7 +233,7 @@ public final class NpmPublishLimits {
         keyword -> keyword instanceof final String s && s.length() > MAX_KEYWORD_LENGTH);
   }
 
-  private static void dropOverLongMaintainers(final Map<String, Object> version) {
+  private static void dropInvalidMaintainers(final Map<String, Object> version) {
     if (!(version.get(NpmConstants.MAINTAINERS) instanceof final Collection<?> maintainers)) {
       return;
     }
@@ -242,9 +244,11 @@ public final class NpmPublishLimits {
             return false;
           }
 
-          if (maintainer.get(NpmConstants.NAME) instanceof final String name
-              && name.length() > MAX_MAINTAINER_NAME_LENGTH) {
-            return true; // the name column is NOT NULL, so the whole entry is dropped instead.
+          // The name column is NOT NULL, so an entry without a usable name (missing, null or not
+          // a string, RPS-2186) or with an over-long one is dropped whole instead of nulled.
+          if (!(maintainer.get(NpmConstants.NAME) instanceof final String name)
+              || name.length() > MAX_MAINTAINER_NAME_LENGTH) {
+            return true;
           }
 
           final var map = (Map<String, Object>) maintainer;

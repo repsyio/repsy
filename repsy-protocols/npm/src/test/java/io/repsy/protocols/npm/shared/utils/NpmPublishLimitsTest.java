@@ -239,6 +239,25 @@ class NpmPublishLimitsTest {
     }
 
     @Test
+    @DisplayName("drops a maintainer entry without a usable name (NOT NULL column, RPS-2186)")
+    void dropsMaintainerEntryWithoutName() {
+      final var version = this.version();
+      final Map<String, Object> good = new HashMap<>(Map.of("name", "ok-maintainer"));
+      final Map<String, Object> missing = new HashMap<>(Map.of("email", "a@example.test"));
+      final Map<String, Object> nullName = new HashMap<>();
+      nullName.put("name", null);
+      nullName.put("email", "b@example.test");
+      final Map<String, Object> notAString = new HashMap<>(Map.of("name", 42));
+      final List<Map<String, Object>> maintainers =
+          new ArrayList<>(List.of(good, missing, nullName, notAString));
+      version.put("maintainers", maintainers);
+
+      NpmPublishLimits.dropOverLongFields(version);
+
+      assertThat(maintainers).containsExactly(good);
+    }
+
+    @Test
     @DisplayName("nulls only the over-long email/url of a maintainer, keeping the entry and name")
     void dropsOverLongMaintainerEmailOrUrlOnly() {
       final var version = this.version();

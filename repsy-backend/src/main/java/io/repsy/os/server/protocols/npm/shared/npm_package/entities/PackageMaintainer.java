@@ -52,7 +52,6 @@ public class PackageMaintainer {
   private PackageVersion packageVersion;
 
   @Column(name = "name", nullable = false, length = NpmPublishLimits.MAX_MAINTAINER_NAME_LENGTH)
-  @Nullable
   private String name;
 
   @Column(name = "email", length = NpmPublishLimits.MAX_MAINTAINER_EMAIL_LENGTH)

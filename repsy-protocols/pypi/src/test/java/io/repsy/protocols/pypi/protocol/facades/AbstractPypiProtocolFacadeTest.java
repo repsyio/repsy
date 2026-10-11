@@ -30,7 +30,9 @@ import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.libs.storage.core.dtos.RelativePath;
+import io.repsy.protocols.pypi.shared.python_package.dtos.BasePypiPackageInfo;
 import io.repsy.protocols.pypi.shared.python_package.dtos.PackageUploadForm;
+import io.repsy.protocols.pypi.shared.python_package.dtos.ReleaseVersionRequiresPython;
 import io.repsy.protocols.pypi.shared.python_package.services.PypiPackageService;
 import io.repsy.protocols.pypi.shared.storage.services.PypiStorageService;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
@@ -41,6 +43,7 @@ import java.io.IOException;
 import java.security.MessageDigest;
 import java.util.HashMap;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -502,6 +505,53 @@ class AbstractPypiProtocolFacadeTest {
       assertThatThrownBy(() -> facade.uploadPackage(context(), params(), upload()))
           .isSameAs(failure)
           .hasSuppressedException(cleanupFailure);
+    }
+  }
+
+  // =========================================================================
+
+  @Nested
+  @DisplayName("fetchFromLocalStorage() requires_python map (RPS-2183)")
+  class SimpleIndexRequiresPythonTests {
+
+    private ReleaseVersionRequiresPython release(
+        final String version, final String requiresPython) {
+      return new ReleaseVersionRequiresPython() {
+        @Override
+        public String getVersion() {
+          return version;
+        }
+
+        @Override
+        public String getRequiresPython() {
+          return requiresPython;
+        }
+      };
+    }
+
+    @Test
+    @DisplayName("renders a release whose requires_python is null, leaving it out of the map")
+    void nullRequiresPythonIsLeftOutOfTheMap() throws Exception {
+      final var packageInfo =
+          BasePypiPackageInfo.<UUID>builder().id(UUID.randomUUID()).name("demo").build();
+
+      when(packageService.getPackage(REPO_ID, "demo")).thenReturn(packageInfo);
+      when(packageService.getReleaseIndexListItemInfos(packageInfo.getId()))
+          .thenReturn(
+              List.of(
+                  release("1.0.0", ">=3.8,<4"),
+                  release("1.1.0", null),
+                  release("1.2.0", "<b>"),
+                  release(null, ">=3")));
+
+      facade.fetchFromLocalStorage(repoInfo, "demo");
+
+      @SuppressWarnings("unchecked")
+      final ArgumentCaptor<Map<String, String>> captor = ArgumentCaptor.forClass(Map.class);
+
+      verify(storageService).getPackageArchiveFileList(eq(repoInfo), eq("demo"), captor.capture());
+      assertThat(captor.getValue())
+          .containsOnly(Map.entry("1.0.0", "&gt;=3.8,&lt;4"), Map.entry("1.2.0", "&lt;b&gt;"));
     }
   }
 }

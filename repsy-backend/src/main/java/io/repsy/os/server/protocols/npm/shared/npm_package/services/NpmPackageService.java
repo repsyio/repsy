@@ -725,21 +725,23 @@ public class NpmPackageService extends AbstractNpmPackageService<UUID> {
   private void addMaintainers(
       final Map<String, Object> version, final PackageVersion packageVersion) {
 
-    if (!(version.get("maintainers") instanceof final Collection<?> maintainers)
-        || maintainers.isEmpty()) {
+    if (!(version.get("maintainers") instanceof final Collection<?> maintainers)) {
       return;
     }
 
     PackageMaintainer packageMaintainer;
 
     for (final var raw : maintainers) {
-      if (!(raw instanceof final Map<?, ?> maintainer) || maintainer.isEmpty()) {
+      // The name column is NOT NULL: NpmPublishLimits already drops nameless entries on publish,
+      // this keeps any other caller from failing the flush with a constraint violation (RPS-2186).
+      if (!(raw instanceof final Map<?, ?> maintainer)
+          || !(maintainer.get(NpmConstants.NAME) instanceof final String name)) {
         continue;
       }
 
       packageMaintainer = new PackageMaintainer();
       packageMaintainer.setPackageVersion(packageVersion);
-      packageMaintainer.setName((String) maintainer.get(NpmConstants.NAME));
+      packageMaintainer.setName(name);
       packageMaintainer.setEmail((String) maintainer.get(NpmConstants.EMAIL));
       packageMaintainer.setUrl((String) maintainer.get(NpmConstants.URL));
       packageMaintainer.setCreatedAt(Instant.now());
