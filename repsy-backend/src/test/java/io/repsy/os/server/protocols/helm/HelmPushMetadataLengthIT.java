@@ -51,6 +51,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockPart;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.ResultActions;
 
@@ -65,6 +66,10 @@ import org.springframework.test.web.servlet.ResultActions;
  * <p>None of these reaches the database with an over-long value, so they run in this class's test
  * transaction.
  */
+// The strict wire (RPS-2164) refuses a tag over 128 characters and a Content-Type that is not the
+// OCI
+// manifest before the column limits this class pins can be reached, so it runs on the lenient wire.
+@TestPropertySource(properties = "repsy.helm.oci.strict-wire=false")
 @DisplayName("Helm push holds chart and OCI metadata to its columns (RPS-1072)")
 class HelmPushMetadataLengthIT extends AbstractIT {
 

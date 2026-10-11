@@ -3095,13 +3095,30 @@ class HelmChartControllerIT extends AbstractIT {
       return "{\"layers\":[{\"digest\":%s,\"size\":%s}]}".formatted(digest, size);
     }
 
+    /**
+     * The checks of the strict wire (schemaVersion, config digest, RPS-2164) come before the layer
+     * checks this class pins, so a JSON object under test is given a valid envelope around it.
+     */
+    private static String withStrictEnvelope(final String manifest) {
+      if (!manifest.startsWith("{") || manifest.contains("schemaVersion")) {
+        return manifest;
+      }
+      final var envelope =
+          "\"schemaVersion\":2,\"config\":{\"mediaType\":\"application/vnd.cncf.helm.config.v1+json\","
+              + "\"digest\":\""
+              + DIGEST
+              + "\",\"size\":2}";
+      final var rest = manifest.substring(1);
+      return "{" + envelope + ("}".equals(rest) ? "}" : "," + rest);
+    }
+
     private MockHttpServletResponse putManifest(final Repo repo, final String manifest)
         throws Exception {
       final var it = HelmChartControllerIT.this;
       return it.protocol(
               put("/v2/{repo}/{name}/manifests/{tag}", repo.getName(), "payments", "1.0.0")
                   .contentType(OCI_MANIFEST_TYPE)
-                  .content(manifest)
+                  .content(withStrictEnvelope(manifest))
                   .header(AUTHORIZATION, it.adminProtocolBearerToken()))
           .andReturn()
           .getResponse();

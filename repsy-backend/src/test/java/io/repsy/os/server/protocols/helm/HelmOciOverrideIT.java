@@ -139,21 +139,23 @@ class HelmOciOverrideIT extends AbstractIT {
     final var upload = this.uploadBlob(repo, chartBytes, layerDigest);
     assertThat(upload.getStatus()).as("chart layer upload").isEqualTo(201);
 
-    final var config = "{}".getBytes(StandardCharsets.UTF_8);
-    final var manifest =
-        ("{\"schemaVersion\":2,\"mediaType\":\"%s\",\"config\":{\"mediaType\":\"%s\","
-                + "\"digest\":\"%s\",\"size\":%d},\"layers\":[{\"mediaType\":\"%s\","
-                + "\"digest\":\"%s\",\"size\":%d}]}")
-            .formatted(
-                OCI_MANIFEST_TYPE,
-                OCI_CONFIG_TYPE,
-                digest("SHA-256", config),
-                config.length,
-                OCI_LAYER_TYPE,
-                layerDigest,
-                chartBytes.length);
+    return this.putManifest(repo, name, reference, ociManifest(chartBytes));
+  }
 
-    return this.putManifest(repo, name, reference, manifest);
+  /** The manifest {@link #pushOci} pushes for {@code chartBytes}. */
+  private static String ociManifest(final byte[] chartBytes) {
+    final var config = "{}".getBytes(StandardCharsets.UTF_8);
+    return ("{\"schemaVersion\":2,\"mediaType\":\"%s\",\"config\":{\"mediaType\":\"%s\","
+            + "\"digest\":\"%s\",\"size\":%d},\"layers\":[{\"mediaType\":\"%s\","
+            + "\"digest\":\"%s\",\"size\":%d}]}")
+        .formatted(
+            OCI_MANIFEST_TYPE,
+            OCI_CONFIG_TYPE,
+            digest("SHA-256", config),
+            config.length,
+            OCI_LAYER_TYPE,
+            digest("SHA-256", chartBytes),
+            chartBytes.length);
   }
 
   private MockHttpServletResponse uploadClassic(final Repo repo, final byte[] chartBytes)
@@ -330,7 +332,12 @@ class HelmOciOverrideIT extends AbstractIT {
     // sub-request that used to slip past the override check entirely and upsert the row via
     // AbstractHelmProtocolTxFacade#findOrCreateChart. The tag-referenced request below is the one
     // checkManifest's by-reference lookup DOES gate, and where the refusal is actually thrown.
-    final var byDigest = this.pushOci(repo, CHART, "sha256:" + secondDigest, second);
+    final var byDigest =
+        this.pushOci(
+            repo,
+            CHART,
+            digest("SHA-256", ociManifest(second).getBytes(StandardCharsets.UTF_8)),
+            second);
     assertThat(byDigest.getStatus())
         .as("by-digest sub-request: " + byDigest.getContentAsString())
         .isEqualTo(409);
