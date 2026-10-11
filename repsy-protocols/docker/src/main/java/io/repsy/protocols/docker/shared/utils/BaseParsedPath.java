@@ -21,6 +21,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 
+// Populated by the builder or by setters after construction.
+@SuppressWarnings("NullAway.Init")
 @Data
 @SuperBuilder
 @NoArgsConstructor

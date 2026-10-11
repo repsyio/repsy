@@ -16,7 +16,6 @@
 package io.repsy.protocols.oci.dtos;
 
 import java.util.List;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -25,7 +24,6 @@ import org.jspecify.annotations.Nullable;
  *
  * @param errors The errors the request failed with; the registry reports one
  */
-@NullMarked
 public record OciErrorResponse(List<Error> errors) {
 
   /**

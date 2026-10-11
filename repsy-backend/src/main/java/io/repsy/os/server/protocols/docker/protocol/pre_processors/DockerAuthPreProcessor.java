@@ -30,7 +30,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
@@ -40,7 +39,6 @@ import org.springframework.stereotype.Component;
  * credentials on a public repository too, and a delete also needs a token issued for it.
  */
 @Component
-@NullMarked
 public class DockerAuthPreProcessor extends BasicOrBearerAuthPreProcessor<DockerAuthenticator> {
 
   public DockerAuthPreProcessor(

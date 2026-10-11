@@ -33,7 +33,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.util.UUID;
 import lombok.SneakyThrows;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpMethod;
 
@@ -41,7 +40,6 @@ import org.springframework.http.HttpMethod;
  * The Docker upload finalize: appends the request body, verifies the digest against the stored
  * bytes and records the layer (retrying a concurrent first insert).
  */
-@NullMarked
 public abstract class AbstractDockerUploadFinalizeProtocolMethodHandler<ID>
     extends AbstractOciUploadFinalizeProtocolMethodHandler<DockerProtocolFacade<ID>> {
 

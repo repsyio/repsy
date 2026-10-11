@@ -36,7 +36,6 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.annotations.UpdateTimestamp;
-import org.jspecify.annotations.NonNull;
 
 @Data
 @Entity
@@ -89,7 +88,7 @@ public class Tag {
   @OnDelete(action = OnDeleteAction.CASCADE)
   private Image image;
 
-  public void setImage(final @NonNull Image image) {
+  public void setImage(final Image image) {
     this.image = image;
   }
 

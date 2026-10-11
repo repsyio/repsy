@@ -17,9 +17,7 @@ package io.repsy.protocols.docker.shared.auth.services;
 
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.util.List;
-import org.jspecify.annotations.NullMarked;
 
-@NullMarked
 public interface DockerAuthService<ID> {
 
   /**

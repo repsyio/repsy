@@ -32,10 +32,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 
-@NullMarked
 public abstract class AbstractDockerStorageService<ID> extends AbstractArtifactStorageService
     implements DockerStorageService<ID> {
 

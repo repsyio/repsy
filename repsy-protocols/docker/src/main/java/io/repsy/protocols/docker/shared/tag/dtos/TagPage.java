@@ -16,7 +16,6 @@
 package io.repsy.protocols.docker.shared.tag.dtos;
 
 import java.util.List;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * One page of the tags of an image, in the lexical order the distribution spec asks for.
@@ -25,5 +24,4 @@ import org.jspecify.annotations.NullMarked;
  * @param hasMore whether tags come after the last one of the page, so a {@code Link} to the next
  *     page is due
  */
-@NullMarked
 public record TagPage(List<String> tags, boolean hasMore) {}

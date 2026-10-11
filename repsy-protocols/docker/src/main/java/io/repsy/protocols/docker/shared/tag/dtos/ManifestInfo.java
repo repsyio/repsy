@@ -20,26 +20,29 @@ import java.util.List;
 import java.util.stream.Collectors;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
+// Bound by Jackson; DockerManifestValidator rejects a push that lacks the non-null fields.
+@SuppressWarnings("NullAway.Init")
 @Data
 @NoArgsConstructor
 public class ManifestInfo {
   private long schemaVersion;
-  private String mediaType;
+  @Nullable private String mediaType;
   private OciImageConfig config;
   private List<ManifestLayer> layers;
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
+  @Nullable
   private OciImageConfig subject;
 
-  public @NonNull List<String> getLayerDigests() {
+  public List<String> getLayerDigests() {
 
     // should be mutable.
     return this.layers.stream().map(ManifestLayer::getDigest).collect(Collectors.toList());
   }
 
-  public @NonNull String getConfigDigest() {
+  public String getConfigDigest() {
 
     return this.config.getDigest();
   }

@@ -17,14 +17,12 @@ package io.repsy.protocols.oci.utils;
 
 import java.util.regex.Pattern;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * The relative paths ({@code /<name>/...} after {@code /v2/<repo>}) of the OCI routes. Group 1 is
  * the name; group 2 the upload id, digest or reference.
  */
 @UtilityClass
-@NullMarked
 public final class OciPathUtils {
 
   public static final Pattern UPLOAD_START = Pattern.compile("^/([^/]+)/blobs/uploads/?$");

@@ -19,7 +19,10 @@ import java.time.Instant;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.jspecify.annotations.Nullable;
 
+// Populated by setters or by the persistence layer after construction.
+@SuppressWarnings("NullAway.Init")
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
@@ -28,7 +31,7 @@ public class BaseManifestDetail<ID> {
   private ID id;
   private long configSize;
   private String digest;
-  private String storageName;
+  @Nullable private String storageName;
   private String mediaType;
   private Instant createdAt;
   private Instant lastUpdatedAt;

@@ -24,11 +24,9 @@ import io.repsy.protocols.docker.shared.tag.dtos.SavedManifest;
 import io.repsy.protocols.docker.shared.tag.dtos.TagPage;
 import java.io.IOException;
 import java.io.InputStream;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 
-@NullMarked
 public interface DockerProtocolFacade<ID> {
 
   /**

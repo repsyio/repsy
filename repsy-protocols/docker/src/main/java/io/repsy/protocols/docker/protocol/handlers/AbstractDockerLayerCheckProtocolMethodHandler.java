@@ -27,11 +27,9 @@ import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.BlobDigests;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import java.util.Optional;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
 
 /** The OCI blob check of a Docker layer, any supported digest algorithm. */
-@NullMarked
 public abstract class AbstractDockerLayerCheckProtocolMethodHandler<ID>
     extends AbstractOciBlobCheckProtocolMethodHandler<LayerService<ID>> {
 

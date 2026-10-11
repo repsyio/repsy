@@ -21,7 +21,6 @@ import java.util.UUID;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.experimental.SuperBuilder;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 @Getter
@@ -29,7 +28,7 @@ import org.jspecify.annotations.Nullable;
 @SuperBuilder
 public class TagDetail extends BaseTagDetail<UUID> {
 
-  public static @NonNull TagDetail of(final @NonNull Tag tag) {
+  public static TagDetail of(final Tag tag) {
 
     return TagDetail.builder()
         .id(tag.getId())
@@ -42,7 +41,7 @@ public class TagDetail extends BaseTagDetail<UUID> {
         .build();
   }
 
-  public static @NonNull TagDetail of(final @NonNull Tag tag, final @Nullable String configDigest) {
+  public static TagDetail of(final Tag tag, final @Nullable String configDigest) {
 
     final var tagDetail = of(tag);
     tagDetail.setConfigDigest(configDigest);

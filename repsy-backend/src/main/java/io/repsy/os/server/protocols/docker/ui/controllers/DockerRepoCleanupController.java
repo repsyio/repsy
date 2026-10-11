@@ -28,7 +28,6 @@ import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.utils.MultiPortNames;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -46,8 +45,8 @@ import org.springframework.web.bind.annotation.RestController;
 @SuppressWarnings("java:S6856")
 public class DockerRepoCleanupController {
 
-  private final @NonNull DockerApiFacade dockerApiFacade;
-  private final @NonNull UsageUpdateService usageUpdateService;
+  private final DockerApiFacade dockerApiFacade;
+  private final UsageUpdateService usageUpdateService;
 
   @DeleteMapping("/orphan-layers")
   @RepoOperation(permission = Permission.MANAGE)

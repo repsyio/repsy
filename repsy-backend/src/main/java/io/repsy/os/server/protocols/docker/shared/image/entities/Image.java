@@ -40,7 +40,6 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.annotations.UpdateTimestamp;
-import org.jspecify.annotations.NonNull;
 
 @Data
 @Entity
@@ -59,7 +58,7 @@ public class Image {
   private Repo repo;
 
   @OneToMany(mappedBy = "image", cascade = CascadeType.ALL, orphanRemoval = true)
-  private @NonNull Set<Tag> tags = new HashSet<>();
+  private Set<Tag> tags = new HashSet<>();
 
   @Column(name = "name", length = DockerConstants.MAX_IMAGE_NAME_LENGTH)
   private String name;

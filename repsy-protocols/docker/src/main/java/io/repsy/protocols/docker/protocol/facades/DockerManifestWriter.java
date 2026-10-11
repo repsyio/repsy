@@ -50,14 +50,12 @@ import java.io.InputStream;
 import java.util.LinkedHashSet;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NullMarked;
 import tools.jackson.databind.ObjectMapper;
 
 /**
  * The manifest push of the Docker facade: the checks that need no image, the image row, the
  * platform of the config, the manifest file and the rows, in the order the push depends on.
  */
-@NullMarked
 @RequiredArgsConstructor
 final class DockerManifestWriter<ID> {
 

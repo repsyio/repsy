@@ -19,20 +19,21 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class Platform {
-  private String architecture;
-  private String os;
+  @Nullable private String architecture;
+  @Nullable private String os;
 
   @JsonInclude(JsonInclude.Include.NON_NULL)
+  @Nullable
   private String variant;
 
   @Override
-  public @NonNull String toString() {
+  public String toString() {
     return this.os + "/" + this.architecture + (this.variant != null ? "/" + this.variant : "");
   }
 }

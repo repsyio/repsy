@@ -17,12 +17,10 @@ package io.repsy.protocols.docker.shared.utils;
 
 import java.util.List;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.util.CollectionUtils;
 
 @UtilityClass
-@NullMarked
 public final class MediaTypes {
 
   // OCI Media Types

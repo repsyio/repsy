@@ -16,8 +16,6 @@
 package io.repsy.os.server.protocols.docker.shared.cleanup.dtos;
 
 import io.repsy.os.shared.repo.dtos.RepoInfo;
-import org.jspecify.annotations.NullMarked;
 
 /** A tag the policy decided to delete, and the retention the manifests it frees are held for. */
-@NullMarked
 public record TagDeletionInfo(RepoInfo repoInfo, String imageName, String tagName, int keepDays) {}

@@ -21,14 +21,12 @@ import io.repsy.protocols.docker.shared.tag.dtos.BaseTagDetail;
 import io.repsy.protocols.docker.shared.tag.dtos.TagForm;
 import java.util.List;
 import java.util.Optional;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * The manifests of a Docker repo. A manifest is content-addressed: one row per image and digest,
  * kept for as long as something (a tag, an index, or nobody) still has it, and pullable by its
  * digest whatever tags point at it. A tag is a movable pointer to a manifest.
  */
-@NullMarked
 public interface ManifestService<ID> {
 
   /**

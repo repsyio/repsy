@@ -29,7 +29,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.Optional;
 import java.util.regex.Pattern;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
@@ -39,7 +38,6 @@ import org.springframework.http.ResponseEntity;
  *
  * @param <F> what the format looks the blob up with
  */
-@NullMarked
 public abstract class AbstractOciBlobCheckProtocolMethodHandler<F>
     extends AbstractFacadeProtocolMethodHandler<F> {
 

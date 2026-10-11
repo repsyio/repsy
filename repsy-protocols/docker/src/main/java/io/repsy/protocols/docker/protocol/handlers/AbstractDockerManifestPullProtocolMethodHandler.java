@@ -32,7 +32,6 @@ import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
 import org.springframework.web.HttpMediaTypeNotAcceptableException;
 
@@ -40,7 +39,6 @@ import org.springframework.web.HttpMediaTypeNotAcceptableException;
  * The Docker manifest pull: negotiates the {@code Accept} header first, so a client that accepts no
  * manifest type this registry serves gets a 406 before the manifest is read.
  */
-@NullMarked
 public abstract class AbstractDockerManifestPullProtocolMethodHandler<ID>
     extends AbstractOciManifestPullProtocolMethodHandler<DockerProtocolFacade<ID>> {
 

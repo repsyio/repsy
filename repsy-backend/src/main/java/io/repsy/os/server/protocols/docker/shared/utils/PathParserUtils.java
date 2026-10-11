@@ -23,7 +23,6 @@ import java.util.regex.Pattern;
 import lombok.Builder;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 @Slf4j
@@ -35,7 +34,7 @@ public class PathParserUtils {
   private static final String REPO_NAME_PATTERN = "(?<repoName>[a-zA-Z0-9_\\-]+)";
   private static final String IMAGE_NAME_PATTERN = "/(?<imageName>[a-zA-Z0-9_\\-]+)";
 
-  private static final @NonNull PathConfig LAYER_UPLOAD =
+  private static final PathConfig LAYER_UPLOAD =
       PathConfig.builder()
           .basePath(BLOBS)
           .pattern(
@@ -49,7 +48,7 @@ public class PathParserUtils {
           .pathType("layer upload")
           .build();
 
-  private static final @NonNull PathConfig LAYER_CHECK =
+  private static final PathConfig LAYER_CHECK =
       PathConfig.builder()
           .basePath(BLOBS)
           .pattern(
@@ -64,7 +63,7 @@ public class PathParserUtils {
           .pathType("layer check")
           .build();
 
-  private static final @NonNull PathConfig MANIFEST_SHA =
+  private static final PathConfig MANIFEST_SHA =
       PathConfig.builder()
           .basePath(MANIFESTS)
           .pattern(
@@ -79,7 +78,7 @@ public class PathParserUtils {
           .pathType("manifest sha")
           .build();
 
-  private static final @NonNull PathConfig MANIFEST_TAG =
+  private static final PathConfig MANIFEST_TAG =
       PathConfig.builder()
           .basePath(MANIFESTS)
           .pattern(
@@ -92,29 +91,25 @@ public class PathParserUtils {
           .pathType("manifest tag")
           .build();
 
-  public static @NonNull ParsedPath parseForLayer(
-      @NonNull final String requestPath, @NonNull final String fileName) {
+  public static ParsedPath parseForLayer(final String requestPath, final String fileName) {
 
     final var isDigest = BlobDigests.containsDigestPrefix(requestPath);
     final var config = isDigest ? LAYER_CHECK : LAYER_UPLOAD;
     return parsePath(requestPath, config, isDigest ? null : fileName);
   }
 
-  public static @NonNull ParsedPath parseForManifest(
-      @NonNull final String requestPath, @NonNull final String fileName) {
+  public static ParsedPath parseForManifest(final String requestPath, final String fileName) {
 
     final var config = BlobDigests.containsDigestPrefix(requestPath) ? MANIFEST_SHA : MANIFEST_TAG;
     return parsePath(requestPath, config, fileName);
   }
 
-  private static @NonNull String cleanPath(@NonNull final String requestPath) {
+  private static String cleanPath(final String requestPath) {
     return requestPath.replaceFirst("\\?.*", "").replaceFirst("^/", "").replaceFirst("^v2/", "");
   }
 
-  private static @NonNull ParsedPath parsePath(
-      @NonNull final String requestPath,
-      @NonNull final PathConfig config,
-      @Nullable final String fileName) {
+  private static ParsedPath parsePath(
+      final String requestPath, final PathConfig config, @Nullable final String fileName) {
 
     final var cleanedPath = cleanPath(requestPath);
     final var matcher = config.pattern().matcher(cleanedPath);
@@ -136,9 +131,5 @@ public class PathParserUtils {
   }
 
   @Builder
-  private record PathConfig(
-      @NonNull String basePath,
-      @NonNull Pattern pattern,
-      @NonNull String groupName,
-      @NonNull String pathType) {}
+  private record PathConfig(String basePath, Pattern pattern, String groupName, String pathType) {}
 }

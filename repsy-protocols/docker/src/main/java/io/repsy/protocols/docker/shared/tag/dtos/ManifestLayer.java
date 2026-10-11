@@ -17,11 +17,14 @@ package io.repsy.protocols.docker.shared.tag.dtos;
 
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.jspecify.annotations.Nullable;
 
+// Bound by Jackson; DockerManifestValidator rejects a push that lacks the non-null fields.
+@SuppressWarnings("NullAway.Init")
 @Data
 @NoArgsConstructor
 public class ManifestLayer {
-  private Long size;
-  private String mediaType;
+  @Nullable private Long size;
+  @Nullable private String mediaType;
   private String digest;
 }

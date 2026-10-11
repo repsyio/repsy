@@ -13,7 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+@NullMarked
 @ApplicationModule(displayName = "Docker UI")
 package io.repsy.os.server.protocols.docker.ui;
 
+import org.jspecify.annotations.NullMarked;
 import org.springframework.modulith.ApplicationModule;

@@ -19,13 +19,11 @@ import io.repsy.os.server.protocols.docker.shared.image.dtos.ImageInfo;
 import io.repsy.os.server.protocols.docker.shared.image.entities.Image;
 import java.time.Instant;
 import java.time.ZoneOffset;
-import org.jspecify.annotations.NullMarked;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.Mappings;
 
 @Mapper(componentModel = "spring")
-@NullMarked
 public interface ImageMapper {
 
   default Instant resolveUpdatedAt(

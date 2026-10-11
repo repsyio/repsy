@@ -21,7 +21,6 @@ import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * Matches the relative path of a routed request again inside {@code handle}. The route already
@@ -29,7 +28,6 @@ import org.jspecify.annotations.NullMarked;
  * did.
  */
 @UtilityClass
-@NullMarked
 final class OciPathMatches {
 
   static Optional<Matcher> match(final Pattern pattern, final ProtocolContext context) {

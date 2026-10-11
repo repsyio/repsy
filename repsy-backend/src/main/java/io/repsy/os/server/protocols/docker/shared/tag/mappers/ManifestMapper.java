@@ -21,13 +21,11 @@ import io.repsy.os.server.protocols.docker.shared.tag.entities.Tag;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import org.jspecify.annotations.NullMarked;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingConstants;
 
 @Mapper(componentModel = MappingConstants.ComponentModel.SPRING)
-@NullMarked
 public interface ManifestMapper {
 
   default Instant map(final LocalDateTime localDateTime) {

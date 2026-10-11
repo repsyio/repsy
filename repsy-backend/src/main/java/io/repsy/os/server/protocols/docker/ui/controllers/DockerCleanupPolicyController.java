@@ -29,7 +29,6 @@ import io.repsy.protocols.shared.repo.dtos.RepoScope;
 import jakarta.validation.Valid;
 import java.net.URI;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -50,7 +49,7 @@ import org.springframework.web.bind.annotation.RestController;
 @SuppressWarnings("java:S6856")
 public class DockerCleanupPolicyController {
 
-  private final @NonNull CleanupPolicyService policyService;
+  private final CleanupPolicyService policyService;
 
   @GetMapping
   @RepoOperation(scope = RepoScope.DOCKER, permission = Permission.MANAGE)

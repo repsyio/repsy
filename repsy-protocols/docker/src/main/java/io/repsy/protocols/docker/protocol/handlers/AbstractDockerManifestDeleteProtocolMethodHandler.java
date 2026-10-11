@@ -27,7 +27,6 @@ import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.regex.Pattern;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -41,7 +40,6 @@ import org.springframework.http.ResponseEntity;
  * cannot delete. It is not a write operation in the router's sense: it publishes nothing to the
  * vulnerability scanner.
  */
-@NullMarked
 public abstract class AbstractDockerManifestDeleteProtocolMethodHandler<ID>
     extends AbstractFacadeProtocolMethodHandler<DockerProtocolFacade<ID>> {
 

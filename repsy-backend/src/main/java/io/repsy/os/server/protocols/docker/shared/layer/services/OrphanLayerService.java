@@ -19,7 +19,6 @@ import io.repsy.os.server.protocols.docker.shared.layer.dtos.OrphanLayerInfo;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -33,15 +32,15 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @RequiredArgsConstructor
 public class OrphanLayerService {
 
-  private final @NonNull LayerTxService layerTxService;
-  private final @NonNull OrphanLayerCleanupService orphanLayerCleanupService;
+  private final LayerTxService layerTxService;
+  private final OrphanLayerCleanupService orphanLayerCleanupService;
 
   /**
    * Deletes the layers no manifest uses and schedules their blobs for deletion.
    *
    * @return The layers whose rows are gone and whose blobs are being deleted in the background
    */
-  public @NonNull List<OrphanLayerInfo> deleteOrphanLayers(final @NonNull RepoInfo repoInfo) {
+  public List<OrphanLayerInfo> deleteOrphanLayers(final RepoInfo repoInfo) {
 
     // The rows go first so a concurrent push cannot re-reference a row whose blob is about to be
     // deleted. The price: a blob whose delete fails stays on disk, still charged to the repo and
@@ -59,7 +58,7 @@ public class OrphanLayerService {
   }
 
   /** Runs the action when the current transaction commits, and never if it rolls back. */
-  private void afterCommit(final @NonNull Runnable action) {
+  private void afterCommit(final Runnable action) {
 
     if (!TransactionSynchronizationManager.isSynchronizationActive()) {
       action.run();

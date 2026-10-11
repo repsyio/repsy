@@ -48,14 +48,12 @@ import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
 import java.util.regex.Pattern;
 import org.apache.commons.lang3.StringUtils;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
-@NullMarked
 public abstract class AbstractDockerManifestPushProtocolMethodHandler<ID>
     extends AbstractFacadeProtocolMethodHandler<DockerProtocolFacade<ID>>
     implements DockerPathParserManifest {

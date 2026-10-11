@@ -15,9 +15,6 @@
  */
 package io.repsy.protocols.docker.shared.constants;
 
-import org.jspecify.annotations.NullMarked;
-
-@NullMarked
 public final class DockerConstants {
 
   private DockerConstants() {}

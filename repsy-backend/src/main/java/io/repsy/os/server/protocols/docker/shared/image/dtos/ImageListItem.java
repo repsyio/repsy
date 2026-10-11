@@ -18,19 +18,20 @@ package io.repsy.os.server.protocols.docker.shared.image.dtos;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 
 public interface ImageListItem {
   UUID getId();
 
-  String getName();
+  @Nullable String getName();
 
-  String getDigest();
+  @Nullable String getDigest();
 
-  Long getSize();
+  @Nullable Long getSize();
 
-  LocalDateTime getUpdatedAt();
+  @Nullable LocalDateTime getUpdatedAt();
 
-  Instant getLastUpdatedAt();
+  @Nullable Instant getLastUpdatedAt();
 
   Long getTagCount();
 }

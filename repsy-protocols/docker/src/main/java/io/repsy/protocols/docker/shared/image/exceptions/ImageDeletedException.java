@@ -15,14 +15,11 @@
  */
 package io.repsy.protocols.docker.shared.image.exceptions;
 
-import org.jspecify.annotations.NullMarked;
-
 /**
  * The image a manifest push looked up was deleted before the push could write to it: an image goes
  * with its last manifest (RPS-1288). Not an error for the client: the push handler creates the
  * image again and runs the save once more.
  */
-@NullMarked
 public class ImageDeletedException extends RuntimeException {
 
   public ImageDeletedException(final Object imageId) {

@@ -17,9 +17,7 @@ package io.repsy.protocols.docker.protocol.parser;
 
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.util.Optional;
-import org.jspecify.annotations.NullMarked;
 
-@NullMarked
 public interface DockerScopeParser<ID> {
 
   Optional<? extends BaseRepoInfo<ID>> findRepoInfoByScope(String scope);

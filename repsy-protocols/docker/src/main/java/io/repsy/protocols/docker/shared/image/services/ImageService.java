@@ -16,9 +16,7 @@
 package io.repsy.protocols.docker.shared.image.services;
 
 import io.repsy.protocols.docker.shared.image.dtos.BaseImageInfo;
-import org.jspecify.annotations.NullMarked;
 
-@NullMarked
 public interface ImageService<ID> {
 
   BaseImageInfo<ID> getOrCreateImage(ID repoId, String imageName);

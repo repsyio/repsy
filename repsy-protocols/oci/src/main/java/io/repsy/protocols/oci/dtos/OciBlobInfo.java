@@ -15,8 +15,5 @@
  */
 package io.repsy.protocols.oci.dtos;
 
-import org.jspecify.annotations.NullMarked;
-
 /** What a blob check answers about a stored blob. */
-@NullMarked
 public record OciBlobInfo(long size, String mediaType) {}

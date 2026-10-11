@@ -20,7 +20,6 @@ import io.repsy.os.server.protocols.docker.shared.tag.entities.Tag;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -28,7 +27,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 @Repository
-@NullMarked
 public interface TagRepository extends JpaRepository<Tag, UUID> {
 
   Optional<Tag> findByImageRepoIdAndImageNameAndName(UUID repoId, String imageName, String tagName);

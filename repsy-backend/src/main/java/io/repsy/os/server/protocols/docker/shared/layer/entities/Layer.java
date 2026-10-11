@@ -38,7 +38,6 @@ import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.annotations.UpdateTimestamp;
-import org.jspecify.annotations.NonNull;
 
 @Data
 @Entity
@@ -57,7 +56,7 @@ public class Layer {
   private Repo repo;
 
   @ManyToMany(mappedBy = "layers", fetch = FetchType.LAZY)
-  private @NonNull Set<Manifest> manifests = new HashSet<>();
+  private Set<Manifest> manifests = new HashSet<>();
 
   @Column(name = "digest", nullable = false)
   private String digest;

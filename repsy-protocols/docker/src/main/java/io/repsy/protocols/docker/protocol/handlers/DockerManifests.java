@@ -18,10 +18,8 @@ package io.repsy.protocols.docker.protocol.handlers;
 import io.repsy.protocols.docker.shared.tag.dtos.ManifestDetails;
 import io.repsy.protocols.oci.dtos.OciManifestInfo;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 
 @UtilityClass
-@NullMarked
 final class DockerManifests {
 
   static OciManifestInfo toOci(final ManifestDetails manifest) {

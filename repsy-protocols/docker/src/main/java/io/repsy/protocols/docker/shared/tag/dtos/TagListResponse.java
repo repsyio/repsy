@@ -16,7 +16,6 @@
 package io.repsy.protocols.docker.shared.tag.dtos;
 
 import java.util.List;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * The body of {@code GET /v2/<name>/tags/list}: the repository-qualified name and its tags.
@@ -24,5 +23,4 @@ import org.jspecify.annotations.NullMarked;
  * @param name the {@code <repo>/<image>} the tags belong to
  * @param tags the tag names of the requested page
  */
-@NullMarked
 public record TagListResponse(String name, List<String> tags) {}

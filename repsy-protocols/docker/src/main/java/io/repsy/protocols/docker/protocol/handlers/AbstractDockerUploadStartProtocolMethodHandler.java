@@ -27,14 +27,12 @@ import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.BlobDigests;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
 
 /**
  * The Docker upload start: honours the {@code digest-algorithm} hint (RPS-1594) and keeps no state
  * for a session until its first byte arrives.
  */
-@NullMarked
 public abstract class AbstractDockerUploadStartProtocolMethodHandler
     extends AbstractOciUploadStartProtocolMethodHandler {
 

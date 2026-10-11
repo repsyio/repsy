@@ -16,11 +16,12 @@
 package io.repsy.os.server.protocols.docker.shared.tag.dtos;
 
 import java.time.LocalDateTime;
+import org.jspecify.annotations.Nullable;
 
 public interface ImageTagListItem {
   String getName();
 
   String getPlatform();
 
-  LocalDateTime getLastUpdatedAt();
+  @Nullable LocalDateTime getLastUpdatedAt();
 }

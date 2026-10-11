@@ -31,7 +31,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.regex.Pattern;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -49,7 +48,6 @@ import org.springframework.http.ResponseEntity;
  * until it is gone. Like the manifest pull it needs {@link Permission#READ}: a public repo answers
  * anonymously, a private one challenges with a {@code pull} scope.
  */
-@NullMarked
 public abstract class AbstractDockerTagsListProtocolMethodHandler<ID>
     extends AbstractFacadeProtocolMethodHandler<DockerProtocolFacade<ID>> {
 

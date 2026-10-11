@@ -19,12 +19,10 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.util.StringUtils;
 
 @UtilityClass
-@NullMarked
 public final class AcceptHeaderParser {
 
   public static List<String> parse(

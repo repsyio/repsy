@@ -45,12 +45,10 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 @Component
-@NullMarked
 public class DockerAuthenticator extends ProtocolAuthService implements DockerAuthService<UUID> {
 
   private static final String ANONYMOUS_USER = "anonymous";

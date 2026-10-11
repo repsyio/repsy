@@ -21,12 +21,10 @@ import io.repsy.protocols.docker.protocol.facades.DockerProtocolFacade;
 import io.repsy.protocols.docker.protocol.handlers.AbstractDockerUploadFinalizeProtocolMethodHandler;
 import io.repsy.protocols.docker.shared.layer.services.LayerService;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 @Component
-@NullMarked
 public class DockerUploadFinalizeProtocolMethodHandler
     extends AbstractDockerUploadFinalizeProtocolMethodHandler<UUID> {
 

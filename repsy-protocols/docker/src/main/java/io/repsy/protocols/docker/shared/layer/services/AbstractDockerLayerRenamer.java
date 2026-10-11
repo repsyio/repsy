@@ -30,11 +30,9 @@ import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NullMarked;
 import tools.jackson.databind.ObjectMapper;
 
 @RequiredArgsConstructor
-@NullMarked
 public abstract class AbstractDockerLayerRenamer<ID> {
 
   private static final String BLOBS_PATH = "blobs";

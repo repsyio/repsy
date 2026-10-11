@@ -27,7 +27,6 @@ import io.repsy.protocols.oci.utils.OciUploadUtils;
 import io.repsy.protocols.shared.handlers.HandlerRoute;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
@@ -39,7 +38,6 @@ import org.springframework.http.ResponseEntity;
  *
  * @param <F> the format's facade
  */
-@NullMarked
 public abstract class AbstractOciUploadStatusProtocolMethodHandler<F>
     extends AbstractOciUploadSessionProtocolMethodHandler<F> {
 

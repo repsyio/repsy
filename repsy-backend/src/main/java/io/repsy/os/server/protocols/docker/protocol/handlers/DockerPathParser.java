@@ -19,11 +19,9 @@ import io.repsy.os.server.protocols.shared.handlers.AbstractRepoPathParser;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.regex.Pattern;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
 @Component("osDockerPathParser")
-@NullMarked
 public class DockerPathParser extends AbstractRepoPathParser {
 
   private static final Pattern REGISTRY_LEVEL_PATTERN = Pattern.compile("^/v2(?:/token)?/?$");

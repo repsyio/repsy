@@ -31,7 +31,6 @@ import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.util.List;
 import lombok.experimental.UtilityClass;
 import org.apache.commons.lang3.StringUtils;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.DeserializationFeature;
@@ -48,7 +47,6 @@ import tools.jackson.databind.json.JsonMapper;
  * {@code 400} whose message id says what is wrong.
  */
 @UtilityClass
-@NullMarked
 public final class DockerManifestValidator {
 
   /** Reads a manifest the way the application's mapper does: fields the registry ignores pass. */

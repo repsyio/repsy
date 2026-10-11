@@ -19,7 +19,6 @@ import io.repsy.os.server.protocols.docker.shared.tag.entities.Manifest;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -31,7 +30,6 @@ import org.springframework.stereotype.Repository;
  * algorithm ({@code sha256:...} or {@code sha512:...}), so the two can never be confused.
  */
 @Repository
-@NullMarked
 public interface ManifestRepository extends JpaRepository<Manifest, UUID> {
 
   Optional<Manifest> findByImageIdAndDigest(UUID imageId, String digest);

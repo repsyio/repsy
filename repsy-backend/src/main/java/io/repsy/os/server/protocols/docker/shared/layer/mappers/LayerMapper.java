@@ -17,13 +17,11 @@ package io.repsy.os.server.protocols.docker.shared.layer.mappers;
 
 import io.repsy.os.server.protocols.docker.shared.layer.entities.Layer;
 import io.repsy.protocols.docker.shared.layer.dtos.LayerInfo;
-import org.jspecify.annotations.NullMarked;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingConstants;
 
 @Mapper(componentModel = MappingConstants.ComponentModel.SPRING)
-@NullMarked
 public interface LayerMapper {
 
   @Mapping(target = "uuid", source = "id")
