@@ -20,12 +20,10 @@ import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
 import io.repsy.protocols.npm.protocol.handlers.AbstractNpmWhoamiProtocolMethodHandler;
 import io.repsy.protocols.npm.shared.auth.services.NpmIdentityResolver;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 @Component
-@NullMarked
 public class NpmWhoamiProtocolMethodHandler extends AbstractNpmWhoamiProtocolMethodHandler<UUID> {
 
   public NpmWhoamiProtocolMethodHandler(

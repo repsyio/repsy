@@ -19,13 +19,11 @@ import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.os.server.protocols.npm.protocol.facades.NpmProtocolFacade;
 import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
 import io.repsy.protocols.npm.protocol.handlers.AbstractNpmPackageUnpublishProtocolMethodHandler;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
 @Component
-@NullMarked
 public class NpmPackageUnpublishProtocolMethodHandler
     extends AbstractNpmPackageUnpublishProtocolMethodHandler {
 

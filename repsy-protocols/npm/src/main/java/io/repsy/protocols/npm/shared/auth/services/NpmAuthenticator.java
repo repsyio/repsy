@@ -16,9 +16,7 @@
 package io.repsy.protocols.npm.shared.auth.services;
 
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
-import org.jspecify.annotations.NullMarked;
 
-@NullMarked
 public interface NpmAuthenticator<ID> {
 
   String authenticateRepoUser(BaseRepoInfo<ID> repoInfo, String name, String password);

@@ -25,7 +25,6 @@ import java.net.URISyntaxException;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.util.Pair;
 
@@ -46,13 +45,13 @@ public interface NpmPackageService<ID> {
    * @throws io.repsy.core.error_handling.exceptions.AccessNotAllowedException when the version
    *     exists and the repo does not allow overrides
    */
-  @NonNull BaseUsages publishVersion(
-      @NonNull BaseRepoInfo<ID> repoInfo,
+  BaseUsages publishVersion(
+      BaseRepoInfo<ID> repoInfo,
       @Nullable String scopeName,
-      @NonNull String packageName,
-      @NonNull String versionName,
-      @NonNull Map<String, Object> payload,
-      @NonNull VersionWriter writer)
+      String packageName,
+      String versionName,
+      Map<String, Object> payload,
+      VersionWriter writer)
       throws IOException, URISyntaxException;
 
   /** What a publish does to the rows, and so to the files {@link VersionWriter} has to write. */
@@ -75,11 +74,11 @@ public interface NpmPackageService<ID> {
      * @param kind what the publish adds. A writer that fails must not delete files it did not
      *     create, so it leaves the files of {@link PublishKind#REPLACES_VERSION} alone.
      */
-    @NonNull BaseUsages write(@NonNull PublishKind kind) throws IOException, URISyntaxException;
+    BaseUsages write(PublishKind kind) throws IOException, URISyntaxException;
   }
 
   BaseNpmPackageInfo<ID> getPackage(
-      UUID storageKey, @Nullable String scopeName, @NonNull String packageName);
+      UUID storageKey, @Nullable String scopeName, String packageName);
 
   /**
    * The package as the rows have it, for rebuilding its metadata file when storage lost it
@@ -89,11 +88,10 @@ public interface NpmPackageService<ID> {
    * @throws io.repsy.core.error_handling.exceptions.ItemNotFoundException when the package does not
    *     exist
    */
-  @NonNull NpmPackageSnapshot getSnapshot(
-      UUID storageKey, @Nullable String scopeName, @NonNull String packageName);
+  NpmPackageSnapshot getSnapshot(UUID storageKey, @Nullable String scopeName, String packageName);
 
   /** The names of the versions the package has. */
-  @NonNull List<String> getVersionNames(ID packageId);
+  List<String> getVersionNames(ID packageId);
 
   /**
    * Deletes the package and its versions and, while that write is still open, removes its files
@@ -108,11 +106,11 @@ public interface NpmPackageService<ID> {
    * @throws io.repsy.core.error_handling.exceptions.ItemNotFoundException when the package does not
    *     exist
    */
-  @NonNull PackageDeletion deletePackage(
-      @NonNull BaseRepoInfo<ID> repoInfo,
+  PackageDeletion deletePackage(
+      BaseRepoInfo<ID> repoInfo,
       @Nullable String scopeName,
-      @NonNull String packageName,
-      @NonNull PackageRemover remover);
+      String packageName,
+      PackageRemover remover);
 
   /**
    * Deletes the version, and the package with it when that was its last version, and while that
@@ -126,20 +124,20 @@ public interface NpmPackageService<ID> {
    * @throws io.repsy.core.error_handling.exceptions.ItemNotFoundException when the package or the
    *     version does not exist
    */
-  @NonNull PackageDeletion deletePackageVersion(
-      @NonNull BaseRepoInfo<ID> repoInfo,
+  PackageDeletion deletePackageVersion(
+      BaseRepoInfo<ID> repoInfo,
       @Nullable String scopeName,
-      @NonNull String packageName,
-      @NonNull String versionName,
-      @NonNull VersionRemover versionRemover,
-      @NonNull PackageRemover packageRemover)
+      String packageName,
+      String versionName,
+      VersionRemover versionRemover,
+      PackageRemover packageRemover)
       throws IOException;
 
   /**
    * What a delete removed: the names of the versions that are gone, and the usages that {@link
    * PackageRemover} or {@link VersionRemover} reported.
    */
-  record PackageDeletion(@NonNull List<String> versions, @NonNull BaseUsages usages) {}
+  record PackageDeletion(List<String> versions, BaseUsages usages) {}
 
   /** Removes the files of a package whose rows {@link #deletePackage} has just deleted. */
   @FunctionalInterface
@@ -149,7 +147,7 @@ public interface NpmPackageService<ID> {
      * Removes every file of the package. Nothing is put back when this fails afterwards, so it is
      * the last thing that runs in the transaction.
      */
-    @NonNull BaseUsages deletePackage();
+    BaseUsages deletePackage();
   }
 
   /** Removes the files of a version whose rows {@link #deletePackageVersion} has just deleted. */
@@ -164,7 +162,7 @@ public interface NpmPackageService<ID> {
      *
      * @param newLatest the version {@code latest} moved to, or {@code null} when it did not move
      */
-    @NonNull BaseUsages deleteVersion(@Nullable String newLatest) throws IOException;
+    BaseUsages deleteVersion(@Nullable String newLatest) throws IOException;
   }
 
   /**
@@ -176,15 +174,15 @@ public interface NpmPackageService<ID> {
    * @throws io.repsy.core.error_handling.exceptions.ItemNotFoundException when the package or a
    *     version does not exist
    */
-  @NonNull BaseUsages handleDeprecations(
-      @NonNull BaseRepoInfo<ID> repoInfo,
+  BaseUsages handleDeprecations(
+      BaseRepoInfo<ID> repoInfo,
       @Nullable String scopeName,
-      @NonNull String packageName,
-      @NonNull List<Pair<String, String>> deprecations,
-      @NonNull MetadataWriter writer)
+      String packageName,
+      List<Pair<String, String>> deprecations,
+      MetadataWriter writer)
       throws IOException;
 
-  @NonNull List<PackageDistributionTagMapListItem> getDistributionTags(ID id);
+  List<PackageDistributionTagMapListItem> getDistributionTags(ID id);
 
   /**
    * Points {@code tagName} at {@code versionName} and, while that write is still open, stores the
@@ -202,13 +200,13 @@ public interface NpmPackageService<ID> {
    * @throws io.repsy.core.error_handling.exceptions.BadRequestException when the version does not
    *     exist
    */
-  @NonNull BaseUsages addDistributionTag(
-      @NonNull BaseRepoInfo<ID> repoInfo,
+  BaseUsages addDistributionTag(
+      BaseRepoInfo<ID> repoInfo,
       @Nullable String scopeName,
-      @NonNull String packageName,
-      @NonNull String tagName,
-      @NonNull String versionName,
-      @NonNull MetadataWriter writer)
+      String packageName,
+      String tagName,
+      String versionName,
+      MetadataWriter writer)
       throws IOException;
 
   /**
@@ -219,12 +217,12 @@ public interface NpmPackageService<ID> {
    * @throws io.repsy.core.error_handling.exceptions.ItemNotFoundException when the package does not
    *     exist
    */
-  @NonNull BaseUsages deleteDistributionTag(
-      @NonNull BaseRepoInfo<ID> repoInfo,
+  BaseUsages deleteDistributionTag(
+      BaseRepoInfo<ID> repoInfo,
       @Nullable String scopeName,
-      @NonNull String packageName,
-      @NonNull String tagName,
-      @NonNull MetadataWriter writer)
+      String packageName,
+      String tagName,
+      MetadataWriter writer)
       throws IOException;
 
   /** Rewrites the package metadata of a dist-tag change the rows of which are already written. */
@@ -235,6 +233,6 @@ public interface NpmPackageService<ID> {
      * Writes the package metadata. A writer that fails must put back the metadata it found, so the
      * rows that are rolled back with the failure and the metadata keep agreeing.
      */
-    @NonNull BaseUsages write() throws IOException;
+    BaseUsages write() throws IOException;
   }
 }

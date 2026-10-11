@@ -19,10 +19,8 @@ import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.jspecify.annotations.NullMarked;
 
 /** Knows the vulnerabilities of the package versions an audit asks about. */
-@NullMarked
 public interface NpmAdvisorySource<ID> {
 
   /**

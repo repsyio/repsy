@@ -17,9 +17,7 @@ package io.repsy.protocols.npm.shared.constants;
 
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
-import org.jspecify.annotations.NullMarked;
 
-@NullMarked
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class NpmConstants {
 

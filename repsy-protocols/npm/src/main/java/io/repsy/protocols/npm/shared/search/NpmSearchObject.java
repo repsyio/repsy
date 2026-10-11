@@ -16,9 +16,7 @@
 package io.repsy.protocols.npm.shared.search;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import org.jspecify.annotations.NullMarked;
 
 /** One hit of a search. */
-@NullMarked
 public record NpmSearchObject(
     @JsonProperty("package") NpmSearchPackage pkg, NpmSearchScore score, double searchScore) {}

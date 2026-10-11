@@ -16,7 +16,6 @@
 package io.repsy.protocols.npm.shared.utils;
 
 import java.util.Map;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * What a tarball vouches for: the manifest in its own {@code package.json} and its digests.
@@ -26,5 +25,4 @@ import org.jspecify.annotations.NullMarked;
  * @param shasum the SHA-1 of the tarball, in hex
  * @param integrity the SHA-512 of the tarball as an SRI string ({@code sha512-<base64>})
  */
-@NullMarked
 public record NpmTarballFacts(Map<String, Object> manifest, String shasum, String integrity) {}

@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Repository;
 
@@ -36,7 +35,6 @@ import org.springframework.stereotype.Repository;
  * whole-name matches first, then prefixes, then the rest by name.
  */
 @Repository
-@NullMarked
 public class NpmSearchCandidateRepository {
 
   private static final String FROM =
@@ -79,7 +77,10 @@ public class NpmSearchCandidateRepository {
               and s2.status = io.repsy.os.server.security.scan.dtos.ScanStatus.COMPLETED))"""
           .formatted(FULL_NAME);
 
-  @PersistenceContext private EntityManager entityManager;
+  // Injected by the container after construction, not by the constructor.
+  @SuppressWarnings("NullAway.Init")
+  @PersistenceContext
+  private EntityManager entityManager;
 
   /** The generated JPQL and the parameters that go with it, for a search. */
   record Built(

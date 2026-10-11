@@ -25,7 +25,6 @@ import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -36,7 +35,6 @@ import org.springframework.http.ResponseEntity;
  * the packages of the repository in the URL only, and needs read access to it. A {@code size} or
  * {@code from} that is no whole number of 0 or more is answered with 400 (RPS-1344).
  */
-@NullMarked
 public abstract class AbstractNpmSearchProtocolMethodHandler<ID>
     extends AbstractRoutedProtocolMethodHandler {
 

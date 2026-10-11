@@ -34,7 +34,6 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
@@ -48,32 +47,30 @@ public class NpmApiFacade implements ProtocolApiFacade {
 
   private static final Set<String> VERSION_SORT_PROPERTIES = Set.of("id", "version", "createdAt");
 
-  private final @NonNull NpmPackageService npmPackageService;
-  private final @NonNull NpmStorageService npmStorageService;
-  private final @NonNull NpmPackageMapper npmPackageConverter;
-  private final @NonNull ApplicationEventPublisher eventPublisher;
+  private final NpmPackageService npmPackageService;
+  private final NpmStorageService npmStorageService;
+  private final NpmPackageMapper npmPackageConverter;
+  private final ApplicationEventPublisher eventPublisher;
 
   @Override
-  public void deleteRepo(final @NonNull RepoInfo repoInfo) {
+  public void deleteRepo(final RepoInfo repoInfo) {
 
     this.npmStorageService.deleteRepo(repoInfo.getStorageKey());
   }
 
-  public @NonNull NpmPackageInfo getPackage(
-      final @NonNull RepoInfo repoInfo,
-      final @Nullable String scopeName,
-      final @NonNull String packageName) {
+  public NpmPackageInfo getPackage(
+      final RepoInfo repoInfo, final @Nullable String scopeName, final String packageName) {
 
     return this.npmPackageConverter.toNpmPackageInfo(
         this.npmPackageService.getPackage(repoInfo.getStorageKey(), scopeName, packageName));
   }
 
-  public @NonNull Page<PackageVersionListItem> listVersions(
-      final @NonNull RepoInfo repoInfo,
+  public Page<PackageVersionListItem> listVersions(
+      final RepoInfo repoInfo,
       final @Nullable String scopeName,
-      final @NonNull String packageName,
-      final @NonNull String version,
-      final @NonNull Pageable pageable) {
+      final String packageName,
+      final String version,
+      final Pageable pageable) {
 
     SortValidator.requireSortableBy(pageable, VERSION_SORT_PROPERTIES);
 
@@ -81,11 +78,11 @@ public class NpmApiFacade implements ProtocolApiFacade {
         repoInfo.getStorageKey(), scopeName, packageName, version, pageable);
   }
 
-  public @NonNull PackageVersionDetail getVersion(
-      final @NonNull RepoInfo repoInfo,
+  public PackageVersionDetail getVersion(
+      final RepoInfo repoInfo,
       final @Nullable String scopeName,
-      final @NonNull String packageName,
-      final @NonNull String versionName)
+      final String packageName,
+      final String versionName)
       throws IOException {
 
     final var packageInfo =
@@ -120,10 +117,8 @@ public class NpmApiFacade implements ProtocolApiFacade {
    * see {@link NpmPackageService#deletePackage}. The events follow the commit, so a delete that
    * rolled back reports nothing.
    */
-  public @NonNull BaseUsages deletePackage(
-      final @NonNull RepoInfo repoInfo,
-      final @Nullable String scopeName,
-      final @NonNull String packageName) {
+  public BaseUsages deletePackage(
+      final RepoInfo repoInfo, final @Nullable String scopeName, final String packageName) {
 
     final var packageBasePath = this.npmStorageService.getPackageBasePath(scopeName, packageName);
 
@@ -143,11 +138,11 @@ public class NpmApiFacade implements ProtocolApiFacade {
    * Deletes the version, and the package with it when that was its last version, like {@link
    * #deletePackage}: see {@link NpmPackageService#deletePackageVersion}.
    */
-  public @NonNull BaseUsages deletePackageVersion(
-      final @NonNull RepoInfo repoInfo,
+  public BaseUsages deletePackageVersion(
+      final RepoInfo repoInfo,
       final @Nullable String scopeName,
-      final @NonNull String packageName,
-      final @NonNull String versionName)
+      final String packageName,
+      final String versionName)
       throws IOException {
 
     final var packageBasePath = this.npmStorageService.getPackageBasePath(scopeName, packageName);
@@ -178,24 +173,23 @@ public class NpmApiFacade implements ProtocolApiFacade {
     return deletion.usages();
   }
 
-  private @NonNull BaseUsages removePackageFiles(
-      final @NonNull RepoInfo repoInfo, final @NonNull Path packageBasePath) {
+  private BaseUsages removePackageFiles(final RepoInfo repoInfo, final Path packageBasePath) {
 
     return BaseUsages.ofDisk(
         -1L * this.npmStorageService.deletePackage(repoInfo.getStorageKey(), packageBasePath));
   }
 
   @Override
-  public void createRepo(final @NonNull UUID repoId) {
+  public void createRepo(final UUID repoId) {
 
     this.npmStorageService.createRepo(repoId);
   }
 
   private void publishVersionDeleted(
-      final @NonNull RepoInfo repoInfo,
+      final RepoInfo repoInfo,
       final @Nullable String scopeName,
-      final @NonNull String packageName,
-      final @NonNull String versionName) {
+      final String packageName,
+      final String versionName) {
 
     this.eventPublisher.publishEvent(
         new ArtifactVersionDeletedEvent(
@@ -207,18 +201,18 @@ public class NpmApiFacade implements ProtocolApiFacade {
   }
 
   private void publishVersionsDeleted(
-      final @NonNull RepoInfo repoInfo,
+      final RepoInfo repoInfo,
       final @Nullable String scopeName,
-      final @NonNull String packageName,
-      final @NonNull List<String> versionNames) {
+      final String packageName,
+      final List<String> versionNames) {
 
     for (final var versionName : versionNames) {
       this.publishVersionDeleted(repoInfo, scopeName, packageName, versionName);
     }
   }
 
-  private static @NonNull String buildArtifactName(
-      final @Nullable String scopeName, final @NonNull String packageName) {
+  private static String buildArtifactName(
+      final @Nullable String scopeName, final String packageName) {
     return scopeName == null ? packageName : "@" + scopeName + "/" + packageName;
   }
 }

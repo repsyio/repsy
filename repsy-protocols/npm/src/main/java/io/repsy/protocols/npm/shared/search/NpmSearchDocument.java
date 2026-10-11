@@ -18,7 +18,6 @@ package io.repsy.protocols.npm.shared.search;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -30,7 +29,6 @@ import org.jspecify.annotations.Nullable;
  * @param keywords The keywords of the latest version
  * @param date When the latest version was published
  */
-@NullMarked
 public record NpmSearchDocument(
     @Nullable String scope,
     String name,

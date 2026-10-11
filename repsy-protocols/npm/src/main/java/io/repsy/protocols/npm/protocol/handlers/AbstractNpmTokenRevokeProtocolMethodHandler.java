@@ -33,7 +33,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpMethod;
@@ -53,7 +52,6 @@ import org.springframework.http.ResponseEntity;
  * token is refused ({@code deployTokenNotRevocable}) and the text says why and what to do instead
  * (RPS-1391).
  */
-@NullMarked
 public abstract class AbstractNpmTokenRevokeProtocolMethodHandler<ID>
     extends AbstractRoutedProtocolMethodHandler {
 

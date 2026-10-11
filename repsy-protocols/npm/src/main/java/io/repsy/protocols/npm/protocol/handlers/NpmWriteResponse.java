@@ -17,7 +17,6 @@ package io.repsy.protocols.npm.protocol.handlers;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -28,7 +27,6 @@ import org.jspecify.annotations.Nullable;
  * answer with neither {@code ok} nor {@code success} for a failure (yarn classic does, see
  * RPS-1362), while npm, pnpm and bun read only the status (RPS-1390).
  */
-@NullMarked
 final class NpmWriteResponse {
 
   private NpmWriteResponse() {}

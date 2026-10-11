@@ -18,11 +18,9 @@ package io.repsy.os.server.protocols.npm.protocol.handlers;
 import io.repsy.os.server.protocols.shared.handlers.AbstractRepoPathParser;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
 @Component("osNpmPathParser")
-@NullMarked
 public class NpmPathParser extends AbstractRepoPathParser {
 
   public NpmPathParser(final RepoTxService repoTxService) {

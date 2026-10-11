@@ -17,7 +17,6 @@ package io.repsy.protocols.npm.protocol.handlers;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -26,7 +25,6 @@ import org.jspecify.annotations.Nullable;
  * document revisions, so it says the tags the package has now instead. Clients read {@code ok}:
  * yarn classic takes an answer without it for a failure, while npm and pnpm read only the status.
  */
-@NullMarked
 final class NpmDistTagsResponse {
 
   private NpmDistTagsResponse() {}

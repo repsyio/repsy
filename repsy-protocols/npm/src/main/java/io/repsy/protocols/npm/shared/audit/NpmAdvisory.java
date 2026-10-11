@@ -17,7 +17,6 @@ package io.repsy.protocols.npm.shared.audit;
 
 import java.time.Instant;
 import java.util.List;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -36,7 +35,6 @@ import org.jspecify.annotations.Nullable;
  * @param updated When the scan that found it finished
  * @param reportedBy The scanner that found it
  */
-@NullMarked
 public record NpmAdvisory(
     long id,
     String packageName,

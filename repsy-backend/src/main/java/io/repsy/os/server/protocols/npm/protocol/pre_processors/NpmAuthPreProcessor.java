@@ -25,7 +25,6 @@ import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import jakarta.servlet.http.HttpServletRequest;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
@@ -34,7 +33,6 @@ import org.springframework.stereotype.Component;
  * {@code requireAuthentication}), and a refused Bearer token is challenged with both schemes.
  */
 @Component
-@NullMarked
 public class NpmAuthPreProcessor extends BasicOrBearerAuthPreProcessor<NpmAuthenticatorImpl> {
 
   /**

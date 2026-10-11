@@ -33,14 +33,12 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Function;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingConstants;
 
 @Mapper(componentModel = MappingConstants.ComponentModel.SPRING)
-@NullMarked
 public interface NpmPackageMapper {
 
   default Instant map(final LocalDateTime localDateTime) {

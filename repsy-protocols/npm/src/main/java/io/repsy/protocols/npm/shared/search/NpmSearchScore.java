@@ -16,13 +16,11 @@
 package io.repsy.protocols.npm.shared.search;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * The {@code score} of a search object: {@code final} is the share of the best match and the
  * details are constant, because Repsy has no quality, popularity or maintenance data.
  */
-@NullMarked
 public record NpmSearchScore(@JsonProperty("final") double finalScore, Detail detail) {
 
   /** The three sub-scores the npm client may show. */

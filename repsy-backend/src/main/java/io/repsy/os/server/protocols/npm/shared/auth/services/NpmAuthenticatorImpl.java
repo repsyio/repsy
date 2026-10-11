@@ -42,7 +42,6 @@ import io.repsy.protocols.shared.repo.dtos.Credentials;
 import java.time.Duration;
 import java.time.Period;
 import java.util.UUID;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
@@ -53,15 +52,15 @@ public class NpmAuthenticatorImpl extends ProtocolAuthService
 
   private static final int TOKEN_EXPIRATION_DAYS = 90;
 
-  private final @NonNull RevokedProtocolTokenService revokedTokenService;
+  private final RevokedProtocolTokenService revokedTokenService;
 
   public NpmAuthenticatorImpl(
-      final @NonNull UserTxService userTxService,
-      final @NonNull JwtUtils jwtUtils,
-      final @NonNull DeployTokenService deployTokenService,
-      final @NonNull VerifiedPasswordCache verifiedPasswordCache,
-      final @NonNull AuthFailureThrottle authFailureThrottle,
-      final @NonNull RevokedProtocolTokenService revokedTokenService) {
+      final UserTxService userTxService,
+      final JwtUtils jwtUtils,
+      final DeployTokenService deployTokenService,
+      final VerifiedPasswordCache verifiedPasswordCache,
+      final AuthFailureThrottle authFailureThrottle,
+      final RevokedProtocolTokenService revokedTokenService) {
 
     super(userTxService, jwtUtils, deployTokenService, verifiedPasswordCache, authFailureThrottle);
 
@@ -70,10 +69,8 @@ public class NpmAuthenticatorImpl extends ProtocolAuthService
   }
 
   @Override
-  public @NonNull String authenticateRepoUser(
-      final @NonNull BaseRepoInfo<UUID> repoInfo,
-      final @NonNull String username,
-      final @NonNull String password) {
+  public String authenticateRepoUser(
+      final BaseRepoInfo<UUID> repoInfo, final String username, final String password) {
 
     // A secret with the personal access token prefix is that and nothing else: it never reaches the
     // password check (RPS-1903).
@@ -95,7 +92,7 @@ public class NpmAuthenticatorImpl extends ProtocolAuthService
    * every request, so it ends with the token and carries its scopes. The username the client typed
    * is ignored.
    */
-  private @NonNull String authenticateWithPersonalAccessToken(final @NonNull String secret) {
+  private String authenticateWithPersonalAccessToken(final String secret) {
 
     final var token = super.authenticateWithPat(secret);
 
@@ -104,8 +101,7 @@ public class NpmAuthenticatorImpl extends ProtocolAuthService
     return super.createPersonalAccessTokenJwt(token, Duration.ofDays(TOKEN_EXPIRATION_DAYS));
   }
 
-  private @NonNull String authenticateWithUserCredentials(
-      final @NonNull String username, final @NonNull String password) {
+  private String authenticateWithUserCredentials(final String username, final String password) {
 
     final var userInfo =
         this.authenticateWithPassword(
@@ -126,8 +122,8 @@ public class NpmAuthenticatorImpl extends ProtocolAuthService
    * registry rejects it, and it should not leave the server. The {@code username} claim is whatever
    * the client typed, so it never identifies a user (RPS-979).
    */
-  private @NonNull String authenticateWithDeployToken(
-      final @NonNull DeployTokenInfo deployTokenInfo, final @NonNull String username) {
+  private String authenticateWithDeployToken(
+      final DeployTokenInfo deployTokenInfo, final String username) {
 
     if (deployTokenInfo.isExpired()) {
       throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
@@ -149,8 +145,8 @@ public class NpmAuthenticatorImpl extends ProtocolAuthService
    * (RPS-979).
    */
   @Override
-  public @NonNull String resolveUsername(
-      final @NonNull BaseRepoInfo<UUID> repoInfo, final @Nullable String authHeader) {
+  public String resolveUsername(
+      final BaseRepoInfo<UUID> repoInfo, final @Nullable String authHeader) {
 
     return this.resolveCaller(repoInfo.getStorageKey(), authHeader).username();
   }
@@ -166,9 +162,7 @@ public class NpmAuthenticatorImpl extends ProtocolAuthService
    */
   @Override
   public void revokeToken(
-      final @NonNull BaseRepoInfo<UUID> repoInfo,
-      final @Nullable String authHeader,
-      final @NonNull String token) {
+      final BaseRepoInfo<UUID> repoInfo, final @Nullable String authHeader, final String token) {
 
     final var caller = this.resolveCaller(repoInfo.getStorageKey(), authHeader);
 
@@ -192,7 +186,7 @@ public class NpmAuthenticatorImpl extends ProtocolAuthService
   /**
    * The claims of a token this registry issued, or {@code loginTokenNotFound} for anything else.
    */
-  private @NonNull ProtocolTokenClaims issuedTokenClaims(final @NonNull String token) {
+  private ProtocolTokenClaims issuedTokenClaims(final String token) {
     try {
       final var claims = this.jwtUtils.verifyProtocolToken(token);
 
@@ -208,10 +202,9 @@ public class NpmAuthenticatorImpl extends ProtocolAuthService
   }
 
   /** Who a request's credentials belong to: the id of the user or deploy token, and its name. */
-  private record Caller(@NonNull UUID id, @NonNull String username) {}
+  private record Caller(UUID id, String username) {}
 
-  private @NonNull Caller resolveCaller(
-      final @NonNull UUID repoId, final @Nullable String authHeader) {
+  private Caller resolveCaller(final UUID repoId, final @Nullable String authHeader) {
 
     if (authHeader == null) {
       throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
@@ -228,7 +221,7 @@ public class NpmAuthenticatorImpl extends ProtocolAuthService
     throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
   }
 
-  private @NonNull Caller basicCaller(final @NonNull UUID repoId, final @NonNull String header) {
+  private Caller basicCaller(final UUID repoId, final String header) {
 
     final var credentials =
         AuthUtils.extractCredentialsFromBasicToken(AuthUtils.removeBasicPrefix(header));
@@ -253,7 +246,7 @@ public class NpmAuthenticatorImpl extends ProtocolAuthService
     return new Caller(user.getId(), user.getUsername());
   }
 
-  private @NonNull Caller bearerCaller(final @NonNull UUID repoId, final @NonNull String header) {
+  private Caller bearerCaller(final UUID repoId, final String header) {
 
     final var patSecret = AuthUtils.personalAccessTokenSecretOf(header);
 
@@ -298,7 +291,7 @@ public class NpmAuthenticatorImpl extends ProtocolAuthService
     };
   }
 
-  private @NonNull AuthenticationType protocolAuthenticationType(final @NonNull String header) {
+  private AuthenticationType protocolAuthenticationType(final String header) {
     try {
       return this.jwtUtils.extractAuthenticationType(header, TokenRealm.PROTOCOL);
     } catch (final BadRequestException _) {
@@ -311,12 +304,11 @@ public class NpmAuthenticatorImpl extends ProtocolAuthService
    * A personal access token is known by its own id and by the username of its owner, never by the
    * username the client typed.
    */
-  private static @NonNull Caller personalAccessTokenCaller(
-      final @NonNull PersonalAccessTokenInfo token) {
+  private static Caller personalAccessTokenCaller(final PersonalAccessTokenInfo token) {
     return new Caller(token.id(), token.username());
   }
 
-  private static @NonNull Caller callerOf(final @NonNull DeployTokenInfo deployToken) {
+  private static Caller callerOf(final DeployTokenInfo deployToken) {
 
     if (deployToken.isExpired() || deployToken.getUsername() == null) {
       throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);

@@ -25,7 +25,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -59,7 +58,6 @@ import org.jspecify.annotations.Nullable;
  * @param size How many objects to return, from {@value #MIN_SIZE} to {@value #MAX_SIZE}
  * @param from How many objects to skip
  */
-@NullMarked
 public record NpmSearchQuery(
     List<String> terms,
     @Nullable String scope,

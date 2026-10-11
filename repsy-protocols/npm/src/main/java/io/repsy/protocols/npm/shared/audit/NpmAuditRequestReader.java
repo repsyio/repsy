@@ -26,7 +26,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.zip.GZIPInputStream;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.StreamReadConstraints;
@@ -40,7 +39,6 @@ import tools.jackson.databind.json.JsonMapper;
  * number. The inflated size is bounded, because a small body can inflate to gigabytes.
  */
 @UtilityClass
-@NullMarked
 public class NpmAuditRequestReader {
 
   /**

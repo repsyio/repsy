@@ -22,7 +22,6 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 
@@ -35,7 +34,6 @@ import tools.jackson.databind.JsonNode;
  * @param versionsByName The distinct versions of each package in the tree
  * @param nodes Every place a package version occurs in the tree
  */
-@NullMarked
 public record NpmAuditTree(Map<String, Set<String>> versionsByName, List<Node> nodes) {
 
   static final int MAX_DEPTH = 1000;

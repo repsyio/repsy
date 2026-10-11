@@ -16,11 +16,9 @@
 package io.repsy.protocols.npm.shared.utils;
 
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 @UtilityClass
-@NullMarked
 public class ExtractPath {
 
   public static NpmPathVars extractPathVars(final String packagePath) {

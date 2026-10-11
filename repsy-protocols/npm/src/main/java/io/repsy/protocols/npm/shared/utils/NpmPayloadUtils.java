@@ -22,10 +22,10 @@ import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import lombok.experimental.UtilityClass;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.codec.digest.DigestUtils;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.util.Pair;
 import tools.jackson.core.JacksonException;
@@ -33,7 +33,6 @@ import tools.jackson.databind.ObjectMapper;
 
 @SuppressWarnings("unchecked")
 @UtilityClass
-@NullMarked
 /** What a publish, unpublish or deprecate payload says: its parts, lengths and identity. */
 public final class NpmPayloadUtils {
   /**
@@ -51,7 +50,8 @@ public final class NpmPayloadUtils {
   public static String findUnpublishedVersion(
       final Map<String, Object> oldMetadata, final Map<String, Object> newMetadata) {
 
-    final var oldVersions = (Map<String, Object>) oldMetadata.get(NpmConstants.VERSIONS);
+    final var oldVersions =
+        Objects.requireNonNull((Map<String, Object>) oldMetadata.get(NpmConstants.VERSIONS));
 
     if (!(newMetadata.get(NpmConstants.VERSIONS) instanceof final Map<?, ?> newVersions)) {
       throw new BadRequestException(ProtocolErrorCodes.BAD_REQUEST);
@@ -72,8 +72,10 @@ public final class NpmPayloadUtils {
 
     final var deprecatedVersions = new ArrayList<Pair<String, String>>();
 
-    final var newVersions = (Map<String, Object>) newMetadata.get(NpmConstants.VERSIONS);
-    final var oldVersions = (Map<String, Object>) oldMetadata.get(NpmConstants.VERSIONS);
+    final var newVersions =
+        Objects.requireNonNull((Map<String, Object>) newMetadata.get(NpmConstants.VERSIONS));
+    final var oldVersions =
+        Objects.requireNonNull((Map<String, Object>) oldMetadata.get(NpmConstants.VERSIONS));
 
     for (final var entry : oldVersions.entrySet()) {
       final var newVersion = (Map<String, Object>) newVersions.get(entry.getKey());
@@ -95,7 +97,8 @@ public final class NpmPayloadUtils {
   }
 
   public static boolean isMetadataHasDeprecatedVersions(final Map<String, Object> metadata) {
-    final Map<String, Object> versions = (Map<String, Object>) metadata.get(NpmConstants.VERSIONS);
+    final Map<String, Object> versions =
+        Objects.requireNonNull((Map<String, Object>) metadata.get(NpmConstants.VERSIONS));
     Map<String, Object> version;
 
     for (final Map.Entry<String, Object> versionEntry : versions.entrySet()) {
@@ -112,7 +115,8 @@ public final class NpmPayloadUtils {
   public static long getTarballLength(final Map<String, Object> payload) {
 
     final var attachments =
-        (Map<String, Map<String, Object>>) payload.get(NpmConstants.ATTACHMENTS);
+        Objects.requireNonNull(
+            (Map<String, Map<String, Object>>) payload.get(NpmConstants.ATTACHMENTS));
     final var attachment = attachments.entrySet().iterator().next().getValue();
 
     var length = (Integer) attachment.get("length");
@@ -144,7 +148,8 @@ public final class NpmPayloadUtils {
   public static Map.Entry<String, String> extractFirstDistTagFromPayload(
       final Map<String, Object> payload) throws ClassCastException {
 
-    final var distTags = (Map<String, String>) payload.get(NpmConstants.DIST_TAGS);
+    final var distTags =
+        Objects.requireNonNull((Map<String, String>) payload.get(NpmConstants.DIST_TAGS));
 
     return distTags.entrySet().iterator().next();
   }
@@ -152,7 +157,8 @@ public final class NpmPayloadUtils {
   public static String extractTarballDataFromPayload(final Map<String, Object> payload)
       throws ClassCastException {
 
-    final var attachments = (Map<String, Map<String, String>>) payload.get("_attachments");
+    final var attachments =
+        Objects.requireNonNull((Map<String, Map<String, String>>) payload.get("_attachments"));
     final var attachment = attachments.entrySet().iterator().next().getValue();
 
     return attachment.getOrDefault("data", "");
@@ -161,7 +167,8 @@ public final class NpmPayloadUtils {
   public static Pair<String, Map<String, Object>> extractVersionFromPayload(
       final Map<String, Object> payload) throws ClassCastException {
 
-    final var versions = (Map<String, Object>) payload.get(NpmConstants.VERSIONS);
+    final var versions =
+        Objects.requireNonNull((Map<String, Object>) payload.get(NpmConstants.VERSIONS));
     final var versionEntry = versions.entrySet().iterator().next();
     final var version = (Map<String, Object>) versionEntry.getValue();
 
@@ -171,8 +178,9 @@ public final class NpmPayloadUtils {
   private static Pair<String, Map<String, Object>> extractVersionFromPayload(
       final Map<String, Object> payload, final String versionName) throws ClassCastException {
 
-    final var versions = (Map<String, Object>) payload.get(NpmConstants.VERSIONS);
-    final var version = (Map<String, Object>) versions.get(versionName);
+    final var versions =
+        Objects.requireNonNull((Map<String, Object>) payload.get(NpmConstants.VERSIONS));
+    final var version = Objects.requireNonNull((Map<String, Object>) versions.get(versionName));
 
     return Pair.of(versionName, version);
   }
@@ -181,7 +189,10 @@ public final class NpmPayloadUtils {
       throws ClassCastException {
 
     final var version =
-        ((Map<String, Object>) payload.get(NpmConstants.VERSIONS)).entrySet().iterator().next();
+        Objects.requireNonNull((Map<String, Object>) payload.get(NpmConstants.VERSIONS))
+            .entrySet()
+            .iterator()
+            .next();
     final var versionName = version.getKey();
 
     NpmSemver.parse(
@@ -276,10 +287,11 @@ public final class NpmPayloadUtils {
     final var integrity =
         "sha512-" + Base64.encodeBase64String(DigestUtils.getSha512Digest().digest(tarballBytes));
 
-    final var versions = (Map<String, Object>) metadata.get(NpmConstants.VERSIONS);
-    final var version = (Map<String, Object>) versions.get(versionName);
+    final var versions =
+        Objects.requireNonNull((Map<String, Object>) metadata.get(NpmConstants.VERSIONS));
+    final var version = Objects.requireNonNull((Map<String, Object>) versions.get(versionName));
 
-    final var dist = (Map<String, Object>) version.get("dist");
+    final var dist = Objects.requireNonNull((Map<String, Object>) version.get("dist"));
 
     dist.put("shasum", shasum);
     dist.put("integrity", integrity);

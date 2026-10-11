@@ -16,10 +16,8 @@
 package io.repsy.protocols.npm.shared.search;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /** A maintainer or publisher in a search result, as the npm registry writes one. */
-@NullMarked
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record NpmSearchPerson(String username, @Nullable String email) {}

@@ -18,11 +18,9 @@ package io.repsy.protocols.npm.protocol.facades;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import java.io.IOException;
 import java.util.Map;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 
-@NullMarked
 public interface NpmProtocolFacade {
 
   void publishOrDeprecate(

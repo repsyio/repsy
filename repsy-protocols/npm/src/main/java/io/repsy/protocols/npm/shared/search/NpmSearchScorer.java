@@ -20,7 +20,6 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * Filters and orders the packages of a search. Every free term of the query has to match (a
@@ -30,7 +29,6 @@ import org.jspecify.annotations.NullMarked;
  * whole-name bonus away.
  */
 @UtilityClass
-@NullMarked
 public class NpmSearchScorer {
 
   static final double BASE_SCORE = 1.0;

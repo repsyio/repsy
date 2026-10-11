@@ -33,7 +33,6 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -42,7 +41,6 @@ import org.jspecify.annotations.Nullable;
  * such as {@code <1.2.3}, which would flag versions that were not scanned.
  */
 @UtilityClass
-@NullMarked
 public class NpmAdvisoryMapper {
 
   static final int MAX_TITLE_LENGTH = 150;

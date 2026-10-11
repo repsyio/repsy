@@ -21,14 +21,12 @@ import io.repsy.os.server.protocols.npm.shared.npm_package.entities.PackageMaint
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 @Repository
-@NullMarked
 public interface PackageMaintainerRepository extends JpaRepository<PackageMaintainer, UUID> {
 
   @Modifying

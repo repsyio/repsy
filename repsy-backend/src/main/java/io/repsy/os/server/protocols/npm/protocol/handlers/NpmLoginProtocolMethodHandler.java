@@ -20,13 +20,11 @@ import io.repsy.protocols.npm.protocol.NpmProtocolProvider;
 import io.repsy.protocols.npm.protocol.handlers.AbstractNpmLoginProtocolMethodHandler;
 import io.repsy.protocols.npm.shared.auth.services.NpmAuthenticator;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.ObjectMapper;
 
 @Component
-@NullMarked
 public class NpmLoginProtocolMethodHandler extends AbstractNpmLoginProtocolMethodHandler<UUID> {
 
   public NpmLoginProtocolMethodHandler(

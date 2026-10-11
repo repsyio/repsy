@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.npm.shared.npm_package.dtos;
 
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 
 /** A maintainer together with the package version that has them. */
 public interface VersionMaintainerListItem {
@@ -24,5 +25,5 @@ public interface VersionMaintainerListItem {
 
   String getName();
 
-  String getEmail();
+  @Nullable String getEmail();
 }

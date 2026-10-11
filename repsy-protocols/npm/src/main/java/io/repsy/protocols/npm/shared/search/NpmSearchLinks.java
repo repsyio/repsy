@@ -16,11 +16,9 @@
 package io.repsy.protocols.npm.shared.search;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /** The links a package declares; a link it does not declare is left out. */
-@NullMarked
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record NpmSearchLinks(
     @Nullable String homepage, @Nullable String repository, @Nullable String bugs) {}

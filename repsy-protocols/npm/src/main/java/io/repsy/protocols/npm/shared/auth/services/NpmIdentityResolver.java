@@ -16,7 +16,6 @@
 package io.repsy.protocols.npm.shared.auth.services;
 
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -24,7 +23,6 @@ import org.jspecify.annotations.Nullable;
  * interface, and not a method of {@link NpmAuthenticator}, so that an implementation of that
  * component outside this repository keeps compiling.
  */
-@NullMarked
 public interface NpmIdentityResolver<ID> {
 
   /**
