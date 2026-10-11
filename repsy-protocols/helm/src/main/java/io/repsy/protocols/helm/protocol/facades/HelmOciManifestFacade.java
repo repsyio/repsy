@@ -36,7 +36,6 @@ import java.util.Arrays;
 import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.event.Level;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -47,7 +46,6 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * the chart version, the manifest row and the manifest file as one unit.
  */
 @Slf4j
-@NullMarked
 @RequiredArgsConstructor
 final class HelmOciManifestFacade<ID> {
 

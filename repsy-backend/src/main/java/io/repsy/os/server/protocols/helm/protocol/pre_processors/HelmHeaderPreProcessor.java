@@ -33,7 +33,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
@@ -43,7 +43,6 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @RequiredArgsConstructor
-@NullMarked
 public class HelmHeaderPreProcessor extends ProtocolProcessor {
 
   private static final int PRIORITY = 50;
@@ -98,7 +97,7 @@ public class HelmHeaderPreProcessor extends ProtocolProcessor {
     return (boolean) properties.getOrDefault(HandlerPropertyKeys.SKIP_HEADER_PRE_PROCESSOR, false);
   }
 
-  private boolean isWritePermission(final Permission permission) {
+  private boolean isWritePermission(final @Nullable Permission permission) {
     return permission == Permission.MANAGE || permission == Permission.WRITE;
   }
 }

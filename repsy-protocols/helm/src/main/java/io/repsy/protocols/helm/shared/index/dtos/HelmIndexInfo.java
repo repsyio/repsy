@@ -19,12 +19,10 @@ import java.util.List;
 import java.util.Map;
 import lombok.Builder;
 import lombok.Value;
-import org.jspecify.annotations.NullMarked;
 
 /** Represents the full Helm index.yaml structure. */
 @Value
 @Builder
-@NullMarked
 public class HelmIndexInfo {
 
   String apiVersion;

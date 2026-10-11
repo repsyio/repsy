@@ -18,11 +18,9 @@ package io.repsy.os.server.protocols.nuget.shared.storage;
 import io.repsy.protocols.nuget.shared.storage.services.AbstractNuGetStorageService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import io.repsy.protocols.shared.storage.StorageStrategyRegistry;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Service;
 
 @Service
-@NullMarked
 public class NuGetStorageService extends AbstractNuGetStorageService {
 
   public NuGetStorageService(final StorageStrategyRegistry storageStrategyRegistry) {

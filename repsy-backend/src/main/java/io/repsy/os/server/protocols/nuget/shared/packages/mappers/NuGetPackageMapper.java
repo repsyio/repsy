@@ -23,14 +23,12 @@ import io.repsy.protocols.nuget.shared.utils.NuGetDependencyJsonUtils;
 import io.repsy.protocols.nuget.shared.utils.NuGetVersionUtils;
 import java.util.Comparator;
 import java.util.List;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingConstants;
 
 @Mapper(componentModel = MappingConstants.ComponentModel.SPRING)
-@NullMarked
 public interface NuGetPackageMapper {
 
   @Mapping(source = "packageId", target = "packageId")

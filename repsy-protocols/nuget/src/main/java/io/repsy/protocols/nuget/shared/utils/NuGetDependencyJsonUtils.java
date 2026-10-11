@@ -24,14 +24,12 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
 /** Writes and reads the stored JSON of the dependencies of a NuGet package version. */
 @Slf4j
-@NullMarked
 @UtilityClass
 public final class NuGetDependencyJsonUtils {
 

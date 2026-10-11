@@ -38,7 +38,6 @@ import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
@@ -49,7 +48,6 @@ import org.w3c.dom.NodeList;
 
 /** Reads the {@code .nuspec} of a NuGet package: its metadata, README and dependencies. */
 @Slf4j
-@NullMarked
 @UtilityClass
 public final class NuspecUtils {
 

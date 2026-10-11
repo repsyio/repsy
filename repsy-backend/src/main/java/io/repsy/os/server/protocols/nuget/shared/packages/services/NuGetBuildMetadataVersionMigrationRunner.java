@@ -18,7 +18,6 @@ package io.repsy.os.server.protocols.nuget.shared.packages.services;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
@@ -39,7 +38,6 @@ import org.springframework.stereotype.Component;
  * in the log and an operator decides, as the README "Upgrading" section describes.
  */
 @Slf4j
-@NullMarked
 @Component
 @RequiredArgsConstructor
 public class NuGetBuildMetadataVersionMigrationRunner implements ApplicationRunner {

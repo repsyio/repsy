@@ -29,10 +29,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Optional;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 
-@NullMarked
 public interface HelmProtocolFacade<ID> {
 
   HelmIndexInfo generateIndex(ProtocolContext context);

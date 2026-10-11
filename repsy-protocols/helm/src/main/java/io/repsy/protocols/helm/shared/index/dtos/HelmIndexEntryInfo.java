@@ -19,13 +19,11 @@ import java.util.List;
 import java.util.Map;
 import lombok.Builder;
 import lombok.Value;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /** A single chart entry inside the Helm index.yaml entries map. */
 @Value
 @Builder
-@NullMarked
 public class HelmIndexEntryInfo {
 
   String name;

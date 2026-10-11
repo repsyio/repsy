@@ -19,7 +19,6 @@ import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackage;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -29,7 +28,6 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 @Repository
-@NullMarked
 public interface NuGetPackageRepository extends JpaRepository<NuGetPackage, UUID> {
 
   Optional<NuGetPackage> findByRepoIdAndPackageIdIgnoreCase(UUID repoId, String packageId);

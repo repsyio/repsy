@@ -27,7 +27,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.type.TypeReference;
@@ -35,7 +34,6 @@ import tools.jackson.databind.ObjectMapper;
 
 /** Builds the classic {@code index.yaml} model from the chart rows of a repo. */
 @Slf4j
-@NullMarked
 final class HelmIndexUtils {
 
   /** Charts by name, the versions of a chart highest first (SemVer precedence, then the string). */

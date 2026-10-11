@@ -25,14 +25,12 @@ import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
 
 /**
  * Handles GET /v2/{repo}/{name}/manifests/{reference} — downloads a manifest. The {@code Accept}
  * header is not negotiated.
  */
-@NullMarked
 public abstract class AbstractHelmOciManifestPullProtocolMethodHandler<ID>
     extends AbstractOciManifestPullProtocolMethodHandler<HelmProtocolFacade<ID>> {
 

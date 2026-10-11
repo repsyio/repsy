@@ -18,9 +18,7 @@ package io.repsy.protocols.nuget.shared.utils;
 import io.repsy.protocols.nuget.shared.dtos.NuGetServiceIndexResource;
 import java.util.List;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 
-@NullMarked
 @UtilityClass
 public final class NuGetServiceIndexResources {
 

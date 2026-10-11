@@ -35,7 +35,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -46,7 +45,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service("helmApiFacade")
 @Transactional
 @RequiredArgsConstructor
-@NullMarked
 public class HelmApiFacade implements ProtocolApiFacade {
 
   private final HelmStorageService helmStorageService;

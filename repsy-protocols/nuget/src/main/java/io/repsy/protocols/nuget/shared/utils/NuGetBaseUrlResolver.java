@@ -16,7 +16,6 @@
 package io.repsy.protocols.nuget.shared.utils;
 
 import jakarta.servlet.http.HttpServletRequest;
-import org.jspecify.annotations.NullMarked;
 
 /**
  * Names the address a NuGet client reaches a repo at, {@code <address>/<repoName>}, which the
@@ -24,7 +23,6 @@ import org.jspecify.annotations.NullMarked;
  * (RPS-1432). The application decides where the address comes from; {@link
  * NuGetUrlBuilder#buildBaseUrl} is the request-derived default.
  */
-@NullMarked
 @FunctionalInterface
 public interface NuGetBaseUrlResolver {
 

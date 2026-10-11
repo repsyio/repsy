@@ -19,10 +19,8 @@ import io.repsy.protocols.nuget.protocol.facades.AbstractNuGetProtocolFacade;
 import io.repsy.protocols.nuget.shared.packages.services.NuGetPackageService;
 import io.repsy.protocols.nuget.shared.storage.services.NuGetStorageService;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
-@NullMarked
 @Component
 public class NuGetProtocolFacade extends AbstractNuGetProtocolFacade<UUID> {
 

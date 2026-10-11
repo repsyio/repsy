@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 
+@NullMarked
 @ApplicationModule(displayName = "Nuget Protocol")
 package io.repsy.os.server.protocols.nuget;
 
+import org.jspecify.annotations.NullMarked;
 import org.springframework.modulith.ApplicationModule;

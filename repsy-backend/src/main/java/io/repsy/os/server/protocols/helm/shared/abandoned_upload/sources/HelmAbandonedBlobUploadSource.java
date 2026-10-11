@@ -33,7 +33,6 @@ import java.util.UUID;
 import java.util.function.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Component;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
@@ -53,24 +52,23 @@ public class HelmAbandonedBlobUploadSource implements AbandonedBlobUploadSource 
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
   private static final String DIGEST_FIELD_NAME = "digest";
 
-  private final @NonNull HelmOciManifestRepository helmOciManifestRepository;
-  private final @NonNull HelmOciBlobRepository helmOciBlobRepository;
-  private final @NonNull HelmChartVersionRepository helmChartVersionRepository;
-  private final @NonNull HelmStorageService helmStorageService;
+  private final HelmOciManifestRepository helmOciManifestRepository;
+  private final HelmOciBlobRepository helmOciBlobRepository;
+  private final HelmChartVersionRepository helmChartVersionRepository;
+  private final HelmStorageService helmStorageService;
 
   @Override
-  public @NonNull RepoType repoType() {
+  public RepoType repoType() {
     return RepoType.HELM;
   }
 
   @Override
-  public @NonNull List<StaleFile> listStaleBlobFiles(
-      final @NonNull UUID repoId, final @NonNull Instant notModifiedSince) {
+  public List<StaleFile> listStaleBlobFiles(final UUID repoId, final Instant notModifiedSince) {
     return this.helmStorageService.listStaleBlobFiles(repoId, notModifiedSince);
   }
 
   @Override
-  public @NonNull Predicate<StaleFile> collectableIn(final @NonNull UUID repoId) {
+  public Predicate<StaleFile> collectableIn(final UUID repoId) {
 
     final var referenced = this.loadReferencedDigests(repoId);
 
@@ -79,8 +77,7 @@ public class HelmAbandonedBlobUploadSource implements AbandonedBlobUploadSource 
   }
 
   @Override
-  public long deleteBlobFile(
-      final @NonNull UUID repoId, final @NonNull String repoName, final @NonNull String fileName)
+  public long deleteBlobFile(final UUID repoId, final String repoName, final String fileName)
       throws IOException {
 
     final var freed =
@@ -97,7 +94,7 @@ public class HelmAbandonedBlobUploadSource implements AbandonedBlobUploadSource 
    * Every digest the repo's Helm OCI manifests or chart versions still reference, loaded once per
    * repo per pass rather than once per candidate file.
    */
-  private @NonNull Set<String> loadReferencedDigests(final @NonNull UUID repoId) {
+  private Set<String> loadReferencedDigests(final UUID repoId) {
 
     final var digests = new HashSet<String>();
 
@@ -112,8 +109,7 @@ public class HelmAbandonedBlobUploadSource implements AbandonedBlobUploadSource 
     return digests;
   }
 
-  private static void collectDigests(
-      final @NonNull String manifestJson, final @NonNull Set<String> into) {
+  private static void collectDigests(final String manifestJson, final Set<String> into) {
 
     try {
       collectDigests(OBJECT_MAPPER.readTree(manifestJson), into);
@@ -122,8 +118,7 @@ public class HelmAbandonedBlobUploadSource implements AbandonedBlobUploadSource 
     }
   }
 
-  private static void collectDigests(
-      final @NonNull JsonNode node, final @NonNull Set<String> into) {
+  private static void collectDigests(final JsonNode node, final Set<String> into) {
 
     if (node.isObject()) {
       node.properties().forEach(entry -> collectDigestsFromProperty(entry, into));
@@ -133,7 +128,7 @@ public class HelmAbandonedBlobUploadSource implements AbandonedBlobUploadSource 
   }
 
   private static void collectDigestsFromProperty(
-      final Map.@NonNull Entry<String, JsonNode> property, final @NonNull Set<String> into) {
+      final Map.Entry<String, JsonNode> property, final Set<String> into) {
 
     if (DIGEST_FIELD_NAME.equals(property.getKey()) && property.getValue().isString()) {
       into.add(property.getValue().asString());

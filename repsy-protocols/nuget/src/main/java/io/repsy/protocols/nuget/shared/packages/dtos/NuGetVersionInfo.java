@@ -17,7 +17,6 @@ package io.repsy.protocols.nuget.shared.packages.dtos;
 
 import java.time.Instant;
 import java.util.List;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -26,7 +25,6 @@ import org.jspecify.annotations.Nullable;
  * the nuspec declared, empty ones included (RPS-1555). Either is {@code null} when the caller did
  * not ask for dependencies.
  */
-@NullMarked
 public record NuGetVersionInfo(
     String packageId,
     String version,

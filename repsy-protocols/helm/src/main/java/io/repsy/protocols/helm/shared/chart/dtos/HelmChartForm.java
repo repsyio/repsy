@@ -17,12 +17,10 @@ package io.repsy.protocols.helm.shared.chart.dtos;
 
 import lombok.Builder;
 import lombok.Value;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 @Value
 @Builder
-@NullMarked
 public class HelmChartForm {
 
   String name;

@@ -21,12 +21,10 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.regex.Pattern;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.semver4j.Semver;
 
 /** Reads, compares and normalizes NuGet version strings the way NuGet does. */
-@NullMarked
 @UtilityClass
 public final class NuGetVersionUtils {
 

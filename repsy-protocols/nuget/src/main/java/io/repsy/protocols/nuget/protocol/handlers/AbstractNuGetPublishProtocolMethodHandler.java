@@ -30,14 +30,13 @@ import java.io.IOException;
 import java.util.Collection;
 import java.util.Locale;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.server.ResponseStatusException;
 
 @Slf4j
-@NullMarked
 public abstract class AbstractNuGetPublishProtocolMethodHandler
     extends AbstractFacadeProtocolMethodHandler<NuGetProtocolFacade> {
 
@@ -118,7 +117,7 @@ public abstract class AbstractNuGetPublishProtocolMethodHandler
     }
   }
 
-  private ResponseEntity<Object> handleException(final String errorMsg) {
+  private ResponseEntity<Object> handleException(final @Nullable String errorMsg) {
 
     log.debug("NuGet validation error: {}", errorMsg);
 
@@ -136,7 +135,7 @@ public abstract class AbstractNuGetPublishProtocolMethodHandler
   }
 
   private ResponseEntity<Object> createErrorResponse(
-      final HttpStatus status, final String message) {
+      final HttpStatus status, final @Nullable String message) {
 
     return ResponseEntity.status(status).body(ProtocolErrorBody.withMessage(message));
   }

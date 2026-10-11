@@ -21,14 +21,12 @@ import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 /** The ChartMuseum API, {@code /api/<repo>/...}; its relative path keeps the {@code /api}. */
 @Component
 @Qualifier("osHelmChartMuseumPathParser")
-@NullMarked
 public class HelmChartMuseumPathParser extends AbstractRepoPathParser {
 
   private static final String SUFFIX_GROUP = "suffix";

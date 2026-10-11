@@ -17,9 +17,7 @@ package io.repsy.protocols.nuget.shared.dtos;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.time.Instant;
-import org.jspecify.annotations.NullMarked;
 
-@NullMarked
 public record NuGetRegistrationLeafItem(
     @JsonProperty("@id") String id,
     @JsonProperty("@type") String type,

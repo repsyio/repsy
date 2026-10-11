@@ -22,11 +22,9 @@ import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.regex.Pattern;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.stereotype.Component;
 
 @Component("osNuGetPathParser")
-@NullMarked
 public class NuGetPathParser extends AbstractRepoPathParser {
 
   /** {@code v3} is the service index, so it is never a repository name. */

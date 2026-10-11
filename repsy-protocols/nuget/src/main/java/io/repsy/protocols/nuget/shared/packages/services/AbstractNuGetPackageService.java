@@ -15,11 +15,8 @@
  */
 package io.repsy.protocols.nuget.shared.packages.services;
 
-import org.jspecify.annotations.NullMarked;
-
 /**
  * Base of the backend implementation of {@link NuGetPackageService}; the abstract methods are
  * inherited from the contract.
  */
-@NullMarked
 public abstract class AbstractNuGetPackageService<ID> implements NuGetPackageService<ID> {}

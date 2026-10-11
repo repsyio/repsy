@@ -20,10 +20,8 @@ import io.repsy.protocols.helm.shared.chart.dtos.HelmChartInfo;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
-@NullMarked
 public interface ChartService<ID> {
 
   HelmChartInfo getOrCreate(HelmChartForm form, ID repoId);

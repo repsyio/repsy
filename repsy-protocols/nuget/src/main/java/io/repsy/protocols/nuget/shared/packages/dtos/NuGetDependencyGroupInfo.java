@@ -16,7 +16,6 @@
 package io.repsy.protocols.nuget.shared.packages.dtos;
 
 import java.util.List;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -25,6 +24,5 @@ import org.jspecify.annotations.Nullable;
  * nothing, so it is kept and not merged into another group (RPS-1555). A group without a target
  * framework applies to every framework.
  */
-@NullMarked
 public record NuGetDependencyGroupInfo(
     @Nullable String targetFramework, List<NuGetDependencyInfo> dependencies) {}

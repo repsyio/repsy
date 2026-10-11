@@ -33,11 +33,9 @@ import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 
 /** The OCI blob side of the Helm facade: upload sessions, finalize, existence and download. */
-@NullMarked
 @RequiredArgsConstructor
 final class HelmOciBlobFacade<ID> {
 

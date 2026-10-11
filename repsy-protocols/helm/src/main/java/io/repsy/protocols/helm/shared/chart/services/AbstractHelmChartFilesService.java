@@ -32,7 +32,6 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
@@ -48,7 +47,6 @@ import tools.jackson.databind.ObjectMapper;
  * manifest of the repo still names it.
  */
 @Slf4j
-@NullMarked
 @RequiredArgsConstructor
 public abstract class AbstractHelmChartFilesService<ID> {
 

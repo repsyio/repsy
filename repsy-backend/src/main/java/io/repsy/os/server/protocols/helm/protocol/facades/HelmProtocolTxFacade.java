@@ -33,7 +33,6 @@ import io.repsy.protocols.helm.shared.storage.services.HelmStorageService;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -41,7 +40,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service("helmProtocolTxFacade")
 @Transactional(readOnly = true)
-@NullMarked
 public class HelmProtocolTxFacade extends AbstractHelmProtocolTxFacade<UUID> {
 
   public HelmProtocolTxFacade(

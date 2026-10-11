@@ -20,12 +20,10 @@ import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
 import io.repsy.protocols.helm.protocol.facades.HelmProtocolFacade;
 import io.repsy.protocols.helm.protocol.handlers.oci.AbstractHelmOciTagsListProtocolMethodHandler;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 @Component
-@NullMarked
 public class HelmOciTagsListProtocolMethodHandler
     extends AbstractHelmOciTagsListProtocolMethodHandler<UUID> {
 

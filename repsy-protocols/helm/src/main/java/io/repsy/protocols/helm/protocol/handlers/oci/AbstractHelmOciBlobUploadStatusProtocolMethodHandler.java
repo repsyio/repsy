@@ -25,7 +25,6 @@ import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.http.HttpMethod;
 
 /**
@@ -34,7 +33,6 @@ import org.springframework.http.HttpMethod;
  * written, or a {@code 404} ({@code io.repsy.core.error_handling.exceptions.ItemNotFoundException}
  * propagated from the facade) when the session does not exist.
  */
-@NullMarked
 public abstract class AbstractHelmOciBlobUploadStatusProtocolMethodHandler<ID>
     extends AbstractOciUploadStatusProtocolMethodHandler<HelmProtocolFacade<ID>> {
 

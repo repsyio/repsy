@@ -19,11 +19,9 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /** Search result entry per NuGet Search Query Service spec. */
-@NullMarked
 @JsonInclude(Include.NON_NULL)
 public record NuGetSearchData(
     @JsonProperty("@id") String id,

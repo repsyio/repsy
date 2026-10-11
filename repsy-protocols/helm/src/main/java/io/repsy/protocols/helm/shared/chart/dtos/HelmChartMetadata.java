@@ -17,13 +17,11 @@ package io.repsy.protocols.helm.shared.chart.dtos;
 
 import lombok.Builder;
 import lombok.Value;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /** Parsed result of Chart.yaml extracted from a .tgz stream. */
 @Value
 @Builder
-@NullMarked
 public class HelmChartMetadata {
 
   String name;

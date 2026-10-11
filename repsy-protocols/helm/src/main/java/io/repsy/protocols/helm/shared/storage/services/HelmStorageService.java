@@ -25,10 +25,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 
-@NullMarked
 public interface HelmStorageService<ID> {
 
   void createRepo(UUID repoId);

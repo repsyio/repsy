@@ -15,9 +15,6 @@
  */
 package io.repsy.protocols.helm.shared.constants;
 
-import org.jspecify.annotations.NullMarked;
-
-@NullMarked
 public final class HelmConstants {
 
   private HelmConstants() {}

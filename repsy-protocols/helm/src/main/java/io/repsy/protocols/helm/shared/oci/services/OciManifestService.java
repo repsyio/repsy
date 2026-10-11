@@ -21,9 +21,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Stream;
-import org.jspecify.annotations.NullMarked;
 
-@NullMarked
 public interface OciManifestService<ID> {
 
   HelmOciManifestInfo save(HelmOciManifestForm form, ID repoId);

@@ -34,7 +34,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Optional;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.core.io.Resource;
 
 /**
@@ -44,7 +43,6 @@ import org.springframework.core.io.Resource;
  * HelmOciManifestFacade}, which this class delegates to. The constructor and the protected
  * collaborators are the contract of a subclass.
  */
-@NullMarked
 public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmProtocolFacade<ID> {
 
   protected final HelmStorageService<ID> helmStorageService;

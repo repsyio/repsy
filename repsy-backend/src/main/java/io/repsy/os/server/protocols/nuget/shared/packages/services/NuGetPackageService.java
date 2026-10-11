@@ -43,7 +43,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -57,7 +56,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Component
 @Transactional(readOnly = true)
-@NullMarked
 public class NuGetPackageService extends AbstractNuGetPackageService<UUID> {
 
   private static final String VERSION_UNIQUE_CONSTRAINT =

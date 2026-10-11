@@ -25,7 +25,6 @@ import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -55,7 +54,6 @@ import org.springframework.transaction.annotation.Transactional;
  * the repair.
  */
 @Slf4j
-@NullMarked
 @Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
