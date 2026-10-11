@@ -24,7 +24,6 @@ import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,10 +33,9 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class UsageService {
 
-  private final @NonNull RepoTxService repoTxService;
+  private final RepoTxService repoTxService;
 
-  public @NonNull RepoUsageInfo getRepoUsageInfo(
-      final @NonNull String repoName, final @NonNull RepoType repoType) {
+  public RepoUsageInfo getRepoUsageInfo(final String repoName, final RepoType repoType) {
 
     final var repo = this.repoTxService.requireRepo(repoName, repoType);
 
@@ -46,14 +44,14 @@ public class UsageService {
     return RepoUsageInfo.builder().diskUsed(diskUsed).build();
   }
 
-  public @NonNull TotalUsageInfo getTotalUsageInfo() {
+  public TotalUsageInfo getTotalUsageInfo() {
     final var diskUsed = this.createUsageInfo(this.repoTxService.getTotalDiskUsage());
     final var reposCount = this.repoTxService.countRepos();
 
     return TotalUsageInfo.builder().diskUsed(diskUsed).reposCount(reposCount).build();
   }
 
-  private @NonNull UsageInfo createUsageInfo(final long value) {
+  private UsageInfo createUsageInfo(final long value) {
     return UsageInfo.builder().value(value).text(humanReadable(value)).build();
   }
 }

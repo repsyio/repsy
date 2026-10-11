@@ -22,7 +22,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -36,19 +35,18 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface UserRepository extends JpaRepository<User, UUID> {
 
-  @NonNull Optional<User> findByUsername(@NonNull String username);
+  Optional<User> findByUsername(String username);
 
-  boolean existsByUsername(@NonNull String username);
+  boolean existsByUsername(String username);
 
-  @NonNull List<User> findAllByRole(@NonNull UserRole role);
+  List<User> findAllByRole(UserRole role);
 
   @Query(
       """
   select u from User u
   where (:pattern is null or lower(u.username) like :pattern escape '\\')
   """)
-  @NonNull Page<User> findAllWithSearch(
-      @Nullable @Param("pattern") String pattern, @NonNull Pageable pageable);
+  Page<User> findAllWithSearch(@Nullable @Param("pattern") String pattern, Pageable pageable);
 
   Long countByRole(UserRole userRole);
 
@@ -66,7 +64,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    */
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("select u.id from User u where u.role = :role order by u.id")
-  @NonNull List<UUID> lockIdsByRole(@NonNull @Param("role") UserRole role);
+  List<UUID> lockIdsByRole(@Param("role") UserRole role);
 
   /**
    * Locks the user row for {@code id} until the surrounding transaction ends and reports whether it
@@ -79,7 +77,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    */
   @Lock(LockModeType.PESSIMISTIC_READ)
   @Query("select u.id from User u where u.id = :id")
-  @NonNull Optional<UUID> lockUserId(@NonNull @Param("id") UUID id);
+  Optional<UUID> lockUserId(@Param("id") UUID id);
 
   /**
    * Like {@link #lockUserId}, but an exclusive lock ({@code FOR UPDATE}): two transactions cannot
@@ -89,7 +87,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    */
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("select u.id from User u where u.id = :id")
-  @NonNull Optional<UUID> lockUserIdForUpdate(@NonNull @Param("id") UUID id);
+  Optional<UUID> lockUserIdForUpdate(@Param("id") UUID id);
 
   /**
    * Swaps a user's password hash only while it still holds {@code oldHash}, so a password change
@@ -103,9 +101,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
   @Query(
       "update User u set u.hash = :newHash, u.salt = null where u.id = :id and u.hash = :oldHash")
   int replaceHash(
-      @NonNull @Param("id") UUID id,
-      @NonNull @Param("oldHash") String oldHash,
-      @NonNull @Param("newHash") String newHash);
+      @Param("id") UUID id, @Param("oldHash") String oldHash, @Param("newHash") String newHash);
 
   /**
    * Records a login by writing the {@code last_login_at} column and nothing else. The login is
@@ -116,6 +112,5 @@ public interface UserRepository extends JpaRepository<User, UUID> {
    */
   @Modifying(flushAutomatically = true, clearAutomatically = true)
   @Query("update User u set u.lastLoginAt = :at where u.username = :username")
-  int updateLastLoginAt(
-      @NonNull @Param("username") String username, @NonNull @Param("at") Instant at);
+  int updateLastLoginAt(@Param("username") String username, @Param("at") Instant at);
 }

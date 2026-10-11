@@ -19,7 +19,6 @@ import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.user.repositories.ReservedUsernameRepository;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,7 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class ReservedUsernameService {
 
-  private final @NonNull ReservedUsernameRepository reservedUsernameRepository;
+  private final ReservedUsernameRepository reservedUsernameRepository;
 
   /**
    * Rejects a reserved username with the same {@code usernameInUse} error a taken one gets, so the
@@ -44,7 +43,7 @@ public class ReservedUsernameService {
    * keeps it: their account is not renamed or blocked, and they are only refused when they rename
    * themselves to another reserved name.
    */
-  public void requireNotReserved(final @NonNull String username) {
+  public void requireNotReserved(final String username) {
 
     if (this.reservedUsernameRepository.existsByUsernameIgnoreCase(username)) {
       throw new BadRequestException(ErrorConstants.USERNAME_IN_USE);

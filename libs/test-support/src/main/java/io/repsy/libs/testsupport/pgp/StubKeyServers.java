@@ -18,7 +18,6 @@ package io.repsy.libs.testsupport.pgp;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.function.Function;
-import org.jspecify.annotations.NonNull;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -32,19 +31,18 @@ public final class StubKeyServers {
   private StubKeyServers() {}
 
   /** A client answering each request URI with the response the function returns. */
-  public static @NonNull RestClient answering(
-      final @NonNull Function<URI, ClientHttpResponse> answers) {
+  public static RestClient answering(final Function<URI, ClientHttpResponse> answers) {
 
     return RestClient.builder()
         .requestInterceptor((request, body, execution) -> answers.apply(request.getURI()))
         .build();
   }
 
-  public static @NonNull ClientHttpResponse notFound() {
+  public static ClientHttpResponse notFound() {
     return new MockClientHttpResponse(new byte[0], HttpStatus.NOT_FOUND);
   }
 
-  public static @NonNull ClientHttpResponse ok(final @NonNull String body) {
+  public static ClientHttpResponse ok(final String body) {
     final var response =
         new MockClientHttpResponse(body.getBytes(StandardCharsets.UTF_8), HttpStatus.OK);
     response.getHeaders().add(HttpHeaders.CONTENT_TYPE, MediaType.TEXT_PLAIN_VALUE);

@@ -17,7 +17,6 @@ package io.repsy.os.shared.configs;
 
 import java.util.Arrays;
 import java.util.List;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
@@ -49,7 +48,7 @@ public record AppCorsProperties(@Nullable String allowedOrigins) {
    * @return {@link #allowedOrigins()} split on commas, trimmed, with blank entries dropped; empty
    *     when {@link #allowedOrigins()} is {@code null} or blank
    */
-  public @NonNull List<String> allowedOriginList() {
+  public List<String> allowedOriginList() {
 
     if (this.allowedOrigins == null || this.allowedOrigins.isBlank()) {
       return List.of();

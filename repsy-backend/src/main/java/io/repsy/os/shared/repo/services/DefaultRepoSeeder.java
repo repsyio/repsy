@@ -22,7 +22,6 @@ import java.util.UUID;
 import java.util.function.Consumer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
@@ -42,7 +41,6 @@ import org.springframework.stereotype.Service;
  */
 @Slf4j
 @Service
-@NullMarked
 @RequiredArgsConstructor
 public class DefaultRepoSeeder {
 

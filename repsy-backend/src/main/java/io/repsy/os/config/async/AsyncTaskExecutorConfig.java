@@ -16,7 +16,6 @@
 package io.repsy.os.config.async;
 
 import java.util.concurrent.ThreadPoolExecutor;
-import org.jspecify.annotations.NonNull;
 import org.springframework.boot.task.ThreadPoolTaskExecutorCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -41,7 +40,7 @@ public class AsyncTaskExecutorConfig {
    * caller also slows down whoever floods the queue.
    */
   @Bean
-  public @NonNull ThreadPoolTaskExecutorCustomizer callerRunsRejectionPolicyCustomizer() {
+  public ThreadPoolTaskExecutorCustomizer callerRunsRejectionPolicyCustomizer() {
     return executor ->
         executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
   }

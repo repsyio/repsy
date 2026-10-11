@@ -16,7 +16,6 @@
 package io.repsy.os.shared.configs;
 
 import io.repsy.core.web.paging.PagingParameterInterceptor;
-import org.jspecify.annotations.NonNull;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
@@ -26,7 +25,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 public class PagingParameterConfig implements WebMvcConfigurer {
 
   @Override
-  public void addInterceptors(final @NonNull InterceptorRegistry registry) {
+  public void addInterceptors(final InterceptorRegistry registry) {
     // Last, so authentication and authorisation still answer 401/403 before a bad page or size
     // is reported.
     registry

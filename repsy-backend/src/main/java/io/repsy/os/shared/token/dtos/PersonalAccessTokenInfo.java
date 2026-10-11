@@ -20,7 +20,6 @@ import java.util.Collections;
 import java.util.EnumSet;
 import java.util.Set;
 import java.util.UUID;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -38,14 +37,14 @@ import org.jspecify.annotations.Nullable;
  * @param createdAt when it was created
  */
 public record PersonalAccessTokenInfo(
-    @NonNull UUID id,
-    @NonNull UUID userId,
-    @NonNull String username,
-    @NonNull String name,
-    @NonNull Set<TokenScope> scopes,
-    @NonNull Instant expirationDate,
+    UUID id,
+    UUID userId,
+    String username,
+    String name,
+    Set<TokenScope> scopes,
+    Instant expirationDate,
     @Nullable Instant lastUsedAt,
-    @NonNull Instant createdAt) {
+    Instant createdAt) {
 
   public PersonalAccessTokenInfo {
     final var copy = EnumSet.noneOf(TokenScope.class);

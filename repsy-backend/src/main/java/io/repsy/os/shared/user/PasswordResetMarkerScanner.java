@@ -31,7 +31,6 @@ import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.core.Ordered;
@@ -83,9 +82,9 @@ public class PasswordResetMarkerScanner implements ApplicationRunner {
 
   private static final int MAX_LOGGED_NAME_LENGTH = 60;
 
-  private final @NonNull PasswordResetMarkerProperties properties;
-  private final @NonNull UserRepository userRepository;
-  private final @NonNull UserTxService userTxService;
+  private final PasswordResetMarkerProperties properties;
+  private final UserRepository userRepository;
+  private final UserTxService userTxService;
 
   /** The markers that already failed and are still in the directory: logged once, not per poll. */
   private final Set<Path> failedMarkers = ConcurrentHashMap.newKeySet();
@@ -97,7 +96,7 @@ public class PasswordResetMarkerScanner implements ApplicationRunner {
   private final Set<Path> unreadableDirectories = ConcurrentHashMap.newKeySet();
 
   @Override
-  public void run(final @NonNull ApplicationArguments args) {
+  public void run(final ApplicationArguments args) {
     if (!this.properties.enabled()) {
       return;
     }
@@ -123,7 +122,7 @@ public class PasswordResetMarkerScanner implements ApplicationRunner {
   }
 
   /** Applies every marker file in {@code dir}; a directory that does not exist has none. */
-  public void scan(final @NonNull Path dir) {
+  public void scan(final Path dir) {
     final var entries = this.list(dir);
     // A marker that is gone (removed by hand, or applied after all) may fail and be logged again.
     this.failedMarkers.retainAll(new HashSet<>(entries));
@@ -132,7 +131,7 @@ public class PasswordResetMarkerScanner implements ApplicationRunner {
     }
   }
 
-  private @NonNull List<Path> list(final @NonNull Path dir) {
+  private List<Path> list(final Path dir) {
     try (Stream<Path> entries = Files.list(dir)) {
       final var sorted = entries.sorted().toList();
       this.unreadableDirectories.remove(dir);
@@ -151,7 +150,7 @@ public class PasswordResetMarkerScanner implements ApplicationRunner {
     }
   }
 
-  private void process(final @NonNull Path entry) {
+  private void process(final Path entry) {
     try {
       final var attributes =
           Files.readAttributes(entry, BasicFileAttributes.class, LinkOption.NOFOLLOW_LINKS);
@@ -178,7 +177,7 @@ public class PasswordResetMarkerScanner implements ApplicationRunner {
     }
   }
 
-  private void logFailure(final @NonNull Path entry, final @NonNull Exception e) {
+  private void logFailure(final Path entry, final Exception e) {
     if (this.failedMarkers.add(entry)) {
       log.error(
           "Could not apply the password reset marker {}, create it again to retry: {}",
@@ -189,7 +188,7 @@ public class PasswordResetMarkerScanner implements ApplicationRunner {
     }
   }
 
-  private void reset(final @NonNull String username, final @NonNull Path marker) {
+  private void reset(final String username, final Path marker) {
     final var user = this.userRepository.findByUsername(username);
     if (user.isEmpty()) {
       log.warn("Removed the password reset marker {}: there is no user {}", marker, username);
@@ -206,7 +205,7 @@ public class PasswordResetMarkerScanner implements ApplicationRunner {
   }
 
   /** A file name is operator input: keep control characters out of the log. */
-  private static @NonNull String printable(final @NonNull String name) {
+  private static String printable(final String name) {
     final var shortened =
         name.length() > MAX_LOGGED_NAME_LENGTH ? name.substring(0, MAX_LOGGED_NAME_LENGTH) : name;
     return shortened.replaceAll("[^\\x20-\\x7E]", "?");

@@ -28,6 +28,7 @@ import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.DynamicUpdate;
+import org.jspecify.annotations.Nullable;
 
 /**
  * {@code @DynamicUpdate} keeps an UPDATE to the columns that changed. The default writes every
@@ -58,7 +59,7 @@ public class User {
    * upgraded.
    */
   @Column(name = "salt", length = 16)
-  private String salt;
+  private @Nullable String salt;
 
   @Enumerated(EnumType.STRING)
   @Column(name = "role", nullable = false, length = 20)
@@ -69,7 +70,7 @@ public class User {
   private Instant createdAt;
 
   @Column(name = "last_login_at")
-  private Instant lastLoginAt;
+  private @Nullable Instant lastLoginAt;
 
   /** Embedded in refresh tokens; bumping it revokes every refresh token issued before. */
   @Column(name = "token_version", nullable = false)

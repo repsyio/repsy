@@ -23,7 +23,6 @@ import org.apache.catalina.connector.Connector;
 import org.apache.coyote.http11.Http11NioProtocol;
 import org.apache.tomcat.util.net.SSLHostConfig;
 import org.apache.tomcat.util.net.SSLHostConfigCertificate;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.tomcat.servlet.TomcatServletWebServerFactory;
@@ -34,7 +33,6 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 @Slf4j
-@NullMarked
 @Component
 @Order(Ordered.LOWEST_PRECEDENCE - 10)
 public class SslConnectorCustomizer

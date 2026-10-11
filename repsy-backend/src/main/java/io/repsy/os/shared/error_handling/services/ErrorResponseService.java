@@ -34,7 +34,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.annotation.AnnotationUtils;
@@ -63,33 +62,32 @@ import org.springframework.web.servlet.HandlerMapping;
 @Service
 public class ErrorResponseService {
 
-  public static final @NonNull String PANEL_AUTH_CHALLENGE = "Bearer";
+  public static final String PANEL_AUTH_CHALLENGE = "Bearer";
 
   /** Seconds a client is told to wait before it repeats a request that lost a lock race. */
-  public static final @NonNull String LOCK_FAILURE_RETRY_AFTER = "1";
+  public static final String LOCK_FAILURE_RETRY_AFTER = "1";
 
-  private static final @NonNull Set<String> NOT_LOGGED_EXCEPTIONS =
+  private static final Set<String> NOT_LOGGED_EXCEPTIONS =
       Set.of(
           "org.apache.catalina.connector.ClientAbortException",
           "java.nio.channels.ClosedChannelException",
           "org.springframework.web.context.request.async.AsyncRequestNotUsableException");
 
-  private final @NonNull RestResponseFactory resp;
+  private final RestResponseFactory resp;
 
   /** Tells the panel port from the protocol ports; {@code null} where only the handler decides. */
   private final @Nullable MultiPortProperties multiPortProperties;
 
   @Autowired
   public ErrorResponseService(
-      final @NonNull RestResponseFactory resp,
-      final @Nullable MultiPortProperties multiPortProperties) {
+      final RestResponseFactory resp, final @Nullable MultiPortProperties multiPortProperties) {
 
     this.resp = resp;
     this.multiPortProperties = multiPortProperties;
   }
 
   /** For a unit test that has no port configuration: only the handler tells a panel request. */
-  public ErrorResponseService(final @NonNull RestResponseFactory resp) {
+  public ErrorResponseService(final RestResponseFactory resp) {
     this(resp, null);
   }
 
@@ -98,7 +96,7 @@ public class ErrorResponseService {
    * carrying {@link RestApiPort}; the protocol endpoints on the main port announce their own
    * challenges (Basic, or a Docker Bearer realm) and must not get the panel's.
    */
-  public boolean isPanelRequest(final @NonNull HttpServletRequest request) {
+  public boolean isPanelRequest(final HttpServletRequest request) {
     if (request.getAttribute(HandlerMapping.BEST_MATCHING_HANDLER_ATTRIBUTE)
         instanceof final HandlerMethod handler) {
       return AnnotationUtils.findAnnotation(handler.getMethod(), RestApiPort.class) != null
@@ -110,7 +108,7 @@ public class ErrorResponseService {
     return this.arrivedOnPanelPort(request);
   }
 
-  private boolean arrivedOnPanelPort(final @NonNull HttpServletRequest request) {
+  private boolean arrivedOnPanelPort(final HttpServletRequest request) {
     final var props = this.multiPortProperties;
 
     if (props == null || props.getPorts() == null) {
@@ -129,24 +127,22 @@ public class ErrorResponseService {
    * The content type of an error body: {@code application/problem+json} (RFC 9457) on a panel
    * request, the {@link RestResponse} JSON the protocol ports and the OCI advice expect otherwise.
    */
-  public MediaType contentType(final @NonNull HttpServletRequest request) {
+  public MediaType contentType(final HttpServletRequest request) {
     return this.isPanelRequest(request)
         ? MediaType.APPLICATION_PROBLEM_JSON
         : MediaType.APPLICATION_JSON;
   }
 
   public Object error(
-      final @NonNull HttpServletRequest request,
-      final @NonNull HttpStatusCode status,
-      final @NonNull String msgId) {
+      final HttpServletRequest request, final HttpStatusCode status, final String msgId) {
 
     return this.error(request, status, msgId, null, List.of());
   }
 
   public Object error(
-      final @NonNull HttpServletRequest request,
-      final @NonNull HttpStatusCode status,
-      final @NonNull String msgId,
+      final HttpServletRequest request,
+      final HttpStatusCode status,
+      final String msgId,
       final @Nullable String data) {
 
     return this.error(request, status, msgId, data, List.of());
@@ -160,13 +156,14 @@ public class ErrorResponseService {
    * protocol clients still read.
    */
   public Object error(
-      final @NonNull HttpServletRequest request,
-      final @NonNull HttpStatusCode status,
-      final @NonNull String msgId,
+      final HttpServletRequest request,
+      final HttpStatusCode status,
+      final String msgId,
       final @Nullable String data,
-      final @NonNull List<ProblemField> fields) {
+      final List<ProblemField> fields) {
 
-    final RestResponse<String> envelope = this.resp.error(msgId, data);
+    final RestResponse<String> envelope =
+        data == null ? this.resp.error(msgId) : this.resp.error(msgId, data);
 
     if (!this.isPanelRequest(request)) {
       return envelope;
@@ -194,12 +191,12 @@ public class ErrorResponseService {
     return problem;
   }
 
-  private static boolean isFieldList(final @NonNull String data, final @NonNull String msgId) {
+  private static boolean isFieldList(final String data, final String msgId) {
     return !data.isBlank() && !data.equals(msgId) && !data.contains(" ");
   }
 
-  private static @NonNull List<ProblemField> namedFields(
-      final @NonNull String msgId, final @Nullable String data, final @Nullable String text) {
+  private static List<ProblemField> namedFields(
+      final String msgId, final @Nullable String data, final @Nullable String text) {
 
     if (data == null
         || !(ProtocolErrorCodes.VALIDATION_ERROR.equals(msgId)
@@ -217,8 +214,7 @@ public class ErrorResponseService {
     return errors;
   }
 
-  public static @NonNull List<ProblemField> fieldsOf(
-      final @NonNull MethodArgumentNotValidException ex) {
+  public static List<ProblemField> fieldsOf(final MethodArgumentNotValidException ex) {
 
     return ex.getBindingResult().getAllErrors().stream()
         .map(
@@ -232,8 +228,13 @@ public class ErrorResponseService {
         .toList();
   }
 
-  public static @NonNull List<ProblemField> fieldsOf(
-      final @NonNull HandlerMethodValidationException ex) {
+  /**
+   * {@code getParameterName()} is null only when the class was compiled without {@code
+   * -parameters}, which the build always passes; {@code ProblemField.field} (core) is not declared
+   * nullable, so the value is passed on as it always was.
+   */
+  @SuppressWarnings("NullAway")
+  public static List<ProblemField> fieldsOf(final HandlerMethodValidationException ex) {
 
     final var fields = new ArrayList<ProblemField>();
 
@@ -262,7 +263,7 @@ public class ErrorResponseService {
     return fields;
   }
 
-  public static @NonNull List<ProblemField> fieldsOf(final @NonNull ValidationException ex) {
+  public static List<ProblemField> fieldsOf(final ValidationException ex) {
 
     if (!(ex instanceof final ConstraintViolationException violations)) {
       return List.of();
@@ -290,8 +291,7 @@ public class ErrorResponseService {
   }
 
   /** The most general code Spring resolved for a constraint, i.e. its annotation name. */
-  private static @NonNull String lastCode(
-      final String @Nullable [] codes, final @Nullable String fallback) {
+  private static String lastCode(final String @Nullable [] codes, final @Nullable String fallback) {
 
     if (codes != null && codes.length > 0) {
       return codes[codes.length - 1];
@@ -301,8 +301,7 @@ public class ErrorResponseService {
   }
 
   /** A 503 that tells the client to repeat the request after {@code Retry-After} seconds. */
-  public ResponseEntity<Object> retryLater(
-      final @NonNull Object body, final @NonNull HttpServletRequest request) {
+  public ResponseEntity<Object> retryLater(final Object body, final HttpServletRequest request) {
 
     return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
         .contentType(this.contentType(request))
@@ -315,8 +314,8 @@ public class ErrorResponseService {
    * committed (then {@code null}, nothing is written).
    */
   public @Nullable ResponseEntity<Object> fallback(
-      final @NonNull Throwable ex,
-      final @NonNull HttpServletRequest request,
+      final Throwable ex,
+      final HttpServletRequest request,
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
@@ -324,7 +323,7 @@ public class ErrorResponseService {
       return null;
     }
 
-    if (ex instanceof @NonNull final HttpClientErrorException exception) {
+    if (ex instanceof final HttpClientErrorException exception) {
       // Neither the upstream body nor the exception message is logged: both can echo values of the
       // request (the message of this exception type carries the body).
       log.error(

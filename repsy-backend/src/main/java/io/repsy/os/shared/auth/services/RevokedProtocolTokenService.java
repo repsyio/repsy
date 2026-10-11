@@ -21,7 +21,6 @@ import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.codec.digest.DigestUtils;
-import org.jspecify.annotations.NonNull;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,12 +34,12 @@ import org.springframework.transaction.annotation.Transactional;
 @RequiredArgsConstructor
 public class RevokedProtocolTokenService {
 
-  private final @NonNull RevokedProtocolTokenRepository repository;
-  private final @NonNull EntityManager entityManager;
+  private final RevokedProtocolTokenRepository repository;
+  private final EntityManager entityManager;
 
   /** Whether {@code token} (a verified JWT, without its {@code Bearer} prefix) was revoked. */
   @Transactional(readOnly = true)
-  public boolean isRevoked(final @NonNull String token) {
+  public boolean isRevoked(final String token) {
     return this.repository.existsById(hash(token));
   }
 
@@ -49,7 +48,7 @@ public class RevokedProtocolTokenService {
    * token twice is not an error.
    */
   @Transactional
-  public void revoke(final @NonNull String token, final @NonNull Instant expiresAt) {
+  public void revoke(final String token, final Instant expiresAt) {
     final var tokenHash = hash(token);
 
     if (this.repository.existsById(tokenHash)) {
@@ -70,7 +69,7 @@ public class RevokedProtocolTokenService {
     this.repository.deleteExpired(Instant.now());
   }
 
-  private static @NonNull String hash(final @NonNull String token) {
+  private static String hash(final String token) {
     return DigestUtils.sha256Hex(token);
   }
 }

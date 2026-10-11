@@ -17,7 +17,6 @@ package io.repsy.os.shared.auth.dtos;
 
 import io.repsy.os.shared.user.dtos.UserInfo;
 import java.time.Instant;
-import org.jspecify.annotations.NonNull;
 
 /**
  * The outcome of authenticating a panel access token: the user it belongs to and the session it was
@@ -27,4 +26,4 @@ import org.jspecify.annotations.NonNull;
  * @param sessionStart when the login the token descends from happened; pass it on when minting new
  *     tokens so the session keeps its absolute lifetime
  */
-public record PanelSession(@NonNull UserInfo user, @NonNull Instant sessionStart) {}
+public record PanelSession(UserInfo user, Instant sessionStart) {}

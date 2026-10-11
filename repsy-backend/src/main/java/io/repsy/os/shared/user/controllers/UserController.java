@@ -34,7 +34,6 @@ import java.net.URI;
 import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
@@ -59,16 +58,16 @@ final class UserController {
 
   private static final Set<String> USER_SORT_PROPERTIES = Set.of("createdAt", "username");
 
-  private final @NonNull PanelAuthHelper panelAuthHelper;
-  private final @NonNull UserTxService userTxService;
-  private final @NonNull ReservedUsernameService reservedUsernameService;
+  private final PanelAuthHelper panelAuthHelper;
+  private final UserTxService userTxService;
+  private final ReservedUsernameService reservedUsernameService;
 
   @GetMapping
-  public @NonNull PagedModel<UserResponse> list(
-      @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
-      @RequestParam(name = "q", required = false, defaultValue = "") final @NonNull String search,
+  public PagedModel<UserResponse> list(
+      @RequestHeader(AUTHORIZATION) final String authHeader,
+      @RequestParam(name = "q", required = false, defaultValue = "") final String search,
       @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC)
-          final @NonNull Pageable pageable) {
+          final Pageable pageable) {
 
     this.panelAuthHelper.requireAdmin(this.panelAuthHelper.authenticate(authHeader));
 
@@ -84,7 +83,7 @@ final class UserController {
    * uses it to tell whether the admin it is about to delete or demote is the last one.
    */
   @GetMapping("/admin-count")
-  public @NonNull Long countAdmins(@RequestHeader(AUTHORIZATION) final @NonNull String authHeader) {
+  public Long countAdmins(@RequestHeader(AUTHORIZATION) final String authHeader) {
 
     this.panelAuthHelper.requireAdmin(this.panelAuthHelper.authenticate(authHeader));
 
@@ -92,9 +91,9 @@ final class UserController {
   }
 
   @PostMapping
-  public @NonNull ResponseEntity<UserResponse> createUser(
-      @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
-      @Valid @RequestBody final @NonNull UserCreateForm dto) {
+  public ResponseEntity<UserResponse> createUser(
+      @RequestHeader(AUTHORIZATION) final String authHeader,
+      @Valid @RequestBody final UserCreateForm dto) {
 
     this.panelAuthHelper.requireAdmin(this.panelAuthHelper.authenticate(authHeader));
 
@@ -106,10 +105,10 @@ final class UserController {
   }
 
   @PutMapping("/{userId}")
-  public @NonNull UserResponse updateUser(
-      @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
-      @PathVariable final @NonNull UUID userId,
-      @Valid @RequestBody final @NonNull UserUpdateForm dto) {
+  public UserResponse updateUser(
+      @RequestHeader(AUTHORIZATION) final String authHeader,
+      @PathVariable final UUID userId,
+      @Valid @RequestBody final UserUpdateForm dto) {
 
     this.panelAuthHelper.requireAdmin(this.panelAuthHelper.authenticate(authHeader));
 
@@ -124,9 +123,8 @@ final class UserController {
   }
 
   @DeleteMapping("/{userId}")
-  public @NonNull ResponseEntity<Void> deleteUser(
-      @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
-      @PathVariable final @NonNull UUID userId) {
+  public ResponseEntity<Void> deleteUser(
+      @RequestHeader(AUTHORIZATION) final String authHeader, @PathVariable final UUID userId) {
 
     this.panelAuthHelper.requireAdmin(this.panelAuthHelper.authenticate(authHeader));
 
@@ -136,10 +134,10 @@ final class UserController {
   }
 
   @PostMapping("/{userId}/actions/reset-password")
-  public @NonNull ResponseEntity<String> resetPassword(
-      @RequestHeader(AUTHORIZATION) final @NonNull String authHeader,
-      @PathVariable final @NonNull UUID userId,
-      final @NonNull HttpServletResponse response) {
+  public ResponseEntity<String> resetPassword(
+      @RequestHeader(AUTHORIZATION) final String authHeader,
+      @PathVariable final UUID userId,
+      final HttpServletResponse response) {
 
     this.panelAuthHelper.requireAdmin(this.panelAuthHelper.authenticate(authHeader));
 

@@ -17,7 +17,6 @@ package io.repsy.os.shared.auth.utils;
 
 import java.util.List;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NonNull;
 import org.passay.data.CharacterData;
 import org.passay.data.EnglishCharacterData;
 import org.passay.generate.PasswordGenerator;
@@ -51,7 +50,7 @@ public class PasswordGeneratorUtils {
   private static final PasswordGenerator PASSWORD_GENERATOR =
       new PasswordGenerator(DEFAULT_PASSWORD_LENGTH, RULES);
 
-  public @NonNull String generatePassword() {
+  public String generatePassword() {
     return PASSWORD_GENERATOR.generate().toString();
   }
 }

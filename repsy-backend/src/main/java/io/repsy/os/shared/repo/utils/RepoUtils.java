@@ -22,11 +22,10 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Pattern;
 import lombok.experimental.UtilityClass;
-import org.jspecify.annotations.NonNull;
 
 @UtilityClass
 public class RepoUtils {
-  private static final @NonNull Pattern REPO_NAME_PATTERN = Pattern.compile("^[a-zA-Z0-9_\\-]+$");
+  private static final Pattern REPO_NAME_PATTERN = Pattern.compile("^[a-zA-Z0-9_\\-]+$");
 
   /**
    * Repository names that would collide with a fixed top-level route the panel declares ahead of
@@ -38,7 +37,7 @@ public class RepoUtils {
    * security-summary}). Compared case-insensitively. Keep this in sync with {@code app.routes.ts},
    * which points back here in a comment.
    */
-  private static final @NonNull Set<String> RESERVED_REPO_NAMES =
+  private static final Set<String> RESERVED_REPO_NAMES =
       Set.of(
           "login",
           "profile",
@@ -52,7 +51,7 @@ public class RepoUtils {
           "counts",
           "security-summary");
 
-  public void validateRepoName(final @NonNull String repoName) {
+  public void validateRepoName(final String repoName) {
     if (!REPO_NAME_PATTERN.matcher(repoName).matches()) {
       throw new BadRequestException(ProtocolErrorCodes.INVALID_REQUEST);
     }
@@ -68,7 +67,7 @@ public class RepoUtils {
    * repository that already carries a reserved name from before this check existed must keep being
    * reachable there, not just left un-renameable.
    */
-  public void validateNewRepoName(final @NonNull String repoName) {
+  public void validateNewRepoName(final String repoName) {
     RepoUtils.validateRepoName(repoName);
 
     if (RESERVED_REPO_NAMES.contains(repoName.toLowerCase(Locale.ROOT))) {

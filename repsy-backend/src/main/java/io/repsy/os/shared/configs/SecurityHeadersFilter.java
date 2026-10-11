@@ -22,7 +22,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -67,24 +66,24 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @RequiredArgsConstructor
 public class SecurityHeadersFilter extends OncePerRequestFilter {
 
-  private static final @NonNull String API_PATH_PREFIX = "/api/";
-  private static final @NonNull String ENFORCED_HEADER = "Content-Security-Policy";
-  private static final @NonNull String REPORT_ONLY_HEADER = "Content-Security-Policy-Report-Only";
-  private static final @NonNull String CONTENT_TYPE_OPTIONS_HEADER = "X-Content-Type-Options";
-  private static final @NonNull String REFERRER_POLICY_HEADER = "Referrer-Policy";
-  private static final @NonNull String FRAME_OPTIONS_HEADER = "X-Frame-Options";
-  private static final @NonNull String HSTS_HEADER = "Strict-Transport-Security";
+  private static final String API_PATH_PREFIX = "/api/";
+  private static final String ENFORCED_HEADER = "Content-Security-Policy";
+  private static final String REPORT_ONLY_HEADER = "Content-Security-Policy-Report-Only";
+  private static final String CONTENT_TYPE_OPTIONS_HEADER = "X-Content-Type-Options";
+  private static final String REFERRER_POLICY_HEADER = "Referrer-Policy";
+  private static final String FRAME_OPTIONS_HEADER = "X-Frame-Options";
+  private static final String HSTS_HEADER = "Strict-Transport-Security";
 
-  private final @NonNull ApiPortMatcher apiPortMatcher;
-  private final @NonNull AppCorsProperties appCorsProperties;
-  private final @NonNull ContentSecurityPolicyProperties cspProperties;
-  private final @NonNull AppHstsProperties hstsProperties;
+  private final ApiPortMatcher apiPortMatcher;
+  private final AppCorsProperties appCorsProperties;
+  private final ContentSecurityPolicyProperties cspProperties;
+  private final AppHstsProperties hstsProperties;
 
   @Override
   protected void doFilterInternal(
-      final @NonNull HttpServletRequest request,
-      final @NonNull HttpServletResponse response,
-      final @NonNull FilterChain filterChain)
+      final HttpServletRequest request,
+      final HttpServletResponse response,
+      final FilterChain filterChain)
       throws ServletException, IOException {
 
     this.setHardeningHeaders(request, response);
@@ -98,7 +97,7 @@ public class SecurityHeadersFilter extends OncePerRequestFilter {
   }
 
   private void setHardeningHeaders(
-      final @NonNull HttpServletRequest request, final @NonNull HttpServletResponse response) {
+      final HttpServletRequest request, final HttpServletResponse response) {
 
     // Every response of both ports: the protocol port serves user-uploaded bytes (RPS-1514).
     response.setHeader(CONTENT_TYPE_OPTIONS_HEADER, "nosniff");
@@ -113,13 +112,13 @@ public class SecurityHeadersFilter extends OncePerRequestFilter {
     }
   }
 
-  private boolean isSpaOrStaticRequest(final @NonNull HttpServletRequest request) {
+  private boolean isSpaOrStaticRequest(final HttpServletRequest request) {
 
     return this.apiPortMatcher.isApiPort(request.getLocalPort())
         && !request.getRequestURI().startsWith(API_PATH_PREFIX);
   }
 
-  private @NonNull String resolvePolicy() {
+  private String resolvePolicy() {
 
     final var override = this.cspProperties.policy();
 
@@ -130,7 +129,7 @@ public class SecurityHeadersFilter extends OncePerRequestFilter {
     return this.buildDefaultPolicy();
   }
 
-  private @NonNull String buildDefaultPolicy() {
+  private String buildDefaultPolicy() {
 
     final var connectSrc = new StringBuilder("connect-src 'self'");
 

@@ -46,7 +46,6 @@ import java.util.function.Consumer;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -87,14 +86,14 @@ public class RepoTxService {
    */
   private static final Set<RepoType> PGP_SETTINGS_SUPPORTED_TYPES = EnumSet.of(RepoType.MAVEN);
 
-  private final @NonNull RepoMapper repoConverter;
-  private final @NonNull RepoRepository repoRepository;
-  private final @NonNull ApplicationEventPublisher eventPublisher;
+  private final RepoMapper repoConverter;
+  private final RepoRepository repoRepository;
+  private final ApplicationEventPublisher eventPublisher;
 
   @Transactional
-  public @NonNull RepoInfo createRepo(
-      final @NonNull String name,
-      final @NonNull RepoType repoType,
+  public RepoInfo createRepo(
+      final String name,
+      final RepoType repoType,
       final boolean privateRepo,
       final @Nullable String description) {
 
@@ -116,25 +115,24 @@ public class RepoTxService {
     return this.mapToRepoInfo(repo);
   }
 
-  public @NonNull RepoInfo getRepo(final @NonNull String name, final @NonNull RepoType type) {
+  public RepoInfo getRepo(final String name, final RepoType type) {
     return this.mapToRepoInfo(
         this.findRepoOrThrowException(this.repoRepository.findByNameAndType(name, type)));
   }
 
-  public @NonNull RepoInfo getRepo(final @NonNull UUID repoId) {
+  public RepoInfo getRepo(final UUID repoId) {
     return this.mapToRepoInfo(this.findRepoById(repoId));
   }
 
-  public @NonNull RepoInfo getRepoByName(final @NonNull String name) {
+  public RepoInfo getRepoByName(final String name) {
     return this.mapToRepoInfo(this.findRepoOrThrowException(this.repoRepository.findByName(name)));
   }
 
-  public @NonNull Optional<RepoInfo> findRepoByName(final @NonNull String name) {
+  public Optional<RepoInfo> findRepoByName(final String name) {
     return this.repoRepository.findByName(name).map(this::mapToRepoInfo);
   }
 
-  public @NonNull Optional<RepoInfo> findRepoByNameAndType(
-      final @NonNull String name, final @NonNull RepoType type) {
+  public Optional<RepoInfo> findRepoByNameAndType(final String name, final RepoType type) {
     return this.repoRepository.findByNameAndType(name, type).map(this::mapToRepoInfo);
   }
 
@@ -143,7 +141,7 @@ public class RepoTxService {
    *
    * @throws ItemNotFoundException {@code repoNotFound} if there is no such repo
    */
-  public @NonNull Repo requireRepo(final @NonNull UUID repoId) {
+  public Repo requireRepo(final UUID repoId) {
     return this.findRepoById(repoId);
   }
 
@@ -152,27 +150,27 @@ public class RepoTxService {
    *
    * @throws ItemNotFoundException {@code repoNotFound} if there is no such repo
    */
-  public @NonNull Repo requireRepo(final @NonNull String name, final @NonNull RepoType type) {
+  public Repo requireRepo(final String name, final RepoType type) {
     return this.findRepoOrThrowException(this.repoRepository.findByNameAndType(name, type));
   }
 
-  public boolean repoExists(final @NonNull UUID repoId) {
+  public boolean repoExists(final UUID repoId) {
     return this.repoRepository.existsById(repoId);
   }
 
   /** The repos of the type, the newest first. */
-  public @NonNull List<Repo> findReposByType(final @NonNull RepoType type) {
+  public List<Repo> findReposByType(final RepoType type) {
     return this.repoRepository.findAllByTypeOrderByCreatedAtDescNameAsc(type);
   }
 
   /** The names of the repos with the ids, keyed by id; an id that is gone is left out. */
-  public @NonNull Map<UUID, String> findRepoNames(final @NonNull Collection<UUID> repoIds) {
+  public Map<UUID, String> findRepoNames(final Collection<UUID> repoIds) {
     return this.repoRepository.findAllById(repoIds).stream()
         .collect(Collectors.toMap(Repo::getId, Repo::getName));
   }
 
   /** The committed {@code pgpVerifyAllSignaturesEnabled} of the repo, empty if it is gone. */
-  public @NonNull Optional<Boolean> findPgpVerifyAllSignaturesEnabled(final @NonNull UUID repoId) {
+  public Optional<Boolean> findPgpVerifyAllSignaturesEnabled(final UUID repoId) {
     return this.repoRepository.findPgpVerifyAllSignaturesEnabledById(repoId);
   }
 
@@ -199,7 +197,7 @@ public class RepoTxService {
    *     that is not a Maven one (RPS-1188, RPS-1204)
    */
   @Transactional
-  public void updateSettings(final @NonNull UUID repoId, final @NonNull RepoSettingsForm settings) {
+  public void updateSettings(final UUID repoId, final RepoSettingsForm settings) {
 
     final var repo = this.findRepoById(repoId);
 
@@ -237,22 +235,19 @@ public class RepoTxService {
 
   /** Hands {@code value} to {@code setter} unless it is absent from the request. */
   private static void applyIfPresent(
-      final @Nullable Boolean value, final @NonNull Consumer<Boolean> setter) {
+      final @Nullable Boolean value, final Consumer<Boolean> setter) {
     if (value != null) {
       setter.accept(value);
     }
   }
 
   @Transactional
-  public void deleteRepo(final @NonNull UUID repoId) {
+  public void deleteRepo(final UUID repoId) {
     this.repoRepository.delete(this.findRepoById(repoId));
   }
 
   @Transactional
-  public void renameRepo(
-      final @NonNull String repoName,
-      final @NonNull String newRepoName,
-      final @NonNull RepoType repoType) {
+  public void renameRepo(final String repoName, final String newRepoName, final RepoType repoType) {
 
     RepoUtils.validateNewRepoName(newRepoName);
 
@@ -272,8 +267,8 @@ public class RepoTxService {
    * @return the repo as it is after the update
    */
   @Transactional
-  public @NonNull RepoListInfo updateRepo(
-      final @NonNull RepoInfo repoInfo,
+  public RepoListInfo updateRepo(
+      final RepoInfo repoInfo,
       final @Nullable String newName,
       final @Nullable String newDescription) {
 
@@ -289,13 +284,13 @@ public class RepoTxService {
   }
 
   @Transactional
-  public void updateDescription(final @NonNull UUID repoId, final @Nullable String description) {
+  public void updateDescription(final UUID repoId, final @Nullable String description) {
     final var repo = this.findRepoById(repoId);
     repo.setDescription(description);
     this.repoRepository.save(repo);
   }
 
-  public @NonNull RepoSettingsInfo getRepoSettings(final @NonNull UUID repoId) {
+  public RepoSettingsInfo getRepoSettings(final UUID repoId) {
     final var repoInfo = this.getRepo(repoId);
     final var supportsReleasesSnapshots =
         RELEASES_SNAPSHOTS_SUPPORTED_TYPES.contains(repoInfo.getType());
@@ -321,10 +316,8 @@ public class RepoTxService {
    *     \} taken literally; every repo matches when null or blank
    * @param pageable the page, sorted by properties of {@link Repo}
    */
-  public @NonNull Page<RepoListInfo> listRepos(
-      final @Nullable RepoType type,
-      final @Nullable String query,
-      final @NonNull Pageable pageable) {
+  public Page<RepoListInfo> listRepos(
+      final @Nullable RepoType type, final @Nullable String query, final Pageable pageable) {
 
     final var pattern = LikePatterns.of("%", query == null ? "" : query.strip(), "%");
 
@@ -332,7 +325,7 @@ public class RepoTxService {
   }
 
   /** The number of repos of every type, {@code 0} for a type that has none. */
-  public @NonNull Map<RepoType, Long> getRepoCounts() {
+  public Map<RepoType, Long> getRepoCounts() {
     final var counts = new EnumMap<RepoType, Long>(RepoType.class);
 
     for (final var type : RepoType.values()) {
@@ -348,11 +341,11 @@ public class RepoTxService {
     return counts;
   }
 
-  public @NonNull RepoListInfo getRepoListInfo(final @NonNull UUID repoId) {
+  public RepoListInfo getRepoListInfo(final UUID repoId) {
     return this.mapToRepoListInfo(this.findRepoById(repoId));
   }
 
-  public @NonNull List<String> getAllRepoNames() {
+  public List<String> getAllRepoNames() {
     return this.repoRepository.findAllRepoNames();
   }
 
@@ -361,7 +354,7 @@ public class RepoTxService {
    *
    * @return whether the repo still existed, {@code false} when nothing was updated
    */
-  public boolean updateDiskUsage(final @NonNull UUID repoId, final long diskUsageDiff) {
+  public boolean updateDiskUsage(final UUID repoId, final long diskUsageDiff) {
     return this.repoRepository.updateDiskUsage(repoId, diskUsageDiff) > 0;
   }
 
@@ -372,7 +365,7 @@ public class RepoTxService {
    * @return whether the diff was applied, {@code false} when the repo no longer exists or the diff
    *     does not fit
    */
-  public boolean tryAddDiskUsage(final @NonNull UUID repoId, final long diskUsageDiff) {
+  public boolean tryAddDiskUsage(final UUID repoId, final long diskUsageDiff) {
     return this.repoRepository.addDiskUsageUnlessNegative(repoId, diskUsageDiff) > 0;
   }
 
@@ -381,12 +374,12 @@ public class RepoTxService {
    *
    * @return the usage, empty when the repo no longer exists
    */
-  public @NonNull Optional<Long> findDiskUsageForUpdate(final @NonNull UUID repoId) {
+  public Optional<Long> findDiskUsageForUpdate(final UUID repoId) {
     return this.repoRepository.findDiskUsageByIdForUpdate(repoId);
   }
 
   private void rejectReleasesSnapshotsForUnsupportedType(
-      final @NonNull Repo repo, final @NonNull RepoSettingsForm settings) {
+      final Repo repo, final RepoSettingsForm settings) {
     final var touchesReleasesSnapshots =
         settings.getReleases() != null || settings.getSnapshots() != null;
     if (touchesReleasesSnapshots && !RELEASES_SNAPSHOTS_SUPPORTED_TYPES.contains(repo.getType())) {
@@ -395,7 +388,7 @@ public class RepoTxService {
   }
 
   private void rejectPgpSettingsForUnsupportedType(
-      final @NonNull Repo repo, final @NonNull RepoSettingsForm settings) {
+      final Repo repo, final RepoSettingsForm settings) {
     final var touchesPgp =
         settings.getPgpVerifyAllSignaturesEnabled() != null
             || settings.getPgpKeyServerLookupEnabled() != null;
@@ -404,24 +397,24 @@ public class RepoTxService {
     }
   }
 
-  private @NonNull Repo findRepoOrThrowException(final @NonNull Optional<Repo> repoOptional) {
+  private Repo findRepoOrThrowException(final Optional<Repo> repoOptional) {
     return repoOptional.orElseThrow(
         () -> new ItemNotFoundException(ProtocolErrorCodes.REPO_NOT_FOUND));
   }
 
-  private @NonNull Repo findRepoById(final @NonNull UUID repoId) {
+  private Repo findRepoById(final UUID repoId) {
     return this.findRepoOrThrowException(this.repoRepository.findById(repoId));
   }
 
-  private @NonNull RepoInfo mapToRepoInfo(final @NonNull Repo repo) {
+  private RepoInfo mapToRepoInfo(final Repo repo) {
     return Objects.requireNonNull(this.repoConverter.toRepoInfo(repo));
   }
 
-  private @NonNull RepoListInfo mapToRepoListInfo(final @NonNull Repo repo) {
+  private RepoListInfo mapToRepoListInfo(final Repo repo) {
     return Objects.requireNonNull(this.repoConverter.toRepoListInfo(repo));
   }
 
-  private void checkIfRepoExists(final @NonNull String name) {
+  private void checkIfRepoExists(final String name) {
     if (this.repoRepository.existsByName(name)) {
       throw new ItemAlreadyExistException(ErrorConstants.REPO_EXISTS);
     }
@@ -435,7 +428,7 @@ public class RepoTxService {
    * to the generic {@code DataIntegrityViolationException} handling in {@code ProtocolErrorAdvice}
    * (RPS- 1134).
    */
-  private void saveOrThrowIfNameTaken(final @NonNull Repo repo) {
+  private void saveOrThrowIfNameTaken(final Repo repo) {
     try {
       this.repoRepository.saveAndFlush(repo);
     } catch (final DataIntegrityViolationException e) {

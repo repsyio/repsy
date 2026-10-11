@@ -31,7 +31,6 @@ import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -40,8 +39,8 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public final class PanelAuthHelper {
 
-  private final @NonNull JwtUtils jwtUtils;
-  private final @NonNull UserTxService userTxService;
+  private final JwtUtils jwtUtils;
+  private final UserTxService userTxService;
 
   private @Nullable PersonalAccessTokenService personalAccessTokens;
 
@@ -60,7 +59,7 @@ public final class PanelAuthHelper {
    * not accepted here: {@link #authenticate} and every method that builds on it take a login only.
    * The routes a command line client needs have an entry point of their own below.
    */
-  public @NonNull UserInfo authenticate(final @NonNull String authHeader) {
+  public UserInfo authenticate(final String authHeader) {
     return this.authenticateSession(authHeader).user();
   }
 
@@ -68,7 +67,7 @@ public final class PanelAuthHelper {
    * Authenticates like {@link #authenticate} and also returns the session start of the token, for
    * endpoints that mint new tokens. The token is verified and decoded once.
    */
-  public @NonNull PanelSession authenticateSession(final @NonNull String authHeader) {
+  public PanelSession authenticateSession(final String authHeader) {
     final var claims = this.jwtUtils.extractPanelClaims(authHeader);
     final var user = this.userTxService.getAuthenticatedUserByUsername(claims.username());
 
@@ -85,7 +84,7 @@ public final class PanelAuthHelper {
    * Authenticates the caller of the repo list: a login, or a personal access token that may read
    * ({@code repo:read}).
    */
-  public @NonNull UserInfo authenticateRepoReader(final @NonNull String authHeader) {
+  public UserInfo authenticateRepoReader(final String authHeader) {
     return this.authenticateOrPersonalAccessToken(authHeader, Permission.READ);
   }
 
@@ -94,7 +93,7 @@ public final class PanelAuthHelper {
    * repo:manage}. The caller still has to be an ADMIN ({@link #requireAdmin}), which a scope cannot
    * give.
    */
-  public @NonNull UserInfo authenticateRepoCreator(final @NonNull String authHeader) {
+  public UserInfo authenticateRepoCreator(final String authHeader) {
     return this.authenticateOrPersonalAccessToken(authHeader, Permission.MANAGE);
   }
 
@@ -103,8 +102,7 @@ public final class PanelAuthHelper {
    * is for a personal access token: it answers what the token is. A login is a valid caller and is
    * answered {@code notAnAccessToken} (400), as it has no token to describe.
    */
-  public @NonNull PersonalAccessTokenInfo authenticateAccessToken(
-      final @NonNull String authHeader) {
+  public PersonalAccessTokenInfo authenticateAccessToken(final String authHeader) {
 
     final var secret = AuthUtils.personalAccessTokenSecretOf(authHeader);
 
@@ -121,8 +119,8 @@ public final class PanelAuthHelper {
     return token;
   }
 
-  private @NonNull UserInfo authenticateOrPersonalAccessToken(
-      final @NonNull String authHeader, final @NonNull Permission required) {
+  private UserInfo authenticateOrPersonalAccessToken(
+      final String authHeader, final Permission required) {
 
     final var secret = AuthUtils.personalAccessTokenSecretOf(authHeader);
 
@@ -144,7 +142,7 @@ public final class PanelAuthHelper {
     return user;
   }
 
-  private @NonNull PersonalAccessTokenInfo liveToken(final @NonNull String secret) {
+  private PersonalAccessTokenInfo liveToken(final String secret) {
 
     final var service = this.personalAccessTokens;
     final var found = service == null ? null : service.findByToken(secret).orElse(null);
@@ -156,7 +154,7 @@ public final class PanelAuthHelper {
     return found;
   }
 
-  private void touch(final @NonNull PersonalAccessTokenInfo token) {
+  private void touch(final PersonalAccessTokenInfo token) {
 
     final var service = this.personalAccessTokens;
 
@@ -165,7 +163,7 @@ public final class PanelAuthHelper {
     }
   }
 
-  public void requireAdmin(final @NonNull UserInfo userInfo) {
+  public void requireAdmin(final UserInfo userInfo) {
     if (userInfo.getRole() != UserRole.ADMIN) {
       throw new AccessNotAllowedException(ProtocolErrorCodes.ACCESS_DENIED);
     }

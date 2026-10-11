@@ -18,6 +18,7 @@ package io.repsy.libs.testsupport;
 import java.util.Collection;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.extension.AfterAllCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
 import org.opentest4j.AssertionFailedError;
@@ -81,7 +82,7 @@ public abstract class AbstractContextCountGuard implements AfterAllCallback {
    * Adds {@code configuration} to {@code seen} and returns a message template (its {@code %s} is
    * the class) when that makes {@code seen} larger than {@code max}, or {@code null} while it fits.
    */
-  public static String record(
+  public static @Nullable String record(
       final Collection<Object> seen, final Object configuration, final int max) {
 
     if (seen.contains(configuration)) {

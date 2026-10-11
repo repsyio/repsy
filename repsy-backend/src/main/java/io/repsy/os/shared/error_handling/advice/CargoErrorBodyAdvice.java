@@ -19,7 +19,6 @@ import io.repsy.core.response.dtos.ResponseType;
 import io.repsy.core.response.dtos.RestResponse;
 import io.repsy.protocols.cargo.shared.constants.CargoConstants;
 import io.repsy.protocols.shared.dtos.ProtocolErrorBody;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.MediaType;
@@ -43,7 +42,6 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
  * message id, the stable code the envelope carried.
  */
 @ControllerAdvice
-@NullMarked
 public class CargoErrorBodyAdvice implements ResponseBodyAdvice<Object> {
 
   @Override

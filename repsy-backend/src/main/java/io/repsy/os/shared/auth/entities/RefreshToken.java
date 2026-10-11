@@ -23,6 +23,7 @@ import java.time.Instant;
 import java.util.UUID;
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 
 @Data
 @Entity
@@ -43,8 +44,8 @@ public class RefreshToken {
   private Instant expiresAt;
 
   @Column(name = "used_at")
-  private Instant usedAt;
+  private @Nullable Instant usedAt;
 
   @Column(name = "revoked_at")
-  private Instant revokedAt;
+  private @Nullable Instant revokedAt;
 }

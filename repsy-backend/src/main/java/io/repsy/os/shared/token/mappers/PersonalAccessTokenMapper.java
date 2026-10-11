@@ -19,12 +19,10 @@ import io.repsy.os.generated.model.AccessTokenCreated;
 import io.repsy.os.generated.model.AccessTokenWhoAmI;
 import io.repsy.os.shared.token.dtos.PersonalAccessTokenInfo;
 import io.repsy.os.shared.token.entities.PersonalAccessToken;
-import org.jspecify.annotations.NullMarked;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingConstants;
 
-@NullMarked
 @Mapper(componentModel = MappingConstants.ComponentModel.SPRING)
 public interface PersonalAccessTokenMapper {
 

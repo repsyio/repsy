@@ -18,6 +18,7 @@ package io.repsy.os.config;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationEnvironmentPreparedEvent;
@@ -96,7 +97,7 @@ public class LegacyDatabaseVariablesWarning
   }
 
   private static List<String> setNames(
-      final String host, final String port, final String database) {
+      final @Nullable String host, final @Nullable String port, final @Nullable String database) {
     final var names = new ArrayList<String>(3);
     if (host != null) {
       names.add(HOST);
@@ -110,7 +111,7 @@ public class LegacyDatabaseVariablesWarning
     return names;
   }
 
-  private static String orDefault(final String value, final String fallback) {
+  private static String orDefault(final @Nullable String value, final String fallback) {
     return value == null || value.isBlank() ? fallback : value;
   }
 }

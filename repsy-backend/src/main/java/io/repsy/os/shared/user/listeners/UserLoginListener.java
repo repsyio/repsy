@@ -18,7 +18,6 @@ package io.repsy.os.shared.user.listeners;
 import io.repsy.core.events.UserLoginEvent;
 import io.repsy.os.shared.user.services.UserTxService;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -27,11 +26,11 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class UserLoginListener {
 
-  private final @NonNull UserTxService userTxService;
+  private final UserTxService userTxService;
 
   @Async
   @EventListener
-  public void onUserLogin(final @NonNull UserLoginEvent event) {
+  public void onUserLogin(final UserLoginEvent event) {
     this.userTxService.updateLastLoginAt(event.username());
   }
 }

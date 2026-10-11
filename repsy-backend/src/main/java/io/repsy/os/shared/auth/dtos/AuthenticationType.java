@@ -18,7 +18,6 @@ package io.repsy.os.shared.auth.dtos;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.os.shared.constants.ErrorConstants;
 import lombok.Getter;
-import org.jspecify.annotations.NonNull;
 
 @Getter
 public enum AuthenticationType {
@@ -39,7 +38,7 @@ public enum AuthenticationType {
     this.value = value;
   }
 
-  public static @NonNull AuthenticationType from(final @NonNull String value) {
+  public static AuthenticationType from(final String value) {
     if (DEPLOY_TOKEN.value.equals(value)) {
       return DEPLOY_TOKEN;
     }

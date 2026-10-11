@@ -18,7 +18,6 @@ package io.repsy.os.shared.auth.dtos;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import java.time.Instant;
 import java.util.UUID;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -33,10 +32,7 @@ import org.jspecify.annotations.Nullable;
  *     refreshes so the session has an absolute lifetime
  */
 public record PanelTokenClaims(
-    @Nullable UUID userId,
-    @NonNull String username,
-    int tokenVersion,
-    @NonNull Instant sessionStart) {
+    @Nullable UUID userId, String username, int tokenVersion, Instant sessionStart) {
 
   /**
    * Whether the token was issued to exactly this user row and to the state of it that still stands:
@@ -44,7 +40,7 @@ public record PanelTokenClaims(
    * {@code token_version} (a password change, a username change or an admin edit ends the token,
    * RPS-1552). The user is the one the {@code username} claim named.
    */
-  public boolean issuedTo(final @NonNull UserInfo user) {
+  public boolean issuedTo(final UserInfo user) {
     return user.getId().equals(this.userId) && this.tokenVersion == user.getTokenVersion();
   }
 }

@@ -20,7 +20,6 @@ import io.repsy.os.shared.token.entities.PersonalAccessToken;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
-import org.jspecify.annotations.NonNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -38,24 +37,23 @@ public interface PersonalAccessTokenRepository extends JpaRepository<PersonalAcc
    * round trip on every such request.
    */
   @EntityGraph(attributePaths = "user")
-  @NonNull Optional<PersonalAccessToken> findByTokenHash(@NonNull String tokenHash);
+  Optional<PersonalAccessToken> findByTokenHash(String tokenHash);
 
   @EntityGraph(attributePaths = "user")
-  @NonNull Optional<PersonalAccessToken> findByUserIdAndId(@NonNull UUID userId, @NonNull UUID id);
+  Optional<PersonalAccessToken> findByUserIdAndId(UUID userId, UUID id);
 
-  @NonNull Page<PersonalAccessTokenListItem> findAllByUserId(
-      @NonNull UUID userId, @NonNull Pageable pageable);
+  Page<PersonalAccessTokenListItem> findAllByUserId(UUID userId, Pageable pageable);
 
-  long countByUserId(@NonNull UUID userId);
+  long countByUserId(UUID userId);
 
   /**
    * How many tokens of the user have not expired at {@code now}: those whose expiration date is
    * after it. A token expires at its date, so one that expires exactly at {@code now} is expired
    * (see {@code PersonalAccessTokenInfo#isExpired}).
    */
-  long countByUserIdAndExpirationDateAfter(@NonNull UUID userId, @NonNull Instant now);
+  long countByUserIdAndExpirationDateAfter(UUID userId, Instant now);
 
   @Modifying
   @Query("update PersonalAccessToken pat set pat.lastUsedAt = :now where pat.id = :tokenId")
-  void updateLastUsedTime(@NonNull UUID tokenId, @NonNull Instant now);
+  void updateLastUsedTime(UUID tokenId, Instant now);
 }

@@ -16,12 +16,10 @@
 package io.repsy.os.shared.error_handling.advice;
 
 import io.repsy.protocols.oci.advice.AbstractOciErrorBodyAdvice;
-import org.jspecify.annotations.NullMarked;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 
 /**
  * Registers the OCI error body rewrite for the OS backend; the logic is in the protocol library.
  */
 @ControllerAdvice
-@NullMarked
 public class OciErrorBodyAdvice extends AbstractOciErrorBodyAdvice {}

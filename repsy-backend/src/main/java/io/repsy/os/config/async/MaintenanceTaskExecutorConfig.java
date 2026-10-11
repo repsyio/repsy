@@ -18,7 +18,6 @@ package io.repsy.os.config.async;
 import java.time.Duration;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadPoolExecutor;
-import org.jspecify.annotations.NonNull;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
@@ -60,7 +59,7 @@ public class MaintenanceTaskExecutorConfig {
    * action produces, so the slow work reaching a request thread is the lesser evil.
    */
   @Bean(BEAN_NAME)
-  public @NonNull Executor maintenanceTaskExecutor() {
+  public Executor maintenanceTaskExecutor() {
 
     final var executor = new ThreadPoolTaskExecutor();
     executor.setCorePoolSize(POOL_SIZE);

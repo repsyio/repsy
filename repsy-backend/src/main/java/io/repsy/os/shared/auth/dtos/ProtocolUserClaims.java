@@ -17,7 +17,6 @@ package io.repsy.os.shared.auth.dtos;
 
 import io.repsy.os.shared.user.dtos.UserInfo;
 import java.util.UUID;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -30,14 +29,14 @@ import org.jspecify.annotations.Nullable;
  *     token minted before the claim existed, which is accepted until it expires (RPS-1552)
  */
 public record ProtocolUserClaims(
-    @Nullable UUID userId, @NonNull String username, @Nullable Integer tokenVersion) {
+    @Nullable UUID userId, String username, @Nullable Integer tokenVersion) {
 
   /**
    * Whether the token was issued to exactly this user row: the same id, so that a username that was
    * freed and registered again does not inherit the token of its former owner (RPS-1604), and the
    * same version, unless the token has none (see {@link #tokenVersion}).
    */
-  public boolean issuedTo(final @NonNull UserInfo user) {
+  public boolean issuedTo(final UserInfo user) {
     return user.getId().equals(this.userId)
         && (this.tokenVersion == null || this.tokenVersion == user.getTokenVersion());
   }

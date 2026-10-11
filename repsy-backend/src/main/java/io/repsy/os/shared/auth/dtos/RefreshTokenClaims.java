@@ -17,7 +17,6 @@ package io.repsy.os.shared.auth.dtos;
 
 import java.time.Instant;
 import java.util.UUID;
-import org.jspecify.annotations.NonNull;
 
 /**
  * The claims of a verified refresh token that decide whether it may be exchanged.
@@ -31,8 +30,4 @@ import org.jspecify.annotations.NonNull;
  *     it revokes the token
  */
 public record RefreshTokenClaims(
-    @NonNull UUID userId,
-    @NonNull UUID tokenId,
-    @NonNull UUID familyId,
-    @NonNull Instant sessionStart,
-    int tokenVersion) {}
+    UUID userId, UUID tokenId, UUID familyId, Instant sessionStart, int tokenVersion) {}

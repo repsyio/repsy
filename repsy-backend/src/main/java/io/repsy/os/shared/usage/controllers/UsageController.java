@@ -23,7 +23,6 @@ import io.repsy.os.shared.auth.PanelAuthHelper;
 import io.repsy.os.shared.usage.services.UsageService;
 import io.repsy.os.shared.utils.MultiPortNames;
 import lombok.RequiredArgsConstructor;
-import org.jspecify.annotations.NonNull;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -35,16 +34,15 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class UsageController {
 
-  private final @NonNull PanelAuthHelper panelAuthHelper;
-  private final @NonNull UsageService usageService;
+  private final PanelAuthHelper panelAuthHelper;
+  private final UsageService usageService;
 
   /**
    * Instance-wide totals, deliberately open to any authenticated user (no {@code requireAdmin}):
    * the panel dashboard, which every signed-in user lands on, shows them in its Total Disk card.
    */
   @GetMapping
-  public @NonNull TotalUsageInfo getTotalUsage(
-      @RequestHeader(AUTHORIZATION) final @NonNull String authHeader) {
+  public TotalUsageInfo getTotalUsage(@RequestHeader(AUTHORIZATION) final String authHeader) {
 
     this.panelAuthHelper.authenticate(authHeader);
 

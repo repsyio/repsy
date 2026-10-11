@@ -21,7 +21,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
-import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 import org.springframework.web.cors.CorsConfiguration;
@@ -49,12 +48,11 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Component
 public class CorsGlobalConfig extends OncePerRequestFilter {
 
-  private final @NonNull ApiPortMatcher apiPortMatcher;
+  private final ApiPortMatcher apiPortMatcher;
   private final @Nullable CorsFilter apiCorsFilter;
 
   public CorsGlobalConfig(
-      final @NonNull AppCorsProperties appCorsProperties,
-      final @NonNull ApiPortMatcher apiPortMatcher) {
+      final AppCorsProperties appCorsProperties, final ApiPortMatcher apiPortMatcher) {
 
     this.apiPortMatcher = apiPortMatcher;
 
@@ -72,9 +70,9 @@ public class CorsGlobalConfig extends OncePerRequestFilter {
 
   @Override
   protected void doFilterInternal(
-      final @NonNull HttpServletRequest request,
-      final @NonNull HttpServletResponse response,
-      final @NonNull FilterChain filterChain)
+      final HttpServletRequest request,
+      final HttpServletResponse response,
+      final FilterChain filterChain)
       throws ServletException, IOException {
 
     final var corsFilter = this.apiCorsFilter;
@@ -87,8 +85,7 @@ public class CorsGlobalConfig extends OncePerRequestFilter {
     corsFilter.doFilter(request, response, filterChain);
   }
 
-  private static @NonNull CorsConfiguration buildConfiguration(
-      final @NonNull List<String> allowedOrigins) {
+  private static CorsConfiguration buildConfiguration(final List<String> allowedOrigins) {
 
     final var configuration = new CorsConfiguration();
     configuration.addAllowedMethod("*");

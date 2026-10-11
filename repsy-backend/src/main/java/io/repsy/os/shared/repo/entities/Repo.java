@@ -29,6 +29,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.DynamicUpdate;
+import org.jspecify.annotations.Nullable;
 
 /**
  * {@code @DynamicUpdate} keeps an UPDATE to the columns that changed. Without it a full-row save
@@ -51,23 +52,23 @@ public class Repo {
   private String name;
 
   @Column(name = "description", length = 500)
-  private String description;
+  private @Nullable String description;
 
   @Column(name = "private_repo", nullable = false)
   private boolean privateRepo;
 
   @Enumerated(EnumType.STRING)
   @Column(name = "type")
-  private RepoType type;
+  private @Nullable RepoType type;
 
   @Column(name = "allow_override", nullable = false)
   private boolean allowOverride;
 
   @Column(name = "snapshots")
-  private Boolean snapshots;
+  private @Nullable Boolean snapshots;
 
   @Column(name = "releases")
-  private Boolean releases;
+  private @Nullable Boolean releases;
 
   @Column(name = "security_scan_enabled", nullable = false)
   private boolean securityScanEnabled;
