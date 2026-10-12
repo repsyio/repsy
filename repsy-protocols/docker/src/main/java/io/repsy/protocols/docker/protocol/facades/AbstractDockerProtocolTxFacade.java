@@ -168,6 +168,17 @@ public abstract class AbstractDockerProtocolTxFacade<ID>
   }
 
   @Override
+  public @Nullable String getLayerMediaType(final ProtocolContext context, final String digest) {
+
+    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+
+    return this.layerService
+        .findLayerInfoByRepoIdAndDigest(repoInfo.getId(), digest)
+        .map(LayerInfo::getMediaType)
+        .orElse(null);
+  }
+
+  @Override
   public ManifestDetails getManifest(
       final ProtocolContext context,
       final String manifestReference,

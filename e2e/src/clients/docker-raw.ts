@@ -80,10 +80,9 @@
  *    confirmed live, RPS-1216.
  *  - Blob check/pull (`AbstractDockerLayerCheckProtocolMethodHandler`/`...LayerPull...`): `HEAD`
  *    answers `200` with the row's own `Content-Type` (always `DOCKER_LAYER`, see above); `GET`
- *    answers `200` with a HARD-CODED `Content-Type: application/vnd.docker.container.image.v1+json`
- *    for EVERY blob (confirmed live: a layer blob's own GET reports the CONFIG media type) -- an
- *    observation, not filed (no real client reads a blob's `Content-Type` to decide what it is; the
- *    digest in the URL already says that).
+ *    answers `200` with the same stored `Content-Type` (RPS-2172; before it was a hard-coded
+ *    `application/vnd.docker.container.image.v1+json` for every blob). No real client reads a
+ *    blob's `Content-Type`; the digest in the URL already says what it is.
  *  - Auth per operation (`DockerAuthPreProcessor`/`DockerAuthenticator.handleBearerAuth`): a deploy
  *    token's JWT is authorized only for ITS OWN repo and, for a write, only when `!readOnly` --
  *    confirmed live: a read-only token's own token-endpoint issuance still answers `200`, but its

@@ -366,6 +366,38 @@ class OciHandlersTest {
   }
 
   @Test
+  @DisplayName("a blob pull serves the content type the format reports for that blob")
+  void blobPullContentTypeHook() throws Exception {
+    final var handler =
+        new AbstractOciBlobPullProtocolMethodHandler<Object>(
+            HandlerRoute.of(Permission.READ, HttpMethod.GET),
+            OciPathUtils.blob("sha256:[0-9a-f]{64}"),
+            "application/x-default",
+            _ -> Optional.empty(),
+            new Object(),
+            this.provider) {
+          @Override
+          protected String contentType(final ProtocolContext context, final String digest) {
+            return "application/x-" + digest.substring(0, 6);
+          }
+
+          @Override
+          protected Resource getBlob(
+              final ProtocolContext context,
+              final HttpServletRequest request,
+              final String digest) {
+            return new ByteArrayResource("blob".getBytes());
+          }
+        };
+
+    final var response =
+        handler.handle(
+            context("/app/blobs/" + DIGEST), request("GET", ""), new MockHttpServletResponse());
+
+    assertThat(response.getHeaders().getFirst("Content-Type")).isEqualTo("application/x-sha256");
+  }
+
+  @Test
   @DisplayName("a manifest check and pull answer the same headers; the check of a missing one 404s")
   void manifestCheckAndPull() throws Exception {
     final var manifest = new OciManifestInfo("application/x-manifest", "{\"é\":1}", DIGEST);

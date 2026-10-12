@@ -15,8 +15,6 @@
  */
 package io.repsy.protocols.docker.protocol.handlers;
 
-import static io.repsy.protocols.oci.utils.OciMediaTypeUtils.DOCKER_CONFIG_JSON;
-
 import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.docker.protocol.DockerProtocolProvider;
@@ -31,9 +29,15 @@ import java.io.IOException;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpMethod;
 
-/** The OCI blob pull of a Docker layer, served as {@code DOCKER_CONFIG_JSON}. */
+/**
+ * The OCI blob pull of a Docker layer, served with the layer's stored media type: the {@code
+ * Content-Type} the blob check of the same digest reports (RPS-2172).
+ */
 public abstract class AbstractDockerLayerPullProtocolMethodHandler<ID>
     extends AbstractOciBlobPullProtocolMethodHandler<DockerProtocolFacade<ID>> {
+
+  /** What a layer without a stored media type is served as. */
+  private static final String DEFAULT_CONTENT_TYPE = "application/octet-stream";
 
   public AbstractDockerLayerPullProtocolMethodHandler(
       final PathParser basePathParser,
@@ -42,10 +46,17 @@ public abstract class AbstractDockerLayerPullProtocolMethodHandler<ID>
     super(
         HandlerRoute.of(Permission.READ, HttpMethod.GET),
         OciPathUtils.blob(BlobDigests.DIGEST_REGEX),
-        DOCKER_CONFIG_JSON,
+        DEFAULT_CONTENT_TYPE,
         basePathParser,
         dockerFacade,
         provider);
+  }
+
+  @Override
+  protected String contentType(final ProtocolContext context, final String digest) {
+    final var mediaType = this.facade.getLayerMediaType(context, digest);
+
+    return mediaType == null || mediaType.isBlank() ? DEFAULT_CONTENT_TYPE : mediaType;
   }
 
   @Override

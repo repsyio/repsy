@@ -45,7 +45,8 @@ public abstract class AbstractOciBlobPullProtocolMethodHandler<F>
   /**
    * @param route the format's methods and properties; the path is {@code blobPattern}
    * @param blobPattern the format's blob path
-   * @param contentType the {@code Content-Type} every blob is served with
+   * @param contentType the {@code Content-Type} blobs are served with, unless {@link #contentType}
+   *     says otherwise
    */
   protected AbstractOciBlobPullProtocolMethodHandler(
       final HandlerRoute route,
@@ -64,6 +65,14 @@ public abstract class AbstractOciBlobPullProtocolMethodHandler<F>
   protected abstract Resource getBlob(
       ProtocolContext context, HttpServletRequest request, String digest) throws Exception;
 
+  /**
+   * The {@code Content-Type} of this blob; the one the handler was built with unless a format
+   * reports each blob's own media type on the check, in which case the pull answers the same.
+   */
+  protected String contentType(final ProtocolContext context, final String digest) {
+    return this.contentType;
+  }
+
   @Override
   public ResponseEntity<Object> handle(
       final ProtocolContext context,
@@ -81,7 +90,7 @@ public abstract class AbstractOciBlobPullProtocolMethodHandler<F>
     final var resource = this.getBlob(context, request, digest);
 
     return ResponseEntity.ok()
-        .header(CONTENT_TYPE, this.contentType)
+        .header(CONTENT_TYPE, this.contentType(context, digest))
         .header(DOCKER_CONTENT_DIGEST, digest)
         .body(resource);
   }

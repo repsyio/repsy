@@ -76,6 +76,12 @@ public interface DockerProtocolFacade<ID> {
 
   Resource getLayer(ProtocolContext context, String digest, String servletPath) throws IOException;
 
+  /**
+   * The media type stored with the layer, what the blob check answers as its Content-Type; null
+   * when the repo has no row for the digest (a layer a proxy fetched from upstream).
+   */
+  @Nullable String getLayerMediaType(ProtocolContext context, String digest);
+
   ManifestDetails getManifest(
       ProtocolContext context, String manifestReference, String imageName, String requestPath)
       throws IOException;

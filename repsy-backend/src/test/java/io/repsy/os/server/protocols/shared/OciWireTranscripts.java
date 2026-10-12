@@ -24,8 +24,11 @@ package io.repsy.os.server.protocols.shared;
  * <p>RPS-2165: the Docker blob pull used to be recorded as 404 {@code layerNotFound} next to a 200
  * blob check. That was the harness, not the registry: the pull runs outside the test transaction
  * and could not see the uncommitted layer row. The script now commits the uploads first, and the
- * pull is the 200 a real registry answers. The pull's {@code Content-Type} stays the config type
- * for every Docker blob, while the blob check reports the layer's own type.
+ * pull is the 200 a real registry answers.
+ *
+ * <p>RPS-2172 changed the Docker transcript, on purpose, in one place: the blob pull's {@code
+ * Content-Type} was the image config type for every blob while the blob check reported the layer's
+ * own type; the pull now answers the layer's own type too, so the two agree.
  *
  * <p>RPS-2164 changed the Helm transcript, on purpose, in these places (each now equals Docker's):
  * the manifest pull with an Accept header naming no manifest type (200 to 406), the tag listing
@@ -193,7 +196,7 @@ final class OciWireTranscripts {
       > GET /v2/{repo}/app/blobs/{digest-2}
       < 200
       < Docker-Content-Digest: {digest-2}
-      < Content-Type: application/vnd.docker.container.image.v1+json
+      < Content-Type: application/vnd.docker.image.rootfs.diff.tar.gzip
       < Content-Length: 12
       < body: hello world!
       ## blob check of the layer
@@ -234,7 +237,7 @@ final class OciWireTranscripts {
       > GET /v2/{repo}/app/blobs/{digest-5}
       < 200
       < Docker-Content-Digest: {digest-5}
-      < Content-Type: application/vnd.docker.container.image.v1+json
+      < Content-Type: application/vnd.docker.image.rootfs.diff.tar.gzip
       < Content-Length: 12
       < body: docker-layer
       ## manifest check by tag
