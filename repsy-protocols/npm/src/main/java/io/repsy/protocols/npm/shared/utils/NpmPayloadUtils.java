@@ -274,9 +274,7 @@ public final class NpmPayloadUtils {
 
     final var versions = (Map<String, Object>) payload.get(NpmConstants.VERSIONS);
 
-    if (versions.isEmpty()
-        || !(payload.get(NpmConstants.DIST_TAGS) instanceof final Map<?, ?> tags)
-        || tags.isEmpty()) {
+    if (versions.isEmpty() || !hasEntries(payload.get(NpmConstants.DIST_TAGS))) {
       throw new BadRequestException(ProtocolErrorCodes.BAD_REQUEST);
     }
 
@@ -287,18 +285,25 @@ public final class NpmPayloadUtils {
       throw new BadRequestException(ProtocolErrorCodes.INVALID_PACKAGE_VERSION);
     }
 
-    if (!(version.get(NpmConstants.NAME) instanceof String)
-        || !(version.get("dist") instanceof final Map<?, ?> dist)
-        || !(dist.get(NpmConstants.TARBALL) instanceof String)) {
+    if (!hasTarballUrl(version) || !hasAttachmentData(payload.get(NpmConstants.ATTACHMENTS))) {
       throw new BadRequestException(ProtocolErrorCodes.BAD_REQUEST);
     }
+  }
 
-    if (!(payload.get(NpmConstants.ATTACHMENTS) instanceof final Map<?, ?> attachments)
-        || attachments.isEmpty()
-        || !(attachments.values().iterator().next() instanceof final Map<?, ?> attachment)
-        || !(attachment.get("data") instanceof String)) {
-      throw new BadRequestException(ProtocolErrorCodes.BAD_REQUEST);
-    }
+  private static boolean hasEntries(final @Nullable Object value) {
+    return value instanceof final Map<?, ?> map && !map.isEmpty();
+  }
+
+  private static boolean hasTarballUrl(final Map<String, Object> version) {
+    return version.get(NpmConstants.NAME) instanceof String
+        && version.get("dist") instanceof final Map<?, ?> dist
+        && dist.get(NpmConstants.TARBALL) instanceof String;
+  }
+
+  private static boolean hasAttachmentData(final @Nullable Object attachments) {
+    return hasEntries(attachments)
+        && ((Map<?, ?>) attachments).values().iterator().next() instanceof final Map<?, ?> first
+        && first.get("data") instanceof String;
   }
 
   /**
