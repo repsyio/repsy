@@ -280,13 +280,18 @@ public final class NpmPayloadUtils {
 
     final var version = (Map<String, Object>) versions.values().iterator().next();
 
-    if (version.get(NpmConstants.VERSION) != null
-        && !(version.get(NpmConstants.VERSION) instanceof String)) {
-      throw new BadRequestException(ProtocolErrorCodes.INVALID_PACKAGE_VERSION);
-    }
+    checkVersionField(version);
 
     if (!hasTarballUrl(version) || !hasAttachmentData(payload.get(NpmConstants.ATTACHMENTS))) {
       throw new BadRequestException(ProtocolErrorCodes.BAD_REQUEST);
+    }
+  }
+
+  private static void checkVersionField(final Map<String, Object> version) {
+    final var declared = version.get(NpmConstants.VERSION);
+
+    if (declared != null && !(declared instanceof String)) {
+      throw new BadRequestException(ProtocolErrorCodes.INVALID_PACKAGE_VERSION);
     }
   }
 
