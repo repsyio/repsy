@@ -453,6 +453,89 @@ class AuthThrottleIT extends AbstractIT {
     assertThat(this.protocolBasic(repo, this.username, "wrong").getStatus()).isEqualTo(401);
   }
 
+  /**
+   * RPS-1909: a deploy token is sent as the password alone ({@code :secret}) by clients that have
+   * no username to give. A wrong one used to answer 401 forever, since a missing username costs no
+   * hash check and so was never counted.
+   */
+  @Test
+  @DisplayName(
+      "counts a wrong deploy token sent without a username, and refuses the client at the"
+          + " limit")
+  void wrongDeployTokenWithoutUsernameIsCounted() throws Exception {
+    final var repo = this.seedDeployTokenRepo();
+    final var deployToken = this.seedDeployToken(repo);
+
+    for (var i = 0; i < MAX_FAILURES; i++) {
+      assertThat(this.protocolBasic(repo, "", "not-" + deployToken.secret() + i).getStatus())
+          .isEqualTo(401);
+    }
+
+    final var refused = this.protocolBasic(repo, "", "not-" + deployToken.secret());
+    expectThrottledProtocol(refused);
+
+    // A client that sends the valid secret is not refused, while blocked, with or without a
+    // username: a deploy token is looked up before anything is counted.
+    assertThat(this.protocolBasic(repo, "", deployToken.secret()).getStatus()).isEqualTo(404);
+    assertThat(this.protocolBasic(repo, deployToken.username(), deployToken.secret()).getStatus())
+        .isEqualTo(404);
+  }
+
+  @Test
+  @DisplayName("counts a wrong deploy token with its own username like a wrong password")
+  void wrongDeployTokenWithUsernameIsCounted() throws Exception {
+    final var repo = this.seedDeployTokenRepo();
+    final var deployToken = this.seedDeployToken(repo);
+
+    for (var i = 0; i < MAX_FAILURES; i++) {
+      assertThat(
+              this.protocolBasic(repo, deployToken.username(), "not-" + deployToken.secret())
+                  .getStatus())
+          .isEqualTo(401);
+    }
+
+    expectThrottledProtocol(
+        this.protocolBasic(repo, deployToken.username(), "not-" + deployToken.secret()));
+  }
+
+  @Test
+  @DisplayName("does not let failures of another client throttle a deploy token client")
+  void deployTokenClientIsNotThrottledByAnotherClient() throws Exception {
+    final var repo = this.seedDeployTokenRepo();
+    final var deployToken = this.seedDeployToken(repo);
+
+    for (var i = 0; i <= MAX_FAILURES; i++) {
+      this.send(
+          get(PRIVATE_READ, repo.getName())
+              .header(AUTHORIZATION, basicAuth("", "not-a-token-" + i))
+              .with(protocolPort())
+              .with(remoteAddr(OTHER_CLIENT)));
+    }
+
+    expectThrottledProtocol(
+        this.send(
+            get(PRIVATE_READ, repo.getName())
+                .header(AUTHORIZATION, basicAuth("", "not-a-token"))
+                .with(protocolPort())
+                .with(remoteAddr(OTHER_CLIENT))));
+
+    // Guessing again from the default address is a fresh client, for a wrong and a right secret.
+    assertThat(this.protocolBasic(repo, "", "not-a-token").getStatus()).isEqualTo(401);
+    assertThat(this.protocolBasic(repo, "", deployToken.secret()).getStatus()).isEqualTo(404);
+  }
+
+  @Test
+  @DisplayName("does not count a credential with no password at all")
+  void emptyCredentialsAreNotCounted() throws Exception {
+    final var repo = this.seedDeployTokenRepo();
+
+    for (var i = 0; i < MAX_FAILURES * 2; i++) {
+      assertThat(this.protocolBasic(repo, "", "").getStatus()).isEqualTo(401);
+    }
+
+    assertThat(this.protocolBasic(repo, this.username, "wrong").getStatus()).isEqualTo(401);
+  }
+
   @Test
   @DisplayName("answers Docker and Helm clients with the OCI TOOMANYREQUESTS error")
   void ociBody() throws Exception {

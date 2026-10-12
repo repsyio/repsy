@@ -683,8 +683,12 @@ public class ProtocolAuthService {
     final var username = credentials.getUsername();
     final var password = credentials.getPassword();
 
-    if (username == null || password == null) {
+    if (password == null) {
       throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
+    }
+
+    if (username == null) {
+      throw this.missingUsername(password);
     }
 
     // A personal access token is not a password: it is never hashed against one (see
@@ -706,6 +710,20 @@ public class ProtocolAuthService {
     }
 
     return userInfo;
+  }
+
+  /**
+   * The answer to a credential that has a password and no username. That is how a deploy token is
+   * sent by a client with no username to give, and this point is reached only after the deploy
+   * token lookup missed, so it is a guess at one (RPS-1909): it costs no hash check but counts like
+   * a wrong password, and a blocked client is refused with 429. A credential with no password
+   * either carries nothing to guess and is not counted.
+   */
+  private UnAuthorizedException missingUsername(final String password) {
+
+    return password.isEmpty()
+        ? new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED)
+        : this.countedUnAuthorized();
   }
 
   private void rejectPersonalAccessTokenAsPassword(final String password) {
@@ -769,7 +787,8 @@ public class ProtocolAuthService {
 
     final var credentials = extractCredentialsFromAuthHeader(authHeader);
 
-    if (credentials == null) {
+    // The web UI has no deploy tokens, so a missing username is no guess at one and is not counted.
+    if (credentials == null || credentials.getUsername() == null) {
       throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
 
