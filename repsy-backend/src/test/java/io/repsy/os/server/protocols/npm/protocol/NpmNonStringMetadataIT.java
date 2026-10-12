@@ -179,7 +179,7 @@ class NpmNonStringMetadataIT extends AbstractIT {
         this.jdbcTemplate.queryForMap(
             """
             select v.description, v.homepage, v.license, v.author_name, v.author_email,
-                   v.author_url, v.bugs_url, v.bugs_email, v.repository_type, v.repository_url
+                v.author_url, v.bugs_url, v.bugs_email, v.repository_type, v.repository_url
             from npm_package_version v
             join npm_package p on p.id = v.package_id
             where p.repo_id = ?
