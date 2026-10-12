@@ -41,7 +41,8 @@ jobs:
       # step.
       - name: The core pin must be on repsy-core main
         run: |
-          git submodule update --init --filter=blob:none core
+          # .gitmodules uses the SSH URL, which the runner has no key for; core is public.
+          git -c url."https://github.com/".insteadOf=git@github.com: submodule update --init --filter=blob:none core
           pin="$(git rev-parse HEAD:core)"
           git -C core fetch --quiet --filter=blob:none origin main
           if ! git -C core merge-base --is-ancestor "$pin" origin/main
