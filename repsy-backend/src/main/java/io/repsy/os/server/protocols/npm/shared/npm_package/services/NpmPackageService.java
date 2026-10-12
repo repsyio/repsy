@@ -774,8 +774,9 @@ public class NpmPackageService extends AbstractNpmPackageService<UUID> {
   private void populatePackageVersionFromMetadata(
       final PackageVersion version, final Map<String, Object> metadata) {
 
-    version.setDescription(this.asString(metadata.get("description")));
-    version.setHomepage(this.asString(metadata.get("homepage")));
+    // Optional values: a value that is not a string is stored as absent, not cast (RPS-2210).
+    version.setDescription(stringOrNull(metadata.get("description")));
+    version.setHomepage(stringOrNull(metadata.get("homepage")));
 
     this.populateLicense(version, metadata.get("license"));
     this.populateRepository(version, metadata.get("repository"));
@@ -783,53 +784,37 @@ public class NpmPackageService extends AbstractNpmPackageService<UUID> {
     this.populateBugs(version, metadata.get("bugs"));
   }
 
-  private @Nullable String asString(final @Nullable Object obj) {
-
-    return obj != null ? obj.toString() : null;
-  }
-
-  @SuppressWarnings("unchecked")
   private void populateLicense(final PackageVersion version, final @Nullable Object license) {
-
-    if (license == null) {
-      return;
-    }
 
     if (license instanceof final String string) {
       version.setLicense(string);
-    } else if (license instanceof Map) {
-      version.setLicense(((Map<String, String>) license).getOrDefault("type", ""));
+    } else if (license instanceof final Map<?, ?> map) {
+      version.setLicense(stringOrNull(map.containsKey("type") ? map.get("type") : ""));
     }
   }
 
-  @SuppressWarnings("unchecked")
   private void populateRepository(final PackageVersion version, final @Nullable Object repository) {
 
-    if (repository instanceof Map) {
-      final Map<String, String> repoMap = (Map<String, String>) repository;
-      version.setRepositoryType(repoMap.get("type"));
-      version.setRepositoryUrl(repoMap.get(NpmConstants.URL));
+    if (repository instanceof final Map<?, ?> map) {
+      version.setRepositoryType(stringOrNull(map.get("type")));
+      version.setRepositoryUrl(stringOrNull(map.get(NpmConstants.URL)));
     }
   }
 
-  @SuppressWarnings("unchecked")
   private void populateAuthor(final PackageVersion version, final @Nullable Object author) {
 
-    if (author instanceof Map) {
-      final Map<String, String> authorMap = (Map<String, String>) author;
-      version.setAuthorName(authorMap.get(NpmConstants.NAME));
-      version.setAuthorEmail(authorMap.get(NpmConstants.EMAIL));
-      version.setAuthorUrl(authorMap.get(NpmConstants.URL));
+    if (author instanceof final Map<?, ?> map) {
+      version.setAuthorName(stringOrNull(map.get(NpmConstants.NAME)));
+      version.setAuthorEmail(stringOrNull(map.get(NpmConstants.EMAIL)));
+      version.setAuthorUrl(stringOrNull(map.get(NpmConstants.URL)));
     }
   }
 
-  @SuppressWarnings("unchecked")
   private void populateBugs(final PackageVersion version, final @Nullable Object bugs) {
 
-    if (bugs instanceof Map) {
-      final Map<String, String> bugsMap = (Map<String, String>) bugs;
-      version.setBugsUrl(bugsMap.get(NpmConstants.URL));
-      version.setBugsEmail(bugsMap.get(NpmConstants.EMAIL));
+    if (bugs instanceof final Map<?, ?> map) {
+      version.setBugsUrl(stringOrNull(map.get(NpmConstants.URL)));
+      version.setBugsEmail(stringOrNull(map.get(NpmConstants.EMAIL)));
     }
   }
 }

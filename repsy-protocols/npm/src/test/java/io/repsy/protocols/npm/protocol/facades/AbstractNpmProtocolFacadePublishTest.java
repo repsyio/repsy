@@ -108,6 +108,7 @@ class AbstractNpmProtocolFacadePublishTest {
     final var version = new LinkedHashMap<String, Object>();
     version.put("name", PACKAGE);
     version.put("version", VERSION);
+    version.put("dist", new LinkedHashMap<>(Map.of("tarball", "http://h/demo/-/demo.tgz")));
 
     final var versions = new LinkedHashMap<String, Object>();
     versions.put(VERSION, version);
@@ -120,6 +121,7 @@ class AbstractNpmProtocolFacadePublishTest {
     payload.put("name", PACKAGE);
     payload.put("dist-tags", distTags);
     payload.put("versions", versions);
+    payload.put("_attachments", new LinkedHashMap<>(Map.of("demo.tgz", Map.of("data", "dGFy"))));
 
     return payload;
   }

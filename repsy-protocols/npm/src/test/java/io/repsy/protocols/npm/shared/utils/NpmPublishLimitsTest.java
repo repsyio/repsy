@@ -310,5 +310,72 @@ class NpmPublishLimitsTest {
       assertThat(version.get("license")).isEqualTo("MIT");
       assertThat((List<String>) version.get("keywords")).containsExactly("a", "b");
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    @DisplayName(
+        "nulls every descriptive value that is not a string, keeping the publish (RPS-2210)")
+    void nullsNonStringDescriptiveValues() {
+      final var version = this.version();
+      version.put("description", 42);
+      version.put("homepage", List.of("x"));
+      version.put("license", new HashMap<>(Map.of("type", 1)));
+      version.put("author", new HashMap<>(Map.of("name", 1, "email", Map.of(), "url", "u")));
+      version.put("bugs", 7);
+      version.put("repository", new HashMap<>(Map.of("type", true, "url", "git://x")));
+
+      NpmPublishLimits.dropOverLongFields(version);
+
+      assertThat(version.get("description")).isNull();
+      assertThat(version.get("homepage")).isNull();
+      assertThat(((Map<String, Object>) version.get("license")).get("type")).isNull();
+      final var author = (Map<String, Object>) version.get("author");
+      assertThat(author.get("name")).isNull();
+      assertThat(author.get("email")).isNull();
+      assertThat(author.get("url")).isEqualTo("u");
+      assertThat(version.get("bugs")).isNull();
+      final var repository = (Map<String, Object>) version.get("repository");
+      assertThat(repository.get("type")).isNull();
+      assertThat(repository.get("url")).isEqualTo("git://x");
+    }
+
+    @Test
+    @DisplayName("keeps the string form of a license, an author and a repository (RPS-2210)")
+    void keepsStringForms() {
+      final var version = this.version();
+      version.put("license", "MIT");
+      version.put("author", "Jane <jane@example.org>");
+      version.put("repository", "github:a/b");
+
+      NpmPublishLimits.dropOverLongFields(version);
+
+      assertThat(version.get("license")).isEqualTo("MIT");
+      assertThat(version.get("author")).isEqualTo("Jane <jane@example.org>");
+      assertThat(version.get("repository")).isEqualTo("github:a/b");
+    }
+
+    @Test
+    @DisplayName("drops non-string keywords and non-object maintainers, nulls non-lists (RPS-2210)")
+    void dropsNonStringEntries() {
+      final var version = this.version();
+      final var keywords = new ArrayList<Object>(java.util.Arrays.asList("ok", 1, null, Map.of()));
+      final var maintainers =
+          new ArrayList<Object>(java.util.Arrays.asList(5, "x", null, Map.of("name", "jane")));
+      version.put("keywords", keywords);
+      version.put("maintainers", maintainers);
+
+      NpmPublishLimits.dropOverLongFields(version);
+
+      assertThat(keywords).containsExactly("ok");
+      assertThat(maintainers).containsExactly(Map.of("name", "jane"));
+
+      version.put("keywords", 42);
+      version.put("maintainers", Map.of("name", "jane"));
+
+      NpmPublishLimits.dropOverLongFields(version);
+
+      assertThat(version.get("keywords")).isNull();
+      assertThat(version.get("maintainers")).isNull();
+    }
   }
 }

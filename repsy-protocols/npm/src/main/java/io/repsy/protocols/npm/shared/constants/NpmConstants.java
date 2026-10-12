@@ -38,6 +38,7 @@ public final class NpmConstants {
   public static final String EMAIL = "email";
   public static final String LATEST = "latest";
   public static final String NAME = "name";
+  public static final String VERSION = "version";
   public static final String URL = "url";
   public static final String METADATA_FILENAME = "package.json";
   public static final String SCOPE_NAME = "scopeName";

@@ -73,6 +73,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
       throws IOException {
 
     NpmPayloadUtils.checkPackageNameMatchesUrl(payload, scopeName, packageName);
+    NpmPayloadUtils.checkPayloadShape(payload);
 
     if (NpmPayloadUtils.isMetadataHasDeprecatedVersions(payload)) {
       this.deprecate(context, scopeName, packageName, payload);
@@ -452,6 +453,9 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
 
     try {
       final var packageBasePath = this.npmStorageService.getPackageBasePath(scopeName, packageName);
+
+      NpmPayloadUtils.checkPublishPayload(payload);
+
       final var versionName = NpmPayloadUtils.extractVersionNameFromPayload(payload);
 
       // Guard every length-limited value before anything is written (RPS-1136): a publish this

@@ -42,8 +42,9 @@ import org.jspecify.annotations.Nullable;
  *       store something under the wrong identity.
  *   <li><b>Drop</b> the value (set it to {@code null}) and keep the rest of the publish: author,
  *       bugs, homepage and repository URLs and emails, license, repository type, and a maintainer's
- *       email or url (also when it is not a string at all, RPS-2199). These are descriptive only; a
- *       value cut to fit would point somewhere wrong, which is worse than a blank field.
+ *       email or url (also when any of them is not a string at all, RPS-2199, RPS-2210). These are
+ *       descriptive only; a value cut to fit would point somewhere wrong, which is worse than a
+ *       blank field.
  *   <li><b>Drop the entry</b> and keep the rest of the array: an over-long keyword, or an over-long
  *       maintainer name, or a maintainer without a name (RPS-2186) &mdash; {@code
  *       npm_package_maintainer.name} is {@code NOT NULL}, so unlike its email and url it cannot be
@@ -168,12 +169,15 @@ public final class NpmPublishLimits {
   }
 
   /**
-   * Drops every over-long descriptive value from a single published version, in place, so what
-   * reaches {@code NpmPackageService} and the stored {@code package.json} already fits its column.
-   * Keywords and maintainers whose own field cannot be nulled lose only that one entry.
+   * Drops every over-long or non-string descriptive value from a single published version, in
+   * place, so what reaches {@code NpmPackageService} and the stored {@code package.json} already
+   * fits its column and holds a string where a string belongs (RPS-2210). Keywords and maintainers
+   * whose own field cannot be nulled lose only that one entry.
    */
   public static void dropOverLongFields(final Map<String, Object> version) {
 
+    nullIfNotString(version, "description");
+    nullIfNotString(version, "homepage");
     dropStringField(version, "homepage", MAX_HOMEPAGE_LENGTH);
     dropLicense(version);
     dropAuthor(version);
@@ -186,62 +190,104 @@ public final class NpmPublishLimits {
   private static void dropLicense(final Map<String, Object> version) {
     final var license = version.get("license");
 
-    if (license instanceof final String value && value.length() > MAX_LICENSE_LENGTH) {
-      version.put("license", null);
+    if (license instanceof String) {
+      dropStringField(version, "license", MAX_LICENSE_LENGTH);
     } else if (license instanceof final Map<?, ?> map) {
-      dropStringField((Map<String, Object>) map, "type", MAX_LICENSE_LENGTH);
+      final var typed = (Map<String, Object>) map;
+      nullIfNotString(typed, "type");
+      dropStringField(typed, "type", MAX_LICENSE_LENGTH);
+    } else if (license != null) {
+      version.put("license", null);
     }
+  }
+
+  /**
+   * The string form of an author, bug tracker or repository is kept as it is. The object form loses
+   * each member that is not a string (or is over-long), and any other value is nulled.
+   */
+  private static @Nullable Map<String, Object> objectOrNull(
+      final Map<String, Object> version, final String field) {
+
+    final var value = version.get(field);
+
+    if (value instanceof final Map<?, ?> map) {
+      return (Map<String, Object>) map;
+    }
+
+    if (value != null && !(value instanceof String)) {
+      version.put(field, null);
+    }
+
+    return null;
+  }
+
+  private static void dropMember(
+      final Map<String, Object> map, final String field, final int maxLength) {
+
+    nullIfNotString(map, field);
+    dropStringField(map, field, maxLength);
   }
 
   private static void dropAuthor(final Map<String, Object> version) {
-    if (!(version.get(NpmConstants.AUTHOR) instanceof final Map<?, ?> author)) {
+    final var map = objectOrNull(version, NpmConstants.AUTHOR);
+
+    if (map == null) {
       return;
     }
 
-    final var map = (Map<String, Object>) author;
-    dropStringField(map, NpmConstants.NAME, MAX_AUTHOR_NAME_LENGTH);
-    dropStringField(map, NpmConstants.EMAIL, MAX_AUTHOR_EMAIL_LENGTH);
-    dropStringField(map, NpmConstants.URL, MAX_AUTHOR_URL_LENGTH);
+    dropMember(map, NpmConstants.NAME, MAX_AUTHOR_NAME_LENGTH);
+    dropMember(map, NpmConstants.EMAIL, MAX_AUTHOR_EMAIL_LENGTH);
+    dropMember(map, NpmConstants.URL, MAX_AUTHOR_URL_LENGTH);
   }
 
   private static void dropBugs(final Map<String, Object> version) {
-    if (!(version.get(NpmConstants.BUGS) instanceof final Map<?, ?> bugs)) {
+    final var map = objectOrNull(version, NpmConstants.BUGS);
+
+    if (map == null) {
       return;
     }
 
-    final var map = (Map<String, Object>) bugs;
-    dropStringField(map, NpmConstants.URL, MAX_BUGS_URL_LENGTH);
-    dropStringField(map, NpmConstants.EMAIL, MAX_BUGS_EMAIL_LENGTH);
+    dropMember(map, NpmConstants.URL, MAX_BUGS_URL_LENGTH);
+    dropMember(map, NpmConstants.EMAIL, MAX_BUGS_EMAIL_LENGTH);
   }
 
   private static void dropRepository(final Map<String, Object> version) {
-    if (!(version.get(NpmConstants.REPOSITORY) instanceof final Map<?, ?> repository)) {
+    final var map = objectOrNull(version, NpmConstants.REPOSITORY);
+
+    if (map == null) {
       return;
     }
 
-    final var map = (Map<String, Object>) repository;
-    dropStringField(map, "type", MAX_REPOSITORY_TYPE_LENGTH);
-    dropStringField(map, NpmConstants.URL, MAX_REPOSITORY_URL_LENGTH);
+    dropMember(map, "type", MAX_REPOSITORY_TYPE_LENGTH);
+    dropMember(map, NpmConstants.URL, MAX_REPOSITORY_URL_LENGTH);
   }
 
   private static void dropOverLongKeywords(final Map<String, Object> version) {
-    if (!(version.get("keywords") instanceof final Collection<?> keywords)) {
-      return;
-    }
+    final var keywords = version.get("keywords");
 
-    keywords.removeIf(
-        keyword -> keyword instanceof final String s && s.length() > MAX_KEYWORD_LENGTH);
+    if (keywords instanceof final Collection<?> items) {
+      items.removeIf(
+          keyword -> !(keyword instanceof final String s) || s.length() > MAX_KEYWORD_LENGTH);
+    } else if (keywords != null) {
+      version.put("keywords", null);
+    }
   }
 
   private static void dropInvalidMaintainers(final Map<String, Object> version) {
-    if (!(version.get(NpmConstants.MAINTAINERS) instanceof final Collection<?> maintainers)) {
+    final var value = version.get(NpmConstants.MAINTAINERS);
+
+    if (!(value instanceof final Collection<?> maintainers)) {
+      if (value != null) {
+        version.put(NpmConstants.MAINTAINERS, null);
+      }
       return;
     }
 
     maintainers.removeIf(
         raw -> {
+          // Anything but an object is no maintainer (RPS-2210).
           if (!(raw instanceof final Map<?, ?> maintainer)) {
-            return false;
+            return true;
           }
 
           // The name column is NOT NULL, so an entry without a usable name (missing, null or not
@@ -252,10 +298,8 @@ public final class NpmPublishLimits {
           }
 
           final var map = (Map<String, Object>) maintainer;
-          dropStringField(map, NpmConstants.EMAIL, MAX_MAINTAINER_EMAIL_LENGTH);
-          dropStringField(map, NpmConstants.URL, MAX_MAINTAINER_URL_LENGTH);
-          nullIfNotString(map, NpmConstants.EMAIL);
-          nullIfNotString(map, NpmConstants.URL);
+          dropMember(map, NpmConstants.EMAIL, MAX_MAINTAINER_EMAIL_LENGTH);
+          dropMember(map, NpmConstants.URL, MAX_MAINTAINER_URL_LENGTH);
 
           return false;
         });
