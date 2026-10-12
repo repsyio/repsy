@@ -28,7 +28,6 @@ import io.repsy.protocols.shared.handlers.HandlerPropertyKeys;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Map;
-import java.util.Objects;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
@@ -36,7 +35,8 @@ import org.springframework.stereotype.Component;
 /**
  * Docker: only the Bearer token of the registry token flow ({@code /v2/token}). Basic credentials
  * are refused, every refusal names the token endpoint in its challenge, a push or delete needs
- * credentials on a public repository too, and a delete also needs a token issued for it.
+ * credentials on a public repository too, and every operation also needs a token issued for it (its
+ * {@code access} claim names the image and the action, RPS-2216).
  */
 @Component
 public class DockerAuthPreProcessor extends BasicOrBearerAuthPreProcessor<DockerAuthenticator> {
@@ -93,9 +93,11 @@ public class DockerAuthPreProcessor extends BasicOrBearerAuthPreProcessor<Docker
   }
 
   /**
-   * A token that passed the role check must also have been issued for what the request does
-   * (RPS-1434). The answer is a 401 like any other refusal, and its challenge names the scope to
-   * ask for, so a client that requested less can request the right one.
+   * A token that passed the role check must also have been issued for what the request does: {@code
+   * pull} for a read, {@code push} for a write and {@code delete} for a delete, in the image the
+   * request addresses (RPS-1434, RPS-2216). The answer is a 401 like any other refusal, and its
+   * challenge names the scope to ask for, so a client that requested less can request the right
+   * one.
    */
   @Override
   protected void afterAuthentication(
@@ -105,19 +107,24 @@ public class DockerAuthPreProcessor extends BasicOrBearerAuthPreProcessor<Docker
       final Permission permission,
       final @Nullable String credential) {
 
-    if (permission != Permission.MANAGE || credential == null) {
+    if (credential == null) {
       return;
     }
 
-    final var name =
-        Objects.requireNonNullElse(
-            DockerAuthChallenge.requestedName(context, repoInfo), repoInfo.getName());
+    // The registry ping addresses no image: any token that passed the role check may ask it.
+    final var name = DockerAuthChallenge.requestedName(context, repoInfo);
+
+    if (name == null) {
+      return;
+    }
 
     try {
       this.authenticator.authorizeGrantedAccess(credential, name, permission);
     } catch (final UnAuthorizedException ex) {
       throw AuthChallenges.challenged(
-          ex, DockerAuthChallenge.insufficientScope(request, "repository:" + name + ":delete"));
+          ex,
+          DockerAuthChallenge.insufficientScope(
+              request, "repository:" + name + ":" + DockerAuthChallenge.actionsOf(permission)));
     }
   }
 }

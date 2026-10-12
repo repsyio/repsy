@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
@@ -37,6 +38,7 @@ import io.repsy.os.shared.auth.dtos.ProtocolUserClaims;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.constants.ErrorConstants;
+import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.os.shared.user.mappers.UserMapper;
@@ -80,7 +82,8 @@ class DockerAuthenticatorTest {
           Mockito.mock(JwtUtils.class),
           Mockito.mock(DeployTokenService.class),
           new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
-          new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()));
+          new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()),
+          Mockito.mock(RepoTxService.class));
 
   private static String basicAuth(final String username, final String password) {
     final var raw = (username + ":" + password).getBytes(StandardCharsets.UTF_8);
@@ -131,7 +134,8 @@ class DockerAuthenticatorTest {
             jwtUtils,
             Mockito.mock(DeployTokenService.class),
             new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
-            new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()));
+            new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()),
+            Mockito.mock(RepoTxService.class));
 
     assertUnauthorized(() -> component.authenticateUser("Bearer signed.jwt.token"));
   }
@@ -161,7 +165,8 @@ class DockerAuthenticatorTest {
             this.jwtUtils,
             Mockito.mock(DeployTokenService.class),
             new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
-            new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()));
+            new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()),
+            Mockito.mock(RepoTxService.class));
 
     PanelBearerBinding() {
       when(this.users.getAuthenticatedUserByUsername(USERNAME)).thenReturn(this.user);
@@ -270,7 +275,8 @@ class DockerAuthenticatorTest {
             this.jwtUtils,
             Mockito.mock(DeployTokenService.class),
             new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
-            new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()));
+            new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()),
+            Mockito.mock(RepoTxService.class));
 
     private void issuedFor(final List<String> grants) {
       when(this.jwtUtils.extractAccess(BEARER, TokenRealm.PROTOCOL)).thenReturn(grants);
@@ -314,15 +320,32 @@ class DockerAuthenticatorTest {
     }
 
     @Test
-    @DisplayName("leaves reads and writes to the role check, whatever the token was issued for")
-    void readAndWriteAreNotScopeChecked() {
+    @DisplayName("allows a read with pull and a write with push, in exactly that image (RPS-2216)")
+    void readNeedsPullAndWriteNeedsPush() {
       this.issuedFor(List.of("images/app:pull"));
-
       assertThatCode(() -> this.component.authorizeGrantedAccess(BEARER, NAME, Permission.READ))
           .doesNotThrowAnyException();
+      assertUnauthorized(
+          () -> this.component.authorizeGrantedAccess(BEARER, NAME, Permission.WRITE));
+
+      this.issuedFor(List.of("images/app:push,pull"));
       assertThatCode(() -> this.component.authorizeGrantedAccess(BEARER, NAME, Permission.WRITE))
           .doesNotThrowAnyException();
-      verify(this.jwtUtils, never()).extractAccess(anyString(), any(TokenRealm.class));
+
+      this.issuedFor(List.of("images/other:pull,push"));
+      assertUnauthorized(
+          () -> this.component.authorizeGrantedAccess(BEARER, NAME, Permission.READ));
+      assertUnauthorized(
+          () -> this.component.authorizeGrantedAccess(BEARER, NAME, Permission.WRITE));
+    }
+
+    @Test
+    @DisplayName("a token with an empty access list grants nothing")
+    void emptyAccessGrantsNothing() {
+      this.issuedFor(List.of());
+
+      assertUnauthorized(
+          () -> this.component.authorizeGrantedAccess(BEARER, NAME, Permission.READ));
     }
 
     @Test
@@ -375,7 +398,8 @@ class DockerAuthenticatorTest {
             this.jwtUtils,
             Mockito.mock(DeployTokenService.class),
             new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
-            new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()));
+            new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()),
+            Mockito.mock(RepoTxService.class));
 
     private final UUID ghostId = UUID.randomUUID();
 
@@ -435,7 +459,8 @@ class DockerAuthenticatorTest {
             this.jwtUtils,
             Mockito.mock(DeployTokenService.class),
             new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
-            new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()));
+            new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()),
+            Mockito.mock(RepoTxService.class));
 
     AnonymousToken() {
       when(this.jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
@@ -454,22 +479,27 @@ class DockerAuthenticatorTest {
     }
 
     @Test
-    @DisplayName("createAnonymousUser mints a token typed as anonymous")
+    @DisplayName("createAnonymousUser mints a token typed as anonymous that may only pull")
     void createAnonymousUserIsTyped() {
       when(this.jwtUtils.createProtocolToken(
               any(UUID.class),
               anyString(),
               any(TemporalAmount.class),
-              any(AuthenticationType.class)))
+              any(AuthenticationType.class),
+              anyList()))
           .thenReturn("typed.jwt.token");
 
-      assertThat(this.component.createAnonymousUser()).isEqualTo("typed.jwt.token");
+      assertThat(
+              this.component.createAnonymousUser(
+                  List.of("images/app:pull,push,delete", "images/lib:push")))
+          .isEqualTo("typed.jwt.token");
       verify(this.jwtUtils)
           .createProtocolToken(
               any(UUID.class),
               Mockito.eq("anonymous"),
               any(TemporalAmount.class),
-              Mockito.eq(AuthenticationType.ANONYMOUS));
+              Mockito.eq(AuthenticationType.ANONYMOUS),
+              Mockito.eq(List.of("images/app:pull")));
     }
 
     @Test
@@ -504,7 +534,8 @@ class DockerAuthenticatorTest {
             this.jwtUtils,
             this.deployTokenService,
             new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
-            new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()));
+            new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()),
+            Mockito.mock(RepoTxService.class));
 
     @Test
     @DisplayName("handleBearerAuth never looks the value up as a deploy token")
@@ -543,7 +574,8 @@ class DockerAuthenticatorTest {
             this.jwtUtils,
             Mockito.mock(DeployTokenService.class),
             new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
-            new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()));
+            new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()),
+            Mockito.mock(RepoTxService.class));
 
     ScannerToken() {
       when(this.jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
@@ -598,7 +630,8 @@ class DockerAuthenticatorTest {
             this.jwtUtils,
             this.deployTokenService,
             new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
-            new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()));
+            new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()),
+            Mockito.mock(RepoTxService.class));
 
     private final UUID repoId = UUID.randomUUID();
     private final UUID tokenId = UUID.randomUUID();

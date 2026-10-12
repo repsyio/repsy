@@ -167,7 +167,8 @@ public abstract class AbstractDockerTokenProtocolMethodHandler<ID>
       throw challenge(ProtocolErrorCodes.UNAUTHORIZED_REQUEST);
     }
 
-    return this.handlePublicReadRequest(String.join(" ", scopes));
+    return this.handlePublicReadRequest(
+        String.join(" ", scopes), DockerScopes.parseGrants(scopeParameters));
   }
 
   /**
@@ -188,13 +189,14 @@ public abstract class AbstractDockerTokenProtocolMethodHandler<ID>
         .toList();
   }
 
-  private ResponseEntity<Object> handlePublicReadRequest(final String scope) {
+  private ResponseEntity<Object> handlePublicReadRequest(
+      final String scope, final List<String> grants) {
     final var repoInfoOpt = this.scopeParser.findRepoInfoByScope(scope);
 
     if (repoInfoOpt.isEmpty()) {
 
       if (this.isWildcardScope(scope)) {
-        final var sessionToken = this.authService.createAnonymousUser();
+        final var sessionToken = this.authService.createAnonymousUser(grants);
         return ResponseEntity.ok(this.createLoginResponse(sessionToken));
       }
 
@@ -205,7 +207,7 @@ public abstract class AbstractDockerTokenProtocolMethodHandler<ID>
 
     this.authService.authorizePublicRead(repoInfo);
 
-    final var sessionToken = this.authService.createAnonymousUser();
+    final var sessionToken = this.authService.createAnonymousUser(grants);
 
     return ResponseEntity.ok(this.createLoginResponse(sessionToken));
   }

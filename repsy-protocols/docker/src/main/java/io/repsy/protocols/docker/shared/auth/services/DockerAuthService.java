@@ -27,7 +27,13 @@ public interface DockerAuthService<ID> {
    */
   void authorizePublicRead(BaseRepoInfo<ID> repoInfo);
 
-  String createAnonymousUser();
+  /**
+   * Creates the token of a caller without credentials.
+   *
+   * @param grants What the client asked for. The token is granted {@code pull} of them and nothing
+   *     more (RPS-2216)
+   */
+  String createAnonymousUser(List<String> grants);
 
   /**
    * Exchanges Basic credentials for a token.
@@ -35,8 +41,10 @@ public interface DockerAuthService<ID> {
    * @param authHeader The Basic {@code Authorization} header
    * @param grants What the client asked for, as {@link
    *     io.repsy.protocols.docker.protocol.parser.DockerScopes#parseGrants} reads it. The token
-   *     records them, so a request it authorizes can be checked against them (RPS-1434). The
-   *     exchange itself is not refused for a scope: authorization stays per request.
+   *     records the part of them the credential may exercise, the intersection of what was asked
+   *     for and what it is permitted (RPS-2216). The exchange itself is not refused for a scope: a
+   *     token that leaves nothing has an empty access list, and the registry refuses the operation
+   *     (the Docker token specification), so {@code docker login} keeps working.
    */
   String authenticateUserDockerCli(String authHeader, List<String> grants);
 }

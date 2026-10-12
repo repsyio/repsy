@@ -20,6 +20,7 @@ import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.function.Function;
 import lombok.experimental.UtilityClass;
 import org.apache.commons.lang3.StringUtils;
 
@@ -40,6 +41,12 @@ final class PatDockerGrants {
 
   private static final String ALL_ACTIONS = "*";
 
+  /** What a credential may do in one image: the permissions of its repo. */
+  record Rights(boolean read, boolean write, boolean manage) {
+
+    static final Rights NONE = new Rights(false, false, false);
+  }
+
   /**
    * @param grants what the client asked for
    * @param scopes the scopes of the token
@@ -48,6 +55,26 @@ final class PatDockerGrants {
    */
   static List<String> narrow(
       final List<String> grants, final Collection<TokenScope> scopes, final boolean admin) {
+
+    final var rights =
+        new Rights(
+            TokenScope.permits(scopes, Permission.READ),
+            TokenScope.permits(scopes, Permission.WRITE),
+            admin && TokenScope.permits(scopes, Permission.MANAGE));
+
+    return narrow(grants, _ -> rights);
+  }
+
+  /**
+   * Narrows what a client asked for to what a credential may do in each named image, which is what
+   * the Docker token specification asks of a token endpoint: the intersection of the requested and
+   * the permitted actions, an empty list when nothing is permitted (RPS-2216).
+   *
+   * @param grants what the client asked for, as {@code <name>:<action>[,<action>...]}
+   * @param rightsOf what the credential may do in the image {@code <repo>/<image>}
+   * @return the grants the token may be issued with, in the order they were asked for
+   */
+  static List<String> narrow(final List<String> grants, final Function<String, Rights> rightsOf) {
 
     final var narrowed = new ArrayList<String>();
 
@@ -58,23 +85,23 @@ final class PatDockerGrants {
         continue;
       }
 
-      final var actions = allowedActions(grant.substring(actionsStart + 1), scopes, admin);
+      final var name = grant.substring(0, actionsStart);
+      final var actions = allowedActions(grant.substring(actionsStart + 1), rightsOf.apply(name));
 
       if (!actions.isEmpty()) {
-        narrowed.add(grant.substring(0, actionsStart) + ":" + String.join(",", actions));
+        narrowed.add(name + ":" + String.join(",", actions));
       }
     }
 
     return narrowed;
   }
 
-  private static List<String> allowedActions(
-      final String actions, final Collection<TokenScope> scopes, final boolean admin) {
+  private static List<String> allowedActions(final String actions, final Rights rights) {
 
     final var allowed = new ArrayList<String>();
 
     for (final var action : List.of("pull", "push", "delete")) {
-      if (asked(actions, action) && granted(action, scopes, admin)) {
+      if (asked(actions, action) && granted(action, rights)) {
         allowed.add(action);
       }
     }
@@ -93,13 +120,12 @@ final class PatDockerGrants {
     return false;
   }
 
-  private static boolean granted(
-      final String action, final Collection<TokenScope> scopes, final boolean admin) {
+  private static boolean granted(final String action, final Rights rights) {
 
     return switch (action) {
-      case "pull" -> TokenScope.permits(scopes, Permission.READ);
-      case "push" -> TokenScope.permits(scopes, Permission.WRITE);
-      default -> admin && TokenScope.permits(scopes, Permission.MANAGE);
+      case "pull" -> rights.read();
+      case "push" -> rights.write();
+      default -> rights.manage();
     };
   }
 }

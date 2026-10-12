@@ -187,17 +187,24 @@ class DockerPatTokenExchangeIT extends AbstractPatIT {
   }
 
   @Test
-  @DisplayName("is refused when nothing of what was asked is left, and that is not counted")
-  void anEmptyIntersectionIsRefused() throws Exception {
+  @DisplayName(
+      "is answered with an empty access list when nothing of what was asked is left (RPS-2216)")
+  void anEmptyIntersectionIsAnEmptyGrant() throws Exception {
     final var reader = this.seedPat(this.admin, TokenScope.REPO_READ);
     final var profileOnly = this.seedPat(this.admin);
 
-    for (int i = 0; i < this.throttleProperties.maxFailures() + 3; i++) {
-      assertThat(this.exchange("typed", reader.secret(), "push").getStatus()).isEqualTo(401);
-      assertThat(this.exchange("typed", profileOnly.secret(), "pull").getStatus()).isEqualTo(401);
+    for (final var response :
+        new MockHttpServletResponse[] {
+          this.exchange("typed", reader.secret(), "push"),
+          this.exchange("typed", profileOnly.secret(), "pull")
+        }) {
+      assertThat(response.getStatus()).isEqualTo(200);
+      assertThat(JWT.decode(this.jwt(response)).getClaim("access").asList(String.class)).isEmpty();
     }
 
-    assertThat(this.exchange("typed", reader.secret(), "pull").getStatus()).isEqualTo(200);
+    // The registry then refuses what the token was not granted, as for any insufficient scope.
+    final var jwt = this.jwt(this.exchange("typed", profileOnly.secret(), "pull"));
+    assertThat(this.pull(jwt)).isEqualTo(401);
   }
 
   @Test
@@ -297,7 +304,8 @@ class DockerPatTokenExchangeIT extends AbstractPatIT {
   void aReadTokenCannotPush() throws Exception {
     final var pat = this.seedPat(this.admin, TokenScope.REPO_READ);
 
-    assertThat(this.exchange("typed", pat.secret(), "push").getStatus()).isEqualTo(401);
+    final var pushOnly = this.jwt(this.exchange("typed", pat.secret(), "push"));
+    assertThat(this.startPush(pushOnly)).isEqualTo(401);
 
     final var jwt = this.jwt(this.exchange("typed", pat.secret(), "pull,push"));
 

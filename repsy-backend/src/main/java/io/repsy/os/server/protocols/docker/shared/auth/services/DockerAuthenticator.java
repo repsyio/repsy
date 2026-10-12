@@ -19,15 +19,18 @@ import static io.repsy.os.shared.auth.utils.AuthUtils.TIMEOUT_ACCESS_TOKEN;
 import static io.repsy.os.shared.auth.utils.AuthUtils.extractCredentialsFromBasicToken;
 import static io.repsy.os.shared.auth.utils.AuthUtils.isBasicToken;
 import static io.repsy.os.shared.auth.utils.AuthUtils.isBearerToken;
+import static io.repsy.os.shared.auth.utils.AuthUtils.personalAccessTokenSecretOf;
 import static io.repsy.os.shared.auth.utils.AuthUtils.removeBasicPrefix;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.server.shared.auth.ProtocolAuthService;
+import io.repsy.os.server.shared.token.dtos.DeployTokenInfo;
 import io.repsy.os.server.shared.token.services.DeployTokenService;
 import io.repsy.os.shared.auth.dtos.AuthenticationType;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.TokenRealm;
+import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.token.dtos.TokenType;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.UserRole;
@@ -40,6 +43,7 @@ import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.repo.dtos.Credentials;
 import io.repsy.protocols.shared.repo.dtos.Permission;
+import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -53,23 +57,37 @@ public class DockerAuthenticator extends ProtocolAuthService implements DockerAu
 
   private static final String ANONYMOUS_USER = "anonymous";
 
+  private final RepoTxService repoTxService;
+
   public DockerAuthenticator(
       final UserTxService userTxService,
       final JwtUtils jwtUtils,
       final DeployTokenService deployTokenService,
       final VerifiedPasswordCache verifiedPasswordCache,
-      final AuthFailureThrottle authFailureThrottle) {
+      final AuthFailureThrottle authFailureThrottle,
+      final RepoTxService repoTxService) {
 
     super(userTxService, jwtUtils, deployTokenService, verifiedPasswordCache, authFailureThrottle);
+    this.repoTxService = repoTxService;
   }
 
+  /**
+   * The token of a caller without credentials. It is granted {@code pull} of what was asked for and
+   * nothing more (RPS-2216): a push or a delete is never anonymous, whatever the client asked for.
+   */
   @Override
-  public String createAnonymousUser() {
+  public String createAnonymousUser(final List<String> grants) {
+
+    final var pullOnly = new PatDockerGrants.Rights(true, false, false);
 
     // The username is only a label. The token type keeps it from being looked up as a real user,
     // so a user who happens to be named "anonymous" is not reachable through it (RPS-986).
     return this.jwtUtils.createProtocolToken(
-        UUID.randomUUID(), ANONYMOUS_USER, TIMEOUT_ACCESS_TOKEN, AuthenticationType.ANONYMOUS);
+        UUID.randomUUID(),
+        ANONYMOUS_USER,
+        TIMEOUT_ACCESS_TOKEN,
+        AuthenticationType.ANONYMOUS,
+        PatDockerGrants.narrow(grants, _ -> pullOnly));
   }
 
   @Override
@@ -92,7 +110,7 @@ public class DockerAuthenticator extends ProtocolAuthService implements DockerAu
     final var credentials = this.getBasicAuthCredentials(removeBasicPrefix(authHeader));
 
     return this.authenticateWithPersonalAccessToken(credentials, grants)
-        .or(() -> this.authenticateWithDeployToken(credentials))
+        .or(() -> this.authenticateWithDeployToken(credentials, grants))
         .or(() -> this.authenticateWithUsernamePassword(credentials, grants))
         .orElseThrow(() -> new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED));
   }
@@ -125,10 +143,11 @@ public class DockerAuthenticator extends ProtocolAuthService implements DockerAu
    * Exchanges a personal access token for a {@link AuthenticationType#PERSONAL_ACCESS_TOKEN} JWT of
    * the protocol realm (RPS-1903). The username is ignored, as it is for a deploy token. The grants
    * the JWT carries are what was asked for, narrowed to the scopes of the token and the role of its
-   * owner ({@link PatDockerGrants}); a request for repositories that leaves nothing is refused with
-   * {@code unAuthorized}, and so is the request of a token that is unknown or expired, which also
-   * counts as a failed credential. A request that asks for nothing (a {@code docker login}) is
-   * answered. The JWT is read against the token again on every {@code /v2} request.
+   * owner ({@link PatDockerGrants}); a request for repositories that leaves nothing is answered
+   * with a token whose access list is empty, as the Docker token specification has it (RPS-2216),
+   * so that {@code docker login} keeps working and the registry refuses the operation. A token that
+   * is unknown or expired is refused with {@code unAuthorized}, which also counts as a failed
+   * credential. The JWT is read against the token again on every {@code /v2} request.
    *
    * @return empty only when the password is not a personal access token
    */
@@ -143,10 +162,6 @@ public class DockerAuthenticator extends ProtocolAuthService implements DockerAu
     final var admin =
         this.userTxService.getAuthenticatedUserById(token.userId()).getRole() == UserRole.ADMIN;
     final var narrowed = PatDockerGrants.narrow(grants, token.scopes(), admin);
-
-    if (!grants.isEmpty() && narrowed.isEmpty()) {
-      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
-    }
 
     this.touchPersonalAccessToken(token);
 
@@ -168,18 +183,27 @@ public class DockerAuthenticator extends ProtocolAuthService implements DockerAu
 
     final var userInfo = this.authenticateWithPassword(credentials);
 
+    // Every user may read and write every repo (OS has no per-repo roles); only an ADMIN manages.
+    final var rights = new PatDockerGrants.Rights(true, true, userInfo.getRole() == UserRole.ADMIN);
+
     final var token =
         this.jwtUtils.createProtocolToken(
             userInfo.getId(),
             userInfo.getUsername(),
             TIMEOUT_ACCESS_TOKEN,
             userInfo.getTokenVersion(),
-            grants);
+            PatDockerGrants.narrow(grants, _ -> rights));
 
     return Optional.of(token);
   }
 
-  private Optional<String> authenticateWithDeployToken(final Credentials credentials) {
+  /**
+   * Exchanges a deploy token for a JWT whose access list is what the token may do in the images
+   * asked for: it is bound to one repo, reads there, writes unless it is read-only, and never
+   * manages (RPS-2216). An image of another repo, or of none, is left out.
+   */
+  private Optional<String> authenticateWithDeployToken(
+      final Credentials credentials, final List<String> grants) {
 
     final var deployTokenOpt = this.deployTokenService.findByToken(credentials.getPassword());
 
@@ -193,36 +217,67 @@ public class DockerAuthenticator extends ProtocolAuthService implements DockerAu
 
     this.deployTokenService.updateLastUsedTime(deployTokenOpt.get().getId());
 
+    final var deployToken = deployTokenOpt.get();
+
     final var token =
         this.jwtUtils.createProtocolToken(
-            deployTokenOpt.get().getId(),
+            deployToken.getId(),
             credentials.getUsername(),
             TIMEOUT_ACCESS_TOKEN,
-            AuthenticationType.DEPLOY_TOKEN);
+            AuthenticationType.DEPLOY_TOKEN,
+            PatDockerGrants.narrow(grants, name -> this.deployTokenRights(deployToken, name)));
 
     return Optional.of(token);
   }
 
+  private PatDockerGrants.Rights deployTokenRights(
+      final DeployTokenInfo deployToken, final String name) {
+
+    final var separator = name.indexOf('/');
+
+    if (separator <= 0) {
+      return PatDockerGrants.Rights.NONE;
+    }
+
+    final var repo =
+        this.repoTxService.findRepoByNameAndType(name.substring(0, separator), RepoType.DOCKER);
+
+    if (repo.isEmpty()
+        || this.deployTokenService
+            .findByRepoIdAndTokenId(repo.get().getStorageKey(), deployToken.getId())
+            .isEmpty()) {
+      return PatDockerGrants.Rights.NONE;
+    }
+
+    return new PatDockerGrants.Rights(true, !deployToken.isReadOnly(), false);
+  }
+
   /**
    * Checks that a token from {@code /v2/token} was issued for the operation it is used for, on top
-   * of the role check {@link #handleBearerAuth} did (RPS-1434). Only a delete needs it: a token
-   * asked for {@code pull} or {@code push,pull} does not delete, even for an administrator. A token
-   * that records no grants (a deploy-token or scanner token, or one minted by another protocol's
-   * login) keeps the role-based decision.
+   * of the role check {@link #handleBearerAuth} did (RPS-1434, RPS-2216): {@code pull} for a read,
+   * {@code push} for a write and {@code delete} for a delete, in exactly the image the request
+   * addresses. A token that records no grants (a scanner token, or one minted before the grants
+   * were recorded for every credential) keeps the role-based decision.
    *
    * @param name The image, as {@code <repo>/<image>}
-   * @throws UnAuthorizedException if the token was not issued for the {@code delete} action of it
+   * @throws UnAuthorizedException if the token was not issued for the action in that image
    */
   public void authorizeGrantedAccess(
       final String authHeader, final String name, final Permission permission) {
 
-    if (permission != Permission.MANAGE) {
+    // A personal access token presented as the Bearer value itself is no JWT and carries no
+    // grants: it is authorized as the token, by its scopes. Only a delete reads it as a JWT.
+    if (permission != Permission.MANAGE && personalAccessTokenSecretOf(authHeader) != null) {
       return;
     }
 
     final var grants = this.jwtUtils.extractAccess(authHeader, TokenRealm.PROTOCOL);
 
-    if (grants != null && !DockerScopes.allowsDelete(grants, name)) {
+    if (grants == null) {
+      return;
+    }
+
+    if (!DockerScopes.allowsPermission(grants, name, permission)) {
       throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
   }

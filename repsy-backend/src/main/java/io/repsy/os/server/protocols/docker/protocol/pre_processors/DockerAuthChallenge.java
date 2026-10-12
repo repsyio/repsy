@@ -101,7 +101,7 @@ final class DockerAuthChallenge {
   }
 
   /** The {@code scope} actions a permission asks for: a push also pulls, as {@code docker} asks. */
-  private static @Nullable String actionsOf(final @Nullable Permission permission) {
+  static @Nullable String actionsOf(final @Nullable Permission permission) {
 
     return switch (permission) {
       case READ -> "pull";

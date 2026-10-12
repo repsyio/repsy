@@ -15,6 +15,7 @@
  */
 package io.repsy.protocols.docker.protocol.parser;
 
+import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
@@ -34,6 +35,8 @@ public final class DockerScopes {
 
   private static final String REPOSITORY_TYPE = "repository:";
   private static final String DELETE_ACTION = "delete";
+  private static final String PULL_ACTION = "pull";
+  private static final String PUSH_ACTION = "push";
   private static final String ALL_ACTIONS = "*";
 
   /**
@@ -71,6 +74,32 @@ public final class DockerScopes {
    * token issued for {@code pull} or {@code push,pull} cannot delete.
    */
   public static boolean allowsDelete(final List<String> grants, final String name) {
+    return allows(grants, name, DELETE_ACTION);
+  }
+
+  /**
+   * Tells whether the grants allow what a request of {@code permission} does in {@code name}: a
+   * read is {@code pull}, a write is {@code push} and a manage is {@code delete}, see {@link
+   * #allows}. A permission that is none of them is never allowed.
+   */
+  public static boolean allowsPermission(
+      final List<String> grants, final String name, final Permission permission) {
+
+    return switch (permission) {
+      case READ -> allows(grants, name, PULL_ACTION);
+      case WRITE -> allows(grants, name, PUSH_ACTION);
+      case MANAGE -> allows(grants, name, DELETE_ACTION);
+      default -> false;
+    };
+  }
+
+  /**
+   * Tells whether the grants allow {@code action} in {@code name}, which is {@code <repo>/<image>}.
+   * Only a grant of exactly that name counts (a token for one image or repo is no token for
+   * another), and only with that action or {@code *}. An action implies no other: a grant of {@code
+   * push} alone does not pull.
+   */
+  public static boolean allows(final List<String> grants, final String name, final String action) {
 
     final var wanted = name.toLowerCase(Locale.ROOT);
 
@@ -83,7 +112,7 @@ public final class DockerScopes {
 
       final var actions = Arrays.asList(StringUtils.split(grant.substring(actionsStart + 1), ','));
 
-      if (actions.contains(DELETE_ACTION) || actions.contains(ALL_ACTIONS)) {
+      if (actions.contains(action) || actions.contains(ALL_ACTIONS)) {
         return true;
       }
     }

@@ -633,7 +633,10 @@ class DockerManifestDeleteIT extends AbstractIT {
     final var repo = this.dockerRepo();
     final var manifest = this.push(repo, IMAGE, "latest", "layer-one");
     final var secret = this.seedDeployToken(repo, false);
-    final var token = this.bearerFromTokenEndpoint("ignored", secret);
+    // RPS-2216: a token is issued for what was asked, as every client does.
+    final var token =
+        this.bearerFromTokenEndpoint(
+            "ignored", secret, "repository:%s/%s:pull,push".formatted(repo.getName(), IMAGE));
     final var wire =
         new DockerWire(this.mockMvc, this.webApplicationContext, protocolPort(), token);
 

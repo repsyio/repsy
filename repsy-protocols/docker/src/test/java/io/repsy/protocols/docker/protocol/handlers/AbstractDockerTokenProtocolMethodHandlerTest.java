@@ -225,7 +225,7 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
   void anonymousTokenForPublicRepo() throws Exception {
     final var repo = repo(false);
     doReturn(Optional.of(repo)).when(this.scopeParser).findRepoInfoByScope(PULL_SCOPE);
-    when(this.authService.createAnonymousUser()).thenReturn("anon-tok");
+    when(this.authService.createAnonymousUser(any())).thenReturn("anon-tok");
 
     final var result =
         this.handler.handle(
@@ -252,7 +252,7 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
                     this.anonymousTokenRequest(),
                     new MockHttpServletResponse()))
         .satisfies(e -> expectChallenge(e, "unAuthorized"));
-    verify(this.authService, never()).createAnonymousUser();
+    verify(this.authService, never()).createAnonymousUser(any());
   }
 
   private MockHttpServletRequest anonymousRequestForScope(final String scope) {
@@ -279,7 +279,7 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
                     this.anonymousRequestForScope(scope),
                     new MockHttpServletResponse()))
         .satisfies(e -> expectChallenge(e, "unauthorizedRequest"));
-    verify(this.authService, never()).createAnonymousUser();
+    verify(this.authService, never()).createAnonymousUser(any());
     verifyNoInteractions(this.scopeParser);
   }
 
@@ -288,7 +288,7 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
   @DisplayName("an image merely named like the action is still a public pull")
   void imageNamedDeleteIsStillAPublicPull(final String scope) throws Exception {
     doReturn(Optional.of(repo(false))).when(this.scopeParser).findRepoInfoByScope(scope);
-    when(this.authService.createAnonymousUser()).thenReturn("anon-tok");
+    when(this.authService.createAnonymousUser(any())).thenReturn("anon-tok");
 
     final var result =
         this.handler.handle(
@@ -338,7 +338,7 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
     assertThat(result.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(((DockerTokenResponse) result.getBody()).getToken()).isEqualTo("user-tok-123");
     verify(this.authService).authenticateUserDockerCli(PASSWORD_GRANT_BASIC_HEADER, PULL_GRANTS);
-    verify(this.authService, never()).createAnonymousUser();
+    verify(this.authService, never()).createAnonymousUser(any());
   }
 
   @Test
@@ -356,7 +356,7 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
                     this.passwordGrantRequest("bob", "secret"),
                     new MockHttpServletResponse()))
         .satisfies(e -> expectChallenge(e, "unAuthorized"));
-    verify(this.authService, never()).createAnonymousUser();
+    verify(this.authService, never()).createAnonymousUser(any());
   }
 
   @Test
@@ -364,7 +364,7 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
   void passwordGrantWithBlankUsernameFallsThroughToAnonymous() throws Exception {
     final var repo = repo(false);
     doReturn(Optional.of(repo)).when(this.scopeParser).findRepoInfoByScope(PULL_SCOPE);
-    when(this.authService.createAnonymousUser()).thenReturn("anon-tok");
+    when(this.authService.createAnonymousUser(any())).thenReturn("anon-tok");
 
     final var result =
         this.handler.handle(
@@ -382,7 +382,7 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
   void noGrantTypeStaysAnonymous() throws Exception {
     final var repo = repo(false);
     doReturn(Optional.of(repo)).when(this.scopeParser).findRepoInfoByScope(PULL_SCOPE);
-    when(this.authService.createAnonymousUser()).thenReturn("anon-tok");
+    when(this.authService.createAnonymousUser(any())).thenReturn("anon-tok");
 
     final var result =
         this.handler.handle(
@@ -461,7 +461,7 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
                     this.anonymousRequestForScopes("repository:*:pull", second),
                     new MockHttpServletResponse()))
         .satisfies(e -> expectChallenge(e, "unauthorizedRequest"));
-    verify(this.authService, never()).createAnonymousUser();
+    verify(this.authService, never()).createAnonymousUser(any());
     verifyNoInteractions(this.scopeParser);
   }
 
@@ -472,7 +472,7 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
     doReturn(Optional.of(repo))
         .when(this.scopeParser)
         .findRepoInfoByScope("repository:*:pull " + PULL_SCOPE);
-    when(this.authService.createAnonymousUser()).thenReturn("anon-tok");
+    when(this.authService.createAnonymousUser(any())).thenReturn("anon-tok");
 
     final var result =
         this.handler.handle(
@@ -502,7 +502,7 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
                     this.anonymousRequestForScopes("repository:*:pull", PULL_SCOPE),
                     new MockHttpServletResponse()))
         .satisfies(e -> expectChallenge(e, "unAuthorized"));
-    verify(this.authService, never()).createAnonymousUser();
+    verify(this.authService, never()).createAnonymousUser(any());
   }
 
   @Test
