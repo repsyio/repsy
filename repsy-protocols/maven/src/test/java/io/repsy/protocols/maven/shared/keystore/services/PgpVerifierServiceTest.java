@@ -950,7 +950,7 @@ class PgpVerifierServiceTest {
 
   // RPS-2067: the rest of the verification outcome matrix, pinned on the backend class before it
   // moves into repsy-protocols/maven. Where an outcome is today's behaviour rather than a policy
-  // (no weak-digest policy, an inline-signed message accepted), the test says so.
+  // (a signature dated before a non-expiring key's creation), the test says so.
 
   @Test
   @DisplayName("accepts a signature made by a bound subkey, looked up by the subkey's id")
@@ -1057,17 +1057,63 @@ class PgpVerifierServiceTest {
   }
 
   @ParameterizedTest
-  @ValueSource(ints = {HashAlgorithmTags.SHA1, HashAlgorithmTags.MD5, HashAlgorithmTags.SHA512})
-  @DisplayName("has no digest policy: a SHA-1, MD5 or SHA-512 signature verifies like SHA-256")
-  void hasNoWeakDigestPolicy(final int hashAlgorithm) {
-    // Today's behaviour, not a decision: BouncyCastle verifies any digest it implements, and the
-    // service does not refuse weak ones.
+  @ValueSource(
+      ints = {HashAlgorithmTags.SHA256, HashAlgorithmTags.SHA384, HashAlgorithmTags.SHA512})
+  @DisplayName("accepts a signature made with a strong digest (RPS-2169)")
+  void acceptsAStrongDigestSignature(final int hashAlgorithm) {
     final var signature = resource(keys.detachedSignature(POM, hashAlgorithm));
 
     assertThatCode(
             () ->
                 this.serviceAnswering(uri -> notFound())
                     .verify(
+                        new ByteArrayResource(POM),
+                        signature,
+                        registeredKeys(keys.armoredPublicKey())))
+        .doesNotThrowAnyException();
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {HashAlgorithmTags.SHA1, HashAlgorithmTags.MD5})
+  @DisplayName("refuses a SHA-1 or MD5 signature of the stored bytes (RPS-2169)")
+  void refusesAWeakDigestSignature(final int hashAlgorithm) {
+    final var signature = resource(keys.detachedSignature(POM, hashAlgorithm));
+
+    assertThatThrownBy(
+            () ->
+                this.serviceAnswering(uri -> notFound())
+                    .verify(
+                        new ByteArrayResource(POM),
+                        signature,
+                        registeredKeys(keys.armoredPublicKey())))
+        .isInstanceOf(SignatureNotVerifiedException.class)
+        .hasMessage(NOT_VERIFIED);
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {HashAlgorithmTags.SHA1, HashAlgorithmTags.MD5})
+  @DisplayName("refuses a weak digest without asking a key server, and when parking it (RPS-2169)")
+  void refusesAWeakDigestBeforeAnyKeyLookup(final int hashAlgorithm) {
+    this.assertRefusedWithoutAskingAKeyServer(resource(keys.detachedSignature(POM, hashAlgorithm)));
+
+    assertThatThrownBy(
+            () ->
+                this.serviceAnswering(uri -> notFound())
+                    .readSignerKeyId(resource(keys.detachedSignature(POM, hashAlgorithm))))
+        .isInstanceOf(SignatureNotVerifiedException.class)
+        .hasMessage(NOT_VERIFIED);
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {HashAlgorithmTags.SHA1, HashAlgorithmTags.MD5})
+  @DisplayName("a signature that is already stored is still read as verified (RPS-2169)")
+  void verifyStoredStillAcceptsAWeakDigestSignature(final int hashAlgorithm) {
+    final var signature = resource(keys.detachedSignature(POM, hashAlgorithm));
+
+    assertThatCode(
+            () ->
+                this.serviceAnswering(uri -> notFound())
+                    .verifyStored(
                         new ByteArrayResource(POM),
                         signature,
                         registeredKeys(keys.armoredPublicKey())))
@@ -1091,17 +1137,30 @@ class PgpVerifierServiceTest {
   }
 
   @Test
-  @DisplayName(
-      "accepts an inline-signed message (gpg --sign) whose literal data is the stored file")
-  void acceptsAnInlineSignedMessageOfTheSameBytes() {
-    // Today's behaviour, not a decision: the signature packet after the literal data is taken and
-    // checked against the stored file, so it verifies like the detached signature of those bytes.
+  @DisplayName("refuses an inline-signed message (gpg --sign) of the stored file (RPS-2169)")
+  void refusesAnInlineSignedMessageOfTheSameBytes() {
+    final var signature = resource(keys.inlineSignedMessage(POM));
+
+    assertThatThrownBy(
+            () ->
+                this.serviceAnswering(uri -> notFound())
+                    .verify(
+                        new ByteArrayResource(POM),
+                        signature,
+                        registeredKeys(keys.armoredPublicKey())))
+        .isInstanceOf(SignatureNotVerifiedException.class)
+        .hasMessage(NOT_VERIFIED);
+  }
+
+  @Test
+  @DisplayName("an inline-signed message that is already stored is still read as verified")
+  void verifyStoredStillAcceptsAnInlineSignedMessage() {
     final var signature = resource(keys.inlineSignedMessage(POM));
 
     assertThatCode(
             () ->
                 this.serviceAnswering(uri -> notFound())
-                    .verify(
+                    .verifyStored(
                         new ByteArrayResource(POM),
                         signature,
                         registeredKeys(keys.armoredPublicKey())))

@@ -455,7 +455,7 @@ class ArtifactSignatureServiceTest {
 
     assertThat(this.service.recompute(this.version.getId())).isTrue();
 
-    verify(this.pgpVerifierService).verify(jar, signature, SOURCES);
+    verify(this.pgpVerifierService).verifyStored(jar, signature, SOURCES);
     final var saved = ArgumentCaptor.forClass(VersionSignature.class);
     verify(this.versionSignatureRepository).save(saved.capture());
     assertThat(saved.getValue().getFileName()).isEqualTo("lib-1.0.jar");
@@ -478,7 +478,7 @@ class ArtifactSignatureServiceTest {
     when(this.keyStoreService.getPublicKeySources(this.storageKey, true)).thenReturn(SOURCES);
     doThrow(new SignatureNotVerifiedException("artifactSignatureNotVerified"))
         .when(this.pgpVerifierService)
-        .verify(jar, signature, SOURCES);
+        .verifyStored(jar, signature, SOURCES);
 
     assertThat(this.service.recompute(this.version.getId())).isTrue();
 
@@ -499,7 +499,7 @@ class ArtifactSignatureServiceTest {
     when(this.keyStoreService.getPublicKeySources(this.storageKey, true)).thenReturn(SOURCES);
     doThrow(new SignatureNotVerifiedException("artifactSignatureNotVerified"))
         .when(this.pgpVerifierService)
-        .verify(pom, signature, SOURCES);
+        .verifyStored(pom, signature, SOURCES);
 
     this.service.recompute(this.version.getId());
 
@@ -539,7 +539,7 @@ class ArtifactSignatureServiceTest {
     when(this.keyStoreService.getPublicKeySources(this.storageKey, true)).thenReturn(SOURCES);
     doThrow(new ItemNotFoundException("artifactSigningKeyNotFound"))
         .when(this.pgpVerifierService)
-        .verify(any(), any(), eq(SOURCES));
+        .verifyStored(any(), any(), eq(SOURCES));
 
     assertThat(this.service.recompute(this.version.getId())).isTrue();
 
@@ -576,7 +576,7 @@ class ArtifactSignatureServiceTest {
 
     this.service.recompute(this.version.getId());
 
-    verify(this.pgpVerifierService).verify(any(), any(), eq(registeredOnly));
+    verify(this.pgpVerifierService).verifyStored(any(), any(), eq(registeredOnly));
   }
 
   @Test
@@ -593,7 +593,7 @@ class ArtifactSignatureServiceTest {
 
     this.service.recompute(this.version.getId());
 
-    verify(this.pgpVerifierService).verify(pom, signature, SOURCES);
+    verify(this.pgpVerifierService).verifyStored(pom, signature, SOURCES);
     final var saved = ArgumentCaptor.forClass(VersionSignature.class);
     verify(this.versionSignatureRepository).save(saved.capture());
     assertThat(saved.getValue().getFileName()).isEqualTo("lib-1.0.pom");
@@ -612,7 +612,7 @@ class ArtifactSignatureServiceTest {
     when(this.keyStoreService.getPublicKeySources(this.storageKey, true)).thenReturn(SOURCES);
     doThrow(new SignatureNotVerifiedException("artifactSignatureNotVerified"))
         .when(this.pgpVerifierService)
-        .verify(pom, signature, SOURCES);
+        .verifyStored(pom, signature, SOURCES);
 
     this.service.recompute(this.version.getId());
 

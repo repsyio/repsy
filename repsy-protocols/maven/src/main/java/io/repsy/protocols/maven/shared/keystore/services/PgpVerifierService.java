@@ -44,9 +44,12 @@ import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import org.bouncycastle.bcpg.HashAlgorithmTags;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.openpgp.PGPException;
+import org.bouncycastle.openpgp.PGPLiteralData;
 import org.bouncycastle.openpgp.PGPObjectFactory;
+import org.bouncycastle.openpgp.PGPOnePassSignatureList;
 import org.bouncycastle.openpgp.PGPPublicKey;
 import org.bouncycastle.openpgp.PGPPublicKeyRingCollection;
 import org.bouncycastle.openpgp.PGPSignature;
@@ -130,9 +133,30 @@ public class PgpVerifierService {
    * @throws ItemNotFoundException {@code artifactSigningKeyNotRegistered} when the key is not
    *     registered and the key-server lookup is off; no server was asked (RPS-1204)
    */
-  @SneakyThrows
   public void verify(
       final Resource file, final Resource signedFile, final @Nullable PublicKeySources sources) {
+
+    this.verify(file, signedFile, sources, true);
+  }
+
+  /**
+   * Verifies a signature that is already stored (RPS-2169): the same as {@link #verify} but without
+   * the signature policy, so a MD5 or SHA-1 (or inline-signed) {@code .asc} that was accepted when
+   * it was uploaded is still read as verified when the stored signatures of a version are
+   * re-checked. Only new signatures are held to the policy.
+   */
+  public void verifyStored(
+      final Resource file, final Resource signedFile, final @Nullable PublicKeySources sources) {
+
+    this.verify(file, signedFile, sources, false);
+  }
+
+  @SneakyThrows
+  private void verify(
+      final Resource file,
+      final Resource signedFile,
+      final @Nullable PublicKeySources sources,
+      final boolean enforcePolicy) {
 
     try (final var dataStream = file.getInputStream();
         final var signatureStream = signedFile.getInputStream()) {
@@ -143,7 +167,7 @@ public class PgpVerifierService {
 
       final PGPSignature signature;
       try {
-        signature = this.extractSignature(signatureStream);
+        signature = this.extractSignature(signatureStream, enforcePolicy);
       } catch (final IOException exception) {
         // RPS-1191: ArmoredInputException ("invalid armor", "crc check failed ..."), an invalid
         // armor header and EOFException all mean that the bytes the client sent are not an OpenPGP
@@ -203,7 +227,7 @@ public class PgpVerifierService {
     ensureBouncyCastleProvider();
 
     try (final var signatureStream = signature.getInputStream()) {
-      return String.format(KEY_ID_FORMAT, this.extractSignature(signatureStream).getKeyID());
+      return String.format(KEY_ID_FORMAT, this.extractSignature(signatureStream, true).getKeyID());
     } catch (final IOException | PGPException exception) {
       log.warn("signature could not be parsed. Cause: {}", exception.toString());
       throw new SignatureNotVerifiedException(ProtocolErrorCodes.ARTIFACT_SIGNATURE_NOT_VERIFIED);
@@ -355,7 +379,44 @@ public class PgpVerifierService {
     return "https://" + normalizedHost + "/pks/lookup?op=get&search=0x" + keyIdHex;
   }
 
-  private PGPSignature extractSignature(final InputStream signatureStream)
+  /**
+   * Reads the signature of an {@code .asc}. With {@code enforcePolicy} (RPS-2169) it refuses, as
+   * {@code artifactSignatureNotVerified}, a signature whose digest is MD5 or SHA-1, and an
+   * inline-signed message (a one-pass signature header or literal data in front of the signature):
+   * only a detached signature is a Maven {@code .asc}. The policy needs no key, so it is applied
+   * before any key is looked up. Key size and public-key algorithm are not part of the policy.
+   */
+  private PGPSignature extractSignature(
+      final InputStream signatureStream, final boolean enforcePolicy)
+      throws IOException, PGPException {
+
+    final var signature = this.readFirstSignature(signatureStream, enforcePolicy);
+
+    if (enforcePolicy && isWeakDigest(signature.getHashAlgorithm())) {
+      log.warn(
+          "the signature of key {} uses the weak digest {} and is refused",
+          String.format(KEY_ID_FORMAT, signature.getKeyID()),
+          signature.getHashAlgorithm() == HashAlgorithmTags.MD5 ? "MD5" : "SHA-1");
+      throw new SignatureNotVerifiedException(ProtocolErrorCodes.ARTIFACT_SIGNATURE_NOT_VERIFIED);
+    }
+
+    return signature;
+  }
+
+  private static void refuseInlineSigned(final Object object) {
+
+    if (object instanceof PGPOnePassSignatureList || object instanceof PGPLiteralData) {
+      log.warn("an inline-signed message is refused: only a detached signature is accepted");
+      throw new SignatureNotVerifiedException(ProtocolErrorCodes.ARTIFACT_SIGNATURE_NOT_VERIFIED);
+    }
+  }
+
+  private static boolean isWeakDigest(final int hashAlgorithm) {
+    return hashAlgorithm == HashAlgorithmTags.MD5 || hashAlgorithm == HashAlgorithmTags.SHA1;
+  }
+
+  private PGPSignature readFirstSignature(
+      final InputStream signatureStream, final boolean enforcePolicy)
       throws IOException, PGPException {
 
     final var factory =
@@ -364,6 +425,10 @@ public class PgpVerifierService {
     Object object;
 
     while ((object = factory.nextObject()) != null) {
+      if (enforcePolicy) {
+        refuseInlineSigned(object);
+      }
+
       if (object instanceof final PGPSignatureList sl && !sl.isEmpty()) {
         return sl.get(0);
       }

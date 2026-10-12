@@ -388,7 +388,8 @@ public class ArtifactSignatureService {
     }
 
     try {
-      this.pgpVerifierService.verify(file.get(), signature.get(), sources.get());
+      // A stored signature is not held to the RPS-2169 policy: it was accepted when uploaded.
+      this.pgpVerifierService.verifyStored(file.get(), signature.get(), sources.get());
 
       return StoredOutcome.VERIFIED;
     } catch (final SignatureNotVerifiedException e) {
@@ -564,7 +565,8 @@ public class ArtifactSignatureService {
     }
 
     try {
-      this.verifyAgainst(repoInfo, file.get(), signature.get());
+      // A recorded signature is not held to the RPS-2169 policy (it was accepted when uploaded).
+      this.verifyStoredAgainst(repoInfo, file.get(), signature.get());
 
       return true;
     } catch (final RuntimeException e) {
@@ -707,14 +709,24 @@ public class ArtifactSignatureService {
             .isPresent();
   }
 
+  /** A signature that is being uploaded: held to the signature policy (RPS-2169). */
   private void verifyAgainst(
       final BaseRepoInfo<UUID> repoInfo, final Resource storedFile, final Resource signature) {
 
-    final var sources =
-        this.keyStoreService.getPublicKeySources(
-            repoInfo.getStorageKey(), repoInfo.isPgpKeyServerLookupEnabled());
+    this.pgpVerifierService.verify(storedFile, signature, this.sourcesOf(repoInfo));
+  }
 
-    this.pgpVerifierService.verify(storedFile, signature, sources);
+  /** A signature that is already stored and recorded: not held to the policy (RPS-2169). */
+  private void verifyStoredAgainst(
+      final BaseRepoInfo<UUID> repoInfo, final Resource storedFile, final Resource signature) {
+
+    this.pgpVerifierService.verifyStored(storedFile, signature, this.sourcesOf(repoInfo));
+  }
+
+  private PublicKeySources sourcesOf(final BaseRepoInfo<UUID> repoInfo) {
+
+    return this.keyStoreService.getPublicKeySources(
+        repoInfo.getStorageKey(), repoInfo.isPgpKeyServerLookupEnabled());
   }
 
   /**

@@ -1150,7 +1150,7 @@ class ArtifactDeploymentServiceTest {
         StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.jar"),
         new ByteArrayResource(new byte[0]));
 
-    verify(this.pgpVerifierService).verify(jar, signature, sources);
+    verify(this.pgpVerifierService).verifyStored(jar, signature, sources);
     verify(this.versionSignatureService, never()).forget(any(), any());
     verify(this.versionSignatureService).refreshSigned(id, version, "com/acme/lib/1.0", true);
   }
@@ -1176,7 +1176,7 @@ class ArtifactDeploymentServiceTest {
     when(this.keyStoreService.getPublicKeySources(id, true)).thenReturn(sources);
     doThrow(new SignatureNotVerifiedException("artifactSignatureNotVerified"))
         .when(this.pgpVerifierService)
-        .verify(jar, signature, sources);
+        .verifyStored(jar, signature, sources);
 
     this.artifactService.createOrUpdateArtifact(
         repoVerifyingAllSignatures(id),

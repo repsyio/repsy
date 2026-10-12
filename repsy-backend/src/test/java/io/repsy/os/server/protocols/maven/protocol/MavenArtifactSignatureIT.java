@@ -24,6 +24,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import io.repsy.libs.testsupport.pgp.PgpTestKeys;
 import io.repsy.libs.testsupport.pgp.StubKeyServers;
 import io.repsy.os.AbstractIT;
+import io.repsy.os.server.protocols.maven.shared.artifact.services.ArtifactSignatureService;
 import io.repsy.os.server.protocols.maven.shared.storage.services.MavenStorageService;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.repo.services.RepoTxService;
@@ -39,6 +40,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Pattern;
+import org.bouncycastle.bcpg.HashAlgorithmTags;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -99,6 +101,7 @@ class MavenArtifactSignatureIT extends AbstractIT {
 
   @Autowired private RepoTxService repoTxService;
   @Autowired private MavenStorageService mavenStorageService;
+  @Autowired private ArtifactSignatureService artifactSignatureService;
   @Autowired private ObjectMapper objectMapper;
 
   private final List<UUID> createdRepoIds = new ArrayList<>();
@@ -302,6 +305,79 @@ class MavenArtifactSignatureIT extends AbstractIT {
     final var managed = this.repoRepository.findByName(repo.getName()).orElseThrow();
     managed.setAllowOverride(true);
     this.repoRepository.saveAndFlush(managed);
+  }
+
+  @Test
+  @DisplayName(
+      "RPS-2169: a SHA-1 or MD5 signature of a new upload is refused with 422, SHA-256 is kept")
+  void aWeakDigestSignatureIsRefusedOnUpload() throws Exception {
+    final var f = this.fixture(true);
+    final var jar = bytes("jar");
+    this.uploadOk(f.repo(), f.admin(), POM, pom("1.0"));
+    this.uploadOk(f.repo(), f.admin(), JAR, jar);
+
+    for (final var digest : new int[] {HashAlgorithmTags.SHA1, HashAlgorithmTags.MD5}) {
+      this.expectSignatureRefused(
+          this.upload(
+              f.repo(),
+              f.admin(),
+              JAR + ".asc",
+              KEYS.detachedSignature(jar, digest).getBytes(UTF_8)));
+    }
+
+    assertThat(stored(f.repo(), JAR + ".asc")).doesNotExist();
+    assertThat(this.verifiedFiles(f.repo(), "1.0")).isEmpty();
+
+    this.uploadOk(f.repo(), f.admin(), JAR + ".asc", sign(jar));
+
+    assertThat(this.verifiedFiles(f.repo(), "1.0")).containsExactly("lib-1.0.jar");
+  }
+
+  @Test
+  @DisplayName("RPS-2169: an inline-signed message of the file is refused as a new .asc with 422")
+  void anInlineSignedMessageIsRefusedOnUpload() throws Exception {
+    final var f = this.fixture(true);
+    final var jar = bytes("jar");
+    this.uploadOk(f.repo(), f.admin(), POM, pom("1.0"));
+    this.uploadOk(f.repo(), f.admin(), JAR, jar);
+
+    this.expectSignatureRefused(
+        this.upload(
+            f.repo(), f.admin(), JAR + ".asc", KEYS.inlineSignedMessage(jar).getBytes(UTF_8)));
+
+    assertThat(stored(f.repo(), JAR + ".asc")).doesNotExist();
+  }
+
+  @Test
+  @DisplayName(
+      "RPS-2169: a SHA-1 signature stored before the policy is still verified on recompute")
+  void aStoredWeakDigestSignatureStaysVerified() throws Exception {
+    final var f = this.fixture(false);
+    final var jar = bytes("jar");
+    this.uploadOk(f.repo(), f.admin(), POM, pom("1.0"));
+    this.uploadOk(f.repo(), f.admin(), JAR, jar);
+    // Stored as sent: the repo does not verify the signature of a jar (the state before the
+    // policy).
+    this.uploadOk(
+        f.repo(),
+        f.admin(),
+        JAR + ".asc",
+        KEYS.detachedSignature(jar, HashAlgorithmTags.SHA1).getBytes(UTF_8));
+    assertThat(this.verifiedFiles(f.repo(), "1.0")).isEmpty();
+
+    final var managed = this.repoRepository.findByName(f.repo().getName()).orElseThrow();
+    managed.setPgpVerifyAllSignaturesEnabled(true);
+    this.repoRepository.saveAndFlush(managed);
+    final var versionId =
+        this.jdbcTemplate.queryForObject(
+            "select v.id from maven_artifact_version v join maven_artifact a on a.id ="
+                + " v.artifact_id where a.repo_id = ? and v.version_name = '1.0'",
+            UUID.class,
+            f.repo().getId());
+
+    this.artifactSignatureService.recompute(versionId);
+
+    assertThat(this.verifiedFiles(f.repo(), "1.0")).containsExactly("lib-1.0.jar");
   }
 
   @Test
