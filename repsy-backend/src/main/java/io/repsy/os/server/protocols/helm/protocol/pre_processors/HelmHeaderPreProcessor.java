@@ -26,6 +26,7 @@ import io.repsy.protocols.helm.protocol.HelmProtocolProvider;
 import io.repsy.protocols.oci.utils.OciErrors;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
 import io.repsy.protocols.shared.handlers.HandlerPropertyKeys;
+import io.repsy.protocols.shared.handlers.RoutePermissions;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
@@ -66,6 +67,9 @@ public class HelmHeaderPreProcessor extends ProtocolProcessor {
       final HttpServletRequest request,
       final HttpServletResponse response,
       final Map<String, Object> properties) {
+
+    // RPS-2212: a route with no declared permission is refused, whatever else it says.
+    RoutePermissions.require(properties);
 
     if (this.shouldSkipAuthentication(request, context, properties)) {
       return ProcessorResult.next();

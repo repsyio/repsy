@@ -29,11 +29,11 @@ import io.repsy.protocols.shared.auth.AuthChallenges;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.handlers.HandlerPropertyKeys;
+import io.repsy.protocols.shared.handlers.RoutePermissions;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.util.Map;
-import java.util.Objects;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpHeaders;
@@ -45,6 +45,7 @@ import org.springframework.http.ResponseEntity;
  * which used to repeat the same steps with small differences.
  *
  * <ol>
+ *   <li>A route that declares no permission is refused ({@link RoutePermissions#require}).
  *   <li>A request the route lets through without credentials passes ({@link
  *       #shouldSkipAuthentication}).
  *   <li>The credential is read ({@link #credential}, the {@code Authorization} header unless a
@@ -100,12 +101,14 @@ public abstract class BasicOrBearerAuthPreProcessor<A extends ProtocolAuthServic
 
     final var repoInfo = UrlPropertiesUtils.getRepoInfo(context);
 
+    // RPS-2212: a route with no declared permission is refused, whatever else it says (a skip
+    // flag, a public repo); a route that needs none declares Permission.NONE.
+    final var permission = RoutePermissions.require(properties);
+
     if (this.shouldSkipAuthentication(repoInfo, properties)) {
       return ProcessorResult.next();
     }
 
-    final var permission =
-        Objects.requireNonNull((Permission) properties.get(HandlerPropertyKeys.PERMISSION));
     final var credential = this.credential(request);
 
     try {

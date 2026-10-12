@@ -25,6 +25,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.libs.protocol.router.ProcessorResult;
 import io.repsy.libs.protocol.router.ProtocolContext;
@@ -165,6 +166,57 @@ class BasicOrBearerAuthPreProcessorTest {
                       HandlerPropertyKeys.WRITE_OPERATION,
                       false)))
           .isTrue();
+    }
+  }
+
+  @Nested
+  @DisplayName("a route that declares no permission (RPS-2212)")
+  class UndeclaredPermission {
+
+    private ProcessorResult process(final boolean privateRepo, final Map<String, Object> props) {
+      return BasicOrBearerAuthPreProcessorTest.this.preProcessor.process(
+          contextOf(repoOf(privateRepo)),
+          BasicOrBearerAuthPreProcessorTest.this.request,
+          mock(HttpServletResponse.class),
+          props);
+    }
+
+    @Test
+    @DisplayName("is refused on a public repo, where a read used to be skipped")
+    void refusedOnPublicRepo() {
+      assertThatThrownBy(
+              () -> this.process(false, Map.of(HandlerPropertyKeys.WRITE_OPERATION, false)))
+          .isInstanceOf(AccessNotAllowedException.class);
+    }
+
+    @Test
+    @DisplayName("is refused on a private repo with 403, not a NullPointerException")
+    void refusedOnPrivateRepo() {
+      assertThatThrownBy(() -> this.process(true, Map.of()))
+          .isInstanceOf(AccessNotAllowedException.class);
+    }
+
+    @Test
+    @DisplayName("is refused even when skipPreProcessor is set")
+    void refusedDespiteSkipFlag() {
+      assertThatThrownBy(
+              () -> this.process(false, Map.of(HandlerPropertyKeys.SKIP_PRE_PROCESSOR, true)))
+          .isInstanceOf(AccessNotAllowedException.class);
+    }
+
+    @Test
+    @DisplayName("Permission.NONE is the explicit public marker and passes on a public repo")
+    void noneIsPublic() {
+      final var result =
+          this.process(
+              false,
+              Map.of(
+                  HandlerPropertyKeys.PERMISSION,
+                  Permission.NONE,
+                  HandlerPropertyKeys.WRITE_OPERATION,
+                  false));
+
+      assertThat(result.isEmpty()).isTrue();
     }
   }
 

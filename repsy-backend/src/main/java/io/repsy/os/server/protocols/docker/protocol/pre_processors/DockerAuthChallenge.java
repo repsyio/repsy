@@ -19,7 +19,7 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.os.server.shared.utils.RequestBaseUrlUtils;
 import io.repsy.os.server.shared.utils.UrlPropertiesUtils;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
-import io.repsy.protocols.shared.handlers.HandlerPropertyKeys;
+import io.repsy.protocols.shared.handlers.RoutePermissions;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Map;
@@ -80,7 +80,7 @@ final class DockerAuthChallenge {
     return of(
         request,
         requestedName(context, UrlPropertiesUtils.getRepoInfo(context)),
-        (Permission) properties.get(HandlerPropertyKeys.PERMISSION));
+        RoutePermissions.require(properties));
   }
 
   /**
