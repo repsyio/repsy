@@ -161,4 +161,82 @@ class NpmPayloadShapeTest {
 
     assertThat(NpmPayloadUtils.getTarballLength(payload)).isEqualTo(3L);
   }
+
+  @Test
+  @DisplayName("a dist-tag that names a version of the body needs no stored versions (RPS-2219)")
+  void tagOfBodyVersionIsKept() {
+    final var payload = payload();
+
+    assertThatCode(
+            () ->
+                NpmPayloadUtils.checkDistTagTargets(
+                    payload,
+                    () -> {
+                      throw new AssertionError("stored versions must not be read");
+                    }))
+        .doesNotThrowAnyException();
+  }
+
+  @Test
+  @DisplayName("a dist-tag that names a stored version is kept, an unknown one is a 400 (RPS-2219)")
+  void tagOfUnknownVersionIsRefused() {
+    final var payload = payload();
+    ((Map<String, Object>) payload.get("dist-tags")).put("beta", "0.9.0");
+
+    assertThatCode(() -> NpmPayloadUtils.checkDistTagTargets(payload, () -> List.of("0.9.0")))
+        .doesNotThrowAnyException();
+    assertThatThrownBy(() -> NpmPayloadUtils.checkDistTagTargets(payload, () -> List.of("0.8.0")))
+        .isInstanceOf(BadRequestException.class);
+    assertThatThrownBy(() -> NpmPayloadUtils.checkDistTagTargets(payload, List::of))
+        .isInstanceOf(BadRequestException.class);
+  }
+
+  private static Map<String, Object> versionsOf(final Object deprecated, final boolean present) {
+    final var version = new HashMap<String, Object>();
+    version.put("name", "demo");
+
+    if (present) {
+      version.put("deprecated", deprecated);
+    }
+
+    return new HashMap<>(Map.of("versions", new HashMap<>(Map.of("1.0.0", version))));
+  }
+
+  @Test
+  @DisplayName("findDeprecatedVersions reads a string, skips null or absent (RPS-2219)")
+  void findDeprecatedVersionsStrings() {
+    final var old = versionsOf(null, false);
+
+    assertThat(NpmPayloadUtils.findDeprecatedVersions(old, versionsOf("use 2.x", true)))
+        .extracting(pair -> pair.getSecond())
+        .containsExactly("use 2.x");
+    assertThat(NpmPayloadUtils.findDeprecatedVersions(old, versionsOf(null, true))).isEmpty();
+    assertThat(NpmPayloadUtils.findDeprecatedVersions(old, versionsOf(null, false))).isEmpty();
+  }
+
+  @ParameterizedTest(name = "deprecated {0} is a 400, not a ClassCastException")
+  @MethodSource("nonStringDeprecated")
+  @DisplayName("findDeprecatedVersions refuses a deprecated that is not a string (RPS-2219)")
+  void findDeprecatedVersionsRefusesNonString(final String label, final Object value) {
+    final var stored = versionsOf("old message", true);
+
+    assertThatThrownBy(
+            () -> NpmPayloadUtils.findDeprecatedVersions(stored, versionsOf(value, true)))
+        .as(label)
+        .isInstanceOf(BadRequestException.class);
+    assertThatThrownBy(
+            () ->
+                NpmPayloadUtils.findDeprecatedVersions(
+                    versionsOf(null, false), versionsOf(value, true)))
+        .as(label)
+        .isInstanceOf(BadRequestException.class);
+  }
+
+  static Stream<Arguments> nonStringDeprecated() {
+    return Stream.of(
+        Arguments.of("number", 5),
+        Arguments.of("boolean", true),
+        Arguments.of("object", Map.of("a", 1)),
+        Arguments.of("list", List.of("x")));
+  }
 }

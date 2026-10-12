@@ -326,6 +326,22 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
   }
 
   /** The rows of the package as the transaction that is open sees them, when asked for. */
+  /** The versions stored for the package, none when it is not there yet. */
+  private List<String> storedVersionNames(
+      final BaseRepoInfo<ID> repoInfo, final @Nullable String scopeName, final String packageName) {
+
+    try {
+      return this.npmPackageService
+          .getSnapshot(repoInfo.getStorageKey(), scopeName, packageName)
+          .versions()
+          .stream()
+          .map(NpmPackageSnapshot.Version::version)
+          .toList();
+    } catch (final ItemNotFoundException _) {
+      return List.of();
+    }
+  }
+
   private Supplier<NpmPackageSnapshot> snapshotOf(
       final BaseRepoInfo<ID> repoInfo, final @Nullable String scopeName, final String packageName) {
 
@@ -457,6 +473,9 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
       NpmPayloadUtils.checkPublishPayload(payload);
 
       final var versionName = NpmPayloadUtils.extractVersionNameFromPayload(payload);
+
+      NpmPayloadUtils.checkDistTagTargets(
+          payload, () -> this.storedVersionNames(repoInfo, scopeName, packageName));
 
       // Guard every length-limited value before anything is written (RPS-1136): a publish this
       // refuses leaves no orphan tarball, and one it lets through never fails the row insert.

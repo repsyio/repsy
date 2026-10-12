@@ -20,9 +20,11 @@ import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.protocols.npm.shared.constants.NpmConstants;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Supplier;
 import lombok.experimental.UtilityClass;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.codec.digest.DigestUtils;
@@ -67,6 +69,18 @@ public final class NpmPayloadUtils {
     return missing.getFirst();
   }
 
+  /**
+   * The versions whose {@code deprecated} the payload changed: a message to deprecate, or an empty
+   * string to undeprecate.
+   *
+   * <p>A version without {@code deprecated}, or with a {@code null} one, is untouched (a {@code
+   * null} is not a deprecation, as {@link #isMetadataHasDeprecatedVersions} reads it). A value of
+   * any other type is not something the client can mean as a message or as a removal, and answering
+   * 200 without applying it would hide that, so it is refused (RPS-2219).
+   *
+   * @throws BadRequestException With {@code badRequest} for a {@code deprecated} that is neither a
+   *     string nor {@code null}.
+   */
   public static List<Pair<String, String>> findDeprecatedVersions(
       final Map<String, Object> oldMetadata, final Map<String, Object> newMetadata) {
 
@@ -77,23 +91,69 @@ public final class NpmPayloadUtils {
     final var oldVersions =
         Objects.requireNonNull((Map<String, Object>) oldMetadata.get(NpmConstants.VERSIONS));
 
+    checkDeprecatedTypes(newVersions);
+
     for (final var entry : oldVersions.entrySet()) {
       final var newVersion = (Map<String, Object>) newVersions.get(entry.getKey());
 
       // A version the payload lacks was published after the client read the metadata: it is not
       // something the client deprecated.
-      if (newVersion != null && newVersion.containsKey(NpmConstants.DEPRECATED)) {
-        final var entryVersion = (Map<String, Object>) entry.getValue();
-        final var entryDeprecated = (String) entryVersion.getOrDefault(NpmConstants.DEPRECATED, "");
-        final var newDeprecated = (String) newVersion.getOrDefault(NpmConstants.DEPRECATED, "");
+      if (newVersion != null
+          && newVersion.get(NpmConstants.DEPRECATED) instanceof final String newDeprecated) {
+        final var entryDeprecated =
+            ((Map<String, Object>) entry.getValue()).get(NpmConstants.DEPRECATED);
 
-        if (!entryDeprecated.equals(newDeprecated)) {
+        if (!newDeprecated.equals(entryDeprecated == null ? "" : entryDeprecated)) {
           deprecatedVersions.add(Pair.of(entry.getKey(), newDeprecated));
         }
       }
     }
 
     return deprecatedVersions;
+  }
+
+  private static void checkDeprecatedTypes(final Map<String, Object> versions) {
+
+    for (final var version : versions.values()) {
+      final var deprecated = ((Map<String, Object>) version).get(NpmConstants.DEPRECATED);
+
+      if (deprecated != null && !(deprecated instanceof String)) {
+        throw new BadRequestException(ProtocolErrorCodes.BAD_REQUEST);
+      }
+    }
+  }
+
+  /**
+   * Refuses a publish whose {@code dist-tags} point a tag at a version that will not exist once the
+   * publish is stored: one that is neither in the body's {@code versions} nor already stored. npm's
+   * registry answers 400 for it, and the tag would otherwise be written into the metadata file with
+   * nothing behind it (RPS-2219).
+   *
+   * @param storedVersions The names of the stored versions. Called at most once, and only when a
+   *     tag points outside the body, which is not what {@code npm publish} sends.
+   * @throws BadRequestException With {@code badRequest}.
+   */
+  public static void checkDistTagTargets(
+      final Map<String, Object> payload, final Supplier<Collection<String>> storedVersions) {
+
+    final var versions = (Map<String, Object>) payload.get(NpmConstants.VERSIONS);
+
+    if (!(payload.get(NpmConstants.DIST_TAGS) instanceof final Map<?, ?> distTags)) {
+      return;
+    }
+
+    final var outside =
+        distTags.values().stream().filter(target -> !versions.containsKey(target)).toList();
+
+    if (outside.isEmpty()) {
+      return;
+    }
+
+    final var stored = storedVersions.get();
+
+    if (!stored.containsAll(outside)) {
+      throw new BadRequestException(ProtocolErrorCodes.BAD_REQUEST);
+    }
   }
 
   public static boolean isMetadataHasDeprecatedVersions(final Map<String, Object> metadata) {
