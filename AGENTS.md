@@ -295,6 +295,16 @@ for SonarCloud.
 - Lombok and MapStruct annotation processors are available via `core-parent`.
 - New source files need the Apache 2.0 licence header (see any existing file), or RAT fails
   the build.
+- Nullability follows JSpecify's package-level convention: every main package has a
+  `package-info.java` annotated `@org.jspecify.annotations.NullMarked`; mark exceptions with
+  `@Nullable` and don't add `@NonNull` or a class-level `@NullMarked`. NullAway (Error Prone,
+  JSpecify mode, `OnlyNullMarked`, ERROR) checks every `@NullMarked` package at compile time and
+  fails the build on a finding (RPS-2077, RPS-2151). The root `pom.xml` and
+  `repsy-scanner-trivy/pom.xml` restate core-parent's `compilerArgs`, so keep their NullAway flags
+  in sync with it. Checkstyle (core's `config/checkstyle.xml`) fails a main package with types but
+  no `package-info.java` and a `package-info.java` without `@NullMarked`. The root `lombok.config`
+  sets `lombok.addLombokGeneratedAnnotation = true`, so NullAway treats Lombok-generated members
+  as unannotated code.
 - Spring Data repositories under `@NullMarked` (RPS-2077): Spring Data enforces the nullability of
   the signature. A query that tolerates null (`:x is null or ...`, `coalesce(:x, ...)`,
   `cast(:x as ...)`) needs `@Nullable` on that parameter, or a null argument throws

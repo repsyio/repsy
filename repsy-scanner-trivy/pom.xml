@@ -112,10 +112,10 @@
             <!--
               RPS-2150: the same Error Prone and NullAway setup as core-build-parent (this module has
               the Spring Boot parent, not core-parent). NullAway checks only @NullMarked packages
-              (OnlyNullMarked); WARN until RPS-2151 flips it. Error Prone needs the compiler
+              (OnlyNullMarked) and fails the build on a finding (RPS-2151). Error Prone needs the compiler
               add-exports flags of the root .mvn/jvm.config.
             -->
-            <arg>-Xplugin:ErrorProne -Xep:UnicodeInCode:OFF -Xep:NullAway:WARN -XepOpt:NullAway:OnlyNullMarked=true -XepOpt:NullAway:JSpecifyMode=true -XepOpt:NullAway:TreatGeneratedAsUnannotated=true -XepExcludedPaths:(.*/src/test/.*|.*/target/.*)</arg>
+            <arg>-Xplugin:ErrorProne -Xep:UnicodeInCode:OFF -Xep:NullAway:ERROR -XepOpt:NullAway:OnlyNullMarked=true -XepOpt:NullAway:JSpecifyMode=true -XepOpt:NullAway:TreatGeneratedAsUnannotated=true -XepExcludedPaths:(.*/src/test/.*|.*/target/.*)</arg>
             <arg>--should-stop=ifError=FLOW</arg>
           </compilerArgs>
           <annotationProcessorPaths>
