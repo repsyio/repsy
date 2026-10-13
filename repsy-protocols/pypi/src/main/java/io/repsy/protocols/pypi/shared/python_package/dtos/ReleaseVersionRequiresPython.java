@@ -18,7 +18,7 @@ package io.repsy.protocols.pypi.shared.python_package.dtos;
 import org.jspecify.annotations.Nullable;
 
 public interface ReleaseVersionRequiresPython {
-  @Nullable String getVersion();
+  String getVersion();
 
   @Nullable String getRequiresPython();
 }

@@ -539,10 +539,7 @@ class AbstractPypiProtocolFacadeTest {
       when(packageService.getReleaseIndexListItemInfos(packageInfo.getId()))
           .thenReturn(
               List.of(
-                  release("1.0.0", ">=3.8,<4"),
-                  release("1.1.0", null),
-                  release("1.2.0", "<b>"),
-                  release(null, ">=3")));
+                  release("1.0.0", ">=3.8,<4"), release("1.1.0", null), release("1.2.0", "<b>")));
 
       facade.fetchFromLocalStorage(repoInfo, "demo");
 

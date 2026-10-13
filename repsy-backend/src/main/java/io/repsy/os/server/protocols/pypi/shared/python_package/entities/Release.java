@@ -55,7 +55,7 @@ public class Release {
   @OnDelete(action = OnDeleteAction.CASCADE)
   private PypiPackage pypiPackage;
 
-  @Column(name = "version", length = PypiPublishLimits.MAX_VERSION_LENGTH)
+  @Column(name = "version", length = PypiPublishLimits.MAX_VERSION_LENGTH, nullable = false)
   private String version;
 
   @Column(name = "final_release")

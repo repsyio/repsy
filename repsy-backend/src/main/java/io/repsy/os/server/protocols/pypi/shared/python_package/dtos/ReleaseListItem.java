@@ -16,10 +16,9 @@
 package io.repsy.os.server.protocols.pypi.shared.python_package.dtos;
 
 import java.time.LocalDateTime;
-import org.jspecify.annotations.Nullable;
 
 public interface ReleaseListItem {
-  @Nullable String getVersion();
+  String getVersion();
 
   boolean isFinalRelease();
 

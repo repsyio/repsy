@@ -144,7 +144,7 @@ public abstract class AbstractPypiProtocolFacade<ID> implements PypiProtocolFaca
       final var version = release.getVersion();
       final var requiresPython = release.getRequiresPython();
 
-      if (version != null && requiresPython != null) {
+      if (requiresPython != null) {
         requiresPythonMap.put(version, HtmlUtils.htmlEscape(requiresPython));
       }
     }
