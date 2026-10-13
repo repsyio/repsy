@@ -18,6 +18,7 @@ package io.repsy.protocols.shared.http;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletRequestWrapper;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A request whose URI, URL, servlet path and path info are safe to log (RPS-2174): the
@@ -38,22 +39,22 @@ public class MaskedPathRequestWrapper extends HttpServletRequestWrapper {
   }
 
   @Override
-  public String getRequestURI() {
+  public @Nullable String getRequestURI() {
     return UrlMaskingUtils.maskPath(super.getRequestURI());
   }
 
   @Override
-  public String getServletPath() {
+  public @Nullable String getServletPath() {
     return UrlMaskingUtils.maskPath(super.getServletPath());
   }
 
   @Override
-  public String getPathInfo() {
+  public @Nullable String getPathInfo() {
     return UrlMaskingUtils.maskPath(super.getPathInfo());
   }
 
   @Override
-  public StringBuffer getRequestURL() {
+  public @Nullable StringBuffer getRequestURL() {
     final var url = super.getRequestURL();
 
     return url == null ? null : new StringBuffer(UrlMaskingUtils.maskPath(url.toString()));

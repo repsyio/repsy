@@ -136,11 +136,12 @@ public final class NpmPayloadUtils {
   public static void checkDistTagTargets(
       final Map<String, Object> payload, final Supplier<Collection<String>> storedVersions) {
 
-    final var versions = (Map<String, Object>) payload.get(NpmConstants.VERSIONS);
-
     if (!(payload.get(NpmConstants.DIST_TAGS) instanceof final Map<?, ?> distTags)) {
       return;
     }
+
+    final var versions =
+        (Map<String, Object>) Objects.requireNonNull(payload.get(NpmConstants.VERSIONS));
 
     final var outside =
         distTags.values().stream().filter(target -> !versions.containsKey(target)).toList();
@@ -332,7 +333,8 @@ public final class NpmPayloadUtils {
    */
   public static void checkPublishPayload(final Map<String, Object> payload) {
 
-    final var versions = (Map<String, Object>) payload.get(NpmConstants.VERSIONS);
+    final var versions =
+        (Map<String, Object>) Objects.requireNonNull(payload.get(NpmConstants.VERSIONS));
 
     if (versions.isEmpty() || !hasEntries(payload.get(NpmConstants.DIST_TAGS))) {
       throw new BadRequestException(ProtocolErrorCodes.BAD_REQUEST);
@@ -366,8 +368,9 @@ public final class NpmPayloadUtils {
   }
 
   private static boolean hasAttachmentData(final @Nullable Object attachments) {
-    return hasEntries(attachments)
-        && ((Map<?, ?>) attachments).values().iterator().next() instanceof final Map<?, ?> first
+    return attachments instanceof final Map<?, ?> map
+        && !map.isEmpty()
+        && map.values().iterator().next() instanceof final Map<?, ?> first
         && first.get("data") instanceof String;
   }
 
