@@ -30,6 +30,7 @@ import io.repsy.libs.scanner.trivy.TrivyScannerClientProperties;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.os.server.security.scan.services.VulnerabilityScanTxService;
+import io.repsy.os.server.security.scanner.noop.NoOpVulnerabilityScanner;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.helm.shared.constants.HelmConstants;
@@ -149,7 +150,7 @@ public class ArtifactScanListener {
       final int attempt) {
 
     try {
-      final var scanInputs = this.resolveScanInputs(event, scanId);
+      final var scanInputs = this.resolveScanInputs(event, scanId, scanner);
 
       if (scanInputs == null) {
         return;
@@ -350,7 +351,14 @@ public class ArtifactScanListener {
   }
 
   private @Nullable ScanInputs resolveScanInputs(
-      final ArtifactPushedEvent event, final UUID scanId) {
+      final ArtifactPushedEvent event, final UUID scanId, final VulnerabilityScanner scanner) {
+
+    // The disabled scanner reads nothing, so it must not look the artifact up either: a protocol
+    // whose event carries the request path instead of the stored path (Ruby, RPS-2230) would
+    // otherwise record a FAILED scan for a stored artifact.
+    if (NoOpVulnerabilityScanner.NAME.equals(scanner.getName())) {
+      return new ScanInputs(null, null, null);
+    }
 
     if (DOCKER_REPO_TYPE.equals(event.repoType())) {
       return this.resolveDockerScanInputs(event);

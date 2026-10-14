@@ -43,6 +43,7 @@ import io.repsy.libs.scanner.trivy.TrivyScannerClientProperties;
 import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.os.server.security.scan.entities.VulnerabilityScan;
 import io.repsy.os.server.security.scan.services.VulnerabilityScanTxService;
+import io.repsy.os.server.security.scanner.noop.NoOpVulnerabilityScanner;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import java.net.ConnectException;
@@ -616,6 +617,31 @@ class ArtifactScanListenerTest {
 
     final var content = this.capturedScanRequest().artifactContent();
     assertThat(content.fileName()).isEqualTo("payments-1.0.0.tgz");
+  }
+
+  @Test
+  @DisplayName(
+      "does not look the artifact up for the disabled scanner, so a push records no FAILED scan"
+          + " (RPS-2230)")
+  void disabledScannerDoesNotReadTheArtifact() {
+    when(this.scanner.getName()).thenReturn(NoOpVulnerabilityScanner.NAME);
+    when(this.scannerRegistry.findScanner("RUBY")).thenReturn(Optional.of(this.scanner));
+    when(this.scanTxService.createPendingScan(REPO_ID, "rake", "13.0.0", "noop"))
+        .thenReturn(SCAN_ID);
+    doAnswer(
+            invocation -> {
+              invocation.<Runnable>getArgument(0).run();
+              return null;
+            })
+        .when(this.scanTaskExecutor)
+        .execute(any());
+
+    this.listener.onArtifactPushed(
+        new ArtifactPushedEvent(
+            REPO_ID, "RUBY", "repo", "api/v1/gems", "rake", "13.0.0", true, false));
+
+    verify(this.scanTxService, never()).recordScanFailure(any(), any());
+    assertThat(this.capturedScanRequest().artifactContent()).isNull();
   }
 
   private void givenDockerScanIsQueued() {
