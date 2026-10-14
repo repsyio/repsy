@@ -6253,29 +6253,43 @@ Rules these specs follow (and a later spec on these pages should too):
 ### Access tokens and /cli/auth (RPS-2004)
 
 Specs: `tests/ui/profile/access-tokens.spec.ts` (PAT-01..PAT-08) and `tests/ui/profile/cli-auth.spec.ts`
-(PAT-10..PAT-17). Page objects: `src/ui/pages/access-tokens.ts` (`AccessTokensPage`, `SettingsPage`, `CliAuthPage`, the
+(PAT-10..PAT-17) and `tests/ui/profile/cli-callback.spec.ts` (PAT-18..PAT-31, RPS-2039). Page objects: `src/ui/pages/access-tokens.ts` (`AccessTokensPage`, `SettingsPage`, `CliAuthPage`, the
 create form and modals; `AccessTokenInfoModal` is a `SecretModal`, the part of `OneTimeSecretModal` that every
 "shown once" modal shares). Fixtures: `src/ui/access-token-fixtures.ts` (`tokenUser`, `tokenPage`, `tokenApi`).
 The API helper is `src/ui/access-token-api.ts` (plain `fetch`, like `RepoSettingsReadback`).
 
-| Scenario | Where                                                                                                                                                    |
-| -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| PAT-01   | create with a name, scopes and an expiry: the secret is shown once (masked, reveal, copy), the row, persisted as asked, gone after a reload              |
-| PAT-02   | form validation: empty and 81-character name, no scope, an expiry past a year; no `scan:read` on offer                                                   |
-| PAT-03   | revoke one behind a confirmation: cancel keeps it, confirm removes only it                                                                               |
-| PAT-04   | revoke all with several tokens: the count in the report, the list empty                                                                                  |
-| PAT-05   | 50 tokens that have not expired: create is disabled with the reason; revoking one frees it                                                               |
-| PAT-06   | the created token answers `GET /api/profile/access-tokens/current` with its owner and scopes; after the revoke in the UI the same call is 401            |
-| PAT-07   | `@cloud-skip`: the password warning appears only while live tokens exist and links to them                                                               |
-| PAT-08   | `@cloud-skip`: Settings in the avatar menu, its title and navigation, no token section on the profile page                                               |
-| PAT-10   | `/cli/auth` signed out: sign-in, then the page opens with the same name and scopes (the END state only: OS keeps a return URL, Cloud a hand-over)        |
-| PAT-11   | unknown scopes and `scan:read` are dropped; none left means the three repository scopes; the default name                                                |
-| PAT-12   | opening (and reloading) creates nothing; Create makes one token and shows the secret once with the "paste it into the terminal where rp is waiting" text |
-| PAT-13   | a name with markup is shown as text, never as an element                                                                                                 |
-| PAT-14   | a name longer than 80 characters is cut to 80                                                                                                            |
-| PAT-15   | at 50 live tokens the page says so and does not create                                                                                                   |
-| PAT-16   | `@cloud-skip`: `X-Frame-Options: DENY` and CSP `frame-ancestors 'none'` on the page                                                                      |
-| PAT-17   | `@cloud-skip`: the link to manage tokens goes to the Settings page                                                                                       |
+| Scenario | Where                                                                                                                                                        |
+| -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| PAT-01   | create with a name, scopes and an expiry: the secret is shown once (masked, reveal, copy), the row, persisted as asked, gone after a reload                  |
+| PAT-02   | form validation: empty and 81-character name, no scope, an expiry past a year; no `scan:read` on offer                                                       |
+| PAT-03   | revoke one behind a confirmation: cancel keeps it, confirm removes only it                                                                                   |
+| PAT-04   | revoke all with several tokens: the count in the report, the list empty                                                                                      |
+| PAT-05   | 50 tokens that have not expired: create is disabled with the reason; revoking one frees it                                                                   |
+| PAT-06   | the created token answers `GET /api/profile/access-tokens/current` with its owner and scopes; after the revoke in the UI the same call is 401                |
+| PAT-07   | `@cloud-skip`: the password warning appears only while live tokens exist and links to them                                                                   |
+| PAT-08   | `@cloud-skip`: Settings in the avatar menu, its title and navigation, no token section on the profile page                                                   |
+| PAT-10   | `/cli/auth` signed out: sign-in, then the page opens with the same name and scopes (the END state only: OS keeps a return URL, Cloud a hand-over)            |
+| PAT-11   | unknown scopes and `scan:read` are dropped; none left means the three repository scopes; the default name                                                    |
+| PAT-12   | opening (and reloading) creates nothing; Create makes one token and shows the secret once with the "paste it into the terminal where rp is waiting" text     |
+| PAT-13   | a name with markup is shown as text, never as an element                                                                                                     |
+| PAT-14   | a name longer than 80 characters is cut to 80                                                                                                                |
+| PAT-15   | at 50 live tokens the page says so and does not create                                                                                                       |
+| PAT-16   | `@cloud-skip`: `X-Frame-Options: DENY` and CSP `frame-ancestors 'none'` on the page                                                                          |
+| PAT-17   | `@cloud-skip`: the link to manage tokens goes to the Settings page                                                                                           |
+| PAT-18   | `/cli/auth` with a loopback `redirect_uri`: the approval screen (account, name, scopes in words, expiry); opening and reloading create nothing               |
+| PAT-19   | Approve creates exactly one token and POSTs `token` and `state` (form body) to the listener; no secret in any URL or `Referer`; the tab keeps no secret      |
+| PAT-20   | a `state` with characters that need escaping comes back byte for byte                                                                                        |
+| PAT-21   | Decline: no token, nothing sent                                                                                                                              |
+| PAT-22   | refused `redirect_uri` (public host, `127.0.0.1.evil.test`, user info, `localhost`, https, no port, `127.1`, decimal IPv4, fragment): no token, nothing sent |
+| PAT-23   | after a refused link the person can still create a token by hand (paste); nothing is posted                                                                  |
+| PAT-24   | a link with no `redirect_uri` is the paste flow, `state` or not                                                                                              |
+| PAT-25   | an older token with the same name is revoked after the new one is delivered (default on); other tokens are untouched                                         |
+| PAT-26   | with the box unticked the older token stays                                                                                                                  |
+| PAT-27   | nothing listens at the address: the token exists and can be shown and copied from the page (the post cannot be observed from the page)                       |
+| PAT-28   | at 50 live tokens Approve is blocked, nothing is created or sent                                                                                             |
+| PAT-29   | `[::1]` is accepted; where the browser policy cannot name it (Repsy OS `form-action`) the page shows the token to copy, elsewhere the listener gets it       |
+| PAT-30   | signed out: sign-in, then the approval screen with the same parameters; Approve posts the same `state` (the END state only)                                  |
+| PAT-31   | signed out, a refused `redirect_uri` is still refused after sign-in                                                                                          |
 
 Rules these specs follow:
 
@@ -6290,6 +6304,11 @@ Rules these specs follow:
 - **Where the section is.** `accessTokensRoute()`: the OS Settings page; Cloud's account page until its Settings
   page takes the section. No `profile`, no hard-coded path.
 - **The secret is checked against the server.** PAT-06 uses it; the list never contains it.
+- **A stand-in for the CLI (PAT-18..PAT-31).** `cliCallback` (`src/ui/loopback-callback.ts`) is an HTTP server on a free
+  `127.0.0.1` port of the machine the browser runs on; it records what the page POSTs and answers like the CLI's
+  "you can close this tab". The harness aborts every request to a host that is not the panel (`applyUiDefaults`), so
+  `tokenPage` is opened with `allowLoopback` (only `127.0.0.1` and `[::1]` are let through). The post goes to a NEW
+  tab (`target=_blank`), so the spec polls the listener instead of waiting for a navigation.
 
 ### Repository settings and deploy tokens (RPS-1254)
 
@@ -7747,17 +7766,19 @@ Modal families use one prefix each (`repo-create-*`, `user-create-*`, `user-edit
 
 ### Access tokens, Settings and /cli/auth
 
-| Prefix / id                                                                                                          | Where                                                                                        |
-| -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
-| `settings-title`, `settings-nav`, `settings-nav-<section>` (`access-tokens`)                                         | the Settings page (`/profile/settings`, OS)                                                  |
-| `access-tokens-section`, `access-token-create`, `-limit`, `-list`, `-empty`, `-revoke-all`, `-revoke-all-report`     | the access token section (the element id `access-tokens` is the link fragment)               |
-| `access-token-row-<name>` with `row-name`, `row-expired`, `row-scopes`, `row-last-used`, `row-expires`, `row-revoke` | one token (rule 2: the raw name; rule 4: short ids, scope them to the row)                   |
-| `access-token-form`, `-blocked`, `-name`, `-name-error-<validator>`, `-scopes`, `-scope-<scope>`, `-scopes-error`    | the create form (the create modal and `/cli/auth` share it)                                  |
-| `access-token-expiration`, `-expiration-error`, `-cancel`, `-submit`                                                 | the rest of the form                                                                         |
-| `access-token-create-{backdrop,modal,close}`, `access-token-info-{backdrop,modal,close,token,toggle,copy}`           | the two modals; the info modal shows the secret once                                         |
-| `cli-auth-title`, `-loading`, `-error`, `-token`, `-copy`, `-manage`                                                 | `/cli/auth`: `-loading` while the live tokens are counted, `-error` when they cannot be read |
-| `profile-password-tokens-warning`                                                                                    | the password form, while live tokens exist                                                   |
-| `header-menu-settings`                                                                                               | the avatar menu, next to `header-menu-profile`                                               |
+| Prefix / id                                                                                                                                                      | Where                                                                                        |
+| ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `settings-title`, `settings-nav`, `settings-nav-<section>` (`access-tokens`)                                                                                     | the Settings page (`/profile/settings`, OS)                                                  |
+| `access-tokens-section`, `access-token-create`, `-limit`, `-list`, `-empty`, `-revoke-all`, `-revoke-all-report`                                                 | the access token section (the element id `access-tokens` is the link fragment)               |
+| `access-token-row-<name>` with `row-name`, `row-expired`, `row-scopes`, `row-last-used`, `row-expires`, `row-revoke`                                             | one token (rule 2: the raw name; rule 4: short ids, scope them to the row)                   |
+| `access-token-form`, `-blocked`, `-name`, `-name-error-<validator>`, `-scopes`, `-scope-<scope>`, `-scopes-error`                                                | the create form (the create modal and `/cli/auth` share it)                                  |
+| `access-token-expiration`, `-expiration-error`, `-cancel`, `-submit`                                                                                             | the rest of the form                                                                         |
+| `access-token-create-{backdrop,modal,close}`, `access-token-info-{backdrop,modal,close,token,toggle,copy}`                                                       | the two modals; the info modal shows the secret once                                         |
+| `cli-auth-title`, `-loading`, `-error`, `-token`, `-copy`, `-manage`                                                                                             | `/cli/auth`: `-loading` while the live tokens are counted, `-error` when they cannot be read |
+| `cli-auth-approval`, `-target`, `-account`, `-name`, `-scopes`, `-scope-<scope>`, `-expiry`, `-revoke-old`, `-blocked`, `-approve-error`, `-approve`, `-decline` | `/cli/auth` with a loopback `redirect_uri` (RPS-2039): the approval screen                   |
+| `cli-auth-delivered`, `-blocked-by-browser`, `-resend`, `-reveal`, `-revoked`, `-revoke-failed`, `-declined`, `-refused`, `-use-paste`                           | `/cli/auth` after Approve, after Decline, and for a refused `redirect_uri`                   |
+| `profile-password-tokens-warning`                                                                                                                                | the password form, while live tokens exist                                                   |
+| `header-menu-settings`                                                                                                                                           | the avatar menu, next to `header-menu-profile`                                               |
 
 ### Protocol pages
 

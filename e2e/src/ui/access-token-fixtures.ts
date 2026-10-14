@@ -26,6 +26,7 @@ import type { Page } from '@playwright/test';
 
 import { AccessTokenApi } from './access-token-api.js';
 import { expect, test as base } from './fixtures.js';
+import { LoopbackCallback } from './loopback-callback.js';
 import { loginSession, type UiSession } from './session.js';
 
 export interface TokenUser {
@@ -41,6 +42,8 @@ export interface AccessTokenFixtures {
   tokenPage: Page;
   /** The access token API of `tokenUser`. */
   tokenApi: AccessTokenApi;
+  /** A stand-in for the CLI's listener on `127.0.0.1` (RPS-2039): records what the page posts to it. */
+  cliCallback: LoopbackCallback;
 }
 
 export const test = base.extend<AccessTokenFixtures>({
@@ -51,11 +54,22 @@ export const test = base.extend<AccessTokenFixtures>({
   },
 
   tokenPage: async ({ openUiPage, tokenUser }, use) => {
-    await use(await openUiPage({ session: tokenUser.session }));
+    // Loopback is open: the /cli/auth specs post to a listener of their own (`cliCallback`).
+    await use(await openUiPage({ session: tokenUser.session, allowLoopback: true }));
   },
 
   tokenApi: async ({ tokenUser }, use) => {
     await use(new AccessTokenApi(tokenUser.session.token));
+  },
+
+  // eslint-disable-next-line no-empty-pattern
+  cliCallback: async ({}, use) => {
+    const callback = await LoopbackCallback.listen('127.0.0.1');
+    try {
+      await use(callback);
+    } finally {
+      await callback.close();
+    }
   },
 });
 

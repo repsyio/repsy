@@ -64,6 +64,8 @@ export interface OpenUiPageOptions {
   session?: UiSession;
   /** Overrides the project's 1440x900 viewport, e.g. `{ width: 390, height: 844 }` for mobile. */
   viewport?: { width: number; height: number };
+  /** Lets the page reach loopback addresses (`127.0.0.1`, `[::1]`): for a spec that plays the Repsy CLI's listener. */
+  allowLoopback?: boolean;
 }
 
 export interface UiFixtures {
@@ -194,7 +196,9 @@ export const test = base.extend<UiFixtures & UiAutoFixtures, UiWorkerFixtures>({
         ...(options.viewport ? { viewport: options.viewport } : {}),
       });
       opened.push(context);
-      await applyUiDefaults(context, allowedOrigins(baseURL));
+      await applyUiDefaults(context, allowedOrigins(baseURL), {
+        allowLoopback: options.allowLoopback,
+      });
       await watchPageErrors(context, pageErrors);
       if (options.session) {
         await seedSession(context, originOf(baseURL), options.session);

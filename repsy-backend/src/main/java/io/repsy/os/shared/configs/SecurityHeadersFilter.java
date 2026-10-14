@@ -74,6 +74,17 @@ public class SecurityHeadersFilter extends OncePerRequestFilter {
   private static final String FRAME_OPTIONS_HEADER = "X-Frame-Options";
   private static final String HSTS_HEADER = "Strict-Transport-Security";
 
+  /**
+   * The panel's own forms, plus the IPv4 loopback address on any port: {@code /cli/auth} posts a new
+   * access token as a form body to the Repsy CLI listening on the user's machine (RPS-2039). The
+   * browser also checks {@code form-action} against redirects of the post, so without this source
+   * the post is blocked. Only that IP literal is named, never a hostname or a wildcard host. The
+   * IPv6 loopback {@code [::1]} cannot be named: a CSP source list has no IPv6 literal (Chrome
+   * drops {@code http://[::1]:*} as an invalid source), so a post to it is blocked by the browser
+   * and the page falls back to copy and paste.
+   */
+  private static final String FORM_ACTION = "form-action 'self' http://127.0.0.1:*";
+
   private final ApiPortMatcher apiPortMatcher;
   private final AppCorsProperties appCorsProperties;
   private final ContentSecurityPolicyProperties cspProperties;
@@ -149,6 +160,6 @@ public class SecurityHeadersFilter extends OncePerRequestFilter {
             "object-src 'none'",
             "base-uri 'self'",
             "frame-ancestors 'none'",
-            "form-action 'self'"));
+            FORM_ACTION));
   }
 }

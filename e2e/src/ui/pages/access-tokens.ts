@@ -236,9 +236,50 @@ export class CliAuthPage extends UiPage {
   readonly manageLink: Locator;
   readonly loading: Locator;
   readonly error: Locator;
+  /** The approval screen of a link with a loopback `redirect_uri` (RPS-2039). */
+  readonly approval: Locator;
+  readonly target: Locator;
+  readonly account: Locator;
+  readonly tokenName: Locator;
+  readonly scopeList: Locator;
+  readonly expiry: Locator;
+  readonly revokeOld: Locator;
+  readonly blocked: Locator;
+  readonly approveError: Locator;
+  readonly approve: Locator;
+  readonly decline: Locator;
+  readonly declined: Locator;
+  readonly delivered: Locator;
+  readonly blockedByBrowser: Locator;
+  readonly resend: Locator;
+  readonly reveal: Locator;
+  readonly revoked: Locator;
+  readonly revokeFailed: Locator;
+  readonly refused: Locator;
+  readonly usePaste: Locator;
 
   constructor(page: Page) {
     super(page);
+    this.approval = this.tid('cli-auth-approval');
+    this.target = this.tid('cli-auth-target');
+    this.account = this.tid('cli-auth-account');
+    this.tokenName = this.tid('cli-auth-name');
+    this.scopeList = this.tid('cli-auth-scopes');
+    this.expiry = this.tid('cli-auth-expiry');
+    this.revokeOld = this.tid('cli-auth-revoke-old');
+    this.blocked = this.tid('cli-auth-blocked');
+    this.approveError = this.tid('cli-auth-approve-error');
+    this.approve = this.tid('cli-auth-approve');
+    this.decline = this.tid('cli-auth-decline');
+    this.declined = this.tid('cli-auth-declined');
+    this.delivered = this.tid('cli-auth-delivered');
+    this.blockedByBrowser = this.tid('cli-auth-blocked-by-browser');
+    this.resend = this.tid('cli-auth-resend');
+    this.reveal = this.tid('cli-auth-reveal');
+    this.revoked = this.tid('cli-auth-revoked');
+    this.revokeFailed = this.tid('cli-auth-revoke-failed');
+    this.refused = this.tid('cli-auth-refused');
+    this.usePaste = this.tid('cli-auth-use-paste');
     this.title = this.tid('cli-auth-title');
     this.form = new AccessTokenForm(page);
     this.token = this.tid('cli-auth-token');
@@ -252,6 +293,17 @@ export class CliAuthPage extends UiPage {
   async goto(query = ''): Promise<void> {
     await this.page.goto(`/cli/auth${query}`);
     await this.expectLoaded();
+  }
+
+  /** Opens a link with a `redirect_uri` and waits until the approval screen has read the user's live tokens. */
+  async gotoApproval(query: string): Promise<void> {
+    await this.page.goto(`/cli/auth${query}`);
+    await this.expectApprovalLoaded();
+  }
+
+  async expectApprovalLoaded(): Promise<void> {
+    await expect(this.approval).toBeVisible();
+    await expect(this.loading).toHaveCount(0);
   }
 
   /** The form is there and the count of the user's live tokens has been read (the create button is final). */

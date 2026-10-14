@@ -703,7 +703,7 @@ connect-src 'self' <app.allowed-origins>;
 object-src 'none';
 base-uri 'self';
 frame-ancestors 'none';
-form-action 'self';
+form-action 'self' http://127.0.0.1:*;
 ```
 
 The panel names no third-party host: it loads no analytics, tag manager, CDN stylesheet, web font
@@ -711,6 +711,10 @@ or avatar image from another origin, so it works with no outbound internet acces
 `connect-src` additionally allows whatever origins `APP_ALLOWED_ORIGINS` allows (see
 [Cross-Origin Requests (CORS)](#cross-origin-requests-cors)), since a browser calling the API
 cross-origin from one of those origins is exactly what CORS was configured to allow.
+`form-action` additionally allows `http://127.0.0.1:*`: the `/cli/auth` page posts a new access token to
+the Repsy CLI listening on the user's own machine. If you replace the policy with `APP_CSP_POLICY`, keep that
+source in `form-action`, or that sign-in cannot hand the token to the CLI (the page then offers the
+copy-and-paste path). A CSP cannot name the IPv6 loopback `[::1]`, so a CLI that listens there is not reached.
 
 - Set `APP_CSP_REPORT_ONLY=true` to send `Content-Security-Policy-Report-Only` instead while
   rolling a change out: violations are reported, nothing is blocked.

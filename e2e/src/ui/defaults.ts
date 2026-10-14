@@ -51,6 +51,7 @@ const STYLE_ELEMENT_ID = 'repsy-e2e-no-motion';
 export async function applyUiDefaults(
   context: BrowserContext,
   allowedOrigins: readonly string[],
+  options: { allowLoopback?: boolean } = {},
 ): Promise<void> {
   await context.addInitScript(
     ({ css, id }) => {
@@ -80,8 +81,15 @@ export async function applyUiDefaults(
   );
 
   const allowed = new Set(allowedOrigins);
+  // RPS-2039: a spec that plays the Repsy CLI listens on a loopback port of its own, which the panel posts the new
+  // token to. Only that spec's pages may reach the loopback addresses; every other host stays blocked.
+  const isLoopback = (url: URL): boolean =>
+    url.hostname === '127.0.0.1' || url.hostname === '[::1]';
   await context.route(
-    (url) => (url.protocol === 'http:' || url.protocol === 'https:') && !allowed.has(url.origin),
+    (url) =>
+      (url.protocol === 'http:' || url.protocol === 'https:') &&
+      !allowed.has(url.origin) &&
+      !(options.allowLoopback && isLoopback(url)),
     (route) => route.abort('blockedbyclient'),
   );
 

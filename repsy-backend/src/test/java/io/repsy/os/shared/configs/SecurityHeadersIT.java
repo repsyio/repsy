@@ -48,7 +48,13 @@ class SecurityHeadersIT extends AbstractStaticFrontendIT {
         .andExpect(status().isOk())
         .andExpect(header().string("Content-Security-Policy", containsString("default-src 'self'")))
         .andExpect(
-            header().string("Content-Security-Policy", containsString("frame-ancestors 'none'")));
+            header().string("Content-Security-Policy", containsString("frame-ancestors 'none'")))
+        // RPS-2039: /cli/auth posts the new token to the CLI on the user's machine.
+        .andExpect(
+            header()
+                .string(
+                    "Content-Security-Policy",
+                    containsString("form-action 'self' http://127.0.0.1:*")));
   }
 
   @Test

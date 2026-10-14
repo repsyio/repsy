@@ -1,6 +1,197 @@
 <div animate.enter="fade-in-down" class="mx-auto max-w-[700px] space-y-[24px]">
-  <h2 data-testid="cli-auth-title" class="text-[24px] text-white">Sign in the Repsy CLI</h2>
+  @switch (mode) {
+    @case ('paste') {
+      <h2 data-testid="cli-auth-title" class="text-[24px] text-white">Sign in the Repsy CLI</h2>
+      <ng-container *ngTemplateOutlet="pasteFlow" />
+    }
+    @case ('approve') {
+      <h2 data-testid="cli-auth-title" class="text-[24px] text-white">Allow the Repsy CLI to use your account?</h2>
+      <p class="text-sm text-[#9FA0A0]">
+        The Repsy CLI asks for an access token. Nothing is created until you approve. The token is then sent to the CLI
+        running on this computer, at
+        <code data-testid="cli-auth-target" class="text-white">{{ redirectUri }}</code
+        >.
+      </p>
+      @if (checkingRoom) {
+        <p data-testid="cli-auth-loading" class="text-sm text-[#9FA0A0]">Checking your access tokens…</p>
+      }
+      @if (roomCheckFailed) {
+        <p data-testid="cli-auth-error" class="text-warning-500 text-sm">
+          Could not check how many access tokens you have. You can still try to approve.
+        </p>
+      }
+      <div data-testid="cli-auth-approval" class="space-y-4 rounded-xl border border-[#404141] bg-[#101112] p-6">
+        <dl class="space-y-3 text-[14px]">
+          <div>
+            <dt class="text-[#9FA0A0]">Signed in as</dt>
+            <dd data-testid="cli-auth-account" class="text-white">{{ username }}</dd>
+          </div>
+          <div>
+            <dt class="text-[#9FA0A0]">Token name</dt>
+            <dd data-testid="cli-auth-name" class="break-all text-white">{{ name }}</dd>
+          </div>
+          <div>
+            <dt class="text-[#9FA0A0]">The CLI will be able to</dt>
+            <dd>
+              <ul data-testid="cli-auth-scopes" class="mt-1 space-y-2">
+                @for (option of scopeDetails; track option.scope) {
+                  <li class="text-white" [attr.data-testid]="'cli-auth-scope-' + option.scope">
+                    {{ option.label }} <code class="text-[12px] text-[#9FA0A0]">{{ option.scope }}</code>
+                    <span class="block text-[13px] text-[#9FA0A0]">{{ option.description }}</span>
+                  </li>
+                }
+              </ul>
+              <p class="mt-2 text-[13px] text-[#9FA0A0]">
+                A token can only do what you can do yourself, narrowed to these scopes.
+              </p>
+            </dd>
+          </div>
+          <div>
+            <dt class="text-[#9FA0A0]">Expires</dt>
+            <dd data-testid="cli-auth-expiry" class="text-white">{{ expiresAt | date: 'mediumDate' : 'UTC' }} (UTC)</dd>
+          </div>
+        </dl>
 
+        @if (sameNameTokens.length > 0) {
+          <label class="flex cursor-pointer items-start gap-3 text-[14px] text-white">
+            <input
+              data-testid="cli-auth-revoke-old"
+              type="checkbox"
+              class="mt-1"
+              [checked]="revokeOld"
+              [disabled]="approving"
+              (change)="revokeOld = $any($event.target).checked"
+            />
+            <span>
+              Revoke the older token{{ sameNameTokens.length > 1 ? 's' : '' }} named “{{ name }}”
+              <span class="block text-[13px] text-[#9FA0A0]">
+                Done after the new token is created. Anything still using the old one stops working.
+              </span>
+            </span>
+          </label>
+        }
+
+        @if (blockedReason) {
+          <p data-testid="cli-auth-blocked" class="text-warning-500 text-sm">{{ blockedReason }}</p>
+        }
+        @if (approveFailed) {
+          <p data-testid="cli-auth-approve-error" class="text-error text-sm">
+            The token could not be created, so nothing was sent to the CLI. You can try again.
+          </p>
+        }
+
+        <div class="flex gap-2 sm:justify-end">
+          <button
+            data-testid="cli-auth-decline"
+            type="button"
+            class="repsy-btn-secondary w-full sm:w-auto"
+            [disabled]="approving"
+            (click)="decline()"
+          >
+            Decline
+          </button>
+          <button
+            data-testid="cli-auth-approve"
+            type="button"
+            class="repsy-btn-confirm w-full sm:w-auto"
+            [disabled]="!canApprove"
+            (click)="approve()"
+          >
+            Approve
+          </button>
+        </div>
+      </div>
+    }
+    @case ('delivered') {
+      <h2 data-testid="cli-auth-title" class="text-[24px] text-white">Token sent to the CLI</h2>
+      <div class="space-y-4 rounded-xl border border-[#404141] bg-[#101112] p-6">
+        @if (deliveryBlocked) {
+          <p data-testid="cli-auth-blocked-by-browser" class="text-warning-500 text-sm">
+            The token “{{ created?.name }}” was created, but your browser did not send it to the CLI: its security
+            policy does not allow posting to {{ redirectUri }}. Copy the token below and paste it into the terminal
+            where rp is waiting.
+          </p>
+        } @else {
+          <p data-testid="cli-auth-delivered" class="text-sm text-white">
+            The token “{{ created?.name }}” was created and sent to the CLI in a new browser tab. If that tab shows the
+            CLI's confirmation, you are done and can close both tabs.
+          </p>
+        }
+        <p class="text-sm text-[#9FA0A0]">
+          The browser cannot tell this page whether the CLI received it. If the new tab shows an error, or the CLI is
+          still waiting, send it again or copy the token by hand.
+        </p>
+        @switch (revokeResult) {
+          @case ('revoked') {
+            <p data-testid="cli-auth-revoked" class="text-sm text-[#9FA0A0]">
+              The older token with this name was revoked.
+            </p>
+          }
+          @case ('failed') {
+            <p data-testid="cli-auth-revoke-failed" class="text-warning-500 text-sm">
+              The older token with this name could not be revoked. Revoke it under Settings.
+            </p>
+          }
+        }
+        <div class="flex gap-2">
+          <button
+            data-testid="cli-auth-resend"
+            type="button"
+            class="repsy-btn-secondary w-full sm:w-auto"
+            (click)="resend()"
+          >
+            Send again
+          </button>
+          @if (!tokenShown) {
+            <button
+              data-testid="cli-auth-reveal"
+              type="button"
+              class="repsy-btn-secondary w-full sm:w-auto"
+              (click)="showToken()"
+            >
+              Show the token to copy
+            </button>
+          }
+        </div>
+        @if (tokenShown && created) {
+          <ng-container *ngTemplateOutlet="secret" />
+        }
+      </div>
+    }
+    @case ('declined') {
+      <h2 data-testid="cli-auth-title" class="text-[24px] text-white">Request declined</h2>
+      <p data-testid="cli-auth-declined" class="text-sm text-[#9FA0A0]">
+        You declined. No access token was created and nothing was sent to the CLI. You can close this tab; the CLI will
+        keep waiting until you cancel it there.
+      </p>
+    }
+    @case ('refused') {
+      <h2 data-testid="cli-auth-title" class="text-[24px] text-white">This sign-in link was refused</h2>
+      <div class="space-y-4 rounded-xl border border-[#404141] bg-[#101112] p-6">
+        <p data-testid="cli-auth-refused" class="text-warning-500 text-sm">
+          The link asks for the token to be sent to an address that is not on this computer. Tokens are only sent to
+          http://127.0.0.1:&lt;port&gt;/… or http://[::1]:&lt;port&gt;/…, so no access token was created. If you did not
+          start this from the Repsy CLI, close this page.
+        </p>
+        @if (!pasteFallback) {
+          <button
+            data-testid="cli-auth-use-paste"
+            type="button"
+            class="repsy-btn-secondary w-full sm:w-auto"
+            (click)="usePasteInstead()"
+          >
+            Create a token to copy by hand instead
+          </button>
+        }
+      </div>
+      @if (pasteFallback) {
+        <ng-container *ngTemplateOutlet="pasteFlow" />
+      }
+    }
+  }
+</div>
+
+<ng-template #pasteFlow>
   @if (!created) {
     <p class="text-sm text-[#9FA0A0]">
       The CLI asked for an access token. Check the name and the scopes below, then create it and paste it into the CLI.
@@ -25,24 +216,24 @@
   } @else {
     <p class="text-warning-500 text-sm">You can only view this access token once, so be sure to save it.</p>
     <div class="rounded-xl border border-[#404141] bg-[#101112] p-6">
-      <p class="mb-2 text-[#9FA0A0]">{{ created.name }} · {{ scopesText() }}</p>
-      <div class="flex items-center gap-2 rounded-lg border border-[#404141] px-4 py-3">
-        <code data-testid="cli-auth-token" class="flex-1 text-[16px] break-all text-white select-all">{{
-          created.token
-        }}</code>
-        <app-copy-clipboard data-testid="cli-auth-copy" [text]="created.token" />
-      </div>
-      <p class="mt-4 text-sm text-[#9FA0A0]">
-        Copy this token and paste it into the terminal where rp is waiting. It will not be shown again. You can revoke
-        it any time under
-        <a
-          data-testid="cli-auth-manage"
-          routerLink="/profile/settings"
-          fragment="access-tokens"
-          class="text-secondary-500"
-          >Settings</a
-        >.
-      </p>
+      <ng-container *ngTemplateOutlet="secret" />
     </div>
   }
-</div>
+</ng-template>
+
+<ng-template #secret>
+  <p class="mb-2 text-[#9FA0A0]">{{ created?.name }} · {{ scopesText() }}</p>
+  <div class="flex items-center gap-2 rounded-lg border border-[#404141] px-4 py-3">
+    <code data-testid="cli-auth-token" class="flex-1 text-[16px] break-all text-white select-all">{{
+      created?.token
+    }}</code>
+    <app-copy-clipboard data-testid="cli-auth-copy" [text]="created?.token ?? ''" />
+  </div>
+  <p class="mt-4 text-sm text-[#9FA0A0]">
+    Copy this token and paste it into the terminal where rp is waiting. It will not be shown again. You can revoke it
+    any time under
+    <a data-testid="cli-auth-manage" routerLink="/profile/settings" fragment="access-tokens" class="text-secondary-500"
+      >Settings</a
+    >.
+  </p>
+</ng-template>

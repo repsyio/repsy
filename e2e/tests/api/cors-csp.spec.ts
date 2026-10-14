@@ -56,6 +56,8 @@ test.describe('Content-Security-Policy', { tag: ['@smoke'] }, () => {
       expect(csp).toContain("object-src 'none'");
       expect(csp).toContain("frame-ancestors 'none'");
       expect(csp).toContain("base-uri 'self'");
+      // RPS-2039: /cli/auth posts the new token to the Repsy CLI on the user's machine (loopback only).
+      expect(csp).toContain("form-action 'self' http://127.0.0.1:*");
     });
   }
 
