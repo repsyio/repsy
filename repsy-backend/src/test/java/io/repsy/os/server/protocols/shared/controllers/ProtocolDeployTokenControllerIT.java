@@ -1388,6 +1388,26 @@ class ProtocolDeployTokenControllerIT extends AbstractIT {
     }
 
     @Test
+    @DisplayName("answers the id of the rotated token in Location, and DELETE accepts that id")
+    void locationCarriesTheTokenId() throws Exception {
+      final var it = ProtocolDeployTokenControllerIT.this;
+      final var repo = it.createRepo(RepoType.MAVEN);
+      final var seeded = it.seedToken(repo, "locate-me");
+      final var token = it.adminBearerToken();
+
+      final var rotated =
+          it.perform(post(rotateUrl(repo, seeded.getId())).header(AUTHORIZATION, token));
+      expectBare(rotated);
+
+      final var location = rotated.andReturn().getResponse().getHeader(LOCATION);
+      assertThat(location).isEqualTo(tokenUrl(repo, seeded.getId()));
+
+      final var returnedId = UUID.fromString(location.substring(location.lastIndexOf('/') + 1));
+      expectNoContent(it.perform(delete(tokenUrl(repo, returnedId)).header(AUTHORIZATION, token)));
+      assertThat(it.tokensOf(repo)).isEmpty();
+    }
+
+    @Test
     @DisplayName("only rotates the addressed token")
     void leavesOtherTokensUntouched() throws Exception {
       final var it = ProtocolDeployTokenControllerIT.this;

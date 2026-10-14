@@ -866,6 +866,12 @@ paths:
               description: "`no-store`, the response carries a secret"
               schema:
                 type: string
+            Location:
+              description: >-
+                The URL of the rotated token, `/api/repos/{repoName}/deploy-tokens/{tokenId}`. The
+                token id is the one DELETE accepts and may differ from the id in the request path.
+              schema:
+                type: string
           content:
             application/json:
               schema:

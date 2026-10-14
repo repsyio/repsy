@@ -38,6 +38,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.data.web.PagedModel;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -100,6 +101,8 @@ public class ProtocolDeployTokenController {
         this.deployTokenService.rotateDeployToken(repoInfo.getStorageKey(), tokenId);
 
     NoStore.apply(response);
+    response.setHeader(
+        HttpHeaders.LOCATION, "/api/repos/" + repoInfo.getName() + "/deploy-tokens/" + tokenId);
 
     return ResponseEntities.jsonString(repoDeployToken);
   }
