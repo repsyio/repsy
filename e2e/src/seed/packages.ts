@@ -120,9 +120,13 @@ export const SEEDERS: Record<PackageProtocol, PackageSeeder> = {
   ruby: seedRuby,
 };
 
-/** The protocol a repo of `type` serves (`RepoType` is upper-case, protocols lower-case). */
+/**
+ * The protocol a repo of `type` serves (`RepoType` is upper-case, protocols lower-case). The panel
+ * API still spells the Go type `GOLANG`; the harness calls the protocol `go` (RPS-2124).
+ */
 export function protocolOf(type: RepoType | string): PackageProtocol {
-  const protocol = String(type).toLowerCase();
+  const lower = String(type).toLowerCase();
+  const protocol = lower === 'golang' ? 'go' : lower;
   if (!(PACKAGE_PROTOCOLS as readonly string[]).includes(protocol)) {
     throw new Error(`protocolOf: "${type}" is not a package protocol`);
   }
