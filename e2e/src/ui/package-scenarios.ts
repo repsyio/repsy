@@ -50,9 +50,10 @@
  */
 import type { Locator, Page } from '@playwright/test';
 
-import { RepoType } from '../api/panel-api.js';
+import type { RepoType } from '../api/panel-api.js';
 import { env } from '../env.js';
 import { repoUrl } from '../repo-url.js';
+import { repoTypeOf as repoTypeOfProtocol } from '../seed/packages.js';
 import type { PackageRef, SeededPackage } from '../seed/packages.js';
 import { allowClipboard, copiedText } from './clipboard.js';
 import { expect, test } from './package-fixtures.js';
@@ -111,7 +112,7 @@ const DEFAULT_CONFIGURE: ConfigureModal = {
 };
 
 function repoTypeOf(descriptor: ProtocolDescriptor): RepoType {
-  return RepoType[descriptor.protocol.toUpperCase() as keyof typeof RepoType];
+  return repoTypeOfProtocol(descriptor.protocol);
 }
 
 export function escapeRegExp(text: string): string {

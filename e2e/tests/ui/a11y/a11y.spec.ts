@@ -27,6 +27,7 @@
  * exists, so the list and settings pages hold data.
  */
 import { RepoType } from '../../../src/api/panel-api.js';
+import { repoTypeOf } from '../../../src/seed/packages.js';
 import type { PackageProtocol } from '../../../src/seed/packages.js';
 import { scanPage } from '../../../src/ui/a11y.js';
 import { expect, test } from '../../../src/ui/package-fixtures.js';
@@ -151,7 +152,7 @@ test.describe('Accessibility (axe)', { tag: '@a11y' }, () => {
   const LEVELS: readonly LevelName[] = ['list', 'sublist', 'versions', 'manifests', 'detail'];
   for (const protocol of Object.keys(DESCRIPTORS) as PackageProtocol[]) {
     const descriptor = DESCRIPTORS[protocol];
-    const repoType = RepoType[protocol.toUpperCase() as keyof typeof RepoType];
+    const repoType = repoTypeOf(protocol);
     for (const level of LEVELS.filter((name) => descriptor.levels[name])) {
       test(`A11Y-01: ${protocol} ${level} page`, async ({
         adminPage,

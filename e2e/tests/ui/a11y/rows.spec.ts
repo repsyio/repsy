@@ -28,6 +28,7 @@
 import type { Locator, Page } from '@playwright/test';
 
 import { RepoType } from '../../../src/api/panel-api.js';
+import { repoTypeOf } from '../../../src/seed/packages.js';
 import type { PackageProtocol, PackageRef } from '../../../src/seed/packages.js';
 import { expect, test } from '../../../src/ui/package-fixtures.js';
 import { repoRoute, urlHasPath } from '../../../src/ui/routes.js';
@@ -305,7 +306,7 @@ test.describe('List rows are links', { tag: '@a11y' }, () => {
   const LEVELS: readonly ListLevelName[] = ['list', 'sublist', 'versions', 'manifests'];
   for (const protocol of Object.keys(DESCRIPTORS) as PackageProtocol[]) {
     const descriptor = DESCRIPTORS[protocol];
-    const repoType = RepoType[protocol.toUpperCase() as keyof typeof RepoType];
+    const repoType = repoTypeOf(protocol);
     const clickable = LEVELS.filter((level) => descriptor.levels[level]?.rowOpens);
 
     for (const level of clickable) {

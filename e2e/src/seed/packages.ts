@@ -27,7 +27,7 @@
  * `SEEDERS` is the registry, one `packages/<proto>.ts` module per protocol. A seeder is `(repoName, ctx, opts) => SeededPackage`
  * and must throw (never return) when the server refuses the publish.
  */
-import type { RepoType } from '../api/panel-api.js';
+import { RepoType } from '../api/panel-api.js';
 import { seedCargo } from './packages/cargo.js';
 import { type DockerSeedOptions, seedDocker } from './packages/docker.js';
 import { seedGo } from './packages/go.js';
@@ -119,6 +119,23 @@ export const SEEDERS: Record<PackageProtocol, PackageSeeder> = {
   go: seedGo,
   ruby: seedRuby,
 };
+
+const REPO_TYPE_BY_PROTOCOL: Readonly<Record<PackageProtocol, RepoType>> = {
+  maven: RepoType.MAVEN,
+  npm: RepoType.NPM,
+  nuget: RepoType.NUGET,
+  cargo: RepoType.CARGO,
+  go: RepoType.GOLANG,
+  docker: RepoType.DOCKER,
+  helm: RepoType.HELM,
+  ruby: RepoType.RUBY,
+  pypi: RepoType.PYPI,
+};
+
+/** The repo type a `protocol` is served by (the inverse of `protocolOf`; `go` is `GOLANG`). */
+export function repoTypeOf(protocol: PackageProtocol): RepoType {
+  return REPO_TYPE_BY_PROTOCOL[protocol];
+}
 
 /**
  * The protocol a repo of `type` serves (`RepoType` is upper-case, protocols lower-case). The panel

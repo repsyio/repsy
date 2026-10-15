@@ -29,6 +29,7 @@ import {
   type PackageProtocol,
   type SeededPackage,
   seedPackage,
+  repoTypeOf,
 } from '../seed/packages.js';
 import type { Seeder, SeededRepo, SeededUser } from '../seed/seeder.js';
 import { type SpecOperation, requestFor } from './spec-ops.js';
@@ -43,18 +44,6 @@ const PROTOCOL_BY_SEGMENT: Readonly<Record<string, PackageProtocol>> = {
   helm: 'helm',
   ruby: 'ruby',
   pypi: 'pypi',
-};
-
-const REPO_TYPE_BY_PROTOCOL: Readonly<Record<PackageProtocol, RepoType>> = {
-  maven: RepoType.MAVEN,
-  npm: RepoType.NPM,
-  nuget: RepoType.NUGET,
-  cargo: RepoType.CARGO,
-  go: RepoType.GOLANG,
-  docker: RepoType.DOCKER,
-  helm: RepoType.HELM,
-  ruby: RepoType.RUBY,
-  pypi: RepoType.PYPI,
 };
 
 /**
@@ -108,7 +97,7 @@ export async function seedSweepWorld(
   const packages = {} as Record<PackageProtocol, SeededPackage>;
   for (const protocol of PACKAGE_PROTOCOLS) {
     // Private, so an anonymous caller has to be refused on every one of them.
-    repos[protocol] = await seeder.createRepo(REPO_TYPE_BY_PROTOCOL[protocol], {
+    repos[protocol] = await seeder.createRepo(repoTypeOf(protocol), {
       privateRepo: true,
     });
     packages[protocol] = await seedPackage(repos[protocol], seeder, {});

@@ -15,12 +15,12 @@
 ///
 
 /**
- * RPS-2245: `protocolOf` maps every panel repo type to a package protocol the seeders know. The Go
+ * RPS-2245, RPS-2248: `protocolOf` and `repoTypeOf` maps every panel repo type to a package protocol the seeders know. The Go
  * type is `GOLANG` on the panel API while the harness protocol is `go`, so the lower-cased type is
  * not enough there.
  */
 import { RepoType } from '../../src/api/panel-api.js';
-import { PACKAGE_PROTOCOLS, protocolOf } from '../../src/seed/packages.js';
+import { PACKAGE_PROTOCOLS, protocolOf, repoTypeOf } from '../../src/seed/packages.js';
 import { expect, test } from '@playwright/test';
 
 test('every repo type maps to a package protocol', () => {
@@ -37,4 +37,13 @@ test('the GOLANG repo type is the go protocol, in any case', () => {
 
 test('a type that is no package protocol is refused', () => {
   expect(() => protocolOf('banana')).toThrow(/not a package protocol/);
+});
+
+test('every package protocol maps to a defined repo type and back (RPS-2248)', () => {
+  for (const protocol of PACKAGE_PROTOCOLS) {
+    const type = repoTypeOf(protocol);
+
+    expect(Object.values(RepoType), protocol).toContain(type);
+    expect(protocolOf(type), protocol).toBe(protocol);
+  }
 });
