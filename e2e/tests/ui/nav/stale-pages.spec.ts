@@ -31,6 +31,7 @@
  * the 404, so each test allows it through the page-error fixture with its reason.
  */
 import { RepoType } from '../../../src/api/panel-api.js';
+import { repoTypeOf } from '../../../src/seed/packages.js';
 import { expect, test } from '../../../src/ui/package-fixtures.js';
 import { allowNotFoundToast } from '../../../src/ui/package-scenarios.js';
 import { DESCRIPTORS, protocolPages } from '../../../src/ui/pages/protocol.js';
@@ -56,9 +57,7 @@ test.describe('Stale pages: versions and packages', { tag: NAV }, () => {
       pageErrors,
     }) => {
       allowNotFoundToast(pageErrors);
-      const repo = await seeder.createRepo(
-        RepoType[protocol.toUpperCase() as keyof typeof RepoType],
-      );
+      const repo = await seeder.createRepo(repoTypeOf(protocol));
       const [first, second] = await seedVersions(repo, ['1.0.0', '2.0.0']);
       const pages = protocolPages(adminPage, descriptor, repo.name);
       const detail = pages.detail(first);

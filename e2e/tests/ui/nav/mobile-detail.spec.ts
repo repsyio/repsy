@@ -28,6 +28,7 @@
 import type { Page } from '@playwright/test';
 
 import { RepoType } from '../../../src/api/panel-api.js';
+import { repoTypeOf } from '../../../src/seed/packages.js';
 import { scanPage } from '../../../src/ui/a11y.js';
 import {
   expectModalFits,
@@ -86,7 +87,7 @@ async function tabThrough(page: Page, max = 90): Promise<string[]> {
 test.describe('Phone width: package pages', { tag: MOBILE }, () => {
   for (const protocol of PROTOCOLS) {
     const descriptor = DESCRIPTORS[protocol];
-    const type = RepoType[protocol.toUpperCase() as keyof typeof RepoType];
+    const type = repoTypeOf(protocol);
 
     /** Opens a repository with one package (`options` shapes its identity) at the phone's width. */
     const setup = async (

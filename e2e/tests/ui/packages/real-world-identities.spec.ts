@@ -31,7 +31,7 @@
  * Data, not code, differs between the cases: `SHOWN` records what the panel displays where it differs
  * from what was published, and `knownFailure` pins a product bug (`test.fail`, never a skip).
  */
-import { RepoType } from '../../../src/api/panel-api.js';
+import { repoTypeOf } from '../../../src/seed/packages.js';
 import { adminCredential } from '../../../src/clients/raw-http.js';
 import { buildJar, rawPut, versionDir } from '../../../src/clients/maven-raw.js';
 import type {
@@ -276,9 +276,7 @@ test.describe('Package identities of the real world', { tag: '@packages' }, () =
       seedPackage,
     }) => {
       test.fail(Boolean(identity.knownFailure), identity.knownFailure);
-      const repo = await seeder.createRepo(
-        RepoType[identity.protocol.toUpperCase() as keyof typeof RepoType],
-      );
+      const repo = await seeder.createRepo(repoTypeOf(identity.protocol));
       const published = await seedPackage(repo, {
         ...identity.options,
         name: identity.name,

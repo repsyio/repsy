@@ -35,6 +35,7 @@
 import type { Page } from '@playwright/test';
 
 import { RepoType } from '../../../src/api/panel-api.js';
+import { repoTypeOf } from '../../../src/seed/packages.js';
 import { env } from '../../../src/env.js';
 import { expect, test } from '../../../src/ui/package-fixtures.js';
 import { allowNotFoundToast, expectVersionNotFound } from '../../../src/ui/package-scenarios.js';
@@ -232,9 +233,7 @@ test.describe('Browser history: lists and details', { tag: NAV }, () => {
       seeder,
       seedPackage,
     }) => {
-      const repo = await seeder.createRepo(
-        RepoType[protocol.toUpperCase() as keyof typeof RepoType],
-      );
+      const repo = await seeder.createRepo(repoTypeOf(protocol));
       const pkg = await seedPackage(repo);
       const { list, versions, detail } = await openWalk(adminPage, protocol, repo.name, pkg);
       const detailAt = where(adminPage);
@@ -341,9 +340,7 @@ test.describe('Browser history: deleted things stay deleted', { tag: NAV }, () =
       pageErrors,
     }) => {
       allowNotFoundToast(pageErrors);
-      const repo = await seeder.createRepo(
-        RepoType[protocol.toUpperCase() as keyof typeof RepoType],
-      );
+      const repo = await seeder.createRepo(repoTypeOf(protocol));
       const [first, second] = await seedVersions(repo, ['1.0.0', '2.0.0']);
       const pages = protocolPages(adminPage, descriptor, repo.name);
       const versions = pages.versions(first);

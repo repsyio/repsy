@@ -21,7 +21,7 @@
  */
 import type { Request } from '@playwright/test';
 
-import { RepoType } from '../../../src/api/panel-api.js';
+import { repoTypeOf } from '../../../src/seed/packages.js';
 import { expect, test } from '../../../src/ui/package-fixtures.js';
 import { repoApiPath } from '../../../src/ui/routes.js';
 import { DESCRIPTORS, protocolPages } from '../../../src/ui/pages/protocol.js';
@@ -35,9 +35,7 @@ test.describe('Repository permissions', { tag: '@packages' }, () => {
       seeder,
       seedPackage,
     }) => {
-      const repo = await seeder.createRepo(
-        RepoType[protocol.toUpperCase() as keyof typeof RepoType],
-      );
+      const repo = await seeder.createRepo(repoTypeOf(protocol));
       const pkg = await seedPackage(repo);
       const permissions = repoApiPath(repo.name, 'permissions');
       const requests: string[] = [];

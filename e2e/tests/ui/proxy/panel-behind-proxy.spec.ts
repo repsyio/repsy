@@ -34,7 +34,7 @@
  * The wire side (the URLs Repsy builds from `X-Forwarded-*`) is `tests/api/reverse-proxy.spec.ts`. Skipped without
  * the overlay (`REPSY_E2E_PROXY=1`); `@smoke` is on none of it, the leg runs `@smoke` and `@proxy` of the ui runner.
  */
-import { RepoType } from '../../../src/api/panel-api.js';
+import { repoTypeOf } from '../../../src/seed/packages.js';
 import { env } from '../../../src/env.js';
 import { optedIn } from '../../../src/stack-overlays.js';
 import { allowClipboard, copiedText } from '../../../src/ui/clipboard.js';
@@ -87,9 +87,7 @@ test.describe('The panel behind a reverse proxy', { tag: ['@proxy'] }, () => {
       seedPackage,
     }) => {
       await allowClipboard(context);
-      const repo = await seeder.createRepo(
-        RepoType[descriptor.protocol.toUpperCase() as keyof typeof RepoType],
-      );
+      const repo = await seeder.createRepo(repoTypeOf(descriptor.protocol));
       const pkg = await seedPackage(repo);
       const detail = protocolPages(adminPage, descriptor, repo.name).detail(pkg);
 

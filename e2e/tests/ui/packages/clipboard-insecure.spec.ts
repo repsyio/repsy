@@ -25,6 +25,7 @@
  * modal's copy buttons are in `tests/ui/users/users-reset-password-copy.spec.ts` (`@cloud-skip`).
  */
 import { RepoType } from '../../../src/api/panel-api.js';
+import { repoTypeOf } from '../../../src/seed/packages.js';
 import { seedHostileNpm } from '../../../src/ui/hostile-packages.js';
 import { expect, test } from '../../../src/ui/package-fixtures.js';
 import { simulatePlainHttp, recordedCopies } from '../../../src/ui/plain-http.js';
@@ -45,9 +46,7 @@ test.describe('Copy buttons without navigator.clipboard', { tag: PACKAGES }, () 
       seedPackage,
     }) => {
       await simulatePlainHttp(context);
-      const repo = await seeder.createRepo(
-        RepoType[protocol.toUpperCase() as keyof typeof RepoType],
-      );
+      const repo = await seeder.createRepo(repoTypeOf(protocol));
       const pkg = await seedPackage(repo);
       const detail = protocolPages(adminPage, DESCRIPTORS[protocol], repo.name).detail(pkg);
       await detail.goto();
