@@ -250,8 +250,7 @@ class SecurityHeadersFilterTest {
     filter.doFilterInternal(request, response, this.filterChain);
 
     // The one place a host appears is form-action (RPS-2039), and it is the two loopback addresses.
-    final var withoutFormAction =
-        policy[0].replace("form-action 'self' http://127.0.0.1:*", "");
+    final var withoutFormAction = policy[0].replace("form-action 'self' http://127.0.0.1:*", "");
 
     assertThat(withoutFormAction)
         .doesNotContain("http:", "https:", "googletagmanager", "google-analytics", "cdnjs");
