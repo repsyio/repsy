@@ -29,6 +29,8 @@
 
     <div class="gradient-border mx-auto my-6 sm:my-10"></div>
 
-    <app-access-token-form (created)="onCreated($event)" (cancelled)="closeModal()" />
+    <div class="pt-4">
+      <app-access-token-form (created)="onCreated($event)" (cancelled)="closeModal()" />
+    </div>
   </div>
 }
