@@ -78,6 +78,7 @@ import {
 import { env } from '../../src/env.js';
 import { repoUrl } from '../../src/repo-url.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
+import { protocolOf, repoTypeOf } from '../../src/seed/packages.js';
 import { perTestRunId } from '../../src/seed/run-id.js';
 import { Seeder } from '../../src/seed/seeder.js';
 import { optedIn } from '../../src/stack-overlays.js';
@@ -496,7 +497,9 @@ test.describe.serial(
         repos.map((repo) => `${repo.type}:${repo.name}`).sort(),
         'the panel lists every repository with its type',
       ).toEqual(
-        packages.map((pkg) => `${pkg.world.protocol.toUpperCase()}:${pkg.world.repoName}`).sort(),
+        packages
+          .map((pkg) => `${repoTypeOf(protocolOf(pkg.world.protocol))}:${pkg.world.repoName}`)
+          .sort(),
       );
       const users = await panelApi.listAllUsers({ q: `e2e-${seeder.runId}` });
       expect(
