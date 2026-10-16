@@ -74,7 +74,7 @@ public class NpmAuthenticatorImpl extends ProtocolAuthService
 
     // A secret with the personal access token prefix is that and nothing else: it never reaches the
     // password check (RPS-1903).
-    if (TokenType.REPSY_USER_TOKEN.matches(password)) {
+    if (TokenType.isUserToken(password)) {
       return this.authenticateWithPersonalAccessToken(password);
     }
 
@@ -230,7 +230,7 @@ public class NpmAuthenticatorImpl extends ProtocolAuthService
       throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
 
-    if (TokenType.REPSY_USER_TOKEN.matches(credentials.getPassword())) {
+    if (TokenType.isUserToken(credentials.getPassword())) {
       return personalAccessTokenCaller(super.authenticateWithPat(credentials.getPassword()));
     }
 

@@ -20,7 +20,9 @@ import lombok.Getter;
 @Getter
 public enum TokenType {
   REPSY_DEPLOY_TOKEN("rdt-"),
-  REPSY_USER_TOKEN("rut-");
+  REPSY_USER_TOKEN("rut-"),
+  /** The temporary token of a CLI login (RPS-2039), 24 hours; a personal access token row. */
+  REPSY_CLI_TOKEN("rct-");
 
   private final String prefix;
 
@@ -31,5 +33,15 @@ public enum TokenType {
   /** Whether {@code secret} carries this type's prefix, which is what tells the types apart. */
   public boolean matches(final String secret) {
     return secret.startsWith(this.prefix);
+  }
+
+  /**
+   * Whether {@code secret} is a secret of the personal access token table: a long-lived {@link
+   * #REPSY_USER_TOKEN} or a temporary {@link #REPSY_CLI_TOKEN}. Every credential entry point asks
+   * this one question, so a token kind is recognized by all of them or by none, and a password that
+   * looks like either is refused as a password.
+   */
+  public static boolean isUserToken(final String secret) {
+    return REPSY_USER_TOKEN.matches(secret) || REPSY_CLI_TOKEN.matches(secret);
   }
 }

@@ -50,9 +50,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * The personal access tokens of the signed-in user. Creating, listing and revoking work with the
- * access token of a login only, so a token cannot mint or revoke tokens (the other three routes
- * answer 401 to one); {@link #current} is the one route a personal access token may call. The
- * secret of a token is shown by {@link #create} only.
+ * access token of a login or with a <em>temporary</em> token of a CLI login (RPS-2039), so that
+ * {@code rp token create} can mint a CI token after {@code rp auth login}; a long-lived token never
+ * manages tokens (it answers 401). {@link #current} takes a token of either kind. Temporary tokens
+ * are neither listed nor revocable here. The secret of a token is shown by {@link #create} only.
  */
 @RestApiPort(MultiPortNames.PORT_API)
 @RestController
@@ -76,9 +77,10 @@ class PersonalAccessTokenController {
       @RequestBody @Valid final AccessTokenForm form,
       final HttpServletResponse response) {
 
-    final var userId = this.panelAuthHelper.authenticate(authHeader).getId();
+    final var caller = this.panelAuthHelper.authenticateTokenManager(authHeader);
 
-    final var created = this.tokenService.createToken(userId, form);
+    final var created =
+        this.tokenService.createToken(caller.user().getId(), form, caller.grantable());
 
     NoStore.apply(response);
 
@@ -91,7 +93,7 @@ class PersonalAccessTokenController {
       @RequestHeader(AUTHORIZATION) final String authHeader,
       @PageableDefault(sort = "id", direction = DESC) final Pageable pageable) {
 
-    final var userId = this.panelAuthHelper.authenticate(authHeader).getId();
+    final var userId = this.panelAuthHelper.authenticateTokenManager(authHeader).user().getId();
 
     SortValidator.requireSortableBy(pageable, SORT_PROPERTIES);
 
@@ -99,7 +101,7 @@ class PersonalAccessTokenController {
   }
 
   /**
-   * What the token of this request is. The one route here that takes a personal access token: it
+   * What the token of this request is. The one route here that takes a long-lived token too: it
    * answers who the token belongs to, what it may do and when it stops working. With the access
    * token of a login it answers {@code notAnAccessToken} (400), as there is no token to describe.
    */
@@ -115,7 +117,7 @@ class PersonalAccessTokenController {
   public ResponseEntity<Void> revoke(
       @RequestHeader(AUTHORIZATION) final String authHeader, @PathVariable final UUID tokenId) {
 
-    final var userId = this.panelAuthHelper.authenticate(authHeader).getId();
+    final var userId = this.panelAuthHelper.authenticateTokenManager(authHeader).user().getId();
 
     this.tokenService.revokeToken(userId, tokenId);
 

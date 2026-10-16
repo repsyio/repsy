@@ -34,6 +34,7 @@ import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
 import io.repsy.os.shared.token.dtos.PersonalAccessTokenInfo;
+import io.repsy.os.shared.token.dtos.PersonalAccessTokenKind;
 import io.repsy.os.shared.token.dtos.TokenScope;
 import io.repsy.os.shared.token.services.PersonalAccessTokenService;
 import io.repsy.os.shared.token.utils.TokenFactory;
@@ -118,6 +119,7 @@ class ProtocolAuthServicePatTest {
         UUID.randomUUID(),
         OWNER_ID,
         OWNER,
+        PersonalAccessTokenKind.PERSONAL,
         "ci",
         TokenScope.withImplicit(java.util.List.of(scopes)),
         expirationDate,
@@ -150,7 +152,17 @@ class ProtocolAuthServicePatTest {
   class TryAuthorize {
 
     @ParameterizedTest(name = "\"{0}\" is not a personal access token")
-    @ValueSource(strings = {"", "password", "rdt-deploy", "RUT-upper", "xrut-x", "ru-t"})
+    @ValueSource(
+        strings = {
+          "",
+          "password",
+          "rdt-deploy",
+          "RUT-upper",
+          "RCT-upper",
+          "xrut-x",
+          "xrct-x",
+          "ru-t"
+        })
     void anythingWithoutThePrefixIsLeftAlone(final String other) {
       assertThat(authService.tryAuthorizeWithPat(REPO_ID, other, Permission.READ)).isFalse();
 
@@ -406,6 +418,7 @@ class ProtocolAuthServicePatTest {
           tokenId,
           token.userId(),
           token.username(),
+          token.kind(),
           token.name(),
           token.scopes(),
           token.expirationDate(),
@@ -613,6 +626,90 @@ class ProtocolAuthServicePatTest {
       assertUnauthorized(() -> authService.authorizeUserRequest(repo, basic, Permission.READ));
 
       verify(userTxService, never()).findUserInfoByUsername(any());
+    }
+  }
+
+  /** RPS-2039: the temporary {@code rct-} token goes through the same checks as a {@code rut-}. */
+  @Nested
+  @DisplayName("a temporary rct- token")
+  class Temporary {
+
+    private String cliSecret;
+
+    @BeforeEach
+    void cliSecretIsGenerated() {
+      cliSecret = TokenFactory.cliToken();
+    }
+
+    private PersonalAccessTokenInfo temporary(final TokenScope... scopes) {
+      return new PersonalAccessTokenInfo(
+          UUID.randomUUID(),
+          OWNER_ID,
+          OWNER,
+          PersonalAccessTokenKind.TEMPORARY,
+          "Repsy CLI login",
+          TokenScope.withImplicit(java.util.List.of(scopes)),
+          Instant.now().plus(Duration.ofHours(24)),
+          null,
+          Instant.now());
+    }
+
+    @Test
+    @DisplayName("is recognized as a personal access token and authorized by its scopes")
+    void isAuthorizedLikeAToken() {
+      when(tokens.findByToken(cliSecret)).thenReturn(Optional.of(temporary(TokenScope.REPO_READ)));
+
+      assertThat(authService.tryAuthorizeWithPat(REPO_ID, cliSecret, Permission.READ)).isTrue();
+      assertUnauthorized(
+          () -> authService.tryAuthorizeWithPat(REPO_ID, cliSecret, Permission.WRITE));
+    }
+
+    @Test
+    @DisplayName("an unknown or expired one is a counted failure")
+    void unknownIsCounted() {
+      when(tokens.findByToken(cliSecret)).thenReturn(Optional.empty());
+
+      assertUnauthorized(
+          () -> authService.tryAuthorizeWithPat(REPO_ID, cliSecret, Permission.READ));
+
+      verify(throttle).recordFailure();
+    }
+
+    @Test
+    @DisplayName(
+        "a Basic password that starts with rct- never reaches the deploy token or the password check")
+    void basicNeverFallsThrough() {
+      when(tokens.findByToken(cliSecret)).thenReturn(Optional.empty());
+      final var basic =
+          "Basic "
+              + Base64.getEncoder()
+                  .encodeToString(("any:" + cliSecret).getBytes(StandardCharsets.UTF_8));
+
+      assertUnauthorized(() -> authService.handleBasicAuth(basic, Permission.READ, REPO_ID));
+
+      verifyNoInteractions(deployTokenService, userTxService);
+    }
+
+    @Test
+    @DisplayName("a rct- password is never hashed against a user's password")
+    void aPasswordLikeATemporaryToken() {
+      final var credentials = Credentials.builder().username(OWNER).password(cliSecret).build();
+
+      assertUnauthorized(() -> authService.authenticateWithPassword(credentials));
+
+      verify(throttle).recordFailure();
+      verifyNoInteractions(userTxService);
+    }
+
+    @Test
+    @DisplayName("a rct- Bearer value never reaches the JWT decode")
+    void bearerNeverFallsThrough() {
+      when(tokens.findByToken(cliSecret)).thenReturn(Optional.empty());
+
+      assertUnauthorized(
+          () -> authService.handleBearerAuth("Bearer " + cliSecret, REPO_ID, Permission.READ));
+
+      verifyNoInteractions(jwtUtils, deployTokenService, userTxService);
     }
   }
 

@@ -93,9 +93,10 @@ public class AuthUtils {
   }
 
   /**
-   * The secret of a personal access token sent as the Bearer value, or {@code null} for any other
-   * header. A header is a personal access token by its {@code rut-} prefix and nothing else, which
-   * is what keeps it away from the JWT and the password checks.
+   * The secret of a personal access token (a long-lived {@code rut-} one or a temporary {@code
+   * rct-} one) sent as the Bearer value, or {@code null} for any other header. A header is a
+   * personal access token by its prefix and nothing else, which is what keeps it away from the JWT
+   * and the password checks.
    */
   public static @Nullable String personalAccessTokenSecretOf(final String authHeader) {
 
@@ -105,7 +106,7 @@ public class AuthUtils {
 
     final var bearerToken = removeBearerHeader(authHeader);
 
-    return TokenType.REPSY_USER_TOKEN.matches(bearerToken) ? bearerToken : null;
+    return TokenType.isUserToken(bearerToken) ? bearerToken : null;
   }
 
   public static boolean isBearerToken(final String authHeader) {

@@ -31,6 +31,7 @@ import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.generated.model.AccessTokenForm;
+import io.repsy.os.shared.token.dtos.PersonalAccessTokenKind;
 import io.repsy.os.shared.token.dtos.TokenScope;
 import io.repsy.os.shared.token.entities.PersonalAccessToken;
 import io.repsy.os.shared.token.mappers.PersonalAccessTokenMapperImpl;
@@ -450,14 +451,18 @@ class PersonalAccessTokenServiceTest {
   void locksTheUserFirst() {
     this.whenUserExists();
     this.whenFlushed();
-    when(this.tokenRepository.countByUserIdAndExpirationDateAfter(USER_ID, NOW)).thenReturn(3L);
+    when(this.tokenRepository.countByUserIdAndKindAndExpirationDateAfter(
+            USER_ID, PersonalAccessTokenKind.PERSONAL, NOW))
+        .thenReturn(3L);
 
     this.service.createToken(USER_ID, form(null, TokenScope.REPO_READ));
 
     final var order = inOrder(this.userRepository, this.tokenRepository);
 
     order.verify(this.userRepository).lockUserIdForUpdate(USER_ID);
-    order.verify(this.tokenRepository).countByUserIdAndExpirationDateAfter(USER_ID, NOW);
+    order
+        .verify(this.tokenRepository)
+        .countByUserIdAndKindAndExpirationDateAfter(USER_ID, PersonalAccessTokenKind.PERSONAL, NOW);
     order.verify(this.tokenRepository).saveAndFlush(any(PersonalAccessToken.class));
   }
 
@@ -469,7 +474,8 @@ class PersonalAccessTokenServiceTest {
 
     this.service.createToken(USER_ID, form(null, TokenScope.REPO_READ));
 
-    verify(this.tokenRepository).countByUserIdAndExpirationDateAfter(USER_ID, NOW);
+    verify(this.tokenRepository)
+        .countByUserIdAndKindAndExpirationDateAfter(USER_ID, PersonalAccessTokenKind.PERSONAL, NOW);
     verify(this.tokenRepository, never()).countByUserId(any());
   }
 
@@ -478,7 +484,8 @@ class PersonalAccessTokenServiceTest {
   void capsTheTokensOfAUser() {
     this.whenUserExists();
     this.whenFlushed();
-    when(this.tokenRepository.countByUserIdAndExpirationDateAfter(USER_ID, NOW))
+    when(this.tokenRepository.countByUserIdAndKindAndExpirationDateAfter(
+            USER_ID, PersonalAccessTokenKind.PERSONAL, NOW))
         .thenReturn((long) PersonalAccessTokenService.MAX_TOKENS_PER_USER - 1)
         .thenReturn((long) PersonalAccessTokenService.MAX_TOKENS_PER_USER);
 
@@ -514,7 +521,8 @@ class PersonalAccessTokenServiceTest {
   @DisplayName("revokes a token of the user by deleting it")
   void revokesOwnToken() {
     final var token = this.tokenOf(this.user);
-    when(this.tokenRepository.findByUserIdAndId(USER_ID, token.getId()))
+    when(this.tokenRepository.findByUserIdAndIdAndKind(
+            USER_ID, token.getId(), PersonalAccessTokenKind.PERSONAL))
         .thenReturn(Optional.of(token));
 
     this.service.revokeToken(USER_ID, token.getId());
@@ -526,13 +534,182 @@ class PersonalAccessTokenServiceTest {
   @DisplayName("answers a token of another user as it answers one that does not exist")
   void doesNotRevokeAnotherUsersToken() {
     final var tokenId = UUID.randomUUID();
-    when(this.tokenRepository.findByUserIdAndId(USER_ID, tokenId)).thenReturn(Optional.empty());
+    when(this.tokenRepository.findByUserIdAndIdAndKind(
+            USER_ID, tokenId, PersonalAccessTokenKind.PERSONAL))
+        .thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> this.service.revokeToken(USER_ID, tokenId))
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessage("accessTokenNotFound");
 
     verify(this.tokenRepository, never()).delete(any());
+  }
+
+  // -------------------------------------------------------------------------------------------
+  // temporary tokens (RPS-2039)
+  // -------------------------------------------------------------------------------------------
+
+  @Test
+  @DisplayName(
+      "creates a temporary token with the rct- prefix, kind TEMPORARY and a 24-hour expiry")
+  void createsATemporaryToken() {
+    this.whenUserExists();
+    this.whenFlushed();
+
+    final var created = this.service.createTemporaryToken(USER_ID, Set.of(TokenScope.REPO_READ));
+    final var saved = this.savedToken();
+
+    assertThat(created.getToken()).startsWith("rct-");
+    assertThat(saved.getKind()).isEqualTo(PersonalAccessTokenKind.TEMPORARY);
+    assertThat(saved.getTokenHash()).isEqualTo(TokenHash.hash(created.getToken()));
+    assertThat(saved.getExpirationDate()).isEqualTo(NOW.plus(Duration.ofHours(24)));
+    assertThat(PersonalAccessTokenService.TEMPORARY_TOKEN_LIFETIME).isEqualTo(Duration.ofHours(24));
+    assertThat(saved.getScopes()).containsExactly(TokenScope.PROFILE_READ, TokenScope.REPO_READ);
+  }
+
+  @Test
+  @DisplayName("a temporary token is not counted against the cap, so it is created at the cap")
+  void temporaryTokenIgnoresTheCap() {
+    this.whenUserExists();
+    this.whenFlushed();
+    when(this.tokenRepository.countByUserIdAndKindAndExpirationDateAfter(any(), any(), any()))
+        .thenReturn((long) PersonalAccessTokenService.MAX_TOKENS_PER_USER);
+
+    assertThat(this.service.createTemporaryToken(USER_ID, Set.of(TokenScope.REPO_READ)).getToken())
+        .startsWith("rct-");
+    verify(this.tokenRepository, never())
+        .countByUserIdAndKindAndExpirationDateAfter(any(), any(), any());
+    verify(this.tokenRepository, never()).countByUserId(any());
+  }
+
+  @Test
+  @DisplayName("the cap counts personal tokens only, whatever temporary tokens the user holds")
+  void capCountsPersonalTokensOnly() {
+    this.whenUserExists();
+    this.whenFlushed();
+
+    this.service.createToken(USER_ID, form(null, TokenScope.REPO_READ));
+
+    verify(this.tokenRepository)
+        .countByUserIdAndKindAndExpirationDateAfter(USER_ID, PersonalAccessTokenKind.PERSONAL, NOW);
+    verify(this.tokenRepository, never())
+        .countByUserIdAndKindAndExpirationDateAfter(
+            any(), eq(PersonalAccessTokenKind.TEMPORARY), any());
+  }
+
+  @Test
+  @DisplayName("a personal token is stored as PERSONAL with the rut- prefix")
+  void personalTokenKeepsItsKind() {
+    this.whenUserExists();
+    this.whenFlushed();
+
+    final var created = this.service.createToken(USER_ID, form(null, TokenScope.REPO_READ));
+
+    assertThat(created.getToken()).startsWith("rut-");
+    assertThat(this.savedToken().getKind()).isEqualTo(PersonalAccessTokenKind.PERSONAL);
+  }
+
+  @Test
+  @DisplayName("refuses a temporary token with no scope")
+  void temporaryTokenNeedsAScope() {
+    assertThatThrownBy(() -> this.service.createTemporaryToken(USER_ID, Set.of()))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("validationError");
+
+    verifyNoInteractions(this.tokenRepository, this.userRepository);
+  }
+
+  @Test
+  @DisplayName("lists personal tokens only")
+  void listsPersonalTokensOnly() {
+    final var pageable = org.springframework.data.domain.PageRequest.of(0, 10);
+
+    this.service.getTokens(USER_ID, pageable);
+
+    verify(this.tokenRepository)
+        .findAllByUserIdAndKind(USER_ID, PersonalAccessTokenKind.PERSONAL, pageable);
+  }
+
+  @Test
+  @DisplayName("a temporary token cannot hand on a scope it does not have")
+  void grantableScopesCapTheForm() {
+    this.whenUserExists();
+    this.whenFlushed();
+
+    assertThatThrownBy(
+            () ->
+                this.service.createToken(
+                    USER_ID,
+                    form(null, TokenScope.REPO_READ, TokenScope.REPO_WRITE),
+                    EnumSet.of(TokenScope.PROFILE_READ, TokenScope.REPO_READ)))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("validationError");
+
+    verify(this.tokenRepository, never()).saveAndFlush(any());
+  }
+
+  @Test
+  @DisplayName("a temporary token can hand on its own scopes")
+  void grantableScopesAllowASubset() {
+    this.whenUserExists();
+    this.whenFlushed();
+
+    final var created =
+        this.service.createToken(
+            USER_ID,
+            form(null, TokenScope.REPO_READ),
+            EnumSet.of(TokenScope.PROFILE_READ, TokenScope.REPO_READ));
+
+    assertThat(created.getToken()).startsWith("rut-");
+  }
+
+  @Test
+  @DisplayName("revoking a personal token never reaches a temporary token")
+  void revokeLooksForPersonalTokensOnly() {
+    final var tokenId = UUID.randomUUID();
+    when(this.tokenRepository.findByUserIdAndIdAndKind(
+            USER_ID, tokenId, PersonalAccessTokenKind.TEMPORARY))
+        .thenReturn(Optional.of(this.tokenOf(this.user)));
+    when(this.tokenRepository.findByUserIdAndIdAndKind(
+            USER_ID, tokenId, PersonalAccessTokenKind.PERSONAL))
+        .thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> this.service.revokeToken(USER_ID, tokenId))
+        .isInstanceOf(ItemNotFoundException.class);
+
+    verify(this.tokenRepository, never()).delete(any());
+  }
+
+  @Test
+  @DisplayName("revokes the temporary tokens older than the new one, and only those")
+  void revokesThePreviousTemporaryTokens() {
+    final var current = this.tokenOf(this.user);
+    current.setKind(PersonalAccessTokenKind.TEMPORARY);
+    current.setCreatedAt(NOW);
+    when(this.tokenRepository.findByUserIdAndIdAndKind(
+            USER_ID, current.getId(), PersonalAccessTokenKind.TEMPORARY))
+        .thenReturn(Optional.of(current));
+
+    this.service.revokePreviousTemporaryTokens(USER_ID, current.getId());
+
+    verify(this.tokenRepository)
+        .deleteByUserIdAndKindCreatedBefore(USER_ID, PersonalAccessTokenKind.TEMPORARY, NOW);
+    verify(this.tokenRepository, never()).delete(any());
+  }
+
+  @Test
+  @DisplayName("revoke-previous of a token the user does not hold as a temporary one is not found")
+  void revokePreviousNeedsATemporaryTokenOfTheUser() {
+    final var tokenId = UUID.randomUUID();
+    when(this.tokenRepository.findByUserIdAndIdAndKind(
+            USER_ID, tokenId, PersonalAccessTokenKind.TEMPORARY))
+        .thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> this.service.revokePreviousTemporaryTokens(USER_ID, tokenId))
+        .isInstanceOf(ItemNotFoundException.class)
+        .hasMessage("accessTokenNotFound");
+
+    verify(this.tokenRepository, never()).deleteByUserIdAndKindCreatedBefore(any(), any(), any());
   }
 
   // -------------------------------------------------------------------------------------------

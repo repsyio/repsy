@@ -103,7 +103,7 @@ public class CargoAuthenticator extends ProtocolAuthService {
     }
 
     // A secret with the personal access token prefix is that and nothing else (RPS-1903).
-    if (TokenType.REPSY_USER_TOKEN.matches(credentials.getPassword())) {
+    if (TokenType.isUserToken(credentials.getPassword())) {
       return this.authenticateWithPersonalAccessToken(credentials.getPassword());
     }
 

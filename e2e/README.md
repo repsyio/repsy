@@ -6253,7 +6253,7 @@ Rules these specs follow (and a later spec on these pages should too):
 ### Access tokens and /cli/auth (RPS-2004)
 
 Specs: `tests/ui/profile/access-tokens.spec.ts` (PAT-01..PAT-08) and `tests/ui/profile/cli-auth.spec.ts`
-(PAT-10..PAT-17) and `tests/ui/profile/cli-callback.spec.ts` (PAT-18..PAT-31, RPS-2039). Page objects: `src/ui/pages/access-tokens.ts` (`AccessTokensPage`, `SettingsPage`, `CliAuthPage`, the
+(PAT-10..PAT-17) and `tests/ui/profile/cli-callback.spec.ts` (PAT-18..PAT-36, RPS-2039). Page objects: `src/ui/pages/access-tokens.ts` (`AccessTokensPage`, `SettingsPage`, `CliAuthPage`, the
 create form and modals; `AccessTokenInfoModal` is a `SecretModal`, the part of `OneTimeSecretModal` that every
 "shown once" modal shares). Fixtures: `src/ui/access-token-fixtures.ts` (`tokenUser`, `tokenPage`, `tokenApi`).
 The API helper is `src/ui/access-token-api.ts` (plain `fetch`, like `RepoSettingsReadback`).
@@ -6268,29 +6268,34 @@ The API helper is `src/ui/access-token-api.ts` (plain `fetch`, like `RepoSetting
 | PAT-06   | the created token answers `GET /api/profile/access-tokens/current` with its owner and scopes; after the revoke in the UI the same call is 401                |
 | PAT-07   | `@cloud-skip`: the password warning appears only while live tokens exist and links to them                                                                   |
 | PAT-08   | `@cloud-skip`: Settings in the avatar menu, its title and navigation, no token section on the profile page                                                   |
-| PAT-10   | `/cli/auth` signed out: sign-in, then the page opens with the same name and scopes (the END state only: OS keeps a return URL, Cloud a hand-over)            |
-| PAT-11   | unknown scopes and `scan:read` in the link are dropped; none left ticks the repository scopes on offer (not `scan:read`); the default name                   |
-| PAT-12   | opening (and reloading) creates nothing; Create makes one token and shows the secret once with the "paste it into the terminal where rp is waiting" text     |
-| PAT-13   | a name with markup is shown as text, never as an element                                                                                                     |
-| PAT-14   | a name longer than 80 characters is cut to 80                                                                                                                |
-| PAT-15   | at 50 live tokens the page says so and does not create                                                                                                       |
+| PAT-10   | `/cli/auth` signed out: sign-in, then the authorize screen opens with the same scopes (the END state only: OS keeps a return URL, Cloud a hand-over)         |
+| PAT-11   | unknown scopes and `scan:read` are dropped; none left means the three repository scopes                                                                      |
+| PAT-12   | opening (and reloading) creates nothing; Authorize shows one temporary `rct-` token once, it works, it is not in the token list                              |
+| PAT-13   | a name or markup in the link is ignored (the token name is not asked for), never an element                                                                  |
+| PAT-14   | the screen says "24 hours" and the server's expiry of the token agrees                                                                                       |
+| PAT-15   | at 50 personal tokens Authorize still works and the list is unchanged                                                                                        |
 | PAT-16   | `@cloud-skip`: `X-Frame-Options: DENY` and CSP `frame-ancestors 'none'` on the page                                                                          |
-| PAT-17   | `@cloud-skip`: the link to manage tokens goes to the Settings page                                                                                           |
-| PAT-18   | `/cli/auth` with a loopback `redirect_uri`: the approval screen (account, name, scopes in words, expiry); opening and reloading create nothing               |
-| PAT-19   | Approve creates exactly one token and POSTs `token` and `state` (form body) to the listener; no secret in any URL or `Referer`; the tab keeps no secret      |
+| PAT-17   | `@cloud-skip`: the link to create a long-lived token goes to the Settings page                                                                               |
+| PAT-18   | `/cli/auth` with a loopback `redirect_uri`: the authorize screen (account, scopes in words, 24 hours, no form); opening and reloading create nothing         |
+| PAT-19   | Authorize creates a temporary token and POSTs `token` and `state` (form body) to the listener; no secret in any URL or `Referer`; the tab keeps no secret    |
 | PAT-20   | a `state` with characters that need escaping comes back byte for byte                                                                                        |
 | PAT-21   | Decline: no token, nothing sent                                                                                                                              |
 | PAT-22   | refused `redirect_uri` (public host, `127.0.0.1.evil.test`, user info, `localhost`, https, no port, `127.1`, decimal IPv4, fragment): no token, nothing sent |
-| PAT-23   | after a refused link the person can still create a token by hand (paste); nothing is posted                                                                  |
-| PAT-24   | a link with no `redirect_uri` is the paste flow, `state` or not                                                                                              |
-| PAT-25   | an older token with the same name is revoked after the new one is delivered (default on); other tokens are untouched                                         |
-| PAT-26   | with the box unticked the older token stays                                                                                                                  |
+| PAT-23   | after a refused link the person can still get a token by hand (the same screen, the secret on screen); nothing is posted                                     |
+| PAT-24   | a link with no `redirect_uri` is the paste flow: the same screen, the secret on screen after Authorize                                                       |
+| PAT-25   | a new authorization ends the previous CLI token once the new one is delivered; personal tokens are untouched                                                 |
+| PAT-26   | declining a second authorization leaves the first CLI token working                                                                                          |
 | PAT-27   | nothing listens at the address: the token exists and can be shown and copied from the page (the post cannot be observed from the page)                       |
-| PAT-28   | at 50 live tokens Approve is blocked, nothing is created or sent                                                                                             |
+| PAT-28   | at 50 personal tokens Authorize still works; the list does not change                                                                                        |
 | PAT-29   | `[::1]` is accepted; where the browser policy cannot name it (Repsy OS `form-action`) the page shows the token to copy, elsewhere the listener gets it       |
-| PAT-30   | signed out: sign-in, then the approval screen with the same parameters; Approve posts the same `state` (the END state only)                                  |
+| PAT-30   | signed out: sign-in, then the authorize screen with the same parameters; Authorize posts the same `state` (the END state only)                               |
 | PAT-31   | signed out, a refused `redirect_uri` is still refused after sign-in                                                                                          |
 | PAT-32   | `@cloud-skip`: an administrator is offered `repo:manage` and `scan:read`, a user only `scan:read` (PAT-02)                                                   |
+| PAT-33   | a temporary token creates, lists and revokes a personal token (`rp token create`)                                                                            |
+| PAT-34   | a personal token cannot create, list or revoke personal tokens (401); it still answers `/current`                                                            |
+| PAT-35   | a temporary token cannot mint a temporary token (401) nor a personal token with a scope it does not have (400)                                               |
+| PAT-36   | a temporary token is not in the Settings list of personal tokens                                                                                             |
+| PAT-37   | a replaced temporary token is refused on every route at once                                                                                                 |
 
 Rules these specs follow:
 
@@ -6305,7 +6310,7 @@ Rules these specs follow:
 - **Where the section is.** `accessTokensRoute()`: the OS Settings page; Cloud's account page until its Settings
   page takes the section. No `profile`, no hard-coded path.
 - **The secret is checked against the server.** PAT-06 uses it; the list never contains it.
-- **A stand-in for the CLI (PAT-18..PAT-31).** `cliCallback` (`src/ui/loopback-callback.ts`) is an HTTP server on a free
+- **A stand-in for the CLI (PAT-18..PAT-36).** `cliCallback` (`src/ui/loopback-callback.ts`) is an HTTP server on a free
   `127.0.0.1` port of the machine the browser runs on; it records what the page POSTs and answers like the CLI's
   "you can close this tab". The harness aborts every request to a host that is not the panel (`applyUiDefaults`), so
   `tokenPage` is opened with `allowLoopback` (only `127.0.0.1` and `[::1]` are let through). The post goes to a NEW

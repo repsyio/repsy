@@ -34,6 +34,7 @@ class PersonalAccessTokenInfoTest {
         UUID.randomUUID(),
         UUID.randomUUID(),
         "alice",
+        PersonalAccessTokenKind.PERSONAL,
         "ci",
         scopes,
         expirationDate,

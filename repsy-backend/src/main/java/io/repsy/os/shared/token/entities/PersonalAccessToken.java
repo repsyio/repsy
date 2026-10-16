@@ -16,12 +16,15 @@
 package io.repsy.os.shared.token.entities;
 
 import io.repsy.core.uuidv7.UuidV7;
+import io.repsy.os.shared.token.dtos.PersonalAccessTokenKind;
 import io.repsy.os.shared.token.dtos.TokenScope;
 import io.repsy.os.shared.token.utils.TokenScopeConverter;
 import io.repsy.os.shared.user.entities.User;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
@@ -65,6 +68,10 @@ public class PersonalAccessToken {
 
   @Column(name = "name", nullable = false, length = 150)
   private String name;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "kind", nullable = false, length = 20)
+  private PersonalAccessTokenKind kind = PersonalAccessTokenKind.PERSONAL;
 
   @Column(name = "token_hash", nullable = false, length = 64)
   @ToString.Exclude

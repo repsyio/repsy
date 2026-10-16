@@ -19,6 +19,7 @@ import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.shared.auth.dtos.PanelSession;
+import io.repsy.os.shared.auth.dtos.TokenManagerSession;
 import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.constants.ErrorConstants;
@@ -30,6 +31,7 @@ import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.Permission;
+import java.util.EnumSet;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -117,6 +119,36 @@ public final class PanelAuthHelper {
     this.touch(token);
 
     return token;
+  }
+
+  /**
+   * Authenticates the caller of the personal access token routes ({@code POST}, {@code GET}, {@code
+   * DELETE /api/profile/access-tokens}): a login, or a <em>temporary</em> token (RPS-2039), which
+   * is what lets {@code rp token create} mint the long-lived token of a CI after {@code rp auth
+   * login}. A personal token is refused with 401, as before: a personal token never manages
+   * personal tokens. A temporary token hands on at most its own scopes, and cannot reach the routes
+   * that mint a temporary token ({@link #authenticate} takes a login only).
+   */
+  public TokenManagerSession authenticateTokenManager(final String authHeader) {
+
+    final var secret = AuthUtils.personalAccessTokenSecretOf(authHeader);
+
+    if (secret == null) {
+      return new TokenManagerSession(
+          this.authenticate(authHeader), EnumSet.allOf(TokenScope.class));
+    }
+
+    final var token = this.liveToken(secret);
+
+    if (!token.isTemporary()) {
+      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
+    }
+
+    final var user = this.userTxService.getAuthenticatedUserById(token.userId());
+
+    this.touch(token);
+
+    return new TokenManagerSession(user, token.scopes());
   }
 
   private UserInfo authenticateOrPersonalAccessToken(

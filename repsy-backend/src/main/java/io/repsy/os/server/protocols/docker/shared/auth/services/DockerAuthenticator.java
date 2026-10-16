@@ -154,7 +154,7 @@ public class DockerAuthenticator extends ProtocolAuthService implements DockerAu
   private Optional<String> authenticateWithPersonalAccessToken(
       final Credentials credentials, final List<String> grants) {
 
-    if (!TokenType.REPSY_USER_TOKEN.matches(credentials.getPassword())) {
+    if (!TokenType.isUserToken(credentials.getPassword())) {
       return Optional.empty();
     }
 

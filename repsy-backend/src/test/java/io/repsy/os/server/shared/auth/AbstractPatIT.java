@@ -17,6 +17,7 @@ package io.repsy.os.server.shared.auth;
 
 import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.repo.entities.Repo;
+import io.repsy.os.shared.token.dtos.PersonalAccessTokenKind;
 import io.repsy.os.shared.token.dtos.TokenScope;
 import io.repsy.os.shared.token.entities.PersonalAccessToken;
 import io.repsy.os.shared.token.repositories.PersonalAccessTokenRepository;
@@ -59,6 +60,22 @@ public abstract class AbstractPatIT extends AbstractIT {
     token.setTokenHash(TokenHash.hash(secret));
     token.setScopes(TokenScope.withImplicit(List.of(scopes)));
     token.setExpirationDate(expirationDate);
+    this.patRepository.saveAndFlush(token);
+
+    return new Pat(token.getId(), owner, secret);
+  }
+
+  /** A temporary CLI token (RPS-2039) of {@code owner}: {@code rct-}, 24 hours, never listed. */
+  protected Pat seedTemporary(final User owner, final TokenScope... scopes) {
+    final var secret = TokenFactory.cliToken();
+    final var token = new PersonalAccessToken();
+
+    token.setUser(owner);
+    token.setKind(PersonalAccessTokenKind.TEMPORARY);
+    token.setName("Repsy CLI login");
+    token.setTokenHash(TokenHash.hash(secret));
+    token.setScopes(TokenScope.withImplicit(List.of(scopes)));
+    token.setExpirationDate(Instant.now().plus(Duration.ofHours(24)));
     this.patRepository.saveAndFlush(token);
 
     return new Pat(token.getId(), owner, secret);
