@@ -20,11 +20,21 @@ import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
+import com.jayway.jsonpath.JsonPath;
+import io.repsy.libs.scanner.dtos.FixStatus;
+import io.repsy.libs.scanner.dtos.Severity;
+import io.repsy.os.server.security.scan.dtos.ScanStatus;
+import io.repsy.os.server.security.scan.entities.VulnerabilityFinding;
+import io.repsy.os.server.security.scan.entities.VulnerabilityScan;
+import io.repsy.os.server.security.scan.repositories.VulnerabilityFindingRepository;
+import io.repsy.os.server.security.scan.repositories.VulnerabilityScanRepository;
+import io.repsy.os.server.security.scan.utils.LatestScanMarkerUtils;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.os.shared.token.dtos.TokenScope;
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import java.time.Instant;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,6 +43,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.springframework.beans.factory.annotation.Autowired;
 
 /**
  * RPS-2260: the scan routes accept {@code repo:read} or {@code scan:read}. This is the scope matrix
@@ -47,18 +58,52 @@ import org.junit.jupiter.params.provider.MethodSource;
 @DisplayName("scan:read on the scan routes")
 class PatScanReadScopeIT extends AbstractPatIT {
 
-  private static final UUID SCAN_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
   private static final String ARTIFACT = "/artifacts/pkg";
   private static final String SCOPED = "/scopes/team/artifacts/pkg";
   private static final String VERSION = "/versions/1.0.0";
 
+  private static final String CVE = "CVE-2026-0001";
+
+  @Autowired private VulnerabilityScanRepository scanRepository;
+  @Autowired private VulnerabilityFindingRepository findingRepository;
+
   private User user;
   private Repo repo;
+  private UUID scanId;
 
   @BeforeEach
   void setUp() {
     this.user = this.createUser(uniqueUsername("patscan"), UserRole.USER);
     this.repo = this.privateRepo(RepoType.NPM);
+    this.scanId = this.seedCompletedScan(this.repo, "pkg", "1.0.0");
+  }
+
+  /** A completed scan of {@code name@version} with one critical finding. */
+  private UUID seedCompletedScan(final Repo target, final String name, final String version) {
+    final var scan = new VulnerabilityScan();
+    scan.setRepo(target);
+    scan.setArtifactName(name);
+    scan.setArtifactVersion(version);
+    scan.setStatus(ScanStatus.COMPLETED);
+    scan.setHighestSeverity(Severity.CRITICAL);
+    scan.setScannerName("trivy");
+    scan.setScannerVersion("0.58.1");
+    scan.setStartedAt(Instant.now().minusSeconds(30));
+    scan.setCompletedAt(Instant.now());
+
+    final var id = this.scanRepository.saveAndFlush(scan).getId();
+    final var finding = new VulnerabilityFinding();
+
+    finding.setScan(this.scanRepository.getReferenceById(id));
+    finding.setCveId(CVE);
+    finding.setSeverity(Severity.CRITICAL);
+    finding.setPackageName("openssl");
+    finding.setPackageVersion("1.0");
+    finding.setFixStatus(FixStatus.UNKNOWN);
+    this.findingRepository.saveAndFlush(finding);
+    LatestScanMarkerUtils.refreshRepoOf(this.jdbcTemplate, id);
+
+    return id;
   }
 
   /** The routes of the controller that read scan results, below {@code /api/repos/{repo}}. */
@@ -71,8 +116,8 @@ class PatScanReadScopeIT extends AbstractPatIT {
         "/artifacts/security-summary",
         ARTIFACT + VERSION + "/scan-overview",
         SCOPED + VERSION + "/scan-overview",
-        "/scans/" + SCAN_ID,
-        "/scans/" + SCAN_ID + "/findings",
+        "/scans/{scanId}",
+        "/scans/{scanId}/findings",
         "/security-detail",
         ARTIFACT + "/security-detail",
         SCOPED + "/security-detail");
@@ -91,11 +136,29 @@ class PatScanReadScopeIT extends AbstractPatIT {
                     Arguments.of(route, new TokenScope[] {TokenScope.REPO_READ}, true),
                     Arguments.of(route, new TokenScope[] {TokenScope.SCAN_READ}, true),
                     Arguments.of(
-                        route,
-                        new TokenScope[] {TokenScope.REPO_READ, TokenScope.SCAN_READ},
-                        true),
+                        route, new TokenScope[] {TokenScope.REPO_READ, TokenScope.SCAN_READ}, true),
                     Arguments.of(route, new TokenScope[] {TokenScope.REPO_WRITE}, true),
                     Arguments.of(route, new TokenScope[] {}, false)));
+  }
+
+  private String path(final String route) {
+    return "/api/repos/%s%s"
+        .formatted(this.repo.getName(), route.replace("{scanId}", this.scanId.toString()));
+  }
+
+  private String bodyOf(final String route, final Pat pat) throws Exception {
+    final var response =
+        this.mockMvc
+            .perform(
+                get(this.path(route))
+                    .with(apiPort())
+                    .header(AUTHORIZATION, "Bearer " + pat.secret()))
+            .andReturn()
+            .getResponse();
+
+    assertThat(response.getStatus()).as(route).isEqualTo(200);
+
+    return response.getContentAsString();
   }
 
   private int statusOf(
@@ -116,7 +179,7 @@ class PatScanReadScopeIT extends AbstractPatIT {
   void readRoutes(final String route, final TokenScope[] scopes, final boolean allowed)
       throws Exception {
     final var pat = this.seedPat(this.user, scopes);
-    final var status = this.statusOf(get("/api/repos/{repo}" + route, this.repo.getName()), pat);
+    final var status = this.statusOf(get(this.path(route)), pat);
 
     if (allowed) {
       assertThat(status).isNotIn(401, 403);
@@ -125,13 +188,105 @@ class PatScanReadScopeIT extends AbstractPatIT {
     }
   }
 
+  static Stream<Arguments> scopesThatReadScans() {
+    return Stream.of(
+        Arguments.of((Object) new TokenScope[] {TokenScope.REPO_READ}),
+        Arguments.of((Object) new TokenScope[] {TokenScope.SCAN_READ}),
+        Arguments.of((Object) new TokenScope[] {TokenScope.REPO_READ, TokenScope.SCAN_READ}));
+  }
+
+  @ParameterizedTest(name = "the scan results come back with 200 for {0}")
+  @MethodSource("scopesThatReadScans")
+  @DisplayName("a token that may read scans gets the seeded scan back, with its findings")
+  void scanResultsAreReturned(final TokenScope[] scopes) throws Exception {
+    final var pat = this.seedPat(this.user, scopes);
+    final var id = this.scanId.toString();
+
+    final var list = this.bodyOf("/artifacts/pkg/versions/1.0.0/scans", pat);
+    assertThat((String) JsonPath.read(list, "$.content[0].id")).isEqualTo(id);
+    assertThat((String) JsonPath.read(list, "$.content[0].status")).isEqualTo("COMPLETED");
+
+    assertThat((String) JsonPath.read(this.bodyOf("/scans/{scanId}", pat), "$.id")).isEqualTo(id);
+
+    final var findings = this.bodyOf("/scans/{scanId}/findings", pat);
+    assertThat((String) JsonPath.read(findings, "$.content[0].cveId")).isEqualTo(CVE);
+
+    assertThat(this.bodyOf("/artifacts/pkg/versions/1.0.0/scan-overview", pat)).contains(id);
+    assertThat((Integer) JsonPath.read(this.bodyOf("/security-detail", pat), "$.criticalCount"))
+        .isEqualTo(1);
+    assertThat(
+            (Integer)
+                JsonPath.read(
+                    this.bodyOf("/artifacts/pkg/security-detail", pat), "$.criticalCount"))
+        .isEqualTo(1);
+    assertThat(this.bodyOf("/artifacts/pkg/security-summary", pat)).contains("1.0.0");
+    assertThat(this.bodyOf("/artifacts/security-summary", pat)).contains("pkg");
+  }
+
+  @Test
+  @DisplayName(
+      "a token with only scan:read is refused the repo on the same repo that it reads scans of")
+  void scanReadOnlyReadsScansOfThisRepo() throws Exception {
+    final var scanOnly = this.seedPat(this.user, TokenScope.SCAN_READ);
+
+    this.bodyOf("/security-detail", scanOnly);
+
+    assertThat(this.statusOf(get("/api/repos"), scanOnly)).isEqualTo(403);
+    assertThat(this.statusOf(get("/api/repos/{repo}", this.repo.getName()), scanOnly))
+        .isEqualTo(403);
+  }
+
+  @Test
+  @DisplayName("the scan id of another repo is not readable through this one, with either scope")
+  void aScanOfAnotherRepoIsNotFound() throws Exception {
+    final var other = this.privateRepo(RepoType.NPM);
+    final var otherScan = this.seedCompletedScan(other, "pkg", "1.0.0");
+    final var path = "/api/repos/%s/scans/%s".formatted(this.repo.getName(), otherScan);
+
+    assertThat(this.statusOf(get(path), this.seedPat(this.user, TokenScope.SCAN_READ)))
+        .isEqualTo(404);
+    assertThat(this.statusOf(get(path), this.seedPat(this.user, TokenScope.REPO_READ)))
+        .isEqualTo(404);
+  }
+
+  @Test
+  @DisplayName(
+      "on the protocol port a token with only scan:read reads nothing, as a Basic password or a Bearer")
+  void scanReadIsNothingOnTheWire() throws Exception {
+    final var maven = this.privateRepo(RepoType.MAVEN);
+    final var path = "/{repo}/com/example/lib/1.0/lib-1.0.pom";
+    final var scanOnly = this.seedPat(this.user, TokenScope.SCAN_READ);
+    final var reader = this.seedPat(this.user, TokenScope.REPO_READ);
+
+    assertThat(
+            this.status(
+                get(path, maven.getName())
+                    .header(AUTHORIZATION, basicAuth("any", scanOnly.secret()))))
+        .isEqualTo(401);
+    assertThat(
+            this.status(
+                get(path, maven.getName()).header(AUTHORIZATION, "Bearer " + scanOnly.secret())))
+        .isEqualTo(401);
+
+    // the same requests with repo:read get past authentication, so the 401 above is the scope
+    assertThat(
+            this.status(
+                get(path, maven.getName())
+                    .header(AUTHORIZATION, basicAuth("any", reader.secret()))))
+        .isEqualTo(404);
+    assertThat(
+            this.status(
+                get(path, maven.getName()).header(AUTHORIZATION, "Bearer " + reader.secret())))
+        .isEqualTo(404);
+  }
+
   @ParameterizedTest(name = "GET {0} without a token is 401")
   @MethodSource("readRoutes")
   @DisplayName("a scan read route of a private repo needs a credential")
   void noToken(final String route) throws Exception {
     final var status =
         this.mockMvc
-            .perform(get("/api/repos/{repo}" + route, this.repo.getName()).with(apiPort()))
+            .perform(get(this.path(route)).with(apiPort()))
             .andReturn()
             .getResponse()
             .getStatus();

@@ -48,12 +48,12 @@ public enum TokenScope {
   REPO_WRITE("repo:write", Permission.WRITE),
   /**
    * Reading the results of security scans of a repo, without being able to read the repo itself
-   * (RPS-2260): the scan results and their state, which are the routes marked {@code
-   * @RepoOperation(scanRead = true)} (the per-version scan overview, scans, the findings and the
-   * security summaries and details of a repo or an artifact). It grants no repo permission, so it
-   * never opens the repo, its artifact lists or its files; {@link #REPO_READ} opens the scan routes
-   * too, as it always did. It does not start a scan: that writes, so it needs {@link #REPO_WRITE}.
-   * The cross-repo {@code /api/security/scans} browser stays ADMIN only, for a login.
+   * (RPS-2260): the scan results and their state, which are the routes marked
+   * {@code @RepoOperation(scanRead = true)} (the per-version scan overview, scans, the findings and
+   * the security summaries and details of a repo or an artifact). It grants no repo permission, so
+   * it never opens the repo, its artifact lists or its files; {@link #REPO_READ} opens the scan
+   * routes too, as it always did. It does not start a scan: that writes, so it needs {@link
+   * #REPO_WRITE}. The cross-repo {@code /api/security/scans} browser stays ADMIN only, for a login.
    */
   SCAN_READ("scan:read", Permission.NONE);
 
