@@ -27,7 +27,11 @@ import { expect, test } from '../../../src/ui/access-token-fixtures.js';
 import { allowClipboard, copiedText } from '../../../src/ui/clipboard.js';
 import { CliAuthPage } from '../../../src/ui/pages/access-tokens.js';
 import { LoginPage } from '../../../src/ui/pages/login.js';
-import { explicitScopes, scopesOfferedToAccount } from '../../../src/ui/access-token-api.js';
+import {
+  defaultScopesOfAccount,
+  explicitScopes,
+  scopesOfferedToAccount,
+} from '../../../src/ui/access-token-api.js';
 import { accessTokensRoute, urlHasPath } from '../../../src/ui/routes.js';
 
 const MAX_LIVE = 50;
@@ -84,13 +88,15 @@ test.describe('/cli/auth', () => {
     await expect(cli.form.scope('repo:read')).toBeChecked();
     await expect(cli.form.scope('repo:write')).not.toBeChecked();
     await expectManageNotTicked(cli);
-    await expect(cli.form.scope('scan:read')).toHaveCount(0);
+    // `scan:read` is in the form now, but a link cannot ask for it: it is dropped and not ticked.
+    await expect(cli.form.scope('scan:read')).not.toBeChecked();
 
     for (const scopes of ['scan:read,admin', 'profile:read', '']) {
       await cli.goto(query({ scopes }));
-      for (const scope of scopesOfferedToAccount()) {
+      for (const scope of defaultScopesOfAccount()) {
         await expect(cli.form.scope(scope), `${scope} for scopes="${scopes}"`).toBeChecked();
       }
+      await expect(cli.form.scope('scan:read')).not.toBeChecked();
       await expectManageNotTicked(cli, true);
     }
 

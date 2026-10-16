@@ -137,20 +137,20 @@ describe('AccessTokenFormComponent', () => {
       profile.get.and.returnValue(of({ role: 'ADMIN' } as ProfileInfo));
       init('cli', ['repo:read']);
 
-      expect(offered()).toEqual(['repo:read', 'repo:write', 'repo:manage']);
+      expect(offered()).toEqual(['repo:read', 'repo:write', 'repo:manage', 'scan:read']);
     });
 
     it('does not offer repo:manage to a user who is not an administrator', () => {
       init('cli', ['repo:read']);
 
-      expect(offered()).toEqual(['repo:read', 'repo:write']);
+      expect(offered()).toEqual(['repo:read', 'repo:write', 'scan:read']);
     });
 
     it('does not offer repo:manage while the profile is unknown or when it fails', () => {
       profile.get.and.returnValue(throwError(() => new Error('boom')));
       init('cli', ['repo:read']);
 
-      expect(offered()).toEqual(['repo:read', 'repo:write']);
+      expect(offered()).toEqual(['repo:read', 'repo:write', 'scan:read']);
     });
 
     it('drops a repo:manage that a link asked for when the user is not an administrator', () => {
@@ -164,6 +164,15 @@ describe('AccessTokenFormComponent', () => {
       init('cli', ['repo:read', 'repo:manage']);
 
       expect([...component.selectedScopes].sort()).toEqual(['repo:manage', 'repo:read']);
+    });
+
+    it('sends scan:read alone when that is all that was picked', () => {
+      init('ci', []);
+      component.toggleScope('scan:read', true);
+
+      component.submit();
+
+      expect(api.createAccessToken.calls.mostRecent().args[0].scopes as unknown).toEqual(['scan:read']);
     });
 
     it('never sends repo:manage for a user who is not an administrator', () => {

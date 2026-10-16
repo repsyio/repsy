@@ -115,7 +115,7 @@ test.describe('Access tokens: create', () => {
     },
   );
 
-  test('PAT-02 the form validates the name, the scopes and the expiry, and offers no scan scope', async ({
+  test('PAT-02 the form validates the name, the scopes and the expiry, and offers the scopes the account can use', async ({
     tokenPage,
   }) => {
     const tokens = new AccessTokensPage(tokenPage);
@@ -156,18 +156,17 @@ test.describe('Access tokens: create', () => {
     await expect(form.expirationError).toHaveCount(0);
     await expect(form.submit).toBeEnabled();
 
-    // The scopes on offer: the repository scopes this account can use, no scan scope. `repo:manage` is for an
-    // administrator on Repsy OS (the role is read on every request, so it would be refused for anyone else).
+    // The scopes on offer: the ones this account can use. `repo:manage` is for an administrator on Repsy OS (the role
+    // is read on every request, so it would be refused for anyone else); `scan:read` needs no role.
     const offered = scopesOfferedToAccount();
     await expect(form.offeredScopes).toHaveCount(offered.length);
-    for (const scope of ['repo:read', 'repo:write', 'repo:manage'] as const) {
+    for (const scope of ['repo:read', 'repo:write', 'repo:manage', 'scan:read'] as const) {
       await expect(form.scope(scope)).toHaveCount(offered.includes(scope) ? 1 : 0);
     }
-    await expect(form.scope('scan:read')).toHaveCount(0);
   });
 
   test(
-    'PAT-25 an administrator is offered repo:manage too, a user is not',
+    'PAT-32 an administrator is offered repo:manage too, a user is not',
     { tag: ['@cloud-skip'] },
     async ({ adminPage }) => {
       const tokens = new AccessTokensPage(adminPage);
@@ -175,9 +174,9 @@ test.describe('Access tokens: create', () => {
       await tokens.openCreateModal();
 
       const form = tokens.createModal;
-      await expect(form.offeredScopes).toHaveCount(3);
+      await expect(form.offeredScopes).toHaveCount(4);
       await expect(form.scope('repo:manage')).toBeVisible();
-      await expect(form.scope('scan:read')).toHaveCount(0);
+      await expect(form.scope('scan:read')).toBeVisible();
     },
   );
 });

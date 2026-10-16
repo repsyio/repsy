@@ -81,7 +81,7 @@ export class AccessTokenForm {
   async chooseScopes(scopes: readonly AccessTokenScope[]): Promise<void> {
     // `repo:read` is on offer to everyone, so once it is there the list has been drawn for this account.
     await this.scope('repo:read').waitFor();
-    for (const offered of ['repo:read', 'repo:write', 'repo:manage'] as const) {
+    for (const offered of ['repo:read', 'repo:write', 'repo:manage', 'scan:read'] as const) {
       const box = this.scope(offered);
       if (scopes.includes(offered)) {
         await box.setChecked(true);

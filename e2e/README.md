@@ -6261,7 +6261,7 @@ The API helper is `src/ui/access-token-api.ts` (plain `fetch`, like `RepoSetting
 | Scenario | Where                                                                                                                                                        |
 | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | PAT-01   | create with a name, scopes and an expiry: the secret is shown once (masked, reveal, copy), the row, persisted as asked, gone after a reload                  |
-| PAT-02   | form validation: empty and 81-character name, no scope, an expiry past a year; no `scan:read` on offer, `repo:manage` only where the account can use it      |
+| PAT-02   | form validation: empty and 81-character name, no scope, an expiry past a year; the scopes on offer are the ones the account can use                          |
 | PAT-03   | revoke one behind a confirmation: cancel keeps it, confirm removes only it                                                                                   |
 | PAT-04   | revoke all with several tokens: the count in the report, the list empty                                                                                      |
 | PAT-05   | 50 tokens that have not expired: create is disabled with the reason; revoking one frees it                                                                   |
@@ -6269,7 +6269,7 @@ The API helper is `src/ui/access-token-api.ts` (plain `fetch`, like `RepoSetting
 | PAT-07   | `@cloud-skip`: the password warning appears only while live tokens exist and links to them                                                                   |
 | PAT-08   | `@cloud-skip`: Settings in the avatar menu, its title and navigation, no token section on the profile page                                                   |
 | PAT-10   | `/cli/auth` signed out: sign-in, then the page opens with the same name and scopes (the END state only: OS keeps a return URL, Cloud a hand-over)            |
-| PAT-11   | unknown scopes and `scan:read` are dropped; none left means every repository scope on offer; the default name                                                |
+| PAT-11   | unknown scopes and `scan:read` in the link are dropped; none left ticks the repository scopes on offer (not `scan:read`); the default name                   |
 | PAT-12   | opening (and reloading) creates nothing; Create makes one token and shows the secret once with the "paste it into the terminal where rp is waiting" text     |
 | PAT-13   | a name with markup is shown as text, never as an element                                                                                                     |
 | PAT-14   | a name longer than 80 characters is cut to 80                                                                                                                |
@@ -6283,7 +6283,6 @@ The API helper is `src/ui/access-token-api.ts` (plain `fetch`, like `RepoSetting
 | PAT-22   | refused `redirect_uri` (public host, `127.0.0.1.evil.test`, user info, `localhost`, https, no port, `127.1`, decimal IPv4, fragment): no token, nothing sent |
 | PAT-23   | after a refused link the person can still create a token by hand (paste); nothing is posted                                                                  |
 | PAT-24   | a link with no `redirect_uri` is the paste flow, `state` or not                                                                                              |
-| PAT-25   | `@cloud-skip`: an administrator is offered `repo:manage` in the create form, a user is not (PAT-02)                                                          |
 | PAT-25   | an older token with the same name is revoked after the new one is delivered (default on); other tokens are untouched                                         |
 | PAT-26   | with the box unticked the older token stays                                                                                                                  |
 | PAT-27   | nothing listens at the address: the token exists and can be shown and copied from the page (the post cannot be observed from the page)                       |
@@ -6291,6 +6290,7 @@ The API helper is `src/ui/access-token-api.ts` (plain `fetch`, like `RepoSetting
 | PAT-29   | `[::1]` is accepted; where the browser policy cannot name it (Repsy OS `form-action`) the page shows the token to copy, elsewhere the listener gets it       |
 | PAT-30   | signed out: sign-in, then the approval screen with the same parameters; Approve posts the same `state` (the END state only)                                  |
 | PAT-31   | signed out, a refused `redirect_uri` is still refused after sign-in                                                                                          |
+| PAT-32   | `@cloud-skip`: an administrator is offered `repo:manage` and `scan:read`, a user only `scan:read` (PAT-02)                                                   |
 
 Rules these specs follow:
 
