@@ -313,7 +313,7 @@ test.describe('auth throttle on the wire', { tag: ['@throttle', '@cloud-skip'] }
     expect(first).toHaveLength(1);
     expect(first[0]).toContain('WARN');
     expect(first[0]).toContain(
-      `Client ${client} (network ${client}) made ${MAX_FAILURES} failed password checks, refusing its password checks until its window ends`,
+      `Client ${client} (network ${client}) made ${MAX_FAILURES} failed password checks (refusing its password checks until its window ends)`,
     );
 
     // A new window that reaches the limit again is a new line.
