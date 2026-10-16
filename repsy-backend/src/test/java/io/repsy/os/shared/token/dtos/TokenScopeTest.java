@@ -167,4 +167,25 @@ class TokenScopeTest {
     assertThat(TokenScope.permits(EnumSet.noneOf(TokenScope.class), Permission.READ)).isFalse();
     assertThat(TokenScope.permits(EnumSet.noneOf(TokenScope.class), Permission.NONE)).isTrue();
   }
+
+  @Test
+  @DisplayName("scan results are readable with scan:read or any scope that reads the repo")
+  void permitsScanRead() {
+    assertThat(TokenScope.permitsScanRead(EnumSet.of(TokenScope.SCAN_READ))).isTrue();
+    assertThat(TokenScope.permitsScanRead(EnumSet.of(TokenScope.REPO_READ))).isTrue();
+    assertThat(TokenScope.permitsScanRead(EnumSet.of(TokenScope.REPO_WRITE))).isTrue();
+    assertThat(TokenScope.permitsScanRead(EnumSet.of(TokenScope.REPO_MANAGE))).isTrue();
+    assertThat(TokenScope.permitsScanRead(EnumSet.of(TokenScope.PROFILE_READ))).isFalse();
+    assertThat(TokenScope.permitsScanRead(EnumSet.noneOf(TokenScope.class))).isFalse();
+  }
+
+  @Test
+  @DisplayName("scan:read alone reads no repo: permits stays false for every repo permission")
+  void scanReadAloneReadsNoRepo() {
+    final var scopes = EnumSet.of(TokenScope.PROFILE_READ, TokenScope.SCAN_READ);
+
+    assertThat(TokenScope.permits(scopes, Permission.READ)).isFalse();
+    assertThat(TokenScope.permits(scopes, Permission.WRITE)).isFalse();
+    assertThat(TokenScope.permits(scopes, Permission.MANAGE)).isFalse();
+  }
 }

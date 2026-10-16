@@ -107,7 +107,8 @@ public class ProtocolAuthInterceptor implements HandlerInterceptor {
     }
 
     final var authenticator = this.getUnknownRepoAuthenticator(methodHandler);
-    authenticator.authorizeUnknownRepoRequest(authHeader, this.getPermission(methodHandler));
+    authenticator.authorizeUnknownRepoRequest(
+        authHeader, this.getPermission(methodHandler), this.isScanRead(methodHandler));
 
     return new ItemNotFoundException(ProtocolErrorCodes.REPO_NOT_FOUND);
   }
@@ -142,7 +143,9 @@ public class ProtocolAuthInterceptor implements HandlerInterceptor {
       final String authHeader) {
 
     final var permission = this.getPermission(handler);
-    final var permissionInfo = authenticator.authorizeUserRequest(repoInfo, authHeader, permission);
+    final var permissionInfo =
+        authenticator.authorizeUserRequest(
+            repoInfo, authHeader, permission, this.isScanRead(handler));
 
     request.setAttribute(REPO_PERMISSION_INFO, permissionInfo);
   }
@@ -188,5 +191,12 @@ public class ProtocolAuthInterceptor implements HandlerInterceptor {
     }
 
     return annotation.permission();
+  }
+
+  private boolean isScanRead(final HandlerMethod methodHandler) {
+
+    final var annotation = methodHandler.getMethodAnnotation(RepoOperation.class);
+
+    return annotation != null && annotation.scanRead();
   }
 }

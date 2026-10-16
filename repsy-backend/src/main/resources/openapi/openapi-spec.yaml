@@ -5815,9 +5815,12 @@ components:
         - scan:read
       description: >-
         What a token may do. `repo:read` downloads and reads, `repo:write` publishes (and reads),
-        `repo:manage` deletes and changes settings (and writes and reads), `scan:read` reads scan
-        results, `profile:read` reads who the token belongs to. Every token has `profile:read`, so
-        it never has to be asked for. A token can only narrow what its owner can do: its permission
+        `repo:manage` deletes and changes settings (and writes and reads), `scan:read` reads the
+        scan results and their state of a repository (the scan, scan overview, findings and security
+        summary and detail routes) without reading the repository itself: it does not list or
+        download its artifacts, and it cannot start a scan (that needs `repo:write`). Those scan
+        routes accept `repo:read` or `scan:read`. `profile:read` reads who the token belongs to.
+        Every token has `profile:read`, so it never has to be asked for. A token can only narrow what its owner can do: its permission
         on a repository is the owner's own permission intersected with these, and `repo:manage` is
         never implied by another scope.
     AccessTokenForm:

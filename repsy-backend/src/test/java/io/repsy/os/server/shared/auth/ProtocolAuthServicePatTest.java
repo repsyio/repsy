@@ -538,6 +538,71 @@ class ProtocolAuthServicePatTest {
     }
 
     @Test
+    @DisplayName("scan:read alone passes a scan route and no other route (RPS-2260)")
+    void scanReadOpensTheScanRoutesOnly() {
+      found(live(TokenScope.SCAN_READ));
+      ownerIs(UserRole.USER);
+
+      final var permissions =
+          authService.authorizeUserRequest(repo, bearer(), Permission.READ, true);
+
+      assertThat(permissions.getCanRead()).isTrue();
+      assertThat(permissions.getCanWrite()).isFalse();
+      assertThat(permissions.getCanManage()).isFalse();
+
+      // the same token on a route that is not a scan route
+      assertThatThrownBy(() -> authService.authorizeUserRequest(repo, bearer(), Permission.READ))
+          .isExactlyInstanceOf(AccessNotAllowedException.class)
+          .hasMessage("accessDenied");
+      assertThatThrownBy(
+              () -> authService.authorizeUserRequest(repo, bearer(), Permission.READ, false))
+          .isExactlyInstanceOf(AccessNotAllowedException.class);
+    }
+
+    @Test
+    @DisplayName("scan:read never starts a scan, even on a scan route")
+    void scanReadNeverWrites() {
+      found(live(TokenScope.SCAN_READ));
+      ownerIs(UserRole.ADMIN);
+
+      assertThatThrownBy(
+              () -> authService.authorizeUserRequest(repo, bearer(), Permission.WRITE, true))
+          .isExactlyInstanceOf(AccessNotAllowedException.class);
+      assertThatThrownBy(
+              () -> authService.authorizeUserRequest(repo, bearer(), Permission.MANAGE, true))
+          .isExactlyInstanceOf(AccessNotAllowedException.class);
+    }
+
+    @Test
+    @DisplayName("repo:read and a token without either scope on a scan route")
+    void repoReadStillPassesAndNothingDoesNot() {
+      found(live(TokenScope.REPO_READ));
+      ownerIs(UserRole.USER);
+
+      assertThat(
+              authService.authorizeUserRequest(repo, bearer(), Permission.READ, true).getCanRead())
+          .isTrue();
+
+      found(live());
+
+      assertThatThrownBy(
+              () -> authService.authorizeUserRequest(repo, bearer(), Permission.READ, true))
+          .isExactlyInstanceOf(AccessNotAllowedException.class);
+    }
+
+    @Test
+    @DisplayName("a repo that does not exist is answered the same way on a scan route")
+    void unknownRepoOnAScanRoute() {
+      found(live(TokenScope.SCAN_READ));
+      ownerIs(UserRole.USER);
+
+      assertThatCode(() -> authService.authorizeUnknownRepoRequest(bearer(), Permission.READ, true))
+          .doesNotThrowAnyException();
+      assertThatThrownBy(() -> authService.authorizeUnknownRepoRequest(bearer(), Permission.READ))
+          .isExactlyInstanceOf(AccessNotAllowedException.class);
+    }
+
+    @Test
     @DisplayName("a rut- Basic password on the panel is never hashed")
     void basicOnThePanel() {
       final var basic =

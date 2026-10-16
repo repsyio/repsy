@@ -46,7 +46,15 @@ public enum TokenScope {
   REPO_READ("repo:read", Permission.READ),
   /** Publishing. Implies read. */
   REPO_WRITE("repo:write", Permission.WRITE),
-  /** Reading the results of security scans. */
+  /**
+   * Reading the results of security scans of a repo, without being able to read the repo itself
+   * (RPS-2260): the scan results and their state, which are the routes marked {@code
+   * @RepoOperation(scanRead = true)} (the per-version scan overview, scans, the findings and the
+   * security summaries and details of a repo or an artifact). It grants no repo permission, so it
+   * never opens the repo, its artifact lists or its files; {@link #REPO_READ} opens the scan routes
+   * too, as it always did. It does not start a scan: that writes, so it needs {@link #REPO_WRITE}.
+   * The cross-repo {@code /api/security/scans} browser stays ADMIN only, for a login.
+   */
   SCAN_READ("scan:read", Permission.NONE);
 
   /** The permissions from the lowest to the highest, which {@link #grants} compares by position. */
@@ -120,5 +128,14 @@ public enum TokenScope {
    */
   public static boolean permits(final Collection<TokenScope> scopes, final Permission required) {
     return required == Permission.NONE || scopes.stream().anyMatch(scope -> scope.grants(required));
+  }
+
+  /**
+   * Whether {@code scopes} may read the scan results of a repo: {@link #SCAN_READ}, or any scope
+   * that reads the repo ({@link #REPO_READ} and the ones that imply it). It is the check of a scan
+   * route, and only of a scan route: {@link #SCAN_READ} alone is not enough for {@link #permits}.
+   */
+  public static boolean permitsScanRead(final Collection<TokenScope> scopes) {
+    return scopes.contains(SCAN_READ) || permits(scopes, Permission.READ);
   }
 }

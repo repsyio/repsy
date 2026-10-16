@@ -327,8 +327,22 @@ public class ProtocolAuthService {
   public RepoPermissionInfo authorizeUserRequest(
       final RepoInfo repoInfo, final @Nullable String authHeader, final Permission permission) {
 
+    return this.authorizeUserRequest(repoInfo, authHeader, permission, false);
+  }
+
+  /**
+   * Authorizes a web UI API request to one repo. {@code scanRead} marks a route that reads scan
+   * results ({@code @RepoOperation(scanRead = true)}): a personal access token with {@code
+   * scan:read} alone passes it too. It changes nothing for a login or for an anonymous caller.
+   */
+  public RepoPermissionInfo authorizeUserRequest(
+      final RepoInfo repoInfo,
+      final @Nullable String authHeader,
+      final Permission permission,
+      final boolean scanRead) {
+
     if (authHeader != null) {
-      return this.authorizeRepoUser(repoInfo, authHeader, permission);
+      return this.authorizeRepoUser(repoInfo, authHeader, permission, scanRead);
     }
 
     // Auth header is null
@@ -354,10 +368,17 @@ public class ProtocolAuthService {
    */
   public void authorizeUnknownRepoRequest(final String authHeader, final Permission permission) {
 
+    this.authorizeUnknownRepoRequest(authHeader, permission, false);
+  }
+
+  /** Like {@link #authorizeUnknownRepoRequest(String, Permission)} for a {@code scanRead} route. */
+  public void authorizeUnknownRepoRequest(
+      final String authHeader, final Permission permission, final boolean scanRead) {
+
     final var secret = AuthUtils.personalAccessTokenSecretOf(authHeader);
 
     if (secret != null) {
-      this.authorizePanelPersonalAccessToken(secret, permission);
+      this.authorizePanelPersonalAccessToken(secret, permission, scanRead);
       return;
     }
 
@@ -370,9 +391,13 @@ public class ProtocolAuthService {
    * owner's role, and a caller who is signed in but may not do it is answered {@code accessDenied}
    * (403), not {@code unAuthorized}: only a missing or invalid credential is a 401 there
    * (RPS-1284).
+   *
+   * <p>On a scan route ({@code scanRead}) a token with {@code scan:read} may read, though it holds
+   * no repo scope: it reads the scan results and nothing else, and it still never writes or
+   * manages.
    */
   private PermissionInfo authorizePanelPersonalAccessToken(
-      final String secret, final Permission permission) {
+      final String secret, final Permission permission, final boolean scanRead) {
 
     final var token = this.authenticateWithPat(secret);
     final var isAdmin =
@@ -380,7 +405,10 @@ public class ProtocolAuthService {
 
     final var permissionInfo =
         PermissionInfo.builder()
-            .canRead(TokenScope.permits(token.scopes(), Permission.READ))
+            .canRead(
+                scanRead && permission == Permission.READ
+                    ? TokenScope.permitsScanRead(token.scopes())
+                    : TokenScope.permits(token.scopes(), Permission.READ))
             .canWrite(TokenScope.permits(token.scopes(), Permission.WRITE))
             .canManage(TokenScope.permits(token.scopes(), Permission.MANAGE) && isAdmin)
             .build();
@@ -765,12 +793,15 @@ public class ProtocolAuthService {
   }
 
   private RepoPermissionInfo authorizeRepoUser(
-      final RepoInfo repoInfo, final String authHeader, final Permission permission) {
+      final RepoInfo repoInfo,
+      final String authHeader,
+      final Permission permission,
+      final boolean scanRead) {
 
     final var secret = AuthUtils.personalAccessTokenSecretOf(authHeader);
     final var permissionInfo =
         secret != null
-            ? this.authorizePanelPersonalAccessToken(secret, permission)
+            ? this.authorizePanelPersonalAccessToken(secret, permission, scanRead)
             : this.authorizePanelUser(this.authenticateUser(authHeader), permission);
 
     return RepoPermissionInfo.builder()

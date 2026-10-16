@@ -26,6 +26,15 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 public @interface RepoOperation {
 
+  /**
+   * Whether a personal access token with {@code scan:read} alone may call the route, besides the
+   * ones that hold the {@link #permission()}. Only for the routes that read the scan results of a
+   * repo, and only with {@link Permission#READ}: starting a scan is a {@code WRITE} and ignores it.
+   * It widens nothing else: the token is still its owner's, and {@code scan:read} opens no other
+   * route.
+   */
+  boolean scanRead() default false;
+
   RepoScope scope() default RepoScope.ALL;
 
   Permission permission() default Permission.READ;
