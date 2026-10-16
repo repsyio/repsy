@@ -21,6 +21,7 @@
  */
 import { operationsUnder } from '../../src/api/contract-checks.js';
 import { contractProblems, specContract } from '../../src/api/spec-contract.js';
+import { ERROR_CODES } from '../../src/error-codes.js';
 import { expect, test } from '@playwright/test';
 
 const PAGE = { size: 10, number: 0, totalElements: 1, totalPages: 1 };
@@ -67,17 +68,25 @@ test.describe('the response validator', () => {
     expect(
       contractProblems('deleteMavenGroup', 404, {
         status: 404,
-        code: 'x',
+        code: ERROR_CODES.ARTIFACT_NOT_FOUND,
         traceId: '49aff165-f2b9-4f94-a85e-21f050cc4fbc',
       }),
     ).toEqual([]);
     expect(
       contractProblems('deleteMavenGroup', 404, {
         status: 404,
-        code: 'x',
+        code: ERROR_CODES.ARTIFACT_NOT_FOUND,
         traceId: 'nope',
       }).join(),
     ).toContain('/traceId must match format "uuid"');
+    // `code` is one of the codes the server emits (RPS-2017): a code the spec does not list is a problem
+    expect(
+      contractProblems('deleteMavenGroup', 404, {
+        status: 404,
+        code: 'x',
+        traceId: '49aff165-f2b9-4f94-a85e-21f050cc4fbc',
+      }).join(),
+    ).toContain('/code must be equal to one of the allowed values');
     // the old failure envelope is not a problem: `status` and `code` are required
     expect(
       contractProblems('deleteMavenGroup', 404, { msgId: 'x', type: 'ERROR' }).join(),
