@@ -274,6 +274,7 @@ logging:
     org.flywaydb: INFO
     # Docker manifest layout repair progress during upgrade (RPS-1564)
     io.repsy.os.server.protocols.docker.shared.tag.services: INFO
+    io.repsy.os.server.protocols.docker.shared.tag.tasks: INFO
     # NuGet build-metadata version migration progress during upgrade (RPS-1564)
     io.repsy.os.server.protocols.nuget.shared.packages.services: INFO
 
