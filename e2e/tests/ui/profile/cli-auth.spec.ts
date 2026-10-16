@@ -15,40 +15,25 @@
 ///
 
 /**
- * `/cli/auth` (RPS-1905, RPS-1906; PAT-10..PAT-16): the page the Repsy CLI opens in a browser with
- * `?name=&scopes=&state=` so a person can create an access token for it and paste it back. Repsy Cloud runs
- * these specs too: the sign-in detour differs (OS keeps a return URL, Cloud a hand-over), so PAT-10 asserts the
- * END state only.
+ * `/cli/auth` without a `redirect_uri` (RPS-1905, RPS-1906, RPS-2039; PAT-10..PAT-17): the authorize screen the Repsy
+ * CLI opens with `?scopes=&state=`. The person authorizes and the page shows a TEMPORARY token (`rct-`, 24 hours) to
+ * paste back; it is not a personal access token, so it is not listed and does not count against the 50 token limit.
+ * Repsy Cloud runs these specs too: the sign-in detour differs (OS keeps a return URL, Cloud a hand-over), so PAT-10
+ * asserts the END state only.
  *
- * The page must never create a token on its own: a GET is only a form, PAT-12 counts the tokens before and after.
- * Each test has its OWN account (`tokenUser`, see `access-token-fixtures.ts`); the names are unique per run.
+ * The page must never create a token on its own: a GET is only a screen, PAT-12 reads the token through the API
+ * (a temporary token is invisible in the list, so `whoAmI` of the secret is the witness). Each test has its OWN
+ * account (`tokenUser`, see `access-token-fixtures.ts`).
  */
 import { expect, test } from '../../../src/ui/access-token-fixtures.js';
+import { whoAmI } from '../../../src/ui/access-token-api.js';
 import { allowClipboard, copiedText } from '../../../src/ui/clipboard.js';
 import { CliAuthPage } from '../../../src/ui/pages/access-tokens.js';
 import { LoginPage } from '../../../src/ui/pages/login.js';
-import {
-  defaultScopesOfAccount,
-  explicitScopes,
-  scopesOfferedToAccount,
-} from '../../../src/ui/access-token-api.js';
 import { accessTokensRoute, urlHasPath } from '../../../src/ui/routes.js';
 
 const MAX_LIVE = 50;
-const NAME_MAX = 80;
-
-/**
- * `repo:manage` is not ticked: it is not on offer to a user of Repsy OS (RPS-2259), and unticked on Repsy Cloud unless
- * the link defaults to every repository scope (`ticksDefaults`).
- */
-async function expectManageNotTicked(cli: CliAuthPage, ticksDefaults = false): Promise<void> {
-  const manage = cli.form.scope('repo:manage');
-  if (!scopesOfferedToAccount().includes('repo:manage')) {
-    await expect(manage).toHaveCount(0);
-  } else if (!ticksDefaults) {
-    await expect(manage).not.toBeChecked();
-  }
-}
+const REPO_LABELS = ['Read repositories', 'Publish packages', 'Manage repositories'];
 
 /** The query a CLI sends. */
 function query(values: Record<string, string>): string {
@@ -57,12 +42,10 @@ function query(values: Record<string, string>): string {
 
 test.describe('/cli/auth', () => {
   test(
-    'PAT-10 signed out, the link goes through sign-in and opens the page with the same name and scopes',
+    'PAT-10 signed out, the link goes through sign-in and opens the authorize screen with the same scopes',
     { tag: ['@smoke'] },
     async ({ page, tokenUser }) => {
-      await page.goto(
-        `/cli/auth${query({ name: 'ci-box', scopes: 'repo:read,repo:write', state: 'abc' })}`,
-      );
+      await page.goto(`/cli/auth${query({ scopes: 'repo:read,repo:write', state: 'abc' })}`);
       // Where the visitor waits differs (OS keeps a return URL on `/`, Cloud a hand-over): only the login form counts.
       const login = new LoginPage(page);
       await expect(login.submit).toBeVisible();
@@ -72,10 +55,10 @@ test.describe('/cli/auth', () => {
       const cli = new CliAuthPage(page);
       await cli.expectLoaded();
       await expect(page).toHaveURL(urlHasPath('/cli/auth'));
-      await expect(cli.form.name).toHaveValue('ci-box');
-      await expect(cli.form.scope('repo:read')).toBeChecked();
-      await expect(cli.form.scope('repo:write')).toBeChecked();
-      await expectManageNotTicked(cli);
+      await expect(cli.account).toHaveText(tokenUser.username);
+      await expect(cli.scopeList).toContainText('Read repositories');
+      await expect(cli.scopeList).toContainText('Publish packages');
+      await expect(cli.scopeList).not.toContainText('Manage repositories');
     },
   );
 
@@ -85,51 +68,40 @@ test.describe('/cli/auth', () => {
     const cli = new CliAuthPage(tokenPage);
 
     await cli.goto(query({ scopes: 'repo:read,profile:read,scan:read,admin' }));
-    await expect(cli.form.scope('repo:read')).toBeChecked();
-    await expect(cli.form.scope('repo:write')).not.toBeChecked();
-    await expectManageNotTicked(cli);
-    // `scan:read` is in the form now, but a link cannot ask for it: it is dropped and not ticked.
-    await expect(cli.form.scope('scan:read')).not.toBeChecked();
+    await expect(cli.scopeList).toContainText('Read repositories');
+    await expect(cli.scopeList).not.toContainText('Publish packages');
+    await expect(cli.scopeList).not.toContainText('Manage repositories');
+    await expect(cli.scopeList).not.toContainText('scan:read');
 
     for (const scopes of ['scan:read,admin', 'profile:read', '']) {
       await cli.goto(query({ scopes }));
-      for (const scope of defaultScopesOfAccount()) {
-        await expect(cli.form.scope(scope), `${scope} for scopes="${scopes}"`).toBeChecked();
+      for (const label of REPO_LABELS) {
+        await expect(cli.scopeList, `${label} for scopes="${scopes}"`).toContainText(label);
       }
-      await expect(cli.form.scope('scan:read')).not.toBeChecked();
-      await expectManageNotTicked(cli, true);
     }
-
-    // No name asked for: the default one.
-    await cli.goto(query({ scopes: 'repo:read' }));
-    await expect(cli.form.name).toHaveValue('Repsy CLI');
   });
 
-  test('PAT-12 opening the page creates nothing; Create makes one token and shows the secret once', async ({
+  test('PAT-12 opening the page creates nothing; Authorize shows one temporary token once, and it works', async ({
     tokenPage,
     tokenApi,
-    seeder,
+    tokenUser,
   }) => {
     await allowClipboard(tokenPage.context());
-    const name = `pat-${seeder.runId}-cli`;
     const cli = new CliAuthPage(tokenPage);
-    expect(await tokenApi.list()).toHaveLength(0);
 
-    await cli.goto(query({ name, scopes: 'repo:read,repo:write', state: 'xyz' }));
+    await cli.goto(query({ scopes: 'repo:read,repo:write', state: 'xyz' }));
     // A GET (a reload is another one) never creates a token.
     await tokenPage.reload();
     await cli.expectLoaded();
-    expect(await tokenApi.list()).toHaveLength(0);
+    await expect(cli.token).toHaveCount(0);
 
-    await expect(cli.form.submit).toBeEnabled();
-    await cli.form.submit.click();
+    await expect(cli.approve).toBeEnabled();
+    await cli.approve.click();
     await expect(cli.token).toBeVisible();
     const secret = (await cli.token.innerText()).trim();
-    expect(secret).toMatch(/^rut-/);
+    expect(secret).toMatch(/^rct-/);
     await expect(
-      tokenPage.getByText(
-        /Copy this token and paste it into the terminal where rp is waiting\. It will not be shown again\./,
-      ),
+      tokenPage.getByText(/Paste this token into the terminal where rp is waiting\./),
     ).toBeVisible();
 
     const copy = cli.copy.getByTestId('copy-button');
@@ -137,47 +109,54 @@ test.describe('/cli/auth', () => {
     await expect(copy).toHaveAttribute('data-copied', 'true');
     expect(await copiedText(tokenPage)).toBe(secret);
 
-    const listed = await tokenApi.list();
-    expect(listed).toHaveLength(1);
-    expect(listed[0]).toMatchObject({ name });
-    expect(explicitScopes(listed[0].scopes)).toEqual(['repo:read', 'repo:write']);
+    const current = await whoAmI(secret);
+    expect(current.status).toBe(200);
+    expect(current.body?.username).toBe(tokenUser.username);
+    // Not a personal access token: invisible in the list.
+    expect(await tokenApi.list()).toHaveLength(0);
 
-    // Shown once: after a reload the page is a form again and the secret is nowhere, and still one token.
+    // Shown once: after a reload the page is the authorize screen again and the secret is nowhere.
     await tokenPage.reload();
     await cli.expectLoaded();
     await expect(cli.token).toHaveCount(0);
     await expect(tokenPage.locator('body')).not.toContainText(secret);
-    expect(await tokenApi.list()).toHaveLength(1);
   });
 
-  test('PAT-13 a name with markup is shown as text and never becomes an element', async ({
+  test('PAT-13 a name or markup in the link is ignored and never becomes an element', async ({
     tokenPage,
   }) => {
     const markup = '<img src=x onerror=alert(1)>';
     const cli = new CliAuthPage(tokenPage);
 
     await cli.goto(query({ name: markup, scopes: 'repo:read' }));
-    await expect(cli.form.name).toHaveValue(markup);
-    await cli.form.submit.click();
 
-    // The created token's name is printed as text.
+    // The token name is not asked for any more, so a name in the link appears nowhere.
+    await expect(tokenPage.locator('body')).not.toContainText('onerror');
+    await expect(tokenPage.locator('img[src="x"]')).toHaveCount(0);
+    await cli.approve.click();
     await expect(cli.token).toBeVisible();
-    await expect(tokenPage.locator('body')).toContainText(markup);
+    await expect(tokenPage.locator('body')).not.toContainText('onerror');
     await expect(tokenPage.locator('img[src="x"]')).toHaveCount(0);
   });
 
-  test(`PAT-14 a name longer than ${NAME_MAX} characters is cut to ${NAME_MAX}`, async ({
+  test('PAT-14 the screen says the token is valid for 24 hours, and the server agrees', async ({
     tokenPage,
   }) => {
     const cli = new CliAuthPage(tokenPage);
+    await cli.goto(query({ scopes: 'repo:read' }));
+    await expect(cli.expiry).toContainText('24 hours');
+    const before = Date.now();
 
-    await cli.goto(query({ name: 'x'.repeat(NAME_MAX + 120), scopes: 'repo:read' }));
+    await cli.approve.click();
+    await expect(cli.token).toBeVisible();
 
-    await expect(cli.form.name).toHaveValue('x'.repeat(NAME_MAX));
-    await expect(cli.form.submit).toBeEnabled();
+    const current = await whoAmI((await cli.token.innerText()).trim());
+    const lifetime = new Date(current.body?.expirationDate ?? 0).getTime() - before;
+    expect(lifetime).toBeGreaterThan(24 * 3_600_000 - 60_000);
+    expect(lifetime).toBeLessThan(24 * 3_600_000 + 60_000);
   });
 
-  test(`PAT-15 at ${MAX_LIVE} tokens that have not expired the page says so and does not create`, async ({
+  test(`PAT-15 at ${MAX_LIVE} personal tokens the authorize screen still works, and the list is unchanged`, async ({
     tokenPage,
     tokenApi,
     seeder,
@@ -185,10 +164,12 @@ test.describe('/cli/auth', () => {
     await tokenApi.createMany(MAX_LIVE, `pat-${seeder.runId}-full`);
     const cli = new CliAuthPage(tokenPage);
 
-    await cli.goto(query({ name: 'one-too-many', scopes: 'repo:read' }));
+    await cli.goto(query({ scopes: 'repo:read' }));
+    await expect(cli.approve).toBeEnabled();
+    await cli.approve.click();
 
-    await expect(cli.form.blocked).toContainText(`${MAX_LIVE} access tokens`);
-    await expect(cli.form.submit).toBeDisabled();
+    await expect(cli.token).toBeVisible();
+    expect((await whoAmI((await cli.token.innerText()).trim())).status).toBe(200);
     expect(await tokenApi.list()).toHaveLength(MAX_LIVE);
   });
 });
@@ -208,12 +189,12 @@ test.describe('/cli/auth on Repsy OS', { tag: ['@cloud-skip'] }, () => {
     expect(headers['content-security-policy']).toContain("frame-ancestors 'none'");
   });
 
-  test('PAT-17 after the token is created, the link to manage tokens goes to the Settings page', async ({
+  test('PAT-17 after the token is shown, the link to create a long-lived token goes to the Settings page', async ({
     tokenPage,
   }) => {
     const cli = new CliAuthPage(tokenPage);
     await cli.goto(query({ scopes: 'repo:read' }));
-    await cli.form.submit.click();
+    await cli.approve.click();
     await expect(cli.token).toBeVisible();
 
     await expect(cli.manageLink).toHaveAttribute('href', accessTokensRoute() + '#access-tokens');

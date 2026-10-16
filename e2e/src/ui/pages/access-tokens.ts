@@ -237,24 +237,21 @@ export class SettingsPage extends UiPage {
   }
 }
 
-/** `/cli/auth`: the page the Repsy CLI opens with `?name=&scopes=&state=` to get a token created. */
+/**
+ * `/cli/auth`: the authorize screen the Repsy CLI opens with `?scopes=&state=&redirect_uri=` (RPS-2039). It issues a
+ * temporary 24-hour `rct-` token, never a personal access token, so there is no token form on it.
+ */
 export class CliAuthPage extends UiPage {
   readonly title: Locator;
-  readonly form: AccessTokenForm;
   readonly token: Locator;
   readonly copy: Locator;
   readonly manageLink: Locator;
-  readonly loading: Locator;
-  readonly error: Locator;
-  /** The approval screen of a link with a loopback `redirect_uri` (RPS-2039). */
+  /** The authorize screen. */
   readonly approval: Locator;
   readonly target: Locator;
   readonly account: Locator;
-  readonly tokenName: Locator;
   readonly scopeList: Locator;
   readonly expiry: Locator;
-  readonly revokeOld: Locator;
-  readonly blocked: Locator;
   readonly approveError: Locator;
   readonly approve: Locator;
   readonly decline: Locator;
@@ -273,11 +270,8 @@ export class CliAuthPage extends UiPage {
     this.approval = this.tid('cli-auth-approval');
     this.target = this.tid('cli-auth-target');
     this.account = this.tid('cli-auth-account');
-    this.tokenName = this.tid('cli-auth-name');
     this.scopeList = this.tid('cli-auth-scopes');
     this.expiry = this.tid('cli-auth-expiry');
-    this.revokeOld = this.tid('cli-auth-revoke-old');
-    this.blocked = this.tid('cli-auth-blocked');
     this.approveError = this.tid('cli-auth-approve-error');
     this.approve = this.tid('cli-auth-approve');
     this.decline = this.tid('cli-auth-decline');
@@ -291,35 +285,20 @@ export class CliAuthPage extends UiPage {
     this.refused = this.tid('cli-auth-refused');
     this.usePaste = this.tid('cli-auth-use-paste');
     this.title = this.tid('cli-auth-title');
-    this.form = new AccessTokenForm(page);
     this.token = this.tid('cli-auth-token');
     this.copy = this.tid('cli-auth-copy');
     this.manageLink = this.tid('cli-auth-manage');
-    this.loading = this.tid('cli-auth-loading');
-    this.error = this.tid('cli-auth-error');
   }
 
-  /** Opens `/cli/auth` with `query` (a direct navigation) and waits for the form. */
+  /** Opens `/cli/auth` with `query` (a direct navigation) and waits for the authorize screen. */
   async goto(query = ''): Promise<void> {
     await this.page.goto(`/cli/auth${query}`);
     await this.expectLoaded();
   }
 
-  /** Opens a link with a `redirect_uri` and waits until the approval screen has read the user's live tokens. */
-  async gotoApproval(query: string): Promise<void> {
-    await this.page.goto(`/cli/auth${query}`);
-    await this.expectApprovalLoaded();
-  }
-
-  async expectApprovalLoaded(): Promise<void> {
-    await expect(this.approval).toBeVisible();
-    await expect(this.loading).toHaveCount(0);
-  }
-
-  /** The form is there and the count of the user's live tokens has been read (the create button is final). */
+  /** The authorize screen is there. */
   async expectLoaded(): Promise<void> {
     await expect(this.title).toBeVisible();
-    await expect(this.form.root).toBeVisible();
-    await expect(this.loading).toHaveCount(0);
+    await expect(this.approval).toBeVisible();
   }
 }

@@ -66,7 +66,7 @@ export interface CreatedAccessToken {
   name: string;
   scopes: StoredScope[];
   expirationDate: string;
-  /** The secret, `rut-...`: shown by the API once. */
+  /** The secret, `rut-...` (`rct-...` for a temporary token): shown by the API once. */
   token: string;
 }
 
@@ -140,4 +140,60 @@ export async function whoAmI(
     return { status: res.status };
   }
   return { status: res.status, body: (await res.json()) as AccessTokenWhoAmI };
+}
+
+/**
+ * The token routes (`POST`, `GET`, `DELETE /api/profile/access-tokens`) called with a token's secret as the Bearer
+ * credential instead of a login (RPS-2039): a temporary `rct-` token is accepted, a `rut-` personal token is refused
+ * with 401. Each call answers its status, and the body when there is one.
+ */
+export class TokenRoutesAs {
+  constructor(private readonly secret: string) {}
+
+  private headers(): Record<string, string> {
+    return { Authorization: `Bearer ${this.secret}`, 'Content-Type': 'application/json' };
+  }
+
+  async create(
+    name: string,
+    scopes: string[] = ['repo:read'],
+  ): Promise<{ status: number; body?: CreatedAccessToken }> {
+    const res = await fetch(`${env.apiBaseUrl}${PATH}`, {
+      method: 'POST',
+      headers: this.headers(),
+      body: JSON.stringify({ name, scopes }),
+    });
+    return res.status === 201
+      ? { status: res.status, body: (await res.json()) as CreatedAccessToken }
+      : { status: res.status };
+  }
+
+  async list(): Promise<{ status: number; body?: AccessTokenListItem[] }> {
+    const res = await fetch(`${env.apiBaseUrl}${PATH}?page=0&size=100`, {
+      headers: this.headers(),
+    });
+    if (res.status !== 200) {
+      return { status: res.status };
+    }
+    const body = (await res.json()) as { content?: AccessTokenListItem[] };
+    return { status: res.status, body: body.content ?? [] };
+  }
+
+  async revoke(tokenId: string): Promise<number> {
+    const res = await fetch(`${env.apiBaseUrl}${PATH}/${tokenId}`, {
+      method: 'DELETE',
+      headers: this.headers(),
+    });
+    return res.status;
+  }
+
+  /** `POST /api/profile/cli-tokens`: only a login may mint a temporary token, so any token answers 401. */
+  async createCliToken(scopes: string[] = ['repo:read']): Promise<number> {
+    const res = await fetch(`${env.apiBaseUrl}/api/profile/cli-tokens`, {
+      method: 'POST',
+      headers: this.headers(),
+      body: JSON.stringify({ scopes }),
+    });
+    return res.status;
+  }
 }
