@@ -21,8 +21,9 @@ import { finalize } from 'rxjs/operators';
 
 import { AccessTokenCreated, AccessTokenForm, AccessTokensApi, AccessTokenScope } from '../../../../../generated/api';
 import { idFactory } from '../../../../shared/utils/unique-id';
+import { ProfileService } from '../../../pages/profile/services/profile.service';
 import { MAX_ACCESS_TOKEN_NAME_LENGTH } from '../../../pages/settings/access-tokens/access-token-limits';
-import { SELECTABLE_SCOPES } from '../../../pages/settings/access-tokens/access-token-scopes';
+import { SelectableScope, selectableScopesFor } from '../../../pages/settings/access-tokens/access-token-scopes';
 import { ToastService } from '../toast/toast.service';
 
 /**
@@ -47,7 +48,12 @@ export class AccessTokenFormComponent implements OnInit {
   @Output() created = new EventEmitter<AccessTokenCreated>();
   @Output() cancelled = new EventEmitter<void>();
 
-  readonly scopeOptions = SELECTABLE_SCOPES;
+  /**
+   * The scopes this user can use. It starts with the ones every user can use and gets `repo:manage`
+   * once the profile says the user is an administrator, so a failed or slow profile call never shows
+   * a scope that cannot work.
+   */
+  scopeOptions: readonly SelectableScope[] = selectableScopesFor(false);
   loading = false;
   form: FormGroup;
   selectedScopes = new Set<AccessTokenScope>();
@@ -58,6 +64,7 @@ export class AccessTokenFormComponent implements OnInit {
     private readonly accessTokensApi: AccessTokensApi,
     private readonly fb: FormBuilder,
     private readonly toastService: ToastService,
+    private readonly profileService: ProfileService,
   ) {
     this.form = this.fb.group({
       name: ['', [Validators.required, Validators.maxLength(MAX_ACCESS_TOKEN_NAME_LENGTH)]],
@@ -69,11 +76,32 @@ export class AccessTokenFormComponent implements OnInit {
     const today = moment.utc();
     this.minDate = today.clone().add(1, 'day').format('YYYY-MM-DD');
     this.maxDate = today.clone().add(365, 'days').format('YYYY-MM-DD');
-    this.selectedScopes = new Set(this.initialScopes);
+    this.selectedScopes = new Set(this.initialScopes.filter((scope) => this.isOffered(scope)));
     this.form.patchValue({
       name: this.initialName.trim().slice(0, MAX_ACCESS_TOKEN_NAME_LENGTH),
       expirationDate: this.maxDate,
     });
+    this.loadScopeOptions();
+  }
+
+  private loadScopeOptions(): void {
+    this.profileService.get().subscribe({
+      next: (profile) => {
+        const before = this.scopeOptions;
+        this.scopeOptions = selectableScopesFor(profile.role === 'ADMIN');
+        // A scope that a link asked for and that has just come on offer is selected as asked.
+        for (const scope of this.initialScopes) {
+          if (this.isOffered(scope) && !before.some((s) => s.scope === scope)) {
+            this.selectedScopes.add(scope);
+          }
+        }
+      },
+      error: () => {},
+    });
+  }
+
+  private isOffered(scope: AccessTokenScope): boolean {
+    return this.scopeOptions.some((s) => s.scope === scope);
   }
 
   isSelected(scope: AccessTokenScope): boolean {
@@ -109,9 +137,9 @@ export class AccessTokenFormComponent implements OnInit {
       name: this.form.value.name.trim(),
       // The generated model types a unique list as a Set, but HttpClient serialises a Set as `{}`:
       // send the array (it is a JSON array on the wire, and the same on the way back).
-      scopes: SELECTABLE_SCOPES.map((s) => s.scope).filter((s) =>
-        this.selectedScopes.has(s),
-      ) as unknown as Set<AccessTokenScope>,
+      scopes: this.scopeOptions
+        .map((s) => s.scope)
+        .filter((s) => this.selectedScopes.has(s)) as unknown as Set<AccessTokenScope>,
     };
     const date = this.form.value.expirationDate;
     if (date) {

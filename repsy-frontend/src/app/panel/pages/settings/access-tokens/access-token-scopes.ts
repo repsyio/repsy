@@ -20,12 +20,17 @@ export interface SelectableScope {
   readonly scope: AccessTokenScope;
   readonly label: string;
   readonly description: string;
+  /**
+   * Only an administrator can use it: the server intersects a token's scopes with its owner's role on
+   * every request, so for anyone else the scope would be accepted and then refused on every call.
+   */
+  readonly adminOnly?: boolean;
 }
 
 /**
  * The scopes a person can ask for. `profile:read` is not listed: every token has it, so it is never
  * asked for. `repo:manage` is never implied by another scope, so it is a choice of its own. `scan:read` is not
- * offered either (decision pending).
+ * offered either: the server accepts it on the scan routes now (RPS-2260), the panel does not ask for it yet.
  */
 export const SELECTABLE_SCOPES: readonly SelectableScope[] = [
   { scope: 'repo:read', label: 'Read repositories', description: 'Download packages and read metadata.' },
@@ -34,8 +39,18 @@ export const SELECTABLE_SCOPES: readonly SelectableScope[] = [
     scope: 'repo:manage',
     label: 'Manage repositories',
     description: 'Delete packages and change repository settings (and write, read).',
+    adminOnly: true,
   },
 ];
+
+/**
+ * The scopes {@link SELECTABLE_SCOPES} that a user with this role can use. Only the panel hides the
+ * rest: the server does not refuse them when a token is created, because the role is read again on
+ * every request, so a token made for a user who is promoted later starts to manage at once.
+ */
+export function selectableScopesFor(isAdmin: boolean): readonly SelectableScope[] {
+  return SELECTABLE_SCOPES.filter((s) => isAdmin || !s.adminOnly);
+}
 
 /**
  * The scopes of a comma separated list (the `scopes` query parameter of `/cli/auth`) that can be

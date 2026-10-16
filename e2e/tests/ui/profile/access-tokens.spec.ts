@@ -25,7 +25,12 @@
  * Every test has its OWN account (`tokenUser`): the list, "revoke all" and the limit are per user, so the
  * harness admin cannot be shared between parallel tests. Names are unique per run (`seeder.runId`).
  */
-import { type AccessTokenScope, explicitScopes, whoAmI } from '../../../src/ui/access-token-api.js';
+import {
+  type AccessTokenScope,
+  explicitScopes,
+  scopesOfferedToAccount,
+  whoAmI,
+} from '../../../src/ui/access-token-api.js';
 import { expect, test } from '../../../src/ui/access-token-fixtures.js';
 import { allowClipboard, copiedText } from '../../../src/ui/clipboard.js';
 import { AccessTokensPage, SettingsPage } from '../../../src/ui/pages/access-tokens.js';
@@ -151,10 +156,30 @@ test.describe('Access tokens: create', () => {
     await expect(form.expirationError).toHaveCount(0);
     await expect(form.submit).toBeEnabled();
 
-    // The scopes on offer: the three repository scopes, no scan scope.
-    await expect(form.offeredScopes).toHaveCount(3);
+    // The scopes on offer: the repository scopes this account can use, no scan scope. `repo:manage` is for an
+    // administrator on Repsy OS (the role is read on every request, so it would be refused for anyone else).
+    const offered = scopesOfferedToAccount();
+    await expect(form.offeredScopes).toHaveCount(offered.length);
+    for (const scope of ['repo:read', 'repo:write', 'repo:manage'] as const) {
+      await expect(form.scope(scope)).toHaveCount(offered.includes(scope) ? 1 : 0);
+    }
     await expect(form.scope('scan:read')).toHaveCount(0);
   });
+
+  test(
+    'PAT-25 an administrator is offered repo:manage too, a user is not',
+    { tag: ['@cloud-skip'] },
+    async ({ adminPage }) => {
+      const tokens = new AccessTokensPage(adminPage);
+      await tokens.goto();
+      await tokens.openCreateModal();
+
+      const form = tokens.createModal;
+      await expect(form.offeredScopes).toHaveCount(3);
+      await expect(form.scope('repo:manage')).toBeVisible();
+      await expect(form.scope('scan:read')).toHaveCount(0);
+    },
+  );
 });
 
 test.describe('Access tokens: revoke', () => {

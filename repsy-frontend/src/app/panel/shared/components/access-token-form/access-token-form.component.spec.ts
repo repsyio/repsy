@@ -14,15 +14,17 @@
 /// limitations under the License.
 ///
 import { FormBuilder } from '@angular/forms';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 
-import { AccessTokenCreated, AccessTokensApi, AccessTokenScope } from '../../../../../generated/api';
+import { AccessTokenCreated, AccessTokensApi, AccessTokenScope, ProfileInfo } from '../../../../../generated/api';
+import { ProfileService } from '../../../pages/profile/services/profile.service';
 import { ToastService } from '../toast/toast.service';
 import { AccessTokenFormComponent } from './access-token-form.component';
 
 describe('AccessTokenFormComponent', () => {
   let api: jasmine.SpyObj<AccessTokensApi>;
   let toast: jasmine.SpyObj<ToastService>;
+  let profile: jasmine.SpyObj<ProfileService>;
   let component: AccessTokenFormComponent;
   const createdToken = {
     id: 'i',
@@ -35,7 +37,9 @@ describe('AccessTokenFormComponent', () => {
     api = jasmine.createSpyObj<AccessTokensApi>('AccessTokensApi', ['createAccessToken']);
     api.createAccessToken.and.returnValue(of(createdToken) as never);
     toast = jasmine.createSpyObj<ToastService>('ToastService', ['show']);
-    component = new AccessTokenFormComponent(api, new FormBuilder(), toast);
+    profile = jasmine.createSpyObj<ProfileService>('ProfileService', ['get']);
+    profile.get.and.returnValue(of({ role: 'USER' } as ProfileInfo));
+    component = new AccessTokenFormComponent(api, new FormBuilder(), toast, profile);
   });
 
   function init(name: string, scopes: AccessTokenScope[]): void {
@@ -124,5 +128,51 @@ describe('AccessTokenFormComponent', () => {
     expect(emitted).toEqual([createdToken]);
     expect(toast.show).toHaveBeenCalledOnceWith('Access token created successfully.', 'success');
     expect(component.loading).toBeFalse();
+  });
+
+  describe('the scopes on offer by role', () => {
+    const offered = (): string[] => component.scopeOptions.map((s) => s.scope);
+
+    it('offers repo:manage to an administrator', () => {
+      profile.get.and.returnValue(of({ role: 'ADMIN' } as ProfileInfo));
+      init('cli', ['repo:read']);
+
+      expect(offered()).toEqual(['repo:read', 'repo:write', 'repo:manage']);
+    });
+
+    it('does not offer repo:manage to a user who is not an administrator', () => {
+      init('cli', ['repo:read']);
+
+      expect(offered()).toEqual(['repo:read', 'repo:write']);
+    });
+
+    it('does not offer repo:manage while the profile is unknown or when it fails', () => {
+      profile.get.and.returnValue(throwError(() => new Error('boom')));
+      init('cli', ['repo:read']);
+
+      expect(offered()).toEqual(['repo:read', 'repo:write']);
+    });
+
+    it('drops a repo:manage that a link asked for when the user is not an administrator', () => {
+      init('cli', ['repo:read', 'repo:manage']);
+
+      expect([...component.selectedScopes]).toEqual(['repo:read']);
+    });
+
+    it('keeps a repo:manage that a link asked for when the user is an administrator', () => {
+      profile.get.and.returnValue(of({ role: 'ADMIN' } as ProfileInfo));
+      init('cli', ['repo:read', 'repo:manage']);
+
+      expect([...component.selectedScopes].sort()).toEqual(['repo:manage', 'repo:read']);
+    });
+
+    it('never sends repo:manage for a user who is not an administrator', () => {
+      init('cli', ['repo:read']);
+      component.toggleScope('repo:manage', true);
+
+      component.submit();
+
+      expect(api.createAccessToken.calls.mostRecent().args[0].scopes as unknown).toEqual(['repo:read']);
+    });
   });
 });

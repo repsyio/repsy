@@ -27,6 +27,18 @@ const PATH = '/api/profile/access-tokens';
 /** The scopes a person can ask for (`scan:read` is not offered in the UI; `profile:read` is implicit). */
 export type AccessTokenScope = 'repo:read' | 'repo:write' | 'repo:manage';
 
+/**
+ * The repository scopes the create form offers to a throwaway account (`seeder.createUser()`): on Repsy OS that is a
+ * USER, who cannot use `repo:manage` (the server re-reads the role on every request), so the form does not offer it
+ * (RPS-2259). On Repsy Cloud there are no roles: every account owns repos and creates them with a `repo:manage`
+ * token, so all three are on offer.
+ */
+export function scopesOfferedToAccount(): AccessTokenScope[] {
+  return env.target.startsWith('cloud-')
+    ? ['repo:read', 'repo:write', 'repo:manage']
+    : ['repo:read', 'repo:write'];
+}
+
 /** `profile:read` is on every token without being asked for. */
 type StoredScope = AccessTokenScope | 'profile:read';
 

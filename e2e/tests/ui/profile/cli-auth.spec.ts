@@ -27,12 +27,24 @@ import { expect, test } from '../../../src/ui/access-token-fixtures.js';
 import { allowClipboard, copiedText } from '../../../src/ui/clipboard.js';
 import { CliAuthPage } from '../../../src/ui/pages/access-tokens.js';
 import { LoginPage } from '../../../src/ui/pages/login.js';
-import { explicitScopes } from '../../../src/ui/access-token-api.js';
+import { explicitScopes, scopesOfferedToAccount } from '../../../src/ui/access-token-api.js';
 import { accessTokensRoute, urlHasPath } from '../../../src/ui/routes.js';
 
 const MAX_LIVE = 50;
 const NAME_MAX = 80;
-const REPO_SCOPES = ['repo:read', 'repo:write', 'repo:manage'];
+
+/**
+ * `repo:manage` is not ticked: it is not on offer to a user of Repsy OS (RPS-2259), and unticked on Repsy Cloud unless
+ * the link defaults to every repository scope (`ticksDefaults`).
+ */
+async function expectManageNotTicked(cli: CliAuthPage, ticksDefaults = false): Promise<void> {
+  const manage = cli.form.scope('repo:manage');
+  if (!scopesOfferedToAccount().includes('repo:manage')) {
+    await expect(manage).toHaveCount(0);
+  } else if (!ticksDefaults) {
+    await expect(manage).not.toBeChecked();
+  }
+}
 
 /** The query a CLI sends. */
 function query(values: Record<string, string>): string {
@@ -59,11 +71,11 @@ test.describe('/cli/auth', () => {
       await expect(cli.form.name).toHaveValue('ci-box');
       await expect(cli.form.scope('repo:read')).toBeChecked();
       await expect(cli.form.scope('repo:write')).toBeChecked();
-      await expect(cli.form.scope('repo:manage')).not.toBeChecked();
+      await expectManageNotTicked(cli);
     },
   );
 
-  test('PAT-11 a scope the page does not offer is dropped; none left means the three repository scopes', async ({
+  test('PAT-11 a scope the page does not offer is dropped; none left means every repository scope on offer', async ({
     tokenPage,
   }) => {
     const cli = new CliAuthPage(tokenPage);
@@ -71,14 +83,15 @@ test.describe('/cli/auth', () => {
     await cli.goto(query({ scopes: 'repo:read,profile:read,scan:read,admin' }));
     await expect(cli.form.scope('repo:read')).toBeChecked();
     await expect(cli.form.scope('repo:write')).not.toBeChecked();
-    await expect(cli.form.scope('repo:manage')).not.toBeChecked();
+    await expectManageNotTicked(cli);
     await expect(cli.form.scope('scan:read')).toHaveCount(0);
 
     for (const scopes of ['scan:read,admin', 'profile:read', '']) {
       await cli.goto(query({ scopes }));
-      for (const scope of REPO_SCOPES) {
+      for (const scope of scopesOfferedToAccount()) {
         await expect(cli.form.scope(scope), `${scope} for scopes="${scopes}"`).toBeChecked();
       }
+      await expectManageNotTicked(cli, true);
     }
 
     // No name asked for: the default one.

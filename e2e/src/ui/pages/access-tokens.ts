@@ -74,10 +74,20 @@ export class AccessTokenForm {
     await field.blur();
   }
 
-  /** Ticks exactly `scopes` (the checkboxes the form offers; the others are cleared). */
+  /**
+   * Ticks exactly `scopes` (the checkboxes the form offers; the others are cleared). A scope that is asked for and not
+   * on offer is a test mistake, not something to skip: `repo:manage` is offered to an administrator only (RPS-2259).
+   */
   async chooseScopes(scopes: readonly AccessTokenScope[]): Promise<void> {
-    for (const offered of ['repo:read', 'repo:write', 'repo:manage']) {
-      await this.scope(offered).setChecked(scopes.includes(offered as AccessTokenScope));
+    // `repo:read` is on offer to everyone, so once it is there the list has been drawn for this account.
+    await this.scope('repo:read').waitFor();
+    for (const offered of ['repo:read', 'repo:write', 'repo:manage'] as const) {
+      const box = this.scope(offered);
+      if (scopes.includes(offered)) {
+        await box.setChecked(true);
+      } else if ((await box.count()) > 0) {
+        await box.setChecked(false);
+      }
     }
   }
 

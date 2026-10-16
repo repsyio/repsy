@@ -13,7 +13,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 ///
-import { parseRequestedScopes, SELECTABLE_SCOPES } from './access-token-scopes';
+import { parseRequestedScopes, SELECTABLE_SCOPES, selectableScopesFor } from './access-token-scopes';
 
 describe('access token scopes', () => {
   it('never offers profile:read, which every token has', () => {
@@ -41,5 +41,10 @@ describe('access token scopes', () => {
     expect(parseRequestedScopes(null)).toEqual([]);
     expect(parseRequestedScopes(undefined)).toEqual([]);
     expect(parseRequestedScopes('')).toEqual([]);
+  });
+
+  it('offers repo:manage to an administrator only', () => {
+    expect(selectableScopesFor(true).map((s) => s.scope)).toEqual(['repo:read', 'repo:write', 'repo:manage']);
+    expect(selectableScopesFor(false).map((s) => s.scope)).toEqual(['repo:read', 'repo:write']);
   });
 });
