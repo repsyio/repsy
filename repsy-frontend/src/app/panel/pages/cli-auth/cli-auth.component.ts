@@ -12,30 +12,14 @@
 /// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
-import { DatePipe, NgTemplateOutlet } from '@angular/common';
+import { NgTemplateOutlet } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
-import moment from 'moment';
-import { forkJoin, of } from 'rxjs';
-import { catchError, map } from 'rxjs/operators';
 
-import {
-  AccessTokenCreated,
-  AccessTokenForm,
-  AccessTokenListItem,
-  AccessTokensApi,
-  AccessTokenScope,
-} from '../../../../generated/api';
+import { AccessTokenCreated, AccessTokensApi, AccessTokenScope } from '../../../../generated/api';
 import { AuthService } from '../../../auth/pages/services/auth.service';
-import { AccessTokenFormComponent } from '../../shared/components/access-token-form/access-token-form.component';
 import { CopyClipboardComponent } from '../../shared/components/copy-clipboard/copy-clipboard.component';
-import {
-  countLive,
-  DEFAULT_CLI_SCOPES,
-  isExpired,
-  MAX_ACCESS_TOKEN_NAME_LENGTH,
-  MAX_LIVE_ACCESS_TOKENS,
-} from '../settings/access-tokens/access-token-limits';
+import { DEFAULT_CLI_SCOPES } from '../settings/access-tokens/access-token-limits';
 import {
   parseRequestedScopes,
   SELECTABLE_SCOPES,
@@ -47,40 +31,42 @@ import { parseLoopbackRedirectUri } from './loopback-redirect-uri';
 /**
  * What the page is doing:
  *
- * - `paste`: the link has no `redirect_uri`. Today's flow: a form, then the secret on screen to copy by hand.
- * - `approve`: the link has a valid loopback `redirect_uri`. An approval screen; nothing is created until "Approve".
- * - `delivered`: approved; the token was created and posted to the CLI.
+ * - `approve`: the authorize screen. Nothing is created until "Authorize". With a valid loopback `redirect_uri` the
+ *   token is posted to the CLI; without one it is shown on screen to paste.
+ * - `delivered`: authorized; the token was created and posted to the CLI.
+ * - `pasted`: authorized without a `redirect_uri`; the token is on screen to copy by hand.
  * - `declined`: the person said no. Nothing was created.
  * - `refused`: the link has a `redirect_uri` that is not a loopback address. Nothing was created.
  */
-export type CliAuthMode = 'paste' | 'approve' | 'delivered' | 'declined' | 'refused';
+export type CliAuthMode = 'approve' | 'delivered' | 'pasted' | 'declined' | 'refused';
 
-/** How long a token created here lives: as far ahead as the backend allows (the same default as the create form). */
-const TOKEN_LIFETIME_DAYS = 365;
+/** The temporary token of a CLI login lives this long, fixed by the server (shown on the screen, never asked for). */
+export const CLI_TOKEN_LIFETIME_HOURS = 24;
 
 /**
- * `/cli/auth?state=&redirect_uri=&name=&scopes=` (RPS-1905, RPS-2039): the page the CLI opens in a browser.
+ * `/cli/auth?state=&redirect_uri=&scopes=` (RPS-1905, RPS-2039): the page the CLI opens in a browser.
  *
- * With a loopback `redirect_uri` it is an approval screen: it shows the account, the token name, the scopes in plain
- * words and the expiry, and only on "Approve" creates the token (the ordinary create call: the same name, expiry and
- * 50 token rules) and POSTs the secret in a form body to the CLI, with `state` unchanged. The server keeps no `state`.
- * Without a `redirect_uri` it is the paste flow, unchanged. A scope the page does not know is dropped, so the screen
- * always shows exactly what would be granted.
+ * It is an authorize screen: it shows the account, the scopes in plain words and the 24-hour validity, and only on
+ * "Authorize" asks the server for a temporary CLI token. The token is not a personal access token: it is not listed
+ * under Settings, does not count against the 50 token limit, expires on its own and replaces the previous one of the
+ * same user. With a loopback `redirect_uri` the secret is POSTed in a form body to the CLI, with `state` unchanged
+ * (never in a URL); without one it is shown on screen to paste. The previous token is revoked only after the new one
+ * exists and the browser has not refused to send it on. The server keeps no `state`. A scope the page does not know
+ * is dropped, so the screen always shows exactly what would be granted.
  */
 @Component({
   selector: 'app-cli-auth',
-  imports: [AccessTokenFormComponent, CopyClipboardComponent, DatePipe, NgTemplateOutlet, RouterLink],
+  imports: [CopyClipboardComponent, NgTemplateOutlet, RouterLink],
   standalone: true,
   templateUrl: './cli-auth.component.html',
 })
 export class CliAuthComponent implements OnInit {
-  mode: CliAuthMode = 'paste';
-  name = '';
+  mode: CliAuthMode = 'approve';
   scopes: AccessTokenScope[] = [];
   /** The signed in account the token will belong to. */
   username = '';
-  expiresAt: Date = new Date();
-  /** The checked address to post the token to (`approve` and `delivered` only). */
+  readonly lifetimeHours = CLI_TOKEN_LIFETIME_HOURS;
+  /** The checked address to post the token to; `null` is the paste flow. */
   redirectUri: string | null = null;
   /** Echoed back unchanged; only held in this page, never stored. */
   private state: string | null = null;
@@ -90,20 +76,9 @@ export class CliAuthComponent implements OnInit {
   deliveryBlocked = false;
   /** After delivery the secret stays hidden until the person asks for it (the CLI did not get it). */
   tokenShown = false;
-  /** On a refused link: the person chose to create a token by hand anyway. */
-  pasteFallback = false;
-  blockedReason: string | null = null;
-  /** The check of how many live tokens exist is under way / could not be read. */
-  checkingRoom = true;
-  roomCheckFailed = false;
-
-  /** Live tokens with the name this page would create. */
-  sameNameTokens: AccessTokenListItem[] = [];
-  /** "Revoke the older token with the same name": on by default, removed only after the new token exists. */
-  revokeOld = true;
-  approving = false;
-  approveFailed = false;
-  /** What happened to the older tokens after delivery: `null` while unknown or not asked. */
+  authorizing = false;
+  authorizeFailed = false;
+  /** What happened to the previous CLI token: `null` while unknown or not yet asked. */
   revokeResult: 'revoked' | 'failed' | null = null;
 
   constructor(
@@ -115,13 +90,10 @@ export class CliAuthComponent implements OnInit {
 
   ngOnInit(): void {
     const params = this.route.snapshot.queryParamMap;
-    // Shown as text (Angular escapes it) and cut to what the backend accepts.
-    this.name = (params.get('name') ?? 'Repsy CLI').trim().slice(0, MAX_ACCESS_TOKEN_NAME_LENGTH);
     const requested = parseRequestedScopes(params.get('scopes'));
-    // A link that names no scope the page knows gets the three repository scopes, ticked.
+    // A link that names no scope the page knows gets the three repository scopes.
     this.scopes = requested.length > 0 ? requested : [...DEFAULT_CLI_SCOPES];
     this.username = this.authService.username ?? '';
-    this.expiresAt = moment.utc().add(TOKEN_LIFETIME_DAYS, 'days').milliseconds(0).toDate();
 
     const rawRedirect = params.get('redirect_uri');
     if (rawRedirect !== null) {
@@ -130,89 +102,59 @@ export class CliAuthComponent implements OnInit {
       this.mode = this.redirectUri === null ? 'refused' : 'approve';
       this.state = params.get('state');
     }
-    if (this.mode !== 'refused') {
-      this.checkRoom();
-    }
   }
 
   get scopeDetails(): SelectableScope[] {
     return SELECTABLE_SCOPES.filter((s) => this.scopes.includes(s.scope));
   }
 
-  /** Approve is possible when nothing blocks it. */
-  get canApprove(): boolean {
-    return this.mode === 'approve' && !this.approving && !this.checkingRoom && !this.blockedReason;
+  get canAuthorize(): boolean {
+    return this.mode === 'approve' && !this.authorizing;
   }
 
-  /** Blocks the create button when the user already holds the most tokens that have not expired. */
-  private checkRoom(): void {
-    this.accessTokensApi.listAccessTokens(0, 100, ['expirationDate,desc']).subscribe({
-      next: (r) => {
-        this.checkingRoom = false;
-        const tokens = r.content ?? [];
-        this.sameNameTokens = tokens.filter((t) => t.name === this.name && !isExpired(t));
-        if (countLive(tokens) >= MAX_LIVE_ACCESS_TOKENS) {
-          // Creating comes first and revoking after it, so a full list is not made room for here: the new token
-          // must never be lost to a revoke that went through and a create that did not.
-          this.blockedReason = `You already have ${MAX_LIVE_ACCESS_TOKENS} access tokens that have not expired, the most allowed. Revoke one under Settings first.`;
-        }
-      },
-      error: () => {
-        this.checkingRoom = false;
-        this.roomCheckFailed = true;
-      },
-    });
-  }
-
-  scopesText(): string {
-    return Array.from(this.created?.scopes ?? []).join(', ');
-  }
-
-  onCreated(token: AccessTokenCreated): void {
-    this.created = token;
-    this.tokenShown = true;
-  }
-
+  /** On a refused link: the person chose to get a token to copy by hand anyway. Same screen, no address to post to. */
   usePasteInstead(): void {
-    this.pasteFallback = true;
-    this.checkRoom();
+    this.redirectUri = null;
+    this.state = null;
+    this.mode = 'approve';
   }
 
   decline(): void {
-    if (!this.approving) {
+    if (!this.authorizing) {
       this.mode = 'declined';
     }
   }
 
-  /** Creates the token, posts it to the CLI, then (only then) revokes the older token of the same name. */
-  approve(): void {
-    if (!this.canApprove || this.redirectUri === null) {
+  /** Creates the token, delivers it (or shows it), then (only then) revokes the previous CLI token. */
+  authorize(): void {
+    if (!this.canAuthorize) {
       return;
     }
-    const payload: AccessTokenForm = {
-      name: this.name,
-      // The generated model types a unique list as a Set, but HttpClient serialises a Set as `{}`: send the array.
-      scopes: this.scopes as unknown as Set<AccessTokenScope>,
-      expirationDate: this.expiresAt.toISOString(),
-    };
-    this.approving = true;
-    this.approveFailed = false;
-    this.accessTokensApi.createAccessToken(payload).subscribe({
+    this.authorizing = true;
+    this.authorizeFailed = false;
+    this.accessTokensApi.createCliToken({ scopes: this.scopes as unknown as Set<AccessTokenScope> }).subscribe({
       next: (token) => {
         this.created = token;
+        this.authorizing = false;
+        if (this.redirectUri === null) {
+          this.mode = 'pasted';
+          this.tokenShown = true;
+          // Nothing was sent anywhere that could be refused: the secret is on screen now.
+          this.revokePrevious(token.id);
+          return;
+        }
         this.mode = 'delivered';
-        this.approving = false;
-        // The older token is only revoked once the browser has sent the new one on.
+        // The previous token is only revoked once the browser has sent the new one on.
         void this.resend().then((sent) => {
-          if (sent && this.revokeOld && this.sameNameTokens.length > 0) {
-            this.revokePrevious();
+          if (sent) {
+            this.revokePrevious(token.id);
           }
         });
       },
       error: () => {
         // Nothing exists and nothing was sent: the person can try again or decline.
-        this.approving = false;
-        this.approveFailed = true;
+        this.authorizing = false;
+        this.authorizeFailed = true;
       },
     });
   }
@@ -235,15 +177,14 @@ export class CliAuthComponent implements OnInit {
     this.tokenShown = true;
   }
 
-  private revokePrevious(): void {
-    const revocations = this.sameNameTokens.map((t) =>
-      this.accessTokensApi.revokeAccessToken(t.id).pipe(
-        map(() => true),
-        catchError(() => of(false)),
-      ),
-    );
-    forkJoin(revocations).subscribe((results) => {
-      this.revokeResult = results.every(Boolean) ? 'revoked' : 'failed';
+  private revokePrevious(tokenId: string): void {
+    this.accessTokensApi.revokePreviousCliTokens(tokenId).subscribe({
+      next: () => {
+        this.revokeResult = 'revoked';
+      },
+      error: () => {
+        this.revokeResult = 'failed';
+      },
     });
   }
 }
