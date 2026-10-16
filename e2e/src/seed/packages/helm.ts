@@ -14,8 +14,8 @@
 
 /**
  * Helm seeder. Helm has TWO backend modules behind one panel, and `opts.variant` picks one:
- * `oci` (default) uploads the config and chart blobs and then the OCI manifest under the tag, what
- * `helm push oci://` sends; `classic` POSTs the chart `.tgz` as the multipart `chart` part, what
+ * `oci` (default) uploads the config and chart blobs and then the OCI manifest under the tag (the
+ * version with `+` rewritten to `_`, as `helm push` does, RPS-2252), what `helm push oci://` sends; `classic` POSTs the chart `.tgz` as the multipart `chart` part, what
  * `helm cm-push` sends (ChartMuseum). Both feed the same chart list. The chart is built in code
  * (`helm-chart.ts`), never with `helm`. `opts.name` is the chart name (lower-case, `-` allowed),
  * `extra.variant` says which module published it.
@@ -25,6 +25,7 @@ import { buildConfigBytes, buildManifestBytes } from '../../clients/helm.js';
 import {
   chartFileName,
   HELM_MEDIA_TYPES,
+  ociTagOf,
   rawPutManifest,
   rawUploadBlob,
   rawUploadChart,
@@ -70,11 +71,11 @@ export const seedHelm: PackageSeeder = async (repoName, ctx, opts) => {
         repoName,
         admin,
         name,
-        version,
+        ociTagOf(version),
         manifestBytes,
         HELM_MEDIA_TYPES.manifest,
       ),
-      `manifest ${name}:${version}`,
+      `manifest ${name}:${ociTagOf(version)}`,
     );
   }
 

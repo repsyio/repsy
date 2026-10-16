@@ -144,6 +144,13 @@ export function chartFileName(name: string, version: string): string {
   return `${name}-${version}.tgz`;
 }
 
+/** The OCI tag a chart version is pushed under. The distribution grammar has no `+`, so `helm push`
+ *  rewrites the `+` of a SemVer build metadata to `_` (`1.2.3+build.5` is tagged `1.2.3_build.5`),
+ *  while the chart keeps its version in `Chart.yaml` (RPS-2252). */
+export function ociTagOf(version: string): string {
+  return version.replaceAll('+', '_');
+}
+
 export function ociRepoRef(repoName: string): string {
   return `oci://${registryHost()}/${repoPath(repoName)}`;
 }
