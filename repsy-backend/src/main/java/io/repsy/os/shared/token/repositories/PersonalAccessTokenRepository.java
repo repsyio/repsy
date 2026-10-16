@@ -15,6 +15,7 @@
  */
 package io.repsy.os.shared.token.repositories;
 
+import io.repsy.os.shared.token.dtos.PersonalAccessTokenKind;
 import io.repsy.os.shared.token.dtos.PersonalAccessTokenListItem;
 import io.repsy.os.shared.token.entities.PersonalAccessToken;
 import java.time.Instant;
@@ -39,19 +40,41 @@ public interface PersonalAccessTokenRepository extends JpaRepository<PersonalAcc
   @EntityGraph(attributePaths = "user")
   Optional<PersonalAccessToken> findByTokenHash(String tokenHash);
 
+  /**
+   * The token of {@code userId} with this id and kind, user included. A token of another user, or
+   * of another kind, is not found: the personal token routes cannot reach a temporary token.
+   */
   @EntityGraph(attributePaths = "user")
-  Optional<PersonalAccessToken> findByUserIdAndId(UUID userId, UUID id);
+  Optional<PersonalAccessToken> findByUserIdAndIdAndKind(
+      UUID userId, UUID id, PersonalAccessTokenKind kind);
 
-  Page<PersonalAccessTokenListItem> findAllByUserId(UUID userId, Pageable pageable);
+  Page<PersonalAccessTokenListItem> findAllByUserIdAndKind(
+      UUID userId, PersonalAccessTokenKind kind, Pageable pageable);
 
   long countByUserId(UUID userId);
 
+  long countByUserIdAndKind(UUID userId, PersonalAccessTokenKind kind);
+
   /**
-   * How many tokens of the user have not expired at {@code now}: those whose expiration date is
-   * after it. A token expires at its date, so one that expires exactly at {@code now} is expired
-   * (see {@code PersonalAccessTokenInfo#isExpired}).
+   * How many tokens of the user and kind have not expired at {@code now}: those whose expiration
+   * date is after it. A token expires at its date, so one that expires exactly at {@code now} is
+   * expired (see {@code PersonalAccessTokenInfo#isExpired}).
    */
-  long countByUserIdAndExpirationDateAfter(UUID userId, Instant now);
+  long countByUserIdAndKindAndExpirationDateAfter(
+      UUID userId, PersonalAccessTokenKind kind, Instant now);
+
+  /**
+   * Deletes the temporary tokens of the user that were created before {@code createdAt}, which is
+   * the newer token's own creation time: a newer token is never revoked by an older one.
+   *
+   * @return how many were deleted
+   */
+  @Modifying
+  @Query(
+      "delete from PersonalAccessToken pat where pat.user.id = :userId"
+          + " and pat.kind = :kind and pat.createdAt < :createdAt")
+  int deleteByUserIdAndKindCreatedBefore(
+      UUID userId, PersonalAccessTokenKind kind, Instant createdAt);
 
   @Modifying
   @Query("update PersonalAccessToken pat set pat.lastUsedAt = :now where pat.id = :tokenId")

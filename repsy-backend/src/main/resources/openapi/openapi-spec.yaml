@@ -388,9 +388,10 @@ paths:
       operationId: getCurrentAccessToken
       description: >-
         Who the access token of the request belongs to, what it may do and until when. It is the
-        route for a client that authenticates with a personal access token (see the
+        route for a client that authenticates with a personal access token of either kind (see the
         `personalAccessToken` security scheme), which asks it what it is. The answer carries the
-        owner, the name, the scopes, `expirationDate` and `lastUsedAt` of the token. It answers 400
+        owner, the name, the scopes, `expirationDate` and `lastUsedAt` of the token; a temporary
+        token is named `Repsy CLI login`. It answers 400
         `notAnAccessToken` for the access token of a login, and 401 for anything that is neither
         (a personal access token sent as Basic credentials included).
       security:
@@ -414,7 +415,12 @@ paths:
         - access-tokens
       operationId: revokeAccessToken
       description: >-
-        Revokes the token at once. A token of another user is a 404, as is one that is already gone.
+        Revokes the token at once. A token of another user is a 404, as is one that is already gone
+        and a temporary token (those are not managed here). Takes the access token of a login or a
+        temporary token (`rct-...`); a long-lived token answers 401.
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '204':
           "$ref": "#/components/responses/NoContent"
@@ -436,8 +442,13 @@ paths:
         - access-tokens
       operationId: listAccessTokens
       description: >-
-        The personal access tokens of the current user. Sortable by `id`, `name`, `expirationDate`,
-        `lastUsedAt`, `createdAt` (`property,direction`). The default is `id,desc`.
+        The personal access tokens of the current user. Temporary tokens (`rct-...`) are not listed.
+        Sortable by `id`, `name`, `expirationDate`, `lastUsedAt`, `createdAt` (`property,direction`).
+        The default is `id,desc`. Takes the access token of a login or a temporary token; a
+        long-lived token answers 401.
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       parameters:
         - "$ref": "#/components/parameters/Page"
         - "$ref": "#/components/parameters/Size"
@@ -463,7 +474,13 @@ paths:
         nowhere else: only its hash is stored, so it cannot be shown again. The answer is 400 when
         the expiration date is in the past (`accessTokenExpirationInPast`) or more than 365 days
         ahead by UTC calendar day (`accessTokenExpirationTooLate`), and when the user already holds
-        50 tokens that have not expired (`accessTokenLimitReached`); an expired token does not count.
+        50 tokens that have not expired (`accessTokenLimitReached`); an expired token and a temporary
+        token do not count. Takes the access token of a login or a temporary token (`rct-...`).
+        With a temporary token the form may ask only for scopes that token has itself, otherwise
+        the answer is 403 `accessDenied`; a long-lived token answers 401.
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       requestBody:
         content:
           application/json:
@@ -494,6 +511,75 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
       summary: Create a personal access token
+  "/api/profile/cli-tokens":
+    post:
+      tags:
+        - access-tokens
+      operationId: createCliToken
+      description: >-
+        Creates the temporary token of a CLI login, for the authorize screen that the Repsy CLI
+        opens in the browser. The token (`rct-...`) is valid for 24 hours, cannot be refreshed, is
+        not listed, does not count against the 50 token cap and carries the requested scopes; what
+        the user may do themselves is applied on every request, so a scope beyond that grants
+        nothing. It does not revoke the previous temporary token: call
+        `revokePreviousCliTokens` once the new secret has been delivered, so a failed delivery
+        never leaves the user without a token. Takes the access token of a login only; a
+        temporary token cannot create one.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/CliTokenForm"
+        required: true
+      responses:
+        '201':
+          description: Created
+          headers:
+            Cache-Control:
+              description: "`no-store`, the response carries a secret"
+              schema:
+                type: string
+            Location:
+              description: >-
+                The URL of the created token, `/api/profile/cli-tokens/{tokenId}`. Only the action
+                below is served under it; there is no token detail route.
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/AccessTokenCreated"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+      summary: Create the temporary token of a CLI login
+  "/api/profile/cli-tokens/{tokenId}/actions/revoke-previous":
+    post:
+      tags:
+        - access-tokens
+      operationId: revokePreviousCliTokens
+      description: >-
+        Revokes the temporary tokens of the current user that were created before this one, which
+        is the one the CLI now holds. A newer token is never revoked, so a login in another tab
+        that finished first cannot undo this one. Repeating it changes nothing. The answer is 404
+        when the user holds no such temporary token. Takes the access token of a login only.
+      responses:
+        '204':
+          "$ref": "#/components/responses/NoContent"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+      summary: Revoke the previous temporary tokens of a CLI login
+    parameters:
+      - name: tokenId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
   # region: repos
   "/api/repos/{repoName}/settings":
     get:
@@ -5121,12 +5207,17 @@ components:
       scheme: bearer
       bearerFormat: opaque
       description: >-
-        A personal access token (`rut-...`), issued by `createAccessToken` and sent as `Authorization:
-        Bearer <token>`. An operation that accepts it lists it next to `bearerAuth` in its
-        `security`: the operations on a repository (every path with `{repoName}`), `listRepos`,
-        `createRepo` and `getCurrentAccessToken`. Every other operation takes the access token of a
-        login only, so a personal access token cannot change a password or a username, and cannot
-        create, list or revoke tokens (it answers 401).
+        A personal access token, sent as `Authorization: Bearer <token>`. There are two kinds. The
+        long-lived one (`rut-...`) is issued by `createAccessToken`. The temporary one (`rct-...`)
+        is issued by `createCliToken` for the Repsy CLI after a browser authorization, lives 24
+        hours, is never listed and does not count against the 50 token cap. An operation that
+        accepts them lists `personalAccessToken` next to `bearerAuth` in its `security`: the
+        operations on a repository (every path with `{repoName}`), `listRepos`, `createRepo`,
+        `getCurrentAccessToken`, and `createAccessToken`, `listAccessTokens` and
+        `revokeAccessToken`, which take a **temporary** token only (a long-lived token answers 401
+        there, so a long-lived token never manages tokens, and a temporary token cannot create or
+        revoke a temporary one). Every other operation takes the access token of a login only, so a
+        token cannot change a password or a username.
 
 
         What a token may do is the permission of its owner intersected with its scopes:
@@ -5847,6 +5938,18 @@ components:
             `23:59:59.999999Z` of the last day, and the date in the answer is the stored one.
       required:
         - name
+        - scopes
+    CliTokenForm:
+      type: object
+      description: The scopes the Repsy CLI asked for and the user approved.
+      properties:
+        scopes:
+          type: array
+          uniqueItems: true
+          minItems: 1
+          items:
+            "$ref": "#/components/schemas/AccessTokenScope"
+      required:
         - scopes
     AccessTokenCreated:
       type: object

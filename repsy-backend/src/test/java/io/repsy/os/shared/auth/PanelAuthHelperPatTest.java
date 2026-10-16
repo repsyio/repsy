@@ -30,6 +30,7 @@ import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.shared.auth.dtos.PanelTokenClaims;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.token.dtos.PersonalAccessTokenInfo;
+import io.repsy.os.shared.token.dtos.PersonalAccessTokenKind;
 import io.repsy.os.shared.token.dtos.TokenScope;
 import io.repsy.os.shared.token.services.PersonalAccessTokenService;
 import io.repsy.os.shared.token.utils.TokenFactory;
@@ -79,6 +80,7 @@ class PanelAuthHelperPatTest {
         UUID.randomUUID(),
         OWNER_ID,
         "owner",
+        PersonalAccessTokenKind.PERSONAL,
         "ci",
         TokenScope.withImplicit(List.of(scopes)),
         expirationDate,
@@ -221,5 +223,113 @@ class PanelAuthHelperPatTest {
 
     assertThatThrownBy(() -> this.helper.authenticateAccessToken("Bearer junk"))
         .isInstanceOf(UnAuthorizedException.class);
+  }
+
+  // -------------------------------------------------------------------------------------------
+  // RPS-2039: the token management routes take a temporary token, never a personal one
+  // -------------------------------------------------------------------------------------------
+
+  private PersonalAccessTokenInfo foundTemporary(final TokenScope... scopes) {
+    final var cli = TokenFactory.cliToken();
+    final var token =
+        new PersonalAccessTokenInfo(
+            UUID.randomUUID(),
+            OWNER_ID,
+            "owner",
+            PersonalAccessTokenKind.TEMPORARY,
+            "Repsy CLI login",
+            TokenScope.withImplicit(List.of(scopes)),
+            Instant.now().plus(Duration.ofHours(24)),
+            null,
+            Instant.now());
+
+    this.secret = cli;
+    this.header = "Bearer " + cli;
+    when(this.tokens.findByToken(cli)).thenReturn(Optional.of(token));
+
+    return token;
+  }
+
+  @Test
+  @DisplayName("the token routes take a temporary token and hand on only its scopes")
+  void tokenManagerTakesATemporaryToken() {
+    final var token = foundTemporary(TokenScope.REPO_READ);
+
+    final var session = this.helper.authenticateTokenManager(this.header);
+
+    assertThat(session.user().getId()).isEqualTo(OWNER_ID);
+    assertThat(session.grantable())
+        .containsExactlyInAnyOrder(TokenScope.PROFILE_READ, TokenScope.REPO_READ);
+    verify(this.tokens).updateLastUsedTime(token.id());
+  }
+
+  @Test
+  @DisplayName("the token routes refuse a personal token with 401, found or not")
+  void tokenManagerRefusesAPersonalToken() {
+    found(TokenScope.REPO_MANAGE, TokenScope.REPO_WRITE, TokenScope.REPO_READ);
+
+    assertThatThrownBy(() -> this.helper.authenticateTokenManager(this.header))
+        .isExactlyInstanceOf(UnAuthorizedException.class)
+        .hasMessage("unAuthorized");
+    verify(this.tokens, never()).updateLastUsedTime(any());
+  }
+
+  @Test
+  @DisplayName("the token routes refuse an expired temporary token")
+  void tokenManagerRefusesAnExpiredTemporaryToken() {
+    final var cli = TokenFactory.cliToken();
+    when(this.tokens.findByToken(cli))
+        .thenReturn(
+            Optional.of(
+                new PersonalAccessTokenInfo(
+                    UUID.randomUUID(),
+                    OWNER_ID,
+                    "owner",
+                    PersonalAccessTokenKind.TEMPORARY,
+                    "Repsy CLI login",
+                    TokenScope.withImplicit(List.of(TokenScope.REPO_READ)),
+                    Instant.now().minusSeconds(1),
+                    null,
+                    Instant.now())));
+
+    assertThatThrownBy(() -> this.helper.authenticateTokenManager("Bearer " + cli))
+        .isExactlyInstanceOf(UnAuthorizedException.class);
+  }
+
+  @Test
+  @DisplayName("the token routes take a login and let it hand on every scope")
+  void tokenManagerTakesALogin() {
+    final var user = UserInfo.builder().id(OWNER_ID).username("owner").role(UserRole.USER).build();
+    final var login = "Bearer a.login.jwt";
+
+    when(this.jwtUtils.extractPanelClaims(login))
+        .thenReturn(new PanelTokenClaims(OWNER_ID, "owner", 0, Instant.now()));
+    when(this.userTxService.getAuthenticatedUserByUsername("owner")).thenReturn(user);
+
+    final var session = this.helper.authenticateTokenManager(login);
+
+    assertThat(session.user()).isEqualTo(user);
+    assertThat(session.grantable()).containsExactlyInAnyOrder(TokenScope.values());
+    verifyNoInteractions(this.tokens);
+  }
+
+  @Test
+  @DisplayName("authenticate stays login-only: a temporary token cannot mint a temporary token")
+  void authenticateRefusesATemporaryToken() {
+    foundTemporary(TokenScope.REPO_READ);
+    when(this.jwtUtils.extractPanelClaims(this.header)).thenThrow(new UnAuthorizedException("x"));
+
+    assertThatThrownBy(() -> this.helper.authenticate(this.header))
+        .isInstanceOf(UnAuthorizedException.class);
+
+    verifyNoInteractions(this.tokens);
+  }
+
+  @Test
+  @DisplayName("/current answers a temporary token too")
+  void currentAnswersATemporaryToken() {
+    final var token = foundTemporary(TokenScope.REPO_READ);
+
+    assertThat(this.helper.authenticateAccessToken(this.header)).isEqualTo(token);
   }
 }

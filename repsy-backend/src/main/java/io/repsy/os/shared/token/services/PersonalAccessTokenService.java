@@ -23,6 +23,7 @@ import io.repsy.os.generated.model.AccessTokenForm;
 import io.repsy.os.generated.model.AccessTokenWhoAmI;
 import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.token.dtos.PersonalAccessTokenInfo;
+import io.repsy.os.shared.token.dtos.PersonalAccessTokenKind;
 import io.repsy.os.shared.token.dtos.PersonalAccessTokenListItem;
 import io.repsy.os.shared.token.dtos.TokenScope;
 import io.repsy.os.shared.token.entities.PersonalAccessToken;
@@ -37,6 +38,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
+import java.util.EnumSet;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -65,6 +67,15 @@ public class PersonalAccessTokenService {
    * counts the first one's row: the cap holds under concurrency, as in Cloud.
    */
   public static final int MAX_TOKENS_PER_USER = 50;
+
+  /**
+   * How long the temporary token of a CLI login lives (RPS-2039). It is fixed: there is no form
+   * field for it and no refresh, the user logs in again.
+   */
+  public static final Duration TEMPORARY_TOKEN_LIFETIME = Duration.ofHours(24);
+
+  /** The name of a temporary token, which nobody is asked for: it is never listed. */
+  public static final String TEMPORARY_TOKEN_NAME = "Repsy CLI login";
 
   /** The expiry of a token created without a date, and the furthest a date can be set. */
   private static final Duration DEFAULT_EXPIRATION_DURATION = Duration.ofDays(365);
@@ -99,7 +110,8 @@ public class PersonalAccessTokenService {
 
   public Page<PersonalAccessTokenListItem> getTokens(final UUID userId, final Pageable pageable) {
 
-    return this.tokenRepository.findAllByUserId(userId, pageable);
+    return this.tokenRepository.findAllByUserIdAndKind(
+        userId, PersonalAccessTokenKind.PERSONAL, pageable);
   }
 
   /**
@@ -136,8 +148,9 @@ public class PersonalAccessTokenService {
   }
 
   /**
-   * Creates a token for {@code userId}. The answer carries the secret, which is returned once and
-   * never stored: only its hash is.
+   * Creates a personal token for {@code userId} that the caller may hold in full: the form may ask
+   * for any scope. The answer carries the secret, which is returned once and never stored: only its
+   * hash is.
    *
    * @throws BadRequestException if no scope is asked for, the date is in the past or too far ahead,
    *     or the user already holds {@link #MAX_TOKENS_PER_USER} tokens
@@ -145,18 +158,104 @@ public class PersonalAccessTokenService {
   @Transactional
   public AccessTokenCreated createToken(final UUID userId, final AccessTokenForm form) {
 
+    return this.createToken(userId, form, EnumSet.allOf(TokenScope.class));
+  }
+
+  /**
+   * Creates a personal token for {@code userId} with at most the scopes in {@code grantable}: what
+   * the credential of the caller may hand on. A login may hand on every scope; a temporary token
+   * only its own, so minting a personal token with it can never widen what the caller can do.
+   *
+   * @throws BadRequestException ({@code validationError}) if the form asks for a scope outside
+   *     {@code grantable}
+   * @throws BadRequestException as {@link #createToken(UUID, AccessTokenForm)}
+   */
+  @Transactional
+  public AccessTokenCreated createToken(
+      final UUID userId, final AccessTokenForm form, final Set<TokenScope> grantable) {
+
     final var now = this.now();
     final var scopes = requestedScopes(form);
     final var expirationDate = resolveExpirationDate(form.getExpirationDate(), now);
 
+    if (!grantable.containsAll(scopes)) {
+      throw new BadRequestException(ProtocolErrorCodes.VALIDATION_ERROR);
+    }
+
     this.lockUser(userId);
     this.requireRoom(userId, now);
 
-    final var secret = TokenFactory.personalAccessToken();
+    return this.insert(
+        userId,
+        PersonalAccessTokenKind.PERSONAL,
+        TokenFactory.personalAccessToken(),
+        form.getName(),
+        scopes,
+        expirationDate);
+  }
+
+  /**
+   * Creates the temporary token of a CLI login (RPS-2039): {@link #TEMPORARY_TOKEN_LIFETIME} from
+   * now, with {@code scopes} (what the user's own rights allow is applied on every request, so a
+   * scope beyond them grants nothing). It does not count against {@link #MAX_TOKENS_PER_USER}, is
+   * not listed, and does not revoke the previous one: that is {@link
+   * #revokePreviousTemporaryTokens} once the new secret has been delivered, so a failed delivery
+   * never leaves the user with none.
+   *
+   * @throws BadRequestException if no scope is asked for
+   */
+  @Transactional
+  public AccessTokenCreated createTemporaryToken(final UUID userId, final Set<TokenScope> scopes) {
+
+    if (scopes.isEmpty() || scopes.stream().anyMatch(Objects::isNull)) {
+      throw new BadRequestException(ProtocolErrorCodes.VALIDATION_ERROR);
+    }
+
+    final var now = this.now();
+
+    this.lockUser(userId);
+
+    return this.insert(
+        userId,
+        PersonalAccessTokenKind.TEMPORARY,
+        TokenFactory.cliToken(),
+        TEMPORARY_TOKEN_NAME,
+        scopes,
+        now.plus(TEMPORARY_TOKEN_LIFETIME));
+  }
+
+  /**
+   * Revokes the temporary tokens of {@code userId} that are older than the temporary token {@code
+   * tokenId}, which is the one the CLI now holds. A newer token is never revoked, so a login in
+   * another tab that finished earlier cannot undo this one. Repeating it changes nothing.
+   *
+   * @throws ItemNotFoundException if the user holds no such temporary token
+   */
+  @Transactional
+  public void revokePreviousTemporaryTokens(final UUID userId, final UUID tokenId) {
+
+    final var current =
+        this.tokenRepository
+            .findByUserIdAndIdAndKind(userId, tokenId, PersonalAccessTokenKind.TEMPORARY)
+            .orElseThrow(() -> new ItemNotFoundException(ErrorConstants.ACCESS_TOKEN_NOT_FOUND));
+
+    this.tokenRepository.deleteByUserIdAndKindCreatedBefore(
+        userId, PersonalAccessTokenKind.TEMPORARY, current.getCreatedAt());
+  }
+
+  private AccessTokenCreated insert(
+      final UUID userId,
+      final PersonalAccessTokenKind kind,
+      final String secret,
+      final String name,
+      final Set<TokenScope> scopes,
+      final Instant expirationDate) {
+
     final var token = new PersonalAccessToken();
 
     token.setUser(this.userRepository.getReferenceById(userId));
-    token.setName(form.getName());
+    token.setKind(kind);
+    token.setName(name);
     token.setTokenHash(TokenHash.hash(secret));
     token.setScopes(TokenScope.withImplicit(scopes));
     token.setExpirationDate(expirationDate);
@@ -169,8 +268,9 @@ public class PersonalAccessTokenService {
   }
 
   /**
-   * Revokes a token of {@code userId}. A token of another user answers the same as one that does
-   * not exist, so nobody learns which ids are taken.
+   * Revokes a personal token of {@code userId}. A token of another user, and a temporary token (it
+   * is not managed from the panel), answer the same as one that does not exist, so nobody learns
+   * which ids are taken.
    *
    * @throws ItemNotFoundException if the user holds no such token
    */
@@ -179,7 +279,7 @@ public class PersonalAccessTokenService {
 
     final var token =
         this.tokenRepository
-            .findByUserIdAndId(userId, tokenId)
+            .findByUserIdAndIdAndKind(userId, tokenId, PersonalAccessTokenKind.PERSONAL)
             .orElseThrow(() -> new ItemNotFoundException(ErrorConstants.ACCESS_TOKEN_NOT_FOUND));
 
     this.tokenRepository.delete(token);
@@ -269,7 +369,8 @@ public class PersonalAccessTokenService {
 
   private void requireRoom(final UUID userId, final Instant now) {
 
-    if (this.tokenRepository.countByUserIdAndExpirationDateAfter(userId, now)
+    if (this.tokenRepository.countByUserIdAndKindAndExpirationDateAfter(
+            userId, PersonalAccessTokenKind.PERSONAL, now)
         >= MAX_TOKENS_PER_USER) {
       throw new BadRequestException(ErrorConstants.ACCESS_TOKEN_LIMIT_REACHED);
     }

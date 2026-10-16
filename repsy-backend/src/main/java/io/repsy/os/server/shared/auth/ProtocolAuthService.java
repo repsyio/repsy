@@ -86,8 +86,8 @@ public class ProtocolAuthService {
 
   /**
    * Setter-injected for the same reason as {@link #setRevokedTokens}. Without it (a unit test that
-   * builds a component by hand) no personal access token is known, so every {@code rut-} secret is
-   * refused.
+   * builds a component by hand) no personal access token is known, so every {@code rut-} and {@code
+   * rct-} secret is refused.
    */
   @Autowired(required = false)
   public void setPersonalAccessTokens(
@@ -115,9 +115,9 @@ public class ProtocolAuthService {
    * is whatever the client typed into the Basic credentials, so it never identifies a user
    * (RPS-979).
    *
-   * <p>A Bearer value that starts with {@code rut-} is a personal access token and nothing else: it
-   * is authorized as one or refused, and never reaches the JWT or the password checks (see {@link
-   * #tryAuthorizeWithPat}). A JWT minted from one ({@link
+   * <p>A Bearer value that starts with {@code rut-} or {@code rct-} is a personal access token and
+   * nothing else: it is authorized as one or refused, and never reaches the JWT or the password
+   * checks (see {@link #tryAuthorizeWithPat}). A JWT minted from one ({@link
    * AuthenticationType#PERSONAL_ACCESS_TOKEN}) is authorized as that token, read again.
    *
    * <p>A Bearer value that is neither a live deploy token nor a verifiable protocol JWT answers
@@ -455,12 +455,12 @@ public class ProtocolAuthService {
    * Authorizes a personal access token presented as the secret itself: the password of a Basic
    * credential (the username is ignored, as it is for a deploy token) or a Bearer value.
    *
-   * <p>A secret that starts with {@code rut-} is a personal access token and only that: this method
-   * either authorizes it or throws, so it never reaches the JWT decode or the password check. One
-   * that is unknown or expired counts as a failed credential against {@link AuthFailureThrottle}
-   * and is answered {@code unAuthorized}. A token that is recognized but not allowed (the scope
-   * does not reach the permission, or MANAGE without the ADMIN role) answers {@code unAuthorized}
-   * too and is not counted, like a refused deploy token.
+   * <p>A secret that starts with {@code rut-} or {@code rct-} is a personal access token and only
+   * that: this method either authorizes it or throws, so it never reaches the JWT decode or the
+   * password check. One that is unknown or expired counts as a failed credential against {@link
+   * AuthFailureThrottle} and is answered {@code unAuthorized}. A token that is recognized but not
+   * allowed (the scope does not reach the permission, or MANAGE without the ADMIN role) answers
+   * {@code unAuthorized} too and is not counted, like a refused deploy token.
    *
    * <p>The token is not bound to a repo, so {@code repoId} does not narrow it: what it may do on
    * any repo is its scopes intersected with what its owner may do, which can only be less.
@@ -470,7 +470,7 @@ public class ProtocolAuthService {
   protected boolean tryAuthorizeWithPat(
       final UUID repoId, final String secret, final Permission permission) {
 
-    if (!TokenType.REPSY_USER_TOKEN.matches(secret)) {
+    if (!TokenType.isUserToken(secret)) {
       return false;
     }
 
@@ -482,7 +482,7 @@ public class ProtocolAuthService {
   private boolean tryAuthorizeWithPatBearer(
       final UUID repoId, final String bearerToken, final Permission permission) {
 
-    if (!TokenType.REPSY_USER_TOKEN.matches(bearerToken)) {
+    if (!TokenType.isUserToken(bearerToken)) {
       return false;
     }
 
@@ -496,8 +496,8 @@ public class ProtocolAuthService {
   }
 
   /**
-   * Finds the live token a {@code rut-} secret belongs to. An unknown or expired one is a failed
-   * credential: it is counted, and is answered like a wrong password.
+   * Finds the live token a {@code rut-} or {@code rct-} secret belongs to. An unknown or expired
+   * one is a failed credential: it is counted, and is answered like a wrong password.
    */
   protected PersonalAccessTokenInfo authenticateWithPat(final String secret) {
 
@@ -756,7 +756,7 @@ public class ProtocolAuthService {
 
   private void rejectPersonalAccessTokenAsPassword(final String password) {
 
-    if (TokenType.REPSY_USER_TOKEN.matches(password)) {
+    if (TokenType.isUserToken(password)) {
       throw this.countedUnAuthorized();
     }
   }

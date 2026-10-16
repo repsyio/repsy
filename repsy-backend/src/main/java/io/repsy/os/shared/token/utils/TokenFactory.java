@@ -36,4 +36,9 @@ public class TokenFactory {
 
     return of(TokenType.REPSY_USER_TOKEN);
   }
+
+  public static String cliToken() {
+
+    return of(TokenType.REPSY_CLI_TOKEN);
+  }
 }

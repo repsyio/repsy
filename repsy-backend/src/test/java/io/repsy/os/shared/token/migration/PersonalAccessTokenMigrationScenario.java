@@ -136,6 +136,8 @@ public final class PersonalAccessTokenMigrationScenario {
 
     expected.put("id", "uuid not null");
     expected.put("user_id", "uuid not null");
+    // V0046 (RPS-2039): PERSONAL or TEMPORARY, PERSONAL for every token that existed before.
+    expected.put("kind", "character varying(20) not null");
     expected.put("name", "character varying(150) not null");
     expected.put("token_hash", "character varying(64) not null");
     expected.put("scopes", "character varying(255) not null");

@@ -29,6 +29,7 @@ import org.jspecify.annotations.Nullable;
  * @param id the id of the token
  * @param userId the id of the user it belongs to
  * @param username the username of that user
+ * @param kind whether it is a long-lived personal token or a temporary CLI login token
  * @param name the name the user gave it
  * @param scopes what it may do, in canonical order; the record keeps its own copy, which cannot be
  *     changed, because whoever reads the scopes decides what the token is allowed to do
@@ -40,6 +41,7 @@ public record PersonalAccessTokenInfo(
     UUID id,
     UUID userId,
     String username,
+    PersonalAccessTokenKind kind,
     String name,
     Set<TokenScope> scopes,
     Instant expirationDate,
@@ -56,6 +58,11 @@ public record PersonalAccessTokenInfo(
     }
 
     scopes = Collections.unmodifiableSet(copy);
+  }
+
+  /** Whether this is the 24-hour token of a CLI login, which is not managed from the panel. */
+  public boolean isTemporary() {
+    return this.kind == PersonalAccessTokenKind.TEMPORARY;
   }
 
   /** Whether the token has stopped working: an expired one is refused, whatever its scopes. */
