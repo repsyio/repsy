@@ -32,6 +32,12 @@ jobs:
             echo "Dependabot pull request, title check skipped."
             exit 0
           fi
+          # The release and bump pull requests of the repsy-release-bot GitHub App (RPS-2268) have
+          # no Jira story of their own. Only that App has this login, so nobody else gets the skip.
+          if [[ "$AUTHOR" == "repsy-release-bot[bot]" ]]; then
+            echo "repsy-release-bot pull request, title check skipped."
+            exit 0
+          fi
           pattern='^RPS-[0-9]+(, RPS-[0-9]+)*: [^[:space:]].*$'
           if [[ "$TITLE" =~ $pattern && ! "$TITLE" =~ [[:space:]]$ && ! "$TITLE" =~ [[:cntrl:]] ]]; then
             echo "OK: $TITLE"
