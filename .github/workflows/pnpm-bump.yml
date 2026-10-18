@@ -5,12 +5,14 @@ name: Bump pnpm
 # so Dependabot cannot track it. This workflow does: once a week it compares the pin in
 # .github/actions/setup-pnpm/action.yml with the newest release of the same major, rewrites
 # every pin in one commit (that action, the Dockerfile and the e2e runner Dockerfiles, which
-# DockerfileTest keeps in sync) and opens a PR that auto-merges once its checks pass.
+# DockerfileTest keeps in sync) and opens a PR. Auto-merge is off for the repository, so a person
+# merges it once its required checks pass.
 #
-# The PR is created with a GitHub App token, not GITHUB_TOKEN: a PR opened with GITHUB_TOKEN triggers
-# no `pull_request` workflows, so the required checks would never report and auto-merge would
-# never fire. Without the App (the PNPM_BUMP_APP_ID variable and PNPM_BUMP_APP_PRIVATE_KEY secret,
-# see AGENTS.md "Merging to main") the job only writes a note to its summary.
+# The PR is created with a token of the repsy-release-bot GitHub App, not GITHUB_TOKEN: a PR opened
+# with GITHUB_TOKEN triggers no `pull_request` workflows, so the required checks would never
+# report. Without the App (the org variable REPSY_BOT_APP_ID and org secret
+# REPSY_BOT_APP_PRIVATE_KEY, see AGENTS.md "Keeping the pnpm pin up to date", RPS-2268) the job
+# only writes a note to its summary.
 
 permissions:
   contents: read
@@ -30,7 +32,7 @@ jobs:
     runs-on: hetzner-sm
     timeout-minutes: 10
     env:
-      APP_ID: ${{ vars.PNPM_BUMP_APP_ID }}
+      APP_ID: ${{ vars.REPSY_BOT_APP_ID }}
     steps:
       - name: Check the GitHub App is configured
         id: configured
@@ -38,7 +40,7 @@ jobs:
           if [ -n "$APP_ID" ]; then
             echo "app=true" >> "$GITHUB_OUTPUT"
           else
-            echo "PNPM_BUMP_APP_ID is not set, so no pnpm bump PR can be opened (see AGENTS.md)." >> "$GITHUB_STEP_SUMMARY"
+            echo "REPSY_BOT_APP_ID is not set, so no pnpm bump PR can be opened (see AGENTS.md)." >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Create the GitHub App token
@@ -46,8 +48,8 @@ jobs:
         id: app
         uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         with:
-          app-id: ${{ vars.PNPM_BUMP_APP_ID }}
-          private-key: ${{ secrets.PNPM_BUMP_APP_PRIVATE_KEY }}
+          app-id: ${{ vars.REPSY_BOT_APP_ID }}
+          private-key: ${{ secrets.REPSY_BOT_APP_PRIVATE_KEY }}
 
       - name: Check out main
         if: steps.configured.outputs.app == 'true'
@@ -121,6 +123,5 @@ jobs:
 
           url=$(gh pr create --base main --head "$branch" \
             --title "RPS-1167: Bump the pinned pnpm from $current to $latest" \
-            --body "Bumps the pnpm pin from $current to $latest in the frontend CI setup action, the Dockerfile and the e2e runner images, which \`DockerfileTest\` keeps in sync. Opened by \`.github/workflows/pnpm-bump.yml\` (RPS-1167); it auto-merges once the required checks pass.")
-          gh pr merge "$url" --auto --squash
-          echo "Opened $url" >> "$GITHUB_STEP_SUMMARY"
+            --body "Bumps the pnpm pin from $current to $latest in the frontend CI setup action, the Dockerfile and the e2e runner images, which \`DockerfileTest\` keeps in sync. Opened by \`.github/workflows/pnpm-bump.yml\` (RPS-1167); merge it once the required checks pass.")
+          echo "Opened $url, to be merged by a person" >> "$GITHUB_STEP_SUMMARY"

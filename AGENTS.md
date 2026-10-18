@@ -529,15 +529,16 @@ rebase or update the branch when another PR has just changed the same area, and 
 The pnpm version is a literal in `.github/actions/setup-pnpm/action.yml`, the `Dockerfile` and every
 `e2e/runners/*.Dockerfile` (`DockerfileTest` keeps them equal). Dependabot cannot track a literal in a
 `run:` line, so `.github/workflows/pnpm-bump.yml` runs weekly, rewrites all of them to the newest release
-of the pinned major in one commit and opens a PR that auto-merges with `gh pr merge --auto --squash`. A new
-major is left to a person.
+of the pinned major in one commit and opens a PR. Auto-merge is off for this repository, so a person merges
+it once the required checks pass. A new major is left to a person.
 
-The PR is opened with a GitHub App token, because a PR opened with `GITHUB_TOKEN` triggers no
-`pull_request` workflows and auto-merge would wait for checks that never report. One-time setup
-(repository admin): create a GitHub App with repository permissions Contents: write, Pull requests:
-write and Metadata: read, install it on `repsyio/repsy`, then store its ID as the Actions variable
-`PNPM_BUMP_APP_ID` and its private key as the secret `PNPM_BUMP_APP_PRIVATE_KEY`. Until then the workflow
-only writes a note to its run summary. Trigger it once with `gh workflow run pnpm-bump.yml`.
+The PR is opened with a token of the `repsy-release-bot` GitHub App (RPS-2268), because a PR opened with
+`GITHUB_TOKEN` triggers no `pull_request` workflows and its required checks would never report. The App
+(Contents and Pull requests write, no webhook) is installed on `repsy-core`, `repsy` and `repsy-mono`
+only; its ID is the org variable `REPSY_BOT_APP_ID` and its private key the org secret
+`REPSY_BOT_APP_PRIVATE_KEY`, both visible to those three repositories. Its PRs skip the PR title check
+(`pr-title.yml`). Without the variable the workflow only writes a note to its run summary. Trigger it
+once with `gh workflow run pnpm-bump.yml`.
 
 ## API guideline
 
