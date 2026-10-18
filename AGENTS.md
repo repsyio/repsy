@@ -12,7 +12,7 @@ installation, configuration and usage.
 
 | Path | Purpose |
 | --- | --- |
-| `core/` | Git submodule ([`repsy-core`](https://github.com/repsyio/repsy-core)): shared parent POM, BOM and libraries. It is the Maven parent of the root `pom.xml` |
+| `config/` | `checkstyle.xml`, the Checkstyle config of every module (a copy of `repsy-core`'s, see "repsy-core version") |
 | `repsy-backend/` | Spring Boot application (`io.repsy.os`): `panel/` (web UI API, e.g. `profile`, `auth`), `server/` (repository serving), `spa/`, `config/` |
 | `libs/` | Shared libraries: `protocol-router`, `multiport`, `storage`, `scanner-client`, `test-support` |
 | `repsy-protocols/` | One module per package format, plus `shared` |
@@ -29,11 +29,11 @@ Repsy is spread over three repositories under the `repsyio` GitHub organisation:
 | Repository | What lives there | How it relates to this one |
 | --- | --- | --- |
 | [`repsy`](https://github.com/repsyio/repsy) (this one) | The application: backend, frontend, protocol modules, scanner, e2e | |
-| [`repsy-core`](https://github.com/repsyio/repsy-core) | Shared parent POM (`core-parent`: plugins, quality gates, Java/Maven enforcement), BOM (`core-bom`: dependency versions) and small shared libraries (`core-event`, `core-error-handling`, `core-response`, `core-uuidv7`) | Vendored here as the `core/` git submodule. See "Submodule" below |
+| [`repsy-core`](https://github.com/repsyio/repsy-core) | Shared parent POM (`core-parent`: plugins, quality gates, Java/Maven enforcement), BOM (`core-bom`: dependency versions) and small shared libraries (`core-event`, `core-error-handling`, `core-response`, `core-uuidv7`) | Consumed here as a released version from `repo.repsy.io` (it was the `core/` git submodule until RPS-2265). See "repsy-core version" below |
 | [`repsy-docs`](https://github.com/repsyio/repsy-docs) | The user documentation, published at [docs.repsy.io](https://docs.repsy.io) | Not vendored. It describes the behaviour users rely on (client setup per protocol, repositories, deploy tokens) |
 
 - A change to how a build is configured, a dependency version or a shared library belongs in
-  `repsy-core`, not here. Merge it there first, then bump the submodule.
+  `repsy-core`, not here. Release it there first (**Release | Core**), then bump the version here.
 - A change to user-visible behaviour (a protocol's client configuration, a panel feature, a
   documented setting or status code) needs a matching `repsy-docs` PR. Tests that pin documented
   behaviour name the docs issue they follow (for example `DeployTokenPasswordOnlyIT` cites
@@ -203,16 +203,13 @@ protocol is proven against the real tool. It has its own README, runners and `ru
 
 ## Build & verify
 
-Dependency versions, plugin configuration and quality gates come from `repsy-core`, so initialise
-the submodule and install it once before building this repo:
+Dependency versions, plugin configuration and quality gates come from `repsy-core`, a released version
+that Maven downloads from `https://repo.repsy.io/repsy/repsy-maven` (no submodule, no core install; see
+"repsy-core version"). Build with:
 
 ```bash
-git submodule update --init
-mvn install -f core/pom.xml -DskipTests -Drat.skip=true -Dcheckstyle.skip=true
 mvn verify
 ```
-
-Re-run the `install -f core/pom.xml` step after the `core` submodule pointer moves.
 
 `mvn verify` runs the integration tests of `repsy-backend` (nearly all the time it takes) in
 several test JVMs at once: `it.fork.count` of them, 4 by default. Each JVM starts its own
@@ -347,7 +344,7 @@ weaker in a subclass: change the route, in the owning repo.
 The naming rules of Repsy OS and Repsy Cloud (RPS-2009). They are the target: some existing code still
 breaks them, and Jira stories under RPS-2009 migrate it. Do not add new exceptions. Cloud's
 `repsy-cloud-server` copies the OS backend classes, so a name changed here is changed in Cloud after the
-submodule bump: rename in this repository first. The same rules are in `repsy-mono`'s `AGENTS.md`; change
+version bump: rename in this repository first. The same rules are in `repsy-mono`'s `AGENTS.md`; change
 them in both repositories together.
 
 ### Types
@@ -520,7 +517,7 @@ rebase or update the branch when another PR has just changed the same area, and 
 ## Dependabot and code scanning
 
 - SonarCloud (PR analysis in `pr-checks.yml`; `main` is analysed by `sonarcloud.yml` at 10, 12, 14, 16 and 18 o'clock Europe/Amsterdam, not on every merge) is the only code scanner. There is no CodeQL workflow and GitHub code scanning is not configured; do not add them back (RPS-1849).
-- `.github/dependabot.yml` checks daily, except the `gitsubmodule` entry, which also checks daily (Dependabot allows no interval shorter than 24 hours, so `interval: "cron"` with an hourly expression is rejected). Minor and patch updates share one PR per update entry (group `minor-and-patch`); a major update gets its own PR. Every entry keeps `open-pull-requests-limit: 3`.
+- `.github/dependabot.yml` checks daily. Minor and patch updates share one PR per update entry (group `minor-and-patch`); a major update gets its own PR. Every entry keeps `open-pull-requests-limit: 3`.
 - The same rules apply in `repsy-core` and `repsy-mono`; change them in all three repositories together.
 
 
@@ -856,13 +853,28 @@ Old springdoc tag to new tag. Several old tags may map to one new tag (one area,
   is `text` in PostgreSQL but `varchar(n)` in H2 is listed in `EntityColumnSchemaChecks`
   (`H2_BOUNDED_TEXT`), so that difference is recorded rather than discovered by an insert.
 
-## Submodule
+## repsy-core version
 
-`core/` is pinned to a specific `repsy-core` commit. Bump it only as a deliberate change (its own
-PR, or a clearly called-out part of one), and re-run the core install above afterwards. Pin it
-only to a commit that is on `repsy-core`'s `main`, so merge the `repsy-core` PR first: a commit
-that only exists on a PR branch disappears from the remote when that branch is deleted on merge.
-`repsy-core` merges to `main` the same way, without a merge queue.
+The root `pom.xml` takes a **released** `repsy-core` (RPS-2265, see its `AGENTS.md` "Releases"): the version
+is the parent `io.repsy.core:core-parent` and, once more, `repsy-core.version`, which the `core-bom` import
+uses for every `io.repsy.core` dependency (the modules declare those without a version).
+`CoreVersionPinTest` fails when the two differ or when the version is not a release. Bump both together,
+nothing else, as a deliberate change of its own, after the release exists on `repo.repsy.io`. No
+`-SNAPSHOT` of `repsy-core` is used here.
 
-repsy-core releases are tags only (no published artifacts, RPS-1085). After a core release, bump
-`<parent><version>` in `pom.xml` together with the pointer.
+- The `<repositories>` entry for `repsy-maven` in the root `pom.xml` (and in `repsy-scanner-trivy/pom.xml`)
+  is what lets Maven find the parent: Maven reads it before it resolves the parent, so no `settings.xml`
+  is needed. The repository is public; there is no credential.
+- Docker builds (`Dockerfile`, `repsy-scanner-trivy/Dockerfile`) no longer build core: they resolve it
+  from the same repository, so they need network access to `repo.repsy.io`.
+- `config/checkstyle.xml` is a copy of `repsy-core`'s file at the pinned release, at the default
+  location of `checkstyle.config.location`. When you bump the version, diff it against the same file in
+  the new `repsy-core` tag and take the changes.
+- A `io.repsy.core:*:1.0.0` that you installed locally from an older `repsy-core` checkout shadows the
+  release (Maven prefers a local release to the remote) and breaks the build with errors that look
+  unrelated, such as a missing `spring-modulith` version. Delete `~/.m2/repository/io/repsy/core/*/1.0.0`,
+  or build once with `-Dmaven.repo.local=<empty dir>` to see what CI sees.
+- For work on both repositories at once, install your `repsy-core` change locally
+  (`mvn install -f ../repsy-core/pom.xml -DskipTests`) under a version of your own, such as
+  `1.1.0-SNAPSHOT`, and point both version places at it in your working copy only; never commit that.
+  `repsy-mono` still vendors this repository as the `repsy/repsy-os` submodule (RPS-2266).

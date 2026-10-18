@@ -29,9 +29,9 @@ updates:
           - "minor"
           - "patch"
     ignore:
-      # io.repsy.core:* (the core-* artifacts) is the core submodule's own
-      # groupId — it's built from the core/ directory and already has its
-      # own Dependabot maven updates in the repsyio/repsy-core repository.
+      # io.repsy.core:* (the core-* artifacts) is released by repsyio/repsy-core. It is bumped by
+      # hand (RPS-2269 automates it) in the parent version and repsy-core.version of the root pom
+      # together, which Dependabot would change one at a time (CoreVersionPinTest).
       - dependency-name: "io.repsy.core:*"
 
   # repsy-scanner-trivy is not in the root reactor and has its own parent
@@ -65,12 +65,6 @@ updates:
       # release (0.16.3 is the latest) supports it. Stay on the 6.x line until zone.js does.
       - dependency-name: "jasmine-core"
         update-types: ["version-update:semver-major"]
-
-  - package-ecosystem: "gitsubmodule"
-    directory: "/"
-    schedule:
-      interval: "daily"
-    open-pull-requests-limit: 3
 
   - package-ecosystem: "docker"
     directory: "/"

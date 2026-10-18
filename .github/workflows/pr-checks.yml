@@ -22,9 +22,7 @@ jobs:
 
       - name: There must be only one .editorconfig file
         run: |
-          # core/ is a git submodule with its own .editorconfig; it's a
-          # separate repo, not part of this repo's file count.
-          if [ "$(find . -path './core' -prune -o -name '.editorconfig' -print | wc -l)" != "1" ]
+          if [ "$(find . -name '.editorconfig' -print | wc -l)" != "1" ]
           then
             exit 1
           fi
@@ -36,21 +34,6 @@ jobs:
 
       - run: editorconfig-checker
 
-      # RPS-2054: a submodule pointer must only point at a commit that is on repsy-core's main. The
-      # pin is fetched together with main, and any failure (unreachable pin, no network) fails the
-      # step.
-      - name: The core pin must be on repsy-core main
-        run: |
-          # .gitmodules uses the SSH URL, which the runner has no key for; core is public.
-          git -c url."https://github.com/".insteadOf=git@github.com: submodule update --init --filter=blob:none core
-          pin="$(git rev-parse HEAD:core)"
-          git -C core fetch --quiet --filter=blob:none https://github.com/repsyio/repsy-core.git main
-          if ! git -C core merge-base --is-ancestor "$pin" FETCH_HEAD
-          then
-            echo "::error::The core pin ($pin) is not on repsy-core main. Merge the repsy-core change first, then bump the pointer."
-            exit 1
-          fi
-          echo "core pin $pin is on repsy-core main"
 
   java-checks:
     name: Java check - All
@@ -70,7 +53,6 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          submodules: recursive
           fetch-depth: 0
 
       - name: Setup Maven Action
@@ -90,9 +72,6 @@ jobs:
           java-version: "25"
           distribution: "temurin"
           cache: maven
-
-      - name: Install core modules
-        run: mvn -B -ntp install -f core/pom.xml -DskipTests -Drat.skip=true -Dcheckstyle.skip=true
 
       # it.fork.count is the number of test JVMs the integration tests of repsy-backend are spread
       # over: one per vCPU of the runner, each with a postgres:18 container of its own

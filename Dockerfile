@@ -24,26 +24,10 @@ ARG MAVEN_OPTS_VALUE="--add-opens=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAM
   --add-opens=jdk.compiler/com.sun.tools.javac.util=ALL-UNNAMED"
 
 # ─────────────────────────────────────────
-# Stage 1: Build Core
-# ─────────────────────────────────────────
-FROM eclipse-temurin:25-jdk-alpine AS core-build
-
-ARG MAVEN_OPTS_VALUE
-ENV MAVEN_OPTS="${MAVEN_OPTS_VALUE}"
-
-RUN apk add --no-cache maven
-
-WORKDIR /app
-
-COPY core/config/ ./config/
-COPY core/ ./core/
-
-WORKDIR /app/core
-
-RUN mvn install -DskipTests -B
-
-# ─────────────────────────────────────────
 # Stage 2: Build libs
+#
+# RPS-2265: repsy-core is not built here. Its parent, BOM and libraries are released artifacts of
+# https://repo.repsy.io/repsy/repsy-maven, which the root pom declares as a repository.
 # ─────────────────────────────────────────
 FROM eclipse-temurin:25-jdk-alpine AS libs-build
 
@@ -54,10 +38,7 @@ RUN apk add --no-cache maven
 
 WORKDIR /app
 
-COPY --from=core-build /root/.m2 /root/.m2
-
-COPY core/config/ ./config/
-COPY core/core-parent/pom.xml ./core/core-parent/pom.xml
+COPY config/ ./config/
 COPY pom.xml ./pom.xml
 COPY libs/pom.xml ./libs/pom.xml
 COPY libs/protocol-router/ ./libs/protocol-router/
@@ -83,8 +64,7 @@ WORKDIR /app
 
 COPY --from=libs-build /root/.m2 /root/.m2
 
-COPY core/config/ ./config/
-COPY core/core-parent/pom.xml ./core/core-parent/pom.xml
+COPY config/ ./config/
 COPY pom.xml ./pom.xml
 COPY repsy-protocols/ ./repsy-protocols/
 
@@ -146,7 +126,6 @@ WORKDIR /app
 
 COPY --from=protocols-build /root/.m2 /root/.m2
 
-COPY core/core-parent/pom.xml ./core/core-parent/pom.xml
 COPY pom.xml ./pom.xml
 COPY repsy-backend/pom.xml ./repsy-backend/pom.xml
 

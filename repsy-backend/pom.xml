@@ -25,37 +25,31 @@
         <dependency>
             <groupId>io.repsy.core</groupId>
             <artifactId>core-event</artifactId>
-            <version>${project.version}</version>
         </dependency>
 
         <dependency>
             <groupId>io.repsy.core</groupId>
             <artifactId>core-error-handling</artifactId>
-            <version>${project.version}</version>
         </dependency>
 
         <dependency>
             <groupId>io.repsy.core</groupId>
             <artifactId>core-web-error</artifactId>
-            <version>${project.version}</version>
         </dependency>
 
         <dependency>
             <groupId>io.repsy.core</groupId>
             <artifactId>core-web</artifactId>
-            <version>${project.version}</version>
         </dependency>
 
         <dependency>
             <groupId>io.repsy.core</groupId>
             <artifactId>core-response</artifactId>
-            <version>${project.version}</version>
         </dependency>
 
         <dependency>
             <groupId>io.repsy.core</groupId>
             <artifactId>core-uuidv7</artifactId>
-            <version>${project.version}</version>
         </dependency>
 
         <dependency>

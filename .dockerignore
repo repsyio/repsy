@@ -13,12 +13,11 @@
 # limitations under the License.
 
 # Keeps local build output, dependencies and tooling state out of the image build context. The
-# Dockerfile copies whole directories (repsy-frontend/, libs/, repsy-protocols/, core/), so without
+# Dockerfile copies whole directories (repsy-frontend/, libs/, repsy-protocols/), so without
 # this a developer's local node_modules or generated client would be copied over the freshly
 # installed/generated ones in the image build, and a local build would differ from CI.
 #
-# This is a deny-list on purpose. Do NOT exclude what the Dockerfile copies: core/ (the git
-# submodule), entrypoint.sh, every pom.xml, and
+# This is a deny-list on purpose. Do NOT exclude what the Dockerfile copies: config/, entrypoint.sh, every pom.xml, and
 # repsy-backend/src/main/resources/openapi/openapi-spec.yaml.
 #
 # It applies to the main build context only, not to the `openapi-jar` named context that
@@ -28,7 +27,7 @@
 .git
 .claude
 
-# Maven build output, at any depth (core/, libs/*, repsy-protocols/*, repsy-backend/)
+# Maven build output, at any depth (libs/*, repsy-protocols/*, repsy-backend/)
 **/target
 
 # Frontend: installed dependencies, build output, caches and the git-ignored generated client. The

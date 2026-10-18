@@ -5,15 +5,23 @@
 
   <modelVersion>4.0.0</modelVersion>
 
+  <!--
+    RPS-2265: a released repsy-core, resolved from the repsy-maven repository declared below. The
+    same version is written once more in repsy-core.version; CoreVersionPinTest keeps the two equal.
+  -->
   <parent>
     <groupId>io.repsy.core</groupId>
-    <artifactId>core</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
-    <relativePath>core/pom.xml</relativePath>
+    <artifactId>core-parent</artifactId>
+    <version>1.0.0</version>
   </parent>
 
   <groupId>io.repsy.os</groupId>
   <artifactId>repsy-os</artifactId>
+  <!--
+    RPS-2265: this was inherited from the core parent while it was the 1.0.0-SNAPSHOT submodule. The
+    modules name this version in their parent element, so it has to be written down here.
+  -->
+  <version>1.0.0-SNAPSHOT</version>
   <packaging>pom</packaging>
   <url>https://github.com/repsyio/repsy-os</url>
 
@@ -27,18 +35,24 @@
     <!--
       TEMPORARY: core-parent enforces an 80% JaCoCo instruction-coverage gate (check-coverage
       execution), intended for repsy-core's own modules. Every repsy module inherits it through
-      core/pom.xml, so it is off by default here and opted into per module (set this property to
+      core-parent, so it is off by default here and opted into per module (set this property to
       "verify") once a module meets the threshold. Coverage reports are still generated for
       SonarCloud. Remove this override once every module has opted in.
     -->
     <jacoco.check.phase>none</jacoco.check.phase>
 
     <!--
-      RPS-2054: core's default is "${maven.multiModuleProjectDirectory}/config/checkstyle.xml",
-      which assumes the root of the build holds a config/ directory. Here the shared config is the
-      one in the core submodule.
+      RPS-2265: the repsy-core release the core-bom import below manages, so the io.repsy.core
+      dependencies of the modules carry no version of their own. Equal to the parent version above
+      (Maven allows no property there); CoreVersionPinTest fails when they differ.
     -->
-    <checkstyle.config.location>${maven.multiModuleProjectDirectory}/core/config/checkstyle.xml</checkstyle.config.location>
+    <repsy-core.version>1.0.0</repsy-core.version>
+
+    <!--
+      RPS-2265: core-parent sets this to "../../config/checkstyle.xml", a path of its own layout.
+      The shared config of this repository is the copy in config/ at the root of the build.
+    -->
+    <checkstyle.config.location>${maven.multiModuleProjectDirectory}/config/checkstyle.xml</checkstyle.config.location>
 
     <!--
       RPS-1453: extra JVM arguments of every forked test JVM. core-parent (RPS-1471) appends this
@@ -56,12 +70,30 @@
     <test.jvm.args>-XX:TieredStopAtLevel=1 -XX:ReservedCodeCacheSize=256m</test.jvm.args>
   </properties>
 
+  <!--
+    RPS-2265: repsy-core is consumed as a release from the public repsy-maven repository. Maven
+    reads this entry before it resolves the parent above, so the parent and the core-* artifacts
+    need no settings.xml. Releases only: no -SNAPSHOT of repsy-core is used here.
+  -->
+  <repositories>
+    <repository>
+      <id>repsy-maven</id>
+      <url>https://repo.repsy.io/repsy/repsy-maven</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>
+  </repositories>
+
   <dependencyManagement>
     <dependencies>
       <dependency>
         <groupId>io.repsy.core</groupId>
         <artifactId>core-bom</artifactId>
-        <version>${project.version}</version>
+        <version>${repsy-core.version}</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>

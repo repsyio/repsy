@@ -72,7 +72,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          submodules: recursive
           fetch-depth: 0
 
       - name: Setup Maven Action
@@ -92,9 +91,6 @@ jobs:
           java-version: "25"
           distribution: "temurin"
           cache: maven
-
-      - name: Install core modules
-        run: mvn -B -ntp install -f core/pom.xml -DskipTests -Drat.skip=true -Dcheckstyle.skip=true
 
       # RPS-1453: two test JVMs for the integration tests on this 2-vCPU runner (see pr-checks.yml).
       - name: Build and Verify

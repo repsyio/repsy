@@ -602,7 +602,7 @@ cmd_local_up() {
   # from an earlier checkout was reused and the runners tested old code (RPS-1321). Build every time
   # instead: Docker's layer cache makes it a near no-op when nothing under the build context
   # changed, and a changed source is never missed (an mtime check would miss e.g. a branch switch
-  # or a core submodule bump). Not with REPSY_IMAGE: that names a published image to test as it is,
+  # or a repsy-core version bump). Not with REPSY_IMAGE: that names a published image to test as it is,
   # and `--build` would replace it with a local build under the same tag.
   if overlay_active upgrade; then
     up_upgrade_stack

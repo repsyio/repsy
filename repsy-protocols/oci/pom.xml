@@ -30,7 +30,6 @@
     <dependency>
       <groupId>io.repsy.core</groupId>
       <artifactId>core-response</artifactId>
-      <version>${project.version}</version>
     </dependency>
 
     <dependency>

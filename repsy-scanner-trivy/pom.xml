@@ -22,13 +22,27 @@
     <maven.compiler.source>25</maven.compiler.source>
     <maven.compiler.target>25</maven.compiler.target>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <checkstyle.config.location>${project.basedir}/../core/config/checkstyle.xml</checkstyle.config.location>
+    <checkstyle.config.location>${project.basedir}/../config/checkstyle.xml</checkstyle.config.location>
     <fmt-maven-plugin.version>2.29</fmt-maven-plugin.version>
     <maven-checkstyle-plugin.version>3.6.0</maven-checkstyle-plugin.version>
     <checkstyle.version>14.3.0</checkstyle.version>
     <error-prone.version>2.50.0</error-prone.version>
     <nullaway.version>0.14.2</nullaway.version>
   </properties>
+
+  <!-- RPS-2265: the core-* artifacts that libs/scanner-client brings come from the repsy-maven release repository. -->
+  <repositories>
+    <repository>
+      <id>repsy-maven</id>
+      <url>https://repo.repsy.io/repsy/repsy-maven</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>
+  </repositories>
 
   <dependencies>
     <dependency>

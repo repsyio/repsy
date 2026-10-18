@@ -24,21 +24,13 @@ FROM aquasec/trivy:${TRIVY_VERSION} AS trivy
 #
 # RPS-2170: the build context is the repository root (docker build -f repsy-scanner-trivy/Dockerfile .),
 # because the service shares the wire records of libs/scanner-client. The library and its parents
-# (core submodule, root and libs POM) are installed into the local repository first, then the
+# (the root and libs POM; repsy-core itself comes from repo.repsy.io, RPS-2265) are installed into the local repository first, then the
 # service is built against them. Dockerfile.dockerignore next to this file keeps the rest of the
 # repository out of the context.
 # ─────────────────────────────────────────
 FROM eclipse-temurin:25-jdk-alpine AS builder
 
 RUN apk add --no-cache maven
-
-WORKDIR /app
-
-COPY core/config/ ./config/
-COPY core/ ./core/
-
-WORKDIR /app/core
-RUN mvn install -DskipTests -B
 
 WORKDIR /app
 
