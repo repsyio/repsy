@@ -148,7 +148,7 @@ jobs:
           org.sonarsource.scanner.maven:sonar-maven-plugin:sonar
           -Dsonar.projectKey=repsyio_repsy
           -Dsonar.organization=repsy
-          -Dsonar.exclusions=core/**,**/*.spec.ts
+          -Dsonar.exclusions=**/*.spec.ts
           -Dsonar.coverage.jacoco.xmlReportPaths=**/target/site/jacoco/jacoco.xml
 
       - name: Upload JaCoCo reports
