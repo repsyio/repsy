@@ -20,6 +20,12 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
+      # RPS-2265: the self-hosted runners keep their workspace, and the checkout that drops the core
+      # submodule leaves its old directory behind ("unable to rmdir 'core'"), with a second
+      # .editorconfig and stale build output. Delete this step once every runner has run it.
+      - name: Remove the former core submodule checkout
+        run: rm -rf core
+
       - name: There must be only one .editorconfig file
         run: |
           if [ "$(find . -name '.editorconfig' -print | wc -l)" != "1" ]
@@ -54,6 +60,12 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
+
+      # RPS-2265: the self-hosted runners keep their workspace, and the checkout that drops the core
+      # submodule leaves its old directory behind ("unable to rmdir 'core'"), with a second
+      # .editorconfig and stale build output. Delete this step once every runner has run it.
+      - name: Remove the former core submodule checkout
+        run: rm -rf core
 
       - name: Setup Maven Action
         uses: s4u/setup-maven-action@4a02cbd99769e46198135c31d5097c94618ba3f5 # v1.21.0
