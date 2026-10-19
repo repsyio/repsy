@@ -70,12 +70,10 @@ jobs:
           push: true
           tags: |
             repo.repsy.io/repsy/os/repsy:${{ env.DOCKER_IMAGE_TAG }}
-            repo.repsy.io/repsy/os/repsy:latest
-          # Build cache in the registry, not the 10 GB GitHub cache. mode=max keeps the Maven and
-          # frontend build stages, which are the expensive ones. This workflow only runs on tags and
-          # manual dispatch, never on pull requests, so only trusted refs write the cache.
-          cache-from: type=registry,ref=repo.repsy.io/repsy/os/repsy:buildcache
-          cache-to: type=registry,ref=repo.repsy.io/repsy/os/repsy:buildcache,mode=max,image-manifest=true,oci-mediatypes=true
+            ${{ github.ref_type == 'tag' && 'repo.repsy.io/repsy/os/repsy:latest' || '' }}
+          # RPS-2276, temporary: no buildx cache in the registry. repo.repsy.io (Cloud, 26.08.14) answers 500 to the
+          # cache manifest PUT (it reads os/architecture from the cache config blob). Put cache-from and cache-to
+          # back once Cloud runs a release with the RPS-1110 fix (the mono deploy after 26.08.14).
 
   # The vulnerability scanner (repsy-scanner-trivy, RPS-1400) is published with every release, under
   # the same tags as the application image, so that an operator enabling SECURITY_SCANNER runs the
@@ -118,9 +116,10 @@ jobs:
           push: true
           tags: |
             repo.repsy.io/repsy/os/repsy-scanner-trivy:${{ env.DOCKER_IMAGE_TAG }}
-            repo.repsy.io/repsy/os/repsy-scanner-trivy:latest
-          cache-from: type=registry,ref=repo.repsy.io/repsy/os/repsy-scanner-trivy:buildcache
-          cache-to: type=registry,ref=repo.repsy.io/repsy/os/repsy-scanner-trivy:buildcache,mode=max,image-manifest=true,oci-mediatypes=true
+            ${{ github.ref_type == 'tag' && 'repo.repsy.io/repsy/os/repsy-scanner-trivy:latest' || '' }}
+          # RPS-2276, temporary: no buildx cache in the registry. repo.repsy.io (Cloud, 26.08.14) answers 500 to the
+          # cache manifest PUT (it reads os/architecture from the cache config blob). Put cache-from and cache-to
+          # back once Cloud runs a release with the RPS-1110 fix (the mono deploy after 26.08.14).
 
   helm-update:
     needs: build-and-push
