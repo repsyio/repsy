@@ -1,0 +1,148 @@
+name: Bump | repsy-core
+
+# RPS-2269. The Release | Core workflow of repsyio/repsy-core sends `core-released` (the version)
+# after it has deployed a release. This workflow moves the parent version and `repsy-core.version`
+# of the root pom.xml to it and opens a pull request that a person merges. When that pull request
+# is merged, core-bump-merged.yml tells repsy-mono.
+#
+# The pull request is created with the repsy-release-bot GitHub App token, not GITHUB_TOKEN: a pull
+# request opened with GITHUB_TOKEN triggers no `pull_request` workflows, so its checks would never
+# report (RPS-2268). Auto-merge is off for this repository and the App is no bypass actor of the
+# `protect default` ruleset, so nothing here merges.
+#
+# Run it by hand (workflow_dispatch) when the dispatch from repsy-core failed.
+
+permissions:
+  contents: read
+
+on:
+  repository_dispatch:
+    types: [core-released]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Released repsy-core version, for example 1.0.1"
+        required: true
+        type: string
+
+concurrency:
+  group: core-bump
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    name: Bump repsy-core
+    runs-on: hetzner-md
+    timeout-minutes: 20
+    env:
+      # Through env, never interpolated into a script: the payload is input.
+      VERSION: ${{ github.event.client_payload.version || inputs.version }}
+      SENDER: ${{ github.event.sender.login }}
+      EVENT: ${{ github.event_name }}
+    steps:
+      # Only the App sends core-released; a person who can run the workflow does so with
+      # workflow_dispatch. Anyone else with write access could send a repository_dispatch.
+      - name: Validate the sender and the version
+        run: |
+          if [ "$EVENT" = "repository_dispatch" ] && [ "$SENDER" != "repsy-release-bot[bot]" ]; then
+            echo "::error::core-released was sent by $SENDER, not by repsy-release-bot[bot]."
+            exit 1
+          fi
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::'$VERSION' is not a release version (x.y.z)."
+            exit 1
+          fi
+
+      # The tag and the POMs the build resolves must exist before a pull request names the version.
+      - name: Check the release exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/repsyio/repsy-core/git/ref/tags/v${VERSION}" --jq .ref
+          for artifact in core-parent core-dependencies core-build-parent core-bom; do
+            curl -fsS -o /dev/null "https://repo.repsy.io/repsy/repsy-maven/io/repsy/core/${artifact}/${VERSION}/${artifact}-${VERSION}.pom"
+          done
+
+      - name: Create the GitHub App token
+        id: app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.REPSY_BOT_APP_ID }}
+          private-key: ${{ secrets.REPSY_BOT_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ github.event.repository.name }}
+
+      - name: Check out main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: main
+          token: ${{ steps.app.outputs.token }}
+
+      - name: Setup Maven Action
+        uses: s4u/setup-maven-action@4a02cbd99769e46198135c31d5097c94618ba3f5 # v1.21.0
+        with:
+          checkout-enabled: false
+          cache-enabled: false
+          java-version: "25"
+          java-distribution: temurin
+
+      - name: Open the bump pull request
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: |
+          set -euo pipefail
+          branch="core/${VERSION}"
+          current="$(awk '/<parent>/,/<\/parent>/' pom.xml | sed -n 's#.*<version>\(.*\)</version>.*#\1#p' | head -n1)"
+          if ! [[ "$current" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::The parent version of pom.xml ($current) is not a release."
+            exit 1
+          fi
+          if [ "$current" = "$VERSION" ]; then
+            echo "repsy-core $VERSION is already the version of main." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if [ "$(printf '%s\n%s\n' "$current" "$VERSION" | sort -V | tail -n1)" != "$VERSION" ]; then
+            echo "::error::repsy-core $VERSION is older than $current, which main uses."
+            exit 1
+          fi
+          if [ -n "$(gh pr list --head "$branch" --state open --json number --jq '.[].number')" ]; then
+            echo "The pull request for repsy-core $VERSION is already open." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          # The parent version and repsy-core.version name one release (CoreVersionPinTest).
+          awk -v v="$VERSION" '/<parent>/ {p=1} p && /<version>/ {sub(/<version>[^<]*<\/version>/, "<version>" v "</version>"); p=0} {print}' pom.xml > pom.xml.new
+          mv pom.xml.new pom.xml
+          sed -i "s#<repsy-core.version>[^<]*</repsy-core.version>#<repsy-core.version>${VERSION}</repsy-core.version>#" pom.xml
+          if [ "$(git diff --numstat -- pom.xml | cut -f1,2)" != "$(printf '2\t2')" ]; then
+            echo "::error::Expected the parent version and repsy-core.version to change, nothing else."
+            git diff -- pom.xml
+            exit 1
+          fi
+
+          # config/checkstyle.xml is a copy of the file at the release tag (AGENTS.md).
+          gh api -H "Accept: application/vnd.github.raw+json" \
+            "repos/repsyio/repsy-core/contents/config/checkstyle.xml?ref=v${VERSION}" > config/checkstyle.xml
+
+          # Proves the parent resolves from the registry; an empty local repository is what CI sees.
+          mvn -B -ntp -N -U validate \
+            -Dmaven.repo.local="$RUNNER_TEMP/m2" \
+            -Daether.connector.requestTimeout=120000
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "$branch"
+          git commit -q -a -m "Bump repsy-core to ${VERSION}" \
+            -m "Opened by .github/workflows/core-bump.yml (RPS-2269)."
+          git push -q origin "$branch"
+
+          # An older bump pull request that is still open is superseded by this one.
+          for old in $(gh pr list --state open --json number,headRefName \
+            --jq '.[] | select(.headRefName | startswith("core/")) | select(.headRefName != "'"$branch"'") | .number'); do
+            gh pr close "$old" --delete-branch --comment "Superseded by the bump to repsy-core ${VERSION}."
+          done
+
+          url="$(gh pr create --base main --head "$branch" \
+            --title "Bump repsy-core to ${VERSION}" \
+            --body "Moves the parent version and \`repsy-core.version\` of the root \`pom.xml\` from ${current} to ${VERSION}, the release tagged \`v${VERSION}\` in repsyio/repsy-core and deployed to https://repo.repsy.io/repsy/repsy-maven. Opened by \`.github/workflows/core-bump.yml\` (RPS-2269); \`mvn -N -U validate\` resolved the new parent from an empty local repository. Not run here: the build of the modules against ${VERSION}, which the checks of this pull request do. A person merges it; merging it opens the matching pull request in repsy-mono.")"
+          echo "Opened ${url}" >> "$GITHUB_STEP_SUMMARY"

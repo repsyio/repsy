@@ -1,0 +1,61 @@
+name: Bump | repsy-core merged
+
+# RPS-2269. When the pull request of core-bump.yml is merged, repsyio/repsy-mono is told to move
+# the repsy/repsy-os pointer to the merge commit and to take the same repsy-core version (its
+# pr-checks fail while the two name different releases). core-bump.yml in repsy-mono does that.
+
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+
+jobs:
+  notify:
+    name: Tell repsy-mono
+    # Merged, from a branch of this repository (a fork gets no secrets), opened by the App.
+    if: >-
+      github.event.pull_request.merged == true
+      && startsWith(github.event.pull_request.head.ref, 'core/')
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && github.event.pull_request.user.login == 'repsy-release-bot[bot]'
+    runs-on: hetzner-sm
+    timeout-minutes: 10
+    env:
+      HEAD_REF: ${{ github.event.pull_request.head.ref }}
+      MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+    steps:
+      - name: Create the GitHub App token for repsy-mono
+        id: app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ vars.REPSY_BOT_APP_ID }}
+          private-key: ${{ secrets.REPSY_BOT_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: repsy-mono
+
+      - name: Check out the merge commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.merge_commit_sha }}
+
+      # The branch name only announces the version; the pom.xml of the merge commit decides.
+      - name: Send os-core-released
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+        run: |
+          set -euo pipefail
+          version="$(awk '/<parent>/,/<\/parent>/' pom.xml | sed -n 's#.*<version>\(.*\)</version>.*#\1#p' | head -n1)"
+          prop="$(sed -n 's#.*<repsy-core.version>\(.*\)</repsy-core.version>.*#\1#p' pom.xml | head -n1)"
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || [ "$version" != "$prop" ] || [ "core/${version}" != "$HEAD_REF" ]; then
+            echo "::error::pom.xml names repsy-core '$version' / '$prop', the branch is '$HEAD_REF'."
+            exit 1
+          fi
+          gh api "repos/${GITHUB_REPOSITORY_OWNER}/repsy-mono/dispatches" \
+            -f event_type=os-core-released \
+            -f "client_payload[version]=${version}" \
+            -f "client_payload[sha]=${MERGE_SHA}"
+          echo "Sent os-core-released ${version} ${MERGE_SHA} to ${GITHUB_REPOSITORY_OWNER}/repsy-mono" >> "$GITHUB_STEP_SUMMARY"

@@ -862,6 +862,14 @@ uses for every `io.repsy.core` dependency (the modules declare those without a v
 nothing else, as a deliberate change of its own, after the release exists on `repo.repsy.io`. No
 `-SNAPSHOT` of `repsy-core` is used here.
 
+The bump is automatic (RPS-2269). The **Release | Core** workflow of `repsy-core` sends `core-released` to
+this repository with the `repsy-release-bot` App token; `.github/workflows/core-bump.yml` checks the tag and
+the POMs, moves both versions and `config/checkstyle.xml`, proves the parent resolves
+(`mvn -N -U validate`) and opens `Bump repsy-core to X.Y.Z` from `core/X.Y.Z`, closing older `core/*` pull
+requests. A person merges it; `core-bump-merged.yml` then sends `os-core-released` (version and merge commit)
+to `repsy-mono`, which opens its own bump. If the dispatch was lost, run **Bump | repsy-core** by hand with
+the version. Dependabot ignores `io.repsy.core:*`.
+
 - The `<repositories>` entry for `repsy-maven` in the root `pom.xml` (and in `repsy-scanner-trivy/pom.xml`)
   is what lets Maven find the parent: Maven reads it before it resolves the parent, so no `settings.xml`
   is needed. The repository is public; there is no credential.

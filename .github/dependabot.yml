@@ -29,9 +29,9 @@ updates:
           - "minor"
           - "patch"
     ignore:
-      # io.repsy.core:* (the core-* artifacts) is released by repsyio/repsy-core. It is bumped by
-      # hand (RPS-2269 automates it) in the parent version and repsy-core.version of the root pom
-      # together, which Dependabot would change one at a time (CoreVersionPinTest).
+      # io.repsy.core:* (the core-* artifacts) is released by repsyio/repsy-core. core-bump.yml
+      # bumps it (RPS-2269) in the parent version and repsy-core.version of the root pom together,
+      # which Dependabot would change one at a time (CoreVersionPinTest).
       - dependency-name: "io.repsy.core:*"
 
   # repsy-scanner-trivy is not in the root reactor and has its own parent
