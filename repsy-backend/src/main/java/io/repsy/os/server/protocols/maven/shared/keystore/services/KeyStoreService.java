@@ -22,10 +22,10 @@ import io.repsy.os.generated.model.AllowedKeyserverItem;
 import io.repsy.os.generated.model.KeyStoreForm;
 import io.repsy.os.generated.model.PgpPublicKeyForm;
 import io.repsy.os.generated.model.PgpPublicKeyItem;
-import io.repsy.os.server.protocols.maven.shared.artifact.mappers.ArtifactMapper;
 import io.repsy.os.server.protocols.maven.shared.keystore.dtos.KeyStoreItem;
 import io.repsy.os.server.protocols.maven.shared.keystore.entities.KeyStore;
 import io.repsy.os.server.protocols.maven.shared.keystore.entities.PgpPublicKey;
+import io.repsy.os.server.protocols.maven.shared.keystore.mappers.KeyStoreMapper;
 import io.repsy.os.server.protocols.maven.shared.keystore.repositories.AllowedKeyserverRepository;
 import io.repsy.os.server.protocols.maven.shared.keystore.repositories.KeyStoreRepository;
 import io.repsy.os.server.protocols.maven.shared.keystore.repositories.PgpPublicKeyRepository;
@@ -62,7 +62,7 @@ public class KeyStoreService {
   private final KeyStoreRepository keyStoreRepository;
   private final RepoTxService repoTxService;
   private final PgpPublicKeyRepository pgpPublicKeyRepository;
-  private final ArtifactMapper artifactConverter;
+  private final KeyStoreMapper keyStoreMapper;
   private final ApplicationEventPublisher eventPublisher;
   private final PgpVerifierService pgpVerifierService;
   private final MavenPgpCaps caps;
@@ -136,7 +136,7 @@ public class KeyStoreService {
 
     return this.keyStoreRepository
         .findAllByRepoId(repoInfo.getStorageKey(), pageable)
-        .map(this.artifactConverter::toKeyStoreItemDto);
+        .map(this.keyStoreMapper::toKeyStoreItemDto);
   }
 
   public List<String> findHostsByRepoId(final UUID repoId) {
@@ -195,14 +195,14 @@ public class KeyStoreService {
     final var saved = this.pgpPublicKeyRepository.saveAndFlush(pgpPublicKey);
     this.publishKeySourcesChanged(repoInfo);
 
-    return this.artifactConverter.toPgpPublicKeyItemDto(saved);
+    return this.keyStoreMapper.toPgpPublicKeyItemDto(saved);
   }
 
   public PgpPublicKeyItem getPublicKey(final RepoInfo repoInfo, final UUID id) {
 
     return this.pgpPublicKeyRepository
         .findByIdAndRepoId(id, repoInfo.getStorageKey())
-        .map(this.artifactConverter::toPgpPublicKeyItemDto)
+        .map(this.keyStoreMapper::toPgpPublicKeyItemDto)
         .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.PGP_PUBLIC_KEY_NOT_FOUND));
   }
 
@@ -225,7 +225,7 @@ public class KeyStoreService {
 
     return this.pgpPublicKeyRepository
         .findAllByRepoId(repoInfo.getStorageKey(), pageable)
-        .map(this.artifactConverter::toPgpPublicKeyItemDto);
+        .map(this.keyStoreMapper::toPgpPublicKeyItemDto);
   }
 
   /**

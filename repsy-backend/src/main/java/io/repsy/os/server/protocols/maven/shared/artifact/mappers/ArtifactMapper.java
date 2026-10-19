@@ -24,8 +24,6 @@ import io.repsy.os.server.protocols.maven.shared.artifact.entities.Artifact;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.ArtifactVersion;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.VersionDeveloper;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.VersionLicense;
-import io.repsy.os.server.protocols.maven.shared.keystore.dtos.KeyStoreItem;
-import io.repsy.os.server.protocols.maven.shared.keystore.entities.PgpPublicKey;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -70,8 +68,4 @@ public interface ArtifactMapper {
   @Mapping(target = "lastUpdatedAt", source = "lastUpdatedAt")
   io.repsy.os.generated.model.ArtifactVersionListItem toArtifactVersionListItemDto(
       ArtifactVersionListItem source);
-
-  io.repsy.os.generated.model.KeyStoreItem toKeyStoreItemDto(KeyStoreItem source);
-
-  io.repsy.os.generated.model.PgpPublicKeyItem toPgpPublicKeyItemDto(PgpPublicKey source);
 }

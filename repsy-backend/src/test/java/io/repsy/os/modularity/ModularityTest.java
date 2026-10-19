@@ -86,9 +86,6 @@ class ModularityTest {
         "io.repsy.os.server.protocols.(*).shared.(*).. :: docker - layer -> docker - tag",
         "same aggregate as the three-slice cycle above: Layer.manifests points at Manifest and the tag services use layers");
     FROZEN_CYCLES.put(
-        "io.repsy.os.server.protocols.(*).shared.(*).. :: maven - artifact -> maven - keystore",
-        "ArtifactMapper maps both artifacts and keystore items, and KeyStoreService uses it; split the keystore mappings into their own mapper");
-    FROZEN_CYCLES.put(
         "io.repsy.os.server.security.(*).. :: scan -> shared",
         "VulnerabilityScanTxService and VulnerabilityScanController use the resolver registry and trigger service of security.shared, which use the scan services back; move the registry and trigger service into scan or put an interface between them");
     FROZEN_CYCLES.put(

@@ -27,10 +27,10 @@ import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.libs.testsupport.pgp.PgpTestKeys;
 import io.repsy.os.generated.model.KeyStoreForm;
 import io.repsy.os.generated.model.PgpPublicKeyForm;
-import io.repsy.os.server.protocols.maven.shared.artifact.mappers.ArtifactMapper;
 import io.repsy.os.server.protocols.maven.shared.keystore.entities.AllowedKeyserver;
 import io.repsy.os.server.protocols.maven.shared.keystore.entities.KeyStore;
 import io.repsy.os.server.protocols.maven.shared.keystore.entities.PgpPublicKey;
+import io.repsy.os.server.protocols.maven.shared.keystore.mappers.KeyStoreMapper;
 import io.repsy.os.server.protocols.maven.shared.keystore.repositories.AllowedKeyserverRepository;
 import io.repsy.os.server.protocols.maven.shared.keystore.repositories.KeyStoreRepository;
 import io.repsy.os.server.protocols.maven.shared.keystore.repositories.PgpPublicKeyRepository;
@@ -67,7 +67,7 @@ class KeyStoreServiceTest {
   @Mock KeyStoreRepository keyStoreRepository;
   @Mock RepoTxService repoTxService;
   @Mock PgpPublicKeyRepository pgpPublicKeyRepository;
-  @Mock ArtifactMapper artifactConverter;
+  @Mock KeyStoreMapper keyStoreMapper;
   @Mock ApplicationEventPublisher eventPublisher;
   @Mock MavenPgpCaps caps;
 
@@ -86,7 +86,7 @@ class KeyStoreServiceTest {
             this.keyStoreRepository,
             this.repoTxService,
             this.pgpPublicKeyRepository,
-            this.artifactConverter,
+            this.keyStoreMapper,
             this.eventPublisher,
             this.verifier,
             this.caps);
