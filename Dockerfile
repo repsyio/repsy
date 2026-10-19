@@ -90,7 +90,7 @@ ENV CI=true
 # checks), so the release image and CI run the same pnpm. It is a literal on purpose (SonarCloud
 # githubactions:S8543 reads the pin off the line): bump both together, and never use @latest.
 # DockerfileTest fails `mvn test` when the two literals differ (RPS-1166).
-RUN corepack enable && corepack prepare pnpm@12.5.1 --activate
+RUN corepack enable && corepack prepare pnpm@12.14.0 --activate
 
 # openapi-generator-cli shells out to a JRE to run the generator jar
 RUN apk add --no-cache openjdk21-jre-headless

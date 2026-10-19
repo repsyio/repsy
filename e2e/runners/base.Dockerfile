@@ -26,7 +26,7 @@ ARG HARNESS_DIR=.
 # Pinned the same literal way repsy-frontend/.github/actions/setup-pnpm pins pnpm for CI: a
 # literal version (not package.json's absent "packageManager" field) and --ignore-scripts. Keep
 # this version equal to the one used to generate pnpm-lock.yaml, or --frozen-lockfile below fails.
-RUN npm install -g --ignore-scripts pnpm@12.5.1
+RUN npm install -g --ignore-scripts pnpm@12.14.0
 
 WORKDIR /app
 
