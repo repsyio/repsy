@@ -19,4 +19,4 @@ package io.repsy.protocols.golang.shared.module.services;
  * Base of the backend implementation of {@link GoModuleService}; the abstract methods are inherited
  * from the contract.
  */
-public abstract class AbstractGoModuleService<I> implements GoModuleService<I> {}
+public abstract class AbstractGoModuleService<ID> implements GoModuleService<ID> {}

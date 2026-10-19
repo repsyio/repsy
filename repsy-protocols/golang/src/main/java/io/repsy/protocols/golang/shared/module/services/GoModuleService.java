@@ -21,7 +21,7 @@ import java.io.IOException;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 
-public interface GoModuleService<I> {
+public interface GoModuleService<ID> {
 
   /**
    * Records a new module version and, while that row is still uncommitted, has {@code filesWriter}
@@ -35,7 +35,7 @@ public interface GoModuleService<I> {
    *     exists
    */
   BaseUsages publishModule(
-      BaseRepoInfo<I> repoInfo,
+      BaseRepoInfo<ID> repoInfo,
       String modulePath,
       String version,
       @Nullable String goVersion,
@@ -44,5 +44,5 @@ public interface GoModuleService<I> {
       GoModuleFilesWriter filesWriter)
       throws IOException;
 
-  Optional<String> findLatestPublishedVersion(BaseRepoInfo<I> repoInfo, String modulePath);
+  Optional<String> findLatestPublishedVersion(BaseRepoInfo<ID> repoInfo, String modulePath);
 }
