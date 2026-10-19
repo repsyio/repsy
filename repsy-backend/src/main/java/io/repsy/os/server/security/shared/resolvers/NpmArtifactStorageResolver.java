@@ -16,7 +16,7 @@
 package io.repsy.os.server.security.shared.resolvers;
 
 import io.repsy.libs.storage.core.dtos.StoragePath;
-import io.repsy.os.server.security.shared.ArtifactStorageResolver;
+import io.repsy.os.server.security.scan.contracts.ArtifactStorageResolver;
 import io.repsy.protocols.npm.shared.storage.services.NpmStorageService;
 import io.repsy.protocols.npm.shared.utils.NpmPackageUtils;
 import io.repsy.protocols.shared.repo.dtos.RepoType;

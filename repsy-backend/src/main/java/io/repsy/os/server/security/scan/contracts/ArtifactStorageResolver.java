@@ -13,7 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-@NullMarked
-package io.repsy.os.server.security.shared.services;
+package io.repsy.os.server.security.scan.contracts;
 
-import org.jspecify.annotations.NullMarked;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+
+public interface ArtifactStorageResolver {
+
+  /**
+   * Resolves the storage path of an artifact version for a scan.
+   *
+   * @return the path, or empty when the artifact version does not exist in the repository, so that
+   *     a manual scan of it can be refused before a scan is created
+   */
+  Optional<String> resolve(
+      UUID repoId, String repoName, String artifactName, String artifactVersion);
+
+  Set<String> getSupportedRepoTypes();
+}

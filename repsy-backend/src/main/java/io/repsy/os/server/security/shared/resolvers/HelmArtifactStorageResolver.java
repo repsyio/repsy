@@ -17,7 +17,7 @@ package io.repsy.os.server.security.shared.resolvers;
 
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.os.server.protocols.helm.shared.chart.services.HelmChartService;
-import io.repsy.os.server.security.shared.ArtifactStorageResolver;
+import io.repsy.os.server.security.scan.contracts.ArtifactStorageResolver;
 import io.repsy.protocols.helm.shared.constants.HelmConstants;
 import io.repsy.protocols.helm.shared.storage.services.HelmStorageService;
 import io.repsy.protocols.shared.storage.RepoRef;

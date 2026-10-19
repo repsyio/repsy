@@ -17,7 +17,7 @@ package io.repsy.os.server.security.shared.resolvers;
 
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.repositories.RubyGemRepository;
 import io.repsy.os.server.protocols.ruby.shared.ruby_gem.repositories.RubyGemVersionRepository;
-import io.repsy.os.server.security.shared.ArtifactStorageResolver;
+import io.repsy.os.server.security.scan.contracts.ArtifactStorageResolver;
 import io.repsy.protocols.ruby.shared.storage.services.RubyStorageService;
 import java.util.Optional;
 import java.util.Set;

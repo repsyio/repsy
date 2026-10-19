@@ -86,9 +86,6 @@ class ModularityTest {
         "io.repsy.os.server.protocols.(*).shared.(*).. :: docker - layer -> docker - tag",
         "same aggregate as the three-slice cycle above: Layer.manifests points at Manifest and the tag services use layers");
     FROZEN_CYCLES.put(
-        "io.repsy.os.server.security.(*).. :: scan -> shared",
-        "VulnerabilityScanTxService and VulnerabilityScanController use the resolver registry and trigger service of security.shared, which use the scan services back; move the registry and trigger service into scan or put an interface between them");
-    FROZEN_CYCLES.put(
         "io.repsy.os.shared.(*).. :: auth -> token -> user",
         "PanelAuthHelper uses the personal access token services, which use the user services, which use the auth utils; move the token-type and scope helpers out of auth");
     FROZEN_CYCLES.put(

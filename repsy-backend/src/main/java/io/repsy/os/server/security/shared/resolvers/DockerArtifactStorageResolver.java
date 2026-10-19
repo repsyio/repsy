@@ -19,7 +19,7 @@ import io.repsy.os.server.protocols.docker.shared.image.entities.Image;
 import io.repsy.os.server.protocols.docker.shared.image.repositories.ImageRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.TagRepository;
-import io.repsy.os.server.security.shared.ArtifactStorageResolver;
+import io.repsy.os.server.security.scan.contracts.ArtifactStorageResolver;
 import io.repsy.protocols.oci.utils.OciDigestUtils;
 import io.repsy.protocols.shared.utils.BlobDigests;
 import java.util.Optional;

@@ -29,6 +29,7 @@ import io.repsy.libs.scanner.dtos.ScanRequest;
 import io.repsy.libs.scanner.trivy.TrivyScannerClientProperties;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
+import io.repsy.os.server.security.scan.contracts.ManualScanExecutor;
 import io.repsy.os.server.security.scan.services.VulnerabilityScanTxService;
 import io.repsy.os.server.security.scanner.noop.NoOpVulnerabilityScanner;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
@@ -55,7 +56,7 @@ import org.springframework.web.client.ResourceAccessException;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class ArtifactScanListener {
+public class ArtifactScanListener implements ManualScanExecutor {
 
   private static final String DOCKER_REPO_TYPE = "DOCKER";
   private static final String HELM_REPO_TYPE = "HELM";
@@ -110,6 +111,7 @@ public class ArtifactScanListener {
         event.repoId(), event.artifactName(), event.artifactVersion());
   }
 
+  @Override
   public void executeManualScan(final UUID scanId, final ArtifactPushedEvent event) {
     this.submitScan(
         event,

@@ -13,22 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.security.shared;
+package io.repsy.os.server.security.scan.contracts;
 
-import java.util.Optional;
-import java.util.Set;
+import io.repsy.core.events.ArtifactPushedEvent;
 import java.util.UUID;
 
-public interface ArtifactStorageResolver {
+/**
+ * Runs the scan that a manual trigger prepared. The scan module owns this port; {@code
+ * ArtifactScanListener} in {@code security.shared} implements it, so the scan module no longer
+ * depends on the shared one (RPS-2278).
+ */
+public interface ManualScanExecutor {
 
-  /**
-   * Resolves the storage path of an artifact version for a scan.
-   *
-   * @return the path, or empty when the artifact version does not exist in the repository, so that
-   *     a manual scan of it can be refused before a scan is created
-   */
-  Optional<String> resolve(
-      UUID repoId, String repoName, String artifactName, String artifactVersion);
-
-  Set<String> getSupportedRepoTypes();
+  void executeManualScan(UUID scanId, ArtifactPushedEvent event);
 }

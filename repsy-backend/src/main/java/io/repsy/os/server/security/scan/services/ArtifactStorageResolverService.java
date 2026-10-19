@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.security.shared;
+package io.repsy.os.server.security.scan.services;
 
+import io.repsy.os.server.security.scan.contracts.ArtifactStorageResolver;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -24,11 +25,11 @@ import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
-public class ArtifactStorageResolverRegistry {
+public class ArtifactStorageResolverService {
 
   private final Map<String, ArtifactStorageResolver> resolversByRepoType;
 
-  public ArtifactStorageResolverRegistry(final List<ArtifactStorageResolver> resolvers) {
+  public ArtifactStorageResolverService(final List<ArtifactStorageResolver> resolvers) {
     this.resolversByRepoType = buildRegistry(resolvers);
   }
 

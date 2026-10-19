@@ -23,7 +23,7 @@ import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.ArtifactVersion;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactRepository;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactVersionRepository;
-import io.repsy.os.server.security.shared.ArtifactStorageResolver;
+import io.repsy.os.server.security.scan.contracts.ArtifactStorageResolver;
 import io.repsy.protocols.maven.shared.utils.MavenMetadataUtils;
 import io.repsy.protocols.maven.shared.utils.SnapshotNameUtils;
 import io.repsy.protocols.shared.repo.dtos.RepoType;

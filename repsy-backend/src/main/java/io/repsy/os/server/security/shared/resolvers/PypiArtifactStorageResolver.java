@@ -19,7 +19,7 @@ import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.libs.storage.core.services.StorageStrategy;
-import io.repsy.os.server.security.shared.ArtifactStorageResolver;
+import io.repsy.os.server.security.scan.contracts.ArtifactStorageResolver;
 import io.repsy.protocols.pypi.shared.utils.PackageStorageUtils;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import io.repsy.protocols.shared.storage.StorageStrategyRegistry;
