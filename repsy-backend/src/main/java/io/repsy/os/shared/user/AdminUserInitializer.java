@@ -16,11 +16,11 @@
 package io.repsy.os.shared.user;
 
 import io.repsy.core.events.UserCreatedEvent;
-import io.repsy.os.shared.auth.utils.PasswordGeneratorUtils;
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.os.shared.user.repositories.UserRepository;
 import io.repsy.os.shared.user.services.UserTxService;
+import io.repsy.os.shared.user.utils.PasswordGeneratorUtils;
 import io.repsy.protocols.shared.auth.PasswordHasher;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

@@ -85,12 +85,6 @@ class ModularityTest {
     FROZEN_CYCLES.put(
         "io.repsy.os.server.protocols.(*).shared.(*).. :: docker - layer -> docker - tag",
         "same aggregate as the three-slice cycle above: Layer.manifests points at Manifest and the tag services use layers");
-    FROZEN_CYCLES.put(
-        "io.repsy.os.shared.(*).. :: auth -> token -> user",
-        "PanelAuthHelper uses the personal access token services, which use the user services, which use the auth utils; move the token-type and scope helpers out of auth");
-    FROZEN_CYCLES.put(
-        "io.repsy.os.shared.(*).. :: auth -> user",
-        "user services use AuthUtils and PanelAuthHelper from auth, and auth reads the user entity; same fix as the three-slice auth cycle");
   }
 
   @Test

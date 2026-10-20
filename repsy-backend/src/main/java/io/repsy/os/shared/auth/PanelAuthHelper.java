@@ -26,6 +26,7 @@ import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.token.dtos.PersonalAccessTokenInfo;
 import io.repsy.os.shared.token.dtos.TokenScope;
 import io.repsy.os.shared.token.services.PersonalAccessTokenService;
+import io.repsy.os.shared.user.contracts.AdminAuthenticator;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.os.shared.user.services.UserTxService;
@@ -39,7 +40,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 @RequiredArgsConstructor
-public final class PanelAuthHelper {
+public final class PanelAuthHelper implements AdminAuthenticator {
 
   private final JwtUtils jwtUtils;
   private final UserTxService userTxService;
@@ -193,6 +194,11 @@ public final class PanelAuthHelper {
     if (service != null) {
       service.updateLastUsedTime(token.id());
     }
+  }
+
+  @Override
+  public void authenticateAdmin(final String authHeader) {
+    this.requireAdmin(this.authenticate(authHeader));
   }
 
   public void requireAdmin(final UserInfo userInfo) {

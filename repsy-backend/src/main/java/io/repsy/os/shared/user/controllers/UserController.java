@@ -24,7 +24,7 @@ import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.os.generated.model.UserCreateForm;
 import io.repsy.os.generated.model.UserResponse;
 import io.repsy.os.generated.model.UserUpdateForm;
-import io.repsy.os.shared.auth.PanelAuthHelper;
+import io.repsy.os.shared.user.contracts.AdminAuthenticator;
 import io.repsy.os.shared.user.services.ReservedUsernameService;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.os.shared.utils.MultiPortNames;
@@ -58,7 +58,7 @@ final class UserController {
 
   private static final Set<String> USER_SORT_PROPERTIES = Set.of("createdAt", "username");
 
-  private final PanelAuthHelper panelAuthHelper;
+  private final AdminAuthenticator adminAuthenticator;
   private final UserTxService userTxService;
   private final ReservedUsernameService reservedUsernameService;
 
@@ -69,7 +69,7 @@ final class UserController {
       @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC)
           final Pageable pageable) {
 
-    this.panelAuthHelper.requireAdmin(this.panelAuthHelper.authenticate(authHeader));
+    this.adminAuthenticator.authenticateAdmin(authHeader);
 
     SortValidator.requireSortableBy(pageable, USER_SORT_PROPERTIES);
 
@@ -85,7 +85,7 @@ final class UserController {
   @GetMapping("/admin-count")
   public Long countAdmins(@RequestHeader(AUTHORIZATION) final String authHeader) {
 
-    this.panelAuthHelper.requireAdmin(this.panelAuthHelper.authenticate(authHeader));
+    this.adminAuthenticator.authenticateAdmin(authHeader);
 
     return this.userTxService.countAdmins();
   }
@@ -95,7 +95,7 @@ final class UserController {
       @RequestHeader(AUTHORIZATION) final String authHeader,
       @Valid @RequestBody final UserCreateForm dto) {
 
-    this.panelAuthHelper.requireAdmin(this.panelAuthHelper.authenticate(authHeader));
+    this.adminAuthenticator.authenticateAdmin(authHeader);
 
     this.reservedUsernameService.requireNotReserved(dto.getUsername());
 
@@ -110,7 +110,7 @@ final class UserController {
       @PathVariable final UUID userId,
       @Valid @RequestBody final UserUpdateForm dto) {
 
-    this.panelAuthHelper.requireAdmin(this.panelAuthHelper.authenticate(authHeader));
+    this.adminAuthenticator.authenticateAdmin(authHeader);
 
     // A user who already holds a now-reserved name may keep it; only a rename is checked.
     if (!this.userTxService.getUserById(userId).getUsername().equals(dto.getUsername())) {
@@ -126,7 +126,7 @@ final class UserController {
   public ResponseEntity<Void> deleteUser(
       @RequestHeader(AUTHORIZATION) final String authHeader, @PathVariable final UUID userId) {
 
-    this.panelAuthHelper.requireAdmin(this.panelAuthHelper.authenticate(authHeader));
+    this.adminAuthenticator.authenticateAdmin(authHeader);
 
     this.userTxService.deleteUserById(userId);
 
@@ -139,7 +139,7 @@ final class UserController {
       @PathVariable final UUID userId,
       final HttpServletResponse response) {
 
-    this.panelAuthHelper.requireAdmin(this.panelAuthHelper.authenticate(authHeader));
+    this.adminAuthenticator.authenticateAdmin(authHeader);
 
     final var newPassword = this.userTxService.resetUserPassword(userId);
 
