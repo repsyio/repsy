@@ -28,7 +28,7 @@ import static org.mockito.Mockito.when;
 import io.repsy.os.server.protocols.nuget.shared.packages.entities.NuGetPackageVersion;
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetBuildMetadataVersion;
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageVersionRepository;
-import io.repsy.os.server.security.scan.repositories.VulnerabilityScanRepository;
+import io.repsy.os.server.protocols.shared.contracts.ScanVersionRenamer;
 import io.repsy.protocols.nuget.shared.storage.services.NuGetStorageService;
 import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.IOException;
@@ -45,7 +45,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 class NuGetBuildMetadataVersionMigrationServiceTest {
 
   private final NuGetPackageVersionRepository versions = mock(NuGetPackageVersionRepository.class);
-  private final VulnerabilityScanRepository scans = mock(VulnerabilityScanRepository.class);
+  private final ScanVersionRenamer scans = mock(ScanVersionRenamer.class);
   private final NuGetStorageService storage = mock(NuGetStorageService.class);
 
   private final UUID repoId = UUID.randomUUID();
@@ -112,7 +112,7 @@ class NuGetBuildMetadataVersionMigrationServiceTest {
 
     assertThat(report.migrated()).isEqualTo(1);
     assertThat(report.failed()).isZero();
-    verify(this.scans).updateArtifactVersion(this.repoId, "some.package", "1.0.0+build", "1.0.0");
+    verify(this.scans).renameArtifactVersion(this.repoId, "some.package", "1.0.0+build", "1.0.0");
   }
 
   @Test

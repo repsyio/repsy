@@ -19,7 +19,7 @@ import static io.repsy.protocols.nuget.shared.utils.NuGetVersionUtils.normalizeN
 
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetBuildMetadataVersion;
 import io.repsy.os.server.protocols.nuget.shared.packages.repositories.NuGetPackageVersionRepository;
-import io.repsy.os.server.security.scan.repositories.VulnerabilityScanRepository;
+import io.repsy.os.server.protocols.shared.contracts.ScanVersionRenamer;
 import io.repsy.protocols.nuget.shared.storage.services.NuGetStorageService;
 import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.IOException;
@@ -55,18 +55,18 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class NuGetBuildMetadataVersionMigrationService {
 
   private final NuGetPackageVersionRepository packageVersionRepository;
-  private final VulnerabilityScanRepository vulnerabilityScanRepository;
+  private final ScanVersionRenamer scanVersionRenamer;
   private final NuGetStorageService nuGetStorageService;
   private final TransactionTemplate transactionTemplate;
 
   public NuGetBuildMetadataVersionMigrationService(
       final NuGetPackageVersionRepository packageVersionRepository,
-      final VulnerabilityScanRepository vulnerabilityScanRepository,
+      final ScanVersionRenamer scanVersionRenamer,
       final NuGetStorageService nuGetStorageService,
       final PlatformTransactionManager transactionManager) {
 
     this.packageVersionRepository = packageVersionRepository;
-    this.vulnerabilityScanRepository = vulnerabilityScanRepository;
+    this.scanVersionRenamer = scanVersionRenamer;
     this.nuGetStorageService = nuGetStorageService;
     this.transactionTemplate = new TransactionTemplate(transactionManager);
   }
@@ -158,7 +158,7 @@ public class NuGetBuildMetadataVersionMigrationService {
     version.setPrerelease(canonical.contains("-"));
     this.packageVersionRepository.saveAndFlush(version);
 
-    this.vulnerabilityScanRepository.updateArtifactVersion(
+    this.scanVersionRenamer.renameArtifactVersion(
         legacy.repoId(), legacy.packageId().toLowerCase(Locale.ROOT), legacy.version(), canonical);
   }
 

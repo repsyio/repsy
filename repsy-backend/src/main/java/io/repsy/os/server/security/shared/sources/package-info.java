@@ -15,6 +15,6 @@
  */
 
 @NullMarked
-package io.repsy.os.server.protocols.npm.shared.audit.services;
+package io.repsy.os.server.security.shared.sources;
 
 import org.jspecify.annotations.NullMarked;

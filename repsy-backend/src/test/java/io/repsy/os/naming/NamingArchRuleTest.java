@@ -160,7 +160,6 @@ class NamingArchRuleTest {
               "io.repsy.os.server.protocols.maven.shared.artifact.services.ArtifactUpsertHelper",
               "io.repsy.os.server.protocols.maven.shared.artifact.services.components.ArtifactDeleter",
               "io.repsy.os.server.protocols.maven.shared.keystore.services.MavenPgpCaps",
-              "io.repsy.os.server.protocols.npm.shared.audit.services.NpmAdvisorySource",
               "io.repsy.os.server.protocols.npm.shared.auth.services.NpmAuthenticatorImpl",
               "io.repsy.os.server.protocols.shared.services.ProtocolApiFacade",
               "io.repsy.os.server.protocols.shared.services.ProtocolApiFacadeMavenAdapter",

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.os.server.protocols.npm.shared.audit.services;
+package io.repsy.os.server.security.shared.sources;
 
 import io.repsy.libs.scanner.VulnerabilityAdvisoryLookup;
 import io.repsy.libs.scanner.dtos.AdvisoryLookupResult;
