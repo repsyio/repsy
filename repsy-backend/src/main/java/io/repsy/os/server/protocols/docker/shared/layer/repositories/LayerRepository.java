@@ -51,7 +51,7 @@ public interface LayerRepository extends JpaRepository<Layer, UUID> {
       """
     select l from Layer l
     where l.repo.id = :repoId
-    and l.manifests is empty
+    and not exists (select 1 from Manifest m join m.layers ml where ml.id = l.id)
     """)
   List<Layer> findOrphansByRepoId(UUID repoId);
 

@@ -143,9 +143,10 @@ example an `ArtifactPushedEvent` that starts a vulnerability scan.
 `ModularityTest` (RPS-2055, no Docker) enforces this in the build: Spring Modulith's `verify()`
 fails on a cycle between modules or on use of another module's internals (the generated OpenAPI
 model is excluded), and an ArchUnit rule fails on a package cycle below the modules. The cycles
-that predate the rule are a frozen list in the test, each with its reason. The list may only
-shrink: delete an entry when you fix its cycle (a stale entry fails), and never add one; break the
-cycle with an event, a port interface or by moving the class. A new package that holds protocol
+that predated the rule were a frozen list in the test; it is empty since RPS-2278, so a new cycle
+fails the build. Never add an entry: break the cycle with an event, a port interface (a
+`contracts` package in the module that owns the need, implemented by the other side) or by moving
+the class. A new package that holds protocol
 code needs its own `package-info.java` with `@ApplicationModule`, otherwise its classes count as
 internals of the parent module.
 

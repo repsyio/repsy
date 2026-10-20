@@ -58,12 +58,11 @@ class ImageTest extends AbstractEntityIdentityTest<Image> {
   }
 
   @Test
-  @DisplayName("Hashing and printing an image never touch its tags or repo")
+  @DisplayName("Hashing and printing an image never touch its repo")
   void hashCodeAndToStringSkipAssociations() {
     final var image = this.newEntity(UUID.randomUUID());
-    image.setTags(new UntouchableSet<>());
 
     assertThat(image.hashCode()).isEqualTo(Image.class.hashCode());
-    assertThat(image.toString()).doesNotContain("tags=", "repo=");
+    assertThat(image.toString()).doesNotContain("repo=");
   }
 }

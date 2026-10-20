@@ -23,9 +23,6 @@ import io.repsy.os.server.protocols.docker.shared.image.entities.Image;
 import io.repsy.os.server.protocols.docker.shared.image.mappers.ImageMapper;
 import io.repsy.os.server.protocols.docker.shared.image.repositories.ImageRepository;
 import io.repsy.os.server.protocols.docker.shared.layer.repositories.LayerRepository;
-import io.repsy.os.server.protocols.docker.shared.tag.entities.Tag;
-import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestRepository;
-import io.repsy.os.server.protocols.docker.shared.tag.repositories.TagRepository;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.docker.shared.image.exceptions.ImageDeletedException;
 import io.repsy.protocols.docker.shared.image.services.ImageService;
@@ -51,8 +48,6 @@ public class ImageTxService implements ImageService<UUID> {
   private final ImageRepository imageRepository;
   private final RepoTxService repoTxService;
   private final LayerRepository layerRepository;
-  private final TagRepository tagRepository;
-  private final ManifestRepository manifestRepository;
 
   /**
    * The image, created when it is not there. Runs in the caller's transaction, so a manifest push
@@ -98,11 +93,7 @@ public class ImageTxService implements ImageService<UUID> {
   @Transactional
   public void refreshImageSize(final UUID repoId, final UUID imageId) {
 
-    final var digest =
-        this.tagRepository
-            .findFirstByImageIdOrderByLastUpdatedAtDescIdDesc(imageId)
-            .map(Tag::getDigest)
-            .orElse(null);
+    final var digest = this.imageRepository.findLatestTagDigest(imageId).orElse(null);
 
     this.storeSizeAndDigest(repoId, imageId, digest);
   }
@@ -167,7 +158,7 @@ public class ImageTxService implements ImageService<UUID> {
     // Flushed first: the count must see the manifests this transaction deleted.
     this.imageRepository.flush();
 
-    if (this.manifestRepository.countByImageId(imageId) > 0) {
+    if (this.imageRepository.countManifests(imageId) > 0) {
       return false;
     }
 

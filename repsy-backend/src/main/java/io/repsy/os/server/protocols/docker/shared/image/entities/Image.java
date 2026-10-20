@@ -16,22 +16,17 @@
 package io.repsy.os.server.protocols.docker.shared.image.entities;
 
 import io.repsy.core.uuidv7.UuidV7;
-import io.repsy.os.server.protocols.docker.shared.tag.entities.Tag;
 import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.protocols.docker.shared.constants.DockerConstants;
-import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import java.time.Instant;
-import java.util.HashSet;
 import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -45,7 +40,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 @Entity
 @Table(name = "docker_image")
 @NoArgsConstructor
-@ToString(exclude = {"repo", "tags"})
+@ToString(exclude = "repo")
 public class Image {
   @Id
   @UuidV7
@@ -56,9 +51,6 @@ public class Image {
   @JoinColumn(name = "repo_id", nullable = false)
   @OnDelete(action = OnDeleteAction.CASCADE)
   private Repo repo;
-
-  @OneToMany(mappedBy = "image", cascade = CascadeType.ALL, orphanRemoval = true)
-  private Set<Tag> tags = new HashSet<>();
 
   @Column(name = "name", length = DockerConstants.MAX_IMAGE_NAME_LENGTH)
   private String name;

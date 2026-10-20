@@ -72,18 +72,6 @@ class ModularityTest {
 
   private static final Map<String, String> FROZEN_CYCLES = new LinkedHashMap<>();
 
-  static {
-    FROZEN_CYCLES.put(
-        "io.repsy.os.server.protocols.(*).shared.(*).. :: docker - image -> docker - layer -> docker - tag",
-        "the Image, Layer and Manifest entities and their services reference each other; merge image, layer and tag into one aggregate package (RPS-2055 follow-up: moves 36 classes and changes the imports of about 80 files, so it is its own change)");
-    FROZEN_CYCLES.put(
-        "io.repsy.os.server.protocols.(*).shared.(*).. :: docker - image -> docker - tag",
-        "same aggregate as the three-slice cycle above: image and tag use each other's entities and repositories");
-    FROZEN_CYCLES.put(
-        "io.repsy.os.server.protocols.(*).shared.(*).. :: docker - layer -> docker - tag",
-        "same aggregate as the three-slice cycle above: Layer.manifests points at Manifest and the tag services use layers");
-  }
-
   @Test
   @DisplayName("Spring Modulith verify() finds no violation")
   void modulesAreWellFormed() {

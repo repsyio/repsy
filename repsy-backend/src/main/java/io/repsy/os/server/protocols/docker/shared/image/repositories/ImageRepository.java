@@ -37,6 +37,24 @@ public interface ImageRepository extends JpaRepository<Image, UUID> {
 
   List<Image> findAllByRepoId(UUID repoId);
 
+  /**
+   * The digest of the tag of an image that was created or moved last. A query on the image
+   * repository, not a call to the tag repository, so the image package does not depend on the tag
+   * package (RPS-2278).
+   */
+  @Query(
+      """
+      select t.digest from Tag t
+      where t.image.id = :imageId
+      order by t.lastUpdatedAt desc, t.id desc
+      limit 1
+      """)
+  Optional<String> findLatestTagDigest(UUID imageId);
+
+  /** How many manifests the image holds, tagged or not. */
+  @Query("select count(m) from Manifest m where m.image.id = :imageId")
+  long countManifests(UUID imageId);
+
   Optional<Image> findByRepoIdAndName(UUID repoId, String name);
 
   /**

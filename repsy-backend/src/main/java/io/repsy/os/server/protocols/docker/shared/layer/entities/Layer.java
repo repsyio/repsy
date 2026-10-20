@@ -16,20 +16,16 @@
 package io.repsy.os.server.protocols.docker.shared.layer.entities;
 
 import io.repsy.core.uuidv7.UuidV7;
-import io.repsy.os.server.protocols.docker.shared.tag.entities.Manifest;
 import io.repsy.os.shared.repo.entities.Repo;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.Instant;
-import java.util.HashSet;
 import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -43,7 +39,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 @Entity
 @Table(name = "docker_layer")
 @NoArgsConstructor
-@ToString(exclude = {"repo", "manifests"})
+@ToString(exclude = "repo")
 public class Layer {
   @Id
   @UuidV7
@@ -54,9 +50,6 @@ public class Layer {
   @JoinColumn(name = "repo_id", nullable = false)
   @OnDelete(action = OnDeleteAction.CASCADE)
   private Repo repo;
-
-  @ManyToMany(mappedBy = "layers", fetch = FetchType.LAZY)
-  private Set<Manifest> manifests = new HashSet<>();
 
   @Column(name = "digest", nullable = false)
   private String digest;
