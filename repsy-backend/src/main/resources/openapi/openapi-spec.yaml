@@ -5845,6 +5845,9 @@ components:
             "$ref": "#/components/schemas/UserResponse"
         page:
           "$ref": "#/components/schemas/PageMetadata"
+      required:
+        - content
+        - page
     # region: profile
     UpdateUsernameForm:
       type: object
@@ -6017,6 +6020,9 @@ components:
             "$ref": "#/components/schemas/AccessTokenListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
+      required:
+        - content
+        - page
     AccessTokenWhoAmI:
       type: object
       properties:
@@ -6156,6 +6162,9 @@ components:
             "$ref": "#/components/schemas/RepoListInfo"
         page:
           "$ref": "#/components/schemas/PageMetadata"
+      required:
+        - content
+        - page
     RepoCounts:
       type: object
       description: >-
@@ -6309,6 +6318,9 @@ components:
             "$ref": "#/components/schemas/DeployTokenInfoListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
+      required:
+        - content
+        - page
     ProtocolApiFacadeMavenAdapter: { }
     # region: usage
     TotalUsageInfo:
@@ -6662,6 +6674,9 @@ components:
             "$ref": "#/components/schemas/VulnerabilityScanInfo"
         page:
           "$ref": "#/components/schemas/PageMetadata"
+      required:
+        - content
+        - page
     PagedModelVulnerabilityFindingInfo:
       type: object
       properties:
@@ -6671,6 +6686,9 @@ components:
             "$ref": "#/components/schemas/VulnerabilityFindingInfo"
         page:
           "$ref": "#/components/schemas/PageMetadata"
+      required:
+        - content
+        - page
     RecentScannedVersion:
       # the generator ignores a property-level policy on a oneOf property, so the whole model omits nulls
       x-class-extra-annotation: '@com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)'
@@ -6766,6 +6784,10 @@ components:
         updatedAt:
           type: string
           format: date-time
+      required:
+        - name
+        - maxVersion
+        - downloads
     PagedModelCrateListItem:
       type: object
       properties:
@@ -6775,6 +6797,9 @@ components:
             "$ref": "#/components/schemas/CrateListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
+      required:
+        - content
+        - page
     CrateInfo:
       type: object
       properties:
@@ -6879,6 +6904,10 @@ components:
         createdAt:
           type: string
           format: date-time
+      required:
+        - version
+        - yanked
+        - createdAt
     PagedModelCrateVersionListItem:
       type: object
       properties:
@@ -6888,6 +6917,9 @@ components:
             "$ref": "#/components/schemas/CrateVersionListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
+      required:
+        - content
+        - page
     # region: docker
     CleanupPolicyForm:
       type: object
@@ -7000,11 +7032,11 @@ components:
           description: Latest tag creation; the last change of the image when it has no tag.
         tagCount:
           type: integer
-          format: int32
+          format: int64
           description: Number of tags of the image.
         untaggedManifestCount:
           type: integer
-          format: int32
+          format: int64
           description: >-
             Manifests that no tag points at and no tagged index lists, directly or through other
             indexes to any depth: what "Delete untagged manifests" removes.
@@ -7015,6 +7047,10 @@ components:
             Size of the distinct layers (config blobs included) that untagged manifests link to and
             no manifest a tag reaches (through indexes of any depth) links to. For an image without
             tags, all it stores.
+      required:
+        - tagCount
+        - untaggedManifestCount
+        - untaggedSize
     PagedModelImageListItem:
       type: object
       properties:
@@ -7024,6 +7060,9 @@ components:
             "$ref": "#/components/schemas/ImageListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
+      required:
+        - content
+        - page
     ImageTagListItem:
       type: object
       properties:
@@ -7034,6 +7073,9 @@ components:
         lastUpdatedAt:
           type: string
           format: date-time
+      required:
+        - name
+        - platform
     PagedModelImageTagListItem:
       type: object
       properties:
@@ -7043,6 +7085,9 @@ components:
             "$ref": "#/components/schemas/ImageTagListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
+      required:
+        - content
+        - page
     ManifestListItem:
       type: object
       properties:
@@ -7066,6 +7111,9 @@ components:
             "$ref": "#/components/schemas/ManifestListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
+      required:
+        - content
+        - page
     TagDetail:
       type: object
       properties:
@@ -7102,6 +7150,10 @@ components:
           format: date-time
         modulePath:
           type: string
+      required:
+        - id
+        - modulePath
+        - createdAt
     PagedModelGoModuleListItem:
       type: object
       properties:
@@ -7111,6 +7163,9 @@ components:
             "$ref": "#/components/schemas/GoModuleListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
+      required:
+        - content
+        - page
     GoModuleVersionListItem:
       type: object
       properties:
@@ -7124,6 +7179,10 @@ components:
           format: date-time
         goVersion:
           type: string
+      required:
+        - id
+        - version
+        - createdAt
     PagedModelGoModuleVersionListItem:
       type: object
       properties:
@@ -7133,6 +7192,9 @@ components:
             "$ref": "#/components/schemas/GoModuleVersionListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
+      required:
+        - content
+        - page
     GoModuleInfo:
       type: object
       properties:
@@ -7171,6 +7233,10 @@ components:
         updatedAt:
           type: string
           format: date-time
+      required:
+        - name
+        - latestVersion
+        - updatedAt
     HelmChartVersionItem:
       type: object
       properties:
@@ -7199,6 +7265,11 @@ components:
         createdAt:
           type: string
           format: date-time
+      required:
+        - version
+        - digest
+        - size
+        - createdAt
     HelmChartSummary:
       type: object
       description: >-
@@ -7271,6 +7342,9 @@ components:
             "$ref": "#/components/schemas/HelmChartVersionItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
+      required:
+        - content
+        - page
     PagedModelHelmChartListItem:
       type: object
       properties:
@@ -7280,6 +7354,9 @@ components:
             "$ref": "#/components/schemas/HelmChartListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
+      required:
+        - content
+        - page
     # region: maven
     ArtifactListItem:
       type: object
@@ -7295,6 +7372,9 @@ components:
           type: string
         latest:
           type: string
+      required:
+        - groupName
+        - artifactName
     PagedModelArtifactListItem:
       type: object
       properties:
@@ -7304,6 +7384,9 @@ components:
             "$ref": "#/components/schemas/ArtifactListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
+      required:
+        - content
+        - page
     MavenGroupSummary:
       type: object
       description: >-
@@ -7335,6 +7418,9 @@ components:
           format: date-time
         versionName:
           type: string
+      required:
+        - versionName
+        - signed
     PagedModelArtifactVersionListItem:
       type: object
       properties:
@@ -7344,6 +7430,9 @@ components:
             "$ref": "#/components/schemas/ArtifactVersionListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
+      required:
+        - content
+        - page
     ArtifactVersionInfo:
       type: object
       properties:
@@ -7506,6 +7595,9 @@ components:
             "$ref": "#/components/schemas/KeyStoreItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
+      required:
+        - content
+        - page
     PagedModelPgpPublicKeyItem:
       type: object
       properties:
@@ -7515,6 +7607,9 @@ components:
             "$ref": "#/components/schemas/PgpPublicKeyItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
+      required:
+        - content
+        - page
     # region: npm
     NpmPackageListItem:
       type: object
@@ -7528,6 +7623,10 @@ components:
         updatedAt:
           type: string
           format: date-time
+      required:
+        - name
+        - latestVersion
+        - updatedAt
     NpmPackageInfo:
       type: object
       properties:
@@ -7553,16 +7652,23 @@ components:
             "$ref": "#/components/schemas/NpmPackageListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
+      required:
+        - content
+        - page
     PackageDistributionTagListItem:
       type: object
       properties:
         tagName:
           type: string
+      required:
+        - tagName
     PackageKeywordListItem:
       type: object
       properties:
         keyword:
           type: string
+      required:
+        - keyword
     PackageMaintainerListItem:
       type: object
       properties:
@@ -7572,6 +7678,8 @@ components:
           type: string
         email:
           type: string
+      required:
+        - name
     PackageVersionDetail:
       type: object
       properties:
@@ -7637,6 +7745,10 @@ components:
           format: date-time
         deprecated:
           type: boolean
+      required:
+        - version
+        - createdAt
+        - deprecated
     PagedModelPackageVersionListItem:
       type: object
       properties:
@@ -7646,6 +7758,9 @@ components:
             "$ref": "#/components/schemas/PackageVersionListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
+      required:
+        - content
+        - page
     PackageDistributionTagMapListItem:
       type: object
       properties:
@@ -7653,6 +7768,9 @@ components:
           type: string
         tag:
           type: string
+      required:
+        - tag
+        - version
     # region: nuget
     NuGetDependencyInfo:
       type: object
@@ -7786,6 +7904,9 @@ components:
             "$ref": "#/components/schemas/NuGetPackageListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
+      required:
+        - content
+        - page
     PagedModelNuGetVersionListItem:
       type: object
       properties:
@@ -7795,6 +7916,9 @@ components:
             "$ref": "#/components/schemas/NuGetVersionListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
+      required:
+        - content
+        - page
     # region: pypi
     PypiPackageListItem:
       type: object
@@ -7808,6 +7932,10 @@ components:
         updatedAt:
           type: string
           format: date-time
+      required:
+        - name
+        - latestVersion
+        - updatedAt
     PypiPackageInfo:
       type: object
       properties:
@@ -7831,6 +7959,9 @@ components:
             "$ref": "#/components/schemas/PypiPackageListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
+      required:
+        - content
+        - page
     PagedModelReleaseListItem:
       type: object
       properties:
@@ -7840,6 +7971,9 @@ components:
             "$ref": "#/components/schemas/ReleaseListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
+      required:
+        - content
+        - page
     ReleaseListItem:
       type: object
       properties:
@@ -7856,6 +7990,13 @@ components:
           type: boolean
         devRelease:
           type: boolean
+      required:
+        - version
+        - finalRelease
+        - preRelease
+        - postRelease
+        - devRelease
+        - createdAt
     ReleaseClassifierInfo:
       type: object
       properties:
@@ -7928,6 +8069,10 @@ components:
         updatedAt:
           type: string
           format: date-time
+      required:
+        - name
+        - latest
+        - updatedAt
     PagedModelGemListItem:
       type: object
       properties:
@@ -7937,6 +8082,9 @@ components:
             "$ref": "#/components/schemas/GemListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
+      required:
+        - content
+        - page
     GemPackageInfo:
       type: object
       properties:
@@ -7968,6 +8116,11 @@ components:
         createdAt:
           type: string
           format: date-time
+      required:
+        - version
+        - platform
+        - yanked
+        - createdAt
     PagedModelGemVersionListItem:
       type: object
       properties:
@@ -7977,6 +8130,9 @@ components:
             "$ref": "#/components/schemas/GemVersionListItem"
         page:
           "$ref": "#/components/schemas/PageMetadata"
+      required:
+        - content
+        - page
     GemDependencyInfo:
       type: object
       properties:

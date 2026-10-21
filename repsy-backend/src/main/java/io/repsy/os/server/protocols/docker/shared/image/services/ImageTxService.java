@@ -239,7 +239,7 @@ public class ImageTxService implements ImageService<UUID> {
     // No row only when the image was deleted between the two queries: it stores nothing then.
     return this.imageConverter
         .toDto(item)
-        .untaggedManifestCount(untagged == null ? 0 : Math.toIntExact(untagged.getManifestCount()))
+        .untaggedManifestCount(untagged == null ? 0L : untagged.getManifestCount())
         .untaggedSize(untagged == null ? 0 : untagged.getSize());
   }
 

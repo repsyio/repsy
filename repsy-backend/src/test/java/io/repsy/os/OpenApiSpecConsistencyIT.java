@@ -706,6 +706,69 @@ class OpenApiSpecConsistencyIT extends AbstractIT {
         .doesNotContain("DeployTokenInfoListItem.read_only_flag");
   }
 
+  /**
+   * RPS-2279: list items without a {@code required} list, with the reason. Cloud copies the shared
+   * list-item schemas from this spec, so a missing list makes every property optional in the
+   * generated TypeScript. These two have no Java projection to read the nullability from. The map
+   * may only shrink.
+   */
+  private static final Map<String, String> LIST_ITEMS_WITHOUT_REQUIRED =
+      Map.of(
+          "CleanupPolicyItem",
+              "built from the cleanup policy settings; nullability not derived yet",
+          "ManifestListItem", "built from the manifest row and a platform lookup; not derived yet");
+
+  @Test
+  @DisplayName("every list item declares its non-null members as required, every page its content")
+  void listItemsDeclareRequired() throws IOException {
+    assertNoNewFindings(
+        "list items without required",
+        listItemsWithoutRequired(loadSpec()),
+        LIST_ITEMS_WITHOUT_REQUIRED);
+  }
+
+  @Test
+  @DisplayName("the required rule fires on a list item and a page without a required list")
+  void requiredRuleFires() throws IOException {
+    final var doc = loadSpec();
+    final var schemas = asMap(asMap(doc.get("components")).get("schemas"));
+
+    asMap(schemas.get("GemListItem")).remove("required");
+    asMap(schemas.get("PagedModelGemListItem")).put("required", List.of("content"));
+
+    assertThat(listItemsWithoutRequired(doc))
+        .contains("GemListItem", "PagedModelGemListItem")
+        .containsAll(LIST_ITEMS_WITHOUT_REQUIRED.keySet());
+  }
+
+  private static Set<String> listItemsWithoutRequired(final Map<String, Object> doc) {
+
+    final var findings = new TreeSet<String>();
+
+    asMap(asMap(doc.get("components")).get("schemas"))
+        .forEach(
+            (name, value) -> {
+              final var schema = asMap(value);
+
+              if (!"object".equals(schema.get("type")) || !schema.containsKey("properties")) {
+                return;
+              }
+
+              final var required = schema.get("required");
+              final var declared = required == null ? List.of() : asList(required);
+
+              if (name.startsWith("PagedModel")) {
+                if (!declared.containsAll(List.of("content", "page"))) {
+                  findings.add(name);
+                }
+              } else if (name.endsWith("Item") && declared.isEmpty()) {
+                findings.add(name);
+              }
+            });
+
+    return findings;
+  }
+
   @Test
   @DisplayName("every $ref in the spec resolves")
   void referencesResolve() throws IOException {
