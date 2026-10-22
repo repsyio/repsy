@@ -77,7 +77,7 @@ export class UserManagementComponent implements OnInit, OnDestroy {
   pageNum = 0;
   pageSize = 10;
   users: UserResponse[];
-  pagedData: PagedModelUserResponse = { page: { totalPages: 0 } };
+  pagedData: PagedModelUserResponse = { content: [], page: { totalPages: 0 } };
   showCreateUserModal = false;
   showEditUserModal = false;
   showResetPasswordModal = false;

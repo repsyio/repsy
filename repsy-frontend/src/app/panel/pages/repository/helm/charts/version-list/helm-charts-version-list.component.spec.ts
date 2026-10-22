@@ -32,7 +32,7 @@ import { HelmService } from '../../services/helm.service';
 import { HelmChartsVersionListComponent } from './helm-charts-version-list.component';
 
 function version(name: string, createdAt: string): HelmChartVersionItem {
-  return { version: name, createdAt };
+  return { version: name, digest: `sha256:${name}`, size: 0, createdAt };
 }
 
 const OLD = version('1.0.0', '2026-01-01T00:00:00Z');
