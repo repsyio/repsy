@@ -56,12 +56,12 @@
     "@angular/compiler-cli": "^21.2.23",
     "@eslint/js": "^10.0.1",
     "@ngx-env/builder": "^21.0.1",
-    "@openapitools/openapi-generator-cli": "^2.41.0",
+    "@openapitools/openapi-generator-cli": "^2.42.0",
     "@tailwindcss/nesting": "0.0.0-insiders.565cd3e",
     "@types/jasmine": "~7.0.0",
     "@types/node": "^26.6.5",
-    "@typescript-eslint/eslint-plugin": "^8.71.2",
-    "@typescript-eslint/parser": "^8.71.2",
+    "@typescript-eslint/eslint-plugin": "^8.72.0",
+    "@typescript-eslint/parser": "^8.72.0",
     "angular-eslint": "^22.6.0",
     "autoprefixer": "^10.6.1",
     "daisyui": "^5.7.50",
@@ -84,7 +84,7 @@
     "tailwind-scrollbar": "^4.0.2",
     "tailwindcss": "^4.3.3",
     "typescript": "~5.9.3",
-    "typescript-eslint": "^8.71.2"
+    "typescript-eslint": "^8.72.0"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
