@@ -12,7 +12,7 @@
   <parent>
     <groupId>io.repsy.core</groupId>
     <artifactId>core-parent</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1</version>
   </parent>
 
   <groupId>io.repsy.os</groupId>
@@ -46,7 +46,7 @@
       dependencies of the modules carry no version of their own. Equal to the parent version above
       (Maven allows no property there); CoreVersionPinTest fails when they differ.
     -->
-    <repsy-core.version>1.0.0</repsy-core.version>
+    <repsy-core.version>1.0.1</repsy-core.version>
 
     <!--
       RPS-2265: core-parent sets this to "../../config/checkstyle.xml", a path of its own layout.
