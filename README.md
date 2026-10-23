@@ -649,6 +649,8 @@ Deleting `1.0.0+a` when there is no such entry (the usual case) still deletes `1
 | `AUTH_THROTTLE_MAX_FAILURES` | How many failed password checks one client may make per window before its next password check is refused | `20` |
 | `AUTH_THROTTLE_WINDOW_SECONDS` | Length of the window in seconds. When it ends, the client starts again with a clean count | `60` |
 | `AUTH_THROTTLE_MAX_CLIENTS` | How many clients are tracked at once | `10000` |
+| `AUTH_THROTTLE_BAN_SECONDS` | How long a client that keeps guessing is refused outright (see `AUTH_THROTTLE_BAN_AFTER_BLOCKED_WINDOWS`). `0` turns the ban off. The ban is kept in memory, so a restart clears it | `3600` |
+| `AUTH_THROTTLE_BAN_AFTER_BLOCKED_WINDOWS` | How many windows in a row a client must have used up its failed password checks in before it is banned | `3` |
 | `PASSWORD_RESET_MARKER_ENABLED` | Reset a user's password when a file named after the user is created in `PASSWORD_RESET_MARKER_DIR`. Nothing is reachable over the network: it takes write access to that directory. See [Forgot admin password?](#forgot-admin-password). Set it to `false` to switch the feature off | `true` |
 | `PASSWORD_RESET_MARKER_DIR` | Directory watched for password reset marker files. The Docker image sets it to `/app/data/password-reset`, on the persisted volume, whatever `STORAGE_BASE_PATH` is | `<STORAGE_BASE_PATH>/password-reset` (`/app/data/password-reset` in the image) |
 | `PASSWORD_RESET_MARKER_POLL_INTERVAL` | How often a running instance looks into the directory (ISO-8601 duration, at least `PT1S`). A marker created while the application is stopped is applied once at startup | `PT5S` |
@@ -1131,8 +1133,12 @@ The repository ports, the `/api` routes that take Basic credentials and the web 
 into the same number. After that the client's next password check is answered with
 `429 Too Many Requests` and a `Retry-After` header (the seconds left in the window) without spending
 a BCrypt verification, until the window ends. That caps what a flood of wrong credentials costs at
-about a second of CPU per client and minute. Set `AUTH_THROTTLE_ENABLED` to `false` to turn the
-limit off.
+about a second of CPU per client and minute. A client that keeps going, and uses up its failures in
+`AUTH_THROTTLE_BAN_AFTER_BLOCKED_WINDOWS` windows in a row (3 by default), is then refused outright
+for `AUTH_THROTTLE_BAN_SECONDS` (one hour by default), with the rest of the ban in `Retry-After`;
+its remembered passwords stop working for that time too. The ban is kept in memory, so a restart
+clears it, and with several instances each bans for itself. Set `AUTH_THROTTLE_BAN_SECONDS` to `0`
+to keep only the window, or `AUTH_THROTTLE_ENABLED` to `false` to turn the limit off.
 
 - **What counts:** a failed password verification (a wrong password, or a username that does not
   exist) and a credential sent as a `Bearer` value that Repsy does not recognise: a deploy token

@@ -20,7 +20,8 @@ import lombok.Getter;
 
 /**
  * Thrown when a client has made too many failed password checks and is refused until its window
- * ends. It carries no username and no credential, so it can be logged and answered as it is.
+ * (or, for a client that kept going, its ban) ends. It carries no username and no credential, so it
+ * can be logged and answered as it is.
  *
  * <p>It sits in the shared protocol module because a protocol handler that turns every failure of
  * its login into 401 has to let this one through, or the client is told to log in again instead of

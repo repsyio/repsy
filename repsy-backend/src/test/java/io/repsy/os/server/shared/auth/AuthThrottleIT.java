@@ -389,6 +389,27 @@ class AuthThrottleIT extends AbstractIT {
   }
 
   @Test
+  @DisplayName("bans a client that used up its failures in three windows in a row (RPS-2306)")
+  void repeatedBlockedWindowsBanTheClient() throws Exception {
+    this.failApi(MAX_FAILURES);
+
+    for (var window = 1; window < 3; window++) {
+      this.advance(Duration.ofSeconds(61));
+      this.failApi(MAX_FAILURES);
+    }
+
+    // The window of the last failures is over, so without the ban the client would be let in.
+    this.advance(Duration.ofSeconds(61));
+
+    final var banned = this.apiBasic(this.username, VALID_PASSWORD);
+    assertThat(banned.getStatus()).as(body(banned)).isEqualTo(429);
+    assertThat(Long.parseLong(banned.getHeader(RETRY_AFTER))).isBetween(3500L, 3600L);
+
+    this.advance(Duration.ofSeconds(3600));
+    assertThat(this.apiBasic(this.username, VALID_PASSWORD).getStatus()).isEqualTo(AUTHENTICATED);
+  }
+
+  @Test
   @DisplayName("lets a remembered password through while the client is blocked, without a hash")
   void rememberedPasswordPassesWhileBlocked() throws Exception {
     // The first successful request remembers the password.

@@ -67,7 +67,13 @@ import org.springframework.web.context.request.ServletRequestAttributes;
  *       AuthThrottleMode#OFF} would. A refused (or would-refuse) attempt costs no BCrypt, but it is
  *       counted too, so a client that keeps sending guesses reaches {@link #isSaturated()
  *       saturation} after {@value #SATURATION_FACTOR} times the limit.
- *   <li>The clients are held in a bounded cache, so an attacker cannot fill the memory with
+ *   <li>A client that keeps going is banned (RPS-2306): one that has used up its failures in {@code
+ *       banAfterBlockedWindows} windows in a row is refused outright for {@code banSeconds},
+ *       whatever its windows say, so it no longer gets a fresh {@code maxFailures} checks every
+ *       minute. A banned client costs no BCrypt, its remembered password stops working like a
+ *       saturated client's, and a success does not lift the ban. The ban follows the mode like the
+ *       window does. It is held in memory, per instance, and a restart clears it.
+ *   <li>The clients are held in bounded caches, so an attacker cannot fill the memory with
  *       addresses.
  * </ul>
  *
@@ -89,12 +95,15 @@ public class AuthFailureThrottle {
   static final String WOULD_BLOCK_METRIC = "repsy.auth.throttle_would_block";
 
   private final @Nullable Cache<String, Window> windows;
+  private final @Nullable Cache<String, Long> bans;
   private final AuthThrottleMode mode;
   private final Supplier<@Nullable MeterRegistry> meterRegistry;
   private final Ticker ticker;
   private final long maxFailures;
   private final long saturationLimit;
   private final long windowNanos;
+  private final long banNanos;
+  private final int banAfterBlockedWindows;
 
   /**
    * The registry is optional: without Micrometer the {@link AuthThrottleMode#OBSERVE} counter is
@@ -133,15 +142,33 @@ public class AuthFailureThrottle {
     this.maxFailures = properties.maxFailures();
     this.saturationLimit = properties.maxFailures() * (long) SATURATION_FACTOR;
     this.windowNanos = TimeUnit.SECONDS.toNanos(properties.windowSeconds());
+    this.banNanos = TimeUnit.SECONDS.toNanos(properties.banSeconds());
+    this.banAfterBlockedWindows = properties.banAfterBlockedWindows();
+
+    final var tracksClients = this.mode != AuthThrottleMode.OFF;
+    final var bansClients = tracksClients && properties.banSeconds() > 0;
+
+    // A ban counts windows in a row, so the previous window has to outlive its own end by one more.
+    final var windowRetention =
+        Duration.ofSeconds(properties.windowSeconds() * (bansClients ? 2 : 1));
 
     this.windows =
-        this.mode == AuthThrottleMode.OFF
-            ? null
-            : CacheBuilder.newBuilder()
+        tracksClients
+            ? CacheBuilder.newBuilder()
                 .maximumSize(properties.maxClients())
-                .expireAfterWrite(Duration.ofSeconds(properties.windowSeconds()))
+                .expireAfterWrite(windowRetention)
                 .ticker(ticker)
-                .build();
+                .build()
+            : null;
+
+    this.bans =
+        bansClients
+            ? CacheBuilder.newBuilder()
+                .maximumSize(properties.maxClients())
+                .expireAfterWrite(Duration.ofSeconds(properties.banSeconds()))
+                .ticker(ticker)
+                .build()
+            : null;
   }
 
   /**
@@ -161,14 +188,26 @@ public class AuthFailureThrottle {
     }
 
     final var now = this.now();
-    final var window = this.windows.getIfPresent(client);
+    final var banSecondsLeft = this.banSecondsLeft(client, now);
+
+    if (banSecondsLeft > 0) {
+      this.refuseBanned(client, banSecondsLeft);
+    } else {
+      this.checkWindow(this.windows, client, now);
+    }
+  }
+
+  private void checkWindow(
+      final Cache<String, Window> clientWindows, final String client, final long now) {
+
+    final var window = clientWindows.getIfPresent(client);
 
     if (window == null || this.isOpen(window, now)) {
       return;
     }
 
     // The refused (or would-refuse) attempt is counted, see SATURATION_FACTOR.
-    this.windows.asMap().computeIfPresent(client, (key, current) -> this.next(current, now));
+    clientWindows.asMap().computeIfPresent(client, (key, current) -> this.next(current, now));
 
     if (this.mode == AuthThrottleMode.OBSERVE) {
       log.warn(
@@ -181,6 +220,21 @@ public class AuthFailureThrottle {
     }
 
     throw new TooManyRequestsException(this.secondsLeft(window, now));
+  }
+
+  /** Refuses a banned client, or in {@code observe} only logs and counts it. */
+  private void refuseBanned(final String client, final long banSecondsLeft) {
+
+    if (this.mode != AuthThrottleMode.OBSERVE) {
+      throw new TooManyRequestsException(banSecondsLeft);
+    }
+
+    log.warn(
+        "repsy.security.auth-throttle.mode=observe: client {} would be refused (429) for"
+            + " another {}s because it is banned; letting it through",
+        client,
+        banSecondsLeft);
+    this.countWouldBlock(client);
   }
 
   private void countWouldBlock(final String client) {
@@ -217,6 +271,27 @@ public class AuthFailureThrottle {
           this.mode == AuthThrottleMode.ENFORCE
               ? "refusing its password checks until its window ends"
               : "would be refused if repsy.security.auth-throttle.mode were enforce");
+      this.banIfRepeated(client, remoteAddr, window, now);
+    }
+  }
+
+  /** Starts the ban of a client whose window just ran out, if enough windows in a row did. */
+  private void banIfRepeated(
+      final String client, final @Nullable String remoteAddr, final Window window, final long now) {
+
+    if (this.bans == null || window.precedingBlocked() + 1 < this.banAfterBlockedWindows) {
+      return;
+    }
+
+    if (this.bans.asMap().putIfAbsent(client, now) == null) {
+      log.warn(
+          "Client {} (network {}) used up its failed password checks in {} windows in a row ({})",
+          remoteAddr,
+          client,
+          this.banAfterBlockedWindows,
+          this.mode == AuthThrottleMode.ENFORCE
+              ? "banning it for " + TimeUnit.NANOSECONDS.toSeconds(this.banNanos) + "s"
+              : "would be banned if repsy.security.auth-throttle.mode were enforce");
     }
   }
 
@@ -233,21 +308,37 @@ public class AuthFailureThrottle {
       return false;
     }
 
+    final var now = this.now();
+
+    if (this.banSecondsLeft(client, now) > 0) {
+      return true;
+    }
+
     final var window = this.windows.getIfPresent(client);
 
     return window != null
-        && !this.expired(window, this.now())
+        && !this.expired(window, now)
         && window.failures() >= this.saturationLimit;
   }
 
-  /** Seconds until the client of the current request starts a new window, at least 1. */
+  /**
+   * Seconds until the client of the current request is let in again: the rest of its ban, or the
+   * rest of its window, at least 1.
+   */
   public long retryAfterSeconds() {
 
     final var client = currentClient();
+    final var now = this.now();
+    final var banSecondsLeft = client == null ? 0 : this.banSecondsLeft(client, now);
+
+    if (banSecondsLeft > 0) {
+      return banSecondsLeft;
+    }
+
     final var window =
         this.windows == null || client == null ? null : this.windows.getIfPresent(client);
 
-    return window == null ? 1 : this.secondsLeft(window, this.now());
+    return window == null ? 1 : this.secondsLeft(window, now);
   }
 
   /** Forgets every client. Only tests need it: their requests all come from one address. */
@@ -256,6 +347,10 @@ public class AuthFailureThrottle {
 
     if (this.windows != null) {
       this.windows.invalidateAll();
+    }
+
+    if (this.bans != null) {
+      this.bans.invalidateAll();
     }
   }
 
@@ -278,16 +373,49 @@ public class AuthFailureThrottle {
   /** The window after one more attempt, or a new window when the old one has ended. */
   private Window next(final @Nullable Window current, final long now) {
 
-    if (current == null || this.expired(current, now)) {
-      return new Window(now, 1);
+    if (current == null) {
+      return new Window(now, 1, 0);
     }
 
-    return new Window(current.startNanos(), Math.min(current.failures() + 1, this.saturationLimit));
+    if (this.expired(current, now)) {
+      return new Window(now, 1, this.precedingBlocked(current, now));
+    }
+
+    return new Window(
+        current.startNanos(),
+        Math.min(current.failures() + 1, this.saturationLimit),
+        current.precedingBlocked());
+  }
+
+  /**
+   * How many windows in a row, ending with {@code ended}, the client used up its failures in. The
+   * run is broken when the client skipped a whole window since.
+   */
+  private int precedingBlocked(final Window ended, final long now) {
+
+    final var wasBlocked = ended.failures() >= this.maxFailures;
+    final var isConsecutive = now - ended.startNanos() < 2 * this.windowNanos;
+
+    return wasBlocked && isConsecutive
+        ? Math.min(ended.precedingBlocked() + 1, this.banAfterBlockedWindows)
+        : 0;
+  }
+
+  /** Seconds left of the client's ban, rounded up; 0 when it is not banned. */
+  private long banSecondsLeft(final String client, final long now) {
+
+    final var bannedAt = this.bans == null ? null : this.bans.getIfPresent(client);
+    final var leftNanos = bannedAt == null ? 0 : this.banNanos - (now - bannedAt);
+
+    return leftNanos <= 0 ? 0 : secondsUntil(leftNanos);
   }
 
   private long secondsLeft(final Window window, final long now) {
 
-    final var leftNanos = this.windowNanos - (now - window.startNanos());
+    return secondsUntil(this.windowNanos - (now - window.startNanos()));
+  }
+
+  private static long secondsUntil(final long leftNanos) {
 
     return Math.max(1, TimeUnit.NANOSECONDS.toSeconds(leftNanos + TimeUnit.SECONDS.toNanos(1) - 1));
   }
@@ -334,6 +462,9 @@ public class AuthFailureThrottle {
     return remoteAddr;
   }
 
-  /** The failures of one client since {@code startNanos}. */
-  private record Window(long startNanos, long failures) {}
+  /**
+   * The failures of one client since {@code startNanos}, and how many windows in a row before this
+   * one the client used up its failures in (capped at {@code banAfterBlockedWindows}).
+   */
+  private record Window(long startNanos, long failures, int precedingBlocked) {}
 }

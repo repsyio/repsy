@@ -34,6 +34,10 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * @param windowSeconds the length of the window, after which a client starts again with a clean
  *     count
  * @param maxClients how many clients are tracked at once before the least recently used go
+ * @param banSeconds how long a client that keeps guessing is refused outright, see {@code
+ *     banAfterBlockedWindows} (RPS-2306); {@code 0} turns the ban off
+ * @param banAfterBlockedWindows how many windows in a row a client must have used up its failures
+ *     in before it is banned
  */
 @ConfigurationProperties(prefix = "repsy.security.auth-throttle")
 public record AuthThrottleProperties(
@@ -41,11 +45,15 @@ public record AuthThrottleProperties(
     @Nullable Boolean enabled,
     Integer maxFailures,
     Long windowSeconds,
-    Long maxClients) {
+    Long maxClients,
+    Long banSeconds,
+    Integer banAfterBlockedWindows) {
 
   static final int DEFAULT_MAX_FAILURES = 20;
   static final long DEFAULT_WINDOW_SECONDS = 60;
   static final long DEFAULT_MAX_CLIENTS = 10_000;
+  static final long DEFAULT_BAN_SECONDS = 3600;
+  static final int DEFAULT_BAN_AFTER_BLOCKED_WINDOWS = 3;
 
   public AuthThrottleProperties {
     mode = Boolean.FALSE.equals(enabled) ? AuthThrottleMode.OFF : mode;
@@ -55,8 +63,12 @@ public record AuthThrottleProperties(
     maxFailures = Objects.requireNonNullElse(maxFailures, DEFAULT_MAX_FAILURES);
     windowSeconds = Objects.requireNonNullElse(windowSeconds, DEFAULT_WINDOW_SECONDS);
     maxClients = Objects.requireNonNullElse(maxClients, DEFAULT_MAX_CLIENTS);
+    banSeconds = Objects.requireNonNullElse(banSeconds, DEFAULT_BAN_SECONDS);
+    banAfterBlockedWindows =
+        Objects.requireNonNullElse(banAfterBlockedWindows, DEFAULT_BAN_AFTER_BLOCKED_WINDOWS);
 
     requirePositiveUnlessOff(mode, maxFailures, windowSeconds, maxClients);
+    requireValidBanUnlessOff(mode, banSeconds, banAfterBlockedWindows);
   }
 
   private static void requirePositiveUnlessOff(
@@ -75,10 +87,24 @@ public record AuthThrottleProperties(
     }
   }
 
+  private static void requireValidBanUnlessOff(
+      final AuthThrottleMode mode, final long banSeconds, final int banAfterBlockedWindows) {
+
+    if (mode == AuthThrottleMode.OFF) {
+      return;
+    }
+
+    if (banSeconds < 0 || (banSeconds > 0 && banAfterBlockedWindows <= 0)) {
+      throw new IllegalArgumentException(
+          "repsy.security.auth-throttle.ban-seconds must not be negative, and"
+              + " ban-after-blocked-windows must be positive unless ban-seconds is 0");
+    }
+  }
+
   /** Settings under which no client is ever tracked or refused. */
   public static AuthThrottleProperties disabled() {
 
-    return new AuthThrottleProperties(AuthThrottleMode.OFF, null, 0, 0L, 0L);
+    return new AuthThrottleProperties(AuthThrottleMode.OFF, null, 0, 0L, 0L, 0L, 0);
   }
 
   /** Settings under which every check runs in full and a saturated client is refused. */
@@ -86,7 +112,31 @@ public record AuthThrottleProperties(
       final int maxFailures, final long windowSeconds, final long maxClients) {
 
     return new AuthThrottleProperties(
-        AuthThrottleMode.ENFORCE, null, maxFailures, windowSeconds, maxClients);
+        AuthThrottleMode.ENFORCE,
+        null,
+        maxFailures,
+        windowSeconds,
+        maxClients,
+        DEFAULT_BAN_SECONDS,
+        DEFAULT_BAN_AFTER_BLOCKED_WINDOWS);
+  }
+
+  /** Like {@link #enforcing(int, long, long)}, with the ban of RPS-2306 set explicitly. */
+  public static AuthThrottleProperties enforcing(
+      final int maxFailures,
+      final long windowSeconds,
+      final long maxClients,
+      final long banSeconds,
+      final int banAfterBlockedWindows) {
+
+    return new AuthThrottleProperties(
+        AuthThrottleMode.ENFORCE,
+        null,
+        maxFailures,
+        windowSeconds,
+        maxClients,
+        banSeconds,
+        banAfterBlockedWindows);
   }
 
   /** Settings under which a saturated client is counted and logged but let through. */
@@ -94,6 +144,12 @@ public record AuthThrottleProperties(
       final int maxFailures, final long windowSeconds, final long maxClients) {
 
     return new AuthThrottleProperties(
-        AuthThrottleMode.OBSERVE, null, maxFailures, windowSeconds, maxClients);
+        AuthThrottleMode.OBSERVE,
+        null,
+        maxFailures,
+        windowSeconds,
+        maxClients,
+        DEFAULT_BAN_SECONDS,
+        DEFAULT_BAN_AFTER_BLOCKED_WINDOWS);
   }
 }

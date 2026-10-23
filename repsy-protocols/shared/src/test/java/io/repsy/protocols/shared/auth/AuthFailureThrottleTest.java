@@ -457,6 +457,238 @@ class AuthFailureThrottleTest {
     }
   }
 
+  /**
+   * RPS-2306: a client that used up its failures in {@code banAfterBlockedWindows} windows in a row
+   * is refused for {@code banSeconds}, however its windows would have reset in the meantime.
+   */
+  @Nested
+  @DisplayName("ban")
+  class Ban {
+
+    private static final long BAN_SECONDS = 3600;
+    private static final int BAN_AFTER = 3;
+    private static final Duration PAST_THE_WINDOW = Duration.ofSeconds(WINDOW_SECONDS + 1);
+
+    private final AuthFailureThrottle banning =
+        new AuthFailureThrottle(
+            AuthThrottleProperties.enforcing(
+                MAX_FAILURES, WINDOW_SECONDS, 100, BAN_SECONDS, BAN_AFTER),
+            AuthFailureThrottleTest.this.meterRegistry,
+            AuthFailureThrottleTest.this.ticker);
+
+    private void blockedWindow() {
+      for (var i = 0; i < MAX_FAILURES; i++) {
+        this.banning.recordFailure();
+      }
+    }
+
+    private void blockedWindows(final int count) {
+      for (var i = 0; i < count; i++) {
+        if (i > 0) {
+          advance(PAST_THE_WINDOW);
+        }
+        this.blockedWindow();
+      }
+    }
+
+    @Test
+    @DisplayName("refuses a client that keeps going after its window would have reset")
+    void refusesAfterTheWindowWouldHaveReset() {
+      requestFrom(CLIENT);
+      this.blockedWindows(BAN_AFTER);
+
+      advance(PAST_THE_WINDOW);
+
+      assertThatThrownBy(this.banning::checkAllowed)
+          .isInstanceOfSatisfying(
+              TooManyRequestsException.class,
+              e ->
+                  assertThat(e.getRetryAfterSeconds())
+                      .isEqualTo(BAN_SECONDS - PAST_THE_WINDOW.toSeconds()));
+      assertThat(this.banning.retryAfterSeconds())
+          .isEqualTo(BAN_SECONDS - PAST_THE_WINDOW.toSeconds());
+    }
+
+    @Test
+    @DisplayName("lets the client in again when the ban has run out")
+    void endsWhenTheBanHasRunOut() {
+      requestFrom(CLIENT);
+      this.blockedWindows(BAN_AFTER);
+
+      advance(Duration.ofSeconds(BAN_SECONDS - 1));
+      assertThatThrownBy(this.banning::checkAllowed).isInstanceOf(TooManyRequestsException.class);
+
+      advance(Duration.ofSeconds(1));
+      assertThatCode(this.banning::checkAllowed).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("does not ban a client that used up its failures in fewer windows in a row")
+    void doesNotBanBeforeTheLastBlockedWindow() {
+      requestFrom(CLIENT);
+      this.blockedWindows(BAN_AFTER - 1);
+
+      advance(PAST_THE_WINDOW);
+
+      assertThatCode(this.banning::checkAllowed).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("a window that skipped a whole window of the client breaks the run")
+    void aSkippedWindowBreaksTheRun() {
+      requestFrom(CLIENT);
+      this.blockedWindows(BAN_AFTER - 1);
+
+      advance(PAST_THE_WINDOW.multipliedBy(2));
+      this.blockedWindow();
+
+      advance(PAST_THE_WINDOW);
+      assertThatCode(this.banning::checkAllowed).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("a window that stayed under the limit breaks the run")
+    void aQuietWindowBreaksTheRun() {
+      requestFrom(CLIENT);
+      this.blockedWindows(BAN_AFTER - 1);
+
+      advance(PAST_THE_WINDOW);
+      this.banning.recordFailure();
+
+      advance(PAST_THE_WINDOW);
+      this.blockedWindow();
+
+      advance(PAST_THE_WINDOW);
+      assertThatCode(this.banning::checkAllowed).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("bans the client and nobody else, and treats a banned client as saturated")
+    void bansOnlyTheClient() {
+      requestFrom(CLIENT);
+      this.blockedWindows(BAN_AFTER);
+      advance(PAST_THE_WINDOW);
+
+      assertThat(this.banning.isSaturated()).isTrue();
+
+      requestFrom(OTHER_CLIENT);
+      assertThatCode(this.banning::checkAllowed).doesNotThrowAnyException();
+      assertThat(this.banning.isSaturated()).isFalse();
+
+      advance(Duration.ofSeconds(BAN_SECONDS));
+      requestFrom(CLIENT);
+      assertThat(this.banning.isSaturated()).isFalse();
+    }
+
+    @Test
+    @DisplayName("bans an IPv6 client by its network")
+    void bansTheNetworkOfAnIpv6Client() {
+      requestFrom(IPV6_CLIENT);
+      this.blockedWindows(BAN_AFTER);
+      advance(PAST_THE_WINDOW);
+
+      requestFrom(IPV6_CLIENT_SAME_NETWORK);
+      assertThatThrownBy(this.banning::checkAllowed).isInstanceOf(TooManyRequestsException.class);
+
+      requestFrom(IPV6_CLIENT_OTHER_NETWORK);
+      assertThatCode(this.banning::checkAllowed).doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("logs the ban once, with the address and the network")
+    void logsTheBanOnce() {
+      requestFrom(CLIENT);
+      this.blockedWindows(BAN_AFTER);
+      this.banning.recordFailure();
+
+      final var banLines =
+          AuthFailureThrottleTest.this.logs.list.stream()
+              .map(ILoggingEvent::getFormattedMessage)
+              .filter(message -> message.contains("windows in a row"))
+              .toList();
+
+      assertThat(banLines).hasSize(1);
+      assertThat(banLines.getFirst()).contains(CLIENT).contains("banning it for 3600s");
+    }
+
+    @Test
+    @DisplayName("with ban-seconds 0 a client that keeps going is only ever held to its window")
+    void banSecondsZeroTurnsTheBanOff() {
+      final var withoutBan =
+          new AuthFailureThrottle(
+              AuthThrottleProperties.enforcing(MAX_FAILURES, WINDOW_SECONDS, 100, 0, BAN_AFTER),
+              AuthFailureThrottleTest.this.meterRegistry,
+              AuthFailureThrottleTest.this.ticker);
+
+      requestFrom(CLIENT);
+
+      for (var window = 0; window < BAN_AFTER + 2; window++) {
+        for (var i = 0; i < MAX_FAILURES; i++) {
+          withoutBan.recordFailure();
+        }
+        advance(PAST_THE_WINDOW);
+      }
+
+      assertThatCode(withoutBan::checkAllowed).doesNotThrowAnyException();
+      assertThat(withoutBan.isSaturated()).isFalse();
+    }
+
+    @Test
+    @DisplayName("in observe a banned client is let through, logged and counted")
+    void observeLetsABannedClientThrough() {
+      final var observing =
+          new AuthFailureThrottle(
+              new AuthThrottleProperties(
+                  AuthThrottleMode.OBSERVE,
+                  null,
+                  MAX_FAILURES,
+                  WINDOW_SECONDS,
+                  100L,
+                  BAN_SECONDS,
+                  BAN_AFTER),
+              AuthFailureThrottleTest.this.meterRegistry,
+              AuthFailureThrottleTest.this.ticker);
+
+      requestFrom(CLIENT);
+
+      for (var window = 0; window < BAN_AFTER; window++) {
+        if (window > 0) {
+          advance(PAST_THE_WINDOW);
+        }
+        for (var i = 0; i < MAX_FAILURES; i++) {
+          observing.recordFailure();
+        }
+      }
+      advance(PAST_THE_WINDOW);
+
+      assertThatCode(observing::checkAllowed).doesNotThrowAnyException();
+
+      assertThat(
+              AuthFailureThrottleTest.this
+                  .meterRegistry
+                  .find(AuthFailureThrottle.WOULD_BLOCK_METRIC)
+                  .counter())
+          .isNotNull();
+      assertThat(
+              AuthFailureThrottleTest.this.logs.list.stream()
+                  .map(ILoggingEvent::getFormattedMessage)
+                  .anyMatch(m -> m.contains("because it is banned")))
+          .isTrue();
+    }
+
+    @Test
+    @DisplayName("reset forgets the bans too")
+    void resetForgetsTheBans() {
+      requestFrom(CLIENT);
+      this.blockedWindows(BAN_AFTER);
+      advance(PAST_THE_WINDOW);
+
+      this.banning.reset();
+
+      assertThatCode(this.banning::checkAllowed).doesNotThrowAnyException();
+    }
+  }
+
   @Test
   @DisplayName("binds the settings from repsy.security.auth-throttle")
   void bindsProperties() {
@@ -477,16 +709,18 @@ class AuthFailureThrottleTest {
   @Test
   @DisplayName("defaults to enforce when the mode is not set at all")
   void defaultsToEnforce() {
-    assertThat(new AuthThrottleProperties(null, null, 5, 30L, 50L).mode())
+    assertThat(new AuthThrottleProperties(null, null, 5, 30L, 50L, null, null).mode())
         .isEqualTo(AuthThrottleMode.ENFORCE);
   }
 
   @Test
   @DisplayName("the legacy enabled=false switches the throttle off whatever the mode says")
   void legacyEnabledFalseMeansOff() {
-    assertThat(new AuthThrottleProperties(AuthThrottleMode.ENFORCE, false, 5, 30L, 50L).mode())
+    assertThat(
+            new AuthThrottleProperties(AuthThrottleMode.ENFORCE, false, 5, 30L, 50L, null, null)
+                .mode())
         .isEqualTo(AuthThrottleMode.OFF);
-    assertThat(new AuthThrottleProperties(null, true, 5, 30L, 50L).mode())
+    assertThat(new AuthThrottleProperties(null, true, 5, 30L, 50L, null, null).mode())
         .isEqualTo(AuthThrottleMode.ENFORCE);
   }
 
@@ -494,11 +728,11 @@ class AuthFailureThrottleTest {
   @DisplayName("refuses settings that could not hold a window, unless the mode is off")
   void rejectsNonPositiveSettings() {
     for (final var mode : List.of(AuthThrottleMode.OBSERVE, AuthThrottleMode.ENFORCE)) {
-      assertThatThrownBy(() -> new AuthThrottleProperties(mode, null, 0, 60L, 10L))
+      assertThatThrownBy(() -> new AuthThrottleProperties(mode, null, 0, 60L, 10L, null, null))
           .isInstanceOf(IllegalArgumentException.class);
-      assertThatThrownBy(() -> new AuthThrottleProperties(mode, null, 10, 0L, 10L))
+      assertThatThrownBy(() -> new AuthThrottleProperties(mode, null, 10, 0L, 10L, null, null))
           .isInstanceOf(IllegalArgumentException.class);
-      assertThatThrownBy(() -> new AuthThrottleProperties(mode, null, 10, 60L, 0L))
+      assertThatThrownBy(() -> new AuthThrottleProperties(mode, null, 10, 60L, 0L, null, null))
           .isInstanceOf(IllegalArgumentException.class);
     }
 
