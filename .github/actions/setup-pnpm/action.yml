@@ -42,7 +42,7 @@ runs:
     # Every run step sets shell and working-directory itself: a job's `defaults.run` does not
     # apply inside a composite action.
     # The prefix is per runner, not the shared /opt/hostedtoolcache/node/... bin directory, where
-    # concurrent jobs on the Hetzner runners raced on the pnpm links (npm EEXIST).
+    # concurrent jobs on the Self Hosted Runners raced on the pnpm links (npm EEXIST).
     - name: Install pnpm
       shell: bash
       working-directory: ${{ inputs.working-directory }}

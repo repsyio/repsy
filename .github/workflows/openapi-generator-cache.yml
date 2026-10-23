@@ -26,7 +26,7 @@ concurrency:
 jobs:
   seed:
     name: Seed generator jar cache
-    runs-on: hetzner-sm
+    runs-on: repsy-sm
     timeout-minutes: 20
     defaults:
       run:

@@ -32,7 +32,7 @@ concurrency:
 jobs:
   bump:
     name: Bump repsy-core
-    runs-on: hetzner-md
+    runs-on: repsy-md
     timeout-minutes: 20
     env:
       # Through env, never interpolated into a script: the payload is input.

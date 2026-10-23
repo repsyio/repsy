@@ -29,7 +29,7 @@ concurrency:
 jobs:
   bump:
     name: Bump the pinned pnpm
-    runs-on: hetzner-sm
+    runs-on: repsy-sm
     timeout-minutes: 10
     env:
       APP_ID: ${{ vars.REPSY_BOT_APP_ID }}
