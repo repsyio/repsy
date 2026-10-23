@@ -20,7 +20,7 @@
  * client key on BOTH listeners (the repo port 9090 and the panel port 8080), that the two ports share
  * one count, that a Bearer value nobody issued counts like a wrong password (RPS-1209), what the
  * refusal looks like to a client (429, the `tooManyRequests` envelope, `Retry-After`), that the window
- * ends, and that the WARN log line is written once per client and window.
+ * ends, and that the log line is written once per client and window.
  *
  * It runs on a stack started with the throttle overlay only (`./run.sh local up --throttle`,
  * `docker-compose.stack-throttle.yml`: 3 failures per 10 s window per client), in the "stack" runner
@@ -289,7 +289,7 @@ test.describe('auth throttle on the wire', { tag: ['@throttle', '@cloud-skip'] }
     expectRefused(await basicGet(repo, wrong(user), client), 'new window, #4');
   });
 
-  test('the WARN line is logged once per client and window, however many attempts follow', async ({
+  test('the INFO line is logged once per client and window, however many attempts follow', async ({
     seeder,
   }, testInfo) => {
     const client = uniqueClient(testInfo);
@@ -311,7 +311,7 @@ test.describe('auth throttle on the wire', { tag: ['@throttle', '@cloud-skip'] }
     }
     const first = await warnings();
     expect(first).toHaveLength(1);
-    expect(first[0]).toContain('WARN');
+    expect(first[0]).toContain('INFO');
     expect(first[0]).toContain(
       `Client ${client} (network ${client}) made ${MAX_FAILURES} failed password checks (refusing its password checks until its window ends)`,
     );

@@ -107,7 +107,7 @@ public class AuthFailureThrottle {
 
   /**
    * The registry is optional: without Micrometer the {@link AuthThrottleMode#OBSERVE} counter is
-   * skipped and the warning in the log remains.
+   * skipped and the log line remains.
    */
   @Autowired
   public AuthFailureThrottle(
@@ -210,7 +210,7 @@ public class AuthFailureThrottle {
     clientWindows.asMap().computeIfPresent(client, (key, current) -> this.next(current, now));
 
     if (this.mode == AuthThrottleMode.OBSERVE) {
-      log.warn(
+      log.info(
           "repsy.security.auth-throttle.mode=observe: client {} would be refused (429) for {}"
               + " failed password checks; letting it through",
           client,
@@ -263,7 +263,7 @@ public class AuthFailureThrottle {
     if (window.failures() == this.maxFailures) {
       // Once per window, because the count only grows. The address is logged individually, even
       // though IPv6 clients are throttled per network, so an operator can still see it.
-      log.warn(
+      log.info(
           "Client {} (network {}) made {} failed password checks ({})",
           remoteAddr,
           client,

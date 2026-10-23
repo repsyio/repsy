@@ -274,6 +274,8 @@ repsy:
 logging:
   level:
     root: WARN
+    # RPS-2306: the lines that tell an operator which client is blocked (INFO) and banned (WARN)
+    io.repsy.protocols.shared.auth.AuthFailureThrottle: INFO
     # Flyway migration progress, visible during upgrades (RPS-1564)
     org.flywaydb: INFO
     # Docker manifest layout repair progress during upgrade (RPS-1564)

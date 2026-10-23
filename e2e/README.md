@@ -5085,7 +5085,7 @@ authentication without the header. What it pins:
 | Per client             | another address is not locked (a first failure is a plain 401); a request with no `X-Forwarded-For` and a right credential passes (only right ones are ever sent there) |
 | Remembered credentials | a credential that already passed once (`VerifiedPasswordCache`) still passes in a blocked bucket; a new one and a wrong one do not                                      |
 | Window                 | 11 s after the lock (window + 1 s) the same client authenticates again and a new count starts                                                                           |
-| WARN log               | exactly one `Client <ip> (network <ip>) made 3 failed password checks ...` line per client and window (refused attempts do not add one); the next window adds a second  |
+| INFO log               | exactly one `Client <ip> (network <ip>) made 3 failed password checks ...` line per client and window (refused attempts do not add one); the next window adds a second  |
 
 **AUTH-11** (`tests/ui/auth/login.spec.ts`, `@throttle`) skips itself unless `throttle` is opted in and
 runs in the same leg (it needs a limit below its 30 attempts). It has no `X-Forwarded-For`, so it locks the

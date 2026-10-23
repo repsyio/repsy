@@ -255,7 +255,7 @@ class AuthFailureThrottleTest {
     this.fail(1);
     assertThat(this.logs.list).hasSize(1);
     final var event = this.logs.list.getFirst();
-    assertThat(event.getLevel().toString()).isEqualTo("WARN");
+    assertThat(event.getLevel().toString()).isEqualTo("INFO");
     assertThat(event.getFormattedMessage()).contains(CLIENT);
 
     this.fail(5);

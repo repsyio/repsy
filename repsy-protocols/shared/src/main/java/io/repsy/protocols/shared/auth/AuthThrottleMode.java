@@ -29,7 +29,7 @@ public enum AuthThrottleMode {
    * Failures are tracked exactly as in {@code enforce}, and {@link
    * AuthFailureThrottle#checkAllowed} still spends no BCrypt on a client that has used up its
    * window. The one difference: a client that would be refused is let through instead, once logged
-   * at WARN and counted against {@link AuthFailureThrottle#WOULD_BLOCK_METRIC}, so the throttle can
+   * at INFO and counted against {@link AuthFailureThrottle#WOULD_BLOCK_METRIC}, so the throttle can
    * be tuned against real traffic (NAT, shared CI egress IPs) before it refuses anything.
    */
   OBSERVE,
