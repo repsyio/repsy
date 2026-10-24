@@ -63,11 +63,38 @@ export class DockerConfigComponent implements OnInit, OnChanges {
   }
 
   private updateMarkdown(): void {
-    if (this.deployToken) {
-      this.markdown = this.getDeployTokenMarkdown();
-    } else {
-      this.markdown = this.getUsernamePasswordAuthMarkdown();
-    }
+    const auth = this.deployToken ? this.getDeployTokenMarkdown() : this.getUsernamePasswordAuthMarkdown();
+    this.markdown = auth + this.getKubernetesMarkdown();
+  }
+
+  // Pulling from a cluster (RPS-341): the same credentials as `docker login`, stored as an image pull secret.
+  private getKubernetesMarkdown(): string {
+    const password = this.deployToken ? '<repsy_deploy_token>' : '<password>';
+    const tokenNote = this.deployToken ? '\nA **Read Only** deploy token is enough for pulling.\n' : '';
+    return `
+### Kubernetes
+
+To let a cluster pull from this registry, store the credentials in an image pull secret
+(add \`-n <namespace>\` to create it in the namespace of the workload);
+
+\`\`\`bash
+kubectl create secret docker-registry repsy-registry \\
+  --docker-server=${getRepoDomain()} \\
+  --docker-username=${this.username} \\
+  --docker-password=${password}
+\`\`\`
+${tokenNote}
+Then reference the secret from the pod spec;
+
+\`\`\`yaml
+spec:
+  imagePullSecrets:
+    - name: repsy-registry
+  containers:
+    - name: ${this.imageName}
+      image: ${getRepoDomain()}/${this.repoName}/${this.imageName}:${this.tagName}
+\`\`\`
+`;
   }
 
   private getDeployTokenAuthStr(): string {

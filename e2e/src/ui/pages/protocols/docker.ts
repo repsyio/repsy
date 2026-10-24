@@ -120,6 +120,9 @@ export const dockerDescriptor: ProtocolDescriptor = {
     contains: (repoName, repoUrl) => [
       `docker login ${new URL(repoUrl).host}`,
       `docker pull ${new URL(repoUrl).host}/${repoPath(repoName)}/`,
+      // The Kubernetes appendix (RPS-341), in both variants.
+      'kubectl create secret docker-registry',
+      `--docker-server=${new URL(repoUrl).host}`,
     ],
     deployTokenMarker: '<repsy_deploy_token>',
   },
