@@ -88,7 +88,7 @@ public class SuspiciousRequestClassifier {
       List.of("${jndi:", "${lower:", "${upper:", "${env:", "${sys:", "${java:", "${::-");
 
   private static final List<String> SSTI_NEEDLES =
-      List.of("{{7*7}}", "${7*7}", "#{7*7}", "<%=", "{{config", "{{self", "__class__");
+      List.of("{{7*7}}", "${7*7}", "#{7*7}", "<%=", "{{config", "{{self");
 
   private static final List<String> SCANNER_AGENTS =
       List.of(
@@ -108,6 +108,7 @@ public class SuspiciousRequestClassifier {
           "havij",
           "whatweb");
 
+  private static final String API_PREFIX = "/api/";
   private static final String ENCODED_PERCENT = "%25";
   private static final int HEX_RADIX = 16;
   private static final int NIBBLE_BITS = 4;
@@ -210,11 +211,13 @@ public class SuspiciousRequestClassifier {
 
   private static boolean isScriptTarget(final Request request) {
 
-    if (request.browserNavigation()) {
+    final var path = pathOf(request.twice());
+
+    // Stored names (a repo called shop.php, a file in a package) travel under /api/ in requests the
+    // panel itself makes, so only a request for a script at the root of the server is a probe.
+    if (request.browserNavigation() || path.startsWith(API_PREFIX)) {
       return false;
     }
-
-    final var path = pathOf(request.twice());
     final var semicolon = path.indexOf(';');
     final var file = semicolon < 0 ? path : path.substring(0, semicolon);
 

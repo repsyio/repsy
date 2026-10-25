@@ -56,13 +56,26 @@ class SuspiciousRequestFamiliesTest {
         "/phpmyadmin/index.html",
         "/wp-admin/setup-config.php",
         "/shell.php;.jpg",
-        "/api/%70hp.php",
+        "/%70hp.php",
       })
   @DisplayName("a request for a script Repsy does not have is a SCRIPT_TARGET on the API port")
   void scriptTargetIsRecognised(final String uri) {
 
     assertThat(this.api(uri)).contains(SignalFamily.SCRIPT_TARGET);
     assertThat(this.protocol(uri)).doesNotContain(SignalFamily.SCRIPT_TARGET);
+  }
+
+  @ParameterizedTest
+  @ValueSource(
+      strings = {
+        "/api/repos/acme/shop.php",
+        "/api/repos/acme/content/index.php",
+        "/api/mvn/artifacts/repo/com/example/lib/1.0/wp-content/x.jsp",
+      })
+  @DisplayName("a stored name under /api/ is not a script probe, the panel requests it itself")
+  void storedNamesUnderApiAreNoSignal(final String uri) {
+
+    assertThat(this.api(uri)).doesNotContain(SignalFamily.SCRIPT_TARGET);
   }
 
   @Test
