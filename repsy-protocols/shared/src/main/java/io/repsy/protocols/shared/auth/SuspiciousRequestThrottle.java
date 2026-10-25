@@ -72,6 +72,7 @@ public class SuspiciousRequestThrottle {
   private final @Nullable Cache<String, Long> bans;
   private final long windowNanos;
   private final long banNanos;
+  private final LogGate wouldBlockLog;
   private volatile @Nullable ClientBanListener banListener;
 
   @Autowired
@@ -102,6 +103,7 @@ public class SuspiciousRequestThrottle {
     this.allowlist = properties.allowlist().stream().map(Cidr::parse).toList();
     this.windowNanos = TimeUnit.SECONDS.toNanos(properties.windowSeconds());
     this.banNanos = TimeUnit.SECONDS.toNanos(properties.banSeconds());
+    this.wouldBlockLog = new LogGate(ticker, properties.maxClients());
 
     if (properties.mode() == AuthThrottleMode.OFF) {
       this.windows = null;
@@ -184,14 +186,22 @@ public class SuspiciousRequestThrottle {
         : Math.max(1, TimeUnit.NANOSECONDS.toSeconds(leftNanos + TimeUnit.SECONDS.toNanos(1) - 1));
   }
 
-  /** Counts a refused (or in {@code observe} would-be refused) request of a banned client. */
+  /**
+   * Counts a refused (or in {@code observe} would-be refused) request of a banned client. The log
+   * line comes once a minute per client, the counter at every request.
+   */
   public void countWouldBlock(final String client, final long banSecondsLeft) {
 
-    log.warn(
-        "repsy.security.probe-throttle.mode=observe: client {} would be refused (429) for"
-            + " another {}s because it is banned; letting it through",
-        client,
-        banSecondsLeft);
+    if (this.wouldBlockLog.allows(client)) {
+      log.warn(
+          "repsy.security.probe-throttle.mode=observe: client {} would be refused (429) for"
+              + " another {}s because it is banned; letting it through (logged once a minute per"
+              + " client, every request is counted in {})",
+          client,
+          banSecondsLeft,
+          WOULD_BLOCK_METRIC);
+    }
+
     this.count(WOULD_BLOCK_METRIC);
   }
 

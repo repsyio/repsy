@@ -96,6 +96,8 @@ public class AuthFailureThrottle {
   private final long saturationLimit;
   private final long windowNanos;
   private final long banNanos;
+  private final LogGate bannedLog;
+  private final LogGate windowLog;
   private volatile @Nullable ClientBanListener banListener;
   private final int banAfterBlockedWindows;
 
@@ -137,6 +139,8 @@ public class AuthFailureThrottle {
     this.saturationLimit = properties.maxFailures() * (long) SATURATION_FACTOR;
     this.windowNanos = TimeUnit.SECONDS.toNanos(properties.windowSeconds());
     this.banNanos = TimeUnit.SECONDS.toNanos(properties.banSeconds());
+    this.bannedLog = new LogGate(ticker, properties.maxClients());
+    this.windowLog = new LogGate(ticker, properties.maxClients());
     this.banAfterBlockedWindows = properties.banAfterBlockedWindows();
 
     final var tracksClients = this.mode != AuthThrottleMode.OFF;
@@ -204,11 +208,16 @@ public class AuthFailureThrottle {
     clientWindows.asMap().computeIfPresent(client, (key, current) -> this.next(current, now));
 
     if (this.mode == AuthThrottleMode.OBSERVE) {
-      log.info(
-          "repsy.security.auth-throttle.mode=observe: client {} would be refused (429) for {}"
-              + " failed password checks; letting it through",
-          client,
-          this.maxFailures);
+      if (this.windowLog.allows(client)) {
+        log.info(
+            "repsy.security.auth-throttle.mode=observe: client {} would be refused (429) for {}"
+                + " failed password checks; letting it through (logged once a minute per client,"
+                + " every request is counted in {})",
+            client,
+            this.maxFailures,
+            WOULD_BLOCK_METRIC);
+      }
+
       this.countWouldBlock(client);
       return;
     }
@@ -223,11 +232,16 @@ public class AuthFailureThrottle {
       throw new TooManyRequestsException(banSecondsLeft);
     }
 
-    log.warn(
-        "repsy.security.auth-throttle.mode=observe: client {} would be refused (429) for"
-            + " another {}s because it is banned; letting it through",
-        client,
-        banSecondsLeft);
+    if (this.bannedLog.allows(client)) {
+      log.warn(
+          "repsy.security.auth-throttle.mode=observe: client {} would be refused (429) for"
+              + " another {}s because it is banned; letting it through (logged once a minute per"
+              + " client, every request is counted in {})",
+          client,
+          banSecondsLeft,
+          WOULD_BLOCK_METRIC);
+    }
+
     this.countWouldBlock(client);
   }
 

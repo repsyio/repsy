@@ -18,6 +18,9 @@ package io.repsy.protocols.shared.auth;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.spi.ILoggingEvent;
+import ch.qos.logback.core.read.ListAppender;
 import com.google.common.base.Ticker;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.ArrayList;
@@ -27,6 +30,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.slf4j.LoggerFactory;
 
 @DisplayName("SuspiciousRequestThrottle")
 class SuspiciousRequestThrottleTest {
@@ -136,6 +140,45 @@ class SuspiciousRequestThrottleTest {
 
     assertThat(throttle.banSecondsLeft(CLIENT)).isEqualTo(3600);
     assertThat(this.registry.counter("repsy.security.probe_would_block").count()).isEqualTo(1);
+  }
+
+  @Test
+  @DisplayName(
+      "observe: the would-be refusal is logged once a minute per client, counted every time")
+  void wouldBlockIsLoggedOncePerMinute() {
+
+    final var logs = new ListAppender<ILoggingEvent>();
+    final var logger = (Logger) LoggerFactory.getLogger(SuspiciousRequestThrottle.class);
+    logs.start();
+    logger.addAppender(logs);
+
+    try {
+      final var throttle =
+          this.throttle(SuspiciousRequestProperties.of(AuthThrottleMode.OBSERVE, 5, 3600));
+
+      for (var i = 0; i < 50; i++) {
+        throttle.countWouldBlock(CLIENT, 3600);
+      }
+      throttle.countWouldBlock("198.51.100.9", 3600);
+
+      assertThat(this.wouldBeRefusedLines(logs)).isEqualTo(2);
+      assertThat(this.registry.counter("repsy.security.probe_would_block").count()).isEqualTo(51);
+
+      this.advanceSeconds(61);
+      throttle.countWouldBlock(CLIENT, 3539);
+
+      assertThat(this.wouldBeRefusedLines(logs)).isEqualTo(3);
+      assertThat(this.registry.counter("repsy.security.probe_would_block").count()).isEqualTo(52);
+    } finally {
+      logger.detachAppender(logs);
+    }
+  }
+
+  private long wouldBeRefusedLines(final ListAppender<ILoggingEvent> logs) {
+
+    return logs.list.stream()
+        .filter(event -> event.getFormattedMessage().contains("would be refused (429)"))
+        .count();
   }
 
   @Test

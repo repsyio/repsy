@@ -439,6 +439,32 @@ class AuthFailureThrottleTest {
     }
 
     @Test
+    @DisplayName("logs the would-be refusal once a minute per client, and counts every request")
+    void wouldBlockIsLoggedOncePerMinute() {
+      requestFrom(CLIENT);
+
+      for (var i = 0; i < MAX_FAILURES; i++) {
+        this.observing.recordFailure();
+      }
+      for (var i = 0; i < 25; i++) {
+        this.observing.checkAllowed();
+      }
+
+      assertThat(
+              AuthFailureThrottleTest.this.logs.list.stream()
+                  .filter(event -> event.getFormattedMessage().contains("would be refused (429)"))
+                  .count())
+          .isEqualTo(1);
+      assertThat(
+              AuthFailureThrottleTest.this
+                  .meterRegistry
+                  .find(AuthFailureThrottle.WOULD_BLOCK_METRIC)
+                  .counter()
+                  .count())
+          .isEqualTo(25.0);
+    }
+
+    @Test
     @DisplayName("works without a meter registry: the client is let through and only logged")
     @SuppressWarnings("unchecked")
     void worksWithoutAMeterRegistry() {
