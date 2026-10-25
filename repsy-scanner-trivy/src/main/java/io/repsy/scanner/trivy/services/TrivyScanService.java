@@ -26,6 +26,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.Executor;
@@ -57,6 +58,8 @@ public class TrivyScanService {
   private static final String STAGING_DIR = "refresh-staging";
   private static final String DOWNLOAD_DB_ONLY_FLAG = "--download-db-only";
   private static final String DOWNLOAD_JAVA_DB_ONLY_FLAG = "--download-java-db-only";
+  private static final String DB_REPOSITORY_FLAG = "--db-repository";
+  private static final String JAVA_DB_REPOSITORY_FLAG = "--java-db-repository";
 
   private static final int MAX_DB_DOWNLOAD_ATTEMPTS = 5;
   private static final long DB_DOWNLOAD_INITIAL_RETRY_DELAY_MS = 5_000;
@@ -397,16 +400,47 @@ public class TrivyScanService {
   }
 
   private void addDbRepositoryFlags(final List<String> command) {
-    command.add("--db-repository");
+    command.add(DB_REPOSITORY_FLAG);
     command.add(this.properties.dbRepository());
-    command.add("--java-db-repository");
+    command.add(JAVA_DB_REPOSITORY_FLAG);
     command.add(this.properties.javaDbRepository());
+  }
+
+  /**
+   * Trivy falls back to the next repository of a list only for some failures (a rate limit, not
+   * ghcr.io's {@code DENIED: invalid token}) and takes the first one otherwise, so the configured
+   * list is walked here instead: attempt n downloads from repository n, wrapping around (RPS-2333).
+   */
+  private static List<String> withDbRepositoriesOfAttempt(
+      final List<String> command, final int attempt) {
+
+    final var rewritten = new ArrayList<>(command);
+
+    for (final var flag : List.of(DB_REPOSITORY_FLAG, JAVA_DB_REPOSITORY_FLAG)) {
+      final var index = rewritten.indexOf(flag);
+
+      if (index >= 0) {
+        rewritten.set(index + 1, repositoryOfAttempt(rewritten.get(index + 1), attempt));
+      }
+    }
+
+    return rewritten;
+  }
+
+  private static String repositoryOfAttempt(final String configured, final int attempt) {
+    final var repositories =
+        Arrays.stream(configured.split(",")).map(String::strip).filter(r -> !r.isEmpty()).toList();
+
+    return repositories.isEmpty()
+        ? configured
+        : repositories.get((attempt - 1) % repositories.size());
   }
 
   private String runTrivy(final List<String> command) {
     for (var attempt = 1; ; attempt++) {
       try {
-        return this.runner.run(command, this.properties.timeoutSeconds());
+        return this.runner.run(
+            withDbRepositoriesOfAttempt(command, attempt), this.properties.timeoutSeconds());
       } catch (final TrivyScanException exception) {
         if (attempt >= MAX_DB_DOWNLOAD_ATTEMPTS || !isDbDownloadFailure(exception.getMessage())) {
           throw exception;

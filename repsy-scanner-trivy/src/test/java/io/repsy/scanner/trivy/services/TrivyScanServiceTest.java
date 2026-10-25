@@ -19,12 +19,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import io.repsy.libs.scanner.trivy.ScanJobStatus;
 import io.repsy.scanner.trivy.config.TrivyScannerProperties;
+import io.repsy.scanner.trivy.errors.TrivyScanException;
 import io.repsy.scanner.trivy.jobs.InMemoryJobStore;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -142,5 +144,57 @@ class TrivyScanServiceTest {
     service.submitDockerScan("scan-1", "img:1", null, false, "DOCKER", "img", "1");
 
     assertThat(scannerVersionOf(jobStore, "scan-1")).isNull();
+  }
+
+  // ghcr.io answers DENIED: invalid token, which Trivy does not treat as a reason to try the next
+  // repository of a comma separated list, so the scanner walks the list itself (RPS-2333).
+  @Test
+  void downloadsTheDatabaseFromTheNextRepositoryWhenTheFirstOneFails() {
+    final var commands = new ArrayList<List<String>>();
+    final TrivyCommandRunner runner =
+        (command, timeoutSeconds) -> {
+          if (command.contains("image")) {
+            commands.add(command);
+          }
+
+          if (command.contains("ghcr.io/db:2")) {
+            throw new TrivyScanException(
+                "trivy exited with code 1: failed to download vulnerability DB: DENIED: invalid token");
+          }
+
+          if (command.contains("version")) {
+            throw new TrivyScanException("no version");
+          }
+
+          return "{\"Results\":[]}";
+        };
+    final var properties =
+        new TrivyScannerProperties(
+            "trivy",
+            30,
+            "ghcr.io/db:2, mirror.gcr.io/db:2",
+            "ghcr.io/java-db:1,mirror.gcr.io/java-db:1",
+            this.tempDir.resolve("cache").toString(),
+            Duration.ofHours(12));
+    final var jobStore = new InMemoryJobStore();
+    final var service =
+        new TrivyScanService(
+            properties,
+            JsonMapper.builder().build(),
+            jobStore,
+            runner,
+            new TrivyDatabaseAccess(),
+            Runnable::run);
+
+    service.submitDockerScan("scan-1", "img:1", null, false, "DOCKER", "img", "1");
+
+    assertThat(jobStore.get("scan-1").orElseThrow().status()).isEqualTo(ScanJobStatus.COMPLETED);
+    assertThat(commands).hasSize(2);
+    assertThat(commands.get(0))
+        .containsSequence("--db-repository", "ghcr.io/db:2")
+        .containsSequence("--java-db-repository", "ghcr.io/java-db:1");
+    assertThat(commands.get(1))
+        .containsSequence("--db-repository", "mirror.gcr.io/db:2")
+        .containsSequence("--java-db-repository", "mirror.gcr.io/java-db:1");
   }
 }
