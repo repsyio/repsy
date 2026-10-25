@@ -50,8 +50,12 @@ public record SuspiciousRequestProperties(
   static final long DEFAULT_BAN_SECONDS = 3600;
   static final long DEFAULT_MAX_CLIENTS = 10_000;
 
-  /** Switch and weight of one {@link SignalFamily}; {@code null} keeps the default. */
-  public record Signal(@Nullable Boolean enabled, @Nullable Integer weight) {}
+  /**
+   * Switch, weight and port scope of one {@link SignalFamily}; {@code null} keeps the default.
+   * {@code apiPortOnly} {@code false} makes a family look at the protocol port too.
+   */
+  public record Signal(
+      @Nullable Boolean enabled, @Nullable Integer weight, @Nullable Boolean apiPortOnly) {}
 
   public SuspiciousRequestProperties {
     mode = Objects.requireNonNullElse(mode, AuthThrottleMode.ENFORCE);
@@ -109,6 +113,18 @@ public record SuspiciousRequestProperties(
     }
 
     return Objects.requireNonNullElse(signal.weight(), family.defaultWeight());
+  }
+
+  /** Whether the family is only checked on the API port, by default or as the settings say. */
+  public boolean apiPortOnly(final SignalFamily family) {
+
+    final var signal = this.signals.get(family.key());
+
+    if (signal == null || signal.apiPortOnly() == null) {
+      return family.apiPortOnly();
+    }
+
+    return signal.apiPortOnly();
   }
 
   /** Settings under which nothing is tracked, refused or answered early. */

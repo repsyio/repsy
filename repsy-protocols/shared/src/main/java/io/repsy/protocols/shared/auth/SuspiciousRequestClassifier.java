@@ -53,6 +53,62 @@ public class SuspiciousRequestClassifier {
           "/web.config",
           "/actuator/env");
 
+  /** URIs longer than this are an {@link SignalFamily#OVERLONG_URI}; no Repsy client sends one. */
+  static final int OVERLONG_URI_LENGTH = 2048;
+
+  private static final List<String> SCRIPT_EXTENSIONS =
+      List.of(".php", ".asp", ".aspx", ".jsp", ".jspx", ".cgi", ".phtml", ".php5", ".cfm");
+
+  private static final List<String> SCRIPT_NEEDLES =
+      List.of("/wp-admin", "/wp-login", "/wp-content", "/wp-includes", "/phpmyadmin", "/cgi-bin/");
+
+  private static final List<String> SQLI_NEEDLES =
+      List.of(
+          "union select",
+          "union all select",
+          "sleep(",
+          "pg_sleep(",
+          "benchmark(",
+          "waitfor delay",
+          "or 1=1",
+          "' or '",
+          "information_schema",
+          "; drop table");
+
+  private static final List<String> XSS_NEEDLES =
+      List.of("<script", "javascript:", "onerror=", "onload=", "<svg", "<iframe");
+
+  private static final List<String> CMDI_NEEDLES =
+      List.of("$(", "`", "/bin/sh", "/bin/bash", "cmd.exe", "powershell", ";wget ", ";curl ");
+
+  private static final List<String> SSRF_NEEDLES =
+      List.of("169.254.169.254", "metadata.google.internal", "file://", "gopher://", "dict://");
+
+  private static final List<String> LOG4SHELL_NEEDLES =
+      List.of("${jndi:", "${lower:", "${upper:", "${env:", "${sys:", "${java:", "${::-");
+
+  private static final List<String> SSTI_NEEDLES =
+      List.of("{{7*7}}", "${7*7}", "#{7*7}", "<%=", "{{config", "{{self", "__class__");
+
+  private static final List<String> SCANNER_AGENTS =
+      List.of(
+          "sqlmap",
+          "nikto",
+          "nmap",
+          "masscan",
+          "zgrab",
+          "nuclei",
+          "gobuster",
+          "dirbuster",
+          "feroxbuster",
+          "ffuf",
+          "wpscan",
+          "acunetix",
+          "nessus",
+          "havij",
+          "whatweb");
+
+  private static final String ENCODED_PERCENT = "%25";
   private static final int HEX_RADIX = 16;
   private static final int NIBBLE_BITS = 4;
 
@@ -68,17 +124,60 @@ public class SuspiciousRequestClassifier {
     this.detectors.put(
         SignalFamily.METHOD_ABUSE,
         request -> ABUSED_METHODS.contains(request.method().toUpperCase(Locale.ROOT)));
+    this.detectors.put(SignalFamily.SCRIPT_TARGET, SuspiciousRequestClassifier::isScriptTarget);
+    this.detectors.put(
+        SignalFamily.SQLI, request -> containsAny(request.pathAndQuery(), SQLI_NEEDLES));
+    this.detectors.put(
+        SignalFamily.XSS, request -> containsAny(request.pathAndQuery(), XSS_NEEDLES));
+    this.detectors.put(SignalFamily.CMDI, request -> containsAny(request.query(), CMDI_NEEDLES));
+    this.detectors.put(
+        SignalFamily.SSRF_URL, request -> containsAny(request.query(), SSRF_NEEDLES));
+    this.detectors.put(
+        SignalFamily.LOG4SHELL, request -> containsAny(request.everything(), LOG4SHELL_NEEDLES));
+    this.detectors.put(
+        SignalFamily.SSTI, request -> containsAny(request.pathAndQuery(), SSTI_NEEDLES));
+    this.detectors.put(SignalFamily.DOUBLE_ENCODED, SuspiciousRequestClassifier::isDoubleEncoded);
+    this.detectors.put(
+        SignalFamily.OVERLONG_URI, request -> request.rawLength() > OVERLONG_URI_LENGTH);
+    this.detectors.put(
+        SignalFamily.SCANNER_UA, request -> containsAny(request.userAgent(), SCANNER_AGENTS));
   }
 
-  /** The families of suspicious signals in the request, only those switched on; usually none. */
+  /** The families found in a request with no User-Agent and no browser context. */
   public Set<SignalFamily> classify(
       final String method, final String rawUri, final boolean apiPort) {
+
+    return this.classify(method, rawUri, "", false, apiPort);
+  }
+
+  /**
+   * The families of suspicious signals in the request, only those switched on; usually none.
+   *
+   * @param userAgent the {@code User-Agent} header, empty when there is none; the only header read
+   *     besides the ones the caller summarises in {@code browserNavigation}
+   * @param browserNavigation whether a browser is navigating to the URL (a person typed or followed
+   *     it), so a repo named like a script is not a probe
+   */
+  public Set<SignalFamily> classify(
+      final String method,
+      final String rawUri,
+      final String userAgent,
+      final boolean browserNavigation,
+      final boolean apiPort) {
 
     final var uri =
         rawUri.length() > MAX_INSPECTED_LENGTH ? rawUri.substring(0, MAX_INSPECTED_LENGTH) : rawUri;
     final var lower = uri.toLowerCase(Locale.ROOT);
     final var once = decode(lower);
-    final var request = new Request(method, lower, once, decode(once));
+    final var request =
+        new Request(
+            method,
+            lower,
+            once,
+            decode(once),
+            rawUri.length(),
+            userAgent.toLowerCase(Locale.ROOT),
+            browserNavigation);
     final var found = EnumSet.noneOf(SignalFamily.class);
 
     for (final var detector : this.detectors.entrySet()) {
@@ -92,7 +191,7 @@ public class SuspiciousRequestClassifier {
 
   private boolean isOn(final SignalFamily family, final boolean apiPort) {
 
-    return (apiPort || !family.apiPortOnly()) && this.properties.weight(family) > 0;
+    return (apiPort || !this.properties.apiPortOnly(family)) && this.properties.weight(family) > 0;
   }
 
   private static boolean isTraversal(final Request request) {
@@ -107,6 +206,45 @@ public class SuspiciousRequestClassifier {
     final var path = pathOf(request.twice());
 
     return path.endsWith("/.git") || SECRET_NEEDLES.stream().anyMatch(path::contains);
+  }
+
+  private static boolean isScriptTarget(final Request request) {
+
+    if (request.browserNavigation()) {
+      return false;
+    }
+
+    final var path = pathOf(request.twice());
+    final var semicolon = path.indexOf(';');
+    final var file = semicolon < 0 ? path : path.substring(0, semicolon);
+
+    return SCRIPT_EXTENSIONS.stream().anyMatch(file::endsWith) || containsAny(path, SCRIPT_NEEDLES);
+  }
+
+  /** {@code %25} followed by two hex digits: a {@code %} that was itself percent-encoded. */
+  private static boolean isDoubleEncoded(final Request request) {
+
+    final var raw = request.lower();
+
+    for (var i = raw.indexOf(ENCODED_PERCENT); i >= 0; i = raw.indexOf(ENCODED_PERCENT, i + 1)) {
+      if (hasTwoHexDigitsAt(raw, i + ENCODED_PERCENT.length())) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private static boolean hasTwoHexDigitsAt(final String text, final int index) {
+
+    return index + 1 < text.length()
+        && hex(text.charAt(index)) >= 0
+        && hex(text.charAt(index + 1)) >= 0;
+  }
+
+  private static boolean containsAny(final String text, final List<String> needles) {
+
+    return needles.stream().anyMatch(text::contains);
   }
 
   /** {@code ..} as a whole segment, also as {@code ..;param}, with {@code /} or {@code \}. */
@@ -124,7 +262,35 @@ public class SuspiciousRequestClassifier {
   }
 
   /** The request as the classifier sees it: lower case, as sent and decoded once and twice. */
-  private record Request(String method, String lower, String once, String twice) {}
+  private record Request(
+      String method,
+      String lower,
+      String once,
+      String twice,
+      int rawLength,
+      String userAgent,
+      boolean browserNavigation) {
+
+    /** Path and query, decoded twice, with {@code +} read as a space in the query. */
+    String pathAndQuery() {
+
+      return pathOf(this.twice()) + " " + this.query();
+    }
+
+    /** The query only (Maven's {@code ${project.version}} is a real path, so not for CMDI). */
+    String query() {
+
+      final var question = this.twice().indexOf('?');
+
+      return question < 0 ? "" : this.twice().substring(question + 1).replace('+', ' ');
+    }
+
+    /** Everything the request carried in its URI, in each of its three forms. */
+    String everything() {
+
+      return this.lower() + " " + this.once() + " " + this.twice();
+    }
+  }
 
   /** One bounded pass of percent-decoding; a malformed escape stays as it is, {@code +} too. */
   static String decode(final String value) {

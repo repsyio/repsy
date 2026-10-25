@@ -28,6 +28,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Objects;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.Ordered;
@@ -73,6 +74,8 @@ public class SuspiciousRequestFilter extends OncePerRequestFilter {
   private static final String SEC_FETCH_SITE_HEADER = "Sec-Fetch-Site";
   private static final String CROSS_SITE = "cross-site";
   private static final String SAME_SITE = "same-site";
+  private static final String SEC_FETCH_MODE_HEADER = "Sec-Fetch-Mode";
+  private static final String NAVIGATE = "navigate";
 
   private final ApiPortMatcher apiPortMatcher;
   private final SuspiciousRequestClassifier classifier;
@@ -134,13 +137,26 @@ public class SuspiciousRequestFilter extends OncePerRequestFilter {
       final HttpServletRequest request, final String client, final boolean apiPort) {
 
     final var signals =
-        this.classifier.classify(request.getMethod(), request.getRequestURI(), apiPort);
+        this.classifier.classify(
+            request.getMethod(),
+            requestTarget(request),
+            Objects.requireNonNullElse(request.getHeader(HttpHeaders.USER_AGENT), ""),
+            NAVIGATE.equalsIgnoreCase(request.getHeader(SEC_FETCH_MODE_HEADER)),
+            apiPort);
 
     if (!signals.isEmpty() && !isCrossSiteBrowserRequest(request)) {
       this.throttle.record(client, request.getRemoteAddr(), signals);
     }
 
     return signals;
+  }
+
+  /** The raw URI with its query, as sent: the query is where injection payloads travel. */
+  private static String requestTarget(final HttpServletRequest request) {
+
+    final var query = request.getQueryString();
+
+    return query == null ? request.getRequestURI() : request.getRequestURI() + "?" + query;
   }
 
   /**

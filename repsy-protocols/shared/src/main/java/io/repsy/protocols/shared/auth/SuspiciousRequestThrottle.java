@@ -184,28 +184,37 @@ public class SuspiciousRequestThrottle {
       return 0;
     }
 
-    final var added = signals.stream().mapToInt(this.properties::weight).sum();
+    final var added = this.weightOf(signals, true);
+    final var soft = this.weightOf(signals, false);
 
     signals.forEach(family -> this.count(STRIKES_METRIC, family));
 
     final var now = this.ticker.read();
     final var window =
-        this.windows.asMap().compute(client, (key, current) -> this.next(current, now, added));
+        this.windows
+            .asMap()
+            .compute(client, (key, current) -> this.next(current, now, added, soft));
 
     log.debug(
-        "Client {} sent a suspicious request {}: {} strikes",
-        remoteAddr,
-        signals,
-        window.strikes());
+        "Client {} sent a suspicious request {}: {} strikes", remoteAddr, signals, window.total());
 
-    if (window.strikes() >= this.properties.maxStrikes()) {
+    if (window.bans(this.properties.maxStrikes())) {
       this.ban(this.bans, client, remoteAddr, signals, now);
-    } else if (window.strikes() == added) {
+    } else if (window.total() == added + soft) {
       // The first request of a window, once per window and client.
       log.info("Client {} (network {}) sent a suspicious request {}", remoteAddr, client, signals);
     }
 
     return this.banSecondsLeft(client);
+  }
+
+  /** The strikes of the signals that can (or, with {@code false}, cannot) ban a client alone. */
+  private int weightOf(final Set<SignalFamily> signals, final boolean bansAlone) {
+
+    return signals.stream()
+        .filter(family -> family.bansAlone() == bansAlone)
+        .mapToInt(this.properties::weight)
+        .sum();
   }
 
   private void ban(
@@ -244,16 +253,19 @@ public class SuspiciousRequestThrottle {
     }
   }
 
-  private Window next(final @Nullable Window current, final long now, final int added) {
+  private Window next(
+      final @Nullable Window current, final long now, final int added, final int soft) {
 
     if (current == null || now - current.startNanos() >= this.windowNanos) {
-      return new Window(now, added);
+      return new Window(now, added, soft);
     }
 
     // The sum stays far below int overflow: it stops growing at the ban, but a long ban window
     // could still be fed, so cap it.
     return new Window(
-        current.startNanos(), (int) Math.min((long) current.strikes() + added, Integer.MAX_VALUE));
+        current.startNanos(),
+        (int) Math.min((long) current.strikes() + added, Integer.MAX_VALUE),
+        (int) Math.min((long) current.softStrikes() + soft, Integer.MAX_VALUE));
   }
 
   private void count(final String metric) {
@@ -274,7 +286,20 @@ public class SuspiciousRequestThrottle {
     }
   }
 
-  private record Window(long startNanos, int strikes) {}
+  /** {@code softStrikes} are of families that cannot ban alone, see {@link SignalFamily}. */
+  private record Window(long startNanos, int strikes, int softStrikes) {
+
+    long total() {
+
+      return (long) this.strikes + this.softStrikes;
+    }
+
+    /** Whether the window is full, and at least one strike is of a family that can ban. */
+    boolean bans(final int maxStrikes) {
+
+      return this.strikes > 0 && this.total() >= maxStrikes;
+    }
+  }
 
   /** An address range, {@code 10.0.0.0/8}; a bare address is a range of one. */
   private static final class Cidr {

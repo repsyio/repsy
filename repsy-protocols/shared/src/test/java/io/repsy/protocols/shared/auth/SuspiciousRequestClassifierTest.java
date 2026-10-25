@@ -174,7 +174,7 @@ class SuspiciousRequestClassifierTest {
             3600L,
             10_000L,
             null,
-            Map.of("traversal", new SuspiciousRequestProperties.Signal(false, null)));
+            Map.of("traversal", new SuspiciousRequestProperties.Signal(false, null, null)));
     final var withoutTraversal = new SuspiciousRequestClassifier(properties);
 
     assertThat(withoutTraversal.classify("GET", "/api/../x", true)).isEmpty();
@@ -189,7 +189,7 @@ class SuspiciousRequestClassifierTest {
         "/api/" + "a".repeat(SuspiciousRequestClassifier.MAX_INSPECTED_LENGTH) + tail;
     final var headed = "/api/../" + "a".repeat(SuspiciousRequestClassifier.MAX_INSPECTED_LENGTH);
 
-    assertThat(this.api(longUri)).isEmpty();
+    assertThat(this.api(longUri)).containsExactly(SignalFamily.OVERLONG_URI);
     assertThat(this.api(headed)).contains(SignalFamily.TRAVERSAL);
   }
 

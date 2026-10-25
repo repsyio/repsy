@@ -196,4 +196,21 @@ class SuspiciousRequestThrottleTest {
     assertThatThrownBy(() -> this.throttle(properties))
         .isInstanceOf(IllegalArgumentException.class);
   }
+
+  @Test
+  @DisplayName("a scanner's User-Agent adds to other strikes but never bans a client alone")
+  void scannerAgentNeverBansAlone() {
+
+    final var throttle =
+        this.throttle(SuspiciousRequestProperties.of(AuthThrottleMode.ENFORCE, 10, 3600));
+    final var agent = Set.of(SignalFamily.SCANNER_UA);
+
+    for (var i = 0; i < 20; i++) {
+      assertThat(throttle.record(CLIENT, CLIENT, agent)).isZero();
+    }
+
+    // The 60 soft strikes are already there: one more strike of a family that can ban tips it.
+    assertThat(throttle.record(CLIENT, CLIENT, Set.of(SignalFamily.DOUBLE_ENCODED)))
+        .isEqualTo(3600);
+  }
 }

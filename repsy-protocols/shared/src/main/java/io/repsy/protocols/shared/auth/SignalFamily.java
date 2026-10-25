@@ -36,7 +36,40 @@ public enum SignalFamily {
   NULL_BYTE(3, false),
 
   /** A method no Repsy route accepts, such as {@code TRACE} or {@code PROPFIND}. */
-  METHOD_ABUSE(3, true);
+  METHOD_ABUSE(3, true),
+
+  /** A request for a script no Repsy server has: {@code .php}, {@code wp-login}, phpMyAdmin. */
+  SCRIPT_TARGET(3, true),
+
+  /** A multi-word or function form of SQL injection: {@code union select}, {@code sleep(}. */
+  SQLI(2, true),
+
+  /** Markup or a script URL in the path or query: {@code <script}, {@code onerror=}. */
+  XSS(2, true),
+
+  /** A shell command in the query: {@code $(}, a backtick, {@code /bin/sh}. */
+  CMDI(2, true),
+
+  /** A query value that points the server at cloud metadata or a {@code file://} URL. */
+  SSRF_URL(3, true),
+
+  /** A JNDI lookup ({@code ${jndi:}}), the Log4Shell shape. Never legitimate, on any port. */
+  LOG4SHELL(5, false),
+
+  /** A template expression such as {@code {{7*7}}} or {@code ${7*7}}. */
+  SSTI(2, true),
+
+  /** A percent sign that was encoded again ({@code %252e}) to get past a filter. */
+  DOUBLE_ENCODED(1, true),
+
+  /** A URI longer than {@value SuspiciousRequestClassifier#OVERLONG_URI_LENGTH} characters. */
+  OVERLONG_URI(1, true),
+
+  /**
+   * The User-Agent of a well-known scanner. A header is cheap to change and a scanner can send any
+   * other, so it never bans a client alone: it only adds to what other signals found.
+   */
+  SCANNER_UA(3, false);
 
   private final int defaultWeight;
   private final boolean apiPortOnly;
@@ -45,6 +78,12 @@ public enum SignalFamily {
 
     this.defaultWeight = defaultWeight;
     this.apiPortOnly = apiPortOnly;
+  }
+
+  /** Whether strikes of this family can ban a client that has no strike of another family. */
+  public boolean bansAlone() {
+
+    return this != SCANNER_UA;
   }
 
   /** The strikes one request of this family counts, unless the settings say otherwise. */
