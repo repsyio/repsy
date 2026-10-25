@@ -57,6 +57,9 @@ import org.springframework.web.filter.OncePerRequestFilter;
  *       the request goes on, so the router answers as it always did.
  * </ol>
  *
+ * <p>Requests a browser sends for another site ({@code Sec-Fetch-Site: cross-site} or {@code
+ * same-site}) are never counted, so a third-party page cannot get a visitor banned.
+ *
  * <p>Runs after {@link SecurityHeadersFilter}, so a refusal carries {@code nosniff} too. The
  * counterpart in Repsy Cloud is a hand-made copy, like the other filters of this package.
  */
@@ -67,6 +70,9 @@ public class SuspiciousRequestFilter extends OncePerRequestFilter {
 
   private static final String BANNED_BODY = "Too many requests\n";
   private static final String NOT_FOUND_BODY = "Not found\n";
+  private static final String SEC_FETCH_SITE_HEADER = "Sec-Fetch-Site";
+  private static final String CROSS_SITE = "cross-site";
+  private static final String SAME_SITE = "same-site";
 
   private final ApiPortMatcher apiPortMatcher;
   private final SuspiciousRequestClassifier classifier;
@@ -130,11 +136,26 @@ public class SuspiciousRequestFilter extends OncePerRequestFilter {
     final var signals =
         this.classifier.classify(request.getMethod(), request.getRequestURI(), apiPort);
 
-    if (!signals.isEmpty()) {
+    if (!signals.isEmpty() && !isCrossSiteBrowserRequest(request)) {
       this.throttle.record(client, request.getRemoteAddr(), signals);
     }
 
     return signals;
+  }
+
+  /**
+   * Whether a browser sent the request on behalf of another site. A page of any site can make a
+   * visitor's browser request {@code /.env} or a {@code %00} path of this server (an image, a
+   * script), so counting those would let a third party get the visitor's address, maybe a whole
+   * NAT, banned. Browsers mark such requests {@code Sec-Fetch-Site: cross-site} or {@code
+   * same-site} and a page cannot change the header; scanners and package managers send none. A
+   * scanner that fakes it only dodges the ban: the request is still answered as before.
+   */
+  private static boolean isCrossSiteBrowserRequest(final HttpServletRequest request) {
+
+    final var site = request.getHeader(SEC_FETCH_SITE_HEADER);
+
+    return CROSS_SITE.equalsIgnoreCase(site) || SAME_SITE.equalsIgnoreCase(site);
   }
 
   private void write(final HttpServletResponse response, final int status, final String body)

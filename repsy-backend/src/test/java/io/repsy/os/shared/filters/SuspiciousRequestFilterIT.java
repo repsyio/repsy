@@ -145,4 +145,40 @@ class SuspiciousRequestFilterIT extends AbstractIT {
         .perform(get("/repo/z").with(protocolPort()).with(remoteAddr(CLIENT)))
         .andExpect(status().is(org.hamcrest.Matchers.not(429)));
   }
+
+  @Test
+  @DisplayName("a request a browser sends for another site is answered but never counted")
+  void crossSiteBrowserRequestsAreNotCounted() throws Exception {
+
+    for (final var site : new String[] {"cross-site", "same-site"}) {
+      for (var i = 0; i < 3; i++) {
+        this.mockMvc
+            .perform(
+                get(LOGGED_PROBE)
+                    .header("Sec-Fetch-Site", site)
+                    .with(apiPort())
+                    .with(remoteAddr(CLIENT)))
+            .andExpect(status().isNotFound());
+      }
+    }
+
+    this.mockMvc
+        .perform(get("/api/auth/login-options").with(apiPort()).with(remoteAddr(CLIENT)))
+        .andExpect(status().is(org.hamcrest.Matchers.not(429)));
+  }
+
+  @Test
+  @DisplayName("a same-origin or header-less request is counted")
+  void sameOriginRequestsAreCounted() throws Exception {
+
+    this.mockMvc.perform(
+        get(LOGGED_PROBE)
+            .header("Sec-Fetch-Site", "same-origin")
+            .with(apiPort())
+            .with(remoteAddr(CLIENT)));
+
+    this.mockMvc
+        .perform(get("/api/auth/login-options").with(apiPort()).with(remoteAddr(CLIENT)))
+        .andExpect(status().isTooManyRequests());
+  }
 }
