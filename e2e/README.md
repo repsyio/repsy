@@ -329,6 +329,7 @@ pnpm gen:api            # (re)generates src/api/generated from ../repsy-backend'
 | `REPSY_UI_OPT_IN`             | _(unset)_                           | ui runner only: the UI suite's older spelling of `REPSY_E2E_OPT_IN`; `optedIn()` reads both, so either works                                                                                                                                                                                                                                                                                                                             |
 | `REPSY_E2E_SCANNER`           | _(unset)_                           | `1` makes `local up\|down` include the stub-scanner overlay (same as `--scanner`) and `test` add `scanner` to `REPSY_E2E_OPT_IN`, see "Scanner stack"                                                                                                                                                                                                                                                                                    |
 | `REPSY_E2E_THROTTLE`          | _(unset)_                           | `1` makes `local up\|down` include the auth-throttle overlay (same as `--throttle`) and `test` add `throttle` to `REPSY_E2E_OPT_IN`, see "Auth-throttle leg"                                                                                                                                                                                                                                                                             |
+| `REPSY_E2E_PROBE_BAN`         | _(unset)_                           | `1` makes `local up\|down` include the strict probe-ban overlay (same as `--probe-ban`) and `test` add `probe-ban` to `REPSY_E2E_OPT_IN`, see "Probe-ban leg"                                                                                                                                                                                                                                                                            |
 | `REPSY_E2E_LIMITS`            | _(unset)_                           | `1` makes `local up\|down` include the tiny-upload-limit overlay (same as `--limits`) and `test` add `limits` to `REPSY_E2E_OPT_IN`, see "Size-limit leg"                                                                                                                                                                                                                                                                                |
 | `REPSY_E2E_UPLOAD_TTL`        | _(unset)_                           | `1` makes `local up\|down` include the short-ttl abandoned-upload-cleanup overlay (same as `--upload-ttl`) and `test` add `upload-ttl` to `REPSY_E2E_OPT_IN`, see "Abandoned upload cleanup"                                                                                                                                                                                                                                             |
 | `REPSY_E2E_CORS`              | _(unset)_                           | `1` makes `local up\|down` include the APP_ALLOWED_ORIGINS overlay (same as `--cors`) and `test` add `cors` to `REPSY_E2E_OPT_IN`, see "CORS leg"                                                                                                                                                                                                                                                                                        |
@@ -4812,6 +4813,7 @@ and is never part of the default stack.
 | ------------ | ----------------------- | ------------------------ | ------------------------------------- | ------------ | ---------------------------------------------------------- | ------------------------------------------------------------------------------ |
 | `scanner`    | `--scanner`             | `REPSY_E2E_SCANNER=1`    | `docker-compose.stack-scanner.yml`    | `scanner`    | stub scanner, `SECURITY_SCANNER=enabled`                   | `@scanner` (ui, npm-clients, docker, maven, pypi), "Scanner stack"             |
 | `throttle`   | `--throttle`            | `REPSY_E2E_THROTTLE=1`   | `docker-compose.stack-throttle.yml`   | `throttle`   | 3 failed password checks per 10 s per client               | `@throttle` (stack, ui), "Auth-throttle leg"                                   |
+| `probe-ban`  | `--probe-ban`           | `REPSY_E2E_PROBE_BAN=1`  | `docker-compose.stack-probe-ban.yml`  | `probe-ban`  | the probe ban in enforce, one strike bans a client         | `@probe-ban` (stack), "Probe-ban leg"; nightly `@smoke` of all clients         |
 | `tls`        | `--tls`                 | `REPSY_E2E_TLS=1`        | `docker-compose.stack-tls.yml`        | `tls`        | Repsy's own https listeners 8443/9443                      | `@tls` (skeleton, go, ui), "TLS stack"; nightly `@smoke` of all clients        |
 | `limits`     | `--limits`              | `REPSY_E2E_LIMITS=1`     | `docker-compose.stack-limits.yml`     | `limits`     | every configurable upload limit at 64 KiB                  | `@limits` (7 runners), "Size-limit leg"                                        |
 | `cors`       | `--cors`                | `REPSY_E2E_CORS=1`       | `docker-compose.stack-cors.yml`       | `cors`       | `APP_ALLOWED_ORIGINS` set to two origins (default: unset)  | `@cors` (api), "CORS leg"                                                      |
@@ -5097,6 +5099,51 @@ Flip checks: `AUTH_THROTTLE_ENABLED: 'false'` in the overlay fails all eight cas
 shorter than the window in the reset case fails it with a 429 where the right password should pass.
 The throttle is per client and never per username, so a leg like this cannot be run by other suites in
 parallel: any client that fails authentication three times is locked out for ten seconds.
+
+### Probe-ban leg (RPS-2328)
+
+The probe ban (`SuspiciousRequestThrottle`, RPS-2319/RPS-2321) bans a client that sends probes: path
+traversal, secret-hunting paths, scripts the server does not have, injection payloads, a scanner's
+User-Agent. A false positive bans a real user, and the classifier's unit tables are built from request
+shapes someone already knew about. This leg is the proof against the real clients that the `@smoke` tests of the
+protocol runners drive (Maven, npm and its alternatives, Cargo, NuGet, Docker, Helm, PyPI, Go, Ruby) and the
+panel in a browser. The
+overlay `docker-compose.stack-probe-ban.yml` sets `PROBE_THROTTLE_MODE=enforce` and
+`PROBE_THROTTLE_MAX_STRIKES=1`, so ONE request that any signal counts bans the client for an hour.
+
+Every runner reaches Repsy from the docker gateway, so the first false positive bans the gateway and every
+request after it is a 429: the runners after it fail loudly, and the first failure names the culprit.
+Nothing here reads a metric: the evidence is the exit status of the runners and the Repsy log. The overlay
+raises the log level of `io.repsy.protocols.shared.auth` to INFO, because the root level is WARN and the line
+that a window's first probe writes is an INFO line.
+
+```bash
+./run.sh local up --probe-ban                                      # (or REPSY_E2E_PROBE_BAN=1) add --h2 for H2
+REPSY_E2E_PROBE_BAN=1 ./run.sh test --protocol skeleton,maven,npm,npm-clients,cargo,nuget,docker,helm,pypi,go,ruby,ui --grep @smoke
+REPSY_E2E_PROBE_BAN=1 ./run.sh test --protocol stack --grep @probe-ban   # last: it reads the log of the whole leg
+./run.sh local down --probe-ban
+```
+
+`tests/stack/probe-ban.spec.ts` (`@probe-ban`, the `stack` runner because it reads the container log with
+`logLinesContaining`; `@cloud-skip`) has two serial cases, each from a client address of its own
+(`X-Forwarded-For`, as in the auth-throttle spec), so the gateway is never banned by this file:
+
+| Case                    | Asserted                                                                                                                                                                                                 |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| The overlay really bans | one request for `/.env` on the API port is not itself refused; the next request of that client is 429 on the API port and on the repo port, with `Retry-After` (1-3600) and the body `Too many requests` |
+| Nobody else was counted | the Repsy log holds lines of the probing client (the log is read and the needle matches) and no `suspicious request(s)` line of any other client; such a line names the client and the signal families   |
+
+The first case keeps the leg honest: an overlay that silently did nothing would pass every runner. The second
+catches what the runners cannot: a signal that adds strikes without banning alone (`SCANNER_UA`), and a client
+whose requests were counted but whose spec did not fail. The api runner sends a probe shape on
+purpose (`../x`, `tests/api/maven-browser.spec.ts`) and never runs on this stack. The leg runs `@smoke` because the full
+catalogs of the other runners have not been checked against the strict stack; to try one, give `run.sh test`
+a wider `--grep` by hand and read the failures as findings.
+
+Adding a client to the matrix means adding its `@smoke` test to its runner; there is no list here to extend.
+When a spec fails on this stack with 429, read `./run.sh local logs --probe-ban | grep 'suspicious request'`
+for the signal families and the request, then fix the classifier (`SuspiciousRequestClassifier`), never the
+client.
 
 ## TLS stack (RPS-1474)
 
@@ -7358,6 +7405,7 @@ says; without it the leg takes tonight's runner of the rotation and `protocol` f
 | `h2-full`           | embedded H2                                 | the WHOLE catalog of one runner per night, rotating over `maven`, `npm`, `npm-clients`, `cargo`, `nuget`, `docker`, `helm`, `pypi`, `go`, `ruby` by date (`ordinal % 10`, UTC); `h2_full` picks another                                                                                                                                | 90 min                                                                     |
 | `scanner`           | PostgreSQL + the stub scanner overlay       | `REPSY_E2E_OPT_IN=scanner`, `--grep @scanner` only, on the `ui` (20 tests, "Scanner stack" above), `npm-clients`, `docker`, `maven` and `pypi` ("Wire clients on the scanner stack") runners, never the whole `ui` suite                                                                                                               | 60 min                                                                     |
 | `throttle`          | PostgreSQL + the auth-throttle overlay      | `REPSY_E2E_OPT_IN=throttle`, `--grep @throttle` on `stack` then `ui` (last), 9 tests, "Auth-throttle leg"                                                                                                                                                                                                                              | 30 min                                                                     |
+| `probe-ban`         | PostgreSQL + the strict probe-ban overlay   | `REPSY_E2E_OPT_IN=probe-ban`, `--grep @smoke` on every protocol runner but `stack` and `api`, and on `ui`, then `--grep @probe-ban` on `stack` (last), "Probe-ban leg": a client the probe ban counts bans the gateway and fails the leg                                                                                               |
 | `limits`            | PostgreSQL + the tiny-upload-limit overlay  | `REPSY_E2E_OPT_IN=limits`, `--grep @limits` on `pypi`, `helm`, `nuget`, `ruby`, `cargo`, `go` and `api`, 16 tests, "Size-limit leg"                                                                                                                                                                                                    | 60 min                                                                     |
 | `cors`              | PostgreSQL + the CORS overlay               | `REPSY_E2E_OPT_IN=cors`, `--grep @cors` on `api`, "CORS leg": the configured origins are reflected, any other refused                                                                                                                                                                                                                  | 30 min                                                                     |
 | `upgrade`           | PostgreSQL + the upgrade overlay            | `REPSY_E2E_OPT_IN=upgrade`, `--grep @upgrade` on `stack`: the previous release, populated, recreated on this image (5 tests, "Upgrade path")                                                                                                                                                                                           | 30 min                                                                     |
@@ -7399,6 +7447,12 @@ fails `local up` with a message; a spec that skipped fails the leg ("Upgrade pat
 The `throttle` leg is the same with `./run.sh local up --throttle`, the `stack` runner first and the `ui` runner
 last (both `--grep @throttle`, `grep` input ignored), and one extra step, "Wait out the throttle window" (12 s):
 AUTH-11 leaves the docker gateway's bucket, admin included, locked for the window, and the leak check logs in.
+
+The `probe-ban` leg is the same with `./run.sh local up --probe-ban`: `@smoke` of the protocol runners and of
+`ui`, then the `stack` runner LAST with `--grep @probe-ban` (it reads the log of the whole leg). The `grep` input
+of the workflow does not apply to this leg (the stack runner takes a pattern of its own). The step "Check the
+opt-in specs ran" only demands that `probe-ban.spec.ts` did not skip, as in the `tls` leg (the runners skip
+cases of their own).
 
 The `limits` leg is the same with `./run.sh local up --limits` and `--grep @limits` (the `grep` input is ignored)
 on seven runners, one `run.sh test` each; the step "Check the opt-in specs ran" fails it when any of them skipped.

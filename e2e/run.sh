@@ -63,8 +63,8 @@ fi
 usage() {
   cat <<'EOF'
 Usage:
-  run.sh local up|down [--h2] [--scanner] [--throttle] [--tls] [--limits] [--cors] [--upgrade] [--trivy] [--proxy] [--upload-ttl] [--force]
-  run.sh local logs|ps [--h2] [--scanner] [--throttle] [--tls] [--limits] [--cors] [--upgrade] [--trivy] [--proxy] [--upload-ttl]
+  run.sh local up|down [--h2] [--scanner] [--throttle] [--tls] [--limits] [--cors] [--upgrade] [--trivy] [--proxy] [--upload-ttl] [--probe-ban] [--force]
+  run.sh local logs|ps [--h2] [--scanner] [--throttle] [--tls] [--limits] [--cors] [--upgrade] [--trivy] [--proxy] [--upload-ttl] [--probe-ban]
   run.sh test [--target local|remote|ci] [--protocol a,b] [--grep PATTERN] [--grep-invert PATTERN] [--workers N] [--update-snapshots] [-b]
   run.sh sweep [--hours N] [--all] [--dry-run]
 
@@ -117,6 +117,10 @@ password checks per 10 s per client (docker-compose.stack-throttle.yml), for the
 stack and ui runners. Overlays are rows of the OVERLAYS table at the top of this script; "run.sh test" turns
 every overlay whose switch is set into an entry of REPSY_E2E_OPT_IN (a comma list the runners read, which
 also takes a name directly, e.g. REPSY_E2E_OPT_IN=a11y-report). See README.md "Stack overlays".
+
+--probe-ban (or REPSY_E2E_PROBE_BAN=1) makes the probe ban strict (docker-compose.stack-probe-ban.yml: enforce, one strike
+bans) for the real clients of the protocol runners and the panel, which must never be counted as probes; the
+@probe-ban spec of the stack runner goes last. See README.md "Probe-ban leg".
 
 --tls (or REPSY_E2E_TLS=1) is the third overlay: Repsy's own HTTPS listeners (8443 next to the panel API, 9443
 next to the repo protocols, moved by the port offset; HTTP stays open) with a throwaway CA and certificate
@@ -173,6 +177,7 @@ OVERLAYS=(
   "cors|--cors|REPSY_E2E_CORS|docker-compose.stack-cors.yml"
   "proxy|--proxy|REPSY_E2E_PROXY|docker-compose.stack-proxy.yml"
   "upload-ttl|--upload-ttl|REPSY_E2E_UPLOAD_TTL|docker-compose.stack-upload-ttl.yml"
+  "probe-ban|--probe-ban|REPSY_E2E_PROBE_BAN|docker-compose.stack-probe-ban.yml"
 )
 
 # Field $2 (1 name, 2 flag, 3 env switch, 4 file) of the overlay row $1.
@@ -626,6 +631,9 @@ cmd_local_up() {
   fi
   if overlay_active throttle; then
     echo "Throttle overlay on: 3 failed password checks per 10 s per client; run REPSY_E2E_THROTTLE=1 ./run.sh test --protocol stack,ui --grep @throttle (the ui runner last: AUTH-11 locks the docker gateway's bucket)"
+  fi
+  if overlay_active probe-ban; then
+    echo "Probe overlay on: one strike bans a client; run REPSY_E2E_PROBE_BAN=1 ./run.sh test --protocol skeleton,maven,npm,npm-clients,cargo,nuget,docker,helm,pypi,go,ruby,ui --grep @smoke, then REPSY_E2E_PROBE_BAN=1 ./run.sh test --protocol stack --grep @probe-ban last (it reads the whole log); never the api runner"
   fi
   if overlay_active limits; then
     echo "Limits overlay on: uploads over 64 KiB are refused (413); run REPSY_E2E_LIMITS=1 ./run.sh test --protocol pypi,helm,nuget,ruby,cargo,go,api --grep @limits, one runner per call"
