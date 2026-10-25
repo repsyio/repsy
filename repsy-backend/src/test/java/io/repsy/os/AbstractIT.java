@@ -34,6 +34,7 @@ import io.repsy.os.shared.user.repositories.UserRepository;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.shared.auth.AuthFailureThrottle;
 import io.repsy.protocols.shared.auth.PasswordHasher;
+import io.repsy.protocols.shared.auth.SuspiciousRequestThrottle;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -201,6 +202,7 @@ public abstract class AbstractIT {
   @Autowired protected RepoRepository repoRepository;
   @Autowired protected JdbcTemplate jdbcTemplate;
   @Autowired protected AuthFailureThrottle authFailureThrottle;
+  @Autowired protected SuspiciousRequestThrottle suspiciousRequestThrottle;
   @PersistenceContext protected EntityManager entityManager;
 
   /**
@@ -212,6 +214,7 @@ public abstract class AbstractIT {
   @BeforeEach
   void resetAuthFailureThrottle() {
     this.authFailureThrottle.reset();
+    this.suspiciousRequestThrottle.reset();
   }
 
   protected void registerRefreshToken(final String token) {

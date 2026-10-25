@@ -27,6 +27,7 @@ import io.repsy.os.shared.configs.ContentSecurityPolicyProperties;
 import io.repsy.os.shared.user.PasswordResetMarkerProperties;
 import io.repsy.protocols.shared.auth.AuthThrottleProperties;
 import io.repsy.protocols.shared.auth.BasicAuthCacheProperties;
+import io.repsy.protocols.shared.auth.SuspiciousRequestProperties;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.SpringApplication;
@@ -45,6 +46,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
   DockerRegistryProperties.class,
   BasicAuthCacheProperties.class,
   AuthThrottleProperties.class,
+  SuspiciousRequestProperties.class,
   AppCorsProperties.class,
   AppHstsProperties.class,
   ContentSecurityPolicyProperties.class,

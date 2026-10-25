@@ -214,6 +214,32 @@ repsy:
       # ban-seconds, so it no longer gets a fresh set of checks every window. 0 turns the ban off.
       ban-seconds: ${AUTH_THROTTLE_BAN_SECONDS:3600}
       ban-after-blocked-windows: ${AUTH_THROTTLE_BAN_AFTER_BLOCKED_WINDOWS:3}
+    # RPS-2319: bans a client that sends probes (path traversal, .env and similar secret paths, null
+    # bytes, TRACE/PROPFIND on the API port). max-strikes strikes in window-seconds ban it for
+    # ban-seconds (429 on every path). mode: off, observe (log and count repsy.security.probe_*,
+    # never refuse) or enforce. A path traversal on the API port is answered 404 in every mode but off.
+    # allowlist: comma-separated addresses or CIDR ranges that are never counted.
+    # Per family: signals.<traversal|secret-path|null-byte|method-abuse>.enabled / .weight.
+    probe-throttle:
+      mode: ${PROBE_THROTTLE_MODE:enforce}
+      max-strikes: ${PROBE_THROTTLE_MAX_STRIKES:10}
+      window-seconds: ${PROBE_THROTTLE_WINDOW_SECONDS:60}
+      ban-seconds: ${PROBE_THROTTLE_BAN_SECONDS:3600}
+      max-clients: ${PROBE_THROTTLE_MAX_CLIENTS:10000}
+      allowlist: ${PROBE_THROTTLE_ALLOWLIST:}
+      signals:
+        traversal:
+          enabled: ${PROBE_THROTTLE_SIGNALS_TRAVERSAL_ENABLED:true}
+          weight: ${PROBE_THROTTLE_SIGNALS_TRAVERSAL_WEIGHT:5}
+        secret-path:
+          enabled: ${PROBE_THROTTLE_SIGNALS_SECRET_PATH_ENABLED:true}
+          weight: ${PROBE_THROTTLE_SIGNALS_SECRET_PATH_WEIGHT:5}
+        null-byte:
+          enabled: ${PROBE_THROTTLE_SIGNALS_NULL_BYTE_ENABLED:true}
+          weight: ${PROBE_THROTTLE_SIGNALS_NULL_BYTE_WEIGHT:3}
+        method-abuse:
+          enabled: ${PROBE_THROTTLE_SIGNALS_METHOD_ABUSE_ENABLED:true}
+          weight: ${PROBE_THROTTLE_SIGNALS_METHOD_ABUSE_WEIGHT:3}
     # Resets a user's password when an operator creates a file named after the user in `dir`
     # (README "Forgot admin password?"). The file is removed and the new password is logged once.
     # The Docker image points `dir` at /app/data/password-reset, on the persisted volume.

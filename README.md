@@ -651,6 +651,13 @@ Deleting `1.0.0+a` when there is no such entry (the usual case) still deletes `1
 | `AUTH_THROTTLE_MAX_CLIENTS` | How many clients are tracked at once | `10000` |
 | `AUTH_THROTTLE_BAN_SECONDS` | How long a client that keeps guessing is refused outright (see `AUTH_THROTTLE_BAN_AFTER_BLOCKED_WINDOWS`). `0` turns the ban off. The ban is kept in memory, so a restart clears it | `3600` |
 | `AUTH_THROTTLE_BAN_AFTER_BLOCKED_WINDOWS` | How many windows in a row a client must have used up its failed password checks in before it is banned | `3` |
+| `PROBE_THROTTLE_MODE` | `enforce`, `observe` or `off`. Bans a client that sends probes: path traversal (`../`, also encoded), secret-hunting paths (`.env`, `/proc/self/`, `.git/`...), a NUL byte, or `TRACE`/`PROPFIND` on the API port. A banned client is answered `429` with `Retry-After` on every path. In `observe` it is logged and counted in `repsy.security.probe_would_block` but never refused. A path traversal on the API port is answered `404` in every mode but `off`. Bans are held in memory per instance (RPS-2319) | `enforce` |
+| `PROBE_THROTTLE_MAX_STRIKES` | Strikes that ban a client within one window. A traversal or secret path weighs 5, a NUL byte or abused method 3 | `10` |
+| `PROBE_THROTTLE_WINDOW_SECONDS` | Length of the strike window in seconds | `60` |
+| `PROBE_THROTTLE_BAN_SECONDS` | How long a banned client is refused | `3600` |
+| `PROBE_THROTTLE_MAX_CLIENTS` | How many clients are tracked at once | `10000` |
+| `PROBE_THROTTLE_ALLOWLIST` | Comma-separated addresses or CIDR ranges (`10.0.0.0/8,192.0.2.5`) that are never counted, for example an internal vulnerability scanner | empty |
+| `PROBE_THROTTLE_SIGNALS_<FAMILY>_ENABLED`, `..._WEIGHT` | Switch off or reweigh one signal family: `TRAVERSAL`, `SECRET_PATH`, `NULL_BYTE`, `METHOD_ABUSE` | `true`, `5` / `5` / `3` / `3` |
 | `PASSWORD_RESET_MARKER_ENABLED` | Reset a user's password when a file named after the user is created in `PASSWORD_RESET_MARKER_DIR`. Nothing is reachable over the network: it takes write access to that directory. See [Forgot admin password?](#forgot-admin-password). Set it to `false` to switch the feature off | `true` |
 | `PASSWORD_RESET_MARKER_DIR` | Directory watched for password reset marker files. The Docker image sets it to `/app/data/password-reset`, on the persisted volume, whatever `STORAGE_BASE_PATH` is | `<STORAGE_BASE_PATH>/password-reset` (`/app/data/password-reset` in the image) |
 | `PASSWORD_RESET_MARKER_POLL_INTERVAL` | How often a running instance looks into the directory (ISO-8601 duration, at least `PT1S`). A marker created while the application is stopped is applied once at startup | `PT5S` |

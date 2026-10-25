@@ -19,14 +19,9 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Ticker;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import com.google.common.net.InetAddresses;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.repsy.protocols.shared.exceptions.TooManyRequestsException;
-import java.net.Inet6Address;
-import java.net.InetAddress;
 import java.time.Duration;
-import java.util.Arrays;
-import java.util.HexFormat;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import lombok.extern.slf4j.Slf4j;
@@ -34,8 +29,6 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 
 /**
  * Limits the failed password checks of one client, so a flood of wrong credentials cannot keep the
@@ -181,7 +174,7 @@ public class AuthFailureThrottle {
    */
   public void checkAllowed() {
 
-    final var client = currentClient();
+    final var client = ClientKeys.currentClient();
 
     if (this.windows == null || client == null) {
       return;
@@ -249,8 +242,8 @@ public class AuthFailureThrottle {
   /** Counts one failed BCrypt check for the client of the current request. */
   public void recordFailure() {
 
-    final var remoteAddr = currentRemoteAddr();
-    final var client = remoteAddr == null ? null : throttleKey(remoteAddr);
+    final var remoteAddr = ClientKeys.currentRemoteAddr();
+    final var client = remoteAddr == null ? null : ClientKeys.throttleKey(remoteAddr);
 
     if (this.windows == null || client == null) {
       return;
@@ -302,7 +295,7 @@ public class AuthFailureThrottle {
    */
   public boolean isSaturated() {
 
-    final var client = currentClient();
+    final var client = ClientKeys.currentClient();
 
     if (this.windows == null || client == null) {
       return false;
@@ -327,7 +320,7 @@ public class AuthFailureThrottle {
    */
   public long retryAfterSeconds() {
 
-    final var client = currentClient();
+    final var client = ClientKeys.currentClient();
     final var now = this.now();
     final var banSecondsLeft = client == null ? 0 : this.banSecondsLeft(client, now);
 
@@ -418,48 +411,6 @@ public class AuthFailureThrottle {
   private static long secondsUntil(final long leftNanos) {
 
     return Math.max(1, TimeUnit.NANOSECONDS.toSeconds(leftNanos + TimeUnit.SECONDS.toNanos(1) - 1));
-  }
-
-  private static @Nullable String currentClient() {
-
-    final var remoteAddr = currentRemoteAddr();
-
-    return remoteAddr == null ? null : throttleKey(remoteAddr);
-  }
-
-  private static @Nullable String currentRemoteAddr() {
-
-    return RequestContextHolder.getRequestAttributes()
-            instanceof final ServletRequestAttributes attributes
-        ? attributes.getRequest().getRemoteAddr()
-        : null;
-  }
-
-  /**
-   * The throttle key for one remote address: the address itself for IPv4, or its {@code /64}
-   * network for IPv6, so an attacker (or a legitimate NAT'd network) cannot evade the throttle by
-   * cycling through the addresses of one network (RPS-1164). Parsing is strict (a literal address,
-   * no DNS lookup); an address {@link InetAddresses#forString} cannot parse is throttled under its
-   * own literal text, which only happens for a remote address Tomcat did not hand us as a literal
-   * IP in the first place.
-   */
-  private static String throttleKey(final String remoteAddr) {
-
-    final InetAddress address;
-
-    try {
-      address = InetAddresses.forString(remoteAddr);
-    } catch (final IllegalArgumentException notALiteralAddress) {
-      return remoteAddr;
-    }
-
-    if (address instanceof final Inet6Address inet6) {
-      final var network = Arrays.copyOf(inet6.getAddress(), 8);
-
-      return HexFormat.of().formatHex(network);
-    }
-
-    return remoteAddr;
   }
 
   /**
