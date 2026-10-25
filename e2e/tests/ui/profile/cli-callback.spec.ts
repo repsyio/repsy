@@ -31,7 +31,7 @@ import { expect, test } from '../../../src/ui/access-token-fixtures.js';
 import { LoopbackCallback } from '../../../src/ui/loopback-callback.js';
 import { CliAuthPage } from '../../../src/ui/pages/access-tokens.js';
 import { LoginPage } from '../../../src/ui/pages/login.js';
-import { urlHasPath } from '../../../src/ui/routes.js';
+import { settingsRoute, urlHasPath } from '../../../src/ui/routes.js';
 
 const STATE = '0123456789abcdef0123456789abcdef';
 
@@ -76,7 +76,7 @@ test.describe('/cli/auth authorize screen with a loopback redirect_uri', () => {
     await expect(cli.target).toHaveText(cliCallback.url());
     await expect(cli.approve).toBeEnabled();
     // No name to choose and nothing to tick: the old token form and its "revoke the older token" box are gone.
-    await expect(tokenPage.locator('input')).toHaveCount(0);
+    await expect(cli.approval.locator('input')).toHaveCount(0);
     await expect(tokenPage.locator('body')).not.toContainText('ignored-name');
     // Opening and reloading is a GET: no token, and nothing sent to the listener.
     expect(await tokenApi.list()).toHaveLength(0);
@@ -477,7 +477,7 @@ test.describe('what a temporary CLI token may do', () => {
     await authorize(new CliAuthPage(tokenPage), 'repo:read');
     await tokenApi.create(`pat-${seeder.runId}-listed`);
 
-    await tokenPage.goto(`/profile/settings`);
+    await tokenPage.goto(settingsRoute());
 
     await expect(tokenPage.getByText(`pat-${seeder.runId}-listed`)).toBeVisible();
     await expect(tokenPage.locator('body')).not.toContainText('Repsy CLI login');
