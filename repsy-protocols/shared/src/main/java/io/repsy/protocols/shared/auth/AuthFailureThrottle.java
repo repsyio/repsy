@@ -96,6 +96,7 @@ public class AuthFailureThrottle {
   private final long saturationLimit;
   private final long windowNanos;
   private final long banNanos;
+  private volatile @Nullable ClientBanListener banListener;
   private final int banAfterBlockedWindows;
 
   /**
@@ -239,6 +240,28 @@ public class AuthFailureThrottle {
     }
   }
 
+  /** Where new bans are announced, for instances that share them (RPS-2324). */
+  @Autowired(required = false)
+  public void setBanListener(final @Nullable ClientBanListener banListener) {
+
+    this.banListener = banListener;
+  }
+
+  /**
+   * Takes a ban that another instance announced. It does not announce it again, and an existing ban
+   * of the client stays as it is.
+   */
+  public void adopt(final String client, final long banSecondsLeft) {
+
+    if (this.bans == null || banSecondsLeft <= 0) {
+      return;
+    }
+
+    final var leftNanos = Math.min(TimeUnit.SECONDS.toNanos(banSecondsLeft), this.banNanos);
+
+    this.bans.asMap().putIfAbsent(client, this.now() - (this.banNanos - leftNanos));
+  }
+
   /** Counts one failed BCrypt check for the client of the current request. */
   public void recordFailure() {
 
@@ -285,6 +308,22 @@ public class AuthFailureThrottle {
           this.mode == AuthThrottleMode.ENFORCE
               ? "banning it for " + TimeUnit.NANOSECONDS.toSeconds(this.banNanos) + "s"
               : "would be banned if repsy.security.auth-throttle.mode were enforce");
+      this.announce(client);
+    }
+  }
+
+  private void announce(final String client) {
+
+    final var listener = this.banListener;
+
+    if (listener == null) {
+      return;
+    }
+
+    try {
+      listener.banned(BanKind.AUTH, client, TimeUnit.NANOSECONDS.toSeconds(this.banNanos));
+    } catch (final RuntimeException e) {
+      log.warn("The ban of client {} could not be shared with the other instances", client, e);
     }
   }
 

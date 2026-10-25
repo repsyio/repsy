@@ -72,6 +72,7 @@ public class SuspiciousRequestThrottle {
   private final @Nullable Cache<String, Long> bans;
   private final long windowNanos;
   private final long banNanos;
+  private volatile @Nullable ClientBanListener banListener;
 
   @Autowired
   public SuspiciousRequestThrottle(
@@ -119,6 +120,28 @@ public class SuspiciousRequestThrottle {
               .ticker(ticker)
               .build();
     }
+  }
+
+  /** Where new bans are announced, for instances that share them (RPS-2324). */
+  @Autowired(required = false)
+  public void setBanListener(final @Nullable ClientBanListener banListener) {
+
+    this.banListener = banListener;
+  }
+
+  /**
+   * Takes a ban that another instance announced. It does not announce it again, and an existing ban
+   * of the client stays as it is.
+   */
+  public void adopt(final String client, final long banSecondsLeft) {
+
+    if (this.bans == null || banSecondsLeft <= 0) {
+      return;
+    }
+
+    final var leftNanos = Math.min(TimeUnit.SECONDS.toNanos(banSecondsLeft), this.banNanos);
+
+    this.bans.asMap().putIfAbsent(client, this.ticker.read() - (this.banNanos - leftNanos));
   }
 
   public AuthThrottleMode mode() {
@@ -238,6 +261,22 @@ public class SuspiciousRequestThrottle {
             ? "banning it for " + this.properties.banSeconds() + "s"
             : "would be banned if repsy.security.probe-throttle.mode were enforce");
     this.count(BANS_METRIC);
+    this.announce(client);
+  }
+
+  private void announce(final String client) {
+
+    final var listener = this.banListener;
+
+    if (listener == null) {
+      return;
+    }
+
+    try {
+      listener.banned(BanKind.PROBE, client, this.properties.banSeconds());
+    } catch (final RuntimeException e) {
+      log.warn("The ban of client {} could not be shared with the other instances", client, e);
+    }
   }
 
   /** Forgets every client. Only tests need it: their requests all come from one address. */

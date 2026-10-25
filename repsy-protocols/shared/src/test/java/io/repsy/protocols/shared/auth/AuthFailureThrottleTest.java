@@ -510,6 +510,34 @@ class AuthFailureThrottleTest {
     }
 
     @Test
+    @DisplayName("announces a new ban once, and refuses a client for an adopted ban")
+    void announcesAndAdopts() {
+      final var announced = new java.util.ArrayList<String>();
+      this.banning.setBanListener(
+          (kind, client, banSeconds) -> announced.add(kind + ":" + banSeconds));
+      requestFrom(CLIENT);
+      this.blockedWindows(BAN_AFTER);
+      this.blockedWindow();
+
+      assertThat(announced).containsExactly("AUTH:" + BAN_SECONDS);
+
+      final var other =
+          new AuthFailureThrottle(
+              AuthThrottleProperties.enforcing(
+                  MAX_FAILURES, WINDOW_SECONDS, 100, BAN_SECONDS, BAN_AFTER),
+              AuthFailureThrottleTest.this.meterRegistry,
+              AuthFailureThrottleTest.this.ticker);
+      other.setBanListener((kind, client, banSeconds) -> announced.add("adopted"));
+      other.adopt(ClientKeys.throttleKey(CLIENT), 100);
+
+      assertThatThrownBy(other::checkAllowed)
+          .isInstanceOfSatisfying(
+              TooManyRequestsException.class,
+              e -> assertThat(e.getRetryAfterSeconds()).isEqualTo(100));
+      assertThat(announced).hasSize(1);
+    }
+
+    @Test
     @DisplayName("lets the client in again when the ban has run out")
     void endsWhenTheBanHasRunOut() {
       requestFrom(CLIENT);

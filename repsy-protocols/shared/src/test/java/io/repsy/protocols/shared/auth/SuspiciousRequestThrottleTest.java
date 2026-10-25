@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.google.common.base.Ticker;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -211,6 +212,72 @@ class SuspiciousRequestThrottleTest {
 
     // The 60 soft strikes are already there: one more strike of a family that can ban tips it.
     assertThat(throttle.record(CLIENT, CLIENT, Set.of(SignalFamily.DOUBLE_ENCODED)))
+        .isEqualTo(3600);
+  }
+
+  private record Announced(BanKind kind, String client, long banSeconds) {}
+
+  private static ClientBanListener recordingInto(final List<Announced> into) {
+
+    return (kind, client, banSeconds) -> into.add(new Announced(kind, client, banSeconds));
+  }
+
+  @Test
+  @DisplayName("a new ban is announced once, with its length")
+  void banIsAnnouncedOnce() {
+
+    final var announced = new ArrayList<Announced>();
+    final var throttle =
+        this.throttle(SuspiciousRequestProperties.of(AuthThrottleMode.ENFORCE, 10, 3600));
+    throttle.setBanListener(recordingInto(announced));
+
+    throttle.record(CLIENT, CLIENT, TRAVERSAL);
+    assertThat(announced).isEmpty();
+
+    throttle.record(CLIENT, CLIENT, TRAVERSAL);
+    throttle.record(CLIENT, CLIENT, TRAVERSAL);
+
+    assertThat(announced).containsExactly(new Announced(BanKind.PROBE, CLIENT, 3600));
+  }
+
+  @Test
+  @DisplayName("an adopted ban refuses for the time left, is clamped, and is not announced")
+  void adoptedBanIsKeptButNotAnnounced() {
+
+    final var announced = new ArrayList<Announced>();
+    final var throttle =
+        this.throttle(SuspiciousRequestProperties.of(AuthThrottleMode.ENFORCE, 10, 3600));
+    throttle.setBanListener(recordingInto(announced));
+
+    throttle.adopt(CLIENT, 120);
+    throttle.adopt("198.51.100.9", 7200);
+    throttle.adopt("198.51.100.10", 0);
+
+    assertThat(throttle.banSecondsLeft(CLIENT)).isEqualTo(120);
+    assertThat(throttle.banSecondsLeft("198.51.100.9")).isEqualTo(3600);
+    assertThat(throttle.banSecondsLeft("198.51.100.10")).isZero();
+
+    this.advanceSeconds(60);
+    throttle.adopt(CLIENT, 3000);
+
+    assertThat(throttle.banSecondsLeft(CLIENT)).isEqualTo(60);
+    assertThat(announced).isEmpty();
+  }
+
+  @Test
+  @DisplayName("a listener that fails does not stop the ban")
+  void failingListenerIsIgnored() {
+
+    final var throttle =
+        this.throttle(SuspiciousRequestProperties.of(AuthThrottleMode.ENFORCE, 10, 3600));
+    throttle.setBanListener(
+        (kind, client, banSeconds) -> {
+          throw new IllegalStateException("store is down");
+        });
+
+    assertThat(
+            throttle.record(
+                CLIENT, CLIENT, Set.of(SignalFamily.TRAVERSAL, SignalFamily.SECRET_PATH)))
         .isEqualTo(3600);
   }
 }
