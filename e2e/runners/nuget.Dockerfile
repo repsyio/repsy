@@ -39,7 +39,7 @@ FROM node:24-bookworm-slim
 # harness's own files below is relative to it. Declared after FROM, so it is in scope for this stage only.
 ARG HARNESS_DIR=.
 
-RUN npm install -g --ignore-scripts pnpm@12.14.0
+RUN npm install -g --ignore-scripts pnpm@12.15.0
 
 WORKDIR /app
 RUN chmod 777 /app

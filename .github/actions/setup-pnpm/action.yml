@@ -49,7 +49,7 @@ runs:
       env:
         NPM_CONFIG_PREFIX: ${{ runner.temp }}/npm-global
       run: |
-        npm install -g --ignore-scripts pnpm@12.14.0
+        npm install -g --ignore-scripts pnpm@12.15.0
         echo "$NPM_CONFIG_PREFIX/bin" >> "$GITHUB_PATH"
 
     # pnpm's content-addressed store, so a lockfile change only downloads the packages that changed.
