@@ -17,6 +17,11 @@
     <properties>
         <!-- RPS-1453: JVMs the integration tests are spread over (see the Failsafe configuration). -->
         <it.fork.count>4</it.fork.count>
+        <!-- RPS-2347: what GET /api/info reports as release and commit. The image build passes the image tag and the
+            full commit sha (-Drelease.version, -Dbuild.sha, from the Dockerfile build arguments); a local build
+            reports the project version and "unknown". -->
+        <build.sha>unknown</build.sha>
+        <release.version>${project.version}</release.version>
     </properties>
 
     <dependencies>
@@ -384,6 +389,18 @@
                         <goals>
                             <goal>repackage</goal>
                         </goals>
+                    </execution>
+                    <execution>
+                        <id>build-info</id>
+                        <goals>
+                            <goal>build-info</goal>
+                        </goals>
+                        <configuration>
+                            <additionalProperties>
+                                <commit>${build.sha}</commit>
+                                <release>${release.version}</release>
+                            </additionalProperties>
+                        </configuration>
                     </execution>
                 </executions>
             </plugin>

@@ -123,10 +123,12 @@ class OpenApiSpecConsistencyIT extends AbstractIT {
    *       pair.
    *   <li>{@code getSupportedRepoTypes}: a constant list, {@code SecurityScanController} takes no
    *       credentials for it.
+   *   <li>{@code getServerInfo} (RPS-2347): the release and commit of the running build, which a
+   *       client asks before it signs in; it holds no data of a user.
    * </ul>
    */
   private static final Set<String> PUBLIC_OPERATIONS =
-      Set.of("login", "refreshToken", "logout", "getSupportedRepoTypes");
+      Set.of("login", "refreshToken", "logout", "getSupportedRepoTypes", "getServerInfo");
 
   /**
    * RPS-1593: the operations that answer 403 to a USER because their handler calls {@code

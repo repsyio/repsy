@@ -37,6 +37,7 @@
     "repos",
     "ruby-gems",
     "security-scans",
+    "server-info",
     "stripe",
     "stripe-webhooks",
     "subscriptions",
@@ -69,6 +70,7 @@
     "repo-collection-controller": "repos",
     "ruby-gem-api-controller": "ruby-gems",
     "security-scan-controller": "security-scans",
+    "server-info-controller": "server-info",
     "usage-controller": "usage",
     "user-controller": "users",
     "vulnerability-scan-controller": "security-scans"

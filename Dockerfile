@@ -133,7 +133,14 @@ RUN mvn -f ./repsy-backend/pom.xml dependency:go-offline -Dcheckstyle.skip=true 
 
 COPY repsy-backend/src ./repsy-backend/src
 
-RUN mvn -f ./repsy-backend/pom.xml package -DskipTests -Dcheckstyle.skip=true -Dfmt.skip=true -B
+# RPS-2347: the release and the full commit sha that GET /api/info reports. Declared here, after the sources, so a
+# new value only rebuilds this layer. The jar is built in the image, so the values must come in as build arguments
+# (release.yml passes them); without them the build reports the project version and "unknown".
+ARG BUILD_SHA=unknown
+ARG RELEASE_VERSION=
+
+RUN mvn -f ./repsy-backend/pom.xml package -DskipTests -Dcheckstyle.skip=true -Dfmt.skip=true -B \
+    -Dbuild.sha="${BUILD_SHA}" ${RELEASE_VERSION:+-Drelease.version="${RELEASE_VERSION}"}
 
 # ─────────────────────────────────────────
 # Stage 6: Runtime

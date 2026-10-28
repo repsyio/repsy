@@ -9,7 +9,8 @@ info:
 
 
     **This API is in beta.** Breaking changes are allowed until 1.0, and the version above is
-    bumped for each one. It is independent of the Repsy release version.
+    bumped for each one. It is independent of the Repsy release version: the release and the commit
+    of the running server are answered by `GET /api/info`.
 
 
     A successful response body is the bare resource: no envelope. A create answers 201 with a
@@ -1886,6 +1887,26 @@ paths:
                 items:
                   type: string
       summary: List repo types (e.g. MAVEN, NPM) that have a registered vulnerability scanner, single source of truth for gating scan-related UI/behavior
+  "/api/info":
+    get:
+      tags:
+        - server-info
+      operationId: getServerInfo
+      security: []
+      description: >-
+        Which build of Repsy OS answers: the release (the image tag, for example `26.10.0`) and the
+        full commit sha it was built from. It needs no credential, so a client can ask before it
+        signs in. The two members are always present and never empty: a build without build
+        information answers `unknown` for what it lacks. The shape is a contract that clients pin
+        to, so the members keep their place from one release to the next.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ServerInfo"
+      summary: Get the release and the commit of the running server
   # region: cargo
   "/api/cargo/crates/{repoName}":
     get:
@@ -6344,6 +6365,25 @@ components:
       properties:
         diskUsed:
           "$ref": "#/components/schemas/UsageInfo"
+    ServerInfo:
+      type: object
+      required:
+        - build
+      properties:
+        build:
+          "$ref": "#/components/schemas/ServerBuildInfo"
+    ServerBuildInfo:
+      type: object
+      required:
+        - release
+        - commit
+      properties:
+        release:
+          type: string
+          description: The release the server was built for, the image tag (`26.10.0`), or `unknown`.
+        commit:
+          type: string
+          description: The full commit sha the server was built from, or `unknown`.
     # region: scans
     ScanStatus:
       type: string

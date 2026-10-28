@@ -67,6 +67,11 @@ jobs:
           file: Dockerfile
           build-contexts: |
             openapi-jar=${{ env.OPENAPI_JAR_DIR }}
+          # RPS-2347: GET /api/info reports the image tag (release) and the full commit sha (the 7 character dev tag
+          # cannot be checked out).
+          build-args: |
+            BUILD_SHA=${{ github.sha }}
+            RELEASE_VERSION=${{ env.DOCKER_IMAGE_TAG }}
           push: true
           tags: |
             repo.repsy.io/repsy/os/repsy:${{ env.DOCKER_IMAGE_TAG }}
