@@ -530,4 +530,185 @@ class GemspecParserTest {
           .hasSize(GemspecParser.MAX_DEPENDENCY_REQUIREMENTS_LENGTH);
     }
   }
+
+  @Nested
+  @DisplayName("odd shapes of a gemspec")
+  class OddShapes {
+
+    private static final String NAME_AND_VERSION = "name: demo\nversion: 1.2.3\n";
+
+    private void assertRejected(final byte[] gem, final String code) {
+      assertThatThrownBy(() -> parse(gem))
+          .isInstanceOf(BadRequestException.class)
+          .hasMessageContaining(code);
+    }
+
+    @ParameterizedTest(name = "[{index}]")
+    @ValueSource(strings = {"", "# only a comment\n", "--- \n"})
+    @DisplayName("parse() rejects a gemspec that holds no document")
+    void rejectsAnEmptyGemspec(final String yaml) throws IOException {
+      assertRejected(gem(yaml), "invalidGemFile");
+    }
+
+    @Test
+    @DisplayName("parse() does not take a directory called metadata.gz for the metadata")
+    void ignoresADirectoryEntry() throws IOException {
+      final var tarBytes = new ByteArrayOutputStream();
+      try (final var tar = new TarArchiveOutputStream(tarBytes)) {
+        tar.putArchiveEntry(new TarArchiveEntry("metadata.gz/"));
+        tar.closeArchiveEntry();
+      }
+
+      assertRejected(tarBytes.toByteArray(), "invalidGemFile");
+    }
+
+    @Test
+    @DisplayName("parse() reads a version written as a plain string")
+    void readsAPlainStringVersion() throws IOException {
+      final var metadata = parse(gem(NAME_AND_VERSION));
+
+      assertThat(metadata.getVersion()).isEqualTo("1.2.3");
+      assertThat(metadata.getPlatform()).isEqualTo("ruby");
+      assertThat(metadata.getAuthors()).isNull();
+      assertThat(metadata.getRequiredRubyVersion()).isNull();
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(
+        strings = {
+          "version: !ruby/object:Gem::Version\n  version: 12\n",
+          "version: [1, 2]\n",
+          "version: !ruby/object:Gem::Version\n  other: 1\n",
+          "version: ''\n"
+        })
+    @DisplayName("parse() rejects a version that is not a string")
+    void rejectsAVersionThatIsNotAString(final String version) throws IOException {
+      assertRejected(gem("name: demo\n" + version), "gemVersionMissing");
+    }
+
+    @Test
+    @DisplayName("parse() rejects a gemspec without a name")
+    void rejectsAMissingName() throws IOException {
+      assertRejected(gem("version: 1.2.3\n"), "gemNameMissing");
+    }
+
+    @Test
+    @DisplayName("parse() falls back to the ruby platform when it is blank")
+    void fallsBackToTheDefaultPlatform() throws IOException {
+      assertThat(parse(gem(NAME_AND_VERSION + "platform: ' '\n")).getPlatform()).isEqualTo("ruby");
+      assertThat(parse(gem(NAME_AND_VERSION + "platform: java\n")).getPlatform()).isEqualTo("java");
+    }
+
+    @Test
+    @DisplayName("parse() accepts the authors as one string and skips entries that are not strings")
+    void readsAuthorsInEitherShape() throws IOException {
+      assertThat(parse(gem(NAME_AND_VERSION + "authors: Ada Lovelace\n")).getAuthors())
+          .isEqualTo("Ada Lovelace");
+      assertThat(parse(gem(NAME_AND_VERSION + "authors: [1, Ada, null, Grace]\n")).getAuthors())
+          .isEqualTo("Ada, Grace");
+      assertThat(parse(gem(NAME_AND_VERSION + "authors: [1, 2]\n")).getAuthors()).isNull();
+      assertThat(parse(gem(NAME_AND_VERSION + "authors: 42\n")).getAuthors()).isNull();
+    }
+
+    @Test
+    @DisplayName("parse() formats the required Ruby version")
+    void formatsTheRequiredRubyVersion() throws IOException {
+      final var yaml =
+          NAME_AND_VERSION
+              + """
+              required_ruby_version: !ruby/object:Gem::Requirement
+                requirements:
+                - - ">="
+                  - !ruby/object:Gem::Version
+                    version: 2.7.0
+                - - "<"
+                  - '4'
+              """;
+
+      assertThat(parse(gem(yaml)).getRequiredRubyVersion()).isEqualTo(">= 2.7.0, < 4");
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(
+        strings = {
+          "required_ruby_version: '>= 2'\n",
+          "required_ruby_version:\n  other: 1\n",
+          "required_ruby_version:\n  requirements: []\n",
+          "required_ruby_version:\n  requirements: not-a-list\n",
+          "required_ruby_version:\n  requirements: [one, two]\n"
+        })
+    @DisplayName("parse() has no required Ruby version when the field has no usable requirements")
+    void hasNoRequiredRubyVersion(final String field) throws IOException {
+      assertThat(parse(gem(NAME_AND_VERSION + field)).getRequiredRubyVersion()).isNull();
+    }
+
+    @Test
+    @DisplayName("parse() treats a requirement pair without a version as any version")
+    void formatsAShortRequirementPair() throws IOException {
+      final var yaml =
+          NAME_AND_VERSION
+              + """
+              required_ruby_version:
+                requirements:
+                - - ">="
+              """;
+
+      assertThat(parse(gem(yaml)).getRequiredRubyVersion()).isEqualTo(">= 0");
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(
+        strings = {
+          "- name: a\n  requirement: just-a-string\n",
+          "- name: a\n  requirement:\n    requirements: not-a-list\n",
+          "- name: a\n  requirement:\n    requirements: [x, y]\n",
+          "- name: a\n  requirement:\n    requirements: []\n"
+        })
+    @DisplayName("parse() reads a dependency without a usable requirement as any version")
+    void readsADependencyWithoutRequirements(final String dependency) throws IOException {
+      final var metadata = parse(gem(NAME_AND_VERSION + "dependencies:\n" + dependency));
+
+      assertThat(metadata.getRuntimeDependencies())
+          .containsExactly(dependency("a", ">= 0", "runtime"));
+    }
+
+    @Test
+    @DisplayName("parse() reads a dependency that has no type or a type that is not a string")
+    void defaultsTheDependencyType() throws IOException {
+      final var yaml =
+          NAME_AND_VERSION
+              + """
+              dependencies:
+              - name: a
+                type: 5
+              - name: b
+                type: development
+              """;
+
+      final var metadata = parse(gem(yaml));
+
+      assertThat(metadata.getRuntimeDependencies())
+          .containsExactly(dependency("a", ">= 0", "runtime"));
+      assertThat(metadata.getDevelopmentDependencies())
+          .containsExactly(dependency("b", ">= 0", "development"));
+    }
+
+    @Test
+    @DisplayName("parse() follows a YAML alias to a node it has already visited")
+    void followsAliases() throws IOException {
+      final var yaml =
+          NAME_AND_VERSION
+              + """
+              description: &d shared
+              summary: *d
+              authors: &a [Ada]
+              email: *a
+              """;
+
+      final var metadata = parse(gem(yaml));
+
+      assertThat(metadata.getDescription()).isEqualTo("shared");
+      assertThat(metadata.getAuthors()).isEqualTo("Ada");
+    }
+  }
 }
