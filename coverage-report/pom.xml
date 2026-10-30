@@ -143,6 +143,16 @@
             <goals>
               <goal>report-aggregate</goal>
             </goals>
+            <configuration>
+              <!--
+                Generated code: the OpenAPI models (generated-sources/openapi) and the MapStruct
+                implementations. Nobody writes tests for them, and they would dominate the totals.
+              -->
+              <excludes>
+                <exclude>io/repsy/os/generated/**</exclude>
+                <exclude>**/*MapperImpl.class</exclude>
+              </excludes>
+            </configuration>
           </execution>
         </executions>
       </plugin>
