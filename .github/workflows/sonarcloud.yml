@@ -122,4 +122,4 @@ jobs:
           -Dsonar.projectKey=repsyio_repsy
           -Dsonar.organization=repsy
           -Dsonar.exclusions=**/*.spec.ts
-          -Dsonar.coverage.jacoco.xmlReportPaths=**/target/site/jacoco/jacoco.xml
+          -Dsonar.coverage.jacoco.xmlReportPaths=${{ github.workspace }}/coverage-report/target/site/jacoco-aggregate/jacoco.xml

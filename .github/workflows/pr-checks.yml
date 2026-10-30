@@ -149,14 +149,16 @@ jobs:
           -Dsonar.projectKey=repsyio_repsy
           -Dsonar.organization=repsy
           -Dsonar.exclusions=**/*.spec.ts
-          -Dsonar.coverage.jacoco.xmlReportPaths=**/target/site/jacoco/jacoco.xml
+          -Dsonar.coverage.jacoco.xmlReportPaths=${{ github.workspace }}/coverage-report/target/site/jacoco-aggregate/jacoco.xml
 
       - name: Upload JaCoCo reports
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: jacoco-reports
-          path: '**/target/site/jacoco/**'
+          path: |
+            **/target/site/jacoco/**
+            coverage-report/target/site/jacoco-aggregate/**
           if-no-files-found: error
 
   repsy-frontend:

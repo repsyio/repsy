@@ -147,6 +147,7 @@
     <module>libs</module>
     <module>repsy-protocols</module>
     <module>repsy-frontend</module>
+    <module>coverage-report</module>
   </modules>
 
   <build>

@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>io.repsy.os</groupId>
+    <artifactId>repsy-os</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>coverage-report</artifactId>
+  <packaging>pom</packaging>
+
+  <!--
+    One JaCoCo report over the classes of every Java module and the execution data of every test run.
+    Each module's own report only counts the tests of that module, so the protocol and library
+    classes that the repsy-backend integration tests run (the Abstract*ProtocolMethodHandler and
+    *StorageService classes) read as untested. SonarCloud reads the aggregate report instead.
+  -->
+  <dependencies>
+    <dependency>
+      <groupId>io.repsy.os</groupId>
+      <artifactId>repsy-backend</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>io.repsy.libs</groupId>
+      <artifactId>multiport</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>io.repsy.libs</groupId>
+      <artifactId>protocol-router</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>io.repsy.libs</groupId>
+      <artifactId>scanner-client</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>io.repsy.libs</groupId>
+      <artifactId>test-support</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>io.repsy.libs</groupId>
+      <artifactId>storage-gateway</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>io.repsy.libs</groupId>
+      <artifactId>storage-gateway-fs</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>io.repsy.protocols</groupId>
+      <artifactId>cargo</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>io.repsy.protocols</groupId>
+      <artifactId>docker</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>io.repsy.protocols</groupId>
+      <artifactId>golang</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>io.repsy.protocols</groupId>
+      <artifactId>helm</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>io.repsy.protocols</groupId>
+      <artifactId>maven</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>io.repsy.protocols</groupId>
+      <artifactId>npm</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>io.repsy.protocols</groupId>
+      <artifactId>nuget</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>io.repsy.protocols</groupId>
+      <artifactId>oci</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>io.repsy.protocols</groupId>
+      <artifactId>pypi</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>io.repsy.protocols</groupId>
+      <artifactId>ruby</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+
+    <dependency>
+      <groupId>io.repsy.protocols</groupId>
+      <artifactId>shared</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>report-aggregate</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>report-aggregate</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>
