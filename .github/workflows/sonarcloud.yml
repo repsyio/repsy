@@ -25,7 +25,7 @@ jobs:
   frontend-coverage:
     if: false
     name: Frontend coverage
-    runs-on: repsy-md
+    runs-on: ubicloud-standard-4
     timeout-minutes: 30
     defaults:
       run:
@@ -66,7 +66,7 @@ jobs:
     if: false
     name: Analyze main branch
     needs: frontend-coverage
-    runs-on: repsy-lg
+    runs-on: ubicloud-standard-8
     timeout-minutes: 60
     steps:
       - name: Checkout

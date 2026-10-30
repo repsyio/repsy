@@ -32,7 +32,7 @@ concurrency:
 jobs:
   bump:
     name: Bump repsy-core
-    runs-on: repsy-md
+    runs-on: ubicloud-standard-4
     timeout-minutes: 20
     env:
       # Through env, never interpolated into a script: the payload is input.
