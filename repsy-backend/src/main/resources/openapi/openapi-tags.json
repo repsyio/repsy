@@ -116,6 +116,7 @@
     "repo-security-summary-controller": "security-scans",
     "ruby-gem-api-controller": "ruby-gems",
     "security-scan-controller": "security-scans",
+    "server-info-controller": "server-info",
     "stats-controller": "usage",
     "stripe-controller": "stripe",
     "subscription-plan-controller": "subscriptions",

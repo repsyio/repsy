@@ -704,6 +704,7 @@ Old springdoc tag to new tag. Several old tags may map to one new tag (one area,
 | `repo-collection-controller` | `repos` |
 | `ruby-gem-api-controller` | `ruby-gems` |
 | `security-scan-controller` | `security-scans` |
+| `server-info-controller` | `server-info` |
 | `usage-controller` | `usage` |
 | `user-controller` | `users` |
 | `vulnerability-scan-controller` | `security-scans` |
@@ -751,6 +752,7 @@ Old springdoc tag to new tag. Several old tags may map to one new tag (one area,
 | `repo-security-summary-controller` | `security-scans` |
 | `ruby-gem-api-controller` | `ruby-gems` |
 | `security-scan-controller` | `security-scans` |
+| `server-info-controller` | `server-info` |
 | `stats-controller` | `usage` |
 | `stripe-controller` | `stripe` |
 | `subscription-plan-controller` | `subscriptions` |
