@@ -145,6 +145,11 @@ public class ArtifactSignatureService {
   @Transactional(readOnly = true)
   public Optional<UUID> findRecordedId(final ArtifactVersion version, final String fileName) {
 
+    return this.recordedIdOf(version, fileName);
+  }
+
+  private Optional<UUID> recordedIdOf(final ArtifactVersion version, final String fileName) {
+
     return this.versionSignatureRepository
         .findByArtifactVersionIdAndFileName(version.getId(), fileName)
         .map(VersionSignature::getId);
@@ -525,7 +530,7 @@ public class ArtifactSignatureService {
       final StoragePath storagePath) {
 
     final var fileName = storagePath.getRelativePath().getFileName();
-    final var recordedId = this.findRecordedId(version, fileName);
+    final var recordedId = this.recordedIdOf(version, fileName);
 
     // Nothing recorded, nothing to forget. Deleting by file name here would take a record that a
     // signature request commits after this read, and leave the version unsigned (RPS-1984).

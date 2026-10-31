@@ -31,7 +31,8 @@ class PypiVersionComparatorTest {
   void ordersByNumericPrecedenceNotString() {
 
     assertThat(comparator.compare("10.0", "9.0")).isPositive();
-    assertThat("10.0").isLessThan("9.0"); // the bug a plain string sort would have
+    assertThat(List.of("10.0", "9.0").stream().sorted().toList())
+        .containsExactly("10.0", "9.0"); // the bug a plain string sort would have
 
     final var sorted = List.of("10.0", "9.0", "1.2").stream().sorted(comparator).toList();
     assertThat(sorted).containsExactly("1.2", "9.0", "10.0");

@@ -34,7 +34,8 @@ class NpmVersionComparatorTest {
     assertThat(comparator.compare("9.0.0", "10.0.0")).isNegative();
 
     // A plain string sort gets this backwards: "10.0.0" < "9.0.0" lexicographically.
-    assertThat("10.0.0").isLessThan("9.0.0");
+    assertThat(List.of("10.0.0", "9.0.0").stream().sorted().toList())
+        .containsExactly("10.0.0", "9.0.0");
 
     final var sorted = List.of("10.0.0", "9.0.0", "1.2.0").stream().sorted(comparator).toList();
     assertThat(sorted).containsExactly("1.2.0", "9.0.0", "10.0.0");

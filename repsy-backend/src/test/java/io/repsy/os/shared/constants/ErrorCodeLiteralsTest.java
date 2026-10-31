@@ -62,7 +62,7 @@ class ErrorCodeLiteralsTest {
 
   @Test
   @DisplayName("no exception of the main sources carries an inline code literal")
-  void noInlineCodeLiteral() throws IOException {
+  void noInlineCodeLiteral() {
     final var sources = mainSources();
     final var offenders =
         sources.stream()
@@ -83,7 +83,7 @@ class ErrorCodeLiteralsTest {
 
   @Test
   @DisplayName("no class keeps a private ERR_ code constant of its own")
-  void noPrivateCodeConstant() throws IOException {
+  void noPrivateCodeConstant() {
     final var offenders =
         mainSources().stream()
             .filter(

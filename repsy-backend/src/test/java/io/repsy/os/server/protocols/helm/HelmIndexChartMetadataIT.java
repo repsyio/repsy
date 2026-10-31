@@ -198,8 +198,8 @@ class HelmIndexChartMetadataIT extends AbstractIT {
 
     final var entry = this.entries(repo).get("1.0.0");
 
-    assertThat(entry).containsEntry("apiVersion", "v2");
     assertThat(entry)
+        .containsEntry("apiVersion", "v2")
         .containsEntry(
             "dependencies",
             List.of(

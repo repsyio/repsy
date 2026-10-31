@@ -33,9 +33,11 @@ import java.io.IOException;
 import java.nio.file.Paths;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.EnumMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -118,7 +120,25 @@ public class DockerManifestLayoutRepairService {
   }
 
   /** The file of a manifest, found under one of its candidate names, and what it holds. */
-  private record LocatedFile(String name, byte[] bytes) {}
+  private record LocatedFile(String name, byte[] bytes) {
+
+    @Override
+    public boolean equals(final Object o) {
+      return o instanceof final LocatedFile other
+          && this.name.equals(other.name)
+          && Arrays.equals(this.bytes, other.bytes);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(this.name, Arrays.hashCode(this.bytes));
+    }
+
+    @Override
+    public String toString() {
+      return "LocatedFile[name=" + this.name + ", bytes=" + this.bytes.length + " bytes]";
+    }
+  }
 
   public RepairReport repair() {
 

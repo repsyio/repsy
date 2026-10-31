@@ -54,7 +54,7 @@ public class PypiAuthenticator extends ProtocolAuthService {
       throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
 
-    if (super.tryAuthorizeWithPat(repoId, credentials.getPassword(), permission)) {
+    if (super.tryAuthorizeWithPat(credentials.getPassword(), permission)) {
       return;
     }
 

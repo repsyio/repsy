@@ -98,8 +98,8 @@ class NpmPackumentBuilderTest {
     assertThat(packument).containsEntry("name", "demo").containsEntry("_id", "demo");
     assertThat(((Map<String, Object>) packument.get("versions")).keySet())
         .containsExactly("1.0.0", "2.0.0");
-    assertThat(packument).containsEntry("dist-tags", Map.of("latest", "2.0.0", "beta", "1.0.0"));
     assertThat(packument)
+        .containsEntry("dist-tags", Map.of("latest", "2.0.0", "beta", "1.0.0"))
         .containsEntry(
             "time",
             Map.of(
@@ -188,8 +188,9 @@ class NpmPackumentBuilderTest {
     final var packument =
         build(snapshot(null, Map.of("latest", "9.9.9"), version("1.0.0")), Map.of(), null);
 
-    assertThat(packument).containsEntry("dist-tags", Map.of("latest", "9.9.9"));
-    assertThat(packument).doesNotContainKey("description");
+    assertThat(packument)
+        .containsEntry("dist-tags", Map.of("latest", "9.9.9"))
+        .doesNotContainKey("description");
   }
 
   @Test

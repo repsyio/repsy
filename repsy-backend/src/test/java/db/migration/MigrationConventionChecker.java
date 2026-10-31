@@ -52,7 +52,7 @@ final class MigrationConventionChecker {
   static final String H2_SYNTAX = "h2Syntax";
 
   private static final Pattern FILE_VERSION = Pattern.compile("^V(\\d+)(?:__.*)?\\.sql$");
-  private static final Pattern JAVA_VERSION = Pattern.compile("^V(\\d+)\\w*\\.java$");
+  private static final Pattern JAVA_VERSION = Pattern.compile("^V(\\d++)\\w*+\\.java$");
   private static final Pattern MARKER =
       Pattern.compile("--\\s*+migration-check:\\s*+allow\\s++(\\w++)\\s++(\\S.*)");
   private static final String NAME = "(?:\"?\\w+\"?\\.)?\"?(\\w+)\"?";
