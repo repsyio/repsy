@@ -21,9 +21,12 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import java.io.ByteArrayInputStream;
+import java.nio.file.Files;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -73,6 +76,26 @@ class FileSystemStorageStrategyListingTest {
         .filteredOn(item -> !item.isDirectory())
         .extracting(StorageItemInfo::getName)
         .containsExactlyInAnyOrder("lib-1.0.jar", "lib-1.0.pom");
+  }
+
+  @Test
+  @DisplayName("hands the creation time over as an Instant of whole milliseconds (RPS-2372)")
+  void createdAtIsAnInstantInMilliseconds() throws Exception {
+    this.write("com/acme/lib/1.0/lib-1.0.jar", "jar");
+    final var file = this.tempDir.resolve("storage").resolve(this.key.toString()).resolve("com");
+
+    final var listed = this.strategy.listDirectoryContents(StoragePath.of(this.key, ""));
+    final var storage = this.strategy.listStorageItems(StoragePath.of(this.key, "com"));
+
+    final var expected =
+        Instant.ofEpochMilli(
+            Files.readAttributes(file, BasicFileAttributes.class).creationTime().toMillis());
+    assertThat(listed).hasSize(1);
+    assertThat(listed.getFirst().getCreatedAt()).isEqualTo(expected);
+    assertThat(storage)
+        .isNotEmpty()
+        .allSatisfy(item -> assertThat(item.getCreatedAt()).isNotNull());
+    assertThat(listed.getFirst().getCreatedAt().getNano() % 1_000_000).isZero();
   }
 
   @Test

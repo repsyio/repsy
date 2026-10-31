@@ -37,13 +37,16 @@ import io.repsy.protocols.shared.storage.AbstractArtifactStorageService;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
+import java.time.format.DateTimeFormatter;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Supplier;
 import lombok.SneakyThrows;
+import lombok.Value;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
+import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.ui.freemarker.FreeMarkerTemplateUtils;
@@ -136,13 +139,44 @@ public abstract class AbstractMavenStorageService<I> extends AbstractArtifactSto
                   "relativePath",
                   storagePath.getRelativePath().getPath(),
                   "items",
-                  items));
+                  this.toListingRows(items)));
     } catch (final TemplateException e) {
 
       throw new ErrorOccurredException(e);
     }
 
     return new ByteArrayResource(directoryContentHtml.getBytes(UTF_8));
+  }
+
+  /**
+   * The page prints each creation time in the template engine's time zone (the server's default
+   * one), to the minute; an {@link java.time.Instant} is not a date to FreeMarker, so the rows
+   * carry it formatted (RPS-2372).
+   */
+  private List<DirectoryListingRow> toListingRows(final List<StorageItemInfo> items) {
+    final var formatter =
+        DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+            .withZone(this.freeMarkerConfiguration.getTimeZone().toZoneId());
+
+    return items.stream()
+        .map(
+            item ->
+                new DirectoryListingRow(
+                    item.getName(),
+                    item.getCreatedAt() == null ? null : formatter.format(item.getCreatedAt()),
+                    item.getSize()))
+        .toList();
+  }
+
+  /**
+   * One line of the directory page: the template reads these three properties. A bean, not a
+   * record, because FreeMarker only exposes getters.
+   */
+  @Value
+  public static class DirectoryListingRow {
+    String name;
+    @Nullable String modified;
+    @Nullable Long size;
   }
 
   private void addDirectoryUpLink(

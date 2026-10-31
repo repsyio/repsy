@@ -18,7 +18,7 @@
     <hr/>
     <main>
     <pre id="contents">
-<#list items as item><#if item.name == '../'><a href="../">../</a><#else><#assign truncatedName=item.name?truncate_c(48, '...')><a href="${item.name?html}" title="${item.name?html}">${truncatedName}</a><#list truncatedName?length..49 as x> </#list>${item.createdAt?datetime?string('yyyy-MM-dd HH:mm')}<#if item.size??>${item.size?string?left_pad(10)}</#if></#if>
+<#list items as item><#if item.name == '../'><a href="../">../</a><#else><#assign truncatedName=item.name?truncate_c(48, '...')><a href="${item.name?html}" title="${item.name?html}">${truncatedName}</a><#list truncatedName?length..49 as x> </#list>${item.modified}<#if item.size??>${item.size?string?left_pad(10)}</#if></#if>
 </#list>
     </pre>
     </main>

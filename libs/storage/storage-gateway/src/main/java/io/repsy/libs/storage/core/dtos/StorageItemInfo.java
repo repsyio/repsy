@@ -15,7 +15,7 @@
  */
 package io.repsy.libs.storage.core.dtos;
 
-import java.util.Date;
+import java.time.Instant;
 import lombok.Builder;
 import lombok.Data;
 
@@ -23,7 +23,7 @@ import lombok.Data;
 @Builder
 public class StorageItemInfo implements Comparable<StorageItemInfo> {
   private String name;
-  private Date createdAt;
+  private Instant createdAt;
   private Long size;
   private boolean directory;
   private String path;
