@@ -41,9 +41,9 @@ public final class PackageStorageUtils {
    * {@code .}), so it can never contain the {@code -} that separates the parts of a wheel name.
    */
   private static final String VERSION_REGEX =
-      "(?:[1-9]\\d*!)?(?:0|[1-9]\\d*)(?:\\.(?:0|[1-9]\\d*))*"
+      "(?:[1-9]\\d*!)?(?:0|[1-9]\\d*)(?:\\.(?:0|[1-9]\\d*))*+"
           + "(?:(?:a|b|rc)(?:0|[1-9]\\d*))?(?:\\.post(?:0|[1-9]\\d*))?(?:\\.dev(?:0|[1-9]\\d*))?"
-          + "(?:\\+[a-z0-9]+(?:\\.[a-z0-9]+)*)?";
+          + "(?:\\+[a-z0-9]+(?:\\.[a-z0-9]+)*+)?";
 
   private static final String SIDECAR_SUFFIX = "." + HASH_ALGORITHM;
 
@@ -62,9 +62,20 @@ public final class PackageStorageUtils {
   /** Name, version and build tag: the fewest parts a wheel has once its tags are cut off. */
   private static final int PARTS_WITH_BUILD_TAG = 3;
 
-  private static final Pattern ARCHIVE_UPLOAD_PATTERN =
-      Pattern.compile(
-          "^" + NAME_PART + "-" + VERSION_REGEX + "(?:-[a-zA-Z0-9._]+)*\\.(?:tar\\.gz|whl|zip)$");
+  private static final String SDIST_SUFFIX = ".tar.gz";
+
+  private static final String ZIP_SUFFIX = ".zip";
+
+  private static final List<String> ARCHIVE_SUFFIXES =
+      List.of(SDIST_SUFFIX, WHEEL_SUFFIX, ZIP_SUFFIX);
+
+  /**
+   * An archive file name without its extension: name, version, then optional dash-separated tags.
+   * The extension is cut off first (see {@link #isArchiveUploadName}) because the possessive local
+   * segment of {@link #VERSION_REGEX} would otherwise swallow the dots of {@code +abc.tar.gz}.
+   */
+  private static final Pattern ARCHIVE_STEM_PATTERN =
+      Pattern.compile("^" + NAME_PART + "-" + VERSION_REGEX + "(?:-[a-zA-Z0-9._]+)*$");
 
   /**
    * The normalized version in an archive file name, or its {@code .sha256} sidecar's, or {@code
@@ -84,7 +95,7 @@ public final class PackageStorageUtils {
 
     // Never run the version grammar on an over-long name: no upload can have stored one.
     if (name.length() > PypiPublishLimits.MAX_ARCHIVE_FILENAME_LENGTH
-        || !ARCHIVE_UPLOAD_PATTERN.matcher(name).matches()) {
+        || !isArchiveUploadName(name)) {
       return null;
     }
 
@@ -97,6 +108,18 @@ public final class PackageStorageUtils {
     return ReleaseVersion.of(version).getVersion();
   }
 
+  /** Whether {@code name} is {@code <name>-<version>[-<tag>...]} plus an archive extension. */
+  private static boolean isArchiveUploadName(final String name) {
+
+    for (final var suffix : ARCHIVE_SUFFIXES) {
+      if (name.endsWith(suffix)) {
+        return ARCHIVE_STEM_PATTERN.matcher(stripSuffix(name, suffix)).matches();
+      }
+    }
+
+    return false;
+  }
+
   private static String versionPart(final String name) {
 
     final var wheel = name.endsWith(WHEEL_SUFFIX);
@@ -107,7 +130,7 @@ public final class PackageStorageUtils {
   }
 
   private static String extensionOfSdist(final String name) {
-    return name.endsWith(".zip") ? ".zip" : ".tar.gz";
+    return name.endsWith(ZIP_SUFFIX) ? ZIP_SUFFIX : SDIST_SUFFIX;
   }
 
   private static String stripSuffix(final String name, final String suffix) {
@@ -141,7 +164,7 @@ public final class PackageStorageUtils {
 
     PypiPublishLimits.checkArchiveFilename(originalFilename);
 
-    if (!ARCHIVE_UPLOAD_PATTERN.matcher(originalFilename).matches()
+    if (!isArchiveUploadName(originalFilename)
         || extractVersionFromArchiveFilename(originalFilename) == null) {
       throw new BadRequestException(ProtocolErrorCodes.ARCHIVE_FILE_NAME_INVALID);
     }
