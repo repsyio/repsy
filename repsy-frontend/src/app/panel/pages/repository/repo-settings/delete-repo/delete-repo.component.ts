@@ -26,7 +26,6 @@ import { ToastService } from '../../../../shared/components/toast/toast.service'
 @Component({
   selector: 'app-delete-repo',
   templateUrl: './delete-repo.component.html',
-  styleUrls: ['./delete-repo.component.css'],
   standalone: true,
   imports: [ReactiveFormsModule, RouterLink],
 })

@@ -29,6 +29,7 @@
         class="hover:text-secondary-500 flex h-[40px] w-[40px] items-center justify-center text-neutral-200"
       >
         <svg
+          aria-hidden="true"
           width="22"
           height="22"
           viewBox="0 0 22 22"
@@ -136,6 +137,7 @@
                       [textHover]="'@' + pkg.scope"
                     />
                     <svg
+                      aria-hidden="true"
                       class="mt-[2px] h-[14px] w-[14px] shrink-0 text-[#9FA0A0] group-hover:text-white"
                       viewBox="0 0 14 14"
                       fill="none"
@@ -164,6 +166,7 @@
                 >
                   <app-tooltip truncate class="group-hover:underline" [text]="pkg.name" [textHover]="pkg.name" />
                   <svg
+                    aria-hidden="true"
                     class="mt-[2px] h-[14px] w-[14px] shrink-0 text-[#9FA0A0] group-hover:text-white"
                     viewBox="0 0 14 14"
                     fill="none"
@@ -214,6 +217,7 @@
                     [textHover]="pkg.latestVersion"
                   />
                   <svg
+                    aria-hidden="true"
                     class="mt-[2px] h-[14px] w-[14px] shrink-0 text-[#9FA0A0] group-hover:text-white"
                     viewBox="0 0 14 14"
                     fill="none"
@@ -304,6 +308,7 @@
                       {{ '@' + pkg.scope }}
                     </span>
                     <svg
+                      aria-hidden="true"
                       class="group-hover:text-secondary-500 mt-[2px] h-[14px] w-[14px] shrink-0 text-neutral-200"
                       viewBox="0 0 14 14"
                       fill="none"
@@ -337,6 +342,7 @@
                     >
                       <span class="text-right text-sm break-all group-hover:underline">{{ pkg.name }}</span>
                       <svg
+                        aria-hidden="true"
                         class="group-hover:text-secondary-500 mt-[2px] h-[14px] w-[14px] shrink-0 text-neutral-200"
                         viewBox="0 0 14 14"
                         fill="none"
@@ -391,6 +397,7 @@
                       </span>
 
                       <svg
+                        aria-hidden="true"
                         class="group-hover:text-secondary-500 mt-[2px] h-[14px] w-[14px] shrink-0 text-neutral-200"
                         viewBox="0 0 14 14"
                         fill="none"

@@ -43,7 +43,8 @@ describe('ToastComponent', () => {
   });
 
   it('keeps a polite live region on screen even when there is no toast', () => {
-    expect(stack().getAttribute('role')).toBe('status');
+    // <output> carries the implicit role "status".
+    expect(stack().tagName).toBe('OUTPUT');
     expect(stack().getAttribute('aria-live')).toBe('polite');
     expect(toasts().length).toBe(0);
   });

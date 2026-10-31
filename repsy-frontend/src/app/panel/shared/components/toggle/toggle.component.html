@@ -14,7 +14,7 @@
       [disabled]="isDisabled"
       [attr.aria-checked]="checked"
       [attr.aria-labelledby]="labelledBy ? labelledBy + ' ' + labelId : null"
-      (click)="toggle()"
+      (change)="toggle()"
     />
     <span
       class="absolute inset-0 rounded-full transition-colors duration-300 ease-in-out peer-focus-visible:ring-2 peer-focus-visible:ring-[#FDFDFD]"

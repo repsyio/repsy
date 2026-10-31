@@ -1,5 +1,6 @@
 <aside
   data-testid="sidebar"
+  aria-label="Sidebar"
   class="sticky hidden overflow-x-hidden overflow-y-auto md:top-[104px] md:flex md:h-[calc(100vh-125px)] md:flex-col md:justify-between lg:top-[125px] lg:h-[calc(100vh-175px)]"
 >
   <div class="flex flex-col">
@@ -7,7 +8,7 @@
     <span class="ml-[16px] text-[14px] font-medium text-[#9FA0A0] uppercase">Account</span>
 
     <!-- Navigation Items -->
-    <nav class="mt-[39px] flex w-full flex-col gap-[35px]">
+    <nav aria-label="Main navigation" class="mt-[39px] flex w-full flex-col gap-[35px]">
       <a
         data-testid="sidebar-link-dashboard"
         routerLink="/"
@@ -38,6 +39,7 @@
           routerLinkActive="bg-[#333333]"
         >
           <svg
+            aria-hidden="true"
             width="20"
             height="20"
             viewBox="0 0 20 20"
@@ -83,6 +85,7 @@
           routerLinkActive="bg-[#333333]"
         >
           <svg
+            aria-hidden="true"
             width="20"
             height="20"
             viewBox="0 0 20 20"
@@ -119,12 +122,13 @@
 
 <!-- Mobile Sidebar -->
 @if (isMobileMenuOpen) {
-  <aside data-testid="mobile-sidebar" class="fixed inset-0 z-3 flex md:hidden">
+  <aside data-testid="mobile-sidebar" aria-label="Mobile sidebar" class="fixed inset-0 z-3 flex md:hidden">
     <!-- Backdrop -->
     <div
       data-testid="mobile-sidebar-backdrop"
       class="fixed inset-0 z-4 bg-black/50"
       (click)="closeMobileMenu()"
+      (keydown.escape)="closeMobileMenu()"
       aria-hidden="true"
     ></div>
 
@@ -173,7 +177,7 @@
       </div>
 
       <!-- Navigation Items -->
-      <nav class="mt-[39px] flex w-full flex-col gap-[35px]">
+      <nav aria-label="Mobile navigation" class="mt-[39px] flex w-full flex-col gap-[35px]">
         <!-- ACCOUNT Text -->
         <span class="ml-[16px] text-[14px] font-medium text-[#9FA0A0] uppercase">Account</span>
 
@@ -210,6 +214,7 @@
             routerLinkActive="bg-[#333333]"
           >
             <svg
+              aria-hidden="true"
               width="20"
               height="20"
               viewBox="0 0 20 20"
@@ -256,6 +261,7 @@
             routerLinkActive="bg-[#333333]"
           >
             <svg
+              aria-hidden="true"
               width="20"
               height="20"
               viewBox="0 0 20 20"

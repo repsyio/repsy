@@ -1,9 +1,4 @@
-<div
-  data-testid="toast-stack"
-  role="status"
-  aria-live="polite"
-  class="z-200 container w-full max-w-[500px] px-4 sm:px-0"
->
+<output data-testid="toast-stack" aria-live="polite" class="z-200 container block w-full max-w-[500px] px-4 sm:px-0">
   @for (toast of toastService.toasts; track toast.id) {
     <div
       data-testid="toast"
@@ -75,4 +70,4 @@
       </button>
     </div>
   }
-</div>
+</output>

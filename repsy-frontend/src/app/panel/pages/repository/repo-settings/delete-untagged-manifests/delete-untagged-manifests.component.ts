@@ -30,7 +30,6 @@ import { ByteFormatter } from '../../../../shared/utils/byte-formatter';
 @Component({
   selector: 'app-delete-untagged-manifests',
   templateUrl: './delete-untagged-manifests.component.html',
-  styleUrls: ['./delete-untagged-manifests.component.css'],
   standalone: true,
   imports: [RouterLink],
 })

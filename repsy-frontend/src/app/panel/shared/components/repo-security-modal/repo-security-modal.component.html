@@ -5,6 +5,7 @@
     animate.enter="fade-in-up"
     class="bg-opacity-50 fixed inset-0 z-50 backdrop-blur-sm"
     (click)="$event.stopPropagation(); closeModal()"
+    (keydown.escape)="$event.stopPropagation(); closeModal()"
     aria-hidden="true"
   ></div>
 
@@ -27,6 +28,7 @@
         class="hover:text-secondary-500 text-neutral-200"
       >
         <svg
+          aria-hidden="true"
           width="15"
           height="15"
           viewBox="0 0 15 15"

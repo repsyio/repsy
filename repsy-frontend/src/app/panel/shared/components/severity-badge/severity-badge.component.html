@@ -7,6 +7,7 @@
   [attr.title]="unscannedTitle || null"
 >
   <svg
+    aria-hidden="true"
     [attr.width]="compact ? 11 : 13"
     [attr.height]="compact ? 11 : 13"
     viewBox="0 0 24 24"
@@ -70,8 +71,10 @@
     <span class="font-bold">{{ count }}</span>
   }
   @if (rescanTitle) {
-    <span class="inline-flex" role="img" [attr.title]="rescanTitle" [attr.aria-label]="rescanTitle">
+    <span class="inline-flex" [attr.title]="rescanTitle">
       <svg
+        role="img"
+        [attr.aria-label]="rescanTitle"
         [attr.width]="compact ? 11 : 13"
         [attr.height]="compact ? 11 : 13"
         viewBox="0 0 24 24"

@@ -23,6 +23,5 @@ import { DividerComponent } from '../divider/divider.component';
   standalone: true,
   imports: [DividerComponent],
   templateUrl: './footer.component.html',
-  styleUrls: ['./footer.component.css'],
 })
 export class FooterComponent {}

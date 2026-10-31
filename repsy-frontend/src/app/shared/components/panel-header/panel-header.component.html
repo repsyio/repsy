@@ -15,7 +15,7 @@
           [attr.aria-expanded]="isMobileMenuOpen"
         >
           <span class="sr-only">Open main menu</span>
-          <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg aria-hidden="true" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
           </svg>
         </button>
@@ -59,11 +59,14 @@
           <button
             #profileToggle
             data-testid="header-avatar"
+            aria-label="Profile menu"
+            [attr.aria-expanded]="profileDropdown"
             class="group flex items-center justify-center gap-2 text-[#9FA0A0]"
             (click)="toggleProfileDropdown()"
           >
             <app-profile-avatar [size]="45" [fallbackChar]="username?.[0]?.toUpperCase() ?? '?'" />
             <svg
+              aria-hidden="true"
               class="group-hover:text-secondary-500"
               [class.rotate-180]="profileDropdown"
               width="16"

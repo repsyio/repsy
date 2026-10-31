@@ -93,3 +93,18 @@
 .toast-out {
   animation: toast-out 400ms ease-out forwards;
 }
+
+/*
+ * Reduced motion: keep the animation (so `animationend` still fires and Angular enter/leave
+ * handling completes) but make it effectively instant.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .fade-in-down,
+  .fade-in-left,
+  .fade-in-right,
+  .fade-in-up,
+  .toast-in,
+  .toast-out {
+    animation-duration: 0.01ms;
+  }
+}
