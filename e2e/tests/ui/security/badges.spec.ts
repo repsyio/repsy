@@ -104,10 +104,9 @@ test.describe('SEC-02a repository list badges', { tag: MOCKED }, () => {
     await expect(badgeText(badge(failed.name))).toHaveText('Scan failed');
     // A rescan keeps the last known severity and adds a marker with its own tooltip.
     await expect(badgeText(badge(rescanning.name))).toHaveText('Medium');
-    await expect(badgeText(badge(rescanning.name)).locator('span[role="img"]')).toHaveAttribute(
-      'title',
-      /being rescanned/,
-    );
+    await expect(
+      badgeText(badge(rescanning.name)).getByRole('img', { name: /being rescanned/ }),
+    ).toBeVisible();
     await expect(badge(never.name)).toHaveCount(0);
     await expect(badge(unsupported.name)).toHaveCount(0);
 

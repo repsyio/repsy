@@ -27,7 +27,7 @@ type ToastType = 'success' | 'error';
 /**
  * The toast stack. A success toast lives 3 s, an error toast 7 s (and stays while it is hovered or
  * focused, RPS-1266) and at most 3 are kept, so assert a toast right after the action that raises it,
- * with nothing awaited in between. The stack is a polite live region (`role="status"`) and an error
+ * with nothing awaited in between. The stack is a polite live region (an `<output>`, whose implicit role is `status`) and an error
  * toast is a `role="alert"`; a11y/shared-components.spec.ts (A11Y-03) pins that and the timing.
  */
 export class Toasts {
