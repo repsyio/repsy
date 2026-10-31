@@ -59,6 +59,7 @@ import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
+import org.jspecify.annotations.Nullable;
 import org.springframework.core.convert.ConversionService;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.data.domain.Page;
@@ -473,13 +474,9 @@ public class PypiPackageService extends AbstractPypiPackageService<UUID> {
     final var releaseClassifiers = new ArrayList<ReleaseClassifier>();
 
     for (final var classifier : uploadForm.getClassifiers()) {
-      if (StringUtils.isBlank(classifier)) {
-        continue;
-      }
+      final var split = StringUtils.isBlank(classifier) ? null : classifier.split("::", 2);
 
-      final var split = classifier.split("::", 2);
-
-      if (split.length != 2) {
+      if (split == null || split.length != 2) {
         continue;
       }
 
@@ -495,6 +492,12 @@ public class PypiPackageService extends AbstractPypiPackageService<UUID> {
     this.releaseClassifierRepository.saveAll(releaseClassifiers);
   }
 
+  /** The label and the URL of a {@code label,url} entry, or {@code null} when it is blank. */
+  private static String @Nullable [] splitProjectUrl(final @Nullable String projectUrl) {
+
+    return projectUrl == null || projectUrl.isBlank() ? null : projectUrl.split(",", -1);
+  }
+
   private void addReleaseProjectURLs(final PackageUploadForm uploadForm, final Release release) {
 
     if (uploadForm.getProjectUrls() == null) {
@@ -504,13 +507,9 @@ public class PypiPackageService extends AbstractPypiPackageService<UUID> {
     final var releaseProjectURLs = new ArrayList<ReleaseProjectUrl>();
 
     for (final var projectURL : uploadForm.getProjectUrls()) {
-      if (projectURL == null || projectURL.isBlank()) {
-        continue;
-      }
+      final var split = splitProjectUrl(projectURL);
 
-      final var split = projectURL.split(",", -1);
-
-      if (split.length != 2) {
+      if (split == null || split.length != 2) {
         continue;
       }
 

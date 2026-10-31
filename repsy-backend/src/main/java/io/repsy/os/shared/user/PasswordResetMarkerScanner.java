@@ -136,7 +136,7 @@ public class PasswordResetMarkerScanner implements ApplicationRunner {
       final var sorted = entries.sorted().toList();
       this.unreadableDirectories.remove(dir);
       return sorted;
-    } catch (final NoSuchFileException e) {
+    } catch (final NoSuchFileException _) {
       this.unreadableDirectories.remove(dir);
       return List.of();
     } catch (final IOException e) {

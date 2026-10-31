@@ -24,7 +24,7 @@ import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -34,7 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
  * file an earlier version named after a tag goes when no other row of the image still uses that
  * name. Ask after the rows are deleted (and flushed), with the references taken before.
  */
-@Component
+@Service
 @RequiredArgsConstructor
 public class ManifestFileService {
 

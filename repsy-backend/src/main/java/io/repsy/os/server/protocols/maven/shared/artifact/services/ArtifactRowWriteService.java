@@ -40,7 +40,7 @@ import org.apache.maven.index.artifact.Gav;
 import org.apache.maven.model.Model;
 import org.jspecify.annotations.Nullable;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
 /**
  * Writes the artifact and version rows of a registered POM (RPS-2167, split out of {@link
@@ -53,7 +53,7 @@ import org.springframework.stereotype.Component;
  * ArtifactVersionWriteService}.
  */
 @Slf4j
-@Component
+@Service
 @RequiredArgsConstructor
 class ArtifactRowWriteService {
 
@@ -94,8 +94,6 @@ class ArtifactRowWriteService {
       final @Nullable String pluginPrefix,
       final Artifact artifact) {
 
-    final var repo = artifact.getRepo();
-
     final var storagePath = StoragePath.of(artifact.getRepo().getId(), versionPath);
 
     final var version = new ArtifactVersion();
@@ -117,12 +115,11 @@ class ArtifactRowWriteService {
       this.artifactUpsertHelper.insertArtifactVersion(version, pomModel, artifact);
     } catch (final DataIntegrityViolationException e) {
       this.handleArtifactVersionInsertConflict(
-          repo, artifact, gav, versionPath, pomModel, pluginPrefix, version, e);
+          artifact, gav, versionPath, pomModel, pluginPrefix, version, e);
     }
   }
 
   private void handleArtifactVersionInsertConflict(
-      final Repo repo,
       final Artifact artifact,
       final Gav gav,
       final String versionPath,
@@ -149,7 +146,8 @@ class ArtifactRowWriteService {
       throw e;
     }
 
-    this.updateArtifactVersion(repo, existingVersion, versionPath, pomModel, pluginPrefix);
+    this.updateArtifactVersion(
+        artifact.getRepo(), existingVersion, versionPath, pomModel, pluginPrefix);
   }
 
   private Artifact createArtifactByGav(

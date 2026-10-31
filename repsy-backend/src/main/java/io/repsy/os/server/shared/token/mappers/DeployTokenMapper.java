@@ -20,22 +20,19 @@ import io.repsy.os.server.shared.token.dtos.DeployTokenInfo;
 import io.repsy.os.server.shared.token.entities.RepoDeployToken;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-import org.mapstruct.Mappings;
 
 @Mapper(componentModel = "spring")
 public interface DeployTokenMapper {
-  @Mappings({
-    @Mapping(target = "id", ignore = true),
-    @Mapping(target = "repo", ignore = true),
-    @Mapping(target = "lastUsedAt", ignore = true),
-    @Mapping(target = "createdAt", ignore = true),
-    @Mapping(target = "tokenDurationDay", ignore = true),
-    @Mapping(target = "token", ignore = true),
-    @Mapping(
-        target = "readOnly",
-        expression = "java(Boolean.TRUE.equals(deployTokenForm.getReadOnly()))"),
-    @Mapping(target = "expirationDate", source = "expirationDate")
-  })
+  @Mapping(target = "id", ignore = true)
+  @Mapping(target = "repo", ignore = true)
+  @Mapping(target = "lastUsedAt", ignore = true)
+  @Mapping(target = "createdAt", ignore = true)
+  @Mapping(target = "tokenDurationDay", ignore = true)
+  @Mapping(target = "token", ignore = true)
+  @Mapping(
+      target = "readOnly",
+      expression = "java(Boolean.TRUE.equals(deployTokenForm.getReadOnly()))")
+  @Mapping(target = "expirationDate", source = "expirationDate")
   RepoDeployToken toDeployToken(DeployTokenForm deployTokenForm);
 
   @Mapping(target = "readOnly", source = "readOnly")

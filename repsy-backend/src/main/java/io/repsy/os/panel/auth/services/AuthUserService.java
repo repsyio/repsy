@@ -67,7 +67,7 @@ public class AuthUserService {
     final UserInfo user;
     try {
       user = this.userTxService.getUserByUsername(form.getUsername());
-    } catch (final ItemNotFoundException exception) {
+    } catch (final ItemNotFoundException _) {
       // Perform the same hash work for unknown usernames to avoid leaking account existence.
       PasswordHasher.verifyDummy(form.getPassword());
       this.authFailureThrottle.recordFailure();

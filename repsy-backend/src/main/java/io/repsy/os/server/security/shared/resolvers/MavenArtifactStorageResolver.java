@@ -178,7 +178,7 @@ public class MavenArtifactStorageResolver implements ArtifactStorageResolver {
 
     final var groupPath = groupId.replace('.', '/');
     final var metadataPath =
-        groupPath + "/" + artifactId + "/" + artifactVersion + "/" + METADATA_FILENAME;
+        groupPath + '/' + artifactId + '/' + artifactVersion + '/' + METADATA_FILENAME;
     final var storagePath = StoragePath.of(repoId, metadataPath);
     final var resource = this.mavenStorageStrategy.get(storagePath, repoName);
 
@@ -236,7 +236,7 @@ public class MavenArtifactStorageResolver implements ArtifactStorageResolver {
       return Optional.empty();
     }
 
-    final var artifactPath = versionDirectory + "/" + fileName;
+    final var artifactPath = versionDirectory + '/' + fileName;
 
     return this.mavenStorageStrategy.get(StoragePath.of(repoId, artifactPath), repoName).isPresent()
         ? Optional.of(artifactPath)

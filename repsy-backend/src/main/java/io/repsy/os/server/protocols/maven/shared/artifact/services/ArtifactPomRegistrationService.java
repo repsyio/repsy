@@ -30,7 +30,7 @@ import org.apache.maven.index.artifact.Gav;
 import org.apache.maven.model.Model;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
 /**
  * Registers a stored POM (RPS-2167, split out of {@link ArtifactDeploymentService}): reads it,
@@ -43,7 +43,7 @@ import org.springframework.stereotype.Component;
  * ArtifactSignatureService#updateSignedForFile}.
  */
 @Slf4j
-@Component
+@Service
 @RequiredArgsConstructor
 class ArtifactPomRegistrationService {
 

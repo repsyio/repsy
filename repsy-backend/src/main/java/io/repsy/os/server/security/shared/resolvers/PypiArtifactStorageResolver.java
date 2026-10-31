@@ -50,13 +50,16 @@ public class PypiArtifactStorageResolver implements ArtifactStorageResolver {
       final String artifactName,
       final String artifactVersion) {
 
-    final var packagePath = artifactName.endsWith("/") ? artifactName : artifactName + "/";
+    final var packagePath =
+        artifactName.isEmpty() || artifactName.charAt(artifactName.length() - 1) != '/'
+            ? artifactName + '/'
+            : artifactName;
     final var storagePath = StoragePath.of(repoId, packagePath);
     final List<StorageItemInfo> items;
 
     try {
       items = this.pypiStorageStrategy.listDirectoryContents(storagePath);
-    } catch (final ItemNotFoundException exception) {
+    } catch (final ItemNotFoundException _) {
       // A package that was never uploaded has no directory at all.
       return Optional.empty();
     }

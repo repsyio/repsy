@@ -16,6 +16,7 @@
 package db.migration.h2;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -25,12 +26,14 @@ import java.util.Map;
 import java.util.UUID;
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 import lombok.extern.slf4j.Slf4j;
 import org.flywaydb.core.api.MigrationVersion;
 import org.flywaydb.core.api.migration.BaseJavaMigration;
 import org.flywaydb.core.api.migration.Context;
 import org.jspecify.annotations.Nullable;
 import org.w3c.dom.Element;
+import org.xml.sax.SAXException;
 import tools.jackson.databind.ObjectMapper;
 
 /**
@@ -121,7 +124,7 @@ public class V0014ConvertNuGetDependenciesToJson extends BaseJavaMigration {
   }
 
   private static List<Map<String, @Nullable String>> parseDependencies(final String xml)
-      throws Exception {
+      throws ParserConfigurationException, SAXException, IOException {
 
     final var factory = DocumentBuilderFactory.newInstance();
     factory.setNamespaceAware(false);

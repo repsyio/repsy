@@ -196,7 +196,7 @@ public class HelmChartService implements ChartService<UUID> {
   @Override
   @Transactional
   public void delete(final UUID repoId, final String name, final String version) {
-    this.deleteVersion(repoId, name, version);
+    this.removeVersion(repoId, name, version);
   }
 
   @Override
@@ -218,6 +218,10 @@ public class HelmChartService implements ChartService<UUID> {
 
   @Transactional
   public void deleteVersion(final UUID repoId, final String name, final String version) {
+    this.removeVersion(repoId, name, version);
+  }
+
+  private void removeVersion(final UUID repoId, final String name, final String version) {
     final var chart = this.lockExistingChart(repoId, name);
     final var chartVersion =
         this.helmChartVersionRepository

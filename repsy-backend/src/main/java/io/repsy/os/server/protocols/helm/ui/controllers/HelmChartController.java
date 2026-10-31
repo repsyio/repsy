@@ -59,15 +59,24 @@ public class HelmChartController {
    * first; {@code createdAt} and {@code lastUpdatedAt} are kept because the panel and the default
    * order already send them.
    */
+  private static final String CREATED_AT = "createdAt";
+
+  private static final String LAST_UPDATED_AT = "lastUpdatedAt";
+
   private static final Map<String, String> CHART_SORT_PATHS =
       Map.of(
-          "name", "chart.name",
-          "latestVersion", "version",
-          "updatedAt", "lastUpdatedAt",
-          "createdAt", "createdAt",
-          "lastUpdatedAt", "lastUpdatedAt");
+          "name",
+          "chart.name",
+          "latestVersion",
+          "version",
+          "updatedAt",
+          LAST_UPDATED_AT,
+          CREATED_AT,
+          CREATED_AT,
+          LAST_UPDATED_AT,
+          LAST_UPDATED_AT);
 
-  private static final Set<String> VERSION_SORT_PROPERTIES = Set.of("version", "createdAt");
+  private static final Set<String> VERSION_SORT_PROPERTIES = Set.of("version", CREATED_AT);
 
   private final HelmApiFacade helmApiFacade;
   private final UsageUpdateService usageUpdateService;
@@ -77,7 +86,7 @@ public class HelmChartController {
   public ResponseEntity<PagedModel<HelmChartListItem>> searchHelmCharts(
       final RepoInfo repoInfo,
       @RequestParam(name = "q", defaultValue = "") final String query,
-      @PageableDefault(sort = "lastUpdatedAt", direction = Sort.Direction.DESC)
+      @PageableDefault(sort = LAST_UPDATED_AT, direction = Sort.Direction.DESC)
           final Pageable pageable) {
 
     final var charts =
@@ -101,7 +110,7 @@ public class HelmChartController {
       final RepoInfo repoInfo,
       @PathVariable final String packageName,
       @RequestParam(name = "q", defaultValue = "") final String query,
-      @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC)
+      @PageableDefault(sort = CREATED_AT, direction = Sort.Direction.DESC)
           final Pageable pageable) {
 
     SortValidator.requireSortableBy(pageable, VERSION_SORT_PROPERTIES);

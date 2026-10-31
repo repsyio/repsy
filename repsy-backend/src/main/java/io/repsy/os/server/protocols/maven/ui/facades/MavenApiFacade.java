@@ -115,7 +115,7 @@ public class MavenApiFacade implements ProtocolApiFacadeMavenAdapter {
 
     final var artifactBasePath =
         this.mavenStorageService.getPath(
-            "/" + artifactVersionInfo.getArtifactGroupName(),
+            '/' + artifactVersionInfo.getArtifactGroupName(),
             artifactVersionInfo.getArtifactName());
 
     final var pomFileName =
@@ -129,7 +129,7 @@ public class MavenApiFacade implements ProtocolApiFacadeMavenAdapter {
 
     if (pomFileName != null) {
       final var filePath =
-          artifactBasePath.resolve(artifactVersionInfo.getVersionName() + "/" + pomFileName);
+          artifactBasePath.resolve(artifactVersionInfo.getVersionName() + '/' + pomFileName);
 
       final var storagePath = StoragePath.of(repoInfo.getStorageKey(), filePath.toString());
 

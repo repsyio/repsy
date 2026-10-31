@@ -29,7 +29,7 @@ import java.util.ArrayList;
 import lombok.RequiredArgsConstructor;
 import org.apache.maven.model.Model;
 import org.jspecify.annotations.Nullable;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -42,7 +42,7 @@ import org.springframework.transaction.annotation.Transactional;
  * {@code @Transactional} (default REQUIRED propagation) so they join whichever transaction the
  * caller already has active, rather than starting a new one.
  */
-@Component
+@Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
 class ArtifactVersionWriteService {
@@ -64,14 +64,20 @@ class ArtifactVersionWriteService {
     this.versionDeveloperRepository.deleteAllByArtifactVersionId(artifactVersion.getId());
     this.versionLicenseRepository.deleteAllByArtifactVersionId(artifactVersion.getId());
 
-    this.createVersionDevelopers(pomModel, artifactVersion);
-    this.createVersionLicenses(pomModel, artifactVersion);
+    this.saveVersionDevelopers(pomModel, artifactVersion);
+    this.saveVersionLicenses(pomModel, artifactVersion);
 
     this.artifactVersionRepository.save(artifactVersion);
   }
 
   @Transactional
   void createVersionDevelopers(
+      final @Nullable Model pomModel, final ArtifactVersion artifactVersion) {
+
+    this.saveVersionDevelopers(pomModel, artifactVersion);
+  }
+
+  private void saveVersionDevelopers(
       final @Nullable Model pomModel, final ArtifactVersion artifactVersion) {
 
     if (pomModel == null
@@ -93,6 +99,12 @@ class ArtifactVersionWriteService {
 
   @Transactional
   void createVersionLicenses(
+      final @Nullable Model pomModel, final ArtifactVersion artifactVersion) {
+
+    this.saveVersionLicenses(pomModel, artifactVersion);
+  }
+
+  private void saveVersionLicenses(
       final @Nullable Model pomModel, final ArtifactVersion artifactVersion) {
 
     if (pomModel == null || pomModel.getLicenses() == null || pomModel.getLicenses().isEmpty()) {

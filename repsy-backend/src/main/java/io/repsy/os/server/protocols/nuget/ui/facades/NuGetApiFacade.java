@@ -161,16 +161,7 @@ public class NuGetApiFacade implements ProtocolApiFacade {
       if (deletedItem == NuGetDeletedItem.PACKAGE) {
 
         freed = this.deleteVersionFiles(repoInfo, packageId, storedVersion);
-        try {
-
-          this.nugetStorageService.deletePackage(
-              RepoRef.of(repoInfo), packageId.toLowerCase(Locale.ROOT));
-        } catch (final Exception cleanupException) {
-          log.debug(
-              "NuGet package directory cleanup skipped for {}: {}",
-              packageId,
-              cleanupException.getMessage());
-        }
+        this.tryDeletePackageDirectory(repoInfo, packageId);
       } else {
         freed = this.deleteVersionFiles(repoInfo, packageId, storedVersion);
       }
@@ -183,6 +174,20 @@ public class NuGetApiFacade implements ProtocolApiFacade {
     }
     return new NuGetDeleteVersionResult(
         deletedItem, BaseUsages.builder().diskUsage(-1L * freed).build());
+  }
+
+  /** Removes the now empty package directory; a failure only skips the cleanup. */
+  private void tryDeletePackageDirectory(final RepoInfo repoInfo, final String packageId) {
+
+    try {
+      this.nugetStorageService.deletePackage(
+          RepoRef.of(repoInfo), packageId.toLowerCase(Locale.ROOT));
+    } catch (final Exception cleanupException) {
+      log.debug(
+          "NuGet package directory cleanup skipped for {}: {}",
+          packageId,
+          cleanupException.getMessage());
+    }
   }
 
   /**

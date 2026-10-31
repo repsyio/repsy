@@ -31,7 +31,7 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,7 +51,7 @@ import org.springframework.transaction.annotation.Transactional;
  *       ArtifactQueryService}: the signature, plugin and registered-version operations.
  * </ul>
  */
-@Component
+@Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
 public class ArtifactDeploymentService extends AbstractArtifactService<UUID> {

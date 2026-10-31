@@ -50,11 +50,11 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-@Component
+@Service
 @Transactional(readOnly = true)
 public class NuGetPackageService extends AbstractNuGetPackageService<UUID> {
 
@@ -388,7 +388,7 @@ public class NuGetPackageService extends AbstractNuGetPackageService<UUID> {
   public boolean deleteVersion(
       final BaseRepoInfo<UUID> repoInfo, final String packageId, final String version) {
 
-    return this.deleteVersionAndGetDeletion(repoInfo, packageId, version).deletedItem()
+    return this.removeVersion(repoInfo, packageId, version).deletedItem()
         == NuGetDeletedItem.PACKAGE;
   }
 
@@ -410,6 +410,12 @@ public class NuGetPackageService extends AbstractNuGetPackageService<UUID> {
    */
   @Transactional
   public VersionDeletion deleteVersionAndGetDeletion(
+      final BaseRepoInfo<UUID> repoInfo, final String packageId, final String version) {
+
+    return this.removeVersion(repoInfo, packageId, version);
+  }
+
+  private VersionDeletion removeVersion(
       final BaseRepoInfo<UUID> repoInfo, final String packageId, final String version) {
 
     final var pkg = this.findPackage(repoInfo.getId(), packageId);

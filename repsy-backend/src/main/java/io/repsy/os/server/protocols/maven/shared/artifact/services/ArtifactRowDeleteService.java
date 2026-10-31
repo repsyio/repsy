@@ -25,14 +25,14 @@ import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
 /**
  * Deletes the artifact, version and group rows (RPS-2167, split out of {@link
  * ArtifactDeploymentService}), with the signatures parked under them. It has no transaction of its
  * own: {@link ArtifactDeploymentService} calls it inside its read write one.
  */
-@Component
+@Service
 @RequiredArgsConstructor
 class ArtifactRowDeleteService {
 

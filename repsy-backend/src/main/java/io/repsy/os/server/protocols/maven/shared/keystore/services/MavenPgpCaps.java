@@ -19,7 +19,6 @@ import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.protocols.maven.shared.utils.MavenUploadLimits;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.LockModeType;
-import jakarta.persistence.PersistenceContext;
 import java.util.UUID;
 import lombok.Getter;
 import org.springframework.beans.factory.annotation.Value;
@@ -63,10 +62,7 @@ public class MavenPgpCaps {
   @Getter private final int maxPendingSignaturesPerRepo;
   @Getter private final long maxBytesPerRepo;
   private final boolean postgres;
-
-  @SuppressWarnings("NullAway.Init") // injected by the container
-  @PersistenceContext
-  private EntityManager entityManager;
+  private final EntityManager entityManager;
 
   public MavenPgpCaps(
       @Value("${repsy.maven.pgp.max-public-keys-per-repo:20}") final int maxPublicKeysPerRepo,
@@ -74,12 +70,14 @@ public class MavenPgpCaps {
           final int maxPendingSignaturesPerRepo,
       @Value("${repsy.maven.pending-signature.max-bytes-per-repo:8388608}")
           final long maxBytesPerRepo,
-      @Value("${spring.datasource.url:}") final String datasourceUrl) {
+      @Value("${spring.datasource.url:}") final String datasourceUrl,
+      final EntityManager entityManager) {
 
     this.maxPublicKeysPerRepo = maxPublicKeysPerRepo;
     this.maxPendingSignaturesPerRepo = maxPendingSignaturesPerRepo;
     this.maxBytesPerRepo = maxBytesPerRepo;
     this.postgres = datasourceUrl.startsWith("jdbc:postgresql:");
+    this.entityManager = entityManager;
   }
 
   /** Serializes the registrations of public keys of one repo until the transaction ends. */

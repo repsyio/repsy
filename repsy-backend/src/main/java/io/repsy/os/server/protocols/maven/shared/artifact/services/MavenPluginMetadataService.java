@@ -39,7 +39,7 @@ import org.apache.maven.index.artifact.Gav;
 import org.apache.maven.model.Model;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -48,7 +48,7 @@ import org.springframework.transaction.annotation.Transactional;
  * after the POM.
  */
 @Slf4j
-@Component
+@Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
 public class MavenPluginMetadataService {

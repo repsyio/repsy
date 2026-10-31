@@ -22,7 +22,6 @@ import java.time.ZoneOffset;
 import org.jspecify.annotations.Nullable;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-import org.mapstruct.Mappings;
 
 @Mapper(componentModel = "spring")
 public interface ImageMapper {
@@ -35,10 +34,8 @@ public interface ImageMapper {
         : lastTagPushedAt.toInstant(ZoneOffset.UTC);
   }
 
-  @Mappings({
-    @Mapping(target = "repoId", source = "repo.id"),
-    @Mapping(target = "repoName", source = "repo.name")
-  })
+  @Mapping(target = "repoId", source = "repo.id")
+  @Mapping(target = "repoName", source = "repo.name")
   ImageInfo toImageInfo(Image image);
 
   // The untagged fields follow indexes of any depth, which the list query cannot: the service

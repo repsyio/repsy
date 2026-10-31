@@ -73,7 +73,7 @@ public class AdminUserInitializer implements ApplicationRunner {
   }
 
   private static boolean isPasswordReset(final User adminUser) {
-    return adminUser.getHash() == null || adminUser.getHash().isEmpty();
+    return adminUser.getHash().isEmpty();
   }
 
   private void resetAdminPassword(final User adminUser) {

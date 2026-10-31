@@ -117,9 +117,7 @@ final class UserController {
       this.reservedUsernameService.requireNotReserved(dto.getUsername());
     }
 
-    final var updatedUser = this.userTxService.updateUserDetails(userId, dto);
-
-    return updatedUser;
+    return this.userTxService.updateUserDetails(userId, dto);
   }
 
   @DeleteMapping("/{userId}")

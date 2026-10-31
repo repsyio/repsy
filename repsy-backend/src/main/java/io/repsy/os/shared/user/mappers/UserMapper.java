@@ -21,18 +21,15 @@ import io.repsy.os.shared.user.entities.User;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingConstants;
-import org.mapstruct.Mappings;
 
 @Mapper(componentModel = MappingConstants.ComponentModel.SPRING)
 public interface UserMapper {
 
   UserInfo toUserInfo(User user);
 
-  @Mappings({
-    @Mapping(target = "id", expression = "java(user.getId().toString())"),
-    @Mapping(
-        target = "role",
-        expression = "java(io.repsy.os.generated.model.UserRole.valueOf(user.getRole().name()))")
-  })
+  @Mapping(target = "id", expression = "java(user.getId().toString())")
+  @Mapping(
+      target = "role",
+      expression = "java(io.repsy.os.generated.model.UserRole.valueOf(user.getRole().name()))")
   UserResponse toUserResponseDto(User user);
 }

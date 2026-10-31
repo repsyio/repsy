@@ -299,7 +299,6 @@ public class NpmAuthenticatorImpl extends ProtocolAuthService
     }
   }
 
-  /** A live deploy token; an expired one identifies nobody. */
   /**
    * A personal access token is known by its own id and by the username of its owner, never by the
    * username the client typed.
@@ -308,6 +307,7 @@ public class NpmAuthenticatorImpl extends ProtocolAuthService
     return new Caller(token.id(), token.username());
   }
 
+  /** A live deploy token; an expired one identifies nobody. */
   private static Caller callerOf(final DeployTokenInfo deployToken) {
 
     if (deployToken.isExpired() || deployToken.getUsername() == null) {
