@@ -111,7 +111,11 @@ COPY --from=helm-tools /opt/helm/plugins /opt/helm/plugins
 # generating and exporting that keyring reuses `src/clients/gpg.ts`'s `generateGpgKey()`, the same
 # real `gpg --batch --gen-key`/`--export` helper the maven runner's signed-deploy specs use, which
 # needs the `gpg` binary on PATH.
+#
+# ca-certificates: the system trust store that helm (Go) verifies a TLS registry against. node's slim image has none,
+# and the copy in the helm-tools stage above does not reach this one (RPS-2375).
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
     gpg \
     gpg-agent \
     && rm -rf /var/lib/apt/lists/*
