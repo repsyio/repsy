@@ -27,7 +27,7 @@ import org.springframework.stereotype.Service;
 public class HelmChartFilesService extends AbstractHelmChartFilesService<UUID> {
 
   public HelmChartFilesService(
-      final HelmStorageService<UUID> helmStorageServiceImpl,
+      final HelmStorageService helmStorageServiceImpl,
       final ChartService<UUID> helmChartService,
       final OciBlobService<UUID> helmOciBlobService,
       final OciManifestService<UUID> helmOciManifestService) {

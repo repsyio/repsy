@@ -45,7 +45,7 @@ import org.springframework.core.io.Resource;
  */
 public abstract class AbstractHelmProtocolTxFacade<I> implements HelmProtocolFacade<I> {
 
-  protected final HelmStorageService<I> helmStorageService;
+  protected final HelmStorageService helmStorageService;
   protected final ChartService<I> chartService;
   protected final OciBlobService<I> ociBlobService;
   protected final OciManifestService<I> ociManifestService;
@@ -56,7 +56,7 @@ public abstract class AbstractHelmProtocolTxFacade<I> implements HelmProtocolFac
   private final HelmOciManifestFacade<I> manifests;
 
   protected AbstractHelmProtocolTxFacade(
-      final HelmStorageService<I> helmStorageService,
+      final HelmStorageService helmStorageService,
       final ChartService<I> chartService,
       final OciBlobService<I> ociBlobService,
       final OciManifestService<I> ociManifestService,

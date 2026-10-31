@@ -28,12 +28,12 @@ import java.io.IOException;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 
-public abstract class AbstractGoDownloadProtocolMethodHandler<I>
-    extends AbstractFacadeProtocolMethodHandler<GoProtocolFacade<I>> {
+public abstract class AbstractGoDownloadProtocolMethodHandler
+    extends AbstractFacadeProtocolMethodHandler<GoProtocolFacade> {
 
   protected AbstractGoDownloadProtocolMethodHandler(
       final PathParser pathParser,
-      final GoProtocolFacade<I> goProtocolFacade,
+      final GoProtocolFacade goProtocolFacade,
       final GolangProtocolProvider provider) {
 
     super(

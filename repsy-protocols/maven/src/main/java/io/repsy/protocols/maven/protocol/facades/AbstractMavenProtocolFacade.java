@@ -56,7 +56,7 @@ import org.springframework.core.io.Resource;
 
 @Slf4j
 @RequiredArgsConstructor
-public abstract class AbstractMavenProtocolFacade<I> implements MavenProtocolFacade<I> {
+public abstract class AbstractMavenProtocolFacade<I> implements MavenProtocolFacade {
 
   private static final String USAGES = "usages";
   private static final String ARTIFACT_NAME = "artifactName";

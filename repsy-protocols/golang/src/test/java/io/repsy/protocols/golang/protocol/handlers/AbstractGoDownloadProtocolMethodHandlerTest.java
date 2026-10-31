@@ -44,12 +44,12 @@ class AbstractGoDownloadProtocolMethodHandlerTest {
 
   private static final String LIST_PATH = "/example.com/mod/@v/list";
 
-  private final GoProtocolFacade<UUID> facade = mock();
-  private AbstractGoDownloadProtocolMethodHandler<UUID> handler;
+  private final GoProtocolFacade facade = mock();
+  private AbstractGoDownloadProtocolMethodHandler handler;
 
-  static class TestHandler extends AbstractGoDownloadProtocolMethodHandler<UUID> {
+  static class TestHandler extends AbstractGoDownloadProtocolMethodHandler {
 
-    TestHandler(final GoProtocolFacade<UUID> facade) {
+    TestHandler(final GoProtocolFacade facade) {
       super(mock(PathParser.class), facade, mock(GolangProtocolProvider.class));
     }
   }

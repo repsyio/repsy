@@ -51,7 +51,7 @@ class AbstractHelmChartFilesServiceTest {
   private static final String CONFIG = digest('b');
   private static final String PROVENANCE = digest('c');
 
-  @Mock private HelmStorageService<UUID> helmStorageService;
+  @Mock private HelmStorageService helmStorageService;
   @Mock private ChartService<UUID> chartService;
   @Mock private OciBlobService<UUID> ociBlobService;
   @Mock private OciManifestService<UUID> ociManifestService;
@@ -61,7 +61,7 @@ class AbstractHelmChartFilesServiceTest {
   private static class TestService extends AbstractHelmChartFilesService<UUID> {
 
     TestService(
-        final HelmStorageService<UUID> helmStorageService,
+        final HelmStorageService helmStorageService,
         final ChartService<UUID> chartService,
         final OciBlobService<UUID> ociBlobService,
         final OciManifestService<UUID> ociManifestService) {

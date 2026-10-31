@@ -91,7 +91,7 @@ class AbstractHelmProtocolTxFacadeTest {
   private static final int BLOB_SIZE = 300;
   private static final String DIGEST = sha256Of(new byte[BLOB_SIZE]);
 
-  @Mock private HelmStorageService<UUID> helmStorageService;
+  @Mock private HelmStorageService helmStorageService;
   @Mock private ChartService<UUID> chartService;
   @Mock private OciBlobService<UUID> ociBlobService;
   @Mock private OciManifestService<UUID> ociManifestService;
@@ -105,7 +105,7 @@ class AbstractHelmProtocolTxFacadeTest {
   private static class TestFacade extends AbstractHelmProtocolTxFacade<UUID> {
 
     TestFacade(
-        final HelmStorageService<UUID> helmStorageService,
+        final HelmStorageService helmStorageService,
         final ChartService<UUID> chartService,
         final OciBlobService<UUID> ociBlobService,
         final OciManifestService<UUID> ociManifestService,

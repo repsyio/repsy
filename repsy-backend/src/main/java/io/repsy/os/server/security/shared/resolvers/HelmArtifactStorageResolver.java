@@ -36,7 +36,7 @@ public class HelmArtifactStorageResolver implements ArtifactStorageResolver {
 
   private static final Set<String> SUPPORTED_REPO_TYPES = Set.of("HELM");
 
-  private final HelmStorageService<?> helmStorageService;
+  private final HelmStorageService helmStorageService;
   private final HelmChartService helmChartService;
 
   @Override

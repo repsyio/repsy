@@ -34,8 +34,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
 
 @Slf4j
-public abstract class AbstractHelmStorageService<I> extends AbstractArtifactStorageService
-    implements HelmStorageService<I> {
+public abstract class AbstractHelmStorageService extends AbstractArtifactStorageService
+    implements HelmStorageService {
 
   private static final String OCI_BLOBS_PATH = HelmConstants.OCI_BLOBS_PATH;
   private static final char SEP = HelmConstants.PATH_SEPARATOR;

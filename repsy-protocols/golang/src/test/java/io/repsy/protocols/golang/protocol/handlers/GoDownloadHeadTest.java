@@ -47,16 +47,16 @@ class GoDownloadHeadTest {
 
   private static final String MOD = "/example.com/mod/@v/";
 
-  private final GoProtocolFacade<UUID> facade = mock();
+  private final GoProtocolFacade facade = mock();
   private final GolangProtocolProvider provider = mock();
   private final PathParser pathParser = mock();
-  private AbstractGoDownloadProtocolMethodHandler<UUID> get;
+  private AbstractGoDownloadProtocolMethodHandler get;
 
-  static class TestGet extends AbstractGoDownloadProtocolMethodHandler<UUID> {
+  static class TestGet extends AbstractGoDownloadProtocolMethodHandler {
 
     TestGet(
         final PathParser parser,
-        final GoProtocolFacade<UUID> facade,
+        final GoProtocolFacade facade,
         final GolangProtocolProvider provider) {
       super(parser, facade, provider);
     }

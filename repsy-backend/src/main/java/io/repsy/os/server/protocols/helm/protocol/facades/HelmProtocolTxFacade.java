@@ -43,7 +43,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class HelmProtocolTxFacade extends AbstractHelmProtocolTxFacade<UUID> {
 
   public HelmProtocolTxFacade(
-      final HelmStorageService<UUID> helmStorageServiceImpl,
+      final HelmStorageService helmStorageServiceImpl,
       final ChartService<UUID> helmChartService,
       final OciBlobService<UUID> helmOciBlobService,
       final OciManifestService<UUID> helmOciManifestService,

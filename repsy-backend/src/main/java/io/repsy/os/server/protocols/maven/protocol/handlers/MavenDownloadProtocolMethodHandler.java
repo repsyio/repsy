@@ -19,17 +19,15 @@ import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.protocols.maven.protocol.MavenProtocolProvider;
 import io.repsy.protocols.maven.protocol.facades.contracts.MavenProtocolFacade;
 import io.repsy.protocols.maven.protocol.handlers.AbstractMavenDownloadProtocolMethodHandler;
-import java.util.UUID;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 @Component
-public class MavenDownloadProtocolMethodHandler
-    extends AbstractMavenDownloadProtocolMethodHandler<UUID> {
+public class MavenDownloadProtocolMethodHandler extends AbstractMavenDownloadProtocolMethodHandler {
 
   public MavenDownloadProtocolMethodHandler(
       @Qualifier("osMavenPathParser") final PathParser pathParser,
-      final MavenProtocolFacade<UUID> mavenFacade,
+      final MavenProtocolFacade mavenFacade,
       final MavenProtocolProvider protocolProvider) {
 
     super(pathParser, mavenFacade, protocolProvider);

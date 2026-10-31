@@ -19,16 +19,15 @@ import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.protocols.golang.protocol.GolangProtocolProvider;
 import io.repsy.protocols.golang.protocol.facades.contracts.GoProtocolFacade;
 import io.repsy.protocols.golang.protocol.handlers.AbstractGoDownloadProtocolMethodHandler;
-import java.util.UUID;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 @Component
-public class GoDownloadProtocolMethodHandler extends AbstractGoDownloadProtocolMethodHandler<UUID> {
+public class GoDownloadProtocolMethodHandler extends AbstractGoDownloadProtocolMethodHandler {
 
   public GoDownloadProtocolMethodHandler(
       @Qualifier("osGolangPathParser") final PathParser pathParser,
-      final GoProtocolFacade<UUID> goProtocolFacade,
+      final GoProtocolFacade goProtocolFacade,
       final GolangProtocolProvider provider) {
 
     super(pathParser, goProtocolFacade, provider);

@@ -27,7 +27,6 @@ import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.golang.protocol.GolangProtocolProvider;
 import io.repsy.protocols.golang.protocol.facades.contracts.GoProtocolFacade;
 import io.repsy.protocols.shared.auth.BasicAuthChallenge;
-import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -39,14 +38,14 @@ import org.springframework.mock.web.MockHttpServletRequest;
 @DisplayName("AbstractGoUploadProtocolMethodHandler answers a refused upload with a text/plain 401")
 class AbstractGoUploadProtocolMethodHandlerTest {
 
-  private final GoProtocolFacade<UUID> facade = mock();
+  private final GoProtocolFacade facade = mock();
   private final ProtocolContext context = new ProtocolContext();
   private final MockHttpServletRequest request = new MockHttpServletRequest("PUT", "/x/@v/v1.0.0");
-  private AbstractGoUploadProtocolMethodHandler<UUID> handler;
+  private AbstractGoUploadProtocolMethodHandler handler;
 
-  static class TestHandler extends AbstractGoUploadProtocolMethodHandler<UUID> {
+  static class TestHandler extends AbstractGoUploadProtocolMethodHandler {
 
-    TestHandler(final GoProtocolFacade<UUID> facade) {
+    TestHandler(final GoProtocolFacade facade) {
       super(mock(PathParser.class), facade, mock(GolangProtocolProvider.class));
     }
   }

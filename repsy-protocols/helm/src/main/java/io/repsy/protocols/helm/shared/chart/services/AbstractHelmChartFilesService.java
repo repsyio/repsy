@@ -53,7 +53,7 @@ public abstract class AbstractHelmChartFilesService<I> {
   private static final Pattern SHA256_DIGEST_PATTERN = Pattern.compile("^sha256:[0-9a-fA-F]{64}$");
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-  private final HelmStorageService<I> helmStorageService;
+  private final HelmStorageService helmStorageService;
   private final ChartService<I> chartService;
   private final OciBlobService<I> ociBlobService;
   private final OciManifestService<I> ociManifestService;

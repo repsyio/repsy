@@ -26,7 +26,6 @@ import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.protocols.golang.protocol.GolangProtocolProvider;
 import io.repsy.protocols.golang.protocol.facades.contracts.GoProtocolFacade;
-import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -42,7 +41,7 @@ import org.springframework.mock.web.MockHttpServletRequest;
 @DisplayName("GoUploadProtocolMethodHandler")
 class GoUploadProtocolMethodHandlerTest {
 
-  private final GoProtocolFacade<UUID> facade = mock();
+  private final GoProtocolFacade facade = mock();
   private GoUploadProtocolMethodHandler handler;
 
   @BeforeEach
