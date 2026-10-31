@@ -39,14 +39,14 @@ import org.yaml.snakeyaml.DumperOptions;
 import org.yaml.snakeyaml.Yaml;
 
 /** Handles GET /{repo}/index.yaml — generates and returns the Helm chart index. */
-public abstract class AbstractHelmIndexPullProtocolMethodHandler<ID>
-    extends AbstractFacadeProtocolMethodHandler<HelmProtocolFacade<ID>> {
+public abstract class AbstractHelmIndexPullProtocolMethodHandler<I>
+    extends AbstractFacadeProtocolMethodHandler<HelmProtocolFacade<I>> {
 
   private static final Pattern INDEX_PATTERN = Pattern.compile("^/index\\.yaml$");
 
-  public AbstractHelmIndexPullProtocolMethodHandler(
+  protected AbstractHelmIndexPullProtocolMethodHandler(
       final PathParser basePathParser,
-      final HelmProtocolFacade<ID> helmFacade,
+      final HelmProtocolFacade<I> helmFacade,
       final HelmProtocolProvider provider) {
     super(
         HandlerRoute.of(Permission.READ, HttpMethod.GET)

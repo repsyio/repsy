@@ -309,7 +309,9 @@ class AbstractHelmOciManifestPushProtocolMethodHandlerTest {
     final var mediaType = "application/" + "x".repeat(HelmConstants.MAX_OCI_MEDIA_TYPE_LENGTH);
     final var context = context("/payments/manifests/1.0.0");
 
-    assertThatThrownBy(() -> this.push(context, layer("\"" + LAYER_DIGEST + "\"", "10"), mediaType))
+    final var manifest = layer("\"" + LAYER_DIGEST + "\"", "10");
+
+    assertThatThrownBy(() -> this.push(context, manifest, mediaType))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("manifestMediaTypeTooLong");
 
@@ -355,7 +357,7 @@ class AbstractHelmOciManifestPushProtocolMethodHandlerTest {
   @ParameterizedTest(name = "{0} -> {1}")
   @MethodSource("malformedManifests")
   @DisplayName("rejects a malformed manifest with a 400 and touches nothing")
-  void rejectsMalformedManifest(final String manifest, final String msgId) throws Exception {
+  void rejectsMalformedManifest(final String manifest, final String msgId) {
     final var context = context("/payments/manifests/1.0.0");
 
     assertThatThrownBy(() -> this.push(context, manifest))
@@ -435,10 +437,9 @@ class AbstractHelmOciManifestPushProtocolMethodHandlerTest {
     this.strict();
     final var context = context("/payments/manifests/1.0.0");
 
-    assertThatThrownBy(
-            () ->
-                this.push(
-                    context, STRICT_MANIFEST.replace("\"schemaVersion\":2", "\"schemaVersion\":1")))
+    final var manifest = STRICT_MANIFEST.replace("\"schemaVersion\":2", "\"schemaVersion\":1");
+
+    assertThatThrownBy(() -> this.push(context, manifest))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("manifestSchemaVersionInvalid");
     verify(this.facade, never()).getBlob(any(ProtocolContext.class), any());
@@ -558,7 +559,7 @@ class AbstractHelmOciManifestPushProtocolMethodHandlerTest {
   }
 
   private static byte[] chartArchive(final String chartName, final String version) {
-    final var chartYaml = "apiVersion: v2\nname: %s\nversion: %s\n".formatted(chartName, version);
+    final var chartYaml = "apiVersion: v2%nname: %s%nversion: %s%n".formatted(chartName, version);
     try {
       final var bytes = new ByteArrayOutputStream();
       try (final var gzip = new GZIPOutputStream(bytes);

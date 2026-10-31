@@ -40,14 +40,14 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
 /** Handles POST /{repo}/api/charts — accepts a multipart/form-data upload of a .tgz chart. */
-public abstract class AbstractHelmChartPushProtocolMethodHandler<ID>
-    extends AbstractFacadeProtocolMethodHandler<HelmProtocolFacade<ID>> {
+public abstract class AbstractHelmChartPushProtocolMethodHandler<I>
+    extends AbstractFacadeProtocolMethodHandler<HelmProtocolFacade<I>> {
 
   private static final Pattern CHART_PUSH_PATTERN = Pattern.compile("^/api/charts$");
 
-  public AbstractHelmChartPushProtocolMethodHandler(
+  protected AbstractHelmChartPushProtocolMethodHandler(
       final PathParser basePathParser,
-      final HelmProtocolFacade<ID> helmFacade,
+      final HelmProtocolFacade<I> helmFacade,
       final HelmProtocolProvider provider) {
     super(
         HandlerRoute.of(Permission.WRITE, HttpMethod.POST)

@@ -27,12 +27,12 @@ import java.util.Optional;
 import org.springframework.http.HttpMethod;
 
 /** Handles HEAD /v2/{repo}/{name}/blobs/{digest} — checks if a blob exists. */
-public abstract class AbstractHelmOciBlobCheckProtocolMethodHandler<ID>
-    extends AbstractOciBlobCheckProtocolMethodHandler<HelmProtocolFacade<ID>> {
+public abstract class AbstractHelmOciBlobCheckProtocolMethodHandler<I>
+    extends AbstractOciBlobCheckProtocolMethodHandler<HelmProtocolFacade<I>> {
 
-  public AbstractHelmOciBlobCheckProtocolMethodHandler(
+  protected AbstractHelmOciBlobCheckProtocolMethodHandler(
       final PathParser basePathParser,
-      final HelmProtocolFacade<ID> helmFacade,
+      final HelmProtocolFacade<I> helmFacade,
       final HelmProtocolProvider provider) {
     super(
         HandlerRoute.of(Permission.READ, HttpMethod.HEAD).writeOperation(false),

@@ -200,10 +200,11 @@ class AbstractHelmChartPushProtocolMethodHandlerTest {
   void refusesAnEmptyChartPart() throws Exception {
     final var request = upload(new byte[0]);
 
-    assertThatThrownBy(
-            () ->
-                this.handler()
-                    .handle(new ProtocolContext(), request, new MockHttpServletResponse()))
+    final var handler = this.handler();
+    final var context = new ProtocolContext();
+    final var response = new MockHttpServletResponse();
+
+    assertThatThrownBy(() -> handler.handle(context, request, response))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("helmChartEmpty");
 
@@ -215,10 +216,11 @@ class AbstractHelmChartPushProtocolMethodHandlerTest {
   void storesNothingForInvalidChart() throws Exception {
     final var request = upload(chart("- just\n- a list\n"));
 
-    assertThatThrownBy(
-            () ->
-                this.handler()
-                    .handle(new ProtocolContext(), request, new MockHttpServletResponse()))
+    final var handler = this.handler();
+    final var context = new ProtocolContext();
+    final var response = new MockHttpServletResponse();
+
+    assertThatThrownBy(() -> handler.handle(context, request, response))
         .isInstanceOf(BadRequestException.class)
         .hasMessageContaining("chartYamlInvalid");
 

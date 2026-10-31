@@ -33,12 +33,12 @@ import org.springframework.http.HttpMethod;
  * written, or a {@code 404} ({@code io.repsy.core.error_handling.exceptions.ItemNotFoundException}
  * propagated from the facade) when the session does not exist.
  */
-public abstract class AbstractHelmOciBlobUploadStatusProtocolMethodHandler<ID>
-    extends AbstractOciUploadStatusProtocolMethodHandler<HelmProtocolFacade<ID>> {
+public abstract class AbstractHelmOciBlobUploadStatusProtocolMethodHandler<I>
+    extends AbstractOciUploadStatusProtocolMethodHandler<HelmProtocolFacade<I>> {
 
-  public AbstractHelmOciBlobUploadStatusProtocolMethodHandler(
+  protected AbstractHelmOciBlobUploadStatusProtocolMethodHandler(
       final PathParser basePathParser,
-      final HelmProtocolFacade<ID> helmFacade,
+      final HelmProtocolFacade<I> helmFacade,
       final HelmProtocolProvider provider) {
     super(
         HandlerRoute.of(Permission.WRITE, HttpMethod.GET, HttpMethod.HEAD).writeOperation(true),

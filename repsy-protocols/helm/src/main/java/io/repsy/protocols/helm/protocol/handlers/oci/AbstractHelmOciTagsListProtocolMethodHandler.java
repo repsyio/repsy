@@ -40,14 +40,14 @@ import org.springframework.http.ResponseEntity;
  * this route any non-pinned OCI pull fails (RPS-1219). {@code n} and {@code last} page the answer
  * as the Docker registry pages it (RPS-2164).
  */
-public abstract class AbstractHelmOciTagsListProtocolMethodHandler<ID>
-    extends AbstractFacadeProtocolMethodHandler<HelmProtocolFacade<ID>> {
+public abstract class AbstractHelmOciTagsListProtocolMethodHandler<I>
+    extends AbstractFacadeProtocolMethodHandler<HelmProtocolFacade<I>> {
 
   private static final Pattern TAGS_LIST_PATTERN = Pattern.compile("^/([^/]+)/tags/list$");
 
-  public AbstractHelmOciTagsListProtocolMethodHandler(
+  protected AbstractHelmOciTagsListProtocolMethodHandler(
       final PathParser basePathParser,
-      final HelmProtocolFacade<ID> helmFacade,
+      final HelmProtocolFacade<I> helmFacade,
       final HelmProtocolProvider provider) {
     super(
         HandlerRoute.of(Permission.READ, HttpMethod.GET)

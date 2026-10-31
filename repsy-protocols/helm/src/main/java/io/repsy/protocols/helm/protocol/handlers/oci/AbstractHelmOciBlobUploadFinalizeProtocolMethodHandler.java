@@ -34,14 +34,14 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpMethod;
 
 /** Handles PUT /v2/{repo}/{name}/blobs/uploads/{uuid}?digest= — finalizes a blob upload. */
-public abstract class AbstractHelmOciBlobUploadFinalizeProtocolMethodHandler<ID>
-    extends AbstractOciUploadFinalizeProtocolMethodHandler<HelmProtocolFacade<ID>> {
+public abstract class AbstractHelmOciBlobUploadFinalizeProtocolMethodHandler<I>
+    extends AbstractOciUploadFinalizeProtocolMethodHandler<HelmProtocolFacade<I>> {
 
   private static final String DEFAULT_BLOB_MEDIA_TYPE = "application/octet-stream";
 
-  public AbstractHelmOciBlobUploadFinalizeProtocolMethodHandler(
+  protected AbstractHelmOciBlobUploadFinalizeProtocolMethodHandler(
       final PathParser basePathParser,
-      final HelmProtocolFacade<ID> helmFacade,
+      final HelmProtocolFacade<I> helmFacade,
       final HelmProtocolProvider provider) {
     super(
         HandlerRoute.of(Permission.WRITE, HttpMethod.PUT)

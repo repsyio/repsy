@@ -19,11 +19,11 @@ import io.repsy.protocols.helm.shared.oci.dtos.HelmOciBlobForm;
 import io.repsy.protocols.helm.shared.oci.dtos.HelmOciBlobInfo;
 import java.util.Optional;
 
-public interface OciBlobService<ID> {
+public interface OciBlobService<I> {
 
-  HelmOciBlobInfo getOrCreate(HelmOciBlobForm form, ID repoId);
+  HelmOciBlobInfo getOrCreate(HelmOciBlobForm form, I repoId);
 
-  Optional<HelmOciBlobInfo> findByDigest(ID repoId, String digest);
+  Optional<HelmOciBlobInfo> findByDigest(I repoId, String digest);
 
-  void deleteByRepoIdAndDigest(ID repoId, String digest);
+  void deleteByRepoIdAndDigest(I repoId, String digest);
 }

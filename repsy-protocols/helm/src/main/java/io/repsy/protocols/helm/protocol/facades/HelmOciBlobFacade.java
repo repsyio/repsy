@@ -37,22 +37,18 @@ import org.springframework.core.io.Resource;
 
 /** The OCI blob side of the Helm facade: upload sessions, finalize, existence and download. */
 @RequiredArgsConstructor
-final class HelmOciBlobFacade<ID> {
+final class HelmOciBlobFacade<I> {
 
-  private final HelmStorageService<ID> helmStorageService;
-  private final OciBlobService<ID> ociBlobService;
+  private final HelmStorageService<I> helmStorageService;
+  private final OciBlobService<I> ociBlobService;
 
-  UUID startBlobUpload(final ProtocolContext context) {
+  UUID startBlobUpload() {
     return UUID.randomUUID();
   }
 
-  long uploadBlobChunk(
-      final ProtocolContext context,
-      final UUID uploadId,
-      final InputStream stream,
-      final long contentLength)
+  long uploadBlobChunk(final ProtocolContext context, final UUID uploadId, final InputStream stream)
       throws IOException {
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     final var usages =
         this.helmStorageService.saveBlobChunk(RepoRef.of(repoInfo), uploadId, stream);
     ProtocolContextUtils.addUsages(context, usages);
@@ -60,7 +56,7 @@ final class HelmOciBlobFacade<ID> {
   }
 
   long getUploadSize(final ProtocolContext context, final UUID uploadId) throws IOException {
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     return this.helmStorageService
         .findBlob(RepoRef.of(repoInfo), uploadId.toString())
         .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.BLOB_NOT_FOUND))
@@ -76,7 +72,7 @@ final class HelmOciBlobFacade<ID> {
       final InputStream stream,
       final long contentLength)
       throws IOException {
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     if (contentLength > 0) {
       final var chunkUsages =
           this.helmStorageService.saveBlobChunk(RepoRef.of(repoInfo), uploadId, stream);
@@ -103,8 +99,7 @@ final class HelmOciBlobFacade<ID> {
 
   /** Refuses an upload that does not hash to the digest the client claims for it. */
   private void verifyUploadDigest(
-      final BaseRepoInfo<ID> repoInfo, final UUID uploadId, final String digest)
-      throws IOException {
+      final BaseRepoInfo<I> repoInfo, final UUID uploadId, final String digest) throws IOException {
     final var upload =
         this.helmStorageService
             .findBlob(RepoRef.of(repoInfo), uploadId.toString())
@@ -116,7 +111,7 @@ final class HelmOciBlobFacade<ID> {
   }
 
   Optional<HelmOciBlobInfo> checkBlob(final ProtocolContext context, final String digest) {
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     final var blobOpt = this.ociBlobService.findByDigest(repoInfo.getId(), digest);
     if (blobOpt.isEmpty()) {
       return Optional.empty();
@@ -128,13 +123,13 @@ final class HelmOciBlobFacade<ID> {
   }
 
   Resource getBlob(final ProtocolContext context, final String digest) throws IOException {
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     return this.helmStorageService
         .findBlob(RepoRef.of(repoInfo), digest)
         .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.BLOB_NOT_FOUND));
   }
 
-  HelmOciBlobInfo getOrCreateBlob(final HelmOciBlobForm form, final ID repoId) {
+  HelmOciBlobInfo getOrCreateBlob(final HelmOciBlobForm form, final I repoId) {
     return this.ociBlobService.getOrCreate(form, repoId);
   }
 }

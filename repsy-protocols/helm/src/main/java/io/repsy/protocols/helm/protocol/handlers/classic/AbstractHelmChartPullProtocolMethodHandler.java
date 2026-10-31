@@ -36,14 +36,14 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
 /** Handles GET /{repo}/charts/{filename} — streams a .tgz chart archive. */
-public abstract class AbstractHelmChartPullProtocolMethodHandler<ID>
-    extends AbstractFacadeProtocolMethodHandler<HelmProtocolFacade<ID>> {
+public abstract class AbstractHelmChartPullProtocolMethodHandler<I>
+    extends AbstractFacadeProtocolMethodHandler<HelmProtocolFacade<I>> {
 
   private static final Pattern CHART_PULL_PATTERN = Pattern.compile("^/charts/([^/]+\\.tgz)$");
 
-  public AbstractHelmChartPullProtocolMethodHandler(
+  protected AbstractHelmChartPullProtocolMethodHandler(
       final PathParser basePathParser,
-      final HelmProtocolFacade<ID> helmFacade,
+      final HelmProtocolFacade<I> helmFacade,
       final HelmProtocolProvider provider) {
     super(
         HandlerRoute.of(Permission.READ, HttpMethod.GET)

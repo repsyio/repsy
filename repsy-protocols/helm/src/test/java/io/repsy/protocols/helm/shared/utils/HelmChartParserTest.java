@@ -141,8 +141,10 @@ class HelmChartParserTest {
         "apiVersion: [v2]",
         "apiVersion: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
       })
-  void rejectsAnInvalidApiVersion(final String line) {
-    assertThatThrownBy(() -> HelmChartParser.parseChartYaml(chart(BASE + line + "\n")))
+  void rejectsAnInvalidApiVersion(final String line) throws IOException {
+    final var stream = chart(BASE + line + "\n");
+
+    assertThatThrownBy(() -> HelmChartParser.parseChartYaml(stream))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("chartApiVersionInvalid");
   }
@@ -186,18 +188,22 @@ class HelmChartParserTest {
   @CsvSource(
       delimiter = '|',
       value = {"dependencies: redis", "dependencies: {name: redis}", "dependencies: [redis]"})
-  void rejectsDependenciesThatAreNotAListOfMappings(final String line) {
-    assertThatThrownBy(() -> HelmChartParser.parseChartYaml(chart(BASE + line + "\n")))
+  void rejectsDependenciesThatAreNotAListOfMappings(final String line) throws IOException {
+    final var stream = chart(BASE + line + "\n");
+
+    assertThatThrownBy(() -> HelmChartParser.parseChartYaml(stream))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("chartDependenciesInvalid");
   }
 
   @Test
-  void rejectsDependenciesTooLargeToRepeatInTheIndex() {
+  void rejectsDependenciesTooLargeToRepeatInTheIndex() throws IOException {
     final var big =
         BASE + "dependencies:\n  - name: x\n    condition: " + "a".repeat(300 * 1024) + "\n";
 
-    assertThatThrownBy(() -> HelmChartParser.parseChartYaml(chart(big)))
+    final var stream = chart(big);
+
+    assertThatThrownBy(() -> HelmChartParser.parseChartYaml(stream))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("chartDependenciesInvalid");
   }
@@ -213,24 +219,29 @@ class HelmChartParserTest {
         "description: 42|chartDescriptionInvalid",
         "type: 3|chartTypeInvalid"
       })
-  void rejectsNonStringOptionalScalars(final String line, final String msgId) {
-    assertThatThrownBy(() -> HelmChartParser.parseChartYaml(chart(BASE + line + "\n")))
+  void rejectsNonStringOptionalScalars(final String line, final String msgId) throws IOException {
+    final var stream = chart(BASE + line + "\n");
+
+    assertThatThrownBy(() -> HelmChartParser.parseChartYaml(stream))
         .isInstanceOf(BadRequestException.class)
         .hasMessage(msgId);
   }
 
   @Test
-  void rejectsNonStringName() {
-    assertThatThrownBy(() -> HelmChartParser.parseChartYaml(chart("name: 5\nversion: 1.0.0\n")))
+  void rejectsNonStringName() throws IOException {
+    final var stream = chart("name: 5\nversion: 1.0.0\n");
+
+    assertThatThrownBy(() -> HelmChartParser.parseChartYaml(stream))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("chartNameInvalid");
   }
 
   @ParameterizedTest
   @CsvSource({"2", "1.0"})
-  void rejectsNonStringVersion(final String version) {
-    assertThatThrownBy(
-            () -> HelmChartParser.parseChartYaml(chart("name: payments\nversion: " + version)))
+  void rejectsNonStringVersion(final String version) throws IOException {
+    final var stream = chart("name: payments\nversion: " + version);
+
+    assertThatThrownBy(() -> HelmChartParser.parseChartYaml(stream))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("chartVersionInvalid");
   }
@@ -247,8 +258,10 @@ class HelmChartParserTest {
   @CsvSource(
       delimiter = '|',
       value = {"''", "- a", "just a string", "name: [unclosed"})
-  void rejectsDocumentsThatAreNotAMapping(final String chartYaml) {
-    assertThatThrownBy(() -> HelmChartParser.parseChartYaml(chart(chartYaml + "\n")))
+  void rejectsDocumentsThatAreNotAMapping(final String chartYaml) throws IOException {
+    final var stream = chart(chartYaml + "\n");
+
+    assertThatThrownBy(() -> HelmChartParser.parseChartYaml(stream))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("chartYamlInvalid");
   }
@@ -276,7 +289,7 @@ class HelmChartParserTest {
     final var metadata =
         HelmChartParser.parseChartYaml(
             chart(
-                "name: %s\nversion: %s\nappVersion: \"%s\"\ntype: %s\n"
+                "name: %s%nversion: %s%nappVersion: \"%s\"%ntype: %s%n"
                     .formatted(name, version, appVersion, type)));
 
     assertThat(metadata.getName()).isEqualTo(name);
@@ -286,37 +299,45 @@ class HelmChartParserTest {
   }
 
   @Test
-  void rejectsANameOverTheLimit() {
-    final var yaml = "name: %s\nversion: 1.0.0\n".formatted(ofLength(256));
+  void rejectsANameOverTheLimit() throws IOException {
+    final var yaml = "name: %s%nversion: 1.0.0%n".formatted(ofLength(256));
 
-    assertThatThrownBy(() -> HelmChartParser.parseChartYaml(chart(yaml)))
+    final var stream = chart(yaml);
+
+    assertThatThrownBy(() -> HelmChartParser.parseChartYaml(stream))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("chartNameTooLong");
   }
 
   @Test
-  void rejectsAVersionOverTheLimit() {
-    final var yaml = "name: payments\nversion: %s\n".formatted(versionOfLength(65));
+  void rejectsAVersionOverTheLimit() throws IOException {
+    final var yaml = "name: payments%nversion: %s%n".formatted(versionOfLength(65));
 
-    assertThatThrownBy(() -> HelmChartParser.parseChartYaml(chart(yaml)))
+    final var stream = chart(yaml);
+
+    assertThatThrownBy(() -> HelmChartParser.parseChartYaml(stream))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("chartVersionTooLong");
   }
 
   @Test
-  void rejectsAnAppVersionOverTheLimit() {
-    final var yaml = BASE + "appVersion: \"%s\"\n".formatted(ofLength(65));
+  void rejectsAnAppVersionOverTheLimit() throws IOException {
+    final var yaml = BASE + "appVersion: \"%s\"%n".formatted(ofLength(65));
 
-    assertThatThrownBy(() -> HelmChartParser.parseChartYaml(chart(yaml)))
+    final var stream = chart(yaml);
+
+    assertThatThrownBy(() -> HelmChartParser.parseChartYaml(stream))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("chartAppVersionTooLong");
   }
 
   @Test
-  void rejectsATypeOverTheLimitAsAnInvalidType() {
-    final var yaml = BASE + "type: %s\n".formatted(ofLength(33));
+  void rejectsATypeOverTheLimitAsAnInvalidType() throws IOException {
+    final var yaml = BASE + "type: %s%n".formatted(ofLength(33));
 
-    assertThatThrownBy(() -> HelmChartParser.parseChartYaml(chart(yaml)))
+    final var stream = chart(yaml);
+
+    assertThatThrownBy(() -> HelmChartParser.parseChartYaml(stream))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("chartTypeInvalid");
   }
@@ -373,17 +394,17 @@ class HelmChartParserTest {
   }
 
   @Test
-  void ignoresFilesAndDirectoriesThatOnlyLookLikeChartYaml() {
-    assertThatThrownBy(
-            () ->
-                HelmChartParser.parseChartYaml(
-                    archive(
-                        "payments/NotChart.yaml",
-                        BASE,
-                        "payments/Chart.yaml/",
-                        "",
-                        "payments/chart.yaml",
-                        BASE)))
+  void ignoresFilesAndDirectoriesThatOnlyLookLikeChartYaml() throws IOException {
+    final var stream =
+        archive(
+            "payments/NotChart.yaml",
+            BASE,
+            "payments/Chart.yaml/",
+            "",
+            "payments/chart.yaml",
+            BASE);
+
+    assertThatThrownBy(() -> HelmChartParser.parseChartYaml(stream))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("chartYamlNotFound");
   }
@@ -410,8 +431,11 @@ class HelmChartParserTest {
 
   @ParameterizedTest
   @MethodSource("blankAndMalformed")
-  void rejectsBlankAndMalformedNamesAndVersions(final String chartYaml, final String msgId) {
-    assertThatThrownBy(() -> HelmChartParser.parseChartYaml(chart(chartYaml + "\n")))
+  void rejectsBlankAndMalformedNamesAndVersions(final String chartYaml, final String msgId)
+      throws IOException {
+    final var stream = chart(chartYaml + "\n");
+
+    assertThatThrownBy(() -> HelmChartParser.parseChartYaml(stream))
         .isInstanceOf(BadRequestException.class)
         .hasMessage(msgId);
   }

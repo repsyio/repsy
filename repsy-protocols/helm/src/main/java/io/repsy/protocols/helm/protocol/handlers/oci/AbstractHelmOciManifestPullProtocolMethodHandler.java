@@ -40,16 +40,16 @@ import org.springframework.web.HttpMediaTypeNotAcceptableException;
  * does (RPS-2164): a header that names no manifest type this registry serves is a 406 before the
  * manifest is read.
  */
-public abstract class AbstractHelmOciManifestPullProtocolMethodHandler<ID>
-    extends AbstractOciManifestPullProtocolMethodHandler<HelmProtocolFacade<ID>> {
+public abstract class AbstractHelmOciManifestPullProtocolMethodHandler<I>
+    extends AbstractOciManifestPullProtocolMethodHandler<HelmProtocolFacade<I>> {
 
   private static final List<String> DEFAULT_ACCEPT_TYPES = List.of(OCI_MANIFEST_SCHEMA1);
 
   private final boolean strictWire;
 
-  public AbstractHelmOciManifestPullProtocolMethodHandler(
+  protected AbstractHelmOciManifestPullProtocolMethodHandler(
       final PathParser basePathParser,
-      final HelmProtocolFacade<ID> helmFacade,
+      final HelmProtocolFacade<I> helmFacade,
       final HelmProtocolProvider provider,
       final boolean strictWire) {
     super(
