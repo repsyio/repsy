@@ -131,7 +131,8 @@ export class PypiPackagesVersionDetailComponent implements OnDestroy {
         next: (releaseInfo: ReleaseDetail) => {
           this.versionInfo = releaseInfo;
           releaseInfo.classifiers.forEach((c: ReleaseClassifierInfo) => {
-            (this.classifiers[c.classifier] ??= []).push(c.value);
+            this.classifiers[c.classifier] ??= [];
+            this.classifiers[c.classifier].push(c.value);
           });
 
           releaseInfo.descriptionContentType = releaseInfo.descriptionContentType
