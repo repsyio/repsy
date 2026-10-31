@@ -110,7 +110,7 @@ describe('RepositoryBreadcrumbComponent', () => {
 
       expect(component.crumbs).toEqual(['Repositories', 'acme-repo', 'settings']);
       expect(component.crumbLinks).toEqual(['/repositories', '/acme-repo', '/acme-repo/settings']);
-      expect(component.crumbQueryParams.length).toBe(3);
+      expect(component.crumbQueryParams).toHaveSize(3);
     });
 
     it('ignores router events other than the end of a navigation', () => {

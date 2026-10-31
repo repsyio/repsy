@@ -73,7 +73,7 @@ export class NuGetService {
   }
 
   async fetchRepositoryUsage(): Promise<RepoUsageInfo> {
-    return firstValueFrom(this.reposApi.getRepoUsage(this.repoName));
+    return await firstValueFrom(this.reposApi.getRepoUsage(this.repoName));
   }
 
   async fetchRepositorySettings(): Promise<RepoSettingsInfo> {
@@ -117,7 +117,7 @@ export class NuGetService {
   }
 
   async fetchPackage(packageId: string): Promise<NuGetPackageInfo> {
-    return firstValueFrom(this.nugetPackagesApi.getNugetPackage(packageId, this.repoName));
+    return await firstValueFrom(this.nugetPackagesApi.getNugetPackage(packageId, this.repoName));
   }
 
   async fetchPackageVersions(
@@ -136,7 +136,7 @@ export class NuGetService {
   }
 
   async fetchPackageVersion(packageId: string, version: string): Promise<NuGetVersionInfo> {
-    return firstValueFrom(this.nugetPackagesApi.getNugetVersion(packageId, version, this.repoName));
+    return await firstValueFrom(this.nugetPackagesApi.getNugetVersion(packageId, version, this.repoName));
   }
 
   async deletePackage(packageId: string): Promise<void> {
@@ -153,11 +153,11 @@ export class NuGetService {
   }
 
   async rotateDeployToken(tokenId: string): Promise<string> {
-    return firstValueFrom(this.deployTokensApi.rotateDeployToken(tokenId, this.repoName));
+    return await firstValueFrom(this.deployTokensApi.rotateDeployToken(tokenId, this.repoName));
   }
 
   async createDeployToken(form: DeployTokenForm): Promise<TokenInfo> {
-    return firstValueFrom(this.deployTokensApi.createDeployToken(this.repoName, form));
+    return await firstValueFrom(this.deployTokensApi.createDeployToken(this.repoName, form));
   }
 
   async revokeDeployToken(tokenId: string): Promise<void> {

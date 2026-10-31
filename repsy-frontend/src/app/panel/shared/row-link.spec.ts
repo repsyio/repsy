@@ -112,8 +112,8 @@ describe('list row with a stretched link', () => {
   it('has no interactive element inside another', () => {
     const nested = root.querySelectorAll('a a, a button, button a, button button, [role="button"]');
 
-    expect(nested.length).toBe(0);
-    expect(q('first', '.row-link').children.length).toBe(0);
+    expect(nested).toHaveSize(0);
+    expect(q('first', '.row-link').children).toHaveSize(0);
   });
 
   it('paints the open menu of a row over the next row', () => {

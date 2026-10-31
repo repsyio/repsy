@@ -53,7 +53,7 @@ export class BreadcrumbComponent implements OnInit, OnDestroy {
     this.crumbs = [this.username];
     this.crumbLinks = ['/'];
 
-    if (!primary || !primary.segments) {
+    if (!primary?.segments) {
       return;
     }
 

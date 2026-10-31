@@ -110,7 +110,7 @@ export class DockerImagesTagListComponent implements OnDestroy {
 
     this.repositoryChanges$ = this.dockerService.repoChanges$.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
-        this.activeRepo = Object.assign({}, repo);
+        this.activeRepo = { ...repo };
         this.imageName = this.route.snapshot.paramMap.get('imageName');
         this.installText = `docker pull ${getRepoDomain()}/${this.activeRepo.repoName}/${this.imageName}`;
         this.fetchTags();

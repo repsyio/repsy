@@ -47,8 +47,8 @@ const PAGE_SIZE = 5;
 const FINDINGS_PAGE_SIZE = 10;
 const SECURITY_FRAGMENT = 'security';
 const POLL_INTERVAL_MS = 3000;
-const TERMINAL_STATUSES: ScanStatus[] = [ScanStatus.Completed, ScanStatus.Failed];
-const ACTIVE_STATUSES: ScanStatus[] = [ScanStatus.Pending, ScanStatus.Queued, ScanStatus.Running];
+const TERMINAL_STATUSES: ReadonlySet<ScanStatus> = new Set([ScanStatus.Completed, ScanStatus.Failed]);
+const ACTIVE_STATUSES: ReadonlySet<ScanStatus> = new Set([ScanStatus.Pending, ScanStatus.Queued, ScanStatus.Running]);
 
 const SCROLL_RETRY_DELAYS_MS = [0, 300, 800];
 
@@ -257,7 +257,7 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
       return false;
     }
 
-    return !ACTIVE_STATUSES.includes(this.overview?.status ?? ScanStatus.Completed);
+    return !ACTIVE_STATUSES.has(this.overview?.status ?? ScanStatus.Completed);
   }
 
   private listScansPage(): Observable<PagedModelVulnerabilityScanInfo> {
@@ -394,7 +394,7 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
     this.patchOverviewStatus(detail, isOverviewScan);
     this.patchSelectedScanStatus(detail, isSelectedScan);
 
-    if (TERMINAL_STATUSES.includes(detail.status!)) {
+    if (TERMINAL_STATUSES.has(detail.status!)) {
       this.refreshOnTerminalScan(detail.id!, isSelectedScan, isOverviewScan);
     }
   }
@@ -448,7 +448,7 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
 
   private syncPolling(): void {
     const scanId = this.overview?.scanId;
-    const isActive = ACTIVE_STATUSES.includes(this.overview?.status ?? ScanStatus.Completed);
+    const isActive = ACTIVE_STATUSES.has(this.overview?.status ?? ScanStatus.Completed);
 
     if (!scanId || !isActive) {
       return;
@@ -456,7 +456,7 @@ export class SecurityScanSectionComponent implements OnInit, OnChanges, OnDestro
 
     this.pollingSub = pollUntilTerminal(
       () => this.securityScansApi.getVulnerabilityScan(scanId, this.repoName).pipe(map((response) => response!)),
-      (detail) => TERMINAL_STATUSES.includes(detail.status!),
+      (detail) => TERMINAL_STATUSES.has(detail.status!),
       POLL_INTERVAL_MS,
     ).subscribe((detail) => this.applyRefreshedScan(detail));
   }

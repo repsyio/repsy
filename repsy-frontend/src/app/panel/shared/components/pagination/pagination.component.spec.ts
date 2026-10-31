@@ -170,7 +170,7 @@ describe('PaginationComponent markup', () => {
     render(2, 5);
 
     const current = fixture.nativeElement.querySelectorAll('[aria-current]');
-    expect(current.length).toBe(1);
+    expect(current).toHaveSize(1);
     expect(current[0].getAttribute('data-testid')).toBe('pagination-page-3');
     expect(current[0].getAttribute('aria-current')).toBe('page');
     expect(q('[data-testid="pagination-page-2"]').hasAttribute('aria-current')).toBeFalse();

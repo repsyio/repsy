@@ -96,7 +96,7 @@ export class GoModulesListComponent implements OnDestroy {
 
     this.repositoryChanges$ = this.goService.repoChanges$.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
-        this.activeRepo = Object.assign({}, repo);
+        this.activeRepo = { ...repo };
         this.fetchModules();
         this.fetchSecuritySummary();
       }

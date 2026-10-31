@@ -116,7 +116,7 @@ describe('AuthRedirectComponent', () => {
 
     expect(has('[data-testid="login-form"]')).toBeTrue();
     expect(has('app-dashboard')).toBeFalse();
-    expect(fixture.nativeElement.querySelectorAll('app-login').length).toBe(1);
+    expect(fixture.nativeElement.querySelectorAll('app-login')).toHaveSize(1);
   });
 
   it('releases the splash screen when it is destroyed while a view is loading', () => {

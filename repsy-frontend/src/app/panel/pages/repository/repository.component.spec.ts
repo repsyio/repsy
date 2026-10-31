@@ -386,7 +386,7 @@ describe('RepositoryComponent', () => {
       component.loadPage(2);
       answer([], 2, 2);
 
-      expect(calls.length).toBe(3);
+      expect(calls).toHaveSize(3);
       expect(last().page).toBe(1);
       expect(component.pageNum).toBe(1);
       answer([repo('second')], 2, 1);
@@ -417,10 +417,10 @@ describe('RepositoryComponent', () => {
       component.search('ma');
       component.search('mav');
       tick(SEARCH_DEBOUNCE_MS - 1);
-      expect(calls.length).toBe(0);
+      expect(calls).toHaveSize(0);
       tick(1);
 
-      expect(calls.length).toBe(1);
+      expect(calls).toHaveSize(1);
       expect(repoApi.listRepos.calls.mostRecent().args).toEqual([undefined, 'mav', 0, 10, ['createdAt,desc']]);
       expect(component.pageNum).toBe(0);
       expect(component.searchQuery).toBe('mav');
@@ -480,7 +480,7 @@ describe('RepositoryComponent', () => {
       component.refreshPage();
       tick(SEARCH_DEBOUNCE_MS);
 
-      expect(calls.length).toBe(1);
+      expect(calls).toHaveSize(1);
       expect(calls[0].q).toBeUndefined();
       expect(component.searchQuery).toBe('');
 
@@ -488,7 +488,7 @@ describe('RepositoryComponent', () => {
       component.filterRepos(RepoType.NPM);
       tick(SEARCH_DEBOUNCE_MS);
 
-      expect(calls.length).toBe(2);
+      expect(calls).toHaveSize(2);
       expect(calls[1].q).toBeUndefined();
     }));
 
@@ -668,7 +668,7 @@ describe('RepositoryComponent', () => {
       dangerModal.call();
 
       expect(protocolApi.deleteRepo).toHaveBeenCalledOnceWith('a-maven');
-      expect(calls.length).toBe(1);
+      expect(calls).toHaveSize(1);
       expect(last().q).toBeUndefined();
       expect(last().page).toBe(0);
       expect(toast.show).toHaveBeenCalledWith('Repository deleted successfully', 'success');
@@ -684,7 +684,7 @@ describe('RepositoryComponent', () => {
       component.deleteRepository({ name: 'a-maven' } as never);
       dangerModal.call();
 
-      expect(calls.length).toBe(0);
+      expect(calls).toHaveSize(0);
       expect(toast.show).not.toHaveBeenCalled();
       expect(component.operationLock).toBeFalse();
     });
@@ -794,7 +794,7 @@ describe('RepositoryComponent', () => {
 
       modal.componentInstance.created.emit(repo('brand-new'));
 
-      expect(calls.length).toBe(before + 1);
+      expect(calls).toHaveSize(before + 1);
       expect(last().page).toBe(0);
     });
   });

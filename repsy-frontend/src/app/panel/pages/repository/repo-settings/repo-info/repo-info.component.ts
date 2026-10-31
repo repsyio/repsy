@@ -60,7 +60,7 @@ export class RepoInfoComponent implements OnInit {
       name: new FormControl('', [
         Validators.required,
         Validators.maxLength(25),
-        Validators.pattern(/^[a-zA-Z0-9_][a-zA-Z0-9_\-]*$/),
+        Validators.pattern(/^\w[\w-]*$/),
         reservedRepoNameValidator(),
       ]),
     });

@@ -50,5 +50,7 @@ export async function renderComponent<T>(
 
 /** The `data-testid` of every element in `el` whose test id starts with `prefix`. */
 export function testIds(el: HTMLElement, prefix: string): string[] {
-  return Array.from(el.querySelectorAll(`[data-testid^="${prefix}"]`)).map((e) => e.getAttribute('data-testid') ?? '');
+  return Array.from(el.querySelectorAll<HTMLElement>(`[data-testid^="${prefix}"]`)).map(
+    (e) => e.dataset['testid'] ?? '',
+  );
 }

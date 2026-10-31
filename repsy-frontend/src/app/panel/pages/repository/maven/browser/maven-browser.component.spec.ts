@@ -101,7 +101,7 @@ describe('MavenBrowserComponent', () => {
       open();
       component.go(dir('org/'));
       component.prev();
-      expect(component.forwardStack.length).toBe(1);
+      expect(component.forwardStack).toHaveSize(1);
 
       repoChanges$.next(permission('other-repo'));
       mavenService.fetchPathContent.calls.reset();
@@ -234,7 +234,7 @@ describe('MavenBrowserComponent', () => {
       component.go(dir('org/'));
       component.go(dir('acme/'));
       component.go(dir('../'));
-      expect(component.forwardStack.length).toBe(1);
+      expect(component.forwardStack).toHaveSize(1);
 
       component.go(dir('com/'));
 
@@ -246,7 +246,7 @@ describe('MavenBrowserComponent', () => {
       component.go(dir('org/'));
       component.go(dir('acme/'));
       component.prev();
-      expect(component.forwardStack.length).toBe(1);
+      expect(component.forwardStack).toHaveSize(1);
 
       component.goToDir(component.directoryStack[0]);
 
@@ -349,7 +349,7 @@ describe('MavenBrowserComponent', () => {
 
     it('shows everything for an empty text, and nothing when no name matches', () => {
       component.search('');
-      expect(component.filteredFsItems.length).toBe(3);
+      expect(component.filteredFsItems).toHaveSize(3);
 
       component.search('zzz');
       expect(component.filteredFsItems).toEqual([]);

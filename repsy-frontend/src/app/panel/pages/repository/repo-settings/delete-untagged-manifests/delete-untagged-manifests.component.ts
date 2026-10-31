@@ -51,10 +51,11 @@ export class DeleteUntaggedManifestsComponent {
   ) {}
 
   deleteUntaggedManifests(): void {
+    const target = this.imageName ? `the image ${this.imageName}` : 'this repository';
     this.dangerModalService.showWithMessage(
       'Delete Untagged Manifests',
       'Delete',
-      `Manifests of ${this.imageName ? `the image ${this.imageName}` : 'this repository'} that no tag points to ` +
+      `Manifests of ${target} that no tag points to ` +
         'will be deleted and stop being pullable by digest. ' +
         'The layers that only they used are deleted afterwards. This cannot be undone.',
       () => {

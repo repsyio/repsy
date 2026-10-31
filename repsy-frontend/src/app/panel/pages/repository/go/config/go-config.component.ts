@@ -75,9 +75,9 @@ export class GoConfigComponent implements OnInit, OnChanges {
     const password = this.deployToken ? 'YOUR_DEPLOY_TOKEN' : 'YOUR_PASSWORD';
     const repoUrl = `${environment.repoBaseUrl}/${this.repoName}`;
     const plainHttp = this.isPlainHttp();
-    const repoUrlWithAuth = this.deployToken
-      ? `${environment.repoBaseUrl.replace(/^(https?):\/\//, `$1://token:${password}@`)}/${this.repoName}`
-      : `${environment.repoBaseUrl.replace(/^(https?):\/\//, `$1://${this.username}:${password}@`)}/${this.repoName}`;
+    const authority = this.deployToken ? 'token' : this.username;
+    const authReplacement = `$1://${authority}:${password}@`;
+    const repoUrlWithAuth = `${environment.repoBaseUrl.replace(/^(https?):\/\//, authReplacement)}/${this.repoName}`;
     const goproxyUrl = plainHttp ? repoUrl : repoUrlWithAuth;
 
     return `
@@ -131,7 +131,7 @@ prefixed with \`{modulePath}@{version}/\`.
 \`\`\`bash
 VERSION=${this.moduleVersion}
 MODULE_PATH=${this.modulePath}
-STAGING=\$(mktemp -d)
+STAGING=$(mktemp -d)
 MODULE_VERSION_DIR="\${STAGING}/\${MODULE_PATH}@\${VERSION}"
 
 mkdir -p "\${MODULE_VERSION_DIR}"
@@ -146,7 +146,7 @@ cp -r . "\${MODULE_VERSION_DIR}/"
 \`\`\`bash
 curl -u ${this.username}:${password} \\
   -T module.zip \\
-  -H "Content-Sha256: \$(sha256sum module.zip | cut -d' ' -f1)" \\
+  -H "Content-Sha256: $(sha256sum module.zip | cut -d' ' -f1)" \\
   "${repoUrl}/\${MODULE_PATH}/@v/\${VERSION}.zip"
 \`\`\`
 

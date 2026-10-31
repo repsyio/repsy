@@ -41,7 +41,7 @@ describe('MarkdownComponent', () => {
   it('renders GitHub-style tables', () => {
     const el = render('| Name | Value |\n| --- | --- |\n| a | 1 |\n');
 
-    expect(el.querySelectorAll('table th').length).toBe(2);
+    expect(el.querySelectorAll('table th')).toHaveSize(2);
     expect(el.querySelector('table td')?.textContent).toBe('a');
   });
 
@@ -159,7 +159,7 @@ describe('MarkdownComponent', () => {
     }
 
     function expectNoImageRequest(el: HTMLElement): void {
-      expect(el.querySelectorAll('img').length).toBe(0);
+      expect(el.querySelectorAll('img')).toHaveSize(0);
       expect(remoteReferences(el)).toEqual([]);
     }
 
@@ -193,7 +193,7 @@ describe('MarkdownComponent', () => {
         `<img src="${PIXEL}" srcset="https://tracker.example/a.png 1x, https://tracker.example/b.png 2x">`,
       );
 
-      expect(el.querySelectorAll('img').length).toBe(1);
+      expect(el.querySelectorAll('img')).toHaveSize(1);
       expect(el.querySelector('img')?.hasAttribute('srcset')).toBeFalse();
       expect(remoteReferences(el)).toEqual([]);
     });
@@ -259,7 +259,7 @@ describe('MarkdownComponent', () => {
     it('keeps an inline data:image picture', () => {
       const el = render(`<img src="${PIXEL}" alt="dot">`);
 
-      expect(el.querySelectorAll('img').length).toBe(1);
+      expect(el.querySelectorAll('img')).toHaveSize(1);
       expect(el.querySelector('img')?.getAttribute('src')).toBe(PIXEL);
     });
 
@@ -267,7 +267,7 @@ describe('MarkdownComponent', () => {
       const el = render('[![CI](https://ci.example/badge.svg)](https://ci.example/run)');
 
       expectNoImageRequest(el);
-      expect(el.querySelectorAll('a').length).toBe(1);
+      expect(el.querySelectorAll('a')).toHaveSize(1);
       expect(el.querySelector('a')?.getAttribute('href')).toBe('https://ci.example/run');
       expect(el.querySelector('a .blocked-image')?.textContent).toBe('CI');
     });
@@ -343,7 +343,7 @@ describe('MarkdownComponent', () => {
       );
 
       const links = Array.from(el.querySelectorAll('a'));
-      expect(links.length).toBe(3);
+      expect(links).toHaveSize(3);
       links.forEach((link) => {
         expect(link.getAttribute('target')).toBe('_blank');
         expect(link.getAttribute('rel')).toBe('noopener noreferrer nofollow');
@@ -361,7 +361,7 @@ describe('MarkdownComponent', () => {
 
       expect(el.querySelector('h1')?.textContent).toBe('Title');
       expect(el.querySelector('code')?.textContent).toBe('code');
-      expect(el.querySelectorAll('li').length).toBe(2);
+      expect(el.querySelectorAll('li')).toHaveSize(2);
       expect(el.querySelector('.blocked-image')).toBeNull();
     });
   });

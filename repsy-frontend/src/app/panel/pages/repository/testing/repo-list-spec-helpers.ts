@@ -76,6 +76,9 @@ export interface ListOptions {
 
 export const REPO_NAME = 'acme-repo';
 
+/** The permission flags a repository is selected with unless the spec passes its own. */
+const MANAGE_FLAGS: Parameters<typeof permission>[1] = { canManage: true };
+
 export function pageOf(content: unknown[], totalPages: number): PagedData<unknown> {
   const paged = new PagedData<unknown>();
   paged.content = content;
@@ -95,7 +98,7 @@ export function describeRepoListBehavior(setup: () => ListFixture, options: List
   afterEach(() => fixture.component.ngOnDestroy());
 
   /** Selects a repository and lets the fetch settle. */
-  function selectRepo(flags: Parameters<typeof permission>[1] = { canManage: true }): void {
+  function selectRepo(flags: Parameters<typeof permission>[1] = MANAGE_FLAGS): void {
     fixture.repoChanges$.next(permission(REPO_NAME, flags));
     flushMicrotasks();
   }
@@ -196,7 +199,7 @@ export function describeRepoListBehavior(setup: () => ListFixture, options: List
     }));
 
     it('sort fetches with the chosen order', fakeAsync(() => {
-      const option = fixture.component.sortOptions[fixture.component.sortOptions.length - 1];
+      const option = fixture.component.sortOptions.at(-1)!;
 
       fixture.component.sort(option);
       flushMicrotasks();
@@ -210,7 +213,7 @@ export function describeRepoListBehavior(setup: () => ListFixture, options: List
       fixture.component.loadPage(2);
       flushMicrotasks();
 
-      fixture.component.sort(fixture.component.sortOptions[fixture.component.sortOptions.length - 1]);
+      fixture.component.sort(fixture.component.sortOptions.at(-1)!);
       flushMicrotasks();
 
       expect(fixture.component.pageNum).toBe(options.sortResetsPage ? 0 : 2);

@@ -136,7 +136,8 @@ export class AccessTokensComponent implements OnInit {
 
   /** The scopes of a token as text (the wire value is an array, the generated type a Set). */
   scopesText(token: AccessTokenListItem): string {
-    return Array.from(token.scopes).join(', ');
+    const scopes: string[] = Array.from(token.scopes);
+    return scopes.join(', ');
   }
 
   isExpired(token: AccessTokenListItem): boolean {

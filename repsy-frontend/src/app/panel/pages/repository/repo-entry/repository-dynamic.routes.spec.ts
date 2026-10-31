@@ -88,7 +88,7 @@ describe('REPOSITORY_DYNAMIC_ROUTES', () => {
   });
 
   it('declares one entry per repository type, in this order', () => {
-    expect(REPOSITORY_DYNAMIC_ROUTES.length).toBe(ENTRIES.length);
+    expect(REPOSITORY_DYNAMIC_ROUTES).toHaveSize(ENTRIES.length);
     REPOSITORY_DYNAMIC_ROUTES.forEach((route: Route) => {
       expect(route.path).toBe('');
       expect(route.canMatch?.length).toBe(1);

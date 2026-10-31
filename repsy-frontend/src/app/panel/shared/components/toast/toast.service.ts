@@ -69,7 +69,7 @@ export class ToastService {
   /** Stops the countdown of a toast the user is hovering or has focused, keeping what is left of it. */
   pause(id: number) {
     const timer = this.timers.get(id);
-    if (!timer || timer.handle === undefined) {
+    if (timer?.handle === undefined) {
       return;
     }
     clearTimeout(timer.handle);

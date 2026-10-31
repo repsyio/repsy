@@ -21,7 +21,7 @@ import { Inject, Injectable, PLATFORM_ID } from '@angular/core';
 export class SplashService {
   loading = false;
 
-  constructor(@Inject(PLATFORM_ID) private platformId: object) {}
+  constructor(@Inject(PLATFORM_ID) private readonly platformId: object) {}
 
   set setLoading(loading: boolean) {
     this.setScrollLock(loading);

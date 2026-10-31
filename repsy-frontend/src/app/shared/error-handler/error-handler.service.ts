@@ -28,7 +28,7 @@ export class ErrorHandlerService {
   constructor(private readonly router: Router) {}
 
   handle(res: HttpErrorResponse): string | null {
-    if (!res || !res.status) {
+    if (!res?.status) {
       return 'Service unavailable';
     }
 

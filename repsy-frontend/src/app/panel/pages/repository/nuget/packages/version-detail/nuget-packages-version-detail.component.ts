@@ -84,7 +84,7 @@ export class NuGetPackagesVersionDetailComponent implements OnDestroy {
     this.activeRepo = {} as RepoPermissionInfo;
     this.repositoryChanges$ = this.nugetService.repoChanges$.subscribe((repo) => {
       if (repo) {
-        this.activeRepo = Object.assign({}, repo);
+        this.activeRepo = { ...repo };
         this.loadVersion();
       }
     });
@@ -142,7 +142,13 @@ export class NuGetPackagesVersionDetailComponent implements OnDestroy {
           this.nugetService.deletePackageVersion(this.packageId, this.versionName).then(() => isLastVersion(probe)),
         )
         .then((wasLastVersion) => {
-          landAfterVersionDelete(this.router, this.route, this.toastService, this.activeRepo.repoName, wasLastVersion);
+          void landAfterVersionDelete(
+            this.router,
+            this.route,
+            this.toastService,
+            this.activeRepo.repoName,
+            wasLastVersion,
+          );
         })
         // The error interceptor has already shown the failure to the user.
         .catch(() => undefined)

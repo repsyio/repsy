@@ -123,7 +123,7 @@ describe('RefreshTokenInterceptor', () => {
     expireSession('/a');
     expireSession('/b');
     refreshes[0].error(new HttpErrorResponse({ status: 401, error: { code: ERROR_CODES.REFRESH_TOKEN_EXPIRED } }));
-    expect(errors.length).toBe(2);
+    expect(errors).toHaveSize(2);
 
     // The user signs in again, and two requests expire together.
     session = true;
@@ -133,7 +133,7 @@ describe('RefreshTokenInterceptor', () => {
     expireSession('/c');
     expireSession('/d');
 
-    expect(errors.length).toBe(2);
+    expect(errors).toHaveSize(2);
     expect(authService.refreshToken).toHaveBeenCalledTimes(2);
 
     refreshes[1].next('token-2');
@@ -142,7 +142,7 @@ describe('RefreshTokenInterceptor', () => {
     expectRetriedWith('/c', 'token-2');
     expectRetriedWith('/d', 'token-2');
     expect(results).toEqual([{ ok: '/c' }, { ok: '/d' }]);
-    expect(errors.length).toBe(2);
+    expect(errors).toHaveSize(2);
     expect(authService.logOut).toHaveBeenCalledTimes(1);
   });
 
@@ -190,7 +190,7 @@ describe('RefreshTokenInterceptor', () => {
 
       httpTesting.expectNone('/api/repos/x');
       expect(results).toEqual([]);
-      expect(errors.length).toBe(1);
+      expect(errors).toHaveSize(1);
       expect(authService.logOut).toHaveBeenCalledTimes(1);
       expect(toastService.show).toHaveBeenCalledOnceWith('Session expired, please log in again.', 'error');
       expect(router.navigateByUrl).toHaveBeenCalledOnceWith('/login?returnUrl=%2Fmy-repo%2Fsettings');
@@ -341,7 +341,7 @@ describe('RefreshTokenInterceptor', () => {
       call();
       refuse(ERROR_CODES.ACCESS_NOT_ALLOWED);
 
-      expect(errors.length).toBe(1);
+      expect(errors).toHaveSize(1);
       expect(authService.logOut).not.toHaveBeenCalled();
       expect(toastService.show).not.toHaveBeenCalled();
       expect(router.navigateByUrl).not.toHaveBeenCalled();
@@ -351,7 +351,7 @@ describe('RefreshTokenInterceptor', () => {
       call();
       httpTesting.expectOne('/a').flush({ code: ERROR_CODES.ACCESS_DENIED }, { status: 403, statusText: 'Forbidden' });
 
-      expect(errors.length).toBe(1);
+      expect(errors).toHaveSize(1);
       expect(authService.refreshToken).not.toHaveBeenCalled();
       expect(authService.logOut).not.toHaveBeenCalled();
       expect(router.navigateByUrl).not.toHaveBeenCalled();
@@ -362,7 +362,7 @@ describe('RefreshTokenInterceptor', () => {
       call('/api/auth/login?x=1');
       refuse(ERROR_CODES.INVALID_CREDENTIALS, '/api/auth/login?x=1');
 
-      expect(errors.length).toBe(1);
+      expect(errors).toHaveSize(1);
       expect(authService.logOut).not.toHaveBeenCalled();
       expect(toastService.show).not.toHaveBeenCalled();
       expect(router.navigateByUrl).not.toHaveBeenCalled();
@@ -390,7 +390,7 @@ describe('RefreshTokenInterceptor', () => {
       refreshes[0].complete();
       httpTesting.expectOne('/a').flush(null, { status: 500, statusText: 'Server Error' });
 
-      expect(errors.length).toBe(1);
+      expect(errors).toHaveSize(1);
       expect(authService.logOut).not.toHaveBeenCalled();
     });
   });

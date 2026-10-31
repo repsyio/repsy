@@ -38,7 +38,7 @@ import { SILENT_ERROR } from '../../../shared/interceptors/error-handler.interce
 const USERNAME_KEY = 'username';
 const TOKEN_KEY = 'token';
 const REFRESH_TOKEN_KEY = 'refresh-token';
-const SESSION_KEYS = [USERNAME_KEY, TOKEN_KEY, REFRESH_TOKEN_KEY];
+const SESSION_KEYS = new Set([USERNAME_KEY, TOKEN_KEY, REFRESH_TOKEN_KEY]);
 
 /** Name of the Web Lock that lets one tab at a time spend the (single-use) refresh token. */
 const REFRESH_LOCK = 'repsy-refresh';
@@ -139,7 +139,7 @@ export class AuthService {
 
   private readonly onStorage = (event: StorageEvent): void => {
     // A null key is `localStorage.clear()`. Other keys and sessionStorage are none of our business.
-    if (event.storageArea === localStorage && (event.key === null || SESSION_KEYS.includes(event.key))) {
+    if (event.storageArea === localStorage && (event.key === null || SESSION_KEYS.has(event.key))) {
       // A write (`newValue` set) can never end a session. The three keys of a login or refresh are written one
       // after the other and Chromium replicates them between processes one event at a time, so the first event
       // can arrive while a re-read still finds the keys that follow empty. Reading that as a logout sent the
@@ -151,7 +151,7 @@ export class AuthService {
   /** Adopts the pair another tab announced (RPS-1672): see the class doc and {@link HANDOVER_WAIT_MS}. */
   private readonly onBroadcast = (event: MessageEvent<SessionBroadcastMessage>): void => {
     const message = event.data;
-    if (!message || message.type !== 'session') {
+    if (message?.type !== 'session') {
       return;
     }
     this.currentUsername = message.username;
@@ -316,7 +316,7 @@ export class AuthService {
     try {
       while (!held && Date.now() < giveUpAt) {
         const expiresAt = Number(localStorage.getItem(REFRESH_LOCK_KEY)?.split(':')[1]);
-        if (!(expiresAt > Date.now())) {
+        if (Number.isNaN(expiresAt) || expiresAt <= Date.now()) {
           localStorage.setItem(REFRESH_LOCK_KEY, `${mine}${Date.now() + LOCK_TTL_MS}`);
           await sleep(LOCK_SETTLE_MS);
           held = !!localStorage.getItem(REFRESH_LOCK_KEY)?.startsWith(mine);

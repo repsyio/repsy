@@ -24,8 +24,8 @@ export class OutSideClickDirective implements OnInit, OnDestroy {
   @Input() appOutSideClick!: boolean;
   @Output() outSideClick = new EventEmitter<void>();
   constructor(
-    private element: ElementRef,
-    private renderer: Renderer2,
+    private readonly element: ElementRef,
+    private readonly renderer: Renderer2,
   ) {}
 
   private listener: (() => void) | undefined;
