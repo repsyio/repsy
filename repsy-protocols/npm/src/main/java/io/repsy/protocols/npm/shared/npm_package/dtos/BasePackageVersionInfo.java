@@ -21,9 +21,9 @@ import lombok.experimental.SuperBuilder;
 
 @Data
 @SuperBuilder
-public class BasePackageVersionInfo<ID> {
+public class BasePackageVersionInfo<I> {
 
-  private ID id;
+  private I id;
   private String packageScope;
   private String packageName;
   private String version;

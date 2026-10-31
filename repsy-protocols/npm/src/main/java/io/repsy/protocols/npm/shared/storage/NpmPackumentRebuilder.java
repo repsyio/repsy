@@ -20,6 +20,7 @@ import io.repsy.protocols.npm.shared.utils.NpmPackageUtils;
 import io.repsy.protocols.npm.shared.utils.NpmPackumentBuilder;
 import io.repsy.protocols.npm.shared.utils.NpmTarballFacts;
 import io.repsy.protocols.npm.shared.utils.NpmTarballInspector;
+import io.repsy.protocols.npm.shared.utils.NpmTarballUrlUtils;
 import io.repsy.protocols.shared.storage.RepoRef;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -89,7 +90,7 @@ public final class NpmPackumentRebuilder {
       return null;
     }
 
-    return base.replaceAll("/+$", "")
+    return NpmTarballUrlUtils.stripTrailingSlashes(base)
         + "/"
         + repoName
         + "/"

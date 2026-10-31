@@ -26,12 +26,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.zip.GZIPOutputStream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import tools.jackson.databind.json.JsonMapper;
 
 @DisplayName("NpmAuditRequestReader")
 class NpmAuditRequestReaderTest {
 
-  private static final JsonMapper MAPPER = JsonMapper.builder().build();
   private static final long MAX = 1024 * 1024;
   private static final String BODY =
       "{\"lodash\":[\"4.17.20\",\"4.17.21\"],\"left-pad\":[\"1.3.0\"]}";
@@ -77,7 +75,9 @@ class NpmAuditRequestReaderTest {
   @Test
   @DisplayName("reads a plain body that wrongly declares gzip as an error")
   void headerWithoutGzip() {
-    assertThatThrownBy(() -> read(plain(BODY), "gzip", MAX))
+    final var body = plain(BODY);
+
+    assertThatThrownBy(() -> read(body, "gzip", MAX))
         .isInstanceOf(InvalidAuditRequestException.class);
   }
 
@@ -102,7 +102,9 @@ class NpmAuditRequestReaderTest {
   @Test
   @DisplayName("refuses a body that is not JSON")
   void invalidJson() {
-    assertThatThrownBy(() -> read(plain("{not json"), null, MAX))
+    final var body = plain("{not json");
+
+    assertThatThrownBy(() -> read(body, null, MAX))
         .isInstanceOf(InvalidAuditRequestException.class)
         .hasMessageContaining("JSON");
   }
@@ -110,10 +112,13 @@ class NpmAuditRequestReaderTest {
   @Test
   @DisplayName("refuses JSON that is not an object")
   void notAnObject() {
-    assertThatThrownBy(() -> read(plain("[1,2]"), null, MAX))
+    final var array = plain("[1,2]");
+    final var text = plain("\"text\"");
+
+    assertThatThrownBy(() -> read(array, null, MAX))
         .isInstanceOf(InvalidAuditRequestException.class)
         .hasMessageContaining("object");
-    assertThatThrownBy(() -> read(plain("\"text\""), null, MAX))
+    assertThatThrownBy(() -> read(text, null, MAX))
         .isInstanceOf(InvalidAuditRequestException.class);
   }
 
@@ -122,12 +127,13 @@ class NpmAuditRequestReaderTest {
   void tooLarge() throws Exception {
     final var big = "{\"a\":[\"" + "1".repeat(2000) + "\"]}";
 
-    assertThatThrownBy(() -> read(plain(big), null, 100))
-        .isInstanceOf(EntryTooLargeException.class);
-    assertThatThrownBy(() -> read(gzip(big), "gzip", 100))
-        .isInstanceOf(EntryTooLargeException.class);
+    final var plainBody = plain(big);
+    final var gzipped = gzip(big);
+
+    assertThatThrownBy(() -> read(plainBody, null, 100)).isInstanceOf(EntryTooLargeException.class);
+    assertThatThrownBy(() -> read(gzipped, "gzip", 100)).isInstanceOf(EntryTooLargeException.class);
     // The compressed body is far smaller than what it inflates to: only the inflated size counts.
-    assertThat(gzip(big).length).isLessThan(200);
+    assertThat(gzipped).hasSizeLessThan(200);
   }
 
   @Test
@@ -179,13 +185,16 @@ class NpmAuditRequestReaderTest {
 
   @Test
   @DisplayName("refuses JSON nested deeper than the limit, plain or gzip")
-  void tooDeep() throws Exception {
+  void tooDeep() throws IOException {
     final var depth = NpmAuditRequestReader.MAX_NESTING_DEPTH + 10;
     final var json = "{\"a\":" + "[".repeat(depth) + "]".repeat(depth) + "}";
 
-    assertThatThrownBy(() -> read(plain(json), null, MAX))
+    final var plainBody = plain(json);
+    final var gzipped = gzip(json);
+
+    assertThatThrownBy(() -> read(plainBody, null, MAX))
         .isInstanceOf(InvalidAuditRequestException.class);
-    assertThatThrownBy(() -> read(gzip(json), "gzip", MAX))
+    assertThatThrownBy(() -> read(gzipped, "gzip", MAX))
         .isInstanceOf(InvalidAuditRequestException.class);
   }
 
@@ -194,8 +203,10 @@ class NpmAuditRequestReaderTest {
   void tooManyTokens() {
     final var json = "{\"a\":[" + "1,".repeat((int) NpmAuditRequestReader.MAX_TOKEN_COUNT) + "1]}";
 
+    final var body = plain(json);
+
     assertThat(json.length()).isLessThan((int) MAX * 4);
-    assertThatThrownBy(() -> read(plain(json), null, MAX * 4))
+    assertThatThrownBy(() -> read(body, null, MAX * 4))
         .isInstanceOf(InvalidAuditRequestException.class);
   }
 
@@ -206,9 +217,12 @@ class NpmAuditRequestReaderTest {
         "{\"a\":[\"" + "x".repeat(NpmAuditRequestReader.MAX_STRING_LENGTH + 1) + "\"]}";
     final var longName = "{\"" + "x".repeat(NpmAuditRequestReader.MAX_NAME_LENGTH + 1) + "\":[]}";
 
-    assertThatThrownBy(() -> read(plain(longValue), null, MAX))
+    final var valueBody = plain(longValue);
+    final var nameBody = plain(longName);
+
+    assertThatThrownBy(() -> read(valueBody, null, MAX))
         .isInstanceOf(InvalidAuditRequestException.class);
-    assertThatThrownBy(() -> read(plain(longName), null, MAX))
+    assertThatThrownBy(() -> read(nameBody, null, MAX))
         .isInstanceOf(InvalidAuditRequestException.class);
   }
 
@@ -217,7 +231,7 @@ class NpmAuditRequestReaderTest {
   void gzipBomb() throws Exception {
     final var bomb = gzip("{\"a\":[\"" + "0".repeat(16 * 1024 * 1024) + "\"]}");
 
-    assertThat(bomb.length).isLessThan(64 * 1024);
+    assertThat(bomb).hasSizeLessThan(64 * 1024);
     assertThatThrownBy(() -> read(bomb, "gzip", 8L * 1024 * 1024))
         .isInstanceOf(EntryTooLargeException.class);
   }

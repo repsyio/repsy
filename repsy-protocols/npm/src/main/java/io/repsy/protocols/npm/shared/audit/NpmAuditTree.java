@@ -125,7 +125,7 @@ public record NpmAuditTree(Map<String, Set<String>> versionsByName, List<Node> n
       final var version = node.path("version");
 
       if (version.isString()) {
-        this.record(
+        this.recordNode(
             new Node(
                 name,
                 version.asString(),
@@ -138,7 +138,7 @@ public record NpmAuditTree(Map<String, Set<String>> versionsByName, List<Node> n
       return new Frame(node.path(DEPENDENCIES), segment, frame.depth() + 1);
     }
 
-    private void record(final Node node) {
+    private void recordNode(final Node node) {
       if (this.nodes.size() >= MAX_NODES) {
         throw new InvalidAuditRequestException("the dependency tree has too many packages");
       }

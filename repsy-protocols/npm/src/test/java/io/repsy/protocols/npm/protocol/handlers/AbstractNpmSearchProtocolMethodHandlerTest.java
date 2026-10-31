@@ -119,13 +119,11 @@ class AbstractNpmSearchProtocolMethodHandlerTest {
     final var request = NpmHandlerTestSupport.request("GET", "/npm/-/v1/search");
     request.setParameter("size", "many");
 
-    assertThatThrownBy(
-            () ->
-                this.handler()
-                    .handle(
-                        NpmHandlerTestSupport.context("/-/v1/search"),
-                        request,
-                        new MockHttpServletResponse()))
+    final var handler = this.handler();
+    final var searchContext = NpmHandlerTestSupport.context("/-/v1/search");
+    final var response = new MockHttpServletResponse();
+
+    assertThatThrownBy(() -> handler.handle(searchContext, request, response))
         .isInstanceOf(BadRequestException.class);
     verifyNoInteractions(this.service);
   }

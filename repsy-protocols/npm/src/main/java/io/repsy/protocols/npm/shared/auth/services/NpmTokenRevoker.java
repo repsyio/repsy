@@ -24,7 +24,7 @@ import org.jspecify.annotations.Nullable;
  * NpmAuthenticator}, so that an implementation of that component outside this repository keeps
  * compiling.
  */
-public interface NpmTokenRevoker<ID> {
+public interface NpmTokenRevoker<I> {
 
   /**
    * Revokes {@code token}, a token the login of this registry issued, so that it is refused from
@@ -43,5 +43,5 @@ public interface NpmTokenRevoker<ID> {
    * @throws io.repsy.core.error_handling.exceptions.ItemNotFoundException If the token is none this
    *     registry issued, or it has expired already
    */
-  void revokeToken(BaseRepoInfo<ID> repoInfo, @Nullable String authHeader, String token);
+  void revokeToken(BaseRepoInfo<I> repoInfo, @Nullable String authHeader, String token);
 }

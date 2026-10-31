@@ -29,18 +29,18 @@ import tools.jackson.databind.JsonNode;
  * pnpm 11 call for {@code audit}. The body maps package names to the versions in use, and the
  * answer maps the packages that have advisories to those.
  */
-public abstract class AbstractNpmAuditBulkProtocolMethodHandler<ID>
-    extends AbstractNpmAuditProtocolMethodHandler<ID> {
+public abstract class AbstractNpmAuditBulkProtocolMethodHandler<I>
+    extends AbstractNpmAuditProtocolMethodHandler<I> {
 
-  public AbstractNpmAuditBulkProtocolMethodHandler(
+  protected AbstractNpmAuditBulkProtocolMethodHandler(
       @Qualifier("npmPathParser") final PathParser basePathParser,
-      final NpmAdvisorySource<ID> advisorySource,
+      final NpmAdvisorySource<I> advisorySource,
       final NpmProtocolProvider provider) {
     super(basePathParser, "/-/npm/v1/security/advisories/bulk", advisorySource, provider);
   }
 
   @Override
-  protected Object report(final BaseRepoInfo<ID> repoInfo, final JsonNode body) {
+  protected Object report(final BaseRepoInfo<I> repoInfo, final JsonNode body) {
 
     final var versionsByName = NpmAuditRequestReader.bulkVersionsByName(body);
 

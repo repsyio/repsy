@@ -38,17 +38,17 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import tools.jackson.databind.ObjectMapper;
 
-public abstract class AbstractNpmLoginProtocolMethodHandler<ID>
+public abstract class AbstractNpmLoginProtocolMethodHandler<I>
     extends AbstractRoutedProtocolMethodHandler {
 
   private static final Pattern LOGIN_PATTERN = Pattern.compile("^/-/user/.*");
 
-  private final NpmAuthenticator<ID> authenticator;
+  private final NpmAuthenticator<I> authenticator;
   private final ObjectMapper objectMapper;
 
-  public AbstractNpmLoginProtocolMethodHandler(
+  protected AbstractNpmLoginProtocolMethodHandler(
       @Qualifier("npmPathParser") final PathParser basePathParser,
-      final NpmAuthenticator<ID> authenticator,
+      final NpmAuthenticator<I> authenticator,
       final ObjectMapper objectMapper,
       final NpmProtocolProvider provider) {
     super(
@@ -73,7 +73,7 @@ public abstract class AbstractNpmLoginProtocolMethodHandler<ID>
       final var loginRequest =
           this.objectMapper.readValue(request.getInputStream(), LoginRequest.class);
 
-      final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+      final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
 
       final var sessionToken =
           this.authenticator.authenticateRepoUser(
@@ -89,7 +89,7 @@ public abstract class AbstractNpmLoginProtocolMethodHandler<ID>
 
       return ResponseEntity.status(HttpStatus.CREATED).body(loginResponse);
 
-    } catch (final UnAuthorizedException e) {
+    } catch (final UnAuthorizedException _) {
       final var loginResponse = NpmLoginResponse.builder().ok(false).build();
 
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED)

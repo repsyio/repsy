@@ -131,6 +131,7 @@ class AbstractNpmStorageServiceRebuildTest {
   @BeforeEach
   void setUp() {
     this.service = new TestStorageService(this.storageStrategy);
+    this.captureWarnings();
   }
 
   private static Version version(final String version) {
@@ -259,7 +260,7 @@ class AbstractNpmStorageServiceRebuildTest {
     assertThat(rebuilt).containsEntry("name", "demo");
     assertThat(((Map<String, Object>) rebuilt.get("versions")).keySet())
         .containsExactly("1.0.0", "2.0.0");
-    assertThat(rebuilt.get("dist-tags")).isEqualTo(Map.of("latest", "2.0.0"));
+    assertThat(rebuilt).containsEntry("dist-tags", Map.of("latest", "2.0.0"));
   }
 
   @Test
@@ -367,10 +368,12 @@ class AbstractNpmStorageServiceRebuildTest {
   void noRowsNoRebuild() {
     this.metadataIsGone();
 
+    final var repoRef = new RepoRef(REPO_ID, REPO_NAME);
+
     assertThatThrownBy(
             () ->
                 this.service.changeMetadata(
-                    new RepoRef(REPO_ID, REPO_NAME),
+                    repoRef,
                     BASE_PATH,
                     () -> {
                       throw new ItemNotFoundException("packageNotFound");
@@ -521,8 +524,7 @@ class AbstractNpmStorageServiceRebuildTest {
     assertThat(full).containsKey("time");
     assertThat(((Map<String, Object>) abbreviated.get("versions")).keySet())
         .containsExactly("1.0.0", "2.0.0");
-    assertThat(abbreviated).containsKey("modified");
-    assertThat(abbreviated).doesNotContainKey("time");
+    assertThat(abbreviated).containsKey("modified").doesNotContainKey("time");
     verify(this.storageStrategy, never()).write(any(), any(), any());
   }
 
@@ -531,10 +533,12 @@ class AbstractNpmStorageServiceRebuildTest {
   void packumentReadOfAnUnknownPackage() {
     this.metadataIsGone();
 
+    final var repoRef = new RepoRef(REPO_ID, REPO_NAME);
+
     assertThatThrownBy(
             () ->
                 this.service.getMetadata(
-                    new RepoRef(REPO_ID, REPO_NAME),
+                    repoRef,
                     null,
                     PACKAGE,
                     false,
@@ -575,8 +579,7 @@ class AbstractNpmStorageServiceRebuildTest {
   private Logger metadataLogger;
   private ListAppender<ILoggingEvent> warnings;
 
-  @BeforeEach
-  void captureWarnings() {
+  private void captureWarnings() {
     this.metadataLogger = (Logger) LoggerFactory.getLogger(NpmPackumentStore.class);
     this.warnings = new ListAppender<>();
     this.warnings.start();
@@ -697,10 +700,12 @@ class AbstractNpmStorageServiceRebuildTest {
   void aCorruptFileOfAnUnknownPackageIsNotFound() {
     this.metadataIs("{oops");
 
+    final var repoRef = new RepoRef(REPO_ID, REPO_NAME);
+
     assertThatThrownBy(
             () ->
                 this.service.getMetadata(
-                    new RepoRef(REPO_ID, REPO_NAME),
+                    repoRef,
                     null,
                     PACKAGE,
                     false,
@@ -780,9 +785,9 @@ class AbstractNpmStorageServiceRebuildTest {
     // The new version is the payload's own entry, not the row-only one of the rebuild.
     assertThat(versions.get("3.0.0")).containsEntry("description", "the published one");
     assertThat(versions.get("1.0.0")).containsEntry("description", "version 1.0.0");
-    assertThat(merged.get("dist-tags")).isEqualTo(Map.of("latest", "3.0.0", "beta", "2.0.0"));
-    assertThat(((Map<String, Object>) merged.get("time")).keySet())
-        .contains("created", "modified", "1.0.0", "2.0.0", "3.0.0");
+    assertThat(merged).containsEntry("dist-tags", Map.of("latest", "3.0.0", "beta", "2.0.0"));
+    assertThat((Map<String, Object>) merged.get("time"))
+        .containsKeys("created", "modified", "1.0.0", "2.0.0", "3.0.0");
     assertThat(merged)
         .containsKey("_attachments")
         .containsEntry("description", "the published one");
@@ -821,12 +826,15 @@ class AbstractNpmStorageServiceRebuildTest {
   void publishToAnUnknownPackage() {
     this.metadataIsGone();
 
+    final var repoRef = new RepoRef(REPO_ID, REPO_NAME);
+    final var latestPayload = payloadOf("latest");
+
     assertThatThrownBy(
             () ->
                 this.service.processVersionPayload(
-                    payloadOf("latest"),
+                    latestPayload,
                     BASE_PATH,
-                    new RepoRef(REPO_ID, REPO_NAME),
+                    repoRef,
                     () -> {
                       throw new ItemNotFoundException("packageNotFound");
                     }))

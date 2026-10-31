@@ -17,7 +17,7 @@ package io.repsy.protocols.npm.shared.auth.services;
 
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 
-public interface NpmAuthenticator<ID> {
+public interface NpmAuthenticator<I> {
 
-  String authenticateRepoUser(BaseRepoInfo<ID> repoInfo, String name, String password);
+  String authenticateRepoUser(BaseRepoInfo<I> repoInfo, String name, String password);
 }

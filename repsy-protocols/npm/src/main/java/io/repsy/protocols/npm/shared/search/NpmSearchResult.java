@@ -82,13 +82,16 @@ public record NpmSearchResult(List<NpmSearchObject> objects, long total, String 
   private static NpmSearchPackage toPackage(
       final NpmSearchDocument document, final List<NpmSearchPerson> maintainers) {
 
+    final var scope = document.scope();
+    final var date = document.date();
+
     return new NpmSearchPackage(
         document.name(),
-        document.scope() == null ? UNSCOPED : document.scope(),
+        scope == null ? UNSCOPED : scope,
         document.version(),
         document.description(),
         document.keywords(),
-        document.date() == null ? null : format(document.date()),
+        date == null ? null : format(date),
         new NpmSearchLinks(document.homepage(), document.repositoryUrl(), document.bugsUrl()),
         author(document),
         maintainers.isEmpty() ? null : maintainers.getFirst(),

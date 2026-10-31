@@ -204,7 +204,9 @@ class AbstractNpmPackagePublishOrDeprecateProtocolMethodHandlerTest {
   void handleRefusesADeclaredOversizedBody() {
     final var body = "{\"versions\":{}}";
 
-    assertThatThrownBy(() -> this.put("/left-pad", body, body.getBytes().length - 1L))
+    final var declaredLimit = body.getBytes().length - 1L;
+
+    assertThatThrownBy(() -> this.put("/left-pad", body, declaredLimit))
         .isInstanceOf(MaxUploadSizeExceededException.class);
 
     verifyNoInteractions(this.facade);
@@ -229,7 +231,9 @@ class AbstractNpmPackagePublishOrDeprecateProtocolMethodHandlerTest {
         new TestHandler(
             this.basePathParser, this.facade, this.provider, body.getBytes().length - 1L);
 
-    assertThatThrownBy(() -> handler.handle(context("/left-pad"), request, response))
+    final var pathContext = context("/left-pad");
+
+    assertThatThrownBy(() -> handler.handle(pathContext, request, response))
         .isInstanceOf(MaxUploadSizeExceededException.class);
 
     verifyNoInteractions(this.facade);

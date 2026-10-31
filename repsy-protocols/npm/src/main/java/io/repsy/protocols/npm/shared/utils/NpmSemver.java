@@ -18,7 +18,10 @@ package io.repsy.protocols.npm.shared.utils;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.math.BigInteger;
+import java.util.Arrays;
+import java.util.Objects;
 import java.util.regex.Pattern;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A semantic version parsed and compared the way real npm (built on node-semver) does, unlike
@@ -38,12 +41,15 @@ import java.util.regex.Pattern;
  */
 public final class NpmSemver implements Comparable<NpmSemver> {
 
-  private static final Pattern SEMVER_PATTERN =
-      Pattern.compile(
-          "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)"
-              + "(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)"
-              + "(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?"
-              + "(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$");
+  private static final int CORE_PARTS = 3;
+
+  // The grammar of semver.org, checked piece by piece instead of by one regular expression: a
+  // single expression is too complex to maintain and its repeated alternation can overflow the
+  // stack on a long input.
+  private static final Pattern NUMERIC_PART = Pattern.compile("0|[1-9]\\d*");
+  private static final Pattern PRE_RELEASE =
+      Pattern.compile("0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*");
+  private static final Pattern BUILD = Pattern.compile("[0-9a-zA-Z-]+");
 
   private final BigInteger major;
   private final BigInteger minor;
@@ -65,7 +71,7 @@ public final class NpmSemver implements Comparable<NpmSemver> {
 
   /** Whether {@code version} matches the semver grammar, without throwing. */
   public static boolean isValid(final String version) {
-    return SEMVER_PATTERN.matcher(version).matches();
+    return tryParse(version) != null;
   }
 
   /**
@@ -75,19 +81,62 @@ public final class NpmSemver implements Comparable<NpmSemver> {
    *     version} does not match the grammar.
    */
   public static NpmSemver parse(final String version) {
-    final var matcher = SEMVER_PATTERN.matcher(version);
+    final var parsed = tryParse(version);
 
-    if (!matcher.matches()) {
+    if (parsed == null) {
       throw new BadRequestException(ProtocolErrorCodes.INVALID_PACKAGE_VERSION);
     }
 
-    final var major = new BigInteger(matcher.group(1));
-    final var minor = new BigInteger(matcher.group(2));
-    final var patch = new BigInteger(matcher.group(3));
-    final var preReleaseGroup = matcher.group(4);
-    final var preRelease = preReleaseGroup == null ? new String[0] : preReleaseGroup.split("\\.");
+    return parsed;
+  }
 
-    return new NpmSemver(major, minor, patch, preRelease);
+  private static @Nullable NpmSemver tryParse(final String version) {
+    final var buildStart = version.indexOf('+');
+
+    if (buildStart < 0) {
+      return parseWithoutBuild(version);
+    }
+
+    if (splitIdentifiers(version.substring(buildStart + 1), BUILD) == null) {
+      return null;
+    }
+
+    return parseWithoutBuild(version.substring(0, buildStart));
+  }
+
+  private static @Nullable NpmSemver parseWithoutBuild(final String version) {
+    final var preReleaseStart = version.indexOf('-');
+    final var coreText = preReleaseStart < 0 ? version : version.substring(0, preReleaseStart);
+    final var core = splitIdentifiers(coreText, NUMERIC_PART);
+
+    if (core == null || core.length != CORE_PARTS) {
+      return null;
+    }
+
+    final var preRelease =
+        preReleaseStart < 0
+            ? new String[0]
+            : splitIdentifiers(version.substring(preReleaseStart + 1), PRE_RELEASE);
+
+    if (preRelease == null) {
+      return null;
+    }
+
+    return new NpmSemver(
+        new BigInteger(core[0]), new BigInteger(core[1]), new BigInteger(core[2]), preRelease);
+  }
+
+  /** The dot-separated identifiers of {@code text}, or {@code null} when one does not match. */
+  private static String @Nullable [] splitIdentifiers(final String text, final Pattern identifier) {
+    final var parts = text.split("\\.", -1);
+
+    for (final var part : parts) {
+      if (!identifier.matcher(part).matches()) {
+        return null;
+      }
+    }
+
+    return parts;
   }
 
   @Override
@@ -108,6 +157,17 @@ public final class NpmSemver implements Comparable<NpmSemver> {
     }
 
     return comparePreRelease(this.preRelease, other.preRelease);
+  }
+
+  /** Equal when {@link #compareTo} says so: build metadata is not part of a version's identity. */
+  @Override
+  public boolean equals(final @Nullable Object other) {
+    return this == other || (other instanceof final NpmSemver that && this.compareTo(that) == 0);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(this.major, this.minor, this.patch, Arrays.hashCode(this.preRelease));
   }
 
   private static int comparePreRelease(final String[] a, final String[] b) {

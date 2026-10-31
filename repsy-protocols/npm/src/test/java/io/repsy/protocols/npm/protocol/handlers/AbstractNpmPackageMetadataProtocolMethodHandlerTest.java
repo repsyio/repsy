@@ -85,7 +85,7 @@ class AbstractNpmPackageMetadataProtocolMethodHandlerTest {
         this.get(ABBREVIATED, Map.of("name", "demo", "modified", "2026-03-04T05:06:07.089Z"));
     final var full = this.get("application/json", full("2026-03-04T05:06:07.089Z"));
 
-    assertThat(abbreviated.getHeaders().getContentType().toString()).isEqualTo(ABBREVIATED);
+    assertThat(abbreviated.getHeaders().getContentType()).hasToString(ABBREVIATED);
     assertThat(abbreviated.getHeaders().getLastModified()).isEqualTo(1772600767000L);
     assertThat(abbreviated.getHeaders().getETag()).isNotEqualTo(full.getHeaders().getETag());
   }

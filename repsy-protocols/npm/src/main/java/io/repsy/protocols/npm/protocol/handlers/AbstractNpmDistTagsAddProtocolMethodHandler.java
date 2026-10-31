@@ -25,6 +25,7 @@ import io.repsy.protocols.shared.handlers.HandlerRoute;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpMethod;
@@ -43,7 +44,7 @@ public abstract class AbstractNpmDistTagsAddProtocolMethodHandler
   private static final Pattern DIST_TAGS_ADD_PATTERN =
       Pattern.compile("^/-/package/(.+)/dist-tags/([^/]+)$");
 
-  public AbstractNpmDistTagsAddProtocolMethodHandler(
+  protected AbstractNpmDistTagsAddProtocolMethodHandler(
       @Qualifier("osNpmPathParser") final PathParser basePathParser,
       final NpmProtocolFacade npmProtocolFacade,
       final NpmProtocolProvider provider) {
@@ -88,7 +89,7 @@ public abstract class AbstractNpmDistTagsAddProtocolMethodHandler
                     context, pathVars.scopeName(), pathVars.packageName())));
   }
 
-  private String readRequestBody(final HttpServletRequest request) throws Exception {
+  private String readRequestBody(final HttpServletRequest request) throws IOException {
     final var reader = request.getReader();
     final var stringBuilder = new StringBuilder();
     String line;
