@@ -146,14 +146,7 @@ class MavenGavUtilsTest {
       final String version,
       final String classifier,
       final String extension) {
-    final var gav = MavenGavUtils.getGavByFile(StoragePath.of(UUID.randomUUID(), path));
-
-    assertThat(gav).isNotNull();
-    assertThat(gav.getGroupId()).isEqualTo(groupId);
-    assertThat(gav.getArtifactId()).isEqualTo(artifactId);
-    assertThat(gav.getVersion()).isEqualTo(version);
-    assertThat(gav.getClassifier()).isEqualTo(classifier);
-    assertThat(gav.getExtension()).isEqualTo(extension);
+    assertGav(path, groupId, artifactId, version, classifier, extension);
   }
 
   @ParameterizedTest(name = "{0} has no GAV")
@@ -287,6 +280,16 @@ class MavenGavUtilsTest {
       })
   @DisplayName("pins the wrong-but-harmless split of a dotted classifier (RPS-1187, won't-fix)")
   void pinsTheDottedClassifierMisparse(
+      final String path,
+      final String groupId,
+      final String artifactId,
+      final String version,
+      final String classifier,
+      final String extension) {
+    assertGav(path, groupId, artifactId, version, classifier, extension);
+  }
+
+  private static void assertGav(
       final String path,
       final String groupId,
       final String artifactId,

@@ -53,7 +53,7 @@ class MavenMetadataUtilsTest {
       <updated>20260921101010</updated></snapshotVersion></snapshotVersions></versioning>\
       </metadata>""";
 
-  private static Metadata metadata(final String xml) throws Exception {
+  private static Metadata metadata(final String xml) {
     return MavenMetadataUtils.readMetadata(xml.getBytes(UTF_8));
   }
 
@@ -86,7 +86,8 @@ class MavenMetadataUtilsTest {
     final var secret = "do-not-reflect-this-marker";
     final var malformed = "<metadata><versioning><!-- " + secret + " -->";
 
-    assertThatThrownBy(() -> MavenMetadataUtils.readMetadata(malformed.getBytes(UTF_8)))
+    final var getBytesArg = malformed.getBytes(UTF_8);
+    assertThatThrownBy(() -> MavenMetadataUtils.readMetadata(getBytesArg))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("malformedMetadataFile")
         .satisfies(e -> assertThat(e.toString()).doesNotContain(secret));
@@ -132,17 +133,15 @@ class MavenMetadataUtilsTest {
     logger.addAppender(logs);
 
     try {
-      assertThatThrownBy(
-              () ->
-                  MavenMetadataUtils.readMetadata(
-                      "<metadata><s3cr3t-token-value></metadata>".getBytes(UTF_8)))
+      final var valueArg = "<metadata><s3cr3t-token-value></metadata>".getBytes(UTF_8);
+      assertThatThrownBy(() -> MavenMetadataUtils.readMetadata(valueArg))
           .isInstanceOf(BadRequestException.class);
     } finally {
       logger.detachAppender(logs);
     }
 
-    assertThat(logs.list).isNotEmpty();
     assertThat(logs.list)
+        .isNotEmpty()
         .noneMatch(event -> event.getFormattedMessage().contains("s3cr3t-token-value"));
   }
 }

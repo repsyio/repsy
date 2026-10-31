@@ -31,12 +31,12 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
-public abstract class AbstractMavenUploadProtocolMethodHandler<ID>
-    extends AbstractFacadeProtocolMethodHandler<MavenProtocolFacade<ID>> {
+public abstract class AbstractMavenUploadProtocolMethodHandler<I>
+    extends AbstractFacadeProtocolMethodHandler<MavenProtocolFacade<I>> {
 
-  public AbstractMavenUploadProtocolMethodHandler(
+  protected AbstractMavenUploadProtocolMethodHandler(
       final PathParser pathParser,
-      final MavenProtocolFacade<ID> mavenProtocolFacade,
+      final MavenProtocolFacade<I> mavenProtocolFacade,
       final MavenProtocolProvider mavenProtocolProvider) {
     super(
         HandlerRoute.write(HttpMethod.PUT).method("upload"),

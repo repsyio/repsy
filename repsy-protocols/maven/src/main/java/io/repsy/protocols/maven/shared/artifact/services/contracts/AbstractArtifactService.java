@@ -19,4 +19,4 @@ package io.repsy.protocols.maven.shared.artifact.services.contracts;
  * Base of the backend implementation of {@link ArtifactService}; the abstract methods are inherited
  * from the contract.
  */
-public abstract class AbstractArtifactService<ID> implements ArtifactService<ID> {}
+public abstract class AbstractArtifactService<I> implements ArtifactService<I> {}

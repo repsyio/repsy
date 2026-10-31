@@ -153,12 +153,10 @@ class PgpVerifierServiceTest {
   void lookupOffStillVerifiesARegisteredKey() {
     final var signature = resource(keys.detachedSignature(POM));
 
-    assertThatCode(
-            () ->
-                this.serviceAnswering(uri -> notFound())
-                    .verify(
-                        new ByteArrayResource(POM), signature, lookupOff(keys.armoredPublicKey())))
-        .doesNotThrowAnyException();
+    final var verifier = this.serviceAnswering(uri -> notFound());
+    final var file = new ByteArrayResource(POM);
+    final var sources = lookupOff(keys.armoredPublicKey());
+    assertThatCode(() -> verifier.verify(file, signature, sources)).doesNotThrowAnyException();
 
     assertThat(this.asked).isEmpty();
   }
@@ -169,7 +167,9 @@ class PgpVerifierServiceTest {
     final var signature = resource(keys.detachedSignature(POM));
     final var service = this.serviceWithTheKey();
 
-    assertThatThrownBy(() -> service.verify(new ByteArrayResource(POM), signature, lookupOff()))
+    final var file = new ByteArrayResource(POM);
+    final var sources = lookupOff();
+    assertThatThrownBy(() -> service.verify(file, signature, sources))
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessage("artifactSigningKeyNotRegistered");
 
@@ -181,11 +181,10 @@ class PgpVerifierServiceTest {
   void lookupOnAsksTheServersForAnUnregisteredKey() {
     final var signature = resource(keys.detachedSignature(POM));
 
-    assertThatCode(
-            () ->
-                this.serviceWithTheKey()
-                    .verify(new ByteArrayResource(POM), signature, noRegisteredKeys()))
-        .doesNotThrowAnyException();
+    final var verifier = this.serviceWithTheKey();
+    final var file = new ByteArrayResource(POM);
+    final var sources = noRegisteredKeys();
+    assertThatCode(() -> verifier.verify(file, signature, sources)).doesNotThrowAnyException();
 
     assertThat(this.asked).isNotEmpty();
   }
@@ -237,8 +236,9 @@ class PgpVerifierServiceTest {
     final var service = this.serviceAnswering(uri -> notFound());
 
     for (int i = 0; i < 2; i++) {
-      assertThatThrownBy(
-              () -> service.verify(new ByteArrayResource(POM), signature, noRegisteredKeys()))
+      final var file = new ByteArrayResource(POM);
+      final var sources = noRegisteredKeys();
+      assertThatThrownBy(() -> service.verify(file, signature, sources))
           .isInstanceOf(ItemNotFoundException.class)
           .hasMessage("artifactSigningKeyNotFound");
     }
@@ -279,11 +279,10 @@ class PgpVerifierServiceTest {
   void verifiesADetachedSignatureOfTheStoredFile() {
     final var signature = resource(keys.detachedSignature(POM));
 
-    assertThatCode(
-            () ->
-                this.serviceWithTheKey()
-                    .verify(new ByteArrayResource(POM), signature, noRegisteredKeys()))
-        .doesNotThrowAnyException();
+    final var verifier = this.serviceWithTheKey();
+    final var file = new ByteArrayResource(POM);
+    final var sources = noRegisteredKeys();
+    assertThatCode(() -> verifier.verify(file, signature, sources)).doesNotThrowAnyException();
   }
 
   @Test
@@ -291,10 +290,10 @@ class PgpVerifierServiceTest {
   void refusesASignatureOfOtherBytes() {
     final var signature = resource(keys.detachedSignature(OTHER_POM));
 
-    assertThatThrownBy(
-            () ->
-                this.serviceWithTheKey()
-                    .verify(new ByteArrayResource(POM), signature, noRegisteredKeys()))
+    final var verifier = this.serviceWithTheKey();
+    final var file = new ByteArrayResource(POM);
+    final var sources = noRegisteredKeys();
+    assertThatThrownBy(() -> verifier.verify(file, signature, sources))
         .isInstanceOf(SignatureNotVerifiedException.class)
         .hasMessage(NOT_VERIFIED);
   }
@@ -302,13 +301,11 @@ class PgpVerifierServiceTest {
   @Test
   @DisplayName("refuses an empty .asc, and never asks a key server about it")
   void refusesAnEmptyAsc() {
-    assertThatThrownBy(
-            () ->
-                this.serviceWithTheKey()
-                    .verify(
-                        new ByteArrayResource(POM),
-                        new ByteArrayResource(new byte[0]),
-                        noRegisteredKeys()))
+    final var verifier = this.serviceWithTheKey();
+    final var file = new ByteArrayResource(POM);
+    final var signed = new ByteArrayResource(new byte[0]);
+    final var sources = noRegisteredKeys();
+    assertThatThrownBy(() -> verifier.verify(file, signed, sources))
         .isInstanceOf(SignatureNotVerifiedException.class)
         .hasMessage(NOT_VERIFIED);
 
@@ -320,13 +317,10 @@ class PgpVerifierServiceTest {
   void refusesAnAscWithoutASignaturePacket() {
     final var publicKeyInsteadOfSignature = resource(keys.armoredPublicKey());
 
-    assertThatThrownBy(
-            () ->
-                this.serviceWithTheKey()
-                    .verify(
-                        new ByteArrayResource(POM),
-                        publicKeyInsteadOfSignature,
-                        noRegisteredKeys()))
+    final var verifier = this.serviceWithTheKey();
+    final var file = new ByteArrayResource(POM);
+    final var sources = noRegisteredKeys();
+    assertThatThrownBy(() -> verifier.verify(file, publicKeyInsteadOfSignature, sources))
         .isInstanceOf(SignatureNotVerifiedException.class)
         .hasMessage(NOT_VERIFIED);
 
@@ -335,10 +329,10 @@ class PgpVerifierServiceTest {
 
   /** Asserts that the check refuses these bytes as {@code artifactSignatureNotVerified}. */
   private void assertRefusedWithoutAskingAKeyServer(final Resource signature) {
-    assertThatThrownBy(
-            () ->
-                this.serviceWithTheKey()
-                    .verify(new ByteArrayResource(POM), signature, noRegisteredKeys()))
+    final var verifier = this.serviceWithTheKey();
+    final var file = new ByteArrayResource(POM);
+    final var sources = noRegisteredKeys();
+    assertThatThrownBy(() -> verifier.verify(file, signature, sources))
         .isInstanceOf(SignatureNotVerifiedException.class)
         .hasMessage(NOT_VERIFIED);
 
@@ -436,11 +430,10 @@ class PgpVerifierServiceTest {
     lines.remove(crcLineIndex(lines));
     final var signature = resource(String.join("\n", lines) + "\n");
 
-    assertThatCode(
-            () ->
-                this.serviceWithTheKey()
-                    .verify(new ByteArrayResource(POM), signature, noRegisteredKeys()))
-        .doesNotThrowAnyException();
+    final var verifier = this.serviceWithTheKey();
+    final var file = new ByteArrayResource(POM);
+    final var sources = noRegisteredKeys();
+    assertThatCode(() -> verifier.verify(file, signature, sources)).doesNotThrowAnyException();
   }
 
   @Test
@@ -457,17 +450,15 @@ class PgpVerifierServiceTest {
     try {
       final var signature = resource(keys.detachedSignature(POM));
 
-      assertThatThrownBy(
-              () ->
-                  this.serviceAnswering(
-                          uri -> {
-                            throw new ResourceAccessException(
-                                "I/O error on GET request for \"" + uri + "\": refused");
-                          })
-                      .verify(
-                          new ByteArrayResource(POM),
-                          signature,
-                          hosts("bob:" + secret + "@keys.acme.com")))
+      final var verifier =
+          this.serviceAnswering(
+              uri -> {
+                throw new ResourceAccessException(
+                    "I/O error on GET request for \"" + uri + "\": refused");
+              });
+      final var file = new ByteArrayResource(POM);
+      final var sources = hosts("bob:" + secret + "@keys.acme.com");
+      assertThatThrownBy(() -> verifier.verify(file, signature, sources))
           .isInstanceOf(ItemNotFoundException.class);
     } finally {
       logger.detachAppender(appender);
@@ -477,8 +468,7 @@ class PgpVerifierServiceTest {
 
     assertThat(appender.list)
         .isNotEmpty()
-        .allSatisfy(event -> assertThat(event.getFormattedMessage()).doesNotContain(secret));
-    assertThat(appender.list)
+        .allSatisfy(event -> assertThat(event.getFormattedMessage()).doesNotContain(secret))
         .anyMatch(event -> event.getFormattedMessage().contains("Failed to fetch key"));
   }
 
@@ -487,10 +477,10 @@ class PgpVerifierServiceTest {
   void answersItemNotFoundWhenNoServerHasTheKey() {
     final var signature = resource(keys.detachedSignature(POM));
 
-    assertThatThrownBy(
-            () ->
-                this.serviceAnswering(uri -> notFound())
-                    .verify(new ByteArrayResource(POM), signature, hosts("keys.acme.com")))
+    final var verifier = this.serviceAnswering(uri -> notFound());
+    final var file = new ByteArrayResource(POM);
+    final var sources = hosts("keys.acme.com");
+    assertThatThrownBy(() -> verifier.verify(file, signature, sources))
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessage("artifactSigningKeyNotFound");
 
@@ -510,14 +500,10 @@ class PgpVerifierServiceTest {
     final var service =
         this.serviceAnswering(uri -> uri.toString().equals(mirror) ? keyResponse() : notFound());
 
-    assertThatCode(
-            () ->
-                service.verify(
-                    new ByteArrayResource(POM),
-                    signature,
-                    // A scheme or a path in the stored host is dropped, only the host is used.
-                    hosts("keys.acme.com", "https://mirror.acme.com/somewhere")))
-        .doesNotThrowAnyException();
+    final var file = new ByteArrayResource(POM);
+    // A scheme or a path in the stored host is dropped, only the host is used.
+    final var sources = hosts("keys.acme.com", "https://mirror.acme.com/somewhere");
+    assertThatCode(() -> service.verify(file, signature, sources)).doesNotThrowAnyException();
 
     assertThat(this.asked).extracting(URI::toString).containsExactly(acme, mirror);
   }
@@ -531,9 +517,9 @@ class PgpVerifierServiceTest {
         this.serviceAnswering(
             uri -> uri.getHost().equals("keys.acme.com") ? notFound() : keyResponse());
 
-    assertThatCode(
-            () -> service.verify(new ByteArrayResource(POM), signature, hosts("keys.acme.com")))
-        .doesNotThrowAnyException();
+    final var file = new ByteArrayResource(POM);
+    final var sources = hosts("keys.acme.com");
+    assertThatCode(() -> service.verify(file, signature, sources)).doesNotThrowAnyException();
 
     assertThat(this.asked.getFirst().getHost()).isEqualTo("keys.acme.com");
     assertThat(this.asked).hasSize(2);
@@ -545,10 +531,10 @@ class PgpVerifierServiceTest {
   void ignoresAnAnswerThatIsNotAKeyBlock() {
     final var signature = resource(keys.detachedSignature(POM));
 
-    assertThatThrownBy(
-            () ->
-                this.serviceAnswering(uri -> StubKeyServers.ok("<html>not a key</html>"))
-                    .verify(new ByteArrayResource(POM), signature, noRegisteredKeys()))
+    final var verifier = this.serviceAnswering(uri -> StubKeyServers.ok("<html>not a key</html>"));
+    final var file = new ByteArrayResource(POM);
+    final var sources = noRegisteredKeys();
+    assertThatThrownBy(() -> verifier.verify(file, signature, sources))
         .isInstanceOf(ItemNotFoundException.class);
   }
 
@@ -579,8 +565,9 @@ class PgpVerifierServiceTest {
                     ? keyBlockResponse(corrupt)
                     : keyResponse());
 
-    assertThatCode(() -> service.verify(new ByteArrayResource(POM), signature, noRegisteredKeys()))
-        .doesNotThrowAnyException();
+    final var file = new ByteArrayResource(POM);
+    final var sources = noRegisteredKeys();
+    assertThatCode(() -> service.verify(file, signature, sources)).doesNotThrowAnyException();
 
     // Both key servers are asked: the first one's corrupt answer does not abort the lookup.
     assertThat(this.asked).hasSize(2);
@@ -594,10 +581,10 @@ class PgpVerifierServiceTest {
     final var signature = resource(keys.detachedSignature(POM));
     final var corrupt = corruptedArmoredPublicKey();
 
-    assertThatThrownBy(
-            () ->
-                this.serviceAnswering(uri -> keyBlockResponse(corrupt))
-                    .verify(new ByteArrayResource(POM), signature, noRegisteredKeys()))
+    final var verifier = this.serviceAnswering(uri -> keyBlockResponse(corrupt));
+    final var file = new ByteArrayResource(POM);
+    final var sources = noRegisteredKeys();
+    assertThatThrownBy(() -> verifier.verify(file, signature, sources))
         .isInstanceOf(ItemNotFoundException.class);
 
     assertThat(this.asked).hasSize(2);
@@ -608,14 +595,10 @@ class PgpVerifierServiceTest {
   void aRegisteredKeyVerifiesWithoutAskingAKeyServer() {
     final var signature = resource(keys.detachedSignature(POM));
 
-    assertThatCode(
-            () ->
-                this.serviceAnswering(uri -> notFound())
-                    .verify(
-                        new ByteArrayResource(POM),
-                        signature,
-                        registeredKeys(keys.armoredPublicKey())))
-        .doesNotThrowAnyException();
+    final var verifier = this.serviceAnswering(uri -> notFound());
+    final var file = new ByteArrayResource(POM);
+    final var sources = registeredKeys(keys.armoredPublicKey());
+    assertThatCode(() -> verifier.verify(file, signature, sources)).doesNotThrowAnyException();
 
     assertThat(this.asked).isEmpty();
   }
@@ -626,14 +609,10 @@ class PgpVerifierServiceTest {
     final var otherKeys = PgpTestKeys.generate();
     final var signature = resource(otherKeys.detachedSignature(POM));
 
-    assertThatCode(
-            () ->
-                this.serviceAnswering(uri -> keyResponse(otherKeys))
-                    .verify(
-                        new ByteArrayResource(POM),
-                        signature,
-                        registeredKeys(keys.armoredPublicKey())))
-        .doesNotThrowAnyException();
+    final var verifier = this.serviceAnswering(uri -> keyResponse(otherKeys));
+    final var file = new ByteArrayResource(POM);
+    final var sources = registeredKeys(keys.armoredPublicKey());
+    assertThatCode(() -> verifier.verify(file, signature, sources)).doesNotThrowAnyException();
 
     // The registered key does not match, so the lookup falls through to the (faked) default key
     // servers; the first one answers with the right key, so it stops there.
@@ -649,13 +628,10 @@ class PgpVerifierServiceTest {
   void aRegisteredKeyWithWrongBytesSignedIsRefused() {
     final var signature = resource(keys.detachedSignature(OTHER_POM));
 
-    assertThatThrownBy(
-            () ->
-                this.serviceAnswering(uri -> notFound())
-                    .verify(
-                        new ByteArrayResource(POM),
-                        signature,
-                        registeredKeys(keys.armoredPublicKey())))
+    final var verifier = this.serviceAnswering(uri -> notFound());
+    final var file = new ByteArrayResource(POM);
+    final var sources = registeredKeys(keys.armoredPublicKey());
+    assertThatThrownBy(() -> verifier.verify(file, signature, sources))
         .isInstanceOf(SignatureNotVerifiedException.class)
         .hasMessage(NOT_VERIFIED);
 
@@ -668,14 +644,10 @@ class PgpVerifierServiceTest {
     final var otherKeys = PgpTestKeys.generate();
     final var signature = resource(otherKeys.detachedSignature(POM));
 
-    assertThatCode(
-            () ->
-                this.serviceAnswering(uri -> notFound())
-                    .verify(
-                        new ByteArrayResource(POM),
-                        signature,
-                        registeredKeys(keys.armoredPublicKey(), otherKeys.armoredPublicKey())))
-        .doesNotThrowAnyException();
+    final var verifier = this.serviceAnswering(uri -> notFound());
+    final var file = new ByteArrayResource(POM);
+    final var sources = registeredKeys(keys.armoredPublicKey(), otherKeys.armoredPublicKey());
+    assertThatCode(() -> verifier.verify(file, signature, sources)).doesNotThrowAnyException();
 
     assertThat(this.asked).isEmpty();
   }
@@ -685,14 +657,10 @@ class PgpVerifierServiceTest {
   void oneMalformedRegisteredKeyIsSkipped() {
     final var signature = resource(keys.detachedSignature(POM));
 
-    assertThatCode(
-            () ->
-                this.serviceAnswering(uri -> notFound())
-                    .verify(
-                        new ByteArrayResource(POM),
-                        signature,
-                        registeredKeys("not a key at all", keys.armoredPublicKey())))
-        .doesNotThrowAnyException();
+    final var verifier = this.serviceAnswering(uri -> notFound());
+    final var file = new ByteArrayResource(POM);
+    final var sources = registeredKeys("not a key at all", keys.armoredPublicKey());
+    assertThatCode(() -> verifier.verify(file, signature, sources)).doesNotThrowAnyException();
 
     assertThat(this.asked).isEmpty();
   }
@@ -704,13 +672,10 @@ class PgpVerifierServiceTest {
     final var afterExpiry = new Date(System.currentTimeMillis() + 60_000);
     final var signature = resource(expiring.detachedSignature(POM, afterExpiry));
 
-    assertThatThrownBy(
-            () ->
-                this.serviceAnswering(uri -> notFound())
-                    .verify(
-                        new ByteArrayResource(POM),
-                        signature,
-                        registeredKeys(expiring.armoredPublicKey())))
+    final var verifier = this.serviceAnswering(uri -> notFound());
+    final var file = new ByteArrayResource(POM);
+    final var sources = registeredKeys(expiring.armoredPublicKey());
+    assertThatThrownBy(() -> verifier.verify(file, signature, sources))
         .isInstanceOf(SignatureNotVerifiedException.class)
         .hasMessage(NOT_VERIFIED);
   }
@@ -721,14 +686,10 @@ class PgpVerifierServiceTest {
     final var expiring = PgpTestKeys.generate().withKeyExpirySeconds(3_600);
     final var signature = resource(expiring.detachedSignature(POM, new Date()));
 
-    assertThatCode(
-            () ->
-                this.serviceAnswering(uri -> notFound())
-                    .verify(
-                        new ByteArrayResource(POM),
-                        signature,
-                        registeredKeys(expiring.armoredPublicKey())))
-        .doesNotThrowAnyException();
+    final var verifier = this.serviceAnswering(uri -> notFound());
+    final var file = new ByteArrayResource(POM);
+    final var sources = registeredKeys(expiring.armoredPublicKey());
+    assertThatCode(() -> verifier.verify(file, signature, sources)).doesNotThrowAnyException();
   }
 
   @Test
@@ -739,10 +700,11 @@ class PgpVerifierServiceTest {
     final var afterExpiry = new Date(System.currentTimeMillis() + 60_000);
     final var signature = resource(expiring.detachedSignature(POM, afterExpiry));
 
-    assertThatThrownBy(
-            () ->
-                this.serviceAnswering(uri -> keyBlockResponse(expiring.armoredPublicKey()))
-                    .verify(new ByteArrayResource(POM), signature, noRegisteredKeys()))
+    final var verifier =
+        this.serviceAnswering(uri -> keyBlockResponse(expiring.armoredPublicKey()));
+    final var file = new ByteArrayResource(POM);
+    final var sources = noRegisteredKeys();
+    assertThatThrownBy(() -> verifier.verify(file, signature, sources))
         .isInstanceOf(SignatureNotVerifiedException.class)
         .hasMessage(NOT_VERIFIED);
   }
@@ -753,13 +715,10 @@ class PgpVerifierServiceTest {
     final var revoked = PgpTestKeys.generate().withRevocation();
     final var signature = resource(revoked.detachedSignature(POM));
 
-    assertThatThrownBy(
-            () ->
-                this.serviceAnswering(uri -> notFound())
-                    .verify(
-                        new ByteArrayResource(POM),
-                        signature,
-                        registeredKeys(revoked.armoredPublicKey())))
+    final var verifier = this.serviceAnswering(uri -> notFound());
+    final var file = new ByteArrayResource(POM);
+    final var sources = registeredKeys(revoked.armoredPublicKey());
+    assertThatThrownBy(() -> verifier.verify(file, signature, sources))
         .isInstanceOf(SignatureNotVerifiedException.class)
         .hasMessage(NOT_VERIFIED);
   }
@@ -770,10 +729,10 @@ class PgpVerifierServiceTest {
     final var revoked = PgpTestKeys.generate().withRevocation();
     final var signature = resource(revoked.detachedSignature(POM));
 
-    assertThatThrownBy(
-            () ->
-                this.serviceAnswering(uri -> keyBlockResponse(revoked.armoredPublicKey()))
-                    .verify(new ByteArrayResource(POM), signature, noRegisteredKeys()))
+    final var verifier = this.serviceAnswering(uri -> keyBlockResponse(revoked.armoredPublicKey()));
+    final var file = new ByteArrayResource(POM);
+    final var sources = noRegisteredKeys();
+    assertThatThrownBy(() -> verifier.verify(file, signature, sources))
         .isInstanceOf(SignatureNotVerifiedException.class)
         .hasMessage(NOT_VERIFIED);
   }
@@ -786,13 +745,10 @@ class PgpVerifierServiceTest {
     final var revokedSubkey = PgpTestKeys.generate().withRevokedSubkey();
     final var signature = resource(revokedSubkey.detachedSignature(POM));
 
-    assertThatThrownBy(
-            () ->
-                this.serviceAnswering(uri -> notFound())
-                    .verify(
-                        new ByteArrayResource(POM),
-                        signature,
-                        registeredKeys(revokedSubkey.armoredPublicKey())))
+    final var verifier = this.serviceAnswering(uri -> notFound());
+    final var file = new ByteArrayResource(POM);
+    final var sources = registeredKeys(revokedSubkey.armoredPublicKey());
+    assertThatThrownBy(() -> verifier.verify(file, signature, sources))
         .isInstanceOf(SignatureNotVerifiedException.class)
         .hasMessage(NOT_VERIFIED);
   }
@@ -817,7 +773,8 @@ class PgpVerifierServiceTest {
   @Test
   @DisplayName("parseArmoredPublicKey refuses a signature block")
   void parseArmoredPublicKeyRefusesASignatureBlock() {
-    assertThatThrownBy(() -> PgpVerifierService.parseArmoredPublicKey(keys.detachedSignature(POM)))
+    final var armored = keys.detachedSignature(POM);
+    assertThatThrownBy(() -> PgpVerifierService.parseArmoredPublicKey(armored))
         .isInstanceOf(BadRequestException.class)
         .hasMessage(INVALID_KEY);
   }
@@ -918,19 +875,14 @@ class PgpVerifierServiceTest {
     final var other = PgpTestKeys.generate();
     final var signature = resource(other.detachedSignature(POM));
 
-    assertThatThrownBy(
-            () ->
-                service.verify(
-                    new ByteArrayResource(POM), signature, registeredKeys(keys.armoredPublicKey())))
+    final var file = new ByteArrayResource(POM);
+    final var sources = registeredKeys(keys.armoredPublicKey());
+    assertThatThrownBy(() -> service.verify(file, signature, sources))
         .isInstanceOf(ItemNotFoundException.class);
 
-    assertThatCode(
-            () ->
-                service.verify(
-                    new ByteArrayResource(POM),
-                    signature,
-                    registeredKeys(other.armoredPublicKey())))
-        .doesNotThrowAnyException();
+    final var file2 = new ByteArrayResource(POM);
+    final var sources2 = registeredKeys(other.armoredPublicKey());
+    assertThatCode(() -> service.verify(file2, signature, sources2)).doesNotThrowAnyException();
   }
 
   @Test
@@ -958,14 +910,10 @@ class PgpVerifierServiceTest {
     final var subkey = PgpTestKeys.generate().withSigningSubkey();
     final var signature = resource(subkey.detachedSignature(POM));
 
-    assertThatCode(
-            () ->
-                this.serviceAnswering(uri -> notFound())
-                    .verify(
-                        new ByteArrayResource(POM),
-                        signature,
-                        registeredKeys(subkey.armoredPublicKey())))
-        .doesNotThrowAnyException();
+    final var verifier = this.serviceAnswering(uri -> notFound());
+    final var file = new ByteArrayResource(POM);
+    final var sources = registeredKeys(subkey.armoredPublicKey());
+    assertThatCode(() -> verifier.verify(file, signature, sources)).doesNotThrowAnyException();
 
     assertThat(this.serviceAnswering(uri -> notFound()).readSignerKeyId(signature))
         .isEqualTo("%016X".formatted(subkey.keyId()));
@@ -977,11 +925,10 @@ class PgpVerifierServiceTest {
     final var subkey = PgpTestKeys.generate().withSigningSubkey();
     final var signature = resource(subkey.detachedSignature(POM));
 
-    assertThatCode(
-            () ->
-                this.serviceAnswering(uri -> keyBlockResponse(subkey.armoredPublicKey()))
-                    .verify(new ByteArrayResource(POM), signature, noRegisteredKeys()))
-        .doesNotThrowAnyException();
+    final var verifier = this.serviceAnswering(uri -> keyBlockResponse(subkey.armoredPublicKey()));
+    final var file = new ByteArrayResource(POM);
+    final var sources = noRegisteredKeys();
+    assertThatCode(() -> verifier.verify(file, signature, sources)).doesNotThrowAnyException();
   }
 
   @Test
@@ -990,13 +937,10 @@ class PgpVerifierServiceTest {
     final var subkey = PgpTestKeys.generate().withRevocation().withSigningSubkey();
     final var signature = resource(subkey.detachedSignature(POM));
 
-    assertThatThrownBy(
-            () ->
-                this.serviceAnswering(uri -> notFound())
-                    .verify(
-                        new ByteArrayResource(POM),
-                        signature,
-                        registeredKeys(subkey.armoredPublicKey())))
+    final var verifier = this.serviceAnswering(uri -> notFound());
+    final var file = new ByteArrayResource(POM);
+    final var sources = registeredKeys(subkey.armoredPublicKey());
+    assertThatThrownBy(() -> verifier.verify(file, signature, sources))
         .isInstanceOf(SignatureNotVerifiedException.class)
         .hasMessage(NOT_VERIFIED);
   }
@@ -1007,13 +951,10 @@ class PgpVerifierServiceTest {
     final var stranger = PgpTestKeys.generate();
     final var signature = resource(stranger.detachedSignature(POM));
 
-    assertThatThrownBy(
-            () ->
-                this.serviceAnswering(uri -> keyResponse())
-                    .verify(
-                        new ByteArrayResource(POM),
-                        signature,
-                        registeredKeys(keys.armoredPublicKey())))
+    final var verifier = this.serviceAnswering(uri -> keyResponse());
+    final var file = new ByteArrayResource(POM);
+    final var sources = registeredKeys(keys.armoredPublicKey());
+    assertThatThrownBy(() -> verifier.verify(file, signature, sources))
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessage("artifactSigningKeyNotFound");
 
@@ -1028,13 +969,10 @@ class PgpVerifierServiceTest {
     final var beforeCreation = new Date(System.currentTimeMillis() - 3_600_000);
     final var signature = resource(expiring.detachedSignature(POM, beforeCreation));
 
-    assertThatThrownBy(
-            () ->
-                this.serviceAnswering(uri -> notFound())
-                    .verify(
-                        new ByteArrayResource(POM),
-                        signature,
-                        registeredKeys(expiring.armoredPublicKey())))
+    final var verifier = this.serviceAnswering(uri -> notFound());
+    final var file = new ByteArrayResource(POM);
+    final var sources = registeredKeys(expiring.armoredPublicKey());
+    assertThatThrownBy(() -> verifier.verify(file, signature, sources))
         .isInstanceOf(SignatureNotVerifiedException.class)
         .hasMessage(NOT_VERIFIED);
   }
@@ -1046,14 +984,10 @@ class PgpVerifierServiceTest {
     final var beforeCreation = new Date(System.currentTimeMillis() - 3_600_000);
     final var signature = resource(keys.detachedSignature(POM, beforeCreation));
 
-    assertThatCode(
-            () ->
-                this.serviceAnswering(uri -> notFound())
-                    .verify(
-                        new ByteArrayResource(POM),
-                        signature,
-                        registeredKeys(keys.armoredPublicKey())))
-        .doesNotThrowAnyException();
+    final var verifier = this.serviceAnswering(uri -> notFound());
+    final var file = new ByteArrayResource(POM);
+    final var sources = registeredKeys(keys.armoredPublicKey());
+    assertThatCode(() -> verifier.verify(file, signature, sources)).doesNotThrowAnyException();
   }
 
   @ParameterizedTest
@@ -1063,14 +997,10 @@ class PgpVerifierServiceTest {
   void acceptsAStrongDigestSignature(final int hashAlgorithm) {
     final var signature = resource(keys.detachedSignature(POM, hashAlgorithm));
 
-    assertThatCode(
-            () ->
-                this.serviceAnswering(uri -> notFound())
-                    .verify(
-                        new ByteArrayResource(POM),
-                        signature,
-                        registeredKeys(keys.armoredPublicKey())))
-        .doesNotThrowAnyException();
+    final var verifier = this.serviceAnswering(uri -> notFound());
+    final var file = new ByteArrayResource(POM);
+    final var sources = registeredKeys(keys.armoredPublicKey());
+    assertThatCode(() -> verifier.verify(file, signature, sources)).doesNotThrowAnyException();
   }
 
   @ParameterizedTest
@@ -1079,13 +1009,10 @@ class PgpVerifierServiceTest {
   void refusesAWeakDigestSignature(final int hashAlgorithm) {
     final var signature = resource(keys.detachedSignature(POM, hashAlgorithm));
 
-    assertThatThrownBy(
-            () ->
-                this.serviceAnswering(uri -> notFound())
-                    .verify(
-                        new ByteArrayResource(POM),
-                        signature,
-                        registeredKeys(keys.armoredPublicKey())))
+    final var verifier = this.serviceAnswering(uri -> notFound());
+    final var file = new ByteArrayResource(POM);
+    final var sources = registeredKeys(keys.armoredPublicKey());
+    assertThatThrownBy(() -> verifier.verify(file, signature, sources))
         .isInstanceOf(SignatureNotVerifiedException.class)
         .hasMessage(NOT_VERIFIED);
   }
@@ -1096,10 +1023,9 @@ class PgpVerifierServiceTest {
   void refusesAWeakDigestBeforeAnyKeyLookup(final int hashAlgorithm) {
     this.assertRefusedWithoutAskingAKeyServer(resource(keys.detachedSignature(POM, hashAlgorithm)));
 
-    assertThatThrownBy(
-            () ->
-                this.serviceAnswering(uri -> notFound())
-                    .readSignerKeyId(resource(keys.detachedSignature(POM, hashAlgorithm))))
+    final var verifier = this.serviceAnswering(uri -> notFound());
+    final var signed = resource(keys.detachedSignature(POM, hashAlgorithm));
+    assertThatThrownBy(() -> verifier.readSignerKeyId(signed))
         .isInstanceOf(SignatureNotVerifiedException.class)
         .hasMessage(NOT_VERIFIED);
   }
@@ -1110,13 +1036,10 @@ class PgpVerifierServiceTest {
   void verifyStoredStillAcceptsAWeakDigestSignature(final int hashAlgorithm) {
     final var signature = resource(keys.detachedSignature(POM, hashAlgorithm));
 
-    assertThatCode(
-            () ->
-                this.serviceAnswering(uri -> notFound())
-                    .verifyStored(
-                        new ByteArrayResource(POM),
-                        signature,
-                        registeredKeys(keys.armoredPublicKey())))
+    final var verifier = this.serviceAnswering(uri -> notFound());
+    final var file = new ByteArrayResource(POM);
+    final var sources = registeredKeys(keys.armoredPublicKey());
+    assertThatCode(() -> verifier.verifyStored(file, signature, sources))
         .doesNotThrowAnyException();
   }
 
@@ -1125,13 +1048,10 @@ class PgpVerifierServiceTest {
   void refusesAWeakDigestSignatureOfOtherBytes() {
     final var signature = resource(keys.detachedSignature(OTHER_POM, HashAlgorithmTags.SHA1));
 
-    assertThatThrownBy(
-            () ->
-                this.serviceAnswering(uri -> notFound())
-                    .verify(
-                        new ByteArrayResource(POM),
-                        signature,
-                        registeredKeys(keys.armoredPublicKey())))
+    final var verifier = this.serviceAnswering(uri -> notFound());
+    final var file = new ByteArrayResource(POM);
+    final var sources = registeredKeys(keys.armoredPublicKey());
+    assertThatThrownBy(() -> verifier.verify(file, signature, sources))
         .isInstanceOf(SignatureNotVerifiedException.class)
         .hasMessage(NOT_VERIFIED);
   }
@@ -1141,13 +1061,10 @@ class PgpVerifierServiceTest {
   void refusesAnInlineSignedMessageOfTheSameBytes() {
     final var signature = resource(keys.inlineSignedMessage(POM));
 
-    assertThatThrownBy(
-            () ->
-                this.serviceAnswering(uri -> notFound())
-                    .verify(
-                        new ByteArrayResource(POM),
-                        signature,
-                        registeredKeys(keys.armoredPublicKey())))
+    final var verifier = this.serviceAnswering(uri -> notFound());
+    final var file = new ByteArrayResource(POM);
+    final var sources = registeredKeys(keys.armoredPublicKey());
+    assertThatThrownBy(() -> verifier.verify(file, signature, sources))
         .isInstanceOf(SignatureNotVerifiedException.class)
         .hasMessage(NOT_VERIFIED);
   }
@@ -1157,13 +1074,10 @@ class PgpVerifierServiceTest {
   void verifyStoredStillAcceptsAnInlineSignedMessage() {
     final var signature = resource(keys.inlineSignedMessage(POM));
 
-    assertThatCode(
-            () ->
-                this.serviceAnswering(uri -> notFound())
-                    .verifyStored(
-                        new ByteArrayResource(POM),
-                        signature,
-                        registeredKeys(keys.armoredPublicKey())))
+    final var verifier = this.serviceAnswering(uri -> notFound());
+    final var file = new ByteArrayResource(POM);
+    final var sources = registeredKeys(keys.armoredPublicKey());
+    assertThatCode(() -> verifier.verifyStored(file, signature, sources))
         .doesNotThrowAnyException();
   }
 
@@ -1172,13 +1086,10 @@ class PgpVerifierServiceTest {
   void refusesAnInlineSignedMessageOfOtherBytes() {
     final var signature = resource(keys.inlineSignedMessage(OTHER_POM));
 
-    assertThatThrownBy(
-            () ->
-                this.serviceAnswering(uri -> notFound())
-                    .verify(
-                        new ByteArrayResource(POM),
-                        signature,
-                        registeredKeys(keys.armoredPublicKey())))
+    final var verifier = this.serviceAnswering(uri -> notFound());
+    final var file = new ByteArrayResource(POM);
+    final var sources = registeredKeys(keys.armoredPublicKey());
+    assertThatThrownBy(() -> verifier.verify(file, signature, sources))
         .isInstanceOf(SignatureNotVerifiedException.class)
         .hasMessage(NOT_VERIFIED);
   }
@@ -1189,13 +1100,10 @@ class PgpVerifierServiceTest {
     final var text = new String(POM, UTF_8);
     final var signature = resource(keys.clearSignedMessage(text));
 
-    assertThatThrownBy(
-            () ->
-                this.serviceAnswering(uri -> notFound())
-                    .verify(
-                        new ByteArrayResource(POM),
-                        signature,
-                        registeredKeys(keys.armoredPublicKey())))
+    final var verifier = this.serviceAnswering(uri -> notFound());
+    final var file = new ByteArrayResource(POM);
+    final var sources = registeredKeys(keys.armoredPublicKey());
+    assertThatThrownBy(() -> verifier.verify(file, signature, sources))
         .isInstanceOf(SignatureNotVerifiedException.class)
         .hasMessage(NOT_VERIFIED);
   }
@@ -1205,9 +1113,9 @@ class PgpVerifierServiceTest {
   void nullSourcesAskTheDefaultKeyServers() {
     final var signature = resource(keys.detachedSignature(POM));
 
-    assertThatCode(
-            () -> this.serviceWithTheKey().verify(new ByteArrayResource(POM), signature, null))
-        .doesNotThrowAnyException();
+    final var verifier = this.serviceWithTheKey();
+    final var file = new ByteArrayResource(POM);
+    assertThatCode(() -> verifier.verify(file, signature, null)).doesNotThrowAnyException();
 
     assertThat(this.asked).hasSize(1);
   }

@@ -31,12 +31,12 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
-public abstract class AbstractMavenDownloadProtocolMethodHandler<ID>
-    extends AbstractFacadeProtocolMethodHandler<MavenProtocolFacade<ID>> {
+public abstract class AbstractMavenDownloadProtocolMethodHandler<I>
+    extends AbstractFacadeProtocolMethodHandler<MavenProtocolFacade<I>> {
 
-  public AbstractMavenDownloadProtocolMethodHandler(
+  protected AbstractMavenDownloadProtocolMethodHandler(
       final PathParser pathParser,
-      final MavenProtocolFacade<ID> mavenProtocolFacade,
+      final MavenProtocolFacade<I> mavenProtocolFacade,
       final MavenProtocolProvider provider) {
     super(
         HandlerRoute.read(HttpMethod.GET).method("download").head(),
@@ -58,7 +58,7 @@ public abstract class AbstractMavenDownloadProtocolMethodHandler<ID>
       resource = this.facade.download(context);
     } catch (final RedirectToSlashEndedLocationException _) {
       return ResponseEntity.status(HttpStatus.TEMPORARY_REDIRECT)
-          .location(new URI(request.getServletPath() + "/"))
+          .location(new URI(request.getServletPath() + '/'))
           .build();
     } catch (final ItemNotFoundException _) {
       return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
@@ -84,7 +84,7 @@ public abstract class AbstractMavenDownloadProtocolMethodHandler<ID>
       resource = this.facade.download(context);
     } catch (final RedirectToSlashEndedLocationException _) {
       return ResponseEntity.status(HttpStatus.TEMPORARY_REDIRECT)
-          .location(new URI(request.getServletPath() + "/"))
+          .location(new URI(request.getServletPath() + '/'))
           .build();
     } catch (final ItemNotFoundException _) {
       return ResponseEntity.status(HttpStatus.NOT_FOUND).build();

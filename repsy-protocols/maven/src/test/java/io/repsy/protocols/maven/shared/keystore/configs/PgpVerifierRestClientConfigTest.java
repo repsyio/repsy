@@ -103,14 +103,13 @@ class PgpVerifierRestClientConfigTest {
 
     final var start = System.nanoTime();
 
-    assertThatThrownBy(
-            () ->
-                new PgpVerifierRestClientConfig()
-                    .pgpVerifierRestClient()
-                    .get()
-                    .uri(this.baseUrl() + "/pks/lookup")
-                    .retrieve()
-                    .body(String.class))
+    final var responseSpec =
+        new PgpVerifierRestClientConfig()
+            .pgpVerifierRestClient()
+            .get()
+            .uri(this.baseUrl() + "/pks/lookup")
+            .retrieve();
+    assertThatThrownBy(() -> responseSpec.body(String.class))
         .isInstanceOf(ResourceAccessException.class);
 
     final var elapsed = Duration.ofNanos(System.nanoTime() - start);
@@ -161,14 +160,13 @@ class PgpVerifierRestClientConfigTest {
           }
         });
 
-    assertThatThrownBy(
-            () ->
-                new PgpVerifierRestClientConfig()
-                    .pgpVerifierRestClient()
-                    .get()
-                    .uri(this.baseUrl() + "/pks/lookup")
-                    .retrieve()
-                    .body(String.class))
+    final var responseSpec =
+        new PgpVerifierRestClientConfig()
+            .pgpVerifierRestClient()
+            .get()
+            .uri(this.baseUrl() + "/pks/lookup")
+            .retrieve();
+    assertThatThrownBy(() -> responseSpec.body(String.class))
         .isInstanceOf(org.springframework.web.client.RestClientException.class);
   }
 
@@ -183,14 +181,13 @@ class PgpVerifierRestClientConfigTest {
 
     final var start = System.nanoTime();
 
-    assertThatThrownBy(
-            () ->
-                new PgpVerifierRestClientConfig()
-                    .pgpVerifierRestClient()
-                    .get()
-                    .uri("http://127.0.0.1:" + closedPort + "/pks/lookup")
-                    .retrieve()
-                    .body(String.class))
+    final var responseSpec =
+        new PgpVerifierRestClientConfig()
+            .pgpVerifierRestClient()
+            .get()
+            .uri("http://127.0.0.1:" + closedPort + "/pks/lookup")
+            .retrieve();
+    assertThatThrownBy(() -> responseSpec.body(String.class))
         .isInstanceOf(ResourceAccessException.class);
 
     assertThat(Duration.ofNanos(System.nanoTime() - start))
