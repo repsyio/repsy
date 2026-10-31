@@ -211,7 +211,7 @@ public class SuspiciousRequestThrottle {
    *
    * @return the client's ban seconds left after this request, 0 when it is not banned
    */
-  public long record(
+  public long recordSuspicious(
       final String client, final String remoteAddr, final Set<SignalFamily> signals) {
 
     if (this.windows == null || this.bans == null || signals.isEmpty()) {
