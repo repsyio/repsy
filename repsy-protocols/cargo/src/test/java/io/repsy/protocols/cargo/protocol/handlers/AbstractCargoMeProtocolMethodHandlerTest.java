@@ -177,7 +177,9 @@ class AbstractCargoMeProtocolMethodHandlerTest {
       when(authenticator.authenticateAndCreateToken(AUTH_HEADER))
           .thenThrow(new IllegalStateException("database is down"));
 
-      assertThatThrownBy(() -> handler.handle(meContext, request, new MockHttpServletResponse()))
+      final var response = new MockHttpServletResponse();
+
+      assertThatThrownBy(() -> handler.handle(meContext, request, response))
           .isInstanceOf(IllegalStateException.class)
           .hasMessage("database is down");
     }
@@ -191,7 +193,9 @@ class AbstractCargoMeProtocolMethodHandlerTest {
       when(authenticator.authenticateAndCreateToken(AUTH_HEADER))
           .thenThrow(new TooManyRequestsException(42));
 
-      assertThatThrownBy(() -> handler.handle(meContext, request, new MockHttpServletResponse()))
+      final var response = new MockHttpServletResponse();
+
+      assertThatThrownBy(() -> handler.handle(meContext, request, response))
           .isInstanceOfSatisfying(
               TooManyRequestsException.class,
               ex -> assertThat(ex.getRetryAfterSeconds()).isEqualTo(42));

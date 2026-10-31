@@ -95,10 +95,9 @@ class CratePublishBodyUtilsTest {
                 new ByteArrayInputStream(
                     new byte[] {(byte) 0xff, (byte) 0xff, (byte) 0xff, (byte) 0xff})))
         .isEqualTo(4294967295L);
-    assertThatThrownBy(
-            () ->
-                CratePublishBodyUtils.readCrateLength(
-                    new ByteArrayInputStream(new byte[] {1, 2, 3})))
+    final var truncatedLength = new ByteArrayInputStream(new byte[] {1, 2, 3});
+
+    assertThatThrownBy(() -> CratePublishBodyUtils.readCrateLength(truncatedLength))
         .isInstanceOf(IllegalArgumentException.class);
   }
 }

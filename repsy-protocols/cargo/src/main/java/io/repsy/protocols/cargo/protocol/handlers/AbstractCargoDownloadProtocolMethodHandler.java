@@ -44,7 +44,7 @@ public abstract class AbstractCargoDownloadProtocolMethodHandler
   static final Pattern DOWNLOAD_PATTERN =
       Pattern.compile(".*/api/v1/crates/([^/]+)/([^/]+)/download$");
 
-  public AbstractCargoDownloadProtocolMethodHandler(
+  protected AbstractCargoDownloadProtocolMethodHandler(
       final PathParser basePathParser,
       final CargoProtocolFacade facade,
       final CargoProtocolProvider provider) {

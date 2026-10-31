@@ -44,7 +44,7 @@ public abstract class AbstractCargoPublishProtocolMethodHandler
   private static final String VERSION_EXISTS_DETAIL =
       "this crate version already exists in this registry";
 
-  public AbstractCargoPublishProtocolMethodHandler(
+  protected AbstractCargoPublishProtocolMethodHandler(
       final PathParser basePathParser,
       final CargoProtocolFacade facade,
       final CargoProtocolProvider provider) {
@@ -87,7 +87,7 @@ public abstract class AbstractCargoPublishProtocolMethodHandler
     } catch (final ItemAlreadyExistException _) {
       // The exception carries a fixed msgId (RPS-1127), which is not a sentence for cargo to show.
       return cargoError(HttpStatus.BAD_REQUEST, VERSION_EXISTS_DETAIL);
-    } catch (final MaxUploadSizeExceededException e) {
+    } catch (final MaxUploadSizeExceededException _) {
       return cargoError(HttpStatus.PAYLOAD_TOO_LARGE, "the crate exceeds the maximum upload size");
     }
   }

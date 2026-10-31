@@ -323,11 +323,10 @@ class AbstractCargoProtocolFacadeTest {
       when(objectMapper.readValue(any(byte[].class), eq(CratePublishRequest.class)))
           .thenReturn(minimalRequest("my_crate", "1.0.0-" + "a".repeat(64)));
 
-      assertThatThrownBy(
-              () ->
-                  facade.publish(
-                      context("/api/v1/crates/new"),
-                      stream(publishPayload("{}", minimalCrateBytes()))))
+      final var publishContext = context("/api/v1/crates/new");
+      final var publishBody = stream(publishPayload("{}", minimalCrateBytes()));
+
+      assertThatThrownBy(() -> facade.publish(publishContext, publishBody))
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessage("version must be at most 64 characters");
 
@@ -516,10 +515,10 @@ class AbstractCargoProtocolFacadeTest {
           .thenReturn(minimalRequest("my_crate", "1.0.0"));
       final var oversizedCrate = new byte[(int) MAX_CRATE_BYTES + 1];
 
-      assertThatThrownBy(
-              () ->
-                  facade.publish(
-                      context("/api/v1/crates/new"), stream(publishPayload("{}", oversizedCrate))))
+      final var publishContext = context("/api/v1/crates/new");
+      final var publishBody = stream(publishPayload("{}", oversizedCrate));
+
+      assertThatThrownBy(() -> facade.publish(publishContext, publishBody))
           .isInstanceOf(MaxUploadSizeExceededException.class);
 
       verifyNoInteractions(storageService, crateService);
@@ -536,7 +535,10 @@ class AbstractCargoProtocolFacadeTest {
       final var truncated = new byte[fullPayload.length - 1];
       System.arraycopy(fullPayload, 0, truncated, 0, truncated.length);
 
-      assertThatThrownBy(() -> facade.publish(context("/api/v1/crates/new"), stream(truncated)))
+      final var publishContext = context("/api/v1/crates/new");
+      final var publishBody = stream(truncated);
+
+      assertThatThrownBy(() -> facade.publish(publishContext, publishBody))
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining("shorter than declared");
 
@@ -546,7 +548,10 @@ class AbstractCargoProtocolFacadeTest {
     @Test
     @DisplayName("refuses a body with no byte in it, nothing stored (RPS-1466)")
     void refusesAnEmptyBody() {
-      assertThatThrownBy(() -> facade.publish(context("/api/v1/crates/new"), stream(new byte[0])))
+      final var publishContext = context("/api/v1/crates/new");
+      final var publishBody = stream(new byte[0]);
+
+      assertThatThrownBy(() -> facade.publish(publishContext, publishBody))
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessage("the publish body is empty");
 
@@ -556,8 +561,10 @@ class AbstractCargoProtocolFacadeTest {
     @Test
     @DisplayName("refuses a body that stops inside a length field, nothing stored (RPS-1466)")
     void refusesABodyCutInsideALengthField() {
-      assertThatThrownBy(
-              () -> facade.publish(context("/api/v1/crates/new"), stream(new byte[] {1, 0})))
+      final var publishContext = context("/api/v1/crates/new");
+      final var publishBody = stream(new byte[] {1, 0});
+
+      assertThatThrownBy(() -> facade.publish(publishContext, publishBody))
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining("ends before a length field");
 
@@ -570,8 +577,10 @@ class AbstractCargoProtocolFacadeTest {
       final var body = new ByteArrayOutputStream();
       writeU32LE(body, 0);
 
-      assertThatThrownBy(
-              () -> facade.publish(context("/api/v1/crates/new"), stream(body.toByteArray())))
+      final var publishContext = context("/api/v1/crates/new");
+      final var publishBody = stream(body.toByteArray());
+
+      assertThatThrownBy(() -> facade.publish(publishContext, publishBody))
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessage("the crate's metadata JSON is empty");
 
@@ -587,8 +596,10 @@ class AbstractCargoProtocolFacadeTest {
       writeU32LE(body, 2);
       body.write("{}".getBytes(StandardCharsets.UTF_8));
 
-      assertThatThrownBy(
-              () -> facade.publish(context("/api/v1/crates/new"), stream(body.toByteArray())))
+      final var publishContext = context("/api/v1/crates/new");
+      final var publishBody = stream(body.toByteArray());
+
+      assertThatThrownBy(() -> facade.publish(publishContext, publishBody))
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessageContaining("ends before a length field");
 
@@ -601,10 +612,10 @@ class AbstractCargoProtocolFacadeTest {
       when(objectMapper.readValue(any(byte[].class), eq(CratePublishRequest.class)))
           .thenReturn(minimalRequest("my_crate", "1.0.0"));
 
-      assertThatThrownBy(
-              () ->
-                  facade.publish(
-                      context("/api/v1/crates/new"), stream(publishPayload("{}", new byte[0]))))
+      final var publishContext = context("/api/v1/crates/new");
+      final var publishBody = stream(publishPayload("{}", new byte[0]));
+
+      assertThatThrownBy(() -> facade.publish(publishContext, publishBody))
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessage("the crate is empty");
 
@@ -647,11 +658,10 @@ class AbstractCargoProtocolFacadeTest {
           .when(crateService)
           .publish(any(), any(), any(), any());
 
-      assertThatThrownBy(
-              () ->
-                  facade.publish(
-                      context("/api/v1/crates/new"),
-                      stream(publishPayload("{}", minimalCrateBytes()))))
+      final var publishContext = context("/api/v1/crates/new");
+      final var publishBody = stream(publishPayload("{}", minimalCrateBytes()));
+
+      assertThatThrownBy(() -> facade.publish(publishContext, publishBody))
           .isInstanceOf(ItemAlreadyExistException.class);
 
       verifyNoInteractions(storageService);
@@ -668,11 +678,10 @@ class AbstractCargoProtocolFacadeTest {
           .when(crateService)
           .publish(any(), any(), any(), any());
 
-      assertThatThrownBy(
-              () ->
-                  facade.publish(
-                      context("/api/v1/crates/new"),
-                      stream(publishPayload("{}", minimalCrateBytes()))))
+      final var publishContext = context("/api/v1/crates/new");
+      final var publishBody = stream(publishPayload("{}", minimalCrateBytes()));
+
+      assertThatThrownBy(() -> facade.publish(publishContext, publishBody))
           .isInstanceOf(ItemAlreadyExistException.class)
           .hasMessage("crateVersionAlreadyExists");
 
@@ -706,11 +715,10 @@ class AbstractCargoProtocolFacadeTest {
       when(storageService.writeCrateAndIndex(any(), any(), any(), any(), any()))
           .thenThrow(new IllegalStateException("storage went away"));
 
-      assertThatThrownBy(
-              () ->
-                  facade.publish(
-                      context("/api/v1/crates/new"),
-                      stream(publishPayload("{}", minimalCrateBytes()))))
+      final var publishContext = context("/api/v1/crates/new");
+      final var publishBody = stream(publishPayload("{}", minimalCrateBytes()));
+
+      assertThatThrownBy(() -> facade.publish(publishContext, publishBody))
           .isInstanceOf(IllegalStateException.class);
 
       verify(storageService).deleteCrate(new RepoRef(REPO_ID, REPO_NAME), "my_crate", "1.0.0");
@@ -728,11 +736,10 @@ class AbstractCargoProtocolFacadeTest {
           .thenThrow(writeFailure);
       when(storageService.deleteCrate(any(), any(), any())).thenThrow(cleanupFailure);
 
-      assertThatThrownBy(
-              () ->
-                  facade.publish(
-                      context("/api/v1/crates/new"),
-                      stream(publishPayload("{}", minimalCrateBytes()))))
+      final var publishContext = context("/api/v1/crates/new");
+      final var publishBody = stream(publishPayload("{}", minimalCrateBytes()));
+
+      assertThatThrownBy(() -> facade.publish(publishContext, publishBody))
           .isSameAs(writeFailure)
           .hasSuppressedException(cleanupFailure);
     }
@@ -946,7 +953,10 @@ class AbstractCargoProtocolFacadeTest {
         when(objectMapper.readValue(any(byte[].class), eq(CratePublishRequest.class)))
             .thenReturn(request);
         final var payload = publishPayload("{}", minimalCrateBytes());
-        assertThatThrownBy(() -> facade.publish(context("/api/v1/crates/new"), stream(payload)))
+        final var publishContext = context("/api/v1/crates/new");
+        final var publishBody = stream(payload);
+
+        assertThatThrownBy(() -> facade.publish(publishContext, publishBody))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining(messagePart);
       }

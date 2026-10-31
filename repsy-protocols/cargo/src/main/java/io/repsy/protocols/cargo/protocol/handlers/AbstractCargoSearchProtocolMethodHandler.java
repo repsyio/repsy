@@ -56,7 +56,7 @@ public abstract class AbstractCargoSearchProtocolMethodHandler
    */
   private static final Sort SEARCH_ORDER = Sort.by("name");
 
-  public AbstractCargoSearchProtocolMethodHandler(
+  protected AbstractCargoSearchProtocolMethodHandler(
       final PathParser basePathParser,
       final CargoProtocolFacade facade,
       final CargoProtocolProvider provider) {
@@ -128,7 +128,7 @@ public abstract class AbstractCargoSearchProtocolMethodHandler
 
     try {
       return OptionalInt.of(Integer.parseInt(value));
-    } catch (final NumberFormatException e) {
+    } catch (final NumberFormatException _) {
       return OptionalInt.empty();
     }
   }

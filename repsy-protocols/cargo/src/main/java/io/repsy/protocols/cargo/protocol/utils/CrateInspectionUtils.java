@@ -103,17 +103,12 @@ public class CrateInspectionUtils {
 
       if (isTableHeader(line)) {
         inPackageTable = "[package]".equals(line);
-        continue;
-      }
+      } else if (inPackageTable) {
+        final var edition = matchEditionValue(line);
 
-      if (!inPackageTable) {
-        continue;
-      }
-
-      final var edition = matchEditionValue(line);
-
-      if (edition != null) {
-        return trimToColumnWidth(edition);
+        if (edition != null) {
+          return trimToColumnWidth(edition);
+        }
       }
     }
 

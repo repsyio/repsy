@@ -40,6 +40,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -192,31 +194,20 @@ class AbstractCargoSearchProtocolMethodHandlerTest {
       assertThat(pageable.getValue()).isEqualTo(PageRequest.of(0, 100, Sort.by("name")));
     }
 
-    @Test
-    @DisplayName("returns 400 with a cargo error body for invalid per_page parameter")
-    void returnsBadRequestOnInvalidPerPage() {
+    @ParameterizedTest(name = "{0}={1}")
+    @CsvSource({"per_page,abc", "page,xyz", "per_page,99999999999"})
+    @DisplayName(
+        "returns 400 with a cargo error body for a pagination parameter that is not an int,"
+            + " without parse details")
+    void returnsBadRequestOnInvalidPaginationParameter(final String parameter, final String value) {
       final var request = new MockHttpServletRequest("GET", SEARCH_PATH);
-      request.setParameter("per_page", "abc");
+      request.setParameter(parameter, value);
 
       final var result =
           handler.handle(context(SEARCH_PATH), request, new MockHttpServletResponse());
 
       assertThat(result.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-      assertThat(errorDetail(result)).isEqualTo("per_page must be a whole number");
-      verifyNoInteractions(facade);
-    }
-
-    @Test
-    @DisplayName("returns 400 with a cargo error body for invalid page parameter")
-    void returnsBadRequestOnInvalidPage() {
-      final var request = new MockHttpServletRequest("GET", SEARCH_PATH);
-      request.setParameter("page", "xyz");
-
-      final var result =
-          handler.handle(context(SEARCH_PATH), request, new MockHttpServletResponse());
-
-      assertThat(result.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-      assertThat(errorDetail(result)).isEqualTo("page must be a whole number");
+      assertThat(errorDetail(result)).isEqualTo(parameter + " must be a whole number");
       verifyNoInteractions(facade);
     }
 
@@ -264,20 +255,6 @@ class AbstractCargoSearchProtocolMethodHandlerTest {
     }
 
     @Test
-    @DisplayName("returns 400 for numbers that do not fit an int, without parse details")
-    void rejectsOutOfRangeNumbers() {
-      final var request = new MockHttpServletRequest("GET", SEARCH_PATH);
-      request.setParameter("per_page", "99999999999");
-
-      final var result =
-          handler.handle(context(SEARCH_PATH), request, new MockHttpServletResponse());
-
-      assertThat(result.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-      assertThat(errorDetail(result)).isEqualTo("per_page must be a whole number");
-      verifyNoInteractions(facade);
-    }
-
-    @Test
     @DisplayName("lets a failing search propagate to the error advice, marked for the cargo body")
     void failingSearchPropagates() {
       final var ctx = context(SEARCH_PATH);
@@ -285,7 +262,9 @@ class AbstractCargoSearchProtocolMethodHandlerTest {
       when(facade.search(eq(ctx), eq(""), any(Pageable.class)))
           .thenThrow(new IllegalStateException("could not execute query: select * from secret"));
 
-      assertThatThrownBy(() -> handler.handle(ctx, request, new MockHttpServletResponse()))
+      final var response = new MockHttpServletResponse();
+
+      assertThatThrownBy(() -> handler.handle(ctx, request, response))
           .isInstanceOf(IllegalStateException.class);
       assertThat(request.getAttribute(CargoConstants.ERROR_BODY_ATTRIBUTE)).isEqualTo(true);
     }

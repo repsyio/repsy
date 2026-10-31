@@ -47,7 +47,7 @@ import tools.jackson.databind.ObjectMapper;
 
 @Slf4j
 @RequiredArgsConstructor
-public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFacade {
+public abstract class AbstractCargoProtocolFacade<I> implements CargoProtocolFacade {
 
   private static final String USAGES = "usages";
   private static final String ARTIFACT_NAME = "artifactName";
@@ -55,7 +55,7 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
   private static final String STORAGE_PATH = "storagePath";
 
   private final CargoStorageService cargoStorageService;
-  private final CargoCrateService<ID> cargoCrateService;
+  private final CargoCrateService<I> cargoCrateService;
   private final ObjectMapper objectMapper;
 
   /**
@@ -68,7 +68,7 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
   @Override
   public List<CrateIndexEntry> getIndexEntries(final ProtocolContext context) {
 
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
 
     final var crateName = CrateUtils.extractLastSegment(context);
 
@@ -78,7 +78,7 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
   @Override
   public Resource download(final ProtocolContext context) {
 
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
 
     final var crateNameAndVersionPair = CrateUtils.extractCrateNameAndVersion(context);
     final var crateName = crateNameAndVersionPair.getFirst();
@@ -94,7 +94,7 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
   @Override
   public Resource getCrate(final ProtocolContext context) {
 
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
 
     final var crateNameAndVersionPair = CrateUtils.extractCrateNameAndVersion(context);
 
@@ -121,7 +121,7 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
     final var inputStream =
         RequestBodies.nonEmpty(requestBody)
             .orElseThrow(() -> new IllegalArgumentException("the publish body is empty"));
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     final var published = CratePublishBodyUtils.getPublishRequest(inputStream, this.objectMapper);
 
     CratePublishRequestUtils.validatePublishRequest(published);
@@ -188,7 +188,7 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
    * version is removed so nothing is left in storage that no row describes (RPS-1124).
    */
   private BaseUsages storeCrate(
-      final BaseRepoInfo<ID> repoInfo,
+      final BaseRepoInfo<I> repoInfo,
       final String crateName,
       final String version,
       final SpooledUpload spool,
@@ -213,7 +213,7 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
   @Override
   public void yank(final ProtocolContext context) {
 
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
 
     final var nameVersionPair = CrateUtils.extractCrateNameAndVersion(context);
 
@@ -223,7 +223,7 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
   @Override
   public void unyank(final ProtocolContext context) {
 
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
 
     final var nameVersionPair = CrateUtils.extractCrateNameAndVersion(context);
 
@@ -235,7 +235,7 @@ public abstract class AbstractCargoProtocolFacade<ID> implements CargoProtocolFa
   public Page<CrateListItem> search(
       final ProtocolContext context, final String query, final Pageable pageable) {
 
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
 
     return this.cargoCrateService.search(repoInfo, query, pageable);
   }

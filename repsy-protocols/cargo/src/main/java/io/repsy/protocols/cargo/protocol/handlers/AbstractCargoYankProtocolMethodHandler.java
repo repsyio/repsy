@@ -41,7 +41,7 @@ public abstract class AbstractCargoYankProtocolMethodHandler
   private static final Pattern YANK_PATTERN =
       Pattern.compile(".*/api/v1/crates/[^/]+/[^/]+/(yank|unyank)$");
 
-  public AbstractCargoYankProtocolMethodHandler(
+  protected AbstractCargoYankProtocolMethodHandler(
       final PathParser basePathParser,
       final CargoProtocolFacade facade,
       final CargoProtocolProvider provider) {

@@ -167,7 +167,9 @@ class AbstractCargoStorageServiceTest {
     void throwsWhenMissing() {
       when(storageStrategy.get(path(CRATE_PATH), eq(REPO_NAME))).thenReturn(Optional.empty());
 
-      assertThatThrownBy(() -> service.getCrate(new RepoRef(REPO_ID, REPO_NAME), "serde", "1.0.0"))
+      final var repoRef = new RepoRef(REPO_ID, REPO_NAME);
+
+      assertThatThrownBy(() -> service.getCrate(repoRef, "serde", "1.0.0"))
           .isInstanceOf(ItemNotFoundException.class)
           .hasMessage("crateNotFound");
     }
@@ -189,7 +191,9 @@ class AbstractCargoStorageServiceTest {
     when(storageStrategy.getFileUsage(path(CRATE_PATH), eq(REPO_NAME)))
         .thenThrow(new IOException("disk"));
 
-    assertThatThrownBy(() -> service.deleteCrate(new RepoRef(REPO_ID, REPO_NAME), "serde", "1.0.0"))
+    final var repoRef = new RepoRef(REPO_ID, REPO_NAME);
+
+    assertThatThrownBy(() -> service.deleteCrate(repoRef, "serde", "1.0.0"))
         .isInstanceOf(ErrorOccurredException.class)
         .hasCauseInstanceOf(IOException.class);
     verify(storageStrategy, never()).delete(any());
@@ -217,7 +221,9 @@ class AbstractCargoStorageServiceTest {
       when(storageStrategy.getFileUsage(path(INDEX_PATH), eq(REPO_NAME)))
           .thenThrow(new IOException("disk"));
 
-      assertThatThrownBy(() -> service.deletePackage(new RepoRef(REPO_ID, REPO_NAME), "serde"))
+      final var repoRef = new RepoRef(REPO_ID, REPO_NAME);
+
+      assertThatThrownBy(() -> service.deletePackage(repoRef, "serde"))
           .isInstanceOf(ErrorOccurredException.class)
           .hasMessage("errorOccurred")
           .hasCauseInstanceOf(IOException.class);

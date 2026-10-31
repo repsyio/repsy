@@ -26,6 +26,7 @@ import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.util.Objects;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
@@ -42,7 +43,7 @@ import org.springframework.http.ResponseEntity;
 public abstract class AbstractCargoConfigProtocolMethodHandler
     extends AbstractRoutedProtocolMethodHandler {
 
-  public AbstractCargoConfigProtocolMethodHandler(
+  protected AbstractCargoConfigProtocolMethodHandler(
       final PathParser pathParser, final CargoProtocolProvider provider) {
 
     super(
@@ -73,7 +74,7 @@ public abstract class AbstractCargoConfigProtocolMethodHandler
     // mark, CargoErrorBodyAdvice writes Cargo's error body (RPS-2060).
     request.setAttribute(CargoConstants.ERROR_BODY_ATTRIBUTE, true);
 
-    final var path = request.getServletPath();
+    final var path = Objects.requireNonNull(request.getServletPath());
     final var basePath = path.substring(0, path.lastIndexOf("/config.json"));
     final var baseUrl = this.resolveBaseUrl(request, basePath);
 
