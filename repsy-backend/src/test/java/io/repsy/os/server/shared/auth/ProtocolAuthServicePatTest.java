@@ -165,7 +165,7 @@ class ProtocolAuthServicePatTest {
           "ru-t"
         })
     void anythingWithoutThePrefixIsLeftAlone(final String other) {
-      assertThat(authService.tryAuthorizeWithPat(REPO_ID, other, Permission.READ)).isFalse();
+      assertThat(authService.tryAuthorizeWithPat(other, Permission.READ)).isFalse();
 
       verifyNoInteractions(tokens, throttle, userTxService, deployTokenService, jwtUtils);
     }
@@ -175,7 +175,7 @@ class ProtocolAuthServicePatTest {
     void unknownIsCounted() {
       when(tokens.findByToken(secret)).thenReturn(Optional.empty());
 
-      assertUnauthorized(() -> authService.tryAuthorizeWithPat(REPO_ID, secret, Permission.READ));
+      assertUnauthorized(() -> authService.tryAuthorizeWithPat(secret, Permission.READ));
 
       verify(throttle).checkAllowed();
       verify(throttle).recordFailure();
@@ -187,7 +187,7 @@ class ProtocolAuthServicePatTest {
     void expiredIsCounted() {
       found(token(Instant.now().minusSeconds(1), TokenScope.REPO_READ));
 
-      assertUnauthorized(() -> authService.tryAuthorizeWithPat(REPO_ID, secret, Permission.READ));
+      assertUnauthorized(() -> authService.tryAuthorizeWithPat(secret, Permission.READ));
 
       verify(throttle).recordFailure();
       verify(tokens, never()).updateLastUsedTime(any());
@@ -204,7 +204,7 @@ class ProtocolAuthServicePatTest {
               new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
               throttle);
 
-      assertUnauthorized(() -> bare.tryAuthorizeWithPat(REPO_ID, secret, Permission.READ));
+      assertUnauthorized(() -> bare.tryAuthorizeWithPat(secret, Permission.READ));
 
       verify(throttle).recordFailure();
     }
@@ -217,7 +217,7 @@ class ProtocolAuthServicePatTest {
           .when(throttle)
           .checkAllowed();
 
-      assertThatThrownBy(() -> authService.tryAuthorizeWithPat(REPO_ID, secret, Permission.READ))
+      assertThatThrownBy(() -> authService.tryAuthorizeWithPat(secret, Permission.READ))
           .isInstanceOf(io.repsy.protocols.shared.exceptions.TooManyRequestsException.class);
 
       verify(throttle, never()).recordFailure();
@@ -230,7 +230,7 @@ class ProtocolAuthServicePatTest {
 
       found(token);
 
-      assertThat(authService.tryAuthorizeWithPat(REPO_ID, secret, Permission.READ)).isTrue();
+      assertThat(authService.tryAuthorizeWithPat(secret, Permission.READ)).isTrue();
 
       verify(tokens).updateLastUsedTime(token.id());
       verifyNoInteractions(throttle, userTxService);
@@ -241,10 +241,7 @@ class ProtocolAuthServicePatTest {
     void anyRepo() {
       found(live(TokenScope.REPO_READ));
 
-      assertThat(authService.tryAuthorizeWithPat(UUID.randomUUID(), secret, Permission.READ))
-          .isTrue();
-      assertThat(authService.tryAuthorizeWithPat(UUID.randomUUID(), secret, Permission.READ))
-          .isTrue();
+      assertThat(authService.tryAuthorizeWithPat(secret, Permission.READ)).isTrue();
     }
 
     @Test
@@ -252,8 +249,8 @@ class ProtocolAuthServicePatTest {
     void tooFewScopes() {
       found(live(TokenScope.REPO_READ));
 
-      assertUnauthorized(() -> authService.tryAuthorizeWithPat(REPO_ID, secret, Permission.WRITE));
-      assertUnauthorized(() -> authService.tryAuthorizeWithPat(REPO_ID, secret, Permission.MANAGE));
+      assertUnauthorized(() -> authService.tryAuthorizeWithPat(secret, Permission.WRITE));
+      assertUnauthorized(() -> authService.tryAuthorizeWithPat(secret, Permission.MANAGE));
 
       verifyNoInteractions(throttle);
       verify(tokens, never()).updateLastUsedTime(any());
@@ -264,9 +261,9 @@ class ProtocolAuthServicePatTest {
     void theLadder() {
       found(live(TokenScope.REPO_WRITE));
 
-      assertThat(authService.tryAuthorizeWithPat(REPO_ID, secret, Permission.READ)).isTrue();
-      assertThat(authService.tryAuthorizeWithPat(REPO_ID, secret, Permission.WRITE)).isTrue();
-      assertUnauthorized(() -> authService.tryAuthorizeWithPat(REPO_ID, secret, Permission.MANAGE));
+      assertThat(authService.tryAuthorizeWithPat(secret, Permission.READ)).isTrue();
+      assertThat(authService.tryAuthorizeWithPat(secret, Permission.WRITE)).isTrue();
+      assertUnauthorized(() -> authService.tryAuthorizeWithPat(secret, Permission.MANAGE));
     }
 
     @Test
@@ -274,7 +271,7 @@ class ProtocolAuthServicePatTest {
     void noRepoScope() {
       found(live(TokenScope.SCAN_READ));
 
-      assertUnauthorized(() -> authService.tryAuthorizeWithPat(REPO_ID, secret, Permission.READ));
+      assertUnauthorized(() -> authService.tryAuthorizeWithPat(secret, Permission.READ));
     }
 
     @ParameterizedTest(name = "repo:manage for a {0} owner")
@@ -284,7 +281,7 @@ class ProtocolAuthServicePatTest {
       ownerIs(role);
 
       final ThrowingAssertion manage =
-          () -> authService.tryAuthorizeWithPat(REPO_ID, secret, Permission.MANAGE);
+          () -> authService.tryAuthorizeWithPat(secret, Permission.MANAGE);
 
       if (role == UserRole.ADMIN) {
         assertThatCode(manage::run).doesNotThrowAnyException();
@@ -299,7 +296,7 @@ class ProtocolAuthServicePatTest {
       found(live(TokenScope.REPO_WRITE));
       ownerIs(UserRole.ADMIN);
 
-      assertUnauthorized(() -> authService.tryAuthorizeWithPat(REPO_ID, secret, Permission.MANAGE));
+      assertUnauthorized(() -> authService.tryAuthorizeWithPat(secret, Permission.MANAGE));
     }
 
     @Test
@@ -307,8 +304,8 @@ class ProtocolAuthServicePatTest {
     void theRoleIsReadOnlyForManage() {
       found(live(TokenScope.REPO_MANAGE));
 
-      authService.tryAuthorizeWithPat(REPO_ID, secret, Permission.READ);
-      authService.tryAuthorizeWithPat(REPO_ID, secret, Permission.WRITE);
+      authService.tryAuthorizeWithPat(secret, Permission.READ);
+      authService.tryAuthorizeWithPat(secret, Permission.WRITE);
 
       verifyNoInteractions(userTxService);
     }
@@ -670,9 +667,8 @@ class ProtocolAuthServicePatTest {
     void isAuthorizedLikeAToken() {
       when(tokens.findByToken(cliSecret)).thenReturn(Optional.of(temporary(TokenScope.REPO_READ)));
 
-      assertThat(authService.tryAuthorizeWithPat(REPO_ID, cliSecret, Permission.READ)).isTrue();
-      assertUnauthorized(
-          () -> authService.tryAuthorizeWithPat(REPO_ID, cliSecret, Permission.WRITE));
+      assertThat(authService.tryAuthorizeWithPat(cliSecret, Permission.READ)).isTrue();
+      assertUnauthorized(() -> authService.tryAuthorizeWithPat(cliSecret, Permission.WRITE));
     }
 
     @Test
@@ -680,8 +676,7 @@ class ProtocolAuthServicePatTest {
     void unknownIsCounted() {
       when(tokens.findByToken(cliSecret)).thenReturn(Optional.empty());
 
-      assertUnauthorized(
-          () -> authService.tryAuthorizeWithPat(REPO_ID, cliSecret, Permission.READ));
+      assertUnauthorized(() -> authService.tryAuthorizeWithPat(cliSecret, Permission.READ));
 
       verify(throttle).recordFailure();
     }

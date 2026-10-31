@@ -47,6 +47,7 @@ import io.repsy.libs.storage.core.services.StorageStrategy;
 import io.repsy.os.server.protocols.maven.shared.artifact.dtos.ArtifactVersionListItem;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.Artifact;
 import io.repsy.os.server.protocols.maven.shared.artifact.entities.ArtifactVersion;
+import io.repsy.os.server.protocols.maven.shared.artifact.entities.VersionSignature;
 import io.repsy.os.server.protocols.maven.shared.artifact.mappers.ArtifactMapper;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactRepository;
 import io.repsy.os.server.protocols.maven.shared.artifact.repositories.ArtifactVersionRepository;
@@ -249,10 +250,6 @@ class ArtifactDeploymentServiceTest {
     // The state operations are what the old mock answered: the setting is read under the lock (on
     // unless a test says otherwise), nothing is recorded, nothing is forgotten.
     lenient().doReturn(true).when(this.versionSignatureService).lockAndIsVerifyAll(any());
-    lenient()
-        .doReturn(Optional.empty())
-        .when(this.versionSignatureService)
-        .findRecordedId(any(), any());
     lenient().doNothing().when(this.versionSignatureService).recordVerified(any(), any());
     lenient()
         .doNothing()
@@ -262,10 +259,17 @@ class ArtifactDeploymentServiceTest {
     lenient().doNothing().when(this.versionSignatureService).forget(any(), any());
   }
 
+  private static VersionSignature recordedSignature() {
+    final var signature = new VersionSignature();
+    signature.setId(RECORDED_ID);
+    return signature;
+  }
+
   /** What {@code verifyNoInteractions} of the old mock meant: no state operation was asked. */
   private void verifyNoSignatureStateTouched() {
     verify(this.versionSignatureService, never()).lockAndIsVerifyAll(any());
-    verify(this.versionSignatureService, never()).findRecordedId(any(), any());
+    verify(this.versionSignatureRepository, never())
+        .findByArtifactVersionIdAndFileName(any(), any());
     verify(this.versionSignatureService, never()).recordVerified(any(), any());
     verify(this.versionSignatureService, never())
         .refreshSigned(any(), any(), any(), org.mockito.ArgumentMatchers.anyBoolean());
@@ -1112,9 +1116,9 @@ class ArtifactDeploymentServiceTest {
     final var version = new ArtifactVersion();
     when(this.artifactVersionRepository.findByArtifactIdAndVersionName(artifact.getId(), "1.0"))
         .thenReturn(Optional.of(version));
-    doReturn(Optional.of(RECORDED_ID))
-        .when(this.versionSignatureService)
-        .findRecordedId(version, "lib-1.0-sources.jar");
+    when(this.versionSignatureRepository.findByArtifactVersionIdAndFileName(
+            version.getId(), "lib-1.0-sources.jar"))
+        .thenReturn(Optional.of(recordedSignature()));
 
     this.artifactService.createOrUpdateArtifact(
         repoVerifyingAllSignatures(id),
@@ -1134,9 +1138,9 @@ class ArtifactDeploymentServiceTest {
     final var version = new ArtifactVersion();
     when(this.artifactVersionRepository.findByArtifactIdAndVersionName(artifact.getId(), "1.0"))
         .thenReturn(Optional.of(version));
-    doReturn(Optional.of(RECORDED_ID))
-        .when(this.versionSignatureService)
-        .findRecordedId(version, "lib-1.0.jar");
+    when(this.versionSignatureRepository.findByArtifactVersionIdAndFileName(
+            version.getId(), "lib-1.0.jar"))
+        .thenReturn(Optional.of(recordedSignature()));
     final var jar = new ByteArrayResource("jar".getBytes(UTF_8));
     final var signature = new ByteArrayResource(ARMORED_SIGNATURE.getBytes(UTF_8));
     when(this.storageStrategy.get(pathOfNullSafe("com/acme/lib/1.0/lib-1.0.jar"), eq("mvn")))
@@ -1164,9 +1168,9 @@ class ArtifactDeploymentServiceTest {
     final var version = new ArtifactVersion();
     when(this.artifactVersionRepository.findByArtifactIdAndVersionName(artifact.getId(), "1.0"))
         .thenReturn(Optional.of(version));
-    doReturn(Optional.of(RECORDED_ID))
-        .when(this.versionSignatureService)
-        .findRecordedId(version, "lib-1.0.jar");
+    when(this.versionSignatureRepository.findByArtifactVersionIdAndFileName(
+            version.getId(), "lib-1.0.jar"))
+        .thenReturn(Optional.of(recordedSignature()));
     final var jar = new ByteArrayResource("another jar".getBytes(UTF_8));
     final var signature = new ByteArrayResource(ARMORED_SIGNATURE.getBytes(UTF_8));
     when(this.storageStrategy.get(pathOfNullSafe("com/acme/lib/1.0/lib-1.0.jar"), eq("mvn")))
@@ -1196,9 +1200,9 @@ class ArtifactDeploymentServiceTest {
     final var version = new ArtifactVersion();
     when(this.artifactVersionRepository.findByArtifactIdAndVersionName(artifact.getId(), "1.0"))
         .thenReturn(Optional.of(version));
-    doReturn(Optional.of(RECORDED_ID))
-        .when(this.versionSignatureService)
-        .findRecordedId(version, "lib-1.0.jar");
+    when(this.versionSignatureRepository.findByArtifactVersionIdAndFileName(
+            version.getId(), "lib-1.0.jar"))
+        .thenReturn(Optional.of(recordedSignature()));
     when(this.storageStrategy.get(any(StoragePath.class), eq("mvn"))).thenReturn(Optional.empty());
 
     this.artifactService.createOrUpdateArtifact(
@@ -1219,9 +1223,6 @@ class ArtifactDeploymentServiceTest {
     final var version = new ArtifactVersion();
     when(this.artifactVersionRepository.findByArtifactIdAndVersionName(artifact.getId(), "1.0"))
         .thenReturn(Optional.of(version));
-    doReturn(Optional.empty())
-        .when(this.versionSignatureService)
-        .findRecordedId(version, "lib-1.0.jar");
 
     this.artifactService.createOrUpdateArtifact(
         repoVerifyingAllSignatures(id),
@@ -1374,8 +1375,9 @@ class ArtifactDeploymentServiceTest {
     verify(this.pendingSignatureService)
         .park(id, "com/acme/lib/1.0/lib-1.0.jar", "sig".getBytes(UTF_8));
 
-    assertThatThrownBy(
-            () -> this.artifactService.verifySignature(repo(id, true, true, true), path, signature))
+    final var repo = repo(id, true, true, true);
+
+    assertThatThrownBy(() -> this.artifactService.verifySignature(repo, path, signature))
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessage("itemNotFound");
     verify(this.pendingSignatureService, times(1)).park(any(), any(), any());

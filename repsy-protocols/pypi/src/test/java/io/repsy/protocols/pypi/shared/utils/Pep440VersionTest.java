@@ -40,7 +40,7 @@ class Pep440VersionTest {
     assertThat(compare("9.0", "10.0")).isNegative();
 
     // A plain string sort gets this backwards: "10.0" < "9.0" lexicographically.
-    assertThat("10.0").isLessThan("9.0");
+    assertThat(List.of("10.0", "9.0").stream().sorted().toList()).containsExactly("10.0", "9.0");
   }
 
   @Test
@@ -152,7 +152,10 @@ class Pep440VersionTest {
     final var a = Pep440Version.parse("1.0");
     final var b = Pep440Version.parse("1.0.0");
 
-    assertThat(a).isEqualTo(b).hasSameHashCodeAs(b);
-    assertThat(a).isNotEqualTo(Pep440Version.parse("1.0.1")).isNotEqualTo("1.0");
+    assertThat(a)
+        .isEqualTo(b)
+        .hasSameHashCodeAs(b)
+        .isNotEqualTo(Pep440Version.parse("1.0.1"))
+        .isNotEqualTo("1.0");
   }
 }

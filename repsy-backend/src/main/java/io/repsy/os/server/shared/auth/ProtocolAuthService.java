@@ -130,7 +130,7 @@ public class ProtocolAuthService {
 
     final var bearerToken = authHeader.substring(AUTH_BEARER.length());
 
-    if (this.tryAuthorizeWithPatBearer(repoId, bearerToken, permission)) {
+    if (this.tryAuthorizeWithPatBearer(bearerToken, permission)) {
       return;
     }
 
@@ -273,7 +273,7 @@ public class ProtocolAuthService {
       throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
 
-    if (this.tryAuthorizeWithPat(repoId, credentials.getPassword(), permission)) {
+    if (this.tryAuthorizeWithPat(credentials.getPassword(), permission)) {
       return;
     }
 
@@ -462,13 +462,12 @@ public class ProtocolAuthService {
    * allowed (the scope does not reach the permission, or MANAGE without the ADMIN role) answers
    * {@code unAuthorized} too and is not counted, like a refused deploy token.
    *
-   * <p>The token is not bound to a repo, so {@code repoId} does not narrow it: what it may do on
-   * any repo is its scopes intersected with what its owner may do, which can only be less.
+   * <p>The token is not bound to a repo, so no repo narrows it: what it may do on any repo is its
+   * scopes intersected with what its owner may do, which can only be less.
    *
    * @return {@code false} only when the secret is not a personal access token
    */
-  protected boolean tryAuthorizeWithPat(
-      final UUID repoId, final String secret, final Permission permission) {
+  protected boolean tryAuthorizeWithPat(final String secret, final Permission permission) {
 
     if (!TokenType.isUserToken(secret)) {
       return false;
@@ -479,8 +478,7 @@ public class ProtocolAuthService {
     return true;
   }
 
-  private boolean tryAuthorizeWithPatBearer(
-      final UUID repoId, final String bearerToken, final Permission permission) {
+  private boolean tryAuthorizeWithPatBearer(final String bearerToken, final Permission permission) {
 
     if (!TokenType.isUserToken(bearerToken)) {
       return false;
@@ -492,7 +490,7 @@ public class ProtocolAuthService {
       throw this.countedUnAuthorized();
     }
 
-    return this.tryAuthorizeWithPat(repoId, bearerToken, permission);
+    return this.tryAuthorizeWithPat(bearerToken, permission);
   }
 
   /**

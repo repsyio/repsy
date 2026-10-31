@@ -301,11 +301,12 @@ class PackageUtilsTest {
 
       NpmPayloadUtils.liftFieldsToTopLevel(payload, "1.0.0");
 
-      assertThat(payload).containsEntry("description", "");
-      assertThat(payload).containsEntry("homepage", "");
-      assertThat(payload).containsEntry("license", "");
-      assertThat(payload).containsEntry("readme", "");
-      assertThat(payload).containsEntry("readmeFilename", "");
+      assertThat(payload)
+          .containsEntry("description", "")
+          .containsEntry("homepage", "")
+          .containsEntry("license", "")
+          .containsEntry("readme", "")
+          .containsEntry("readmeFilename", "");
     }
   }
 

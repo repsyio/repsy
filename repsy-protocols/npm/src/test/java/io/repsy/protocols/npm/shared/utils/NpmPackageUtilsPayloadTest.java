@@ -125,8 +125,8 @@ class NpmPackageUtilsPayloadTest {
 
     final var versions = (Map<String, Map<String, Object>>) payload.get("versions");
     final var dist = (Map<String, Object>) versions.get("1.2.3").get("dist");
-    assertThat(dist).containsEntry("shasum", DigestUtils.sha1Hex(bytes));
     assertThat(dist)
+        .containsEntry("shasum", DigestUtils.sha1Hex(bytes))
         .containsEntry(
             "integrity",
             "sha512-" + Base64.encodeBase64String(DigestUtils.getSha512Digest().digest(bytes)));

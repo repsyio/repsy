@@ -29,6 +29,7 @@ import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.BlobDigests;
 import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
+import java.util.Objects;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpMethod;
@@ -104,7 +105,8 @@ public abstract class AbstractHelmOciBlobUploadFinalizeProtocolMethodHandler<I>
       final String digest) {
 
     // Derive base blob path from request URI: strip "/uploads/{uuid}" → ".../blobs/{digest}"
-    final var requestPath = request.getRequestURI();
+    final var requestPath =
+        Objects.requireNonNull(request.getRequestURI(), "the request has no URI");
     final var blobsBasePath = requestPath.substring(0, requestPath.lastIndexOf("/uploads/"));
 
     return PublicUrls.currentContextRoot() + blobsBasePath + "/" + digest;

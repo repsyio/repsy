@@ -60,7 +60,7 @@ class MavenMetadataUtilsTest {
   @Test
   @DisplayName(
       "plugin metadata needs at least one plugin, an empty plugin list is not plugin metadata")
-  void pluginMetadataNeedsAtLeastOnePlugin() throws Exception {
+  void pluginMetadataNeedsAtLeastOnePlugin() {
     assertThat(MavenMetadataUtils.isPluginMetadata(metadata("<metadata/>"))).isFalse();
     assertThat(MavenMetadataUtils.isPluginMetadata(metadata(ARTIFACT_METADATA))).isFalse();
     assertThat(MavenMetadataUtils.isPluginMetadata(metadata(VERSION_METADATA))).isFalse();
@@ -69,7 +69,7 @@ class MavenMetadataUtilsTest {
 
   @Test
   @DisplayName("version-level metadata is recognised by the version it names")
-  void versionLevelMetadataIsRecognisedByItsVersion() throws Exception {
+  void versionLevelMetadataIsRecognisedByItsVersion() {
     assertThat(MavenMetadataUtils.isVersionLevelMetadata(metadata(VERSION_METADATA))).isTrue();
     assertThat(MavenMetadataUtils.isVersionLevelMetadata(metadata(ARTIFACT_METADATA))).isFalse();
     assertThat(MavenMetadataUtils.isVersionLevelMetadata(metadata(GROUP_METADATA))).isFalse();
@@ -95,7 +95,7 @@ class MavenMetadataUtilsTest {
 
   @Test
   @DisplayName("sorts the versions and takes latest as the highest, release as the highest release")
-  void setsReleaseAndLatestFromTheSortedVersions() throws Exception {
+  void setsReleaseAndLatestFromTheSortedVersions() {
     final var metadata =
         metadata(
             "<metadata><versioning><versions><version>2.0-SNAPSHOT</version>"
@@ -112,7 +112,7 @@ class MavenMetadataUtilsTest {
 
   @Test
   @DisplayName("leaves metadata without versioning or versions alone")
-  void setReleaseAndLatestIgnoresMetadataWithoutVersions() throws Exception {
+  void setReleaseAndLatestIgnoresMetadataWithoutVersions() {
     final var none = metadata("<metadata/>");
     final var empty = metadata("<metadata><versioning/></metadata>");
 

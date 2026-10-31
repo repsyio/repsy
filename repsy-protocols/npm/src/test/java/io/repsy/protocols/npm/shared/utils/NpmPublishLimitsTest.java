@@ -316,8 +316,9 @@ class NpmPublishLimitsTest {
 
       NpmPublishLimits.dropOverLongFields(version);
 
-      assertThat(version).containsEntry("homepage", "https://example.test");
-      assertThat(version).containsEntry("license", "MIT");
+      assertThat(version)
+          .containsEntry("homepage", "https://example.test")
+          .containsEntry("license", "MIT");
       assertThat((List<String>) version.get("keywords")).containsExactly("a", "b");
     }
 
@@ -359,9 +360,10 @@ class NpmPublishLimitsTest {
 
       NpmPublishLimits.dropOverLongFields(version);
 
-      assertThat(version).containsEntry("license", "MIT");
-      assertThat(version).containsEntry("author", "Jane <jane@example.org>");
-      assertThat(version).containsEntry("repository", "github:a/b");
+      assertThat(version)
+          .containsEntry("license", "MIT")
+          .containsEntry("author", "Jane <jane@example.org>")
+          .containsEntry("repository", "github:a/b");
     }
 
     @Test

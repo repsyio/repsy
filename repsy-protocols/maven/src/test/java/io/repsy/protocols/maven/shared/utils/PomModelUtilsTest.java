@@ -298,15 +298,14 @@ class PomModelUtilsTest {
 
   @Test
   @DisplayName("does not log the content of a malformed POM (RPS-2174)")
-  void malformedPomDoesNotLogTheContent() {
+  void malformedPomDoesNotLogTheContent() throws IOException {
     final var logs = new ListAppender<ILoggingEvent>();
     final var logger = (Logger) LoggerFactory.getLogger(PomModelUtils.class);
     logs.start();
     logger.addAppender(logs);
 
-    try {
-      final var byteArrayInputStreamArg =
-          new ByteArrayInputStream("<project><s3cr3t-token-value></project>".getBytes(UTF_8));
+    try (final var byteArrayInputStreamArg =
+        new ByteArrayInputStream("<project><s3cr3t-token-value></project>".getBytes(UTF_8))) {
       assertThatThrownBy(() -> PomModelUtils.readModel(byteArrayInputStreamArg))
           .isInstanceOf(BadRequestException.class);
     } finally {

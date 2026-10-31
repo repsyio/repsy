@@ -706,6 +706,6 @@ public abstract class AbstractNpmStorageService extends AbstractArtifactStorageS
 
   public void clearTrash() {
 
-    final var unused = this.storageStrategy.clearTrash();
+    this.storageStrategy.clearTrash();
   }
 }

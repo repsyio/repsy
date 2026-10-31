@@ -112,6 +112,7 @@ public class SuspiciousRequestClassifier {
   private static final String ENCODED_PERCENT = "%25";
   private static final int HEX_RADIX = 16;
   private static final int NIBBLE_BITS = 4;
+  private static final int ESCAPE_LENGTH = 3;
 
   private final SuspiciousRequestProperties properties;
   private final Map<SignalFamily, Predicate<Request>> detectors = new EnumMap<>(SignalFamily.class);
@@ -304,15 +305,18 @@ public class SuspiciousRequestClassifier {
 
     final var out = new StringBuilder(value.length());
 
-    for (var i = 0; i < value.length(); i++) {
+    var i = 0;
+
+    while (i < value.length()) {
       final var escaped = escapedByte(value, i);
 
       if (escaped < 0) {
         out.append(value.charAt(i));
       } else {
         out.append((char) escaped);
-        i += 2;
       }
+
+      i += escaped < 0 ? 1 : ESCAPE_LENGTH;
     }
 
     return out.toString();

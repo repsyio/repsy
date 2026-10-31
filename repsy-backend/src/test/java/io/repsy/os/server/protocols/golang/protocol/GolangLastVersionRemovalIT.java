@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.protocols.golang.protocol;
 
+import static io.repsy.os.server.protocols.shared.PostgresLockWaits.awaitBlockedOnALockOrDone;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -45,7 +46,6 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -59,7 +59,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
-import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -493,21 +492,6 @@ class GolangLastVersionRemovalIT extends AbstractIT {
     return invocation.callRealMethod();
   }
 
-  /** Waits until a database session is blocked on a lock, or the operation has finished. */
-  private void awaitBlockedOnALockOrDone(final Future<?> operation) throws Exception {
-    Awaitility.await("the operation blocked or finished")
-        .atMost(Duration.ofSeconds(30))
-        .pollInterval(Duration.ofMillis(10))
-        .until(() -> operation.isDone() || this.someSessionWaitsForALock());
-  }
-
-  private boolean someSessionWaitsForALock() {
-    return this.count(
-            "select count(*) from pg_stat_activity"
-                + " where datname = current_database() and wait_event_type = 'Lock'")
-        > 0;
-  }
-
   private static Throwable failureOf(final Future<?> future) throws Exception {
     try {
       future.get(30, TimeUnit.SECONDS);
@@ -535,7 +519,7 @@ class GolangLastVersionRemovalIT extends AbstractIT {
       assertThat(firstReached.await(30, TimeUnit.SECONDS)).isTrue();
 
       final var secondResult = executor.submit(second);
-      this.awaitBlockedOnALockOrDone(secondResult);
+      awaitBlockedOnALockOrDone(this.jdbcTemplate, secondResult);
       gate.countDown();
 
       assertThat(failureOf(firstResult)).as("the operation that went first").isNull();
