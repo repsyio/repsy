@@ -32,7 +32,7 @@ public class GoArtifactStorageResolver implements ArtifactStorageResolver {
 
   private static final Set<String> SUPPORTED_REPO_TYPES = Set.of("GOLANG");
 
-  private final GoStorageService<?> goStorageService;
+  private final GoStorageService goStorageService;
 
   private final StorageStrategyRegistry storageStrategyRegistry;
 

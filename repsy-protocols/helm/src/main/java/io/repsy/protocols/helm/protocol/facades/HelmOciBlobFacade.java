@@ -39,7 +39,7 @@ import org.springframework.core.io.Resource;
 @RequiredArgsConstructor
 final class HelmOciBlobFacade<I> {
 
-  private final HelmStorageService<I> helmStorageService;
+  private final HelmStorageService helmStorageService;
   private final OciBlobService<I> ociBlobService;
 
   UUID startBlobUpload() {

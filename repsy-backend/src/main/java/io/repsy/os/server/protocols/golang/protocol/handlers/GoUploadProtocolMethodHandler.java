@@ -22,20 +22,19 @@ import io.repsy.protocols.golang.protocol.handlers.AbstractGoUploadProtocolMetho
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.util.Locale;
 import java.util.Objects;
-import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.MessageSource;
 import org.springframework.stereotype.Component;
 
 @Component
-public class GoUploadProtocolMethodHandler extends AbstractGoUploadProtocolMethodHandler<UUID> {
+public class GoUploadProtocolMethodHandler extends AbstractGoUploadProtocolMethodHandler {
 
   private final MessageSource messageSource;
 
   public GoUploadProtocolMethodHandler(
       @Qualifier("osGolangPathParser") final PathParser pathParser,
-      final GoProtocolFacade<UUID> goProtocolFacade,
+      final GoProtocolFacade goProtocolFacade,
       final GolangProtocolProvider provider,
       final MessageSource messageSource) {
 

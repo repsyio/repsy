@@ -31,12 +31,12 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
-public abstract class AbstractMavenDownloadProtocolMethodHandler<I>
-    extends AbstractFacadeProtocolMethodHandler<MavenProtocolFacade<I>> {
+public abstract class AbstractMavenDownloadProtocolMethodHandler
+    extends AbstractFacadeProtocolMethodHandler<MavenProtocolFacade> {
 
   protected AbstractMavenDownloadProtocolMethodHandler(
       final PathParser pathParser,
-      final MavenProtocolFacade<I> mavenProtocolFacade,
+      final MavenProtocolFacade mavenProtocolFacade,
       final MavenProtocolProvider provider) {
     super(
         HandlerRoute.read(HttpMethod.GET).method("download").head(),

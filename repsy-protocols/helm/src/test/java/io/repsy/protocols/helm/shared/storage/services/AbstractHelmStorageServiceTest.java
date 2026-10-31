@@ -58,7 +58,7 @@ class AbstractHelmStorageServiceTest {
 
   @Mock private StorageStrategy storageStrategy;
 
-  private static class TestStorageService extends AbstractHelmStorageService<UUID> {
+  private static class TestStorageService extends AbstractHelmStorageService {
 
     TestStorageService(final StorageStrategy storageStrategy) {
       super(storageStrategy);

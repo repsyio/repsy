@@ -27,7 +27,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.core.io.Resource;
 
-public interface HelmStorageService<I> {
+public interface HelmStorageService {
 
   void createRepo(UUID repoId);
 

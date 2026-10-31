@@ -42,7 +42,7 @@ class GoHandlerRoutesTest {
 
   private static final ProtocolContext CONTEXT = new ProtocolContext();
   private static final PathParser PARSER = _ -> Optional.of(CONTEXT);
-  private static final GoProtocolFacade<?> FACADE = mock(GoProtocolFacade.class);
+  private static final GoProtocolFacade FACADE = mock(GoProtocolFacade.class);
   private static final GolangProtocolProvider PROVIDER = mock(GolangProtocolProvider.class);
 
   private static <T extends ProtocolMethodHandler> T handler(final Class<T> type) {

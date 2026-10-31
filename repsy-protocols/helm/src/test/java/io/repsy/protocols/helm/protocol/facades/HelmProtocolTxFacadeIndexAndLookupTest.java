@@ -61,7 +61,7 @@ class HelmProtocolTxFacadeIndexAndLookupTest {
   private static final String REPO_NAME = "charts";
   private static final Instant CREATED = Instant.parse("2026-01-02T03:04:05Z");
 
-  @Mock private HelmStorageService<UUID> helmStorageService;
+  @Mock private HelmStorageService helmStorageService;
   @Mock private ChartService<UUID> chartService;
   @Mock private OciBlobService<UUID> ociBlobService;
   @Mock private OciManifestService<UUID> ociManifestService;
@@ -73,7 +73,7 @@ class HelmProtocolTxFacadeIndexAndLookupTest {
   private static class TestFacade extends AbstractHelmProtocolTxFacade<UUID> {
 
     TestFacade(
-        final HelmStorageService<UUID> helmStorageService,
+        final HelmStorageService helmStorageService,
         final ChartService<UUID> chartService,
         final OciBlobService<UUID> ociBlobService,
         final OciManifestService<UUID> ociManifestService,

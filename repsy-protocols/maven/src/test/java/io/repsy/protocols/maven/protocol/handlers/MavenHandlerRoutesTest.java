@@ -97,7 +97,7 @@ class MavenHandlerRoutesTest {
   }
 
   @SuppressWarnings("unchecked")
-  private static final MavenProtocolFacade<UUID> FACADE = mock(MavenProtocolFacade.class);
+  private static final MavenProtocolFacade FACADE = mock(MavenProtocolFacade.class);
 
   private static final MavenProtocolProvider PROVIDER = mock(MavenProtocolProvider.class);
 

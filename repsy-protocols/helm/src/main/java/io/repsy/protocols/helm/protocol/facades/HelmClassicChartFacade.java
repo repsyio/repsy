@@ -57,7 +57,7 @@ final class HelmClassicChartFacade<I> {
   private static final String ARTIFACT_VERSION = "artifactVersion";
   private static final String STORAGE_PATH = "storagePath";
 
-  private final HelmStorageService<I> helmStorageService;
+  private final HelmStorageService helmStorageService;
   private final ChartService<I> chartService;
   private final OciManifestService<I> ociManifestService;
   private final AbstractHelmChartFilesService<I> chartFilesService;

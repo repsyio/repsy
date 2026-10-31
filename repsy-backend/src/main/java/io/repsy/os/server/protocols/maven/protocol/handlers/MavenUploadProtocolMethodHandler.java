@@ -19,13 +19,11 @@ import io.repsy.libs.protocol.router.PathParser;
 import io.repsy.os.server.protocols.maven.protocol.facades.MavenProtocolFacade;
 import io.repsy.protocols.maven.protocol.MavenProtocolProvider;
 import io.repsy.protocols.maven.protocol.handlers.AbstractMavenUploadProtocolMethodHandler;
-import java.util.UUID;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 @Component
-public class MavenUploadProtocolMethodHandler
-    extends AbstractMavenUploadProtocolMethodHandler<UUID> {
+public class MavenUploadProtocolMethodHandler extends AbstractMavenUploadProtocolMethodHandler {
 
   public MavenUploadProtocolMethodHandler(
       @Qualifier("osMavenPathParser") final PathParser pathParser,

@@ -49,14 +49,14 @@ class AbstractGoStorageServiceTest {
 
   @Mock private StorageStrategy storageStrategy;
 
-  private AbstractGoStorageService<UUID> service;
+  private AbstractGoStorageService service;
 
   @BeforeEach
   void setUp() {
     service = new TestStorageService(storageStrategy);
   }
 
-  static class TestStorageService extends AbstractGoStorageService<UUID> {
+  static class TestStorageService extends AbstractGoStorageService {
 
     TestStorageService(final StorageStrategy storageStrategy) {
       super(storageStrategy);

@@ -34,7 +34,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
-import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -61,17 +60,17 @@ import org.springframework.mock.web.MockHttpServletResponse;
 class MavenDownloadHeadTest {
 
   @Mock private MavenProtocolProvider provider;
-  @Mock private MavenProtocolFacade<UUID> facade;
+  @Mock private MavenProtocolFacade facade;
   @Mock private PathParser pathParser;
 
   @TempDir private Path dir;
 
   private final ProtocolContext context = new ProtocolContext();
 
-  private static class TestDownload extends AbstractMavenDownloadProtocolMethodHandler<UUID> {
+  private static class TestDownload extends AbstractMavenDownloadProtocolMethodHandler {
     TestDownload(
         final PathParser parser,
-        final MavenProtocolFacade<UUID> facade,
+        final MavenProtocolFacade facade,
         final MavenProtocolProvider provider) {
       super(parser, facade, provider);
     }

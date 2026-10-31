@@ -55,7 +55,7 @@ import tools.jackson.databind.cfg.DateTimeFeature;
 import tools.jackson.databind.json.JsonMapper;
 
 @Slf4j
-public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I> {
+public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade {
 
   private static final String PATH_SEPARATOR = "/";
   private static final String LIST_SUFFIX = "/@v/list";
@@ -75,7 +75,7 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
           .disable(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)
           .build();
 
-  private final GoStorageService<I> goStorageService;
+  private final GoStorageService goStorageService;
   private final GoModuleService<I> goModuleService;
   private final long maxModuleZipBytes;
 
@@ -85,7 +85,7 @@ public abstract class AbstractGoProtocolFacade<I> implements GoProtocolFacade<I>
    *     being held whole in memory or spooled to disk without bound (RPS-1119).
    */
   protected AbstractGoProtocolFacade(
-      final GoStorageService<I> goStorageService,
+      final GoStorageService goStorageService,
       final GoModuleService<I> goModuleService,
       final long maxModuleZipBytes) {
     this.goStorageService = goStorageService;

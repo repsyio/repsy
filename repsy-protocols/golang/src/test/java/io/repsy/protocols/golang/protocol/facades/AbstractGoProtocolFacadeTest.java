@@ -62,7 +62,7 @@ class AbstractGoProtocolFacadeTest {
   private static final String VERSION = "v1.0.0";
   private static final long MAX_ZIP_BYTES = 1024 * 1024;
 
-  @Mock private GoStorageService<UUID> storageService;
+  @Mock private GoStorageService storageService;
   @Mock private GoModuleService<UUID> moduleService;
 
   private final BaseRepoInfo<UUID> repoInfo =
@@ -76,7 +76,7 @@ class AbstractGoProtocolFacadeTest {
 
   static class TestFacade extends AbstractGoProtocolFacade<UUID> {
 
-    TestFacade(final GoStorageService<UUID> s, final GoModuleService<UUID> m) {
+    TestFacade(final GoStorageService s, final GoModuleService<UUID> m) {
       super(s, m, MAX_ZIP_BYTES);
     }
   }

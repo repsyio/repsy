@@ -49,7 +49,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 @RequiredArgsConstructor
 final class HelmOciManifestFacade<I> {
 
-  private final HelmStorageService<I> helmStorageService;
+  private final HelmStorageService helmStorageService;
   private final ChartService<I> chartService;
   private final OciManifestService<I> ociManifestService;
 

@@ -43,7 +43,7 @@ class HelmArtifactStorageResolverTest {
 
   private final UUID repoId = UUID.randomUUID();
 
-  @Mock HelmStorageService<UUID> storage;
+  @Mock HelmStorageService storage;
   @Mock HelmChartService chartService;
 
   private HelmArtifactStorageResolver resolver() {
