@@ -225,9 +225,19 @@ it either). `-T 1C` is fine for `mvn test`, which does not run RAT.
 (Google Java Format), Checkstyle, SpotBugs, Apache RAT and Error Prone. Run
 `mvn com.spotify.fmt:fmt-maven-plugin:format` if it reports formatting violations.
 
-The JaCoCo 80% coverage gate from `core-parent` is opt-in per module here
-(`jacoco.check.phase` is `none` in the root `pom.xml`). Coverage reports are still generated
-for SonarCloud.
+Coverage (RPS-2359, RPS-2361, RPS-2368):
+
+- `core-parent`'s JaCoCo gate (80% instruction coverage per module, on the module's own report) runs at
+  `verify` in every module (`jacoco.check.phase` in the root `pom.xml`). It leaves out the generated
+  OpenAPI models (`io/repsy/os/generated/**`) and `*MapperImpl`. `libs/test-support` opts out with
+  `jacoco.check.phase` = `none`. A change that drops a module below 80% fails `Java check - All`:
+  add tests, do not lower the bar or add an exclude for code you wrote.
+- The `coverage-report` module aggregates every module's data at `verify`
+  (`coverage-report/target/site/jacoco-aggregate/`). It is the number that counts, because the backend
+  integration tests exercise the protocol modules' abstract handlers, which their own reports show as
+  uncovered. SonarCloud reads that report (`sonar.coverage.jacoco.xmlReportPaths`, in `pr-checks.yml`
+  and `sonarcloud.yml`; the scans are off until RPS-1877). Run the whole `mvn verify` to refresh it: a
+  `-pl` build only has the data of the modules it ran.
 
 ## Testing
 
