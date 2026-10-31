@@ -236,7 +236,7 @@ Coverage (RPS-2359, RPS-2361, RPS-2368):
   (`coverage-report/target/site/jacoco-aggregate/`). It is the number that counts, because the backend
   integration tests exercise the protocol modules' abstract handlers, which their own reports show as
   uncovered. SonarCloud reads that report (`sonar.coverage.jacoco.xmlReportPaths`, in `pr-checks.yml`
-  and `sonarcloud.yml`; the scans are off until RPS-1877). Run the whole `mvn verify` to refresh it: a
+  and `sonarcloud.yml`). Run the whole `mvn verify` to refresh it: a
   `-pl` build only has the data of the modules it ran.
 
 ## Testing
