@@ -21,6 +21,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 @DisplayName("ReleaseVersion (RPS-1155)")
 class ReleaseVersionTest {
@@ -108,5 +110,52 @@ class ReleaseVersionTest {
     assertThat(ReleaseVersion.of(version).getVersion()).isEqualTo(version);
     assertThat(ReleaseVersion.of(version.toUpperCase(java.util.Locale.ROOT)).getVersion())
         .isEqualTo(version);
+  }
+
+  @ParameterizedTest(name = "{0} is {1}")
+  @CsvSource({
+    "1!2.0, 1!2.0",
+    "1.0ALPHA, 1.0a0",
+    "1.0-alpha2, 1.0a2",
+    "1.0Beta, 1.0b0",
+    "1.0b3, 1.0b3",
+    "1.0c1, 1.0rc1",
+    "1.0preview3, 1.0rc3",
+    "1.0pre, 1.0rc0",
+    "1.0.post, 1.0.post0",
+    "1.0-1, 1.0.post1",
+    "1.0.post2, 1.0.post2",
+    "1.0.dev, 1.0.dev0",
+    "1.0.dev4, 1.0.dev4",
+    "1.0rc1.post2.dev3, 1.0rc1.post2.dev3",
+    "1!1.0a.post.dev, 1!1.0a0.post0.dev0",
+    "1.0+Ubuntu_1-2.007, 1.0+ubuntu.1.2.7",
+    "1.0+000, 1.0+0"
+  })
+  @DisplayName("normalizes epochs, pre, post, dev and local parts")
+  void normalizesEveryPart(final String given, final String expected) {
+    assertThat(ReleaseVersion.of(given).getVersion()).isEqualTo(expected);
+  }
+
+  @Test
+  @DisplayName("tells the kind of release")
+  void tellsTheKindOfRelease() {
+    assertThat(ReleaseVersion.of("1.0").isFinalRelease()).isTrue();
+    assertThat(ReleaseVersion.of("1.0+local").isFinalRelease()).isTrue();
+    assertThat(ReleaseVersion.of("1.0rc1").isPreRelease()).isTrue();
+    assertThat(ReleaseVersion.of("1.0rc1").isFinalRelease()).isFalse();
+    assertThat(ReleaseVersion.of("1.0.post1").isPostRelease()).isTrue();
+    assertThat(ReleaseVersion.of("1.0.post1").isFinalRelease()).isFalse();
+    assertThat(ReleaseVersion.of("1.0.dev1").isDevelopmentRelease()).isTrue();
+    assertThat(ReleaseVersion.of("1.0.dev1").isFinalRelease()).isFalse();
+  }
+
+  @ParameterizedTest(name = "\"{0}\" is refused")
+  @CsvSource(
+      value = {"not-a-version", "1.0.0.", "''", "1.0 rc"},
+      quoteCharacter = '"')
+  @DisplayName("refuses text that is not a PEP 440 version")
+  void refusesGarbage(final String given) {
+    assertThatThrownBy(() -> ReleaseVersion.of(given)).isInstanceOf(BadRequestException.class);
   }
 }

@@ -18,7 +18,9 @@ package io.repsy.protocols.golang.shared.utils;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -196,5 +198,84 @@ class GoVersionUtilsTest {
       "isPseudoVersion() is false for a release, a tagged pre-release, or a malformed version")
   void isPseudoVersionIsFalseForNonPseudoVersions(final String version) {
     assertThat(GoVersionUtils.isPseudoVersion(version)).isFalse();
+  }
+
+  @Test
+  @DisplayName("COMPARATOR puts a pre-release before its release, whichever side it is on")
+  void comparatorOrdersPreReleaseBeforeRelease() {
+    assertThat(GoVersionUtils.COMPARATOR.compare("v1.0.0-beta", "v1.0.0")).isNegative();
+    assertThat(GoVersionUtils.COMPARATOR.compare("v1.0.0", "v1.0.0-beta")).isPositive();
+    assertThat(GoVersionUtils.COMPARATOR.compare("v1.0.0", "v1.0.0")).isZero();
+    assertThat(GoVersionUtils.COMPARATOR.compare("v1.2.0-rc1", "v1.10.0-rc1")).isNegative();
+    assertThat(GoVersionUtils.COMPARATOR.compare("v1.0.01", "v1.0.1")).isZero();
+  }
+
+  @Test
+  @DisplayName("COMPARATOR orders pseudo-versions by timestamp and other pre-releases by text")
+  void comparatorOrdersPseudoVersionsByTimestamp() {
+    final var older = "v0.0.0-20230101000000-aaaaaaaaaaaa";
+    final var newer = "v0.0.0-20240101000000-000000000000";
+
+    assertThat(GoVersionUtils.COMPARATOR.compare(older, newer)).isNegative();
+    assertThat(GoVersionUtils.COMPARATOR.compare(newer, older)).isPositive();
+    assertThat(GoVersionUtils.COMPARATOR.compare("v1.0.0-alpha", "v1.0.0-beta")).isNegative();
+    assertThat(GoVersionUtils.COMPARATOR.compare("v1.0.0-beta", older)).isPositive();
+  }
+
+  @Test
+  @DisplayName("COMPARATOR falls back to text for a string that is not a semantic version")
+  void comparatorFallsBackToText() {
+    assertThat(GoVersionUtils.COMPARATOR.compare("banana", "v1.0.0")).isNegative();
+    assertThat(GoVersionUtils.COMPARATOR.compare("v1.0.0", "banana")).isPositive();
+  }
+
+  @Test
+  @DisplayName("latestOf takes the highest release, then the highest tagged pre-release")
+  void latestOfPrefersReleasesThenTaggedPreReleases() {
+    assertThat(GoVersionUtils.latestOf(List.of("v1.0.0", "v1.2.0-beta", "v1.1.0")))
+        .contains("v1.1.0");
+    assertThat(
+            GoVersionUtils.latestOf(
+                List.of("v1.2.0-beta", "v1.2.0-rc1", "v0.0.0-20240101000000-0123456789ab")))
+        .contains("v1.2.0-rc1");
+  }
+
+  @Test
+  @DisplayName("latestOf takes the highest pseudo-version only when nothing is tagged")
+  void latestOfFallsBackToPseudoVersions() {
+    assertThat(
+            GoVersionUtils.latestOf(
+                List.of(
+                    "v0.0.0-20230101000000-aaaaaaaaaaaa", "v0.0.0-20240101000000-bbbbbbbbbbbb")))
+        .contains("v0.0.0-20240101000000-bbbbbbbbbbbb");
+    assertThat(GoVersionUtils.latestOf(List.of())).isEqualTo(Optional.empty());
+  }
+
+  @ParameterizedTest
+  @CsvSource({
+    "/io.repsy/hello/@v/v1.2.0.zip, v1.2.0",
+    "/io.repsy/hello/@v/v1.2.0.mod, v1.2.0",
+    "/io.repsy/hello/@v/v1.2.0.info, v1.2.0",
+    "/io.repsy/hello/@v/v1.2.0, v1.2.0",
+    "/io.repsy/hello/@v/list, list",
+    "v1.2.0.zip, v1.2.0"
+  })
+  @DisplayName("extractVersionFromPath drops the directory and a known extension")
+  void extractsTheVersionFromAPath(final String path, final String expected) {
+    assertThat(GoVersionUtils.extractVersionFromPath(path)).isEqualTo(expected);
+  }
+
+  @ParameterizedTest
+  @CsvSource({"/github.com/foo/bar/@v/v1.2.3.zip, github.com/foo/bar", "/a/@v/list, a"})
+  @DisplayName("extractModulePath reads the module path before /@v/")
+  void extractsTheModulePath(final String path, final String expected) {
+    assertThat(GoVersionUtils.extractModulePath(path)).isEqualTo(expected);
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"/github.com/foo/bar", "/@v/v1.0.0", "", "/x@v/v1"})
+  @DisplayName("extractModulePath is null without a module before /@v/")
+  void noModulePath(final String path) {
+    assertThat(GoVersionUtils.extractModulePath(path)).isNull();
   }
 }
