@@ -58,7 +58,7 @@ class CargoCategoryTest extends AbstractEntityIdentityTest<CargoCategory> {
     final var cargoCategory = this.newEntity(UUID.randomUUID());
     cargoCategory.setCrates(new UntouchableSet<>());
 
-    assertThat(cargoCategory.hashCode()).isEqualTo(CargoCategory.class.hashCode());
+    assertThat(cargoCategory).hasSameHashCodeAs(CargoCategory.class);
     assertThat(cargoCategory.toString()).doesNotContain("crates=");
   }
 }

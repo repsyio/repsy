@@ -373,7 +373,9 @@ class PublishStorageFailureIT extends AbstractIT {
     }
 
     /** Anything the request needs before the storage is made to fail. */
-    void prepare(final PublishStorageFailureIT it, final Repo repo) throws Exception {}
+    void prepare(final PublishStorageFailureIT it, final Repo repo) throws Exception {
+      // most formats need nothing before the storage is made to fail
+    }
 
     abstract MockHttpServletResponse publish(PublishStorageFailureIT it, Repo repo)
         throws Exception;
@@ -602,7 +604,12 @@ class PublishStorageFailureIT extends AbstractIT {
 
   private static byte[] cargoBody(final String name, final String version) {
     final var manifest =
-        "[package]\nname = \"%s\"\n".formatted(name).getBytes(StandardCharsets.UTF_8);
+        """
+        [package]
+        name = "%s"
+        """
+            .formatted(name)
+            .getBytes(StandardCharsets.UTF_8);
     final var crate = new ByteArrayOutputStream();
 
     try (final var tar = new TarArchiveOutputStream(new GzipCompressorOutputStream(crate))) {

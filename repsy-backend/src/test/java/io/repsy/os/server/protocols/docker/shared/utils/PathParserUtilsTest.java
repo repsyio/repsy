@@ -115,10 +115,9 @@ class PathParserUtilsTest {
   @Test
   @DisplayName("an unsupported digest algorithm is still refused as a tag path")
   void unsupportedAlgorithmIsRefused() {
-    assertThatThrownBy(
-            () ->
-                PathParserUtils.parseForManifest(
-                    "/v2/repo/image/manifests/sha384:" + "ab".repeat(48), FILE_NAME))
+    final var path = "/v2/repo/image/manifests/sha384:" + "ab".repeat(48);
+
+    assertThatThrownBy(() -> PathParserUtils.parseForManifest(path, FILE_NAME))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("dockerPathInvalid");
   }

@@ -206,7 +206,9 @@ class PendingSignatureServiceTest {
     when(this.pgpVerifierService.readSignerKeyId(any()))
         .thenThrow(new SignatureNotVerifiedException("artifactSignatureNotVerified"));
 
-    assertThatThrownBy(() -> this.service.park(this.repoId, FILE, "garbage".getBytes(UTF_8)))
+    final var garbage = "garbage".getBytes(UTF_8);
+
+    assertThatThrownBy(() -> this.service.park(this.repoId, FILE, garbage))
         .isInstanceOf(SignatureNotVerifiedException.class)
         .hasMessage("artifactSignatureNotVerified");
     assertThatThrownBy(() -> this.service.park(this.repoId, FILE, new byte[] {(byte) 0xC3, 0x28}))

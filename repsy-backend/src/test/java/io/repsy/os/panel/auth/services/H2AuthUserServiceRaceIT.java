@@ -109,7 +109,9 @@ class H2AuthUserServiceRaceIT extends H2IntegrationTest {
         .when(this.userTxServiceSpy)
         .getUserByUsername(username);
 
-    assertThatThrownBy(() -> this.authUserService.login(this.loginForm(username)))
+    final var form = this.loginForm(username);
+
+    assertThatThrownBy(() -> this.authUserService.login(form))
         .isInstanceOf(UnAuthorizedException.class)
         .hasMessage("invalidCredentials");
   }

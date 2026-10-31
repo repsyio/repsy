@@ -16,7 +16,6 @@
 package io.repsy.os.server.core.post_processors;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -86,7 +85,7 @@ class H2CheckpointPostProcessorTest {
     final var result =
         processor.process(new ProtocolContext(), this.request, this.response, properties(true));
 
-    verify(this.statement).execute(eq("CHECKPOINT SYNC"));
+    verify(this.statement).execute("CHECKPOINT SYNC");
     assertThat(result.isEmpty()).isTrue();
   }
 

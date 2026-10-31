@@ -30,9 +30,9 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.regex.Pattern;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.modulith.core.ApplicationModules;
@@ -112,7 +112,8 @@ class ModularityTest {
     assertThat(FROZEN_CYCLES.values()).allSatisfy(reason -> assertThat(reason).isNotBlank());
   }
 
-  private static final Pattern SLICE_LINE = Pattern.compile("^\\s*Slice (.+?)(?: ->)?\\s*$");
+  private static final String SLICE_PREFIX = "Slice ";
+  private static final String SLICE_SUFFIX = " ->";
 
   private static Set<String> cyclesOf(final String pattern) {
 
@@ -137,7 +138,7 @@ class ModularityTest {
           current = new ArrayList<>();
           current.add(sliceName(line.substring(line.indexOf("Cycle detected: ") + 16)));
         } else if (current != null
-            && SLICE_LINE.matcher(line).matches()
+            && sliceNameOf(line).isPresent()
             && !line.contains("Dependencies of")) {
           current.add(sliceName(line));
         } else {
@@ -154,10 +155,25 @@ class ModularityTest {
 
   private static String sliceName(final String line) {
 
-    final var matcher =
-        SLICE_LINE.matcher(line.trim().startsWith("Slice") ? line : "Slice " + line);
+    return sliceNameOf(line.trim().startsWith("Slice") ? line : SLICE_PREFIX + line)
+        .orElse(line.trim());
+  }
 
-    return matcher.matches() ? matcher.group(1) : line.trim();
+  /** The slice named by a {@code Slice <name> ->} line, or empty if the line is not one. */
+  private static Optional<String> sliceNameOf(final String line) {
+
+    final var stripped = line.strip();
+
+    if (!stripped.startsWith(SLICE_PREFIX) || stripped.length() == SLICE_PREFIX.length()) {
+      return Optional.empty();
+    }
+
+    final var rest = stripped.substring(SLICE_PREFIX.length());
+
+    return Optional.of(
+        rest.length() > SLICE_SUFFIX.length() && rest.endsWith(SLICE_SUFFIX)
+            ? rest.substring(0, rest.length() - SLICE_SUFFIX.length())
+            : rest);
   }
 
   /** Adds the cycle once, rotated so that it starts at its smallest slice. */

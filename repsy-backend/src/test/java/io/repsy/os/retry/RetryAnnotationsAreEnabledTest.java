@@ -85,7 +85,7 @@ class RetryAnnotationsAreEnabledTest {
 
     usesByAnnotation.keySet().removeIf(annotation -> enablers.contains(ENABLED_BY.get(annotation)));
 
-    assertThat(resources.length).as("the scan found the application's classes").isGreaterThan(500);
+    assertThat(resources).as("the scan found the application's classes").hasSizeGreaterThan(500);
     assertThat(usesByAnnotation)
         .as(
             "a retry annotation is dead code unless @EnableRetry (spring-retry) or"

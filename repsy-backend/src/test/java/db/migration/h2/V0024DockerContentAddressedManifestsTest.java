@@ -15,6 +15,8 @@
  */
 package db.migration.h2;
 
+import static org.assertj.core.api.Assertions.assertThatCode;
+
 import io.repsy.os.server.protocols.docker.migration.DockerManifestMigrationScenario;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
@@ -81,6 +83,6 @@ class V0024DockerContentAddressedManifestsTest {
   @Test
   @DisplayName("runs on a database without any Docker data")
   void runsOnEmptyTables() {
-    this.migrateTo(null);
+    assertThatCode(() -> this.migrateTo(null)).doesNotThrowAnyException();
   }
 }

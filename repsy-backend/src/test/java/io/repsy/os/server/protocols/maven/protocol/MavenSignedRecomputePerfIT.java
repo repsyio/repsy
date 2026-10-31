@@ -44,9 +44,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.sql.DriverManager;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -64,6 +62,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
+import org.awaitility.Awaitility;
+import org.awaitility.core.ConditionTimeoutException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -352,13 +352,17 @@ class MavenSignedRecomputePerfIT extends AbstractIT {
       final var accepted = TOGGLES - rejected;
 
       // wait for everything that was accepted to run
-      final var deadline = Instant.now().plus(RECOMPUTE_TIMEOUT);
-      while (Instant.now().isBefore(deadline)) {
-        final var done = small.stream().filter(r -> this.finished(r.getId())).count();
-        if (this.finished(big.getId()) && done >= accepted) {
-          break;
-        }
-        Thread.sleep(200);
+      try {
+        Awaitility.await()
+            .atMost(RECOMPUTE_TIMEOUT)
+            .pollInterval(Duration.ofMillis(200))
+            .until(
+                () ->
+                    this.finished(big.getId())
+                        && small.stream().filter(r -> this.finished(r.getId())).count()
+                            >= accepted);
+      } catch (final ConditionTimeoutException _) {
+        // The report below states how many of the repos were recomputed in time.
       }
 
       final var recomputed = small.stream().filter(r -> this.finished(r.getId())).count();
@@ -373,7 +377,7 @@ class MavenSignedRecomputePerfIT extends AbstractIT {
       final var bigRun = this.runs.get(big.getId());
 
       final var sortedMs = new ArrayList<>(requestMs);
-      Collections.sort(sortedMs);
+      sortedMs.sort(Comparator.naturalOrder());
 
       this.out(
           "RPS1449 executor toggles="
@@ -445,12 +449,11 @@ class MavenSignedRecomputePerfIT extends AbstractIT {
     return times != null && times[1] != 0;
   }
 
-  private void awaitStarted(final UUID repoId) throws InterruptedException {
-    final var deadline = Instant.now().plusSeconds(60);
-    while (!this.runs.containsKey(repoId) && Instant.now().isBefore(deadline)) {
-      Thread.sleep(20);
-    }
-    assertThat(this.runs).containsKey(repoId);
+  private void awaitStarted(final UUID repoId) {
+    Awaitility.await()
+        .atMost(Duration.ofSeconds(60))
+        .pollInterval(Duration.ofMillis(20))
+        .untilAsserted(() -> assertThat(this.runs).containsKey(repoId));
   }
 
   /** PUTs the setting and waits until the recompute that it queued has ended. */
@@ -461,11 +464,10 @@ class MavenSignedRecomputePerfIT extends AbstractIT {
     this.putSettings(repo, admin, "{\"pgpVerifyAllSignaturesEnabled\":" + on + "}");
     final var requestMs = millis(System.nanoTime() - start);
 
-    final var deadline = Instant.now().plus(RECOMPUTE_TIMEOUT);
-    while (!this.finished(repo.getId())) {
-      assertThat(Instant.now()).as("recompute finished").isBefore(deadline);
-      Thread.sleep(20);
-    }
+    Awaitility.await("recompute finished")
+        .atMost(RECOMPUTE_TIMEOUT)
+        .pollInterval(Duration.ofMillis(20))
+        .until(() -> this.finished(repo.getId()));
     final var times = this.runs.get(repo.getId());
 
     return new Toggle(requestMs, millis(times[0] - start), millis(times[1] - times[0]));
@@ -666,7 +668,7 @@ class MavenSignedRecomputePerfIT extends AbstractIT {
               .getStatus();
 
       samples.add(new Sample(kind, micros(System.nanoTime() - start), status));
-    } catch (final Exception e) {
+    } catch (final Exception _) {
       samples.add(new Sample(kind, -1, -1));
     }
   }
@@ -720,7 +722,7 @@ class MavenSignedRecomputePerfIT extends AbstractIT {
 
     for (final var entry : byKind.entrySet()) {
       final var values = entry.getValue();
-      Collections.sort(values);
+      values.sort(Comparator.naturalOrder());
       this.out(
           "RPS1449 uploads "
               + tag
@@ -764,7 +766,7 @@ class MavenSignedRecomputePerfIT extends AbstractIT {
   private static void sleep(final long millis) {
     try {
       Thread.sleep(millis);
-    } catch (final InterruptedException e) {
+    } catch (final InterruptedException _) {
       Thread.currentThread().interrupt();
     }
   }

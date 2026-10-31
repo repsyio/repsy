@@ -87,7 +87,13 @@ class MavenPgpCapsIT extends AbstractIT {
   private final List<UUID> createdUserIds = new ArrayList<>();
 
   @AfterEach
-  void deleteCommittedData() {
+  void cleanUp() {
+    // The cap is put back first: it is a field of a shared bean.
+    this.restoreBytesCap();
+    this.deleteCommittedData();
+  }
+
+  private void deleteCommittedData() {
     // Registering a key starts an async recompute that locks version rows; wait for it to be idle
     // before the fixtures are deleted (RPS-1655).
     await()
@@ -216,8 +222,7 @@ class MavenPgpCapsIT extends AbstractIT {
 
     final var statuses = this.concurrently(racers, keys -> this.keyStatus(repo, admin, keys));
 
-    assertThat(statuses).filteredOn(s -> s == 201).hasSize(2);
-    assertThat(statuses).filteredOn(s -> s == 400).hasSize(4);
+    assertThat(statuses).containsExactlyInAnyOrder(201, 201, 400, 400, 400, 400);
     assertThat(this.keyCount(repo)).isEqualTo(cap);
   }
 
@@ -420,8 +425,7 @@ class MavenPgpCapsIT extends AbstractIT {
     ReflectionTestUtils.setField(this.caps, "maxBytesPerRepo", TEST_BYTES_CAP);
   }
 
-  @AfterEach
-  void restoreBytesCap() {
+  private void restoreBytesCap() {
     if (this.originalBytesCap != null) {
       ReflectionTestUtils.setField(this.caps, "maxBytesPerRepo", this.originalBytesCap);
       this.originalBytesCap = null;

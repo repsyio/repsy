@@ -321,7 +321,7 @@ class HelmChartServiceTest {
 
   @Test
   @DisplayName("publish() refuses an existing version that may not be replaced, writing nothing")
-  void publishRefusesAnExistingVersionWithoutOverride() throws Exception {
+  void publishRefusesAnExistingVersionWithoutOverride() {
     final var chart = chartRow();
     when(this.helmChartRepository.findWithLockByRepoIdAndName(REPO_ID, NAME))
         .thenReturn(Optional.of(chart));
@@ -329,7 +329,9 @@ class HelmChartServiceTest {
         .thenReturn(Optional.of(versionRow(chart, 10L)));
     final ChartFileWriter writer = replaced -> fail("written");
 
-    assertThatThrownBy(() -> this.service.publish(REPO_ID, newForm(), false, writer))
+    final var form = newForm();
+
+    assertThatThrownBy(() -> this.service.publish(REPO_ID, form, false, writer))
         .isInstanceOf(ItemAlreadyExistException.class)
         .hasMessage("chartAlreadyExists");
 
@@ -352,8 +354,9 @@ class HelmChartServiceTest {
         .when(this.helmChartVersionRepository)
         .flush();
     final var written = new ArrayList<HelmChartInfo>();
+    final var form = newForm();
 
-    assertThatThrownBy(() -> this.service.publish(REPO_ID, newForm(), false, written::add))
+    assertThatThrownBy(() -> this.service.publish(REPO_ID, form, false, written::add))
         .isInstanceOf(ItemAlreadyExistException.class)
         .hasMessage("chartAlreadyExists");
 

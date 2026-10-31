@@ -21,6 +21,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Lob;
 import jakarta.persistence.Table;
+import jakarta.persistence.metamodel.Type;
 import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -134,7 +135,7 @@ public final class EntityColumnSchemaChecks {
   /** The entity classes the persistence unit maps, sorted by name. */
   public static List<Class<?>> entities(final EntityManagerFactory entityManagerFactory) {
     return entityManagerFactory.getMetamodel().getEntities().stream()
-        .<Class<?>>map(e -> e.getJavaType())
+        .<Class<?>>map(Type::getJavaType)
         .sorted(Comparator.comparing(Class::getName))
         .toList();
   }

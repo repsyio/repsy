@@ -281,8 +281,7 @@ class DockerManifestPushIT extends AbstractIT {
     assertThat(this.imageRepository.findByRepoIdAndName(repo.getId(), IMAGE)).isEmpty();
     assertThat(storageDirOf(repo).resolve("manifests"))
         .satisfiesAnyOf(
-            path -> assertThat(path).doesNotExist(),
-            path -> assertThat(path.toFile().list()).isEmpty());
+            path -> assertThat(path).doesNotExist(), path -> assertThat(path).isEmptyDirectory());
   }
 
   @ParameterizedTest(name = "{0}")
@@ -291,11 +290,7 @@ class DockerManifestPushIT extends AbstractIT {
   void malformedImageManifestIsRefused(
       final String description, final String contentType, final String body, final String msgId)
       throws Exception {
-    final var repo = this.dockerRepo();
-
-    final var response = this.putManifest(repo, "latest", contentType, body);
-
-    this.assertRejected(response, msgId, repo);
+    this.assertMalformedBodyRefused(contentType, body, msgId);
   }
 
   @ParameterizedTest(name = "{0}")
@@ -304,6 +299,11 @@ class DockerManifestPushIT extends AbstractIT {
   void malformedIndexIsRefused(
       final String description, final String contentType, final String body, final String msgId)
       throws Exception {
+    this.assertMalformedBodyRefused(contentType, body, msgId);
+  }
+
+  private void assertMalformedBodyRefused(
+      final String contentType, final String body, final String msgId) throws Exception {
     final var repo = this.dockerRepo();
 
     final var response = this.putManifest(repo, "latest", contentType, body);
@@ -756,8 +756,7 @@ class DockerManifestPushIT extends AbstractIT {
         .contains("\"detail\":\"" + CONFIG_INVALID + "\"");
     assertThat(storageDirOf(repo).resolve("manifests"))
         .satisfiesAnyOf(
-            path -> assertThat(path).doesNotExist(),
-            path -> assertThat(path.toFile().list()).isEmpty());
+            path -> assertThat(path).doesNotExist(), path -> assertThat(path).isEmptyDirectory());
   }
 
   private String imageManifest(final byte[] config, final byte[] layer, final String configType) {

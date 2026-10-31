@@ -30,6 +30,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 
 import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.docker.shared.image.repositories.ImageRepository;
+import io.repsy.os.server.protocols.docker.shared.tag.entities.Manifest;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestChildRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.TagRepository;
@@ -178,7 +179,7 @@ class DockerManifestOverrideIT extends AbstractIT {
     assertThat(tags.getFirst().getManifest().getId()).isNotEqualTo(firstManifestId);
     final var manifests = this.manifestRepository.findAllByImageId(image.getId());
     assertThat(manifests)
-        .extracting(manifest -> manifest.getDigest())
+        .extracting(Manifest::getDigest)
         .containsExactlyInAnyOrder(sha256(bytes(first)), sha256(bytes(second)));
     assertThat(manifests).allSatisfy(manifest -> assertThat(manifest.getStorageName()).isNull());
     assertThat(storageDirOf(repo).resolve("manifests").resolve(sha256(bytes(first)))).exists();

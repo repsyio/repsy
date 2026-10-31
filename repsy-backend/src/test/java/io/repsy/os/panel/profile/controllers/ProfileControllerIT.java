@@ -48,6 +48,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -762,11 +763,19 @@ class ProfileControllerIT extends AbstractIT {
           .andExpect(jsonPath("$.msgId").doesNotExist());
     }
 
-    @Test
-    @DisplayName("returns 400 validationError for a too-short password")
-    void tooShortPassword() throws Exception {
+    @ParameterizedTest(name = "{0}")
+    @CsvSource(
+        delimiter = '|',
+        value = {
+          "a too-short password|Ab1",
+          "a password without an uppercase letter|lowercase1",
+          "a password without a digit|NoDigitsHere",
+          "a password that contains whitespace|Has Space1"
+        })
+    @DisplayName("returns 400 validationError for an invalid password")
+    void invalidPassword(final String description, final String password) throws Exception {
       final var user =
-          ProfileControllerIT.this.createUser(uniqueUsername("shortpw"), UserRole.USER);
+          ProfileControllerIT.this.createUser(uniqueUsername("invalidpw"), UserRole.USER);
       final var token = ProfileControllerIT.this.bearerTokenFor(user.getId(), user.getUsername());
 
       expectError(
@@ -774,7 +783,7 @@ class ProfileControllerIT extends AbstractIT {
               patch("/api/profile/password")
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
-                  .content(body("Ab1"))),
+                  .content(body(password))),
           HttpStatus.BAD_REQUEST,
           "validationError",
           null,
@@ -793,61 +802,6 @@ class ProfileControllerIT extends AbstractIT {
                   .header(AUTHORIZATION, token)
                   .contentType(MediaType.APPLICATION_JSON)
                   .content(body("Aa1" + "x".repeat(48)))),
-          HttpStatus.BAD_REQUEST,
-          "validationError",
-          null,
-          "Incoming data couldn't be validated.");
-    }
-
-    @Test
-    @DisplayName("returns 400 validationError when missing an uppercase letter")
-    void missingUppercase() throws Exception {
-      final var user = ProfileControllerIT.this.createUser(uniqueUsername("nouppr"), UserRole.USER);
-      final var token = ProfileControllerIT.this.bearerTokenFor(user.getId(), user.getUsername());
-
-      expectError(
-          ProfileControllerIT.this.perform(
-              patch("/api/profile/password")
-                  .header(AUTHORIZATION, token)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(body("lowercase1"))),
-          HttpStatus.BAD_REQUEST,
-          "validationError",
-          null,
-          "Incoming data couldn't be validated.");
-    }
-
-    @Test
-    @DisplayName("returns 400 validationError when missing a digit")
-    void missingDigit() throws Exception {
-      final var user =
-          ProfileControllerIT.this.createUser(uniqueUsername("nodigit"), UserRole.USER);
-      final var token = ProfileControllerIT.this.bearerTokenFor(user.getId(), user.getUsername());
-
-      expectError(
-          ProfileControllerIT.this.perform(
-              patch("/api/profile/password")
-                  .header(AUTHORIZATION, token)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(body("NoDigitsHere"))),
-          HttpStatus.BAD_REQUEST,
-          "validationError",
-          null,
-          "Incoming data couldn't be validated.");
-    }
-
-    @Test
-    @DisplayName("returns 400 validationError when the password contains whitespace")
-    void containsWhitespace() throws Exception {
-      final var user = ProfileControllerIT.this.createUser(uniqueUsername("wspw"), UserRole.USER);
-      final var token = ProfileControllerIT.this.bearerTokenFor(user.getId(), user.getUsername());
-
-      expectError(
-          ProfileControllerIT.this.perform(
-              patch("/api/profile/password")
-                  .header(AUTHORIZATION, token)
-                  .contentType(MediaType.APPLICATION_JSON)
-                  .content(body("Has Space1"))),
           HttpStatus.BAD_REQUEST,
           "validationError",
           null,

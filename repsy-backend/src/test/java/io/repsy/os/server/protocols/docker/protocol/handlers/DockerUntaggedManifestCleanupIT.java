@@ -242,7 +242,7 @@ class DockerUntaggedManifestCleanupIT extends AbstractIT {
 
     try (final var files = java.nio.file.Files.list(directory)) {
       return files.count();
-    } catch (final java.io.IOException e) {
+    } catch (final java.io.IOException _) {
       return 0;
     }
   }
@@ -261,7 +261,25 @@ class DockerUntaggedManifestCleanupIT extends AbstractIT {
         .untilAsserted(
             () ->
                 assertThat(Stream.of(layers).map(layer -> this.blobOf(repo, layer)))
+                    .isNotEmpty()
                     .allSatisfy(blob -> assertThat(blob).doesNotExist()));
+  }
+
+  private void assertOnlyTheUnreachableManifestsAreGone(
+      final Repo repo,
+      final List<String> gone,
+      final String current,
+      final String child,
+      final String indexJson)
+      throws Exception {
+    for (final var manifest : gone) {
+      assertThat(this.status(repo, IMAGE, manifest)).isEqualTo(404);
+    }
+    assertThat(this.status(repo, IMAGE, current)).isEqualTo(200);
+    assertThat(this.status(repo, IMAGE, child)).as("a child of a tagged index").isEqualTo(200);
+    assertThat(this.status(repo, IMAGE, indexJson)).isEqualTo(200);
+    assertThat(this.wire.getManifest(repo, IMAGE, "latest").getContentAsString())
+        .isEqualTo(current);
   }
 
   private void verifyRefund(final Repo repo, final long bytes) {
@@ -314,14 +332,8 @@ class DockerUntaggedManifestCleanupIT extends AbstractIT {
     assertThat(this.manifestRows(repo)).isEqualTo(3);
     assertThat(this.manifestFiles(repo)).isEqualTo(3);
     assertThat(this.layerRows(repo)).as("the three orphan layer rows are gone").isEqualTo(3);
-    assertThat(this.status(repo, IMAGE, overridden)).isEqualTo(404);
-    assertThat(this.status(repo, IMAGE, deletedTag)).isEqualTo(404);
-    assertThat(this.status(repo, IMAGE, bare)).isEqualTo(404);
-    assertThat(this.status(repo, IMAGE, current)).isEqualTo(200);
-    assertThat(this.status(repo, IMAGE, child)).as("a child of a tagged index").isEqualTo(200);
-    assertThat(this.status(repo, IMAGE, indexJson)).isEqualTo(200);
-    assertThat(this.wire.getManifest(repo, IMAGE, "latest").getContentAsString())
-        .isEqualTo(current);
+    this.assertOnlyTheUnreachableManifestsAreGone(
+        repo, List.of(overridden, deletedTag, bare), current, child, indexJson);
     assertThat(this.edgeRows(repo)).isEqualTo(1);
     // The blobs go in the background and refund themselves.
     this.awaitBlobsDeleted(repo, "layer-one", "layer-three", "layer-five");

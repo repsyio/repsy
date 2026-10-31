@@ -17,6 +17,7 @@ package io.repsy.os.panel.profile.controllers;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -41,7 +42,6 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import org.springframework.mock.web.MockHttpServletResponse;
 
 @DisplayName("ProfileController")
@@ -49,10 +49,10 @@ class ProfileControllerTest {
 
   private static final String AUTH_HEADER = "Bearer signed.jwt.token";
 
-  private final JwtUtils jwtUtils = Mockito.mock(JwtUtils.class);
-  private final UserRepository userRepository = Mockito.mock(UserRepository.class);
-  private final UserMapper userConverter = Mockito.mock(UserMapper.class);
-  private final ProfileService profileService = Mockito.mock(ProfileService.class);
+  private final JwtUtils jwtUtils = mock(JwtUtils.class);
+  private final UserRepository userRepository = mock(UserRepository.class);
+  private final UserMapper userConverter = mock(UserMapper.class);
+  private final ProfileService profileService = mock(ProfileService.class);
   private final UserTxService userTxService =
       new UserTxService(this.userRepository, this.userConverter);
   private final PanelAuthHelper panelAuthHelper =
@@ -116,8 +116,9 @@ class ProfileControllerTest {
     when(this.userRepository.findByUsername("alice")).thenReturn(Optional.of(user));
     when(this.userConverter.toUserInfo(user)).thenReturn(userInfo);
 
-    assertThatThrownBy(
-            () -> this.controller.updatePassword(AUTH_HEADER, form, new MockHttpServletResponse()))
+    final var response = new MockHttpServletResponse();
+
+    assertThatThrownBy(() -> this.controller.updatePassword(AUTH_HEADER, form, response))
         .isExactlyInstanceOf(UnAuthorizedException.class)
         .hasMessage("sessionExpired");
     verifyNoInteractions(this.profileService);

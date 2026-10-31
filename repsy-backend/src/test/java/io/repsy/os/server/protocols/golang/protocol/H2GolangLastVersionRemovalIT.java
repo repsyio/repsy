@@ -258,7 +258,7 @@ class H2GolangLastVersionRemovalIT extends H2IntegrationTest {
                     writing.countDown();
                     try {
                       release.await(TIMEOUT_SECONDS, TimeUnit.SECONDS);
-                    } catch (final InterruptedException e) {
+                    } catch (final InterruptedException _) {
                       Thread.currentThread().interrupt();
                     }
                   });

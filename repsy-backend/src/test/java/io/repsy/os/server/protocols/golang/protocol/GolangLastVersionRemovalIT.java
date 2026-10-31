@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.verify;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -44,6 +45,7 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -57,6 +59,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -302,7 +305,7 @@ class GolangLastVersionRemovalIT extends AbstractIT {
   /** The disk usage every {@code updateUsage} of the test reported, summed. */
   private long reportedDiskUsage(final RepoInfo repo) {
     final var captor = ArgumentCaptor.forClass(UsageChangedInfo.class);
-    Mockito.verify(this.usageUpdateService, Mockito.atLeast(0)).updateUsage(captor.capture());
+    verify(this.usageUpdateService, Mockito.atLeast(0)).updateUsage(captor.capture());
 
     return captor.getAllValues().stream()
         .filter(info -> info.repoId().equals(repo.getStorageKey()))
@@ -492,12 +495,10 @@ class GolangLastVersionRemovalIT extends AbstractIT {
 
   /** Waits until a database session is blocked on a lock, or the operation has finished. */
   private void awaitBlockedOnALockOrDone(final Future<?> operation) throws Exception {
-    final var deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
-
-    while (!operation.isDone() && !this.someSessionWaitsForALock()) {
-      assertThat(System.nanoTime()).as("the operation blocked or finished").isLessThan(deadline);
-      TimeUnit.MILLISECONDS.sleep(10);
-    }
+    Awaitility.await("the operation blocked or finished")
+        .atMost(Duration.ofSeconds(30))
+        .pollInterval(Duration.ofMillis(10))
+        .until(() -> operation.isDone() || this.someSessionWaitsForALock());
   }
 
   private boolean someSessionWaitsForALock() {

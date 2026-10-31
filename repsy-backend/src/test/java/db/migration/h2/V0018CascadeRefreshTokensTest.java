@@ -16,6 +16,7 @@
 package db.migration.h2;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.sql.Connection;
@@ -102,7 +103,7 @@ class V0018CascadeRefreshTokensTest {
 
   @Test
   @DisplayName("rejects a token for a user that does not exist")
-  void rejectsOrphanInsert() throws Exception {
+  void rejectsOrphanInsert() {
 
     migrateTo("18");
 
@@ -113,7 +114,7 @@ class V0018CascadeRefreshTokensTest {
   @Test
   @DisplayName("runs on a database without any token")
   void runsOnEmptyTable() {
-    migrateTo("18");
+    assertThatCode(() -> migrateTo("18")).doesNotThrowAnyException();
   }
 
   private void migrateTo(final String version) {

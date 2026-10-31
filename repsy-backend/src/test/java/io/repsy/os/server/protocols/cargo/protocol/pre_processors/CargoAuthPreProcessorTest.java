@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -50,7 +51,6 @@ import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -67,19 +67,19 @@ class CargoAuthPreProcessorTest {
   /** The Cargo CLI sends the token as a raw value with no scheme. */
   private static final String RAW_TOKEN = "signed.jwt.token";
 
-  private final JwtUtils jwtUtils = Mockito.mock(JwtUtils.class);
+  private final JwtUtils jwtUtils = mock(JwtUtils.class);
 
   private final CargoAuthPreProcessor preProcessor =
       new CargoAuthPreProcessor(
           new CargoAuthenticator(
               // A real UserTxService over an empty repository: the user of the token is gone.
-              new UserTxService(Mockito.mock(UserRepository.class), Mockito.mock(UserMapper.class)),
+              new UserTxService(mock(UserRepository.class), mock(UserMapper.class)),
               this.jwtUtils,
-              Mockito.mock(DeployTokenService.class),
+              mock(DeployTokenService.class),
               new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
               new AuthFailureThrottle(
                   AuthThrottleProperties.disabled(), new SimpleMeterRegistry())),
-          Mockito.mock(CargoProtocolProvider.class));
+          mock(CargoProtocolProvider.class));
 
   CargoAuthPreProcessorTest() {
     when(this.jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))

@@ -65,7 +65,7 @@ class ManifestTest extends AbstractEntityIdentityTest<Manifest> {
     final var manifest = this.newEntity(UUID.randomUUID());
     manifest.setLayers(new UntouchableSet<>());
 
-    assertThat(manifest.hashCode()).isEqualTo(Manifest.class.hashCode());
+    assertThat(manifest).hasSameHashCodeAs(Manifest.class);
     assertThat(manifest.toString()).doesNotContain("layers=", "image=");
   }
 }

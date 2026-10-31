@@ -63,7 +63,7 @@ class TagTest extends AbstractEntityIdentityTest<Tag> {
   void hashCodeAndToStringSkipAssociations() {
     final var tag = this.newEntity(UUID.randomUUID());
 
-    assertThat(tag.hashCode()).isEqualTo(Tag.class.hashCode());
+    assertThat(tag).hasSameHashCodeAs(Tag.class);
     assertThat(tag.toString()).doesNotContain("manifest=", "image=");
   }
 }

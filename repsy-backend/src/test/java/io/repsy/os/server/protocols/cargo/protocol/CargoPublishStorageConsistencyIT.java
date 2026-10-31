@@ -160,7 +160,13 @@ class CargoPublishStorageConsistencyIT extends AbstractIT {
   /** A crate that differs from the others of the same name and version by {@code marker}. */
   private static byte[] crateArchive(final String name, final String version, final String marker) {
     final var manifest =
-        "[package]\nname = \"%s\"\n\n[lib]\n# %s\n"
+        """
+        [package]
+        name = "%s"
+
+        [lib]
+        # %s
+        """
             .formatted(name, marker)
             .getBytes(StandardCharsets.UTF_8);
     final var bytes = new ByteArrayOutputStream();

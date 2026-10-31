@@ -23,7 +23,6 @@ import static io.repsy.os.server.protocols.helm.HelmChartFixtures.digest;
 import static io.repsy.protocols.oci.constants.OciConstants.DOCKER_CONTENT_DIGEST;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -51,7 +50,6 @@ class HelmOciOverrideDigestIT extends AbstractIT {
 
   private static final String CHART = "payments";
   private static final String OCTET_STREAM = "application/octet-stream";
-  private static final String LATEST = "latest";
 
   /** {@code @Async}, so it cannot see this class's uncommitted rows. */
   @MockitoBean private UsageUpdateService usageUpdateService;
@@ -158,47 +156,6 @@ class HelmOciOverrideDigestIT extends AbstractIT {
                 .with(protocolPort()))
         .andReturn()
         .getResponse();
-  }
-
-  private MockHttpServletResponse tagsList(final Repo repo, final String name, final String token)
-      throws Exception {
-    return this.mockMvc
-        .perform(
-            get("/v2/{repo}/{name}/tags/list", repo.getName(), name)
-                .header(AUTHORIZATION, token)
-                .with(protocolPort()))
-        .andReturn()
-        .getResponse();
-  }
-
-  private MockHttpServletResponse deleteVersion(
-      final Repo repo, final String name, final String version, final String panelToken)
-      throws Exception {
-    return this.perform(
-            delete(
-                    "/api/helm/charts/{repo}/{name}/versions/{version}",
-                    repo.getName(),
-                    name,
-                    version)
-                .header(AUTHORIZATION, panelToken))
-        .andReturn()
-        .getResponse();
-  }
-
-  /** The chart version the manifest row named {@code (name, reference)} is currently linked to. */
-  private String linkedVersion(final Repo repo, final String name, final String reference) {
-    this.entityManager.flush();
-
-    return this.jdbcTemplate.queryForObject(
-        """
-        select v.version
-          from helm_oci_manifest m join helm_chart_version v on v.id = m.chart_version_id
-          where m.repo_id = ? and m.name = ? and m.reference = ?
-        """,
-        String.class,
-        repo.getId(),
-        name,
-        reference);
   }
 
   /** As {@code helm push} does: the manifest by its own digest, then by the tag. */

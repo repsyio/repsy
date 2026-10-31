@@ -64,8 +64,7 @@ class LayerTest {
   void transientLayersEqualOnlyThemselves() {
     final var layer = layer(null, DIGEST);
 
-    assertThat(layer).isEqualTo(layer);
-    assertThat(layer).isNotEqualTo(layer(null, DIGEST));
+    assertThat(layer).isEqualTo(layer).isNotEqualTo(layer(null, DIGEST));
   }
 
   @Test

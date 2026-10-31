@@ -1948,7 +1948,9 @@ class OpenApiSpecConsistencyIT extends AbstractIT {
                             case "created" -> codes.add(201);
                             case "accepted" -> codes.add(202);
                             case "noContent" -> codes.add(204);
-                            default -> {}
+                            default -> {
+                              // any other callee does not set a response status
+                            }
                           }
                         }
                       }
@@ -1965,7 +1967,9 @@ class OpenApiSpecConsistencyIT extends AbstractIT {
                             case "CREATED" -> codes.add(201);
                             case "ACCEPTED" -> codes.add(202);
                             case "NO_CONTENT" -> codes.add(204);
-                            default -> {}
+                            default -> {
+                              // any other status constant is not a success status the spec tracks
+                            }
                           }
                         }
                       }

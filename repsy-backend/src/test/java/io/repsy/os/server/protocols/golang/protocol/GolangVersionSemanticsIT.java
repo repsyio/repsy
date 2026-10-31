@@ -107,7 +107,7 @@ class GolangVersionSemanticsIT extends AbstractIT {
   private String latestVersionOf(final Repo repo, final String modulePath) throws Exception {
     final var res = this.wireGet(repo, modulePath, "@latest");
     assertThat(res.getStatus()).as(res.getContentAsString()).isEqualTo(200);
-    // {"Version":"vX.Y.Z", ...}
+    // The body is a JSON object whose Version field holds the version, among other fields.
     final var body = res.getContentAsString(StandardCharsets.UTF_8);
     final var marker = "\"Version\":\"";
     final var start = body.indexOf(marker) + marker.length();

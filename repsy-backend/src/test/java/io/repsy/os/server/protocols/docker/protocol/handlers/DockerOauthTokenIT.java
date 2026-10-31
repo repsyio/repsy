@@ -138,8 +138,10 @@ class DockerOauthTokenIT extends AbstractIT {
     final var token =
         AuthUtils.AUTH_BEARER + JsonPath.<String>read(response.getContentAsString(), "$.token");
 
-    // An anonymous token is refused outright (401) on a private repo (DockerAnonymousTokenIT);
-    // a real user's token gets past authentication and answers 404 for the missing manifest.
+    // An anonymous token is refused outright with a 401 on a private repo, as
+    // DockerAnonymousTokenIT
+    // shows, while a real user's token gets past authentication and answers 404 for the missing
+    // manifest.
     assertThat(this.pullManifest(repo, token)).isEqualTo(404);
   }
 

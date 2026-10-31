@@ -58,7 +58,7 @@ class VersionLicenseTest extends AbstractEntityIdentityTest<VersionLicense> {
   void hashCodeAndToStringSkipAssociations() {
     final var versionLicense = this.newEntity(UUID.randomUUID());
 
-    assertThat(versionLicense.hashCode()).isEqualTo(VersionLicense.class.hashCode());
+    assertThat(versionLicense).hasSameHashCodeAs(VersionLicense.class);
     assertThat(versionLicense.toString()).doesNotContain("artifactVersion=");
   }
 }

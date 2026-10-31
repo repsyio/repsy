@@ -65,8 +65,9 @@ class MavenPutBodyIT extends AbstractIT {
   private static final String FORM = "application/x-www-form-urlencoded";
 
   /** Looks like form data, and is not text at all. */
-  private static final byte[] BINARY =
-      new byte[] {'P', 'K', 3, 4, 0, 1, 2, (byte) 200, (byte) 255, '%', '4', '1', '=', '&'};
+  private static final byte[] BINARY = {
+    'P', 'K', 3, 4, 0, 1, 2, (byte) 200, (byte) 255, '%', '4', '1', '=', '&'
+  };
 
   private static final byte[] FORM_LOOKING = "a=b&c=d%20e".getBytes(StandardCharsets.UTF_8);
 

@@ -348,7 +348,7 @@ class HelmPushMetadataLengthIT extends AbstractIT {
   }
 
   // ---------------------------------------------------------------------------------------------
-  // PUT /v2/{repo}/{name}/manifests/{reference}
+  // Manifest uploads: a PUT on a manifest reference
   // ---------------------------------------------------------------------------------------------
 
   @Nested
@@ -447,7 +447,7 @@ class HelmPushMetadataLengthIT extends AbstractIT {
   }
 
   // ---------------------------------------------------------------------------------------------
-  // PUT /v2/{repo}/{name}/blobs/uploads/{id}
+  // Blob uploads: the PUT that finishes an upload session
   // ---------------------------------------------------------------------------------------------
 
   @Nested

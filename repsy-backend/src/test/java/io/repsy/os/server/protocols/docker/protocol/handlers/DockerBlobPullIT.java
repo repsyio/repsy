@@ -161,7 +161,7 @@ class DockerBlobPullIT extends AbstractIT {
     final var blob = bytes("another-" + algorithm + "-blob");
     this.pushBlob(repo, blob, "sha512".equals(algorithm) ? sha512(blob) : sha256(blob), token);
 
-    final var unknown = "sha512".equals(algorithm) ? "0".repeat(128) : "0".repeat(64);
+    final var unknown = "0".repeat("sha512".equals(algorithm) ? 128 : 64);
 
     assertThat(this.getBlob(repo, algorithm + ":" + unknown, token).getStatus()).isEqualTo(404);
   }

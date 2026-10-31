@@ -33,6 +33,8 @@ import com.jayway.jsonpath.JsonPath;
 import io.repsy.core.events.ArtifactVersionDeletedEvent;
 import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.docker.shared.image.repositories.ImageRepository;
+import io.repsy.os.server.protocols.docker.shared.tag.entities.Manifest;
+import io.repsy.os.server.protocols.docker.shared.tag.entities.Tag;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestChildRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.TagRepository;
@@ -241,10 +243,10 @@ class DockerManifestDeleteIT extends AbstractIT {
     this.expectOciError(
         this.wire.getManifest(repo, IMAGE, "v1"), 404, "MANIFEST_UNKNOWN", "tagNotFound");
     assertThat(this.manifestRepository.findAllByImageId(image.getId()))
-        .extracting(row -> row.getDigest())
+        .extracting(Manifest::getDigest)
         .containsExactly(sha256(bytes(imageManifest("layer-two"))));
     assertThat(this.tagRepository.findAllByImageRepoIdAndImageId(repo.getId(), image.getId()))
-        .extracting(tag -> tag.getName())
+        .extracting(Tag::getName)
         .containsExactly("other");
     assertThat(this.manifestFileExists(repo, digest)).isFalse();
     assertThat(this.netUsage(repo)).isEqualTo(-bytes(manifest).length);
@@ -339,7 +341,7 @@ class DockerManifestDeleteIT extends AbstractIT {
 
     final var image = this.imageRepository.findByRepoIdAndName(repo.getId(), IMAGE).orElseThrow();
     assertThat(this.tagRepository.findAllByImageRepoIdAndImageId(repo.getId(), image.getId()))
-        .extracting(tag -> tag.getName())
+        .extracting(Tag::getName)
         .containsExactly("v2");
     assertThat(this.wire.getManifest(repo, IMAGE, "v2").getStatus()).isEqualTo(200);
   }
@@ -637,10 +639,11 @@ class DockerManifestDeleteIT extends AbstractIT {
     final var token =
         this.bearerFromTokenEndpoint(
             "ignored", secret, "repository:%s/%s:pull,push".formatted(repo.getName(), IMAGE));
-    final var wire =
+    final var tokenWire =
         new DockerWire(this.mockMvc, this.webApplicationContext, protocolPort(), token);
 
-    assertThat(wire.getManifest(repo, IMAGE, "latest").getContentAsString()).isEqualTo(manifest);
-    assertThat(wire.putImage(repo, IMAGE, "other", manifest).getStatus()).isEqualTo(201);
+    assertThat(tokenWire.getManifest(repo, IMAGE, "latest").getContentAsString())
+        .isEqualTo(manifest);
+    assertThat(tokenWire.putImage(repo, IMAGE, "other", manifest).getStatus()).isEqualTo(201);
   }
 }

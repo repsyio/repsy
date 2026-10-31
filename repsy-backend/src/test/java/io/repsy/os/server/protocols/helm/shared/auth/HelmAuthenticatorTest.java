@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -45,7 +46,6 @@ import java.util.UUID;
 import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 /**
  * RPS-1040: Helm answers a bearer token with the behaviour of {@code ProtocolAuthService}, like
@@ -56,9 +56,9 @@ class HelmAuthenticatorTest {
 
   private static final String BEARER = "Bearer signed.jwt.token";
 
-  private final UserTxService userTxService = Mockito.mock(UserTxService.class);
-  private final JwtUtils jwtUtils = Mockito.mock(JwtUtils.class);
-  private final DeployTokenService deployTokenService = Mockito.mock(DeployTokenService.class);
+  private final UserTxService userTxService = mock(UserTxService.class);
+  private final JwtUtils jwtUtils = mock(JwtUtils.class);
+  private final DeployTokenService deployTokenService = mock(DeployTokenService.class);
 
   private final HelmAuthenticator authenticator =
       new HelmAuthenticator(
@@ -109,7 +109,7 @@ class HelmAuthenticatorTest {
     // A real UserTxService over an empty repository: the lookup itself is under test.
     final var component =
         new HelmAuthenticator(
-            new UserTxService(Mockito.mock(UserRepository.class), Mockito.mock(UserMapper.class)),
+            new UserTxService(mock(UserRepository.class), mock(UserMapper.class)),
             this.jwtUtils,
             this.deployTokenService,
             new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),

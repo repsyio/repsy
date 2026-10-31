@@ -110,15 +110,17 @@ class V0046PersonalAccessTokenKindIT {
                 "select count(*) from \"personal_access_token\" where \"kind\" = 'TEMPORARY'",
                 Long.class))
         .isEqualTo(1);
+    final var rejectedTokenId = UUID.randomUUID();
+    final var rejectedTokenHash = "c".repeat(64);
     assertThatThrownBy(
             () ->
                 jdbc.update(
                     "insert into \"personal_access_token\" (\"id\", \"user_id\", \"kind\", \"name\","
                         + " \"token_hash\", \"scopes\", \"expiration_date\", \"created_at\")"
                         + " values (?, ?, NULL, 'x', ?, 'x', now(), now())",
-                    UUID.randomUUID(),
+                    rejectedTokenId,
                     userId,
-                    "c".repeat(64)))
+                    rejectedTokenHash))
         .isInstanceOf(DataIntegrityViolationException.class);
   }
 }

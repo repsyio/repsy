@@ -84,7 +84,6 @@ class DockerManifestUsageFailureIT extends AbstractIT {
 
   private DockerWire wire;
   private String protocolToken;
-  private String panelToken;
 
   @BeforeEach
   void setUpWire() {
@@ -93,7 +92,6 @@ class DockerManifestUsageFailureIT extends AbstractIT {
     this.createdUserIds.add(info.getId());
     final var user = this.userRepository.findById(info.getId()).orElseThrow();
     this.protocolToken = this.protocolBearerTokenFor(user);
-    this.panelToken = this.bearerTokenFor(user);
     this.wire =
         new DockerWire(
             this.mockMvc, this.webApplicationContext, protocolPort(), this.protocolToken);

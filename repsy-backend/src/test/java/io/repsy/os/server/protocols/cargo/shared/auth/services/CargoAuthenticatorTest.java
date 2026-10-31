@@ -21,6 +21,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -53,7 +54,6 @@ import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 /**
  * RPS-906: Basic credentials of an unknown user must be indistinguishable from a wrong password.
@@ -67,13 +67,13 @@ class CargoAuthenticatorTest {
   /** BCrypt is slow on purpose, so the hash is made once for the whole class. */
   private static final String PASSWORD_HASH = PasswordHasher.hash(PASSWORD);
 
-  private final UserTxService userTxService = Mockito.mock(UserTxService.class);
+  private final UserTxService userTxService = mock(UserTxService.class);
 
   private final CargoAuthenticator authenticator =
       new CargoAuthenticator(
           this.userTxService,
-          Mockito.mock(JwtUtils.class),
-          Mockito.mock(DeployTokenService.class),
+          mock(JwtUtils.class),
+          mock(DeployTokenService.class),
           new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
           new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()));
 
@@ -116,15 +116,15 @@ class CargoAuthenticatorTest {
   @DisplayName(
       "authenticateAndCreateToken answers unAuthorized for a bearer token whose user is gone")
   void authenticateAndCreateTokenUserNoLongerExists() {
-    final var jwtUtils = Mockito.mock(JwtUtils.class);
+    final var jwtUtils = mock(JwtUtils.class);
     when(jwtUtils.extractProtocolUserClaims(anyString()))
         .thenReturn(new ProtocolUserClaims(UUID.randomUUID(), "ghost", null));
     // A real UserTxService over an empty repository: the lookup itself is under test.
     final var component =
         new CargoAuthenticator(
-            new UserTxService(Mockito.mock(UserRepository.class), Mockito.mock(UserMapper.class)),
+            new UserTxService(mock(UserRepository.class), mock(UserMapper.class)),
             jwtUtils,
-            Mockito.mock(DeployTokenService.class),
+            mock(DeployTokenService.class),
             new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
             new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()));
 
@@ -138,7 +138,7 @@ class CargoAuthenticatorTest {
   @Test
   @DisplayName("authenticateAndCreateToken refuses a deploy-token bearer JWT")
   void authenticateAndCreateTokenRefusesDeployTokenJwt() {
-    final var jwtUtils = Mockito.mock(JwtUtils.class);
+    final var jwtUtils = mock(JwtUtils.class);
     when(jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
         .thenReturn(AuthenticationType.DEPLOY_TOKEN);
     when(jwtUtils.extractProtocolUserClaims(anyString()))
@@ -147,7 +147,7 @@ class CargoAuthenticatorTest {
         new CargoAuthenticator(
             this.userTxService,
             jwtUtils,
-            Mockito.mock(DeployTokenService.class),
+            mock(DeployTokenService.class),
             new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
             new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()));
 
@@ -164,7 +164,7 @@ class CargoAuthenticatorTest {
   @Test
   @DisplayName("authenticateAndCreateToken refuses a bearer token of an older version")
   void authenticateAndCreateTokenRefusesAnOlderVersion() {
-    final var jwtUtils = Mockito.mock(JwtUtils.class);
+    final var jwtUtils = mock(JwtUtils.class);
     final var userId = UUID.randomUUID();
     when(jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
         .thenReturn(AuthenticationType.USERNAME_PASSWORD);
@@ -184,7 +184,7 @@ class CargoAuthenticatorTest {
   @Test
   @DisplayName("authenticateAndCreateToken renews a current or claim-less token with the version")
   void authenticateAndCreateTokenRenewsWithTheCurrentVersion() {
-    final var jwtUtils = Mockito.mock(JwtUtils.class);
+    final var jwtUtils = mock(JwtUtils.class);
     final var userId = UUID.randomUUID();
     when(jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
         .thenReturn(AuthenticationType.USERNAME_PASSWORD);
@@ -212,7 +212,7 @@ class CargoAuthenticatorTest {
   @Test
   @DisplayName("authenticateAndCreateToken renews a scheme-less (raw) bearer token")
   void authenticateAndCreateTokenAcceptsARawBearerToken() {
-    final var jwtUtils = Mockito.mock(JwtUtils.class);
+    final var jwtUtils = mock(JwtUtils.class);
     final var userId = UUID.randomUUID();
     when(jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
         .thenReturn(AuthenticationType.USERNAME_PASSWORD);
@@ -232,7 +232,7 @@ class CargoAuthenticatorTest {
     return new CargoAuthenticator(
         this.userTxService,
         jwtUtils,
-        Mockito.mock(DeployTokenService.class),
+        mock(DeployTokenService.class),
         new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
         new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()));
   }

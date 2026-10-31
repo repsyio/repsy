@@ -23,6 +23,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -74,16 +75,16 @@ class DockerAuthenticatorTest {
   /** BCrypt is slow on purpose, so the hash is made once for the whole class. */
   private static final String PASSWORD_HASH = PasswordHasher.hash(PASSWORD);
 
-  private final UserTxService userTxService = Mockito.mock(UserTxService.class);
+  private final UserTxService userTxService = mock(UserTxService.class);
 
   private final DockerAuthenticator authenticator =
       new DockerAuthenticator(
           this.userTxService,
-          Mockito.mock(JwtUtils.class),
-          Mockito.mock(DeployTokenService.class),
+          mock(JwtUtils.class),
+          mock(DeployTokenService.class),
           new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
           new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()),
-          Mockito.mock(RepoTxService.class));
+          mock(RepoTxService.class));
 
   private static String basicAuth(final String username, final String password) {
     final var raw = (username + ":" + password).getBytes(StandardCharsets.UTF_8);
@@ -124,18 +125,18 @@ class DockerAuthenticatorTest {
   @Test
   @DisplayName("authenticateUser answers unAuthorized for a bearer token whose user is gone")
   void authenticateUserTokenUserNoLongerExists() {
-    final var jwtUtils = Mockito.mock(JwtUtils.class);
+    final var jwtUtils = mock(JwtUtils.class);
     when(jwtUtils.extractPanelClaims(anyString()))
         .thenReturn(new PanelTokenClaims(UUID.randomUUID(), "ghost", 0, Instant.now()));
     // A real UserTxService over an empty repository: the lookup itself is under test.
     final var component =
         new DockerAuthenticator(
-            new UserTxService(Mockito.mock(UserRepository.class), Mockito.mock(UserMapper.class)),
+            new UserTxService(mock(UserRepository.class), mock(UserMapper.class)),
             jwtUtils,
-            Mockito.mock(DeployTokenService.class),
+            mock(DeployTokenService.class),
             new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
             new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()),
-            Mockito.mock(RepoTxService.class));
+            mock(RepoTxService.class));
 
     assertUnauthorized(() -> component.authenticateUser("Bearer signed.jwt.token"));
   }
@@ -150,8 +151,8 @@ class DockerAuthenticatorTest {
 
     private static final String BEARER = "Bearer signed.jwt.token";
 
-    private final JwtUtils jwtUtils = Mockito.mock(JwtUtils.class);
-    private final UserTxService users = Mockito.mock(UserTxService.class);
+    private final JwtUtils jwtUtils = mock(JwtUtils.class);
+    private final UserTxService users = mock(UserTxService.class);
     private final UserInfo user =
         UserInfo.builder()
             .id(UUID.randomUUID())
@@ -163,10 +164,10 @@ class DockerAuthenticatorTest {
         new DockerAuthenticator(
             this.users,
             this.jwtUtils,
-            Mockito.mock(DeployTokenService.class),
+            mock(DeployTokenService.class),
             new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
             new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()),
-            Mockito.mock(RepoTxService.class));
+            mock(RepoTxService.class));
 
     PanelBearerBinding() {
       when(this.users.getAuthenticatedUserByUsername(USERNAME)).thenReturn(this.user);
@@ -267,16 +268,16 @@ class DockerAuthenticatorTest {
     private static final String BEARER = "Bearer signed.jwt.token";
     private static final String NAME = "images/app";
 
-    private final JwtUtils jwtUtils = Mockito.mock(JwtUtils.class);
+    private final JwtUtils jwtUtils = mock(JwtUtils.class);
 
     private final DockerAuthenticator component =
         new DockerAuthenticator(
             DockerAuthenticatorTest.this.userTxService,
             this.jwtUtils,
-            Mockito.mock(DeployTokenService.class),
+            mock(DeployTokenService.class),
             new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
             new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()),
-            Mockito.mock(RepoTxService.class));
+            mock(RepoTxService.class));
 
     private void issuedFor(final List<String> grants) {
       when(this.jwtUtils.extractAccess(BEARER, TokenRealm.PROTOCOL)).thenReturn(grants);
@@ -373,7 +374,9 @@ class DockerAuthenticatorTest {
   @Test
   @DisplayName("authorizePublicRead answers repoNotFound for a private repo")
   void authorizePublicReadRefusesPrivateRepo() {
-    assertThatThrownBy(() -> this.authenticator.authorizePublicRead(repo(true)))
+    final var privateRepo = repo(true);
+
+    assertThatThrownBy(() -> this.authenticator.authorizePublicRead(privateRepo))
         .isExactlyInstanceOf(ItemNotFoundException.class)
         .hasMessage("repoNotFound");
   }
@@ -390,16 +393,16 @@ class DockerAuthenticatorTest {
 
     private static final String BEARER = "Bearer signed.jwt.token";
 
-    private final JwtUtils jwtUtils = Mockito.mock(JwtUtils.class);
+    private final JwtUtils jwtUtils = mock(JwtUtils.class);
 
     private final DockerAuthenticator component =
         new DockerAuthenticator(
             DockerAuthenticatorTest.this.userTxService,
             this.jwtUtils,
-            Mockito.mock(DeployTokenService.class),
+            mock(DeployTokenService.class),
             new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
             new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()),
-            Mockito.mock(RepoTxService.class));
+            mock(RepoTxService.class));
 
     private final UUID ghostId = UUID.randomUUID();
 
@@ -451,16 +454,16 @@ class DockerAuthenticatorTest {
 
     private static final String BEARER = "Bearer signed.jwt.token";
 
-    private final JwtUtils jwtUtils = Mockito.mock(JwtUtils.class);
+    private final JwtUtils jwtUtils = mock(JwtUtils.class);
 
     private final DockerAuthenticator component =
         new DockerAuthenticator(
             DockerAuthenticatorTest.this.userTxService,
             this.jwtUtils,
-            Mockito.mock(DeployTokenService.class),
+            mock(DeployTokenService.class),
             new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
             new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()),
-            Mockito.mock(RepoTxService.class));
+            mock(RepoTxService.class));
 
     AnonymousToken() {
       when(this.jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
@@ -525,8 +528,8 @@ class DockerAuthenticatorTest {
 
     private static final String BEARER = "Bearer signed.jwt.token";
 
-    private final JwtUtils jwtUtils = Mockito.mock(JwtUtils.class);
-    private final DeployTokenService deployTokenService = Mockito.mock(DeployTokenService.class);
+    private final JwtUtils jwtUtils = mock(JwtUtils.class);
+    private final DeployTokenService deployTokenService = mock(DeployTokenService.class);
 
     private final DockerAuthenticator component =
         new DockerAuthenticator(
@@ -535,7 +538,7 @@ class DockerAuthenticatorTest {
             this.deployTokenService,
             new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
             new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()),
-            Mockito.mock(RepoTxService.class));
+            mock(RepoTxService.class));
 
     @Test
     @DisplayName("handleBearerAuth never looks the value up as a deploy token")
@@ -566,16 +569,16 @@ class DockerAuthenticatorTest {
 
     private static final String BEARER = "Bearer signed.jwt.token";
 
-    private final JwtUtils jwtUtils = Mockito.mock(JwtUtils.class);
+    private final JwtUtils jwtUtils = mock(JwtUtils.class);
 
     private final DockerAuthenticator component =
         new DockerAuthenticator(
             DockerAuthenticatorTest.this.userTxService,
             this.jwtUtils,
-            Mockito.mock(DeployTokenService.class),
+            mock(DeployTokenService.class),
             new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
             new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()),
-            Mockito.mock(RepoTxService.class));
+            mock(RepoTxService.class));
 
     ScannerToken() {
       when(this.jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
@@ -621,8 +624,8 @@ class DockerAuthenticatorTest {
 
     private static final String BEARER = "Bearer signed.jwt.token";
 
-    private final JwtUtils jwtUtils = Mockito.mock(JwtUtils.class);
-    private final DeployTokenService deployTokenService = Mockito.mock(DeployTokenService.class);
+    private final JwtUtils jwtUtils = mock(JwtUtils.class);
+    private final DeployTokenService deployTokenService = mock(DeployTokenService.class);
 
     private final DockerAuthenticator component =
         new DockerAuthenticator(
@@ -631,7 +634,7 @@ class DockerAuthenticatorTest {
             this.deployTokenService,
             new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
             new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()),
-            Mockito.mock(RepoTxService.class));
+            mock(RepoTxService.class));
 
     private final UUID repoId = UUID.randomUUID();
     private final UUID tokenId = UUID.randomUUID();

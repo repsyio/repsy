@@ -213,7 +213,7 @@ class ManifestDeleterTest {
         .extracting(event -> ((ArtifactVersionDeletedEvent) event).artifactVersion())
         .containsExactly("latest", "v1");
     assertThat(captor.getAllValues())
-        .extracting(event -> (ArtifactVersionDeletedEvent) event)
+        .extracting(ArtifactVersionDeletedEvent.class::cast)
         .allSatisfy(
             event -> {
               assertThat(event.repoId()).isEqualTo(REPO_ID);

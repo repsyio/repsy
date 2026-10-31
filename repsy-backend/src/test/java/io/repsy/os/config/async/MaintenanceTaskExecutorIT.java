@@ -16,7 +16,7 @@
 package io.repsy.os.config.async;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 
@@ -125,7 +125,7 @@ class MaintenanceTaskExecutorIT extends AbstractIT {
               return null;
             })
         .when(dockerStorageService)
-        .deleteBlob(eq(repoId), eq("sha256:orphan"));
+        .deleteBlob(repoId, "sha256:orphan");
     final var service =
         this.withAsyncWiring(
             new OrphanLayerCleanupService(dockerStorageService, usageUpdateService),
@@ -165,18 +165,20 @@ class MaintenanceTaskExecutorIT extends AbstractIT {
     final var completedBefore =
         this.maintenanceTaskExecutor.getThreadPoolExecutor().getCompletedTaskCount();
 
-    final var unused = strategy.clearTrash();
+    strategy.clearTrash();
 
-    final var deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(TIMEOUT_SECONDS);
-    while (Files.exists(expiredDir) && System.nanoTime() < deadline) {
-      Thread.sleep(20);
-    }
+    await()
+        .atMost(Duration.ofSeconds(TIMEOUT_SECONDS))
+        .pollInterval(Duration.ofMillis(20))
+        .until(() -> !Files.exists(expiredDir));
     assertThat(expiredDir).doesNotExist();
-    while (this.maintenanceTaskExecutor.getThreadPoolExecutor().getCompletedTaskCount()
-            == completedBefore
-        && System.nanoTime() < deadline) {
-      Thread.sleep(20);
-    }
+    await()
+        .atMost(Duration.ofSeconds(TIMEOUT_SECONDS))
+        .pollInterval(Duration.ofMillis(20))
+        .until(
+            () ->
+                this.maintenanceTaskExecutor.getThreadPoolExecutor().getCompletedTaskCount()
+                    > completedBefore);
     assertThat(this.maintenanceTaskExecutor.getThreadPoolExecutor().getCompletedTaskCount())
         .isGreaterThan(completedBefore);
   }

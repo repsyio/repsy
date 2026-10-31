@@ -104,10 +104,6 @@ class GolangModuleControllerIT extends AbstractIT {
         .andExpect(status().isOk());
   }
 
-  private static byte[] moduleZip(final String version) {
-    return moduleZip(MODULE, version);
-  }
-
   private static byte[] moduleZip(final String module, final String version) {
     try {
       final var output = new ByteArrayOutputStream();

@@ -690,7 +690,7 @@ class PagedListsIT extends AbstractIT {
   /** The names of the operation's own query parameters, in order. */
   private static List<String> queryParameterNames(final Map<String, Object> operation) {
     return parameters(operation).stream()
-        .map(parameter -> asMap(parameter))
+        .map(PagedListsIT::asMap)
         .filter(parameter -> "query".equals(parameter.get("in")))
         .map(parameter -> String.valueOf(parameter.get("name")))
         .toList();

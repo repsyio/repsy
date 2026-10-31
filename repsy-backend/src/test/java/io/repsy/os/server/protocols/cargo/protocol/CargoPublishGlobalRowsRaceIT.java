@@ -141,7 +141,12 @@ class CargoPublishGlobalRowsRaceIT extends AbstractIT {
 
   private static byte[] crateArchive(final String name, final String version) {
     final var manifest =
-        "[package]\nname = \"%s\"\n".formatted(name).getBytes(StandardCharsets.UTF_8);
+        """
+        [package]
+        name = "%s"
+        """
+            .formatted(name)
+            .getBytes(StandardCharsets.UTF_8);
     final var bytes = new ByteArrayOutputStream();
 
     try (final var tar = new TarArchiveOutputStream(new GzipCompressorOutputStream(bytes))) {

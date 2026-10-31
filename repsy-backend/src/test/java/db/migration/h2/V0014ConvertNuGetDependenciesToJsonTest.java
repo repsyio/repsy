@@ -16,6 +16,7 @@
 package db.migration.h2;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
 import io.repsy.core.web.configs.XmlMapperConfig;
 import io.repsy.protocols.nuget.shared.packages.dtos.NuGetDependencyInfo;
@@ -126,7 +127,7 @@ class V0014ConvertNuGetDependenciesToJsonTest {
   @Test
   @DisplayName("runs on a database without any NuGet package versions")
   void runsOnEmptyTable() {
-    migrateTo("14");
+    assertThatCode(() -> migrateTo("14")).doesNotThrowAnyException();
   }
 
   private static String legacyXml(final List<NuGetDependencyInfo> dependencies) {

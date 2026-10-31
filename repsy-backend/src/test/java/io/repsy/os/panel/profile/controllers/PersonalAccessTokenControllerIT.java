@@ -510,8 +510,8 @@ class PersonalAccessTokenControllerIT extends AbstractIT {
     assertThat(body)
         .doesNotContain("not-mine")
         .doesNotContain("tokenHash")
-        .doesNotContain("\"token\"");
-    assertThat(body).doesNotContain(mine.getTokenHash());
+        .doesNotContain("\"token\"")
+        .doesNotContain(mine.getTokenHash());
 
     final List<Map<String, Object>> content = JsonPath.read(body, "$.content");
     for (final var item : content) {

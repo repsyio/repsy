@@ -68,7 +68,7 @@ class SignedRecomputeExecutorConfigTest {
   private static void awaitQuietly(final CountDownLatch gate) {
     try {
       gate.await();
-    } catch (final InterruptedException e) {
+    } catch (final InterruptedException _) {
       Thread.currentThread().interrupt();
     }
   }
