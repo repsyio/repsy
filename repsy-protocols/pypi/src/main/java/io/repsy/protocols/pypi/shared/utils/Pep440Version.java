@@ -56,7 +56,7 @@ public final class Pep440Version implements Comparable<Pep440Version> {
               + "(?:-(?<postnum1>\\d+)"
               + "|[-_.]?(?<postlabel>post|rev|r)[-_.]?(?<postnum2>\\d+)?)?"
               + "(?:[-_.]?(?<devlabel>dev)[-_.]?(?<devnum>\\d+)?)?"
-              + "(?:\\+(?<local>[a-z0-9]+(?:[-_.][a-z0-9]+)*))?"
+              + "(?:\\+(?<local>[a-z0-9]+(?:[-_.][a-z0-9]+)*+))?"
               + "\\s*$");
 
   private static final Pattern RELEASE_SEPARATOR = Pattern.compile("\\.");

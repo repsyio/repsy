@@ -23,7 +23,8 @@ import { afterNextRender, DestroyRef, Directive, ElementRef, inject, input, sign
  * yet a block that fits makes a pointless tab stop. The host therefore gets `role="region"`,
  * `aria-label` and `tabindex="0"` while its content overflows horizontally or vertically, and none
  * of them otherwise. The overflow is re-measured when the host is resized or its content changes
- * (the highlighter fills the block after the first render).
+ * (the highlighter fills the block after the first render; a size change of the content, such as a
+ * style change, counts too).
  *
  * Put it on the element that actually scrolls: for the highlighted snippets that is the `<code>`
  * element (the highlight.js theme gives it `overflow-x: auto`, and as a flex child of the `<pre>` it
@@ -56,7 +57,12 @@ export class ScrollRegionDirective {
       const resizeObserver = new ResizeObserver(measure);
       const mutationObserver = new MutationObserver(measure);
       resizeObserver.observe(this.element);
-      mutationObserver.observe(this.element, { childList: true, subtree: true, characterData: true });
+      mutationObserver.observe(this.element, {
+        attributes: true,
+        childList: true,
+        subtree: true,
+        characterData: true,
+      });
       destroyRef.onDestroy(() => {
         resizeObserver.disconnect();
         mutationObserver.disconnect();

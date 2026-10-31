@@ -124,9 +124,9 @@ public class DockerManifestLayoutRepairService {
 
     @Override
     public boolean equals(final Object o) {
-      return o instanceof final LocatedFile other
-          && this.name.equals(other.name)
-          && Arrays.equals(this.bytes, other.bytes);
+      return o instanceof LocatedFile(final String otherName, final byte[] otherBytes)
+          && this.name.equals(otherName)
+          && Arrays.equals(this.bytes, otherBytes);
     }
 
     @Override

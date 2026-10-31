@@ -33,8 +33,9 @@ let bodyBefore = new Set<ChildNode>();
 function describeNode(node: ChildNode): string {
   if (node instanceof Element) {
     const id = node.id ? `#${node.id}` : '';
-    const testId = node.getAttribute('data-testid');
-    return `<${node.tagName.toLowerCase()}${id}${testId ? ` data-testid="${testId}"` : ''}>`;
+    const testId = (node as HTMLElement | SVGElement).dataset['testid'];
+    const testIdPart = testId ? ` data-testid="${testId}"` : '';
+    return `<${node.tagName.toLowerCase()}${id}${testIdPart}>`;
   }
   return node.nodeName;
 }
