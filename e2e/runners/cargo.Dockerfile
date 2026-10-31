@@ -60,6 +60,13 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends gcc libc6-dev \
     && rm -rf /var/lib/apt/lists/*
 
+# The system trust store, which cargo (libcurl) verifies a registry's https certificate against: node's slim image has
+# none (node and npm use their own bundled list), so against a TLS registry every cargo call failed with "unable to get
+# local issuer certificate" (RPS-2375). The plain-http stacks never needed it.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
 # /usr/local/cargo/bin/{cargo,rustc} in the official image are rustup proxies that resolve the real
 # toolchain via RUSTUP_HOME at run time -- copying both directories (not just the proxies) is what
 # makes that resolution work. CARGO_HOME here only ever hosts these proxies: clients/cargo.ts

@@ -129,6 +129,13 @@ RUN chmod +x ./entrypoint.sh
 
 # --- docker-specific layers ---
 
+# The system trust store that crane, skopeo, regctl and oras (all Go) verify a TLS registry against. node's slim image
+# has none, and the copies in the download stages above do not reach this one: against an https registry every call
+# failed with "x509: certificate signed by unknown authority" (RPS-2375).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY --from=crane /ko-app/crane /usr/local/bin/crane
 
 # Readable/executable (not necessarily owned) by whatever uid the container runs as
