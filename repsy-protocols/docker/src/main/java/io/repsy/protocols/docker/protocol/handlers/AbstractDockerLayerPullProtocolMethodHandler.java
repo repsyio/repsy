@@ -33,15 +33,15 @@ import org.springframework.http.HttpMethod;
  * The OCI blob pull of a Docker layer, served with the layer's stored media type: the {@code
  * Content-Type} the blob check of the same digest reports (RPS-2172).
  */
-public abstract class AbstractDockerLayerPullProtocolMethodHandler<ID>
-    extends AbstractOciBlobPullProtocolMethodHandler<DockerProtocolFacade<ID>> {
+public abstract class AbstractDockerLayerPullProtocolMethodHandler<I>
+    extends AbstractOciBlobPullProtocolMethodHandler<DockerProtocolFacade<I>> {
 
   /** What a layer without a stored media type is served as. */
   private static final String DEFAULT_CONTENT_TYPE = "application/octet-stream";
 
-  public AbstractDockerLayerPullProtocolMethodHandler(
+  protected AbstractDockerLayerPullProtocolMethodHandler(
       final PathParser basePathParser,
-      final DockerProtocolFacade<ID> dockerFacade,
+      final DockerProtocolFacade<I> dockerFacade,
       final DockerProtocolProvider provider) {
     super(
         HandlerRoute.of(Permission.READ, HttpMethod.GET),

@@ -54,8 +54,8 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 
-public abstract class AbstractDockerManifestPushProtocolMethodHandler<ID>
-    extends AbstractFacadeProtocolMethodHandler<DockerProtocolFacade<ID>>
+public abstract class AbstractDockerManifestPushProtocolMethodHandler<I>
+    extends AbstractFacadeProtocolMethodHandler<DockerProtocolFacade<I>>
     implements DockerPathParserManifest {
 
   private static final String MANIFEST_JSON = "manifestJson";
@@ -65,15 +65,15 @@ public abstract class AbstractDockerManifestPushProtocolMethodHandler<ID>
   private static final int MAX_IMAGE_RECREATIONS = 20;
   private static final long WAIT_RETRY = 100;
 
-  private final ImageService<ID> imageTxService;
-  private final AbstractDockerLayerRenamer<ID> layerRenamer;
+  private final ImageService<I> imageTxService;
+  private final AbstractDockerLayerRenamer<I> layerRenamer;
 
-  public AbstractDockerManifestPushProtocolMethodHandler(
+  protected AbstractDockerManifestPushProtocolMethodHandler(
       final PathParser basePathParser,
-      final DockerProtocolFacade<ID> dockerFacade,
+      final DockerProtocolFacade<I> dockerFacade,
       final DockerProtocolProvider provider,
-      final AbstractDockerLayerRenamer<ID> layerRenamer,
-      final ImageService<ID> imageService) {
+      final AbstractDockerLayerRenamer<I> layerRenamer,
+      final ImageService<I> imageService) {
 
     super(
         HandlerRoute.of(Permission.WRITE, HttpMethod.PUT)
@@ -95,7 +95,7 @@ public abstract class AbstractDockerManifestPushProtocolMethodHandler<ID>
       final HttpServletResponse response)
       throws NoSuchAlgorithmException, IOException {
 
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     final var relativePath = ProtocolContextUtils.getRelativePath(context).getPath();
     final var matcher = MANIFEST_PUSH_PATTERN.matcher(relativePath);
 
@@ -221,13 +221,15 @@ public abstract class AbstractDockerManifestPushProtocolMethodHandler<ID>
    * retry inside its transaction (a retry annotation on the service, which nothing enabled anyway)
    * would reuse the failed persistence context and could never succeed.
    */
-  private SavedManifest<ID> saveManifest(
+  private SavedManifest<I> saveManifest(
       final ProtocolContext context, final String imageName, final ManifestForm form)
       throws IOException {
 
     var recreations = 0;
 
-    for (var attempt = 1; ; ) {
+    var attempt = 1;
+
+    while (true) {
       try {
         return this.facade.saveManifest(context, imageName, form);
       } catch (final ImageDeletedException e) {

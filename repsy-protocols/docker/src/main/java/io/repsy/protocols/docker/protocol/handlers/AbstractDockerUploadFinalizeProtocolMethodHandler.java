@@ -40,19 +40,19 @@ import org.springframework.http.HttpMethod;
  * The Docker upload finalize: appends the request body, verifies the digest against the stored
  * bytes and records the layer (retrying a concurrent first insert).
  */
-public abstract class AbstractDockerUploadFinalizeProtocolMethodHandler<ID>
-    extends AbstractOciUploadFinalizeProtocolMethodHandler<DockerProtocolFacade<ID>> {
+public abstract class AbstractDockerUploadFinalizeProtocolMethodHandler<I>
+    extends AbstractOciUploadFinalizeProtocolMethodHandler<DockerProtocolFacade<I>> {
 
   private static final int RETRY_COUNT = 3;
 
   private static final long WAIT_RETRY = 100;
 
-  private final LayerService<ID> layerService;
+  private final LayerService<I> layerService;
 
-  public AbstractDockerUploadFinalizeProtocolMethodHandler(
+  protected AbstractDockerUploadFinalizeProtocolMethodHandler(
       final PathParser basePathParser,
-      final DockerProtocolFacade<ID> dockerFacade,
-      final LayerService<ID> layerService,
+      final DockerProtocolFacade<I> dockerFacade,
+      final LayerService<I> layerService,
       final DockerProtocolProvider provider) {
     super(
         HandlerRoute.of(Permission.WRITE, HttpMethod.PUT).skipHeaderPreProcessor(true),
@@ -71,7 +71,7 @@ public abstract class AbstractDockerUploadFinalizeProtocolMethodHandler<ID>
       final String digest)
       throws IOException {
 
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     final var uploadPath = DockerUploadPaths.of(uploadId);
 
     if (request.getContentLength() > 0) {
@@ -122,7 +122,7 @@ public abstract class AbstractDockerUploadFinalizeProtocolMethodHandler<ID>
 
   @SneakyThrows
   private LayerInfo findOrCreateLayer(
-      final ID repoId, final LayerForm layerForm, final int counter) {
+      final I repoId, final LayerForm layerForm, final int counter) {
 
     try {
       return this.layerService.getOrCreate(layerForm, repoId);

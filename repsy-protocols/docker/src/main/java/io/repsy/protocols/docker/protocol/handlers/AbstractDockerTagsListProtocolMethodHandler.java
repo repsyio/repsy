@@ -44,14 +44,14 @@ import org.springframework.http.ResponseEntity;
  * until it is gone. Like the manifest pull it needs {@link Permission#READ}: a public repo answers
  * anonymously, a private one challenges with a {@code pull} scope.
  */
-public abstract class AbstractDockerTagsListProtocolMethodHandler<ID>
-    extends AbstractFacadeProtocolMethodHandler<DockerProtocolFacade<ID>> {
+public abstract class AbstractDockerTagsListProtocolMethodHandler<I>
+    extends AbstractFacadeProtocolMethodHandler<DockerProtocolFacade<I>> {
 
   private static final Pattern TAGS_LIST_PATTERN = Pattern.compile("^/([^/]+)/tags/list$");
 
-  public AbstractDockerTagsListProtocolMethodHandler(
+  protected AbstractDockerTagsListProtocolMethodHandler(
       final PathParser basePathParser,
-      final DockerProtocolFacade<ID> dockerFacade,
+      final DockerProtocolFacade<I> dockerFacade,
       final DockerProtocolProvider provider) {
     super(
         HandlerRoute.of(Permission.READ, HttpMethod.GET)

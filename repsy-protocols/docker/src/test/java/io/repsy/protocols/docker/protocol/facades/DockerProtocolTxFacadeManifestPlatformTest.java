@@ -273,10 +273,10 @@ class DockerProtocolTxFacadeManifestPlatformTest {
     this.stubConfigLayer();
     this.stubBlob(CONFIG_DIGEST, "not json");
 
-    assertThatThrownBy(
-            () ->
-                this.facade.saveManifest(
-                    newContext(), IMAGE_NAME, formFor(MANIFEST, imageManifest(IMAGE_CONFIG))))
+    final var context = newContext();
+    final var form = formFor(MANIFEST, imageManifest(IMAGE_CONFIG));
+
+    assertThatThrownBy(() -> this.facade.saveManifest(context, IMAGE_NAME, form))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("manifestConfigInvalid");
     verify(this.dockerStorageService, never()).writeInputStreamToPath(any(), any(), any());
@@ -289,10 +289,10 @@ class DockerProtocolTxFacadeManifestPlatformTest {
     this.stubConfigLayer();
     this.stubBlob(CONFIG_DIGEST, "{\"os\":\"linux\"}");
 
-    assertThatThrownBy(
-            () ->
-                this.facade.saveManifest(
-                    newContext(), IMAGE_NAME, formFor(MANIFEST, imageManifest(IMAGE_CONFIG))))
+    final var context = newContext();
+    final var form = formFor(MANIFEST, imageManifest(IMAGE_CONFIG));
+
+    assertThatThrownBy(() -> this.facade.saveManifest(context, IMAGE_NAME, form))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("manifestConfigInvalid");
     verify(this.dockerStorageService, never()).writeInputStreamToPath(any(), any(), any());
@@ -305,10 +305,10 @@ class DockerProtocolTxFacadeManifestPlatformTest {
     this.stubConfigLayer();
     this.stubBlob(CONFIG_DIGEST, "{\"os\":\" \",\"architecture\":\"arm64\"}");
 
-    assertThatThrownBy(
-            () ->
-                this.facade.saveManifest(
-                    newContext(), IMAGE_NAME, formFor(MANIFEST, imageManifest(IMAGE_CONFIG))))
+    final var context = newContext();
+    final var form = formFor(MANIFEST, imageManifest(IMAGE_CONFIG));
+
+    assertThatThrownBy(() -> this.facade.saveManifest(context, IMAGE_NAME, form))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("manifestConfigInvalid");
   }
@@ -320,10 +320,10 @@ class DockerProtocolTxFacadeManifestPlatformTest {
     when(this.layerService.findLayerInfoByRepoIdAndDigest(REPO_ID, CONFIG_DIGEST))
         .thenReturn(Optional.empty());
 
-    assertThatThrownBy(
-            () ->
-                this.facade.saveManifest(
-                    newContext(), IMAGE_NAME, formFor(MANIFEST, imageManifest(IMAGE_CONFIG))))
+    final var context = newContext();
+    final var form = formFor(MANIFEST, imageManifest(IMAGE_CONFIG));
+
+    assertThatThrownBy(() -> this.facade.saveManifest(context, IMAGE_NAME, form))
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessage("layerNotFound");
   }
@@ -357,8 +357,10 @@ class DockerProtocolTxFacadeManifestPlatformTest {
   void saveManifestRefusesAnUnsupportedContentType() {
     this.stubImage();
 
-    assertThatThrownBy(
-            () -> this.facade.saveManifest(newContext(), IMAGE_NAME, formFor("text/plain", "{}")))
+    final var context = newContext();
+    final var form = formFor("text/plain", "{}");
+
+    assertThatThrownBy(() -> this.facade.saveManifest(context, IMAGE_NAME, form))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("manifestMediaTypeUnsupported");
   }
@@ -383,7 +385,9 @@ class DockerProtocolTxFacadeManifestPlatformTest {
     when(this.layerService.findLayerInfoByRepoIdAndDigest(REPO_ID, LAYER_DIGEST))
         .thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> this.facade.getLayer(newContext(), LAYER_DIGEST, "/v2/x/blobs/y"))
+    final var context = newContext();
+
+    assertThatThrownBy(() -> this.facade.getLayer(context, LAYER_DIGEST, "/v2/x/blobs/y"))
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessage("layerNotFound");
   }
@@ -396,7 +400,9 @@ class DockerProtocolTxFacadeManifestPlatformTest {
         .thenReturn(Optional.of(layer));
     when(this.dockerStorageService.existsResource(any(), eq(REPO_NAME))).thenReturn(false);
 
-    assertThatThrownBy(() -> this.facade.getLayer(newContext(), LAYER_DIGEST, "/v2/x/blobs/y"))
+    final var context = newContext();
+
+    assertThatThrownBy(() -> this.facade.getLayer(context, LAYER_DIGEST, "/v2/x/blobs/y"))
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessage("layerNotFound");
   }

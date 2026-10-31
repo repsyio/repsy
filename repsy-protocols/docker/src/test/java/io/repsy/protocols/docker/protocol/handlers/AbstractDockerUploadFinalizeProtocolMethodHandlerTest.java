@@ -157,10 +157,11 @@ class AbstractDockerUploadFinalizeProtocolMethodHandlerTest {
         .when(this.dockerFacade)
         .verifyLayerDigest(eq(this.context), uploadPath(), eq(DIGEST));
 
-    assertThatThrownBy(
-            () ->
-                this.handler()
-                    .handle(this.context, request(new byte[0]), new MockHttpServletResponse()))
+    final var handler = this.handler();
+    final var request = request(new byte[0]);
+    final var response = new MockHttpServletResponse();
+
+    assertThatThrownBy(() -> handler.handle(this.context, request, response))
         .isInstanceOf(BadRequestException.class);
 
     verify(this.layerService, never()).getOrCreate(any(), any());

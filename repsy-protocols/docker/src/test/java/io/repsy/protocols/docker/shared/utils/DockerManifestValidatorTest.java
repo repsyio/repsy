@@ -315,8 +315,9 @@ class DockerManifestValidatorTest {
     final var config =
         "{\"mediaType\":\"" + longMediaType + "\",\"digest\":\"sha256:c\",\"size\":2}";
 
-    assertThatThrownBy(
-            () -> DockerManifestValidator.validate(type, image(config, "[" + LAYER + "]")))
+    final var body = image(config, "[" + LAYER + "]");
+
+    assertThatThrownBy(() -> DockerManifestValidator.validate(type, body))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("dockerMediaTypeTooLong");
   }
@@ -346,7 +347,9 @@ class DockerManifestValidatorTest {
     final var entry =
         "{\"digest\":\"sha256:m\",\"size\":9,\"mediaType\":\"" + longMediaType + "\"}";
 
-    assertThatThrownBy(() -> DockerManifestValidator.validate(type, index("[" + entry + "]")))
+    final var body = index("[" + entry + "]");
+
+    assertThatThrownBy(() -> DockerManifestValidator.validate(type, body))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("dockerMediaTypeTooLong");
   }
@@ -362,7 +365,9 @@ class DockerManifestValidatorTest {
             + longVariant
             + "\"}}";
 
-    assertThatThrownBy(() -> DockerManifestValidator.validate(type, index("[" + entry + "]")))
+    final var body = index("[" + entry + "]");
+
+    assertThatThrownBy(() -> DockerManifestValidator.validate(type, body))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("dockerPlatformTooLong");
   }

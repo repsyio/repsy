@@ -170,15 +170,15 @@ class AbstractDockerProtocolTxFacadeTest {
 
   @Test
   @DisplayName("verifyLayerDigest() accepts an upload that hashes to the claimed digest")
-  void verifyLayerDigestAcceptsAMatch() throws Exception {
+  void verifyLayerDigestAcceptsAMatch() throws NoSuchAlgorithmException {
     final var bytes = "layer bytes".getBytes(StandardCharsets.UTF_8);
     this.uploadHolds(bytes);
+    final var facade = this.facade();
+    final var context = newContext();
+    final var path = new RelativePath("/blobs/upload-id");
+    final var digest = sha256Of(bytes);
 
-    assertThatCode(
-            () ->
-                this.facade()
-                    .verifyLayerDigest(
-                        newContext(), new RelativePath("/blobs/upload-id"), sha256Of(bytes)))
+    assertThatCode(() -> facade.verifyLayerDigest(context, path, digest))
         .doesNotThrowAnyException();
   }
 
@@ -188,10 +188,11 @@ class AbstractDockerProtocolTxFacadeTest {
     this.uploadHolds("layer bytes".getBytes(StandardCharsets.UTF_8));
     final var claimed = sha256Of("other bytes".getBytes(StandardCharsets.UTF_8));
 
-    assertThatThrownBy(
-            () ->
-                this.facade()
-                    .verifyLayerDigest(newContext(), new RelativePath("/blobs/upload-id"), claimed))
+    final var facade = this.facade();
+    final var context = newContext();
+    final var path = new RelativePath("/blobs/upload-id");
+
+    assertThatThrownBy(() -> facade.verifyLayerDigest(context, path, claimed))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("digestMismatch");
   }
@@ -229,8 +230,11 @@ class AbstractDockerProtocolTxFacadeTest {
             eq(REPO_NAME)))
         .thenReturn(Optional.empty());
 
-    assertThatThrownBy(
-            () -> this.facade().getUploadSize(newContext(), new RelativePath("/blobs/upload-id")))
+    final var facade = this.facade();
+    final var context = newContext();
+    final var path = new RelativePath("/blobs/upload-id");
+
+    assertThatThrownBy(() -> facade.getUploadSize(context, path))
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessage("resourceNotFound");
   }
@@ -436,7 +440,10 @@ class AbstractDockerProtocolTxFacadeTest {
     final var reference = algorithm + ":" + "0".repeat("sha256".equals(algorithm) ? 64 : 128);
     final var form = formFor(reference, "{}".getBytes(StandardCharsets.UTF_8));
 
-    assertThatThrownBy(() -> this.facade().saveManifest(newContext(), IMAGE_NAME, form))
+    final var facade = this.facade();
+    final var context = newContext();
+
+    assertThatThrownBy(() -> facade.saveManifest(context, IMAGE_NAME, form))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("digestMismatch");
     verify(this.dockerStorageService, never()).writeInputStreamToPath(any(), any(), any());
@@ -456,8 +463,10 @@ class AbstractDockerProtocolTxFacadeTest {
         .thenReturn(
             Optional.of(BaseTagDetail.<UUID>builder().digest("sha256:" + "1".repeat(64)).build()));
 
-    assertThatThrownBy(
-            () -> this.facade().saveManifest(context, IMAGE_NAME, formFor("latest", bytes)))
+    final var facade = this.facade();
+    final var form = formFor("latest", bytes);
+
+    assertThatThrownBy(() -> facade.saveManifest(context, IMAGE_NAME, form))
         .isInstanceOf(AccessNotAllowedException.class)
         .hasMessage("packageOverrideDisabled");
     verify(this.dockerStorageService, never()).writeInputStreamToPath(any(), any(), any());
@@ -490,9 +499,11 @@ class AbstractDockerProtocolTxFacadeTest {
         .when(this.layerService)
         .isAllExistsByRepoIdAndDigests(any(), any());
 
-    assertThatThrownBy(
-            () -> this.facade().saveManifest(newContext(), IMAGE_NAME, formFor(digest, bytes)))
-        .hasMessage("stop");
+    final var facade = this.facade();
+    final var context = newContext();
+    final var form = formFor(digest, bytes);
+
+    assertThatThrownBy(() -> facade.saveManifest(context, IMAGE_NAME, form)).hasMessage("stop");
 
     final var captor = org.mockito.ArgumentCaptor.<List<String>>captor();
     verify(this.layerService).isAllExistsByRepoIdAndDigests(eq(REPO_ID), captor.capture());
@@ -523,11 +534,12 @@ class AbstractDockerProtocolTxFacadeTest {
     when(this.manifestService.findActiveTagByNameAndRepoAndImage(REPO_ID, IMAGE_NAME, "missing"))
         .thenReturn(Optional.empty());
 
+    final var facade = this.facade();
+
     assertThatThrownBy(
             () ->
-                this.facade()
-                    .getManifest(
-                        context, "missing", IMAGE_NAME, "/v2/images/app/manifests/missing"))
+                facade.getManifest(
+                    context, "missing", IMAGE_NAME, "/v2/images/app/manifests/missing"))
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessage("tagNotFound");
   }
@@ -551,7 +563,10 @@ class AbstractDockerProtocolTxFacadeTest {
     when(this.imageService.getImageInfoByRepoIdAndName(REPO_ID, IMAGE_NAME))
         .thenThrow(new ItemNotFoundException("imageNotFound"));
 
-    assertThatThrownBy(() -> this.facade().listTags(newContext(), IMAGE_NAME, null, null))
+    final var facade = this.facade();
+    final var context = newContext();
+
+    assertThatThrownBy(() -> facade.listTags(context, IMAGE_NAME, null, null))
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessage("imageNotFound");
   }

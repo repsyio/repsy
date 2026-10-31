@@ -132,14 +132,15 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
 
   @Test
   @DisplayName("answers 401 with a challenge when the credentials are wrong")
-  void wrongCredentials() throws Exception {
+  void wrongCredentials() {
     when(this.authService.authenticateUserDockerCli(AUTH_HEADER, List.of()))
         .thenThrow(new UnAuthorizedException("unAuthorized"));
 
-    assertThatThrownBy(
-            () ->
-                this.handler.handle(
-                    new ProtocolContext(), this.tokenRequest(), new MockHttpServletResponse()))
+    final var context = new ProtocolContext();
+    final var request = this.tokenRequest();
+    final var response = new MockHttpServletResponse();
+
+    assertThatThrownBy(() -> this.handler.handle(context, request, response))
         .satisfies(e -> expectChallenge(e, "unAuthorized"));
   }
 
@@ -157,14 +158,15 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
 
   @Test
   @DisplayName("keeps the cause the credential check named, an expired deploy token (RPS-1435)")
-  void expiredDeployTokenKeepsItsCause() throws Exception {
+  void expiredDeployTokenKeepsItsCause() {
     when(this.authService.authenticateUserDockerCli(AUTH_HEADER, List.of()))
         .thenThrow(new UnAuthorizedException("deployTokenExpired"));
 
-    assertThatThrownBy(
-            () ->
-                this.handler.handle(
-                    new ProtocolContext(), this.tokenRequest(), new MockHttpServletResponse()))
+    final var context = new ProtocolContext();
+    final var request = this.tokenRequest();
+    final var response = new MockHttpServletResponse();
+
+    assertThatThrownBy(() -> this.handler.handle(context, request, response))
         .satisfies(e -> expectChallenge(e, "deployTokenExpired"));
   }
 
@@ -179,10 +181,11 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
     when(this.authService.authenticateUserDockerCli(AUTH_HEADER, List.of()))
         .thenThrow(new IllegalStateException("database is down"));
 
-    assertThatThrownBy(
-            () ->
-                this.handler.handle(
-                    new ProtocolContext(), this.tokenRequest(), new MockHttpServletResponse()))
+    final var context = new ProtocolContext();
+    final var request = this.tokenRequest();
+    final var response = new MockHttpServletResponse();
+
+    assertThatThrownBy(() -> this.handler.handle(context, request, response))
         .isInstanceOf(IllegalStateException.class)
         .hasMessage("database is down");
   }
@@ -193,10 +196,11 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
     when(this.authService.authenticateUserDockerCli(AUTH_HEADER, List.of()))
         .thenThrow(new TooManyRequestsException(42));
 
-    assertThatThrownBy(
-            () ->
-                this.handler.handle(
-                    new ProtocolContext(), this.tokenRequest(), new MockHttpServletResponse()))
+    final var context = new ProtocolContext();
+    final var request = this.tokenRequest();
+    final var response = new MockHttpServletResponse();
+
+    assertThatThrownBy(() -> this.handler.handle(context, request, response))
         .isInstanceOfSatisfying(
             TooManyRequestsException.class,
             ex -> assertThat(ex.getRetryAfterSeconds()).isEqualTo(42));
@@ -238,7 +242,7 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
 
   @Test
   @DisplayName("answers 401 with a challenge, and no token, when the repo is not public")
-  void noAnonymousTokenForPrivateRepo() throws Exception {
+  void noAnonymousTokenForPrivateRepo() {
     final var repo = repo(true);
     doReturn(Optional.of(repo)).when(this.scopeParser).findRepoInfoByScope(PULL_SCOPE);
     doThrow(new ItemNotFoundException("repoNotFound"))
@@ -271,7 +275,7 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
         "repository:repo/app:DELETE"
       })
   @DisplayName("a delete scope is never anonymous, even for a public repo (RPS-1216)")
-  void deleteScopeNeedsCredentials(final String scope) throws Exception {
+  void deleteScopeNeedsCredentials(final String scope) {
     assertThatThrownBy(
             () ->
                 this.handler.handle(
@@ -345,7 +349,7 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
   @DisplayName(
       "grant_type=password with a wrong password answers 401 and never hands out an anonymous "
           + "token")
-  void passwordGrantWithWrongPasswordIsRefused() throws Exception {
+  void passwordGrantWithWrongPasswordIsRefused() {
     when(this.authService.authenticateUserDockerCli(PASSWORD_GRANT_BASIC_HEADER, PULL_GRANTS))
         .thenThrow(new UnAuthorizedException("unAuthorized"));
 
@@ -486,7 +490,7 @@ class AbstractDockerTokenProtocolMethodHandlerTest {
 
   @Test
   @DisplayName("the placeholder next to a private pull scope is not an anonymous token")
-  void placeholderNextToPrivatePull() throws Exception {
+  void placeholderNextToPrivatePull() {
     final var repo = repo(true);
     doReturn(Optional.of(repo))
         .when(this.scopeParser)

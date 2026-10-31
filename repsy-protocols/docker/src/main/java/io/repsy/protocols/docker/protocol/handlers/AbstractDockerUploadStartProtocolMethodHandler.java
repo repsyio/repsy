@@ -26,6 +26,7 @@ import io.repsy.protocols.shared.http.PublicUrls;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import io.repsy.protocols.shared.utils.BlobDigests;
 import jakarta.servlet.http.HttpServletRequest;
+import java.util.Objects;
 import java.util.UUID;
 import org.springframework.http.HttpMethod;
 
@@ -38,7 +39,7 @@ public abstract class AbstractDockerUploadStartProtocolMethodHandler
 
   private static final String DIGEST_ALGORITHM_PARAMETER = "digest-algorithm";
 
-  public AbstractDockerUploadStartProtocolMethodHandler(
+  protected AbstractDockerUploadStartProtocolMethodHandler(
       final PathParser basePathParser, final DockerProtocolProvider provider) {
     super(
         HandlerRoute.of(Permission.WRITE, HttpMethod.POST).skipHeaderPreProcessor(true),
@@ -64,7 +65,8 @@ public abstract class AbstractDockerUploadStartProtocolMethodHandler
 
   @Override
   protected String uploadLocation(final HttpServletRequest request, final UUID uploadId) {
-    final var requestPath = request.getRequestURI();
+    final var requestPath =
+        Objects.requireNonNull(request.getRequestURI(), "the request has no URI");
     final var end = requestPath.endsWith("/") ? requestPath.length() - 1 : requestPath.length();
 
     return PublicUrls.origin(request) + requestPath.substring(0, end) + "/" + uploadId;

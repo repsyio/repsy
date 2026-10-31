@@ -243,9 +243,11 @@ class AbstractDockerTagsListProtocolMethodHandlerTest {
   void refusesAnInvalidN(final String n) {
     final var context = contextFor("/app/tags/list");
 
-    assertThatThrownBy(
-            () ->
-                this.handler().handle(context, requestWith("n", n), new MockHttpServletResponse()))
+    final var handler = this.handler();
+    final var request = requestWith("n", n);
+    final var response = new MockHttpServletResponse();
+
+    assertThatThrownBy(() -> handler.handle(context, request, response))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("paginationNumberInvalid");
     verifyNoInteractions(this.dockerFacade);
@@ -258,8 +260,11 @@ class AbstractDockerTagsListProtocolMethodHandlerTest {
     when(this.dockerFacade.listTags(context, "app", null, null))
         .thenThrow(new ItemNotFoundException("imageNotFound"));
 
-    assertThatThrownBy(
-            () -> this.handler().handle(context, requestWith(), new MockHttpServletResponse()))
+    final var handler = this.handler();
+    final var request = requestWith();
+    final var response = new MockHttpServletResponse();
+
+    assertThatThrownBy(() -> handler.handle(context, request, response))
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessage("imageNotFound");
   }

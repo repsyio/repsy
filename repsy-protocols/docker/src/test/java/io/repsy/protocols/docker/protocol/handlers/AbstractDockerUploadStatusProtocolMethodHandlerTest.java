@@ -137,13 +137,11 @@ class AbstractDockerUploadStatusProtocolMethodHandlerTest {
             argThat(path -> path != null && path.getPath().equals("/blobs/" + SESSION_ID))))
         .thenThrow(new ItemNotFoundException("resourceNotFound"));
 
-    assertThatThrownBy(
-            () ->
-                this.handler()
-                    .handle(
-                        context,
-                        new MockHttpServletRequest("GET", UPLOAD_URI),
-                        new MockHttpServletResponse()))
+    final var handler = this.handler();
+    final var request = new MockHttpServletRequest("GET", UPLOAD_URI);
+    final var response = new MockHttpServletResponse();
+
+    assertThatThrownBy(() -> handler.handle(context, request, response))
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessage("resourceNotFound");
   }

@@ -21,8 +21,8 @@ import lombok.experimental.SuperBuilder;
 
 @Data
 @SuperBuilder
-public class BaseImageInfo<ID> {
-  private ID id;
+public class BaseImageInfo<I> {
+  private I id;
   private String name;
   private String digest;
   private String repoName;

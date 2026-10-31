@@ -17,17 +17,17 @@ package io.repsy.protocols.docker.shared.image.services;
 
 import io.repsy.protocols.docker.shared.image.dtos.BaseImageInfo;
 
-public interface ImageService<ID> {
+public interface ImageService<I> {
 
-  BaseImageInfo<ID> getOrCreateImage(ID repoId, String imageName);
+  BaseImageInfo<I> getOrCreateImage(I repoId, String imageName);
 
-  BaseImageInfo<ID> getImageInfoByRepoIdAndName(ID repoId, String imageName);
+  BaseImageInfo<I> getImageInfoByRepoIdAndName(I repoId, String imageName);
 
   /**
    * Recomputes the size and the digest the image is listed with from the tags it has now: the size
    * of the layers the tagged manifests reach, and the digest of the most recently moved tag.
    */
-  void refreshImageSize(ID repoId, ID imageId);
+  void refreshImageSize(I repoId, I imageId);
 
-  void deleteImage(ID repoId, String imageName);
+  void deleteImage(I repoId, String imageName);
 }
