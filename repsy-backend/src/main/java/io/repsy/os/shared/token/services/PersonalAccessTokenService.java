@@ -158,7 +158,7 @@ public class PersonalAccessTokenService {
   @Transactional
   public AccessTokenCreated createToken(final UUID userId, final AccessTokenForm form) {
 
-    return this.createToken(userId, form, EnumSet.allOf(TokenScope.class));
+    return this.mintToken(userId, form, EnumSet.allOf(TokenScope.class));
   }
 
   /**
@@ -172,6 +172,12 @@ public class PersonalAccessTokenService {
    */
   @Transactional
   public AccessTokenCreated createToken(
+      final UUID userId, final AccessTokenForm form, final Set<TokenScope> grantable) {
+
+    return this.mintToken(userId, form, grantable);
+  }
+
+  private AccessTokenCreated mintToken(
       final UUID userId, final AccessTokenForm form, final Set<TokenScope> grantable) {
 
     final var now = this.now();

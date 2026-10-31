@@ -118,24 +118,7 @@ public class DockerManifestLayoutRepairService {
   }
 
   /** The file of a manifest, found under one of its candidate names, and what it holds. */
-  private static final class LocatedFile {
-
-    private final String name;
-    private final byte[] bytes;
-
-    private LocatedFile(final String name, final byte[] bytes) {
-      this.name = name;
-      this.bytes = bytes;
-    }
-
-    private String name() {
-      return this.name;
-    }
-
-    private byte[] bytes() {
-      return this.bytes;
-    }
-  }
+  private record LocatedFile(String name, byte[] bytes) {}
 
   public RepairReport repair() {
 

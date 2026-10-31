@@ -26,58 +26,49 @@ import java.util.UUID;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingConstants;
-import org.mapstruct.Mappings;
 
 @Mapper(componentModel = MappingConstants.ComponentModel.SPRING, uses = CargoJsonMapper.class)
 public interface CargoCrateMapper {
 
-  @Mappings({
-    @Mapping(target = "authors", source = "authors", qualifiedByName = "authorsToStrings"),
-    @Mapping(target = "keywords", source = "keywords", qualifiedByName = "keywordsToStrings"),
-    @Mapping(target = "categories", source = "categories", qualifiedByName = "categoriesToStrings"),
-    @Mapping(target = "originalName", source = "originalName"),
-    @Mapping(target = "maxVersion", source = "maxVersion"),
-    @Mapping(target = "totalDownloads", source = "totalDownloads")
-  })
+  @Mapping(target = "authors", source = "authors", qualifiedByName = "authorsToStrings")
+  @Mapping(target = "keywords", source = "keywords", qualifiedByName = "keywordsToStrings")
+  @Mapping(target = "categories", source = "categories", qualifiedByName = "categoriesToStrings")
+  @Mapping(target = "originalName", source = "originalName")
+  @Mapping(target = "maxVersion", source = "maxVersion")
+  @Mapping(target = "totalDownloads", source = "totalDownloads")
   BaseCrateInfo<UUID> toCrateInfo(CargoCrate crate);
 
-  @Mappings({
-    @Mapping(target = "crateId", source = "meta.crate.id"),
-    @Mapping(target = "name", source = "meta.crate.name"),
-    @Mapping(target = "version", source = "meta.version"),
-    @Mapping(target = "readme", source = "meta.readme"),
-    @Mapping(target = "license", source = "meta.license"),
-    @Mapping(target = "licenseFile", source = "meta.licenseFile"),
-    @Mapping(target = "documentation", source = "meta.documentation"),
-    @Mapping(target = "edition", source = "meta.edition"),
-    @Mapping(target = "rustVersion", source = "meta.rustVersion"),
-    @Mapping(target = "deps", source = "index.deps", qualifiedByName = "jsonToDeps"),
-    @Mapping(target = "downloads", source = "meta.downloads"),
-    @Mapping(target = "hasLib", source = "crate.hasLib"),
-    @Mapping(target = "yanked", source = "index.yanked"),
-    @Mapping(target = "createdAt", source = "meta.createdAt")
-  })
+  @Mapping(target = "crateId", source = "meta.crate.id")
+  @Mapping(target = "name", source = "meta.crate.name")
+  @Mapping(target = "version", source = "meta.version")
+  @Mapping(target = "readme", source = "meta.readme")
+  @Mapping(target = "license", source = "meta.license")
+  @Mapping(target = "licenseFile", source = "meta.licenseFile")
+  @Mapping(target = "documentation", source = "meta.documentation")
+  @Mapping(target = "edition", source = "meta.edition")
+  @Mapping(target = "rustVersion", source = "meta.rustVersion")
+  @Mapping(target = "deps", source = "index.deps", qualifiedByName = "jsonToDeps")
+  @Mapping(target = "downloads", source = "meta.downloads")
+  @Mapping(target = "hasLib", source = "crate.hasLib")
+  @Mapping(target = "yanked", source = "index.yanked")
+  @Mapping(target = "createdAt", source = "meta.createdAt")
   BaseCrateVersionInfo<UUID> toCrateVersionInfo(
       CargoCrate crate, CargoCrateMeta meta, CargoCrateIndex index);
 
-  @Mappings({
-    @Mapping(target = "name", source = "crate.originalName"),
-    @Mapping(target = "vers", source = "vers"),
-    @Mapping(target = "deps", source = "deps", qualifiedByName = "jsonToDeps"),
-    @Mapping(target = "cksum", source = "cksum"),
-    @Mapping(target = "features", source = "features", qualifiedByName = "jsonToFeatures"),
-    @Mapping(target = "yanked", source = "yanked"),
-    @Mapping(target = "links", source = "links"),
-    @Mapping(target = "v", source = "v"),
-    @Mapping(target = "features2", source = "features2", qualifiedByName = "jsonToFeatures2"),
-    @Mapping(target = "rustVersion", source = "rustVersion")
-  })
+  @Mapping(target = "name", source = "crate.originalName")
+  @Mapping(target = "vers", source = "vers")
+  @Mapping(target = "deps", source = "deps", qualifiedByName = "jsonToDeps")
+  @Mapping(target = "cksum", source = "cksum")
+  @Mapping(target = "features", source = "features", qualifiedByName = "jsonToFeatures")
+  @Mapping(target = "yanked", source = "yanked")
+  @Mapping(target = "links", source = "links")
+  @Mapping(target = "v", source = "v")
+  @Mapping(target = "features2", source = "features2", qualifiedByName = "jsonToFeatures2")
+  @Mapping(target = "rustVersion", source = "rustVersion")
   CrateIndexEntry toCrateIndexEntry(CargoCrateIndex index);
 
-  @Mappings({
-    @Mapping(target = "downloads", source = "totalDownloads"),
-    @Mapping(target = "updatedAt", source = "lastUpdatedAt")
-  })
+  @Mapping(target = "downloads", source = "totalDownloads")
+  @Mapping(target = "updatedAt", source = "lastUpdatedAt")
   io.repsy.os.generated.model.CrateListItem toCrateListItemDto(
       io.repsy.protocols.cargo.shared.crate.dtos.CrateListItem source);
 

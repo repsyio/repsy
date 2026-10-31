@@ -36,9 +36,23 @@ public class NuGetPublicUrlResolver implements NuGetBaseUrlResolver {
 
   public NuGetPublicUrlResolver(@Value("${repsy.nuget.public-url:}") final String publicUrl) {
 
-    final var stripped = publicUrl.strip().replaceAll("/+$", "");
+    final var stripped = stripTrailingSlashes(publicUrl.strip());
 
     this.publicUrl = stripped.isEmpty() ? null : stripped;
+  }
+
+  /**
+   * Drops the trailing slashes; a loop, because the regex {@code /+$} backtracks super-linearly.
+   */
+  private static String stripTrailingSlashes(final String value) {
+
+    var end = value.length();
+
+    while (end > 0 && value.charAt(end - 1) == '/') {
+      end--;
+    }
+
+    return value.substring(0, end);
   }
 
   @Override

@@ -74,7 +74,7 @@ public class Manifest {
    * DockerManifestLayoutRepairService} fills it from the stored file.
    */
   @Column(name = "digest_sha512")
-  private String digestSha512;
+  private @Nullable String digestSha512;
 
   /**
    * The reference the file name of a manifest stored by an earlier version was generated from (see

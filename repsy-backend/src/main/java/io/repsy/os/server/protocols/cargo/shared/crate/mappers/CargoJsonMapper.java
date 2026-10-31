@@ -76,7 +76,7 @@ public class CargoJsonMapper {
       }
 
       return this.objectMapper.readValue(json, new TypeReference<>() {});
-    } catch (final JacksonIOException e) {
+    } catch (final JacksonIOException _) {
       return List.of();
     }
   }
@@ -90,7 +90,7 @@ public class CargoJsonMapper {
       }
 
       return this.objectMapper.readValue(json, new TypeReference<>() {});
-    } catch (final JacksonIOException e) {
+    } catch (final JacksonIOException _) {
       return Collections.emptyMap();
     }
   }
@@ -104,7 +104,7 @@ public class CargoJsonMapper {
       }
 
       return this.objectMapper.readValue(json, new TypeReference<>() {});
-    } catch (final JacksonIOException e) {
+    } catch (final JacksonIOException _) {
       return null;
     }
   }

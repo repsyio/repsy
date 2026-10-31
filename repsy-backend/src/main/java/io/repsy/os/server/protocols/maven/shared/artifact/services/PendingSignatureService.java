@@ -55,7 +55,7 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
@@ -109,7 +109,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  * row earlier, and it fails.
  */
 @Slf4j
-@Component
+@Service
 public class PendingSignatureService {
 
   /** What a check does with the signatures it finds. */
@@ -213,7 +213,7 @@ public class PendingSignatureService {
 
     try {
       this.upsert(repoId, signedFilePath, armored, keyId);
-    } catch (final DataIntegrityViolationException e) {
+    } catch (final DataIntegrityViolationException _) {
       // Two signatures of one file raced to insert it: the second one replaces the first.
       log.debug("Pending signature of {} was inserted concurrently, replacing it", signedFilePath);
       this.upsert(repoId, signedFilePath, armored, keyId);

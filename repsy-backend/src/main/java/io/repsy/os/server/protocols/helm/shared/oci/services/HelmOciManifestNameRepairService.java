@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.helm.shared.oci.services;
 
 import io.repsy.os.server.protocols.helm.shared.chart.services.HelmChartService;
+import io.repsy.os.server.protocols.helm.shared.oci.entities.HelmOciManifest;
 import io.repsy.os.server.protocols.helm.shared.oci.repositories.HelmOciManifestMismatch;
 import io.repsy.os.server.protocols.helm.shared.oci.repositories.HelmOciManifestRepository;
 import io.repsy.os.server.protocols.helm.shared.storage.services.HelmStorageService;
@@ -87,15 +88,7 @@ public class HelmOciManifestNameRepairService {
     final var fileMoves = new ArrayList<PendingFileMove>();
 
     for (final var mismatch : mismatches) {
-      // The chart first, as a push and a delete take it (RPS-1365), and before the manifest and the
-      // manifest it would collide with are read: the runner starts after the web server, so a push
-      // or a delete of this chart can be running, and what it commits is then what is repaired
-      // (RPS-1392). A chart deleted since the list was read has no manifests left to repair.
-      if (!this.helmChartService.lockChartIfPresent(mismatch.repoId(), mismatch.chartName())) {
-        continue;
-      }
-
-      final var manifest = this.helmOciManifestRepository.findById(mismatch.id()).orElse(null);
+      final var manifest = this.lockChartAndFindManifest(mismatch);
       if (manifest == null) {
         continue;
       }
@@ -133,6 +126,22 @@ public class HelmOciManifestNameRepairService {
     fileMoves.forEach(this::moveFile);
 
     return new RepairReport(rekeyed, duplicatesRemoved, List.copyOf(conflicts));
+  }
+
+  /**
+   * Locks the chart first, as a push and a delete take it (RPS-1365), and only then reads the
+   * manifest and the manifest it would collide with: the runner starts after the web server, so a
+   * push or a delete of this chart can be running, and what it commits is then what is repaired
+   * (RPS-1392). A chart deleted since the list was read has no manifests left to repair, so it
+   * answers {@code null}, like a manifest that is gone.
+   */
+  private @Nullable HelmOciManifest lockChartAndFindManifest(
+      final HelmOciManifestMismatch mismatch) {
+    if (!this.helmChartService.lockChartIfPresent(mismatch.repoId(), mismatch.chartName())) {
+      return null;
+    }
+
+    return this.helmOciManifestRepository.findById(mismatch.id()).orElse(null);
   }
 
   private void moveFile(final PendingFileMove move) {

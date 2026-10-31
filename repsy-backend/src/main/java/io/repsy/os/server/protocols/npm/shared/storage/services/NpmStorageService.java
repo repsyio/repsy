@@ -40,7 +40,21 @@ public class NpmStorageService extends AbstractNpmStorageService {
     super(storageStrategyRegistry.get(RepoType.NPM));
 
     this.repoPort = repoPort;
-    this.publicUrl = publicUrl.isBlank() ? null : publicUrl.strip().replaceAll("/+$", "");
+    this.publicUrl = publicUrl.isBlank() ? null : stripTrailingSlashes(publicUrl.strip());
+  }
+
+  /**
+   * Drops the trailing slashes; a loop, because the regex {@code /+$} backtracks super-linearly.
+   */
+  private static String stripTrailingSlashes(final String value) {
+
+    var end = value.length();
+
+    while (end > 0 && value.charAt(end - 1) == '/') {
+      end--;
+    }
+
+    return value.substring(0, end);
   }
 
   /**

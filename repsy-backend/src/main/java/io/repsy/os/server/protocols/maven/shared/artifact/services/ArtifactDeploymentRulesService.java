@@ -40,7 +40,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.maven.index.artifact.Gav;
 import org.jspecify.annotations.Nullable;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
 /**
  * The judgement of a Maven upload before anything is stored (RPS-2167, split out of {@link
@@ -49,7 +49,7 @@ import org.springframework.stereotype.Component;
  * own: {@link ArtifactDeploymentService} calls it under its read only one, as it ran before.
  */
 @Slf4j
-@Component
+@Service
 @RequiredArgsConstructor
 class ArtifactDeploymentRulesService {
 

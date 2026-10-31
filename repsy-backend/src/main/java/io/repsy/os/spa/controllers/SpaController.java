@@ -20,7 +20,8 @@ import io.repsy.os.shared.utils.MultiPortNames;
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.Collections;
 import java.util.List;
-import java.util.regex.Pattern;
+import java.util.Locale;
+import java.util.Set;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.InvalidMediaTypeException;
@@ -58,11 +59,31 @@ public class SpaController {
    * The extensions of the files the panel build and its assets directory emit (scripts, styles,
    * source maps, fonts, images, text and manifest files).
    */
-  private static final Pattern ASSET_EXTENSION =
-      Pattern.compile(
-          "\\.(?:js|mjs|cjs|css|map|json|txt|xml|webmanifest|woff2?|ttf|otf|eot|svg|png|jpe?g|gif"
-              + "|webp|avif|ico|wasm)$",
-          Pattern.CASE_INSENSITIVE);
+  private static final Set<String> ASSET_EXTENSIONS =
+      Set.of(
+          "js",
+          "mjs",
+          "cjs",
+          "css",
+          "map",
+          "json",
+          "txt",
+          "xml",
+          "webmanifest",
+          "woff",
+          "woff2",
+          "ttf",
+          "otf",
+          "eot",
+          "svg",
+          "png",
+          "jpg",
+          "jpeg",
+          "gif",
+          "webp",
+          "avif",
+          "ico",
+          "wasm");
 
   @GetMapping(
       value = {
@@ -77,13 +98,21 @@ public class SpaController {
     final var pathWithinApplication =
         ServletRequestPathUtils.getParsedRequestPath(request).pathWithinApplication();
 
-    if (ASSET_EXTENSION.matcher(lastSegment(pathWithinApplication)).find()
-        && !isNavigation(request)) {
+    if (hasAssetExtension(lastSegment(pathWithinApplication)) && !isNavigation(request)) {
       throw new NoResourceFoundException(
           HttpMethod.GET, request.getContextPath(), pathWithinApplication.value());
     }
 
     return "forward:/index.html";
+  }
+
+  /** True when the segment ends in a dot and one of {@link #ASSET_EXTENSIONS}, any case. */
+  private static boolean hasAssetExtension(final String segment) {
+
+    final var dot = segment.lastIndexOf('.');
+
+    return dot >= 0
+        && ASSET_EXTENSIONS.contains(segment.substring(dot + 1).toLowerCase(Locale.ROOT));
   }
 
   private static String lastSegment(final PathContainer path) {
@@ -106,7 +135,7 @@ public class SpaController {
       return MediaType.parseMediaTypes(Collections.list(request.getHeaders(HttpHeaders.ACCEPT)))
           .stream()
           .anyMatch(MediaType.TEXT_HTML::equalsTypeAndSubtype);
-    } catch (final InvalidMediaTypeException e) {
+    } catch (final InvalidMediaTypeException _) {
       return false;
     }
   }

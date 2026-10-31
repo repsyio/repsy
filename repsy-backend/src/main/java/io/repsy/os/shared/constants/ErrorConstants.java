@@ -15,6 +15,7 @@
  */
 package io.repsy.os.shared.constants;
 
+import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
 
 /**
@@ -22,7 +23,7 @@ import lombok.NoArgsConstructor;
  * shared backend code emit are in {@code ProtocolErrorCodes}. The strings are the wire contract;
  * see {@code ErrorConstantsTest}.
  */
-@NoArgsConstructor
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
 public final class ErrorConstants {
 
   public static final String ACCESS_TOKEN_EXPIRATION_IN_PAST = "accessTokenExpirationInPast";

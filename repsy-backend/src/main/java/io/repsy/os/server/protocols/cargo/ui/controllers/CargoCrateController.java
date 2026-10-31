@@ -58,15 +58,26 @@ public class CargoCrateController {
    * lastUpdatedAt}). The former snake_case aliases ({@code max_version}, {@code updated_at}) are
    * gone with the snake_case JSON: like any unknown key they answer 400.
    */
+  private static final String TOTAL_DOWNLOADS = "totalDownloads";
+
+  private static final String LAST_UPDATED_AT = "lastUpdatedAt";
+
   private static final Map<String, String> CRATE_SORT_PATHS =
       Map.of(
-          "id", "id",
-          "name", "name",
-          "maxVersion", "maxVersion",
-          "downloads", "totalDownloads",
-          "totalDownloads", "totalDownloads",
-          "updatedAt", "lastUpdatedAt",
-          "lastUpdatedAt", "lastUpdatedAt");
+          "id",
+          "id",
+          "name",
+          "name",
+          "maxVersion",
+          "maxVersion",
+          "downloads",
+          TOTAL_DOWNLOADS,
+          TOTAL_DOWNLOADS,
+          TOTAL_DOWNLOADS,
+          "updatedAt",
+          LAST_UPDATED_AT,
+          LAST_UPDATED_AT,
+          LAST_UPDATED_AT);
 
   private static final Set<String> VERSION_SORT_PROPERTIES = Set.of("version", "createdAt");
 

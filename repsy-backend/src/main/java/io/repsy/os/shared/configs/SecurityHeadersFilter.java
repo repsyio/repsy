@@ -21,6 +21,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -126,7 +127,7 @@ public class SecurityHeadersFilter extends OncePerRequestFilter {
   private boolean isSpaOrStaticRequest(final HttpServletRequest request) {
 
     return this.apiPortMatcher.isApiPort(request.getLocalPort())
-        && !request.getRequestURI().startsWith(API_PATH_PREFIX);
+        && !Objects.requireNonNull(request.getRequestURI()).startsWith(API_PATH_PREFIX);
   }
 
   private String resolvePolicy() {

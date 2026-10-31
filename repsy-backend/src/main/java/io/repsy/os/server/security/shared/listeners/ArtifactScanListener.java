@@ -61,6 +61,8 @@ public class ArtifactScanListener implements ManualScanExecutor {
   private static final String DOCKER_REPO_TYPE = "DOCKER";
   private static final String HELM_REPO_TYPE = "HELM";
   private static final String NO_SCANNER_NAME = "none";
+  private static final String EXECUTOR_SATURATED_MESSAGE =
+      "Scan executor is saturated; retry later";
 
   private final VulnerabilityScannerRegistry scannerRegistry;
   private final VulnerabilityScanTxService scanTxService;
@@ -96,7 +98,7 @@ public class ArtifactScanListener implements ManualScanExecutor {
         event,
         scanId,
         () -> {
-          this.scanTxService.recordScanFailure(scanId, "Scan executor is saturated; retry later");
+          this.scanTxService.recordScanFailure(scanId, EXECUTOR_SATURATED_MESSAGE);
           log.warn(
               "Skipping vulnerability scan for {}@{} (repo={}): scan executor is saturated",
               event.artifactName(),
@@ -117,7 +119,7 @@ public class ArtifactScanListener implements ManualScanExecutor {
         event,
         scanId,
         () -> {
-          this.scanTxService.recordScanFailure(scanId, "Scan executor is saturated; retry later");
+          this.scanTxService.recordScanFailure(scanId, EXECUTOR_SATURATED_MESSAGE);
           throw new RetryableException(ProtocolErrorCodes.SCAN_EXECUTOR_SATURATED);
         });
   }
@@ -126,7 +128,7 @@ public class ArtifactScanListener implements ManualScanExecutor {
       final ArtifactPushedEvent event, final UUID scanId, final Runnable rejectionAction) {
     try {
       this.scanTaskExecutor.execute(() -> this.executeScan(event, scanId));
-    } catch (final RejectedExecutionException exception) {
+    } catch (final RejectedExecutionException _) {
       rejectionAction.run();
     }
   }
@@ -308,7 +310,7 @@ public class ArtifactScanListener implements ManualScanExecutor {
     try {
       this.scanTaskExecutor.execute(() -> this.retryScan(event, scanId, scanner, attempt));
     } catch (final RejectedExecutionException _) {
-      this.scanTxService.recordScanFailure(scanId, "Scan executor is saturated; retry later");
+      this.scanTxService.recordScanFailure(scanId, EXECUTOR_SATURATED_MESSAGE);
       log.warn(
           "Giving up on the retry of the vulnerability scan for {}@{} (repo={}): scan executor is"
               + " saturated",
@@ -446,7 +448,7 @@ public class ArtifactScanListener implements ManualScanExecutor {
     try {
       return this.scanTxService.createPendingScan(
           event.repoId(), event.artifactName(), event.artifactVersion(), scannerName);
-    } catch (final ItemAlreadyExistException exception) {
+    } catch (final ItemAlreadyExistException _) {
       log.warn(
           "Skipping vulnerability scan for {}@{} (repo={}): a scan is already PENDING/RUNNING for"
               + " this exact artifact version",

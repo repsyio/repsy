@@ -258,7 +258,7 @@ public class CleanupPolicyService {
 
     try {
       compileAnchored(regex);
-    } catch (final PatternSyntaxException e) {
+    } catch (final PatternSyntaxException _) {
       throw new BadRequestException(ProtocolErrorCodes.INVALID_REGEX);
     }
   }

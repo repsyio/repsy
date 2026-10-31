@@ -60,7 +60,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -71,7 +71,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Nothing here writes: the class is read only.
  */
 @Slf4j
-@Component
+@Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
 public class ArtifactQueryService {

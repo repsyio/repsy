@@ -58,7 +58,7 @@ public class UrlPropertiesUtils {
             .repoInfo(emptyRepoInfo)
             .build();
 
-    context.addProperty("urlProperties", urlProperties);
+    context.addProperty(URL_PROPERTIES, urlProperties);
 
     return context;
   }

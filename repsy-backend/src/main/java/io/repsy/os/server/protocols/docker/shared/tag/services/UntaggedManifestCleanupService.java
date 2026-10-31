@@ -66,7 +66,7 @@ public class UntaggedManifestCleanupService {
   @Transactional
   public Result deleteUntagged(final RepoInfo repoInfo, final @Nullable String imageName) {
 
-    return this.deleteUntagged(repoInfo, imageName, null);
+    return this.deleteUntaggedOlderThan(repoInfo, imageName, null);
   }
 
   /**
@@ -76,6 +76,14 @@ public class UntaggedManifestCleanupService {
    */
   @Transactional
   public Result deleteUntagged(
+      final RepoInfo repoInfo,
+      final @Nullable String imageName,
+      final @Nullable Instant olderThan) {
+
+    return this.deleteUntaggedOlderThan(repoInfo, imageName, olderThan);
+  }
+
+  private Result deleteUntaggedOlderThan(
       final RepoInfo repoInfo,
       final @Nullable String imageName,
       final @Nullable Instant olderThan) {

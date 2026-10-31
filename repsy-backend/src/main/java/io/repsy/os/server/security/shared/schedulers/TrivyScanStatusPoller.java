@@ -70,7 +70,7 @@ public class TrivyScanStatusPoller {
 
       final var status = this.statusClient.fetchStatus(scan.getId());
       this.applyStatus(scan, status);
-    } catch (final ScanJobNotFoundException exception) {
+    } catch (final ScanJobNotFoundException _) {
       this.handleJobNotFound(scan);
     } catch (final Exception exception) {
       log.debug("Failed to poll scan status for {}, will retry next tick", scan.getId(), exception);

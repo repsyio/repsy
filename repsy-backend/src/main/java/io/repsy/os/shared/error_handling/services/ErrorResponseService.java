@@ -176,7 +176,7 @@ public class ErrorResponseService {
 
     try {
       problem.setInstance(URI.create(request.getRequestURI()));
-    } catch (final IllegalArgumentException ignored) {
+    } catch (final IllegalArgumentException _) {
       // A request path that is not a valid URI reference: the problem simply has no instance.
     }
 

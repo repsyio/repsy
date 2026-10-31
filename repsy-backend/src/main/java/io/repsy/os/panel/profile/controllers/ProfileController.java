@@ -55,9 +55,7 @@ class ProfileController {
 
     final var userId = this.panelAuthHelper.authenticate(authHeader).getId();
 
-    final var profileInfo = this.profileService.getProfile(userId);
-
-    return profileInfo;
+    return this.profileService.getProfile(userId);
   }
 
   @PatchMapping("/username")

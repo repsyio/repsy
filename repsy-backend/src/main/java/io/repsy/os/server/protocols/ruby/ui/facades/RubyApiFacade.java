@@ -73,6 +73,10 @@ public class RubyApiFacade implements ProtocolApiFacade {
 
   @Transactional
   public BaseUsages deleteGem(final RepoInfo repoInfo, final String gemName) {
+    return this.removeGem(repoInfo, gemName);
+  }
+
+  private BaseUsages removeGem(final RepoInfo repoInfo, final String gemName) {
     final var gemId = this.gemService.getGemId(repoInfo.getStorageKey(), gemName);
     final var freed = this.storageService.deleteAllGems(RepoRef.of(repoInfo), gemName);
     this.gemService.deleteGem(gemId);
@@ -90,7 +94,7 @@ public class RubyApiFacade implements ProtocolApiFacade {
 
     final var usages =
         remaining == 0
-            ? this.deleteGem(repoInfo, gemName)
+            ? this.removeGem(repoInfo, gemName)
             : BaseUsages.ofDisk(
                 -1L
                     * this.storageService.deleteGem(

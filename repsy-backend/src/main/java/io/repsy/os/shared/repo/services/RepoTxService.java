@@ -248,6 +248,10 @@ public class RepoTxService {
 
   @Transactional
   public void renameRepo(final String repoName, final String newRepoName, final RepoType repoType) {
+    this.rename(repoName, newRepoName, repoType);
+  }
+
+  private void rename(final String repoName, final String newRepoName, final RepoType repoType) {
 
     RepoUtils.validateNewRepoName(newRepoName);
 
@@ -273,11 +277,11 @@ public class RepoTxService {
       final @Nullable String newDescription) {
 
     if (newName != null && !newName.equals(repoInfo.getName())) {
-      this.renameRepo(repoInfo.getName(), newName, repoInfo.getType());
+      this.rename(repoInfo.getName(), newName, repoInfo.getType());
     }
 
     if (newDescription != null) {
-      this.updateDescription(repoInfo.getId(), newDescription);
+      this.changeDescription(repoInfo.getId(), newDescription);
     }
 
     return this.getRepoListInfo(repoInfo.getId());
@@ -285,6 +289,10 @@ public class RepoTxService {
 
   @Transactional
   public void updateDescription(final UUID repoId, final @Nullable String description) {
+    this.changeDescription(repoId, description);
+  }
+
+  private void changeDescription(final UUID repoId, final @Nullable String description) {
     final var repo = this.findRepoById(repoId);
     repo.setDescription(description);
     this.repoRepository.save(repo);

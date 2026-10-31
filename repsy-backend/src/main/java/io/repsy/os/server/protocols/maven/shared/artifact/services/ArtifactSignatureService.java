@@ -49,7 +49,7 @@ import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -68,7 +68,7 @@ import org.springframework.transaction.annotation.Transactional;
  * artifact service.
  */
 @Slf4j
-@Component
+@Service
 @Transactional
 @RequiredArgsConstructor
 public class ArtifactSignatureService {
@@ -270,9 +270,9 @@ public class ArtifactSignatureService {
     final var repo = artifact.getRepo();
     final var versionPath =
         artifact.getGroupName().replace('.', '/')
-            + "/"
+            + '/'
             + artifact.getArtifactName()
-            + "/"
+            + '/'
             + version.getVersionName();
 
     // Best effort, no row lock held: may include network calls to a key server (RPS-1469).
@@ -376,7 +376,7 @@ public class ArtifactSignatureService {
       final String fileName,
       final Supplier<PublicKeySources> sources) {
 
-    final var filePath = versionPath + "/" + fileName;
+    final var filePath = versionPath + '/' + fileName;
     final var signature =
         this.mavenStorage()
             .get(StoragePath.of(repo.getId(), filePath + SIGNATURE_SUFFIX), repo.getName());
@@ -590,8 +590,13 @@ public class ArtifactSignatureService {
    * same repo.
    */
   @Transactional(readOnly = true)
-  @SuppressWarnings("NullAway") // a path without a storage key is never a repository path here
   public StoragePath getNonSignedStoragePath(final StoragePath signedStoragePath) {
+
+    return nonSignedPathOf(signedStoragePath);
+  }
+
+  @SuppressWarnings("NullAway") // a path without a storage key is never a repository path here
+  private static StoragePath nonSignedPathOf(final StoragePath signedStoragePath) {
 
     final var signaturePath = signedStoragePath.getRelativePath().getPath();
 
@@ -610,7 +615,7 @@ public class ArtifactSignatureService {
   public void processSignedFile(
       final BaseRepoInfo<UUID> repoInfo, final StoragePath signaturePath) {
 
-    final var signedStoragePath = this.getNonSignedStoragePath(signaturePath);
+    final var signedStoragePath = nonSignedPathOf(signaturePath);
 
     final var gav = MavenGavUtils.convertPathToGav(signedStoragePath.getRelativePath().getPath());
 
@@ -674,7 +679,7 @@ public class ArtifactSignatureService {
       final StoragePath signedStoragePath,
       final Resource signature) {
 
-    final var nonSignedStoragePath = this.getNonSignedStoragePath(signedStoragePath);
+    final var nonSignedStoragePath = nonSignedPathOf(signedStoragePath);
     final var storedFile = this.mavenStorage().get(nonSignedStoragePath, repoInfo.getName());
 
     if (storedFile.isPresent() && this.isVersionRegistered(repoInfo, nonSignedStoragePath)) {
