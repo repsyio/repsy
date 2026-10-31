@@ -188,7 +188,7 @@ test.describe('Shared components: ARIA contract', { tag: '@a11y' }, () => {
     }) => {
       const { repos, toast } = await raiseErrorToast(adminPage);
 
-      await expect(repos.toasts.stack).toHaveAttribute('role', 'status');
+      await expect(repos.toasts.stack).toHaveRole('status');
       await expect(repos.toasts.stack).toHaveAttribute('aria-live', 'polite');
       await expect(toast).toHaveAttribute('role', 'alert');
       await expect(toast.getByRole('button', { name: 'Dismiss notification' })).toBeVisible();
@@ -197,7 +197,7 @@ test.describe('Shared components: ARIA contract', { tag: '@a11y' }, () => {
       await toast.getByTestId('toast-close').click();
       await expect(toast).toHaveCount(0);
       // The live region itself stays for the next message.
-      await expect(repos.toasts.stack).toHaveAttribute('role', 'status');
+      await expect(repos.toasts.stack).toHaveRole('status');
     });
 
     test('A11Y-03: an error toast outlives the old 3 s and is gone after its 7 s', async ({
