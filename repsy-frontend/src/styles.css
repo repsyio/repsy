@@ -196,7 +196,28 @@
 
 * {
   scrollbar-color: #666 #222;
-  transition: all 0.3s ease-out;
+}
+
+/*
+ * Default hover/focus/active feedback for every element. Only the paint properties the app animates are listed
+ * (`transition: all` also animated layout and transform, which made unrelated changes look sluggish and is flagged
+ * by SonarCloud css:S9449). It sits in the base layer so a Tailwind utility such as `transition-transform` or
+ * `transition-colors` on an element (toggle knob, chevrons) wins over it, and so does a component stylesheet.
+ */
+@layer base {
+  * {
+    transition:
+      color 0.3s ease-out,
+      background-color 0.3s ease-out,
+      border-color 0.3s ease-out,
+      outline-color 0.3s ease-out,
+      text-decoration-color 0.3s ease-out,
+      fill 0.3s ease-out,
+      stroke 0.3s ease-out,
+      opacity 0.3s ease-out,
+      box-shadow 0.3s ease-out,
+      filter 0.3s ease-out;
+  }
 }
 
 *::-webkit-scrollbar-track {
