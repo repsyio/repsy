@@ -48,15 +48,15 @@ import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.ui.freemarker.FreeMarkerTemplateUtils;
 
-public abstract class AbstractMavenStorageService<ID> extends AbstractArtifactStorageService
-    implements MavenStorageService<ID> {
+public abstract class AbstractMavenStorageService<I> extends AbstractArtifactStorageService
+    implements MavenStorageService<I> {
 
   private static final String METADATA_FILENAME = "maven-metadata.xml";
 
   private final Configuration freeMarkerConfiguration;
 
   /** Rewrites the stored {@code maven-metadata.xml} files and guards them with its locks. */
-  private final MavenMetadataStore<ID> metadataStore;
+  private final MavenMetadataStore<I> metadataStore;
 
   protected AbstractMavenStorageService(
       final Configuration freeMarkerConfiguration, final StorageStrategy storageStrategy) {
@@ -267,7 +267,7 @@ public abstract class AbstractMavenStorageService<ID> extends AbstractArtifactSt
    */
   private long deleteGroupLevelMetadataFiles(final UUID repoId, final Path groupPath) {
 
-    final var groupStoragePath = StoragePath.of(repoId, groupPath + "/");
+    final var groupStoragePath = StoragePath.of(repoId, groupPath.toString() + '/');
 
     var usage = 0L;
 
@@ -294,7 +294,7 @@ public abstract class AbstractMavenStorageService<ID> extends AbstractArtifactSt
 
   @Override
   public BaseUsages deleteVersionFromMetadata(
-      final BaseRepoInfo<ID> repoInfo,
+      final BaseRepoInfo<I> repoInfo,
       final String groupId,
       final String artifactId,
       final String versionName)
@@ -305,7 +305,7 @@ public abstract class AbstractMavenStorageService<ID> extends AbstractArtifactSt
 
   @Override
   public long addVersionsToMetadata(
-      final BaseRepoInfo<ID> repoInfo,
+      final BaseRepoInfo<I> repoInfo,
       final String groupId,
       final String artifactId,
       final Supplier<? extends Collection<String>> registeredVersions)
@@ -317,7 +317,7 @@ public abstract class AbstractMavenStorageService<ID> extends AbstractArtifactSt
 
   @Override
   public long addPluginsToGroupMetadata(
-      final BaseRepoInfo<ID> repoInfo,
+      final BaseRepoInfo<I> repoInfo,
       final String groupId,
       final Supplier<? extends Collection<RegisteredPlugin>> registeredPlugins)
       throws IOException {
@@ -327,7 +327,7 @@ public abstract class AbstractMavenStorageService<ID> extends AbstractArtifactSt
 
   @Override
   public long replacePluginPrefixInGroupMetadata(
-      final BaseRepoInfo<ID> repoInfo, final String groupId, final PluginPrefixChange change)
+      final BaseRepoInfo<I> repoInfo, final String groupId, final PluginPrefixChange change)
       throws IOException {
 
     return this.metadataStore.replacePluginPrefixInGroupMetadata(repoInfo, groupId, change);
@@ -355,6 +355,6 @@ public abstract class AbstractMavenStorageService<ID> extends AbstractArtifactSt
   @Override
   public void clearTrash() {
 
-    final var unused = this.storageStrategy.clearTrash();
+    this.storageStrategy.clearTrash();
   }
 }

@@ -149,7 +149,7 @@ describe('TooltipComponent', () => {
     it('hands a click on the text to the row link', () => {
       click('[data-testid="plain"] [data-testid="tooltip-text"]');
 
-      expect(clicks.length).toBe(1);
+      expect(clicks).toHaveSize(1);
     });
 
     it('keeps the modifier keys, so a ctrl-click still opens a new tab', () => {
@@ -161,7 +161,7 @@ describe('TooltipComponent', () => {
     it('leaves a tooltip that sits in its own link alone', () => {
       click('[data-testid="own-link"] [data-testid="tooltip-text"]');
 
-      expect(clicks.length).toBe(0);
+      expect(clicks).toHaveSize(0);
     });
   });
 });

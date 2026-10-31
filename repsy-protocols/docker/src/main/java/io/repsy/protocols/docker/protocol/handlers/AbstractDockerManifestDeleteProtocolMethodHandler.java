@@ -40,15 +40,15 @@ import org.springframework.http.ResponseEntity;
  * cannot delete. It is not a write operation in the router's sense: it publishes nothing to the
  * vulnerability scanner.
  */
-public abstract class AbstractDockerManifestDeleteProtocolMethodHandler<ID>
-    extends AbstractFacadeProtocolMethodHandler<DockerProtocolFacade<ID>> {
+public abstract class AbstractDockerManifestDeleteProtocolMethodHandler<I>
+    extends AbstractFacadeProtocolMethodHandler<DockerProtocolFacade<I>> {
 
   private static final Pattern MANIFEST_DELETE_PATTERN =
       Pattern.compile("^/([^/]+)/manifests/(.+)$");
 
-  public AbstractDockerManifestDeleteProtocolMethodHandler(
+  protected AbstractDockerManifestDeleteProtocolMethodHandler(
       final PathParser basePathParser,
-      final DockerProtocolFacade<ID> dockerFacade,
+      final DockerProtocolFacade<I> dockerFacade,
       final DockerProtocolProvider provider) {
     super(
         HandlerRoute.of(Permission.MANAGE, HttpMethod.DELETE)

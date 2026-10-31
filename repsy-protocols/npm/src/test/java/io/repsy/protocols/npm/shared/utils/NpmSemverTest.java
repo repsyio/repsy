@@ -133,8 +133,8 @@ class NpmSemverTest {
     @Test
     @DisplayName("build metadata plays no part in precedence")
     void buildMetadataIgnored() {
-      assertThat(NpmSemver.parse("1.0.0+build1").compareTo(NpmSemver.parse("1.0.0+build2")))
-          .isZero();
+      assertThat(NpmSemver.parse("1.0.0+build1"))
+          .isEqualByComparingTo(NpmSemver.parse("1.0.0+build2"));
     }
 
     @Test

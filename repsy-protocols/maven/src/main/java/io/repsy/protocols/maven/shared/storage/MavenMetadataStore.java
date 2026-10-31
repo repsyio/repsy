@@ -34,7 +34,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Collection;
-import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -49,7 +48,6 @@ import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.maven.artifact.repository.metadata.Metadata;
 import org.apache.maven.artifact.repository.metadata.Plugin;
 import org.apache.maven.artifact.repository.metadata.io.xpp3.MetadataXpp3Writer;
-import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 
@@ -63,7 +61,7 @@ import org.springframework.core.io.Resource;
  * <p>The state is the lock table, so one instance belongs to one storage service: the locks only
  * serialize the callers that share it.
  */
-public class MavenMetadataStore<ID> {
+public class MavenMetadataStore<I> {
 
   private static final String METADATA_FILENAME = "maven-metadata.xml";
 
@@ -183,11 +181,11 @@ public class MavenMetadataStore<ID> {
    * from it but computed from the version rows (RPS-1331).
    */
   public BaseUsages deleteVersionFromMetadata(
-      final BaseRepoInfo<ID> repoInfo,
+      final BaseRepoInfo<I> repoInfo,
       final String groupId,
       final String artifactId,
       final String versionName)
-      throws IOException, XmlPullParserException {
+      throws IOException {
 
     return this.rewriteArtifactMetadata(
         repoInfo,
@@ -209,7 +207,7 @@ public class MavenMetadataStore<ID> {
    * as it is, with its signature.
    */
   public long addVersionsToMetadata(
-      final BaseRepoInfo<ID> repoInfo,
+      final BaseRepoInfo<I> repoInfo,
       final String groupId,
       final String artifactId,
       final Supplier<? extends Collection<String>> registeredVersions)
@@ -243,7 +241,7 @@ public class MavenMetadataStore<ID> {
    * {@code mutate} answers {@code false}.
    */
   private BaseUsages rewriteArtifactMetadata(
-      final BaseRepoInfo<ID> repoInfo,
+      final BaseRepoInfo<I> repoInfo,
       final String groupId,
       final String artifactId,
       final Predicate<Metadata> mutate)
@@ -259,7 +257,7 @@ public class MavenMetadataStore<ID> {
             return false;
           }
 
-          versioning.setLastUpdatedTimestamp(Date.from(Instant.now()));
+          MavenMetadataUtils.setLastUpdated(versioning, Instant.now());
 
           MavenMetadataUtils.setReleaseAndLatest(metadata);
 
@@ -277,7 +275,7 @@ public class MavenMetadataStore<ID> {
    * <parent>:<last>} that has the same path, and is left alone.
    */
   public long addPluginsToGroupMetadata(
-      final BaseRepoInfo<ID> repoInfo,
+      final BaseRepoInfo<I> repoInfo,
       final String groupId,
       final Supplier<? extends Collection<RegisteredPlugin>> registeredPlugins)
       throws IOException {
@@ -310,7 +308,7 @@ public class MavenMetadataStore<ID> {
   }
 
   public long replacePluginPrefixInGroupMetadata(
-      final BaseRepoInfo<ID> repoInfo, final String groupId, final PluginPrefixChange change)
+      final BaseRepoInfo<I> repoInfo, final String groupId, final PluginPrefixChange change)
       throws IOException {
 
     return this.rewriteStoredMetadata(
@@ -358,7 +356,7 @@ public class MavenMetadataStore<ID> {
    * client's own upload of the file takes too.
    */
   private BaseUsages rewriteStoredMetadata(
-      final BaseRepoInfo<ID> repoInfo,
+      final BaseRepoInfo<I> repoInfo,
       final Path metadataDirectory,
       final Predicate<Metadata> mutate)
       throws IOException {
@@ -463,7 +461,7 @@ public class MavenMetadataStore<ID> {
   private long contentLengthQuietly(final Resource resource) {
     try {
       return resource.contentLength();
-    } catch (final IOException e) {
+    } catch (final IOException _) {
       return 0L;
     }
   }

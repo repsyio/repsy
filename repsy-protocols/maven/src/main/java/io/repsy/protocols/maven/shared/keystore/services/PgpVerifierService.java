@@ -37,7 +37,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.Security;
 import java.time.Duration;
-import java.util.Date;
+import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -165,17 +165,7 @@ public class PgpVerifierService {
         Security.addProvider(new BouncyCastleProvider());
       }
 
-      final PGPSignature signature;
-      try {
-        signature = this.extractSignature(signatureStream, enforcePolicy);
-      } catch (final IOException exception) {
-        // RPS-1191: ArmoredInputException ("invalid armor", "crc check failed ..."), an invalid
-        // armor header and EOFException all mean that the bytes the client sent are not an OpenPGP
-        // signature. Only this parsing is caught: an IOException from a key server's answer or from
-        // reading the stored file is infrastructure and stays a 5xx.
-        log.warn("signature could not be parsed. Cause: {}", exception.toString());
-        throw new SignatureNotVerifiedException(ProtocolErrorCodes.ARTIFACT_SIGNATURE_NOT_VERIFIED);
-      }
+      final var signature = this.parseSignatureOrReject(signatureStream, enforcePolicy);
 
       final var matchedKey =
           this.getPublicKey(signature.getKeyID(), sources)
@@ -189,7 +179,7 @@ public class PgpVerifierService {
                         ProtocolErrorCodes.ARTIFACT_SIGNING_KEY_NOT_FOUND);
                   });
 
-      this.checkKeyValidity(matchedKey, signature.getCreationTime());
+      this.checkKeyValidity(matchedKey, signature.getCreationTime().toInstant());
 
       signature.init(
           new JcaPGPContentVerifierBuilderProvider().setProvider("BC"), matchedKey.signingKey());
@@ -209,6 +199,21 @@ public class PgpVerifierService {
       // The BouncyCastle text ("PGPSignature is not found", ...) is for the log, not for the
       // client.
       log.warn("signature verification failed. Cause: {}", exception.getMessage());
+      throw new SignatureNotVerifiedException(ProtocolErrorCodes.ARTIFACT_SIGNATURE_NOT_VERIFIED);
+    }
+  }
+
+  private PGPSignature parseSignatureOrReject(
+      final InputStream signatureStream, final boolean enforcePolicy) throws PGPException {
+
+    try {
+      return this.extractSignature(signatureStream, enforcePolicy);
+    } catch (final IOException exception) {
+      // RPS-1191: ArmoredInputException ("invalid armor", "crc check failed ..."), an invalid
+      // armor header and EOFException all mean that the bytes the client sent are not an OpenPGP
+      // signature. Only this parsing is caught: an IOException from a key server's answer or from
+      // reading the stored file is infrastructure and stays a 5xx.
+      log.warn("signature could not be parsed. Cause: {}", exception.toString());
       throw new SignatureNotVerifiedException(ProtocolErrorCodes.ARTIFACT_SIGNATURE_NOT_VERIFIED);
     }
   }
@@ -514,7 +519,7 @@ public class PgpVerifierService {
   }
 
   private static Optional<MatchedKey> matchKey(
-      final PGPPublicKeyRingCollection collection, final long keyId) throws PGPException {
+      final PGPPublicKeyRingCollection collection, final long keyId) {
 
     final var key = collection.getPublicKey(keyId);
 
@@ -547,7 +552,7 @@ public class PgpVerifierService {
    * packet is present, not that the packet is itself a genuine signature by the key's owner; a
    * known limitation, see the PR description.
    */
-  private void checkKeyValidity(final MatchedKey matchedKey, final Date signatureCreationTime) {
+  private void checkKeyValidity(final MatchedKey matchedKey, final Instant signatureCreationTime) {
 
     this.checkNotRevoked(matchedKey);
     checkNotExpired(matchedKey.signingKey(), signatureCreationTime);
@@ -573,17 +578,17 @@ public class PgpVerifierService {
   }
 
   private static void checkNotExpired(
-      final PGPPublicKey signingKey, final Date signatureCreationTime) {
+      final PGPPublicKey signingKey, final Instant signatureCreationTime) {
 
     final var validSeconds = signingKey.getValidSeconds();
     if (validSeconds <= 0) {
       return; // 0 means the key never expires.
     }
 
-    final var creationTime = signingKey.getCreationTime();
-    final var expiryTime = new Date(creationTime.getTime() + validSeconds * 1000L);
+    final var creationTime = signingKey.getCreationTime().toInstant();
+    final var expiryTime = creationTime.plusSeconds(validSeconds);
 
-    if (signatureCreationTime.before(creationTime) || signatureCreationTime.after(expiryTime)) {
+    if (signatureCreationTime.isBefore(creationTime) || signatureCreationTime.isAfter(expiryTime)) {
       log.warn(
           "the signing key {} had expired ({} - {}) by the signature's creation time {}",
           keyIdHex(signingKey),

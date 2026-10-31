@@ -15,8 +15,15 @@
 ///
 
 import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
-import { AbstractControl, FormBuilder, FormGroup, ValidationErrors, ValidatorFn, Validators } from '@angular/forms';
-import { ReactiveFormsModule } from '@angular/forms';
+import {
+  AbstractControl,
+  FormBuilder,
+  FormGroup,
+  ReactiveFormsModule,
+  ValidationErrors,
+  ValidatorFn,
+  Validators,
+} from '@angular/forms';
 import moment, { Moment } from 'moment';
 import { finalize } from 'rxjs/operators';
 
@@ -64,8 +71,8 @@ export class DeployTokenCreateModalComponent implements OnInit {
     { label: 'Read Only', value: true },
   ];
 
-  private todayUtc = moment.utc();
-  private oneYearLaterUtc = this.todayUtc.clone().add(365, 'days').format('YYYY-MM-DD');
+  private readonly todayUtc = moment.utc();
+  private readonly oneYearLaterUtc = this.todayUtc.clone().add(365, 'days').format('YYYY-MM-DD');
 
   constructor(
     private readonly deployTokensApi: DeployTokensApi,

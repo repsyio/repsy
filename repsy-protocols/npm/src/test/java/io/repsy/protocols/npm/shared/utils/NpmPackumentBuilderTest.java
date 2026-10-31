@@ -98,9 +98,10 @@ class NpmPackumentBuilderTest {
     assertThat(packument).containsEntry("name", "demo").containsEntry("_id", "demo");
     assertThat(((Map<String, Object>) packument.get("versions")).keySet())
         .containsExactly("1.0.0", "2.0.0");
-    assertThat(packument.get("dist-tags")).isEqualTo(Map.of("latest", "2.0.0", "beta", "1.0.0"));
-    assertThat(packument.get("time"))
-        .isEqualTo(
+    assertThat(packument).containsEntry("dist-tags", Map.of("latest", "2.0.0", "beta", "1.0.0"));
+    assertThat(packument)
+        .containsEntry(
+            "time",
             Map.of(
                 "created", "2026-01-02T03:04:05.678Z",
                 "modified", "2026-09-24T10:11:12.131Z",
@@ -125,7 +126,7 @@ class NpmPackumentBuilderTest {
   void latestFromThePackageRow() {
     final var packument = build(snapshot(null, Map.of(), version("2.0.0")), Map.of(), null);
 
-    assertThat(packument.get("dist-tags")).isEqualTo(Map.of("latest", "2.0.0"));
+    assertThat(packument).containsEntry("dist-tags", Map.of("latest", "2.0.0"));
   }
 
   @Test
@@ -187,7 +188,7 @@ class NpmPackumentBuilderTest {
     final var packument =
         build(snapshot(null, Map.of("latest", "9.9.9"), version("1.0.0")), Map.of(), null);
 
-    assertThat(packument.get("dist-tags")).isEqualTo(Map.of("latest", "9.9.9"));
+    assertThat(packument).containsEntry("dist-tags", Map.of("latest", "9.9.9"));
     assertThat(packument).doesNotContainKey("description");
   }
 
@@ -248,9 +249,9 @@ class NpmPackumentBuilderTest {
             null);
 
     assertThat(versionOf(packument, "2.0.0")).doesNotContainKey("deprecated");
-    assertThat(versionOf(packument, "2.0.0").get("dist"))
+    assertThat(versionOf(packument, "2.0.0"))
         .as("the dist of the manifest is not the tarball's own")
-        .isEqualTo(Map.of("shasum", "s", "integrity", "i"));
+        .containsEntry("dist", Map.of("shasum", "s", "integrity", "i"));
   }
 
   @Test
@@ -262,8 +263,9 @@ class NpmPackumentBuilderTest {
             Map.of("2.0.0", new NpmTarballFacts(Map.of(), "abc123", "sha512-zzz")),
             "http://localhost:9090/repo/@acme/demo");
 
-    assertThat(versionOf(packument, "2.0.0").get("dist"))
-        .isEqualTo(
+    assertThat(versionOf(packument, "2.0.0"))
+        .containsEntry(
+            "dist",
             Map.of(
                 "tarball", "http://localhost:9090/repo/@acme/demo/-/demo-2.0.0.tgz",
                 "shasum", "abc123",
@@ -284,9 +286,9 @@ class NpmPackumentBuilderTest {
             Map.of(),
             "http://h/repo/demo");
 
-    assertThat(versionOf(withDigestsOnly, "2.0.0").get("dist"))
-        .isEqualTo(Map.of("shasum", "abc", "integrity", "sha512-z"));
-    assertThat(versionOf(withUrlOnly, "2.0.0").get("dist"))
-        .isEqualTo(Map.of("tarball", "http://h/repo/demo/-/demo-2.0.0.tgz"));
+    assertThat(versionOf(withDigestsOnly, "2.0.0"))
+        .containsEntry("dist", Map.of("shasum", "abc", "integrity", "sha512-z"));
+    assertThat(versionOf(withUrlOnly, "2.0.0"))
+        .containsEntry("dist", Map.of("tarball", "http://h/repo/demo/-/demo-2.0.0.tgz"));
   }
 }

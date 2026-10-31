@@ -49,8 +49,8 @@ import org.springframework.ui.freemarker.FreeMarkerTemplateUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 @Slf4j
-public abstract class AbstractPypiStorageService<ID> extends AbstractArtifactStorageService
-    implements PypiStorageService<ID> {
+public abstract class AbstractPypiStorageService<I> extends AbstractArtifactStorageService
+    implements PypiStorageService<I> {
 
   private static final String PATH_DELIMITER = "/";
 
@@ -62,7 +62,7 @@ public abstract class AbstractPypiStorageService<ID> extends AbstractArtifactSto
     this.freeMarkerConfiguration = freeMarkerConfiguration;
   }
 
-  protected abstract String buildRepoUri(BaseRepoInfo<ID> baseRepoInfo);
+  protected abstract String buildRepoUri(BaseRepoInfo<I> baseRepoInfo);
 
   /** mark package directory as deleted ands return its usage */
   @Override
@@ -140,7 +140,7 @@ public abstract class AbstractPypiStorageService<ID> extends AbstractArtifactSto
 
   @Override
   public ByteArrayResource getPackageArchiveFileList(
-      final BaseRepoInfo<ID> repoInfo,
+      final BaseRepoInfo<I> repoInfo,
       final String packageName,
       final Map<String, String> versionAndRequiresPythonMap)
       throws IOException, TemplateException {
@@ -178,7 +178,7 @@ public abstract class AbstractPypiStorageService<ID> extends AbstractArtifactSto
 
   private List<ReleaseArchiveIndexListItem> getReleaseArchiveIndexListItem(
       final String packageName,
-      final BaseRepoInfo<ID> repoInfo,
+      final BaseRepoInfo<I> repoInfo,
       final Map<String, String> versionAndRequiresPythonMap,
       final List<StorageItemInfo> storageItemInfoList)
       throws IOException {
@@ -230,7 +230,7 @@ public abstract class AbstractPypiStorageService<ID> extends AbstractArtifactSto
   @Override
   public void clearTrash() {
 
-    final var unused = this.storageStrategy.clearTrash();
+    this.storageStrategy.clearTrash();
   }
 
   @Override
@@ -279,7 +279,7 @@ public abstract class AbstractPypiStorageService<ID> extends AbstractArtifactSto
     final var digestStoragePath = StoragePath.of(repo.id(), digestPath);
 
     final var uploadFormSha256DigestBytes =
-        Objects.requireNonNull(uploadForm.getSha256_digest(), "sha256_digest").getBytes(UTF_8);
+        Objects.requireNonNull(uploadForm.getSha256Digest(), "sha256_digest").getBytes(UTF_8);
 
     try (final var bais = new ByteArrayInputStream(uploadFormSha256DigestBytes)) {
       final var metadataUsage = this.storageStrategy.write(repo.name(), digestStoragePath, bais);

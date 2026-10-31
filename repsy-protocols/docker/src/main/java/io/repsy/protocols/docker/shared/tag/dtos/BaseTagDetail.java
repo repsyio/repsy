@@ -22,8 +22,8 @@ import org.jspecify.annotations.Nullable;
 
 @Data
 @SuperBuilder
-public class BaseTagDetail<ID> {
-  private ID id;
+public class BaseTagDetail<I> {
+  private I id;
   private String digest;
   @Nullable private String configDigest;
   private String imageName;

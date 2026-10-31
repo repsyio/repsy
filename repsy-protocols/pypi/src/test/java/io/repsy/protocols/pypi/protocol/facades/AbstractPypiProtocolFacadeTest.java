@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -143,7 +144,9 @@ class AbstractPypiProtocolFacadeTest {
       final var file = file("pkg-1.0.0.tar.gz", bytes);
       final var params = form("pkg", "1.0.0", null);
 
-      assertThatThrownBy(() -> facade.uploadPackage(context(), params, file))
+      final var context = context();
+
+      assertThatThrownBy(() -> facade.uploadPackage(context, params, file))
           .isInstanceOf(BadRequestException.class)
           .hasMessage("sha256DigestMissing");
 
@@ -158,7 +161,9 @@ class AbstractPypiProtocolFacadeTest {
       final var file = file("pkg-1.0.0.tar.gz", bytes);
       final var params = form("pkg", "1.0.0", sha256Hex(bytes));
 
-      assertThatThrownBy(() -> facade.uploadPackage(context(), params, file))
+      final var context = context();
+
+      assertThatThrownBy(() -> facade.uploadPackage(context, params, file))
           .isInstanceOf(BadRequestException.class)
           .hasMessage("pypiArchiveEmpty");
 
@@ -172,7 +177,9 @@ class AbstractPypiProtocolFacadeTest {
       final var file = file("pkg-1.0.0.tar.gz", bytes);
       final var params = form("pkg", "1.0.0", "deadbeef");
 
-      assertThatThrownBy(() -> facade.uploadPackage(context(), params, file))
+      final var context = context();
+
+      assertThatThrownBy(() -> facade.uploadPackage(context, params, file))
           .isInstanceOf(BadRequestException.class)
           .hasMessage("sha256DigestMismatch");
 
@@ -195,7 +202,7 @@ class AbstractPypiProtocolFacadeTest {
       final var captor = ArgumentCaptor.forClass(PackageUploadForm.class);
       verify(storageService)
           .writePackageArchive(eq(new RepoRef(REPO_ID, REPO_NAME)), captor.capture(), eq(file));
-      assertThat(captor.getValue().getSha256_digest()).isEqualTo(sha256Hex(bytes));
+      assertThat(captor.getValue().getSha256Digest()).isEqualTo(sha256Hex(bytes));
     }
 
     @Test
@@ -214,7 +221,7 @@ class AbstractPypiProtocolFacadeTest {
 
       final var captor = ArgumentCaptor.forClass(PackageUploadForm.class);
       verify(storageService).writePackageArchive(any(), captor.capture(), any());
-      assertThat(captor.getValue().getSha256_digest()).isEqualTo(digest);
+      assertThat(captor.getValue().getSha256Digest()).isEqualTo(digest);
     }
   }
 
@@ -236,7 +243,9 @@ class AbstractPypiProtocolFacadeTest {
       // Form version deliberately does NOT match the filename's own version ("1.0.0").
       final var params = form("pkg", "1.0.0.post9", digest);
 
-      assertThatThrownBy(() -> facade.uploadPackage(context(), params, file))
+      final var context = context();
+
+      assertThatThrownBy(() -> facade.uploadPackage(context, params, file))
           .isInstanceOf(BadRequestException.class)
           .hasMessage("archiveVersionMismatch");
 
@@ -250,11 +259,14 @@ class AbstractPypiProtocolFacadeTest {
       final var digest = sha256Hex(bytes);
       final var file = file("pkg-1.0.0+cu118.tar.gz", bytes);
 
-      assertThatThrownBy(() -> facade.uploadPackage(context(), form("pkg", "1.0.0", digest), file))
+      final var context = context();
+      final var withoutLocal = form("pkg", "1.0.0", digest);
+      final var otherLocal = form("pkg", "1.0.0+cu121", digest);
+
+      assertThatThrownBy(() -> facade.uploadPackage(context, withoutLocal, file))
           .isInstanceOf(BadRequestException.class)
           .hasMessage("archiveVersionMismatch");
-      assertThatThrownBy(
-              () -> facade.uploadPackage(context(), form("pkg", "1.0.0+cu121", digest), file))
+      assertThatThrownBy(() -> facade.uploadPackage(context, otherLocal, file))
           .isInstanceOf(BadRequestException.class)
           .hasMessage("archiveVersionMismatch");
 
@@ -331,7 +343,9 @@ class AbstractPypiProtocolFacadeTest {
       when(storageService.isPackageFileExist(REPO_ID, "pkg", "pkg-1.0.0.tar.gz"))
           .thenReturn(false, true);
 
-      assertThatThrownBy(() -> facade.uploadPackage(context(), params, file))
+      final var context = context();
+
+      assertThatThrownBy(() -> facade.uploadPackage(context, params, file))
           .isInstanceOf(AccessNotAllowedException.class)
           .hasMessage("fileAlreadyExists");
 
@@ -498,9 +512,7 @@ class AbstractPypiProtocolFacadeTest {
       final var failure = new IllegalStateException("disk full");
       final var cleanupFailure = new IllegalStateException("cannot delete");
       when(storageService.writePackageArchive(any(), any(), any())).thenThrow(failure);
-      org.mockito.Mockito.doThrow(cleanupFailure)
-          .when(storageService)
-          .discardArchive(any(), any(), any());
+      doThrow(cleanupFailure).when(storageService).discardArchive(any(), any(), any());
 
       assertThatThrownBy(() -> facade.uploadPackage(context(), params(), upload()))
           .isSameAs(failure)

@@ -12,6 +12,7 @@
   >
     <span [id]="valueId">{{ selectedOption.charAt(0).toUpperCase() + selectedOption.slice(1) }}</span>
     <svg
+      aria-hidden="true"
       [class.rotate-180]="isOpen"
       class="transition-transform duration-200"
       width="16"

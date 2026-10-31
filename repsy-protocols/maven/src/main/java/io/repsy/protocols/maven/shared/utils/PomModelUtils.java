@@ -36,6 +36,7 @@ import org.springframework.core.io.Resource;
 public class PomModelUtils {
 
   private static final String MAVEN_PLUGIN = "maven-plugin";
+  private static final String MAVEN_PLUGIN_SUFFIX = "-maven-plugin";
 
   /**
    * The plugin prefix {@code maven-plugin-plugin} 3.x derives from an artifactId when the plugin
@@ -49,11 +50,11 @@ public class PomModelUtils {
    */
   public static String getPrefixFromArtifactId(final String artifactId) {
 
-    final var suffixed = artifactId.endsWith("-maven-plugin");
+    final var suffixed = artifactId.endsWith(MAVEN_PLUGIN_SUFFIX);
     final var prefixed = artifactId.startsWith("maven-") && artifactId.endsWith("-plugin");
 
-    if (suffixed && artifactId.length() > "-maven-plugin".length()) {
-      return artifactId.substring(0, artifactId.length() - "-maven-plugin".length());
+    if (suffixed && artifactId.length() > MAVEN_PLUGIN_SUFFIX.length()) {
+      return artifactId.substring(0, artifactId.length() - MAVEN_PLUGIN_SUFFIX.length());
     } else if (prefixed && artifactId.length() > "maven--plugin".length()) {
       return artifactId.substring("maven-".length(), artifactId.length() - "-plugin".length());
     } else {

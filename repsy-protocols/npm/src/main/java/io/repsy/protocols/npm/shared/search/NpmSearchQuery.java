@@ -86,9 +86,9 @@ public record NpmSearchQuery(
   private static final String IS_QUALIFIER = "is:";
   private static final String NOT_QUALIFIER = "not:";
   private static final String BOOST_EXACT_QUALIFIER = "boost-exact:";
-  private static final String DEPRECATED = "deprecated";
-  private static final String UNSTABLE = "unstable";
-  private static final String INSECURE = "insecure";
+  private static final String DEPRECATED_FLAG = "deprecated";
+  private static final String UNSTABLE_FLAG = "unstable";
+  private static final String INSECURE_FLAG = "insecure";
 
   /**
    * Parses the query parameters of a search request. A missing or blank {@code size} or {@code
@@ -218,9 +218,9 @@ public record NpmSearchQuery(
 
     private void acceptFlag(final String name, final boolean value) {
       switch (name) {
-        case DEPRECATED -> this.deprecated = value;
-        case UNSTABLE -> this.unstable = value;
-        case INSECURE -> this.insecure = value;
+        case DEPRECATED_FLAG -> this.deprecated = value;
+        case UNSTABLE_FLAG -> this.unstable = value;
+        case INSECURE_FLAG -> this.insecure = value;
         default -> {
           return;
         }
@@ -245,10 +245,10 @@ public record NpmSearchQuery(
 
       this.filtersOnSomething = true;
     }
-  }
 
-  private static String stripAt(final String value) {
-    return value.startsWith("@") ? value.substring(1) : value;
+    private static String stripAt(final String value) {
+      return value.startsWith("@") ? value.substring(1) : value;
+    }
   }
 
   private static int parseNumber(final @Nullable String value, final int fallback) {

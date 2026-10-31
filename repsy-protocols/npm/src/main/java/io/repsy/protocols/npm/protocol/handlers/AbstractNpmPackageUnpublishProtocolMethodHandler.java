@@ -51,7 +51,7 @@ public abstract class AbstractNpmPackageUnpublishProtocolMethodHandler
 
   private final ObjectMapper objectMapper;
 
-  public AbstractNpmPackageUnpublishProtocolMethodHandler(
+  protected AbstractNpmPackageUnpublishProtocolMethodHandler(
       @Qualifier("osNpmPathParser") final PathParser basePathParser,
       final NpmProtocolFacade npmProtocolFacade,
       final ObjectMapper objectMapper,

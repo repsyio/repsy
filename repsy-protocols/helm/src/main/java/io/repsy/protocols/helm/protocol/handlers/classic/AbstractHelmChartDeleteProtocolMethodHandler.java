@@ -35,15 +35,15 @@ import org.springframework.http.ResponseEntity;
  * removes stored files, so it needs {@link Permission#MANAGE} like the panel's delete, and a deploy
  * token never has it (RPS-1424).
  */
-public abstract class AbstractHelmChartDeleteProtocolMethodHandler<ID>
-    extends AbstractFacadeProtocolMethodHandler<HelmProtocolFacade<ID>> {
+public abstract class AbstractHelmChartDeleteProtocolMethodHandler<I>
+    extends AbstractFacadeProtocolMethodHandler<HelmProtocolFacade<I>> {
 
   private static final Pattern CHART_DELETE_PATTERN =
       Pattern.compile("^/api/charts/([^/]+)/([^/]+)$");
 
-  public AbstractHelmChartDeleteProtocolMethodHandler(
+  protected AbstractHelmChartDeleteProtocolMethodHandler(
       final PathParser basePathParser,
-      final HelmProtocolFacade<ID> helmFacade,
+      final HelmProtocolFacade<I> helmFacade,
       final HelmProtocolProvider provider) {
     super(
         HandlerRoute.of(Permission.MANAGE, HttpMethod.DELETE)

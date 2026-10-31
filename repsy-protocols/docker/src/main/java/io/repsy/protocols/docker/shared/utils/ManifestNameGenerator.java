@@ -33,7 +33,6 @@ import org.jspecify.annotations.Nullable;
 public final class ManifestNameGenerator {
 
   private static final int SHORT_HASH_LENGTH = 12;
-  private static final int UUID_LENGTH = 8;
 
   /**
    * The name of the file a manifest is stored under, inside the repo's {@code manifests} directory.

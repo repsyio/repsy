@@ -32,12 +32,12 @@ import org.springframework.http.HttpMethod;
  * written, or a {@code 404} ({@code io.repsy.core.error_handling.exceptions.ItemNotFoundException}
  * propagated from the facade) when the session does not exist.
  */
-public abstract class AbstractDockerUploadStatusProtocolMethodHandler<ID>
-    extends AbstractOciUploadStatusProtocolMethodHandler<DockerProtocolFacade<ID>> {
+public abstract class AbstractDockerUploadStatusProtocolMethodHandler<I>
+    extends AbstractOciUploadStatusProtocolMethodHandler<DockerProtocolFacade<I>> {
 
-  public AbstractDockerUploadStatusProtocolMethodHandler(
+  protected AbstractDockerUploadStatusProtocolMethodHandler(
       final PathParser basePathParser,
-      final DockerProtocolFacade<ID> dockerFacade,
+      final DockerProtocolFacade<I> dockerFacade,
       final DockerProtocolProvider provider) {
     super(
         HandlerRoute.of(Permission.WRITE, HttpMethod.GET, HttpMethod.HEAD),

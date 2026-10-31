@@ -22,13 +22,13 @@ import java.util.List;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 
-public interface ChartService<ID> {
+public interface ChartService<I> {
 
-  HelmChartInfo getOrCreate(HelmChartForm form, ID repoId);
+  HelmChartInfo getOrCreate(HelmChartForm form, I repoId);
 
-  Optional<HelmChartInfo> findOptionalByNameAndVersion(ID repoId, String name, String version);
+  Optional<HelmChartInfo> findOptionalByNameAndVersion(I repoId, String name, String version);
 
-  HelmChartInfo update(ID repoId, HelmChartForm form);
+  HelmChartInfo update(I repoId, HelmChartForm form);
 
   /**
    * Records the chart version of a classic upload and, while that write is still open, stores its
@@ -44,7 +44,7 @@ public interface ChartService<ID> {
    *     exists and may not be replaced, or a concurrent upload of it won the race
    */
   HelmChartInfo publish(
-      ID repoId, HelmChartForm form, boolean allowOverride, ChartFileWriter fileWriter)
+      I repoId, HelmChartForm form, boolean allowOverride, ChartFileWriter fileWriter)
       throws IOException;
 
   /**
@@ -56,15 +56,15 @@ public interface ChartService<ID> {
    * @throws io.repsy.core.error_handling.exceptions.ItemNotFoundException When there is no such
    *     chart
    */
-  void lockChart(ID repoId, String name);
+  void lockChart(I repoId, String name);
 
-  HelmChartInfo getByRepoIdAndNameAndVersion(ID repoId, String name, String version);
+  HelmChartInfo getByRepoIdAndNameAndVersion(I repoId, String name, String version);
 
-  List<HelmChartInfo> findAllByRepoId(ID repoId);
+  List<HelmChartInfo> findAllByRepoId(I repoId);
 
-  void delete(ID repoId, String name, String version);
+  void delete(I repoId, String name, String version);
 
-  boolean existsByRepoIdAndDigest(ID repoId, String digest);
+  boolean existsByRepoIdAndDigest(I repoId, String digest);
 
   /** Stores the file of a version whose row {@link #publish} has just written. */
   @FunctionalInterface

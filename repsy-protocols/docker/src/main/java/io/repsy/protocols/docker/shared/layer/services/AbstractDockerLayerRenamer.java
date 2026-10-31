@@ -33,16 +33,16 @@ import lombok.RequiredArgsConstructor;
 import tools.jackson.databind.ObjectMapper;
 
 @RequiredArgsConstructor
-public abstract class AbstractDockerLayerRenamer<ID> {
+public abstract class AbstractDockerLayerRenamer<I> {
 
   private static final String BLOBS_PATH = "blobs";
 
-  private final DockerStorageService<ID> dockerStorageService;
-  private final LayerService<ID> layerTxService;
+  private final DockerStorageService<I> dockerStorageService;
+  private final LayerService<I> layerTxService;
   private final ObjectMapper objectMapper;
 
   public Map<LayerInfo, StoragePath> findLayersToRename(
-      final BaseRepoInfo<ID> repoInfo, final String manifestJson) {
+      final BaseRepoInfo<I> repoInfo, final String manifestJson) {
 
     final var manifestInfo = this.objectMapper.readValue(manifestJson, ManifestInfo.class);
 
@@ -83,7 +83,7 @@ public abstract class AbstractDockerLayerRenamer<ID> {
    * @return the disk usage the renames changed, summed over every layer
    */
   public BaseUsages renameLayers(
-      final BaseRepoInfo<ID> repoInfo, final Map<LayerInfo, StoragePath> storageMap) {
+      final BaseRepoInfo<I> repoInfo, final Map<LayerInfo, StoragePath> storageMap) {
 
     var diskUsage = 0L;
 
@@ -104,7 +104,7 @@ public abstract class AbstractDockerLayerRenamer<ID> {
   }
 
   private boolean checkLayerExistsInStorage(
-      final BaseRepoInfo<ID> repoInfo, final RelativePath relativePath, final LayerInfo layerInfo) {
+      final BaseRepoInfo<I> repoInfo, final RelativePath relativePath, final LayerInfo layerInfo) {
 
     final var idx = BlobDigests.indexOfDigestPrefix(relativePath.getPath());
 

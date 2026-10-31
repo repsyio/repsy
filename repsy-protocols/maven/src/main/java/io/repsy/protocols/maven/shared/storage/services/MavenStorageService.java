@@ -31,7 +31,7 @@ import java.util.function.Supplier;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.springframework.core.io.Resource;
 
-public interface MavenStorageService<ID> {
+public interface MavenStorageService<I> {
 
   void createRepo(UUID repoId);
 
@@ -74,7 +74,7 @@ public interface MavenStorageService<ID> {
   void deleteRepo(UUID repoId);
 
   BaseUsages deleteVersionFromMetadata(
-      BaseRepoInfo<ID> repoInfo, String groupId, String artifactId, String versionName)
+      BaseRepoInfo<I> repoInfo, String groupId, String artifactId, String versionName)
       throws IOException, XmlPullParserException;
 
   /**
@@ -97,7 +97,7 @@ public interface MavenStorageService<ID> {
    *     malformedMetadataFile}, before anything is written, when the stored file cannot be parsed
    */
   long addVersionsToMetadata(
-      BaseRepoInfo<ID> repoInfo,
+      BaseRepoInfo<I> repoInfo,
       String groupId,
       String artifactId,
       Supplier<? extends Collection<String>> registeredVersions)
@@ -124,7 +124,7 @@ public interface MavenStorageService<ID> {
    *     malformedMetadataFile}, before anything is written, when the stored file cannot be parsed
    */
   long addPluginsToGroupMetadata(
-      BaseRepoInfo<ID> repoInfo,
+      BaseRepoInfo<I> repoInfo,
       String groupId,
       Supplier<? extends Collection<RegisteredPlugin>> registeredPlugins)
       throws IOException;
@@ -147,7 +147,7 @@ public interface MavenStorageService<ID> {
    *     malformedMetadataFile}, before anything is written, when the stored file cannot be parsed
    */
   long replacePluginPrefixInGroupMetadata(
-      BaseRepoInfo<ID> repoInfo, String groupId, PluginPrefixChange change) throws IOException;
+      BaseRepoInfo<I> repoInfo, String groupId, PluginPrefixChange change) throws IOException;
 
   Path getPath(String groupId, String artifactId);
 

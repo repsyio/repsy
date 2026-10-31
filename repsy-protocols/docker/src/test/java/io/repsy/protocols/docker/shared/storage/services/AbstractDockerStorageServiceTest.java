@@ -135,7 +135,9 @@ class AbstractDockerStorageServiceTest {
     when(this.storageStrategy.getFileUsage(any(), eq("repo"))).thenThrow(new IOException("disk"));
     final var service = new TestStorageService(this.storageStrategy);
 
-    assertThatThrownBy(() -> service.deleteBlobFile(new RepoRef(REPO_UUID, "repo"), "upload-id"))
+    final var repoRef = new RepoRef(REPO_UUID, "repo");
+
+    assertThatThrownBy(() -> service.deleteBlobFile(repoRef, "upload-id"))
         .isInstanceOf(ErrorOccurredException.class)
         .hasCauseInstanceOf(IOException.class);
     verify(this.storageStrategy, never()).delete(any());

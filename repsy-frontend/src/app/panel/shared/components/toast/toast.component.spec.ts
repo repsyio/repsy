@@ -43,9 +43,10 @@ describe('ToastComponent', () => {
   });
 
   it('keeps a polite live region on screen even when there is no toast', () => {
-    expect(stack().getAttribute('role')).toBe('status');
+    // <output> carries the implicit role "status".
+    expect(stack().tagName).toBe('OUTPUT');
     expect(stack().getAttribute('aria-live')).toBe('polite');
-    expect(toasts().length).toBe(0);
+    expect(toasts()).toHaveSize(0);
   });
 
   it('gives error toasts role alert and success toasts none', () => {
@@ -77,7 +78,7 @@ describe('ToastComponent', () => {
     (fixture.nativeElement.querySelector('[data-testid="toast-close"]') as HTMLButtonElement).click();
     fixture.detectChanges();
 
-    expect(toasts().length).toBe(0);
+    expect(toasts()).toHaveSize(0);
   });
 
   it('keeps an error toast while it is hovered and lets it go on leave', fakeAsync(() => {
@@ -87,11 +88,11 @@ describe('ToastComponent', () => {
     tick(6000);
     fire(toasts()[0], 'mouseenter');
     tick(30000);
-    expect(service.toasts.length).toBe(1);
+    expect(service.toasts).toHaveSize(1);
 
     fire(toasts()[0], 'mouseleave');
     tick(1000);
-    expect(service.toasts.length).toBe(0);
+    expect(service.toasts).toHaveSize(0);
   }));
 
   it('keeps an error toast while focus is inside it, and while either hover or focus remains', fakeAsync(() => {
@@ -102,11 +103,11 @@ describe('ToastComponent', () => {
     fire(toasts()[0], 'mouseenter');
     fire(toasts()[0], 'mouseleave');
     tick(30000);
-    expect(service.toasts.length).toBe(1);
+    expect(service.toasts).toHaveSize(1);
 
     fire(toasts()[0], 'focusout');
     tick(7000);
-    expect(service.toasts.length).toBe(0);
+    expect(service.toasts).toHaveSize(0);
   }));
 
   it('does not hold a success toast', fakeAsync(() => {
@@ -115,6 +116,6 @@ describe('ToastComponent', () => {
 
     fire(toasts()[0], 'mouseenter');
     tick(3000);
-    expect(service.toasts.length).toBe(0);
+    expect(service.toasts).toHaveSize(0);
   }));
 });

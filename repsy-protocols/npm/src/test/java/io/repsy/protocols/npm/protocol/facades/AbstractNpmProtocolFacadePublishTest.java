@@ -272,7 +272,10 @@ class AbstractNpmProtocolFacadePublishTest {
     when(this.packageService.publishVersion(any(), any(), any(), any(), any(), any()))
         .thenThrow(new AccessNotAllowedException("packageVersionAlreadyExists"));
 
-    assertThatThrownBy(() -> this.publish(payload())).isInstanceOf(AccessNotAllowedException.class);
+    final var publishPayload = payload();
+
+    assertThatThrownBy(() -> this.publish(publishPayload))
+        .isInstanceOf(AccessNotAllowedException.class);
 
     verify(this.storageService, never()).writeTarballAndMetadata(any(), any(), any(), any(), any());
     verify(this.storageService, never()).discardPublishedVersion(any(), any(), any(), any(), any());
@@ -323,7 +326,9 @@ class AbstractNpmProtocolFacadePublishTest {
     this.publishRuns(PublishKind.NEW_PACKAGE);
     when(this.storageService.processPackagePayload(any(), any())).thenThrow(failure);
 
-    assertThatThrownBy(() -> this.publish(payload())).isInstanceOf(BadRequestException.class);
+    final var publishPayload = payload();
+
+    assertThatThrownBy(() -> this.publish(publishPayload)).isInstanceOf(BadRequestException.class);
 
     verify(this.storageService)
         .discardPublishedVersion(

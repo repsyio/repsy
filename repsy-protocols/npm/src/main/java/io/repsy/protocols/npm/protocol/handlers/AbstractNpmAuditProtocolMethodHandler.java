@@ -43,18 +43,18 @@ import tools.jackson.databind.JsonNode;
  * here and not thrown, so that the npm client, which falls back to another endpoint on an error,
  * gets a plain JSON error.
  */
-public abstract class AbstractNpmAuditProtocolMethodHandler<ID>
+public abstract class AbstractNpmAuditProtocolMethodHandler<I>
     extends AbstractRoutedProtocolMethodHandler {
 
   /** The largest inflated body an audit request may have. */
   static final long DEFAULT_MAX_AUDIT_BODY_BYTES = 8L * 1024 * 1024;
 
-  private final NpmAdvisorySource<ID> advisorySource;
+  private final NpmAdvisorySource<I> advisorySource;
 
   protected AbstractNpmAuditProtocolMethodHandler(
       final PathParser basePathParser,
       final String relativePathRegex,
-      final NpmAdvisorySource<ID> advisorySource,
+      final NpmAdvisorySource<I> advisorySource,
       final NpmProtocolProvider provider) {
     super(
         HandlerRoute.read(HttpMethod.POST).skipUsagePostProcessor(true),
@@ -64,10 +64,10 @@ public abstract class AbstractNpmAuditProtocolMethodHandler<ID>
   }
 
   /** Builds the report of an audit request; {@code body} is its JSON object. */
-  protected abstract Object report(BaseRepoInfo<ID> repoInfo, JsonNode body);
+  protected abstract Object report(BaseRepoInfo<I> repoInfo, JsonNode body);
 
   /** Where the advisories of the requested versions come from. */
-  protected final NpmAdvisorySource<ID> advisorySource() {
+  protected final NpmAdvisorySource<I> advisorySource() {
     return this.advisorySource;
   }
 
@@ -90,7 +90,7 @@ public abstract class AbstractNpmAuditProtocolMethodHandler<ID>
               request.getHeader(HttpHeaders.CONTENT_ENCODING),
               this.maxAuditBodyBytes());
 
-      final var report = this.report(ProtocolContextUtils.<ID>getRepoInfo(context), body);
+      final var report = this.report(ProtocolContextUtils.<I>getRepoInfo(context), body);
 
       return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(report);
 

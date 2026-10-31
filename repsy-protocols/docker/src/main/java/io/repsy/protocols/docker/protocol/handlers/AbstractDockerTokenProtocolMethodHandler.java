@@ -51,18 +51,18 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 
-public abstract class AbstractDockerTokenProtocolMethodHandler<ID>
+public abstract class AbstractDockerTokenProtocolMethodHandler<I>
     extends AbstractRoutedProtocolMethodHandler {
 
   public static final TemporalAmount DEFAULT_TIMEOUT_ACCESS_TOKEN =
       Duration.of(30, ChronoUnit.MINUTES);
 
-  private final DockerScopeParser<ID> scopeParser;
-  private final DockerAuthService<ID> authService;
+  private final DockerScopeParser<I> scopeParser;
+  private final DockerAuthService<I> authService;
 
-  public AbstractDockerTokenProtocolMethodHandler(
-      final DockerAuthService<ID> authService,
-      final DockerScopeParser<ID> scopeParser,
+  protected AbstractDockerTokenProtocolMethodHandler(
+      final DockerAuthService<I> authService,
+      final DockerScopeParser<I> scopeParser,
       final DockerProtocolProvider provider) {
     super(
         HandlerRoute.of(Permission.NONE, HttpMethod.GET, HttpMethod.POST)

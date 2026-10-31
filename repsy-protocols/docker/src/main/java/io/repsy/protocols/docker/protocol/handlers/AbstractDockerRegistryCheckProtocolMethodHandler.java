@@ -51,7 +51,8 @@ public abstract class AbstractDockerRegistryCheckProtocolMethodHandler
     return "/v2".equals(path) || "/v2/".equals(path);
   }
 
-  public AbstractDockerRegistryCheckProtocolMethodHandler(final DockerProtocolProvider provider) {
+  protected AbstractDockerRegistryCheckProtocolMethodHandler(
+      final DockerProtocolProvider provider) {
     super(
         HandlerRoute.of(Permission.NONE, HttpMethod.GET, HttpMethod.HEAD)
             .skipPreProcessor(true)

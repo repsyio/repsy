@@ -26,6 +26,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import org.apache.commons.codec.digest.DigestUtils;
+import org.apache.maven.artifact.repository.metadata.Plugin;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -319,7 +320,7 @@ class ArtifactMetadataSynthesizerTest {
     assertThat(ArtifactMetadataSynthesizer.groupMetadataXml(plugins())).isEqualTo(first);
     assertThat(
             MavenMetadataUtils.readMetadata(first).getPlugins().stream()
-                .map(plugin -> plugin.getArtifactId())
+                .map(Plugin::getArtifactId)
                 .toList())
         .containsExactly("hello-maven-plugin", "zed-maven-plugin");
     assertThat(ArtifactMetadataSynthesizer.checksum(first, "sha1"))

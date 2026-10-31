@@ -28,6 +28,12 @@ public final class HelmConstants {
    */
   public static final String OCI_BLOBS_PATH = "oci/blobs";
 
+  /** Where the OCI route stores manifests, as {@code oci/manifests/<name>/<reference>}. */
+  public static final String OCI_MANIFESTS_PATH = "oci/manifests";
+
+  /** The separator between the segments of a storage path. */
+  public static final char PATH_SEPARATOR = '/';
+
   public static final String INDEX_YAML = "index.yaml";
   public static final String CHART_YAML = "Chart.yaml";
   public static final String TGZ_EXTENSION = ".tgz";

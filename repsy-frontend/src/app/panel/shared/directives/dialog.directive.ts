@@ -78,7 +78,7 @@ export class DialogDirective {
 
   @HostListener('document:keydown', ['$event'])
   onKeydown(event: KeyboardEvent): void {
-    if (openDialogs[openDialogs.length - 1] !== this || event.defaultPrevented) {
+    if (openDialogs.at(-1) !== this || event.defaultPrevented) {
       return;
     }
     if (event.key === 'Escape') {
@@ -111,7 +111,7 @@ export class DialogDirective {
       return;
     }
     const first = items[0];
-    const last = items[items.length - 1];
+    const last = items.at(-1)!;
     const active = document.activeElement;
     const inside = this.host.contains(active);
     if (event.shiftKey && (!inside || active === first || active === this.host)) {

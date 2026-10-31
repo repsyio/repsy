@@ -34,10 +34,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
 
 @Slf4j
-public abstract class AbstractHelmStorageService<ID> extends AbstractArtifactStorageService
-    implements HelmStorageService<ID> {
+public abstract class AbstractHelmStorageService<I> extends AbstractArtifactStorageService
+    implements HelmStorageService<I> {
 
-  private static final String OCI_BLOBS_PATH = "oci/blobs";
+  private static final String OCI_BLOBS_PATH = HelmConstants.OCI_BLOBS_PATH;
+  private static final char SEP = HelmConstants.PATH_SEPARATOR;
 
   protected AbstractHelmStorageService(final StorageStrategy storageStrategy) {
     super(storageStrategy);
@@ -65,14 +66,14 @@ public abstract class AbstractHelmStorageService<ID> extends AbstractArtifactSto
 
   @Override
   public long deleteChartFile(final RepoRef repo, final String filename, final String digest) {
-    final var classicPath = StoragePath.of(repo.id(), HelmConstants.CHARTS_PATH + "/" + filename);
+    final var classicPath = StoragePath.of(repo.id(), HelmConstants.CHARTS_PATH + SEP + filename);
     final var classicUsage = this.fileUsage(classicPath, repo.name());
     if (classicUsage > 0) {
       log.debug("Deleting classic chart at {} ({} bytes)", classicPath, classicUsage);
       this.storageStrategy.delete(classicPath);
       return classicUsage;
     }
-    final var ociPath = StoragePath.of(repo.id(), "oci/blobs/" + digest);
+    final var ociPath = StoragePath.of(repo.id(), OCI_BLOBS_PATH + SEP + digest);
     final var ociUsage = this.fileUsage(ociPath, repo.name());
     if (ociUsage > 0) {
       log.debug("Deleting OCI blob at {} ({} bytes)", ociPath, ociUsage);
@@ -83,7 +84,8 @@ public abstract class AbstractHelmStorageService<ID> extends AbstractArtifactSto
 
   @Override
   public long deleteManifestFile(final RepoRef repo, final String name, final String reference) {
-    final var path = StoragePath.of(repo.id(), "oci/manifests/" + name + "/" + reference);
+    final var path =
+        StoragePath.of(repo.id(), HelmConstants.OCI_MANIFESTS_PATH + SEP + name + SEP + reference);
     final var usage = this.fileUsage(path, repo.name());
     if (usage > 0) {
       log.debug("Deleting OCI manifest file at {} ({} bytes)", path, usage);
@@ -94,30 +96,30 @@ public abstract class AbstractHelmStorageService<ID> extends AbstractArtifactSto
 
   @Override
   public void clearTrash() {
-    final var unused = this.storageStrategy.clearTrash();
+    this.storageStrategy.clearTrash();
   }
 
   @Override
   public String getChartRelativePath(final String name, final String version) {
-    return HelmConstants.CHARTS_PATH + "/" + name + "-" + version + HelmConstants.TGZ_EXTENSION;
+    return HelmConstants.CHARTS_PATH + SEP + name + "-" + version + HelmConstants.TGZ_EXTENSION;
   }
 
   @Override
   public BaseUsages saveBlobChunk(
       final RepoRef repo, final UUID uploadId, final InputStream chunk) {
-    final var storagePath = StoragePath.of(repo.id(), "oci/blobs/" + uploadId);
+    final var storagePath = StoragePath.of(repo.id(), OCI_BLOBS_PATH + SEP + uploadId);
     return this.storageStrategy.appendStream(repo.name(), storagePath, chunk);
   }
 
   @Override
   public long getBlobSize(final RepoRef repo, final UUID uploadId) throws IOException {
-    final var storagePath = StoragePath.of(repo.id(), "oci/blobs/" + uploadId);
+    final var storagePath = StoragePath.of(repo.id(), OCI_BLOBS_PATH + SEP + uploadId);
     return this.storageStrategy.getFileUsage(storagePath, repo.name());
   }
 
   @Override
   public BaseUsages finalizeBlob(final UUID repoId, final UUID uploadId, final String digest) {
-    final var storagePath = StoragePath.of(repoId, "oci/blobs/" + uploadId);
+    final var storagePath = StoragePath.of(repoId, OCI_BLOBS_PATH + SEP + uploadId);
     return this.storageStrategy.renameObject(storagePath, digest);
   }
 
@@ -129,13 +131,13 @@ public abstract class AbstractHelmStorageService<ID> extends AbstractArtifactSto
 
   @Override
   public long deleteBlobFile(final RepoRef repo, final String fileName) {
-    final var storagePath = StoragePath.of(repo.id(), OCI_BLOBS_PATH + "/" + fileName);
+    final var storagePath = StoragePath.of(repo.id(), OCI_BLOBS_PATH + SEP + fileName);
     return this.deleteFileWithUsage(storagePath, repo.name());
   }
 
   @Override
   public long deleteBlob(final RepoRef repo, final String digest) {
-    final var storagePath = StoragePath.of(repo.id(), OCI_BLOBS_PATH + "/" + digest);
+    final var storagePath = StoragePath.of(repo.id(), OCI_BLOBS_PATH + SEP + digest);
     final var blob = this.storageStrategy.get(storagePath, repo.name());
     if (blob.isEmpty()) {
       return 0;
@@ -153,7 +155,7 @@ public abstract class AbstractHelmStorageService<ID> extends AbstractArtifactSto
 
   @Override
   public Optional<Resource> findBlob(final RepoRef repo, final String digest) {
-    final var storagePath = StoragePath.of(repo.id(), "oci/blobs/" + digest);
+    final var storagePath = StoragePath.of(repo.id(), OCI_BLOBS_PATH + SEP + digest);
     return this.storageStrategy.get(storagePath, repo.name());
   }
 
@@ -166,7 +168,8 @@ public abstract class AbstractHelmStorageService<ID> extends AbstractArtifactSto
   @Override
   public BaseUsages saveManifest(
       final RepoRef repo, final String name, final String reference, final byte[] content) {
-    final var storagePath = StoragePath.of(repo.id(), "oci/manifests/" + name + "/" + reference);
+    final var storagePath =
+        StoragePath.of(repo.id(), HelmConstants.OCI_MANIFESTS_PATH + SEP + name + SEP + reference);
     try (final var inputStream = new ByteArrayInputStream(content)) {
       return this.storageStrategy.write(repo.name(), storagePath, inputStream);
     } catch (final IOException e) {
@@ -177,7 +180,8 @@ public abstract class AbstractHelmStorageService<ID> extends AbstractArtifactSto
   @Override
   public Optional<Resource> findManifest(
       final RepoRef repo, final String name, final String reference) {
-    final var storagePath = StoragePath.of(repo.id(), "oci/manifests/" + name + "/" + reference);
+    final var storagePath =
+        StoragePath.of(repo.id(), HelmConstants.OCI_MANIFESTS_PATH + SEP + name + SEP + reference);
     return this.storageStrategy.get(storagePath, repo.name());
   }
 

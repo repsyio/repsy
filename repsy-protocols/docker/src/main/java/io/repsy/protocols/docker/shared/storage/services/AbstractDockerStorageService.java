@@ -34,8 +34,8 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.core.io.Resource;
 
-public abstract class AbstractDockerStorageService<ID> extends AbstractArtifactStorageService
-    implements DockerStorageService<ID> {
+public abstract class AbstractDockerStorageService<I> extends AbstractArtifactStorageService
+    implements DockerStorageService<I> {
 
   private static final String MANIFESTS_PATH = "manifests";
   private static final String BLOBS_PATH = "blobs";
@@ -90,7 +90,7 @@ public abstract class AbstractDockerStorageService<ID> extends AbstractArtifactS
 
   @Override
   public long deleteManifests(
-      final BaseRepoInfo<ID> repoInfo, final Collection<String> manifestsToDeleteFileNames) {
+      final BaseRepoInfo<I> repoInfo, final Collection<String> manifestsToDeleteFileNames) {
 
     var totalUsage = 0L;
 
@@ -102,7 +102,7 @@ public abstract class AbstractDockerStorageService<ID> extends AbstractArtifactS
   }
 
   @Override
-  public long deleteManifest(final BaseRepoInfo<ID> repoInfo, final String manifestName) {
+  public long deleteManifest(final BaseRepoInfo<I> repoInfo, final String manifestName) {
 
     final var storagePath =
         StoragePath.of(
@@ -150,6 +150,6 @@ public abstract class AbstractDockerStorageService<ID> extends AbstractArtifactS
   @Override
   public void clearTrash() {
 
-    final var unused = this.storageStrategy.clearTrash();
+    this.storageStrategy.clearTrash();
   }
 }

@@ -47,21 +47,21 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  */
 @Slf4j
 @RequiredArgsConstructor
-final class HelmOciManifestFacade<ID> {
+final class HelmOciManifestFacade<I> {
 
-  private final HelmStorageService<ID> helmStorageService;
-  private final ChartService<ID> chartService;
-  private final OciManifestService<ID> ociManifestService;
+  private final HelmStorageService<I> helmStorageService;
+  private final ChartService<I> chartService;
+  private final OciManifestService<I> ociManifestService;
 
   Optional<HelmOciManifestInfo> checkManifest(
       final ProtocolContext context, final String name, final String reference) {
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     return this.ociManifestService.findByNameAndReference(repoInfo.getId(), name, reference);
   }
 
   HelmOciManifestInfo getManifest(
       final ProtocolContext context, final String name, final String reference) throws IOException {
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     return this.ociManifestService
         .findByNameAndReference(repoInfo.getId(), name, reference)
         .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.MANIFEST_NOT_FOUND));
@@ -80,7 +80,7 @@ final class HelmOciManifestFacade<ID> {
   HelmOciManifestPushResult pushManifest(
       final ProtocolContext context, final HelmOciManifestPushForm form, final byte[] contentBytes)
       throws IOException {
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
 
     final var chart = this.chartService.getOrCreate(form.getChart(), repoInfo.getId());
     // Looked up after the chart lock: a push that waited for another one must see the manifest
@@ -136,7 +136,7 @@ final class HelmOciManifestFacade<ID> {
    * refers to is harmless, a missing one for a row that did commit is not.
    */
   private void undoManifestFileUnlessCommitted(
-      final BaseRepoInfo<ID> repoInfo,
+      final BaseRepoInfo<I> repoInfo,
       final HelmOciManifestPushForm form,
       final byte[] written,
       final byte @Nullable [] previous,
@@ -169,7 +169,7 @@ final class HelmOciManifestFacade<ID> {
   }
 
   private void undoManifestFile(
-      final BaseRepoInfo<ID> repoInfo,
+      final BaseRepoInfo<I> repoInfo,
       final HelmOciManifestPushForm form,
       final byte[] written,
       final byte @Nullable [] previous,
@@ -199,7 +199,7 @@ final class HelmOciManifestFacade<ID> {
   }
 
   private byte @Nullable [] readManifestFile(
-      final BaseRepoInfo<ID> repoInfo, final HelmOciManifestPushForm form) {
+      final BaseRepoInfo<I> repoInfo, final HelmOciManifestPushForm form) {
 
     try {
       final var resource =
@@ -221,7 +221,7 @@ final class HelmOciManifestFacade<ID> {
   }
 
   HelmOciTagListInfo listTags(final ProtocolContext context, final String name) {
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     // listTagsByName's references include pushes by digest (sha256:...), which the distribution
     // spec's tags/list must not return, and are ordered newest-first, where the spec wants
     // lexical order. The filtering/sorting stays here rather than in OciManifestService because

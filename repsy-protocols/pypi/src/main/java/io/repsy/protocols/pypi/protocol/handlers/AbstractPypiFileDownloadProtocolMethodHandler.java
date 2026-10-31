@@ -35,13 +35,13 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
-public abstract class AbstractPypiFileDownloadProtocolMethodHandler<ID>
-    extends AbstractFacadeProtocolMethodHandler<PypiProtocolFacade<ID>> {
+public abstract class AbstractPypiFileDownloadProtocolMethodHandler<I>
+    extends AbstractFacadeProtocolMethodHandler<PypiProtocolFacade<I>> {
 
   private static final Pattern DOWNLOAD_PATTERN = Pattern.compile("^/([^/]+)/-/([^/]+)$");
 
-  public AbstractPypiFileDownloadProtocolMethodHandler(
-      final PypiProtocolFacade<ID> pypiProtocolFacade,
+  protected AbstractPypiFileDownloadProtocolMethodHandler(
+      final PypiProtocolFacade<I> pypiProtocolFacade,
       final PathParser basePathParser,
       final PypiProtocolProvider provider) {
     super(

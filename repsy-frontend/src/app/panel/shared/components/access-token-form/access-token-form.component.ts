@@ -108,12 +108,12 @@ export class AccessTokenFormComponent implements OnInit {
     return this.selectedScopes.has(scope);
   }
 
-  toggleScope(scope: AccessTokenScope, checked: boolean): void {
-    if (checked) {
-      this.selectedScopes.add(scope);
-    } else {
-      this.selectedScopes.delete(scope);
-    }
+  selectScope(scope: AccessTokenScope): void {
+    this.selectedScopes.add(scope);
+  }
+
+  deselectScope(scope: AccessTokenScope): void {
+    this.selectedScopes.delete(scope);
   }
 
   get expirationInvalid(): boolean {

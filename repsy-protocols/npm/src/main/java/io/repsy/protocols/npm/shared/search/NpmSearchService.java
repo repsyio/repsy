@@ -18,8 +18,8 @@ package io.repsy.protocols.npm.shared.search;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 
 /** Searches the packages of one npm repository, for {@code GET /-/v1/search}. */
-public interface NpmSearchService<ID> {
+public interface NpmSearchService<I> {
 
   /** Returns the requested page of the packages of {@code repoInfo} that match {@code query}. */
-  NpmSearchResult search(BaseRepoInfo<ID> repoInfo, NpmSearchQuery query);
+  NpmSearchResult search(BaseRepoInfo<I> repoInfo, NpmSearchQuery query);
 }

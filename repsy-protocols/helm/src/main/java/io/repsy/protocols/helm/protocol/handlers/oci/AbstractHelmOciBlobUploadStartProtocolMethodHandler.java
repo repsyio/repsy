@@ -28,14 +28,14 @@ import java.util.UUID;
 import org.springframework.http.HttpMethod;
 
 /** Handles POST /v2/{repo}/{name}/blobs/uploads/ — starts a blob upload session. */
-public abstract class AbstractHelmOciBlobUploadStartProtocolMethodHandler<ID>
+public abstract class AbstractHelmOciBlobUploadStartProtocolMethodHandler<I>
     extends AbstractOciUploadStartProtocolMethodHandler {
 
-  protected final HelmProtocolFacade<ID> facade;
+  protected final HelmProtocolFacade<I> facade;
 
-  public AbstractHelmOciBlobUploadStartProtocolMethodHandler(
+  protected AbstractHelmOciBlobUploadStartProtocolMethodHandler(
       final PathParser basePathParser,
-      final HelmProtocolFacade<ID> helmFacade,
+      final HelmProtocolFacade<I> helmFacade,
       final HelmProtocolProvider provider) {
     super(
         HandlerRoute.of(Permission.WRITE, HttpMethod.POST)

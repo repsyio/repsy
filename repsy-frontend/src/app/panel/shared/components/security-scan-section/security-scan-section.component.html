@@ -30,6 +30,7 @@
       </div>
 
       <svg
+        aria-hidden="true"
         width="16"
         height="16"
         viewBox="0 0 24 24"
@@ -140,16 +141,15 @@
                 class="hidden grid-cols-[110px_140px_1.5fr_120px_140px_130px] gap-4 rounded-t-[12px] border-t border-r border-l border-neutral-400 p-[10px] text-[#9C9C9D] lg:grid"
               >
                 <div>CVE ID</div>
-                <div
+                <button
                   data-testid="scan-findings-sort-severity"
-                  role="button"
-                  tabindex="0"
+                  type="button"
                   class="flex w-fit cursor-pointer items-center gap-1"
                   (click)="toggleFindingsSort()"
-                  (keydown.enter)="toggleFindingsSort()"
                 >
                   Severity
                   <svg
+                    aria-hidden="true"
                     width="10"
                     height="10"
                     viewBox="0 0 24 24"
@@ -166,7 +166,7 @@
                       stroke-linejoin="round"
                     />
                   </svg>
-                </div>
+                </button>
                 <div>Package</div>
                 <div>Installed Version</div>
                 <div>Fixed Version</div>

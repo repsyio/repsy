@@ -103,7 +103,7 @@ export class RubyGemsVersionListComponent implements OnDestroy {
     this.activeRepo = {} as RepoPermissionInfo;
     this.repositoryChanges$ = this.rubyService.repoChanges$.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
-        this.activeRepo = Object.assign({}, repo);
+        this.activeRepo = { ...repo };
         this.gemName = this.route.snapshot.paramMap.get('packageName');
         this.fetchVersions();
         this.fetchSecuritySummary();

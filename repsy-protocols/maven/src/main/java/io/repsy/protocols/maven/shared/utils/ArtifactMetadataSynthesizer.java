@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -250,7 +249,7 @@ public class ArtifactMetadataSynthesizer {
         .map(RegisteredVersion::lastUpdatedAt)
         .filter(Objects::nonNull)
         .max(Instant::compareTo)
-        .ifPresent(newest -> versioning.setLastUpdatedTimestamp(Date.from(newest)));
+        .ifPresent(newest -> MavenMetadataUtils.setLastUpdated(versioning, newest));
 
     return write(metadata);
   }

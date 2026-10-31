@@ -27,12 +27,12 @@ import java.io.IOException;
 import org.springframework.http.HttpMethod;
 
 /** The Docker upload chunk; the session lives at {@code /blobs/<id>} of the repo's storage. */
-public abstract class AbstractDockerUploadChunkProtocolMethodHandler<ID>
-    extends AbstractOciUploadChunkProtocolMethodHandler<DockerProtocolFacade<ID>> {
+public abstract class AbstractDockerUploadChunkProtocolMethodHandler<I>
+    extends AbstractOciUploadChunkProtocolMethodHandler<DockerProtocolFacade<I>> {
 
-  public AbstractDockerUploadChunkProtocolMethodHandler(
+  protected AbstractDockerUploadChunkProtocolMethodHandler(
       final PathParser basePathParser,
-      final DockerProtocolFacade<ID> dockerFacade,
+      final DockerProtocolFacade<I> dockerFacade,
       final DockerProtocolProvider provider) {
     super(
         HandlerRoute.of(Permission.WRITE, HttpMethod.PATCH).skipHeaderPreProcessor(true),

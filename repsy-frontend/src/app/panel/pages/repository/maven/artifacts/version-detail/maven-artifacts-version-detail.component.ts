@@ -128,7 +128,7 @@ export class MavenArtifactsVersionDetailComponent implements OnDestroy {
     this.activeRepo = {} as RepoPermissionInfo;
     this.repositoryChanges$ = this.mavenService.repoChanges$.subscribe((registry: RepoPermissionInfo) => {
       if (registry && this.isRegistryForCurrentRoute(registry)) {
-        this.activeRepo = Object.assign({}, registry);
+        this.activeRepo = { ...registry };
         this.loadVersion();
       }
     });
@@ -239,7 +239,13 @@ export class MavenArtifactsVersionDetailComponent implements OnDestroy {
       )
       .subscribe({
         next: (wasLastVersion) => {
-          landAfterVersionDelete(this.router, this.route, this.toastService, this.activeRepo.repoName, wasLastVersion);
+          void landAfterVersionDelete(
+            this.router,
+            this.route,
+            this.toastService,
+            this.activeRepo.repoName,
+            wasLastVersion,
+          );
         },
         error: () => {},
       });

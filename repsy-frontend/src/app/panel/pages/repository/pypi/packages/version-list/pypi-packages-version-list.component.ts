@@ -102,7 +102,7 @@ export class PypiPackagesVersionListComponent implements OnDestroy {
     this.activeRepo = {} as RepoPermissionInfo;
     this.repositoryChanges$ = this.pypiService.repoChanges$.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
-        this.activeRepo = Object.assign({}, repo);
+        this.activeRepo = { ...repo };
         this.packageName = this.route.snapshot.paramMap.get('packageName');
 
         this.fetchVersions();

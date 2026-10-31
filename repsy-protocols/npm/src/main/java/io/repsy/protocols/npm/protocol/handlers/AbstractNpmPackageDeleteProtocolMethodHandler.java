@@ -40,7 +40,7 @@ import org.springframework.http.ResponseEntity;
 public abstract class AbstractNpmPackageDeleteProtocolMethodHandler
     extends AbstractFacadeProtocolMethodHandler<NpmProtocolFacade> {
 
-  public AbstractNpmPackageDeleteProtocolMethodHandler(
+  protected AbstractNpmPackageDeleteProtocolMethodHandler(
       @Qualifier("npmPathParser") final PathParser basePathParser,
       final NpmProtocolFacade npmProtocolFacade,
       final NpmProtocolProvider provider) {

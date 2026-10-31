@@ -61,8 +61,8 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 @Slf4j
-public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
-    extends AbstractFacadeProtocolMethodHandler<HelmProtocolFacade<ID>> {
+public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<I>
+    extends AbstractFacadeProtocolMethodHandler<HelmProtocolFacade<I>> {
 
   private static final Pattern MANIFEST_PUSH_PATTERN = Pattern.compile("^/([^/]+)/manifests/(.+)$");
   private static final int RETRY_COUNT = 3;
@@ -80,9 +80,9 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
    *     reference grammar, the manifest's media type, schema version and config, and a digest
    *     reference against the bytes); {@code repsy.helm.oci.strict-wire}
    */
-  public AbstractHelmOciManifestPushProtocolMethodHandler(
+  protected AbstractHelmOciManifestPushProtocolMethodHandler(
       final PathParser basePathParser,
-      final HelmProtocolFacade<ID> helmFacade,
+      final HelmProtocolFacade<I> helmFacade,
       final HelmProtocolProvider provider,
       final boolean strictWire) {
     super(
@@ -121,7 +121,7 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
     rejectOverLongIdentifiers(name, reference, mediaType);
     this.guardReference(reference);
 
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     final var existingManifest = this.facade.checkManifest(context, name, reference);
     if (existingManifest.isPresent() && !repoInfo.isAllowOverride()) {
       log.info("Chart {}:{} already exists in repo {}", name, reference, repoInfo.getName());
@@ -234,7 +234,7 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
    */
   private void checkChartOverride(
       final ProtocolContext context,
-      final BaseRepoInfo<ID> repoInfo,
+      final BaseRepoInfo<I> repoInfo,
       final HelmChartMetadata metadata,
       final String layerDigest) {
 
@@ -331,7 +331,7 @@ public abstract class AbstractHelmOciManifestPushProtocolMethodHandler<ID>
     final JsonNode manifest;
     try {
       manifest = OBJECT_MAPPER.readTree(manifestJson);
-    } catch (final JacksonException e) {
+    } catch (final JacksonException _) {
       throw new BadRequestException(ProtocolErrorCodes.MANIFEST_INVALID_JSON);
     }
 

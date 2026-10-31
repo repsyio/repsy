@@ -60,7 +60,7 @@ describe('AccessTokenFormComponent', () => {
   it('cuts a name longer than 80 characters', () => {
     init('x'.repeat(200), ['repo:read']);
 
-    expect(component.form.value.name.length).toBe(80);
+    expect(component.form.value.name).toHaveSize(80);
   });
 
   it('does not submit without a scope, nor without a name', () => {
@@ -69,7 +69,7 @@ describe('AccessTokenFormComponent', () => {
     expect(component.canSubmit).toBeFalse();
     expect(api.createAccessToken).not.toHaveBeenCalled();
 
-    component.toggleScope('scan:read', true);
+    component.selectScope('scan:read');
     component.form.patchValue({ name: '  ' });
     expect(component.form.value.name.trim()).toBe('');
   });
@@ -110,10 +110,10 @@ describe('AccessTokenFormComponent', () => {
 
   it('creates the token with the selected scopes only, in the offered order, and emits it once', () => {
     init('cli', []);
-    component.toggleScope('repo:write', true);
-    component.toggleScope('repo:read', true);
-    component.toggleScope('repo:manage', true);
-    component.toggleScope('repo:manage', false);
+    component.selectScope('repo:write');
+    component.selectScope('repo:read');
+    component.selectScope('repo:manage');
+    component.deselectScope('repo:manage');
     const emitted: AccessTokenCreated[] = [];
     component.created.subscribe((t) => emitted.push(t));
 
@@ -168,7 +168,7 @@ describe('AccessTokenFormComponent', () => {
 
     it('sends scan:read alone when that is all that was picked', () => {
       init('ci', []);
-      component.toggleScope('scan:read', true);
+      component.selectScope('scan:read');
 
       component.submit();
 
@@ -177,7 +177,7 @@ describe('AccessTokenFormComponent', () => {
 
     it('never sends repo:manage for a user who is not an administrator', () => {
       init('cli', ['repo:read']);
-      component.toggleScope('repo:manage', true);
+      component.selectScope('repo:manage');
 
       component.submit();
 

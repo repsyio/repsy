@@ -202,7 +202,8 @@ class AbstractMavenProtocolFacadeTest {
     requestFor(POM_PATH);
     deployIsAllowed();
 
-    assertThatThrownBy(() -> upload(VALID_POM.replace("com.example", "org.other")))
+    final var replaceArg = VALID_POM.replace("com.example", "org.other");
+    assertThatThrownBy(() -> upload(replaceArg))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("pomGroupIdMismatch");
 
@@ -217,11 +218,9 @@ class AbstractMavenProtocolFacadeTest {
     requestFor(POM_PATH);
     deployIsAllowed();
 
-    assertThatThrownBy(
-            () ->
-                upload(
-                    VALID_POM.replace(
-                        "</project>", "<packaging>" + "p".repeat(51) + "</packaging></project>")))
+    final var replaceArg =
+        VALID_POM.replace("</project>", "<packaging>" + "p".repeat(51) + "</packaging></project>");
+    assertThatThrownBy(() -> upload(replaceArg))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("pomPackagingTooLong");
 
@@ -264,8 +263,9 @@ class AbstractMavenProtocolFacadeTest {
     requestFor(POM_PATH);
     deployIsAllowed();
     storageReportsUsage(VALID_POM.length());
-    final Resource stored = new ByteArrayResource(VALID_POM.getBytes(UTF_8));
-    when(this.storageService.getResource(anyString(), any(StoragePath.class))).thenReturn(stored);
+    final Resource storedPom = new ByteArrayResource(VALID_POM.getBytes(UTF_8));
+    when(this.storageService.getResource(anyString(), any(StoragePath.class)))
+        .thenReturn(storedPom);
 
     upload(VALID_POM);
 
@@ -794,10 +794,9 @@ class AbstractMavenProtocolFacadeTest {
   void rejectsAnEmptyBody(final String path, final long declaredLength) {
     requestFor(path);
 
+    final var byteArrayInputStreamArg = new ByteArrayInputStream(new byte[0]);
     assertThatThrownBy(
-            () ->
-                this.facade.upload(
-                    this.context, new ByteArrayInputStream(new byte[0]), declaredLength))
+            () -> this.facade.upload(this.context, byteArrayInputStreamArg, declaredLength))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("mavenUploadBodyEmpty");
 
@@ -827,12 +826,14 @@ class AbstractMavenProtocolFacadeTest {
   /** A valid POM padded with a comment so its total size can be pinned exactly (RPS-1121). */
   private static String pomOfSize(final long totalBytes) {
     final var prefix =
-        "<project>\n"
-            + "  <modelVersion>4.0.0</modelVersion>\n"
-            + "  <groupId>com.example</groupId>\n"
-            + "  <artifactId>lib</artifactId>\n"
-            + "  <version>1.0</version>\n"
-            + "  <!-- ";
+        """
+        <project>
+          <modelVersion>4.0.0</modelVersion>
+          <groupId>com.example</groupId>
+          <artifactId>lib</artifactId>
+          <version>1.0</version>
+          <!-- \
+        """;
     final var suffix = " -->\n</project>\n";
     final var padding = totalBytes - prefix.getBytes(UTF_8).length - suffix.getBytes(UTF_8).length;
 

@@ -27,7 +27,7 @@ import java.util.List;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 
-public interface ArtifactService<ID> {
+public interface ArtifactService<I> {
 
   /**
    * Classifies an upload of a file that is not a {@code maven-metadata.xml}.
@@ -38,7 +38,7 @@ public interface ArtifactService<ID> {
    * @throws BadRequestException {@code invalidArtifactPath} when the path is not a Maven 2 artifact
    *     path (metadata is not judged here)
    */
-  ArtifactVersionType getVersionType(BaseRepoInfo<ID> repoInfo, StoragePath storagePath);
+  ArtifactVersionType getVersionType(BaseRepoInfo<I> repoInfo, StoragePath storagePath);
 
   /**
    * Classifies an upload of a {@code maven-metadata.xml}, of one of its checksums or of its {@code
@@ -47,7 +47,7 @@ public interface ArtifactService<ID> {
    * other level is not judged (RPS-1183, RPS-1185).
    */
   @Nullable ArtifactVersionType getVersionTypeByMetadataTypeFiles(
-      BaseRepoInfo<ID> repoInfo, byte[] content, StoragePath storagePath);
+      BaseRepoInfo<I> repoInfo, byte[] content, StoragePath storagePath);
 
   /**
    * Refuses an upload that the repo settings do not allow.
@@ -56,12 +56,9 @@ public interface ArtifactService<ID> {
    *     no version type, which the {@code releases} and {@code snapshots} rule does not judge
    */
   void checkDeploymentRules(
-      BaseRepoInfo<ID> repoInfo,
-      @Nullable ArtifactVersionType versionType,
-      StoragePath storagePath);
+      BaseRepoInfo<I> repoInfo, @Nullable ArtifactVersionType versionType, StoragePath storagePath);
 
-  void createOrUpdateArtifact(
-      BaseRepoInfo<ID> repoInfo, StoragePath storagePath, Resource resource);
+  void createOrUpdateArtifact(BaseRepoInfo<I> repoInfo, StoragePath storagePath, Resource resource);
 
   StoragePath getNonSignedStoragePath(StoragePath storagePath);
 
@@ -98,7 +95,7 @@ public interface ArtifactService<ID> {
    *     key-server lookup off (RPS-1204)
    */
   SignatureOutcome verifySignature(
-      BaseRepoInfo<ID> repoInfo, StoragePath signedStoragePath, Resource signature);
+      BaseRepoInfo<I> repoInfo, StoragePath signedStoragePath, Resource signature);
 
   /**
    * The versions of {@code groupId:artifactId} the repo has registered, which the artifact-level
@@ -107,7 +104,7 @@ public interface ArtifactService<ID> {
    * nothing, so such a request keeps being answered with a 404.
    */
   default List<RegisteredVersion> getRegisteredVersions(
-      final BaseRepoInfo<ID> repoInfo, final String groupId, final String artifactId) {
+      final BaseRepoInfo<I> repoInfo, final String groupId, final String artifactId) {
 
     return List.of();
   }
@@ -119,7 +116,7 @@ public interface ArtifactService<ID> {
    * override it registers nothing, so such a request keeps being answered with a 404.
    */
   default List<RegisteredPlugin> getRegisteredPlugins(
-      final BaseRepoInfo<ID> repoInfo, final String groupId) {
+      final BaseRepoInfo<I> repoInfo, final String groupId) {
 
     return List.of();
   }
@@ -137,7 +134,7 @@ public interface ArtifactService<ID> {
    *     that does not override it registers nothing.
    */
   default @Nullable PluginPrefixChange refreshPluginPrefixFromJar(
-      final BaseRepoInfo<ID> repoInfo, final StoragePath jarPath, final Resource jar) {
+      final BaseRepoInfo<I> repoInfo, final StoragePath jarPath, final Resource jar) {
 
     return null;
   }

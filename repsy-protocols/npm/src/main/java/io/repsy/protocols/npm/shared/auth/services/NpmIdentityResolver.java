@@ -23,7 +23,7 @@ import org.jspecify.annotations.Nullable;
  * interface, and not a method of {@link NpmAuthenticator}, so that an implementation of that
  * component outside this repository keeps compiling.
  */
-public interface NpmIdentityResolver<ID> {
+public interface NpmIdentityResolver<I> {
 
   /**
    * Verifies the {@code Authorization} header against the repository and returns the username it
@@ -36,5 +36,5 @@ public interface NpmIdentityResolver<ID> {
    * @throws io.repsy.core.error_handling.exceptions.UnAuthorizedException If the header is missing,
    *     unsupported, invalid, expired or belongs to another repository
    */
-  String resolveUsername(BaseRepoInfo<ID> repoInfo, @Nullable String authHeader);
+  String resolveUsername(BaseRepoInfo<I> repoInfo, @Nullable String authHeader);
 }

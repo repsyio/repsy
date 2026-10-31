@@ -31,12 +31,12 @@ import org.springframework.http.HttpMethod;
  * Handles HEAD /v2/{repo}/{name}/manifests/{reference} — checks if a manifest exists; a missing one
  * is a bare 404.
  */
-public abstract class AbstractHelmOciManifestCheckProtocolMethodHandler<ID>
-    extends AbstractOciManifestCheckProtocolMethodHandler<HelmProtocolFacade<ID>> {
+public abstract class AbstractHelmOciManifestCheckProtocolMethodHandler<I>
+    extends AbstractOciManifestCheckProtocolMethodHandler<HelmProtocolFacade<I>> {
 
-  public AbstractHelmOciManifestCheckProtocolMethodHandler(
+  protected AbstractHelmOciManifestCheckProtocolMethodHandler(
       final PathParser basePathParser,
-      final HelmProtocolFacade<ID> helmFacade,
+      final HelmProtocolFacade<I> helmFacade,
       final HelmProtocolProvider provider) {
     super(
         HandlerRoute.of(Permission.READ, HttpMethod.HEAD).writeOperation(false),

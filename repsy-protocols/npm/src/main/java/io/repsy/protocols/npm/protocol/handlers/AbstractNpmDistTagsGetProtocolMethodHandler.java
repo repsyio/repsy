@@ -36,7 +36,7 @@ public abstract class AbstractNpmDistTagsGetProtocolMethodHandler
 
   private static final Pattern DIST_TAGS_PATTERN = Pattern.compile("^/-/package/(.+?)/dist-tags$");
 
-  public AbstractNpmDistTagsGetProtocolMethodHandler(
+  protected AbstractNpmDistTagsGetProtocolMethodHandler(
       @Qualifier("npmPathParser") final PathParser basePathParser,
       final NpmProtocolFacade npmProtocolFacade,
       final NpmProtocolProvider provider) {

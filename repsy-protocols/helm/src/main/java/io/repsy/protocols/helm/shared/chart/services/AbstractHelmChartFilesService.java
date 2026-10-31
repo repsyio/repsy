@@ -48,15 +48,15 @@ import tools.jackson.databind.ObjectMapper;
  */
 @Slf4j
 @RequiredArgsConstructor
-public abstract class AbstractHelmChartFilesService<ID> {
+public abstract class AbstractHelmChartFilesService<I> {
 
   private static final Pattern SHA256_DIGEST_PATTERN = Pattern.compile("^sha256:[0-9a-fA-F]{64}$");
   private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-  private final HelmStorageService<ID> helmStorageService;
-  private final ChartService<ID> chartService;
-  private final OciBlobService<ID> ociBlobService;
-  private final OciManifestService<ID> ociManifestService;
+  private final HelmStorageService<I> helmStorageService;
+  private final ChartService<I> chartService;
+  private final OciBlobService<I> ociBlobService;
+  private final OciManifestService<I> ociManifestService;
 
   /**
    * A chart version whose database rows are already deleted.
@@ -77,7 +77,7 @@ public abstract class AbstractHelmChartFilesService<ID> {
    * @return the bytes the deleted files held
    */
   public long deleteFiles(
-      final ID repoId,
+      final I repoId,
       final UUID storageKey,
       final String repoName,
       final Collection<DeletedChart> charts)
@@ -112,7 +112,7 @@ public abstract class AbstractHelmChartFilesService<ID> {
    * name to {@code referencedBlobs} and drops the row of its archive blob.
    */
   private long deleteChartVersionFiles(
-      final ID repoId,
+      final I repoId,
       final UUID storageKey,
       final String repoName,
       final DeletedChart chart,
@@ -142,7 +142,7 @@ public abstract class AbstractHelmChartFilesService<ID> {
    * matched as text, so an unusual manifest (an index, an annotation) can only keep too much, never
    * too little.
    */
-  private Set<String> findStillReferenced(final ID repoId, final Set<String> candidates) {
+  private Set<String> findStillReferenced(final I repoId, final Set<String> candidates) {
     // A chart that stays may be stored under a digest a deleted manifest also named (a tag that was
     // pushed again for another chart), and its archive must not go with the manifest.
     final Set<String> referenced =

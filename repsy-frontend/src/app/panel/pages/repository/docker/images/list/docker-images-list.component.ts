@@ -97,7 +97,7 @@ export class DockerImagesListComponent implements OnDestroy {
     this.username = this.authService.username;
     this.repositoryChanges$ = this.dockerService.repoChanges$.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
-        this.activeRepo = Object.assign({}, repo);
+        this.activeRepo = { ...repo };
         this.fetchImages();
         this.fetchSecuritySummary();
       }

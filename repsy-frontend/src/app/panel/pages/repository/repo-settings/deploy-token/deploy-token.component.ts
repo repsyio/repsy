@@ -75,7 +75,6 @@ import { TokenCreateInfo } from './dtos/token-create-info';
     RouterLink,
   ],
   templateUrl: './deploy-token.component.html',
-  styleUrl: './deploy-token.component.css',
 })
 export class DeployTokenComponent implements OnInit {
   @Input() activeRepository: RepoPermissionInfo;

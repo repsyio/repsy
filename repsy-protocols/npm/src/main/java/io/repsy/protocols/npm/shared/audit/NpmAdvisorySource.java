@@ -21,7 +21,7 @@ import java.util.Map;
 import java.util.Set;
 
 /** Knows the vulnerabilities of the package versions an audit asks about. */
-public interface NpmAdvisorySource<ID> {
+public interface NpmAdvisorySource<I> {
 
   /**
    * Returns the advisories of the given package versions, in the scope of one repository.
@@ -31,5 +31,5 @@ public interface NpmAdvisorySource<ID> {
    * @return The advisories of which at least one requested version is vulnerable
    */
   List<NpmAdvisory> findAdvisories(
-      BaseRepoInfo<ID> repoInfo, Map<String, Set<String>> versionsByName);
+      BaseRepoInfo<I> repoInfo, Map<String, Set<String>> versionsByName);
 }

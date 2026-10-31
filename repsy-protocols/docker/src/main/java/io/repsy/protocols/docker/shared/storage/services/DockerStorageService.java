@@ -31,7 +31,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.core.io.Resource;
 
-public interface DockerStorageService<ID> {
+public interface DockerStorageService<I> {
 
   void createRepo(UUID repoId);
 
@@ -55,9 +55,9 @@ public interface DockerStorageService<ID> {
   BaseUsages appendInputStreamToPath(
       String repoName, StoragePath storagePath, InputStream inputStream);
 
-  long deleteManifests(BaseRepoInfo<ID> repoInfo, Collection<String> manifestsToDeleteFileNames);
+  long deleteManifests(BaseRepoInfo<I> repoInfo, Collection<String> manifestsToDeleteFileNames);
 
-  long deleteManifest(BaseRepoInfo<ID> repoInfo, String manifestName);
+  long deleteManifest(BaseRepoInfo<I> repoInfo, String manifestName);
 
   void deleteBlob(UUID repoId, String digest);
 

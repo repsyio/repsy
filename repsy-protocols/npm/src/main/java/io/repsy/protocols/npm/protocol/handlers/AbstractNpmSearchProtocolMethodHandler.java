@@ -35,14 +35,14 @@ import org.springframework.http.ResponseEntity;
  * the packages of the repository in the URL only, and needs read access to it. A {@code size} or
  * {@code from} that is no whole number of 0 or more is answered with 400 (RPS-1344).
  */
-public abstract class AbstractNpmSearchProtocolMethodHandler<ID>
+public abstract class AbstractNpmSearchProtocolMethodHandler<I>
     extends AbstractRoutedProtocolMethodHandler {
 
-  private final NpmSearchService<ID> searchService;
+  private final NpmSearchService<I> searchService;
 
-  public AbstractNpmSearchProtocolMethodHandler(
+  protected AbstractNpmSearchProtocolMethodHandler(
       @Qualifier("npmPathParser") final PathParser basePathParser,
-      final NpmSearchService<ID> searchService,
+      final NpmSearchService<I> searchService,
       final NpmProtocolProvider provider) {
     super(
         HandlerRoute.read(HttpMethod.GET).skipUsagePostProcessor(true),
@@ -64,7 +64,7 @@ public abstract class AbstractNpmSearchProtocolMethodHandler<ID>
             request.getParameter("from"));
 
     final var result =
-        this.searchService.search(ProtocolContextUtils.<ID>getRepoInfo(context), query);
+        this.searchService.search(ProtocolContextUtils.<I>getRepoInfo(context), query);
 
     return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(result);
   }

@@ -50,12 +50,12 @@ public final class Pep440Version implements Comparable<Pep440Version> {
   private static final Pattern PATTERN =
       Pattern.compile(
           "^\\s*v?"
-              + "(?:(?<epoch>[0-9]+)!)?"
-              + "(?<release>[0-9]+(?:\\.[0-9]+)*)"
-              + "(?:[-_.]?(?<prelabel>alpha|a|beta|b|preview|pre|c|rc)[-_.]?(?<prenum>[0-9]+)?)?"
-              + "(?:(?:-(?<postnum1>[0-9]+))"
-              + "|(?:[-_.]?(?<postlabel>post|rev|r)[-_.]?(?<postnum2>[0-9]+)?))?"
-              + "(?:[-_.]?(?<devlabel>dev)[-_.]?(?<devnum>[0-9]+)?)?"
+              + "(?:(?<epoch>\\d+)!)?"
+              + "(?<release>\\d+(?:\\.\\d+)*)"
+              + "(?:[-_.]?(?<prelabel>alpha|a|beta|b|preview|pre|c|rc)[-_.]?(?<prenum>\\d+)?)?"
+              + "(?:-(?<postnum1>\\d+)"
+              + "|[-_.]?(?<postlabel>post|rev|r)[-_.]?(?<postnum2>\\d+)?)?"
+              + "(?:[-_.]?(?<devlabel>dev)[-_.]?(?<devnum>\\d+)?)?"
               + "(?:\\+(?<local>[a-z0-9]+(?:[-_.][a-z0-9]+)*))?"
               + "\\s*$");
 
@@ -103,21 +103,18 @@ public final class Pep440Version implements Comparable<Pep440Version> {
   private Pep440Version(
       final BigInteger epoch,
       final List<BigInteger> release,
-      final int preRank,
-      final BigInteger preNum,
-      final boolean hasPost,
-      final BigInteger postNum,
-      final boolean hasDev,
-      final BigInteger devNum,
+      final PreRelease pre,
+      final Segment post,
+      final Segment dev,
       final @Nullable List<LocalSegment> local) {
     this.epoch = epoch;
     this.release = release;
-    this.preRank = preRank;
-    this.preNum = preNum;
-    this.hasPost = hasPost;
-    this.postNum = postNum;
-    this.hasDev = hasDev;
-    this.devNum = devNum;
+    this.preRank = pre.rank();
+    this.preNum = pre.num();
+    this.hasPost = post.present();
+    this.postNum = post.num();
+    this.hasDev = dev.present();
+    this.devNum = dev.num();
     this.local = local;
   }
 
@@ -145,17 +142,11 @@ public final class Pep440Version implements Comparable<Pep440Version> {
     final var preRank = computePreRank(matcher.group("prelabel"), dev.present(), post.present());
     final var local = extractLocal(matcher);
 
-    return new Pep440Version(
-        epoch,
-        release,
-        preRank,
-        pre.num(),
-        post.present(),
-        post.num(),
-        dev.present(),
-        dev.num(),
-        local);
+    return new Pep440Version(epoch, release, new PreRelease(preRank, pre.num()), post, dev, local);
   }
+
+  /** A pre-release's precedence rank and its number (zero when the grammar omits it). */
+  private record PreRelease(int rank, BigInteger num) {}
 
   /** A version segment's presence and, if present, its number (zero when the grammar omits it). */
   private record Segment(boolean present, BigInteger num) {}
@@ -253,6 +244,26 @@ public final class Pep440Version implements Comparable<Pep440Version> {
   @Override
   public int compareTo(final Pep440Version other) {
     return ORDER.compare(this, other);
+  }
+
+  /** Equal exactly when {@link #compareTo} is zero: every field the order reads must match. */
+  @Override
+  public boolean equals(final @Nullable Object obj) {
+    return this == obj || (obj instanceof Pep440Version other && this.compareTo(other) == 0);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(
+        this.epoch,
+        this.release,
+        this.preRank,
+        this.preNum,
+        this.hasPost,
+        this.postNum,
+        this.hasDev,
+        this.devNum,
+        this.local);
   }
 
   /** Two release or local-version segment tuples, in PEP 440's tuple order. */

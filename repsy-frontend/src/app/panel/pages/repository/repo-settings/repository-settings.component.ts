@@ -134,13 +134,7 @@ export class RepositorySettingsComponent implements OnInit, OnDestroy {
       )
       .subscribe({
         next: (res: RepoSettingsInfo) => {
-          if (this.repoType === RepoType.NPM) {
-            this.repositorySettings = res as RepoSettingsInfo;
-            this.generalSettingsForm.patchValue({
-              privateRepository: this.repositorySettings.privateRepo,
-              ...this.repositorySettings,
-            });
-          } else if (this.repoType === RepoType.MAVEN) {
+          if (this.repoType === RepoType.MAVEN) {
             this.mavenRepositorySettings = res;
             this.mavenSettingsForm.patchValue({
               privateRepository: this.mavenRepositorySettings.privateRepo,

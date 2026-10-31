@@ -118,6 +118,11 @@ public final class NpmTarballInspector {
 
     // Reading twice would digest twice: the archive readers get a stream that cannot be rewound.
     @Override
+    public int read(final byte[] buffer, final int offset, final int length) throws IOException {
+      return this.in.read(buffer, offset, length);
+    }
+
+    @Override
     public boolean markSupported() {
       return false;
     }

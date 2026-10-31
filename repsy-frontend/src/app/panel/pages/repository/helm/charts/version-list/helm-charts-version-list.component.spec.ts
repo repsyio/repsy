@@ -262,7 +262,7 @@ describe('HelmChartsVersionListComponent', () => {
       selectRepo();
 
       expect(component.securitySummary).toEqual({});
-      expect(component.versions.length).toBe(3);
+      expect(component.versions).toHaveSize(3);
     }));
   });
 

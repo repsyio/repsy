@@ -39,15 +39,15 @@ import org.springframework.web.HttpMediaTypeNotAcceptableException;
  * The Docker manifest pull: negotiates the {@code Accept} header first, so a client that accepts no
  * manifest type this registry serves gets a 406 before the manifest is read.
  */
-public abstract class AbstractDockerManifestPullProtocolMethodHandler<ID>
-    extends AbstractOciManifestPullProtocolMethodHandler<DockerProtocolFacade<ID>> {
+public abstract class AbstractDockerManifestPullProtocolMethodHandler<I>
+    extends AbstractOciManifestPullProtocolMethodHandler<DockerProtocolFacade<I>> {
 
   private static final List<String> DEFAULT_DOCKER_ACCEPT_TYPES =
       List.of(DOCKER_MANIFEST_SCHEMA2, DOCKER_MANIFEST_LIST, OCI_MANIFEST_SCHEMA1, OCI_IMAGE_INDEX);
 
-  public AbstractDockerManifestPullProtocolMethodHandler(
+  protected AbstractDockerManifestPullProtocolMethodHandler(
       final PathParser basePathParser,
-      final DockerProtocolFacade<ID> dockerFacade,
+      final DockerProtocolFacade<I> dockerFacade,
       final DockerProtocolProvider provider) {
     super(HandlerRoute.of(Permission.READ, HttpMethod.GET), basePathParser, dockerFacade, provider);
   }

@@ -17,6 +17,7 @@ package io.repsy.protocols.maven.shared.storage.services;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.groups.Tuple.tuple;
 import static org.mockito.ArgumentMatchers.any;
@@ -49,6 +50,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 import org.apache.commons.codec.digest.DigestUtils;
@@ -422,9 +424,10 @@ class AbstractMavenStorageServiceTest {
 
     assertThat(stored(METADATA_FILENAME + ".sha1")).isEqualTo(DigestUtils.sha1Hex(xml));
     assertThat(stored(METADATA_FILENAME + ".md5")).isEqualTo(DigestUtils.md5Hex(xml));
-    assertThat(this.files).doesNotContainKey("com/example/demo/" + METADATA_FILENAME + ".sha256");
-    assertThat(this.files).doesNotContainKey("com/example/demo/" + METADATA_FILENAME + ".asc");
-    assertThat(this.files).doesNotContainKey("com/example/demo/" + METADATA_FILENAME + ".asc.sha1");
+    assertThat(this.files)
+        .doesNotContainKey("com/example/demo/" + METADATA_FILENAME + ".sha256")
+        .doesNotContainKey("com/example/demo/" + METADATA_FILENAME + ".asc")
+        .doesNotContainKey("com/example/demo/" + METADATA_FILENAME + ".asc.sha1");
     assertThat(this.deletes).hasSize(2);
 
     // The xml grew, the sha1 lost its newline (-1), the md5 grew from "stale" (5) to 32, and 140
@@ -514,10 +517,11 @@ class AbstractMavenStorageServiceTest {
     store(METADATA_FILENAME + ".asc", "signature");
     final var asked = new AtomicBoolean();
 
+    final var repoInfoArg = repoInfo();
     assertThatThrownBy(
             () ->
                 this.storageService.addVersionsToMetadata(
-                    repoInfo(),
+                    repoInfoArg,
                     GROUP,
                     ARTIFACT,
                     () -> {
@@ -574,6 +578,13 @@ class AbstractMavenStorageServiceTest {
     assertThat(stored(METADATA_FILENAME + ".sha1")).isEqualTo(DigestUtils.sha1Hex(xml));
   }
 
+  /** Gives {@code running} a moment to get past the lock, and asserts that it does not. */
+  private static void assertStaysBlocked(final CompletableFuture<?> running) {
+    assertThatExceptionOfType(TimeoutException.class)
+        .isThrownBy(() -> running.get(300, TimeUnit.MILLISECONDS));
+    assertThat(running).isNotDone();
+  }
+
   /** Runs an append that stays inside the artifact's lock until {@code release} is counted down. */
   private CompletableFuture<Long> appendHeldUntil(
       final CountDownLatch inside, final CountDownLatch release, final String version) {
@@ -590,7 +601,7 @@ class AbstractMavenStorageServiceTest {
 
                   try {
                     release.await(10, TimeUnit.SECONDS);
-                  } catch (final InterruptedException e) {
+                  } catch (final InterruptedException _) {
                     Thread.currentThread().interrupt();
                   }
 
@@ -624,8 +635,7 @@ class AbstractMavenStorageServiceTest {
                     REPO_NAME));
 
     // The upload has all the time to get past the lock, and does not.
-    TimeUnit.MILLISECONDS.sleep(300);
-    assertThat(upload).isNotDone();
+    assertStaysBlocked(upload);
     assertThat(this.writes).isEmpty();
 
     release.countDown();
@@ -658,8 +668,7 @@ class AbstractMavenStorageServiceTest {
               }
             });
 
-    TimeUnit.MILLISECONDS.sleep(300);
-    assertThat(delete).isNotDone();
+    assertStaysBlocked(delete);
 
     release.countDown();
     append.get(10, TimeUnit.SECONDS);
@@ -807,9 +816,10 @@ class AbstractMavenStorageServiceTest {
     assertThat(storedMetadata().getVersioning()).isNull();
     assertThat(stored(METADATA_FILENAME + ".sha1")).isEqualTo(DigestUtils.sha1Hex(xml));
     assertThat(stored(METADATA_FILENAME + ".md5")).isEqualTo(DigestUtils.md5Hex(xml));
-    assertThat(this.files).doesNotContainKey(METADATA_PATH + ".sha256");
-    assertThat(this.files).doesNotContainKey(METADATA_PATH + ".asc");
-    assertThat(this.files).doesNotContainKey(METADATA_PATH + ".asc.sha1");
+    assertThat(this.files)
+        .doesNotContainKey(METADATA_PATH + ".sha256")
+        .doesNotContainKey(METADATA_PATH + ".asc")
+        .doesNotContainKey(METADATA_PATH + ".asc.sha1");
     assertThat(this.deletes).hasSize(2);
 
     // The xml grew, the sha1 lost its newline (-1), the md5 grew from "stale" (5) to 32, and 140
@@ -973,7 +983,8 @@ class AbstractMavenStorageServiceTest {
     store(METADATA_FILENAME, "<metadata><plugins>");
     store(METADATA_FILENAME + ".asc", "signature");
 
-    assertThatThrownBy(() -> addPlugins(plugins(bar()))).isInstanceOf(BadRequestException.class);
+    final var pluginsArg = plugins(bar());
+    assertThatThrownBy(() -> addPlugins(pluginsArg)).isInstanceOf(BadRequestException.class);
 
     assertThat(this.writes).isEmpty();
     assertThat(this.deletes).isEmpty();
@@ -1007,7 +1018,7 @@ class AbstractMavenStorageServiceTest {
 
                   try {
                     release.await(10, TimeUnit.SECONDS);
-                  } catch (final InterruptedException e) {
+                  } catch (final InterruptedException _) {
                     Thread.currentThread().interrupt();
                   }
 
@@ -1039,8 +1050,7 @@ class AbstractMavenStorageServiceTest {
                     new ByteArrayInputStream(clientBytes.getBytes(UTF_8)),
                     REPO_NAME));
 
-    TimeUnit.MILLISECONDS.sleep(300);
-    assertThat(upload).isNotDone();
+    assertStaysBlocked(upload);
     assertThat(this.writes).isEmpty();
 
     release.countDown();
@@ -1071,8 +1081,7 @@ class AbstractMavenStorageServiceTest {
                     new ByteArrayInputStream("<metadata/>".getBytes(UTF_8)),
                     REPO_NAME));
 
-    TimeUnit.MILLISECONDS.sleep(300);
-    assertThat(upload).isNotDone();
+    assertStaysBlocked(upload);
     assertThat(this.writes).isEmpty();
 
     release.countDown();
@@ -1104,8 +1113,7 @@ class AbstractMavenStorageServiceTest {
               }
             });
 
-    TimeUnit.MILLISECONDS.sleep(300);
-    assertThat(versions).isNotDone();
+    assertStaysBlocked(versions);
 
     release.countDown();
     append.get(10, TimeUnit.SECONDS);

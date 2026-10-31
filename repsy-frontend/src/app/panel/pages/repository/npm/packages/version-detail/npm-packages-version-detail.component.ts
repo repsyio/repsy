@@ -78,7 +78,7 @@ export class NpmPackagesVersionDetailComponent implements OnDestroy {
 
     this.registryChanges$ = this.npmService.repoChanges$.subscribe((registry: RepoPermissionInfo) => {
       if (registry && this.isRegistryForCurrentRoute(registry)) {
-        this.activeRegistry = Object.assign({}, registry);
+        this.activeRegistry = { ...registry };
         this.loadVersion();
       }
     });
@@ -172,7 +172,7 @@ export class NpmPackagesVersionDetailComponent implements OnDestroy {
         )
         .subscribe({
           next: (wasLastVersion) => {
-            landAfterVersionDelete(
+            void landAfterVersionDelete(
               this.router,
               this.route,
               this.toastService,

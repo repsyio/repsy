@@ -216,7 +216,7 @@ class PackageUtilsTest {
       NpmTarballUrlUtils.rewriteTarballUrls(packument, "https://repo.test", "myrepo");
 
       assertThat(noDist).doesNotContainKey("dist");
-      assertThat(noTarball.get("dist")).isEqualTo(Map.of());
+      assertThat(noTarball).containsEntry("dist", Map.of());
     }
 
     @Test
@@ -229,7 +229,7 @@ class PackageUtilsTest {
       NpmTarballUrlUtils.rewriteTarballUrls(malformed, "https://repo.test", "myrepo");
 
       assertThat(noVersions).containsOnlyKeys("name");
-      assertThat(malformed.get(NpmConstants.VERSIONS)).isEqualTo(Map.of("1.0.0", "not a map"));
+      assertThat(malformed).containsEntry(NpmConstants.VERSIONS, Map.of("1.0.0", "not a map"));
     }
   }
 
@@ -266,7 +266,7 @@ class PackageUtilsTest {
 
       NpmPayloadUtils.liftFieldsToTopLevel(payload, "1.0.0");
 
-      assertThat(payload.get("keywords")).isEqualTo(List.of("a", "b"));
+      assertThat(payload).containsEntry("keywords", List.of("a", "b"));
     }
 
     @Test
@@ -290,7 +290,7 @@ class PackageUtilsTest {
 
       NpmPayloadUtils.liftFieldsToTopLevel(payload, "1.0.0");
 
-      assertThat(payload.get("maintainers")).isEqualTo(maintainers);
+      assertThat(payload).containsEntry("maintainers", maintainers);
     }
 
     @Test
@@ -301,11 +301,11 @@ class PackageUtilsTest {
 
       NpmPayloadUtils.liftFieldsToTopLevel(payload, "1.0.0");
 
-      assertThat(payload.get("description")).isEqualTo("");
-      assertThat(payload.get("homepage")).isEqualTo("");
-      assertThat(payload.get("license")).isEqualTo("");
-      assertThat(payload.get("readme")).isEqualTo("");
-      assertThat(payload.get("readmeFilename")).isEqualTo("");
+      assertThat(payload).containsEntry("description", "");
+      assertThat(payload).containsEntry("homepage", "");
+      assertThat(payload).containsEntry("license", "");
+      assertThat(payload).containsEntry("readme", "");
+      assertThat(payload).containsEntry("readmeFilename", "");
     }
   }
 
@@ -528,10 +528,10 @@ class PackageUtilsTest {
     @Test
     @DisplayName("is a conflict when the payload lacks no version")
     void nothingMissing() {
-      assertThatThrownBy(
-              () ->
-                  NpmPayloadUtils.findUnpublishedVersion(
-                      this.packument("1.0.0"), this.packument("1.0.0")))
+      final var stored = this.packument("1.0.0");
+      final var payload = this.packument("1.0.0");
+
+      assertThatThrownBy(() -> NpmPayloadUtils.findUnpublishedVersion(stored, payload))
           .isInstanceOf(ItemAlreadyExistException.class)
           .hasMessage("unpublishPayloadStale");
     }
@@ -540,10 +540,10 @@ class PackageUtilsTest {
     @DisplayName("is a conflict when a version was published after the client read the package")
     void stalePayload() {
       // The client removed 1.0.0 from what it read; 2.0.0 was published in between.
-      assertThatThrownBy(
-              () ->
-                  NpmPayloadUtils.findUnpublishedVersion(
-                      this.packument("1.0.0", "2.0.0"), this.packument()))
+      final var stored = this.packument("1.0.0", "2.0.0");
+      final var payload = this.packument();
+
+      assertThatThrownBy(() -> NpmPayloadUtils.findUnpublishedVersion(stored, payload))
           .isInstanceOf(ItemAlreadyExistException.class)
           .hasMessage("unpublishPayloadStale");
     }
@@ -551,9 +551,10 @@ class PackageUtilsTest {
     @Test
     @DisplayName("is a bad request when the payload has no versions object")
     void payloadWithoutVersions() {
-      assertThatThrownBy(
-              () ->
-                  NpmPayloadUtils.findUnpublishedVersion(this.packument("1.0.0"), new HashMap<>()))
+      final var stored = this.packument("1.0.0");
+      final var payload = new HashMap<String, Object>();
+
+      assertThatThrownBy(() -> NpmPayloadUtils.findUnpublishedVersion(stored, payload))
           .isInstanceOf(BadRequestException.class);
     }
   }
@@ -687,8 +688,9 @@ class PackageUtilsTest {
 
       NpmMetadataUtils.removePublishOnlyFields(packument);
 
-      assertThat(packument).doesNotContainKeys("_attachments", "_from", "_resolved");
-      assertThat(packument).containsEntry("readme", "kept");
+      assertThat(packument)
+          .doesNotContainKeys("_attachments", "_from", "_resolved")
+          .containsEntry("readme", "kept");
       final var versions = (Map<String, Map<String, Object>>) packument.get("versions");
       assertThat(versions.get("1.0.0"))
           .doesNotContainKeys("_from", "_resolved")

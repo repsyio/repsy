@@ -49,8 +49,8 @@ export class DropdownComponent implements OnDestroy {
   };
 
   constructor(
-    private eRef: ElementRef<HTMLElement>,
-    private cdr: ChangeDetectorRef,
+    private readonly eRef: ElementRef<HTMLElement>,
+    private readonly cdr: ChangeDetectorRef,
   ) {
     this.document.addEventListener('click', this.onDocumentClick, true);
   }

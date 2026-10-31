@@ -60,9 +60,10 @@ class MavenPublishLimitsTest {
     final var path = "g/" + artifact + "/" + version + "/" + artifact + "-" + version + ".pom";
     final var group = "g".repeat(255) + "/a/1/a-1.pom";
 
-    assertThatCode(() -> MavenPublishLimits.checkCoordinates(gav(path))).doesNotThrowAnyException();
-    assertThatCode(() -> MavenPublishLimits.checkCoordinates(gav(group)))
-        .doesNotThrowAnyException();
+    final var gavArg = gav(path);
+    assertThatCode(() -> MavenPublishLimits.checkCoordinates(gavArg)).doesNotThrowAnyException();
+    final var gavArg2 = gav(group);
+    assertThatCode(() -> MavenPublishLimits.checkCoordinates(gavArg2)).doesNotThrowAnyException();
   }
 
   @Test
@@ -71,7 +72,8 @@ class MavenPublishLimitsTest {
     final var base = "1".repeat(240) + "-SNAPSHOT";
     final var path = "g/a/" + base + "/a-" + "1".repeat(240) + "-20260921.101010-1.pom";
 
-    assertThatCode(() -> MavenPublishLimits.checkCoordinates(gav(path))).doesNotThrowAnyException();
+    final var gavArg = gav(path);
+    assertThatCode(() -> MavenPublishLimits.checkCoordinates(gavArg)).doesNotThrowAnyException();
   }
 
   @Test
@@ -79,19 +81,16 @@ class MavenPublishLimitsTest {
   void refusesOverLongCoordinates() {
     final var tooLong = "a".repeat(256);
 
-    assertThatThrownBy(() -> MavenPublishLimits.checkCoordinates(gav(tooLong + "/a/1/a-1.pom")))
+    final var gavArg = gav(tooLong + "/a/1/a-1.pom");
+    assertThatThrownBy(() -> MavenPublishLimits.checkCoordinates(gavArg))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("groupIdTooLong");
-    assertThatThrownBy(
-            () ->
-                MavenPublishLimits.checkCoordinates(
-                    gav("g/" + tooLong + "/1/" + tooLong + "-1.pom")))
+    final var gavArg2 = gav("g/" + tooLong + "/1/" + tooLong + "-1.pom");
+    assertThatThrownBy(() -> MavenPublishLimits.checkCoordinates(gavArg2))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("artifactIdTooLong");
-    assertThatThrownBy(
-            () ->
-                MavenPublishLimits.checkCoordinates(
-                    gav("g/a/" + tooLong + "/a-" + tooLong + ".pom")))
+    final var gavArg3 = gav("g/a/" + tooLong + "/a-" + tooLong + ".pom");
+    assertThatThrownBy(() -> MavenPublishLimits.checkCoordinates(gavArg3))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("mavenVersionTooLong");
   }
@@ -102,7 +101,8 @@ class MavenPublishLimitsTest {
     final var version = "1".repeat(255 - "a-".length() - ".pom".length());
     final var path = "g/a/" + version + "/a-" + version + ".pom";
 
-    assertThatCode(() -> MavenPublishLimits.checkFileNameLength(storagePath(path)))
+    final var storagePathArg = storagePath(path);
+    assertThatCode(() -> MavenPublishLimits.checkFileNameLength(storagePathArg))
         .doesNotThrowAnyException();
   }
 
@@ -112,7 +112,8 @@ class MavenPublishLimitsTest {
     final var version = "1".repeat(255 - "a-".length() - ".pom".length() + 1);
     final var path = "g/a/" + version + "/a-" + version + ".pom";
 
-    assertThatThrownBy(() -> MavenPublishLimits.checkFileNameLength(storagePath(path)))
+    final var storagePathArg = storagePath(path);
+    assertThatThrownBy(() -> MavenPublishLimits.checkFileNameLength(storagePathArg))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("mavenFileNameTooLong");
   }
@@ -128,15 +129,17 @@ class MavenPublishLimitsTest {
     final var maxVersion = "1".repeat(255);
     final var versionPath = "g/a/" + maxVersion + "/a-" + maxVersion + ".pom";
 
-    assertThatCode(() -> MavenPublishLimits.checkCoordinates(gav(artifactPath)))
-        .doesNotThrowAnyException();
-    assertThatThrownBy(() -> MavenPublishLimits.checkFileNameLength(storagePath(artifactPath)))
+    final var gavArg = gav(artifactPath);
+    assertThatCode(() -> MavenPublishLimits.checkCoordinates(gavArg)).doesNotThrowAnyException();
+    final var storagePathArg = storagePath(artifactPath);
+    assertThatThrownBy(() -> MavenPublishLimits.checkFileNameLength(storagePathArg))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("mavenFileNameTooLong");
 
-    assertThatCode(() -> MavenPublishLimits.checkCoordinates(gav(versionPath)))
-        .doesNotThrowAnyException();
-    assertThatThrownBy(() -> MavenPublishLimits.checkFileNameLength(storagePath(versionPath)))
+    final var gavArg2 = gav(versionPath);
+    assertThatCode(() -> MavenPublishLimits.checkCoordinates(gavArg2)).doesNotThrowAnyException();
+    final var storagePathArg2 = storagePath(versionPath);
+    assertThatThrownBy(() -> MavenPublishLimits.checkFileNameLength(storagePathArg2))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("mavenFileNameTooLong");
   }
@@ -148,9 +151,11 @@ class MavenPublishLimitsTest {
     final var version = "1".repeat(255 - "a-".length() - ".pom".length());
     final var path = "g/a/" + version + "/a-" + version + ".pom";
 
-    assertThatCode(() -> MavenPublishLimits.checkFileNameLength(storagePath(path)))
+    final var storagePathArg = storagePath(path);
+    assertThatCode(() -> MavenPublishLimits.checkFileNameLength(storagePathArg))
         .doesNotThrowAnyException();
-    assertThatThrownBy(() -> MavenPublishLimits.checkFileNameLength(storagePath(path + ".sha1")))
+    final var storagePathArg2 = storagePath(path + ".sha1");
+    assertThatThrownBy(() -> MavenPublishLimits.checkFileNameLength(storagePathArg2))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("mavenFileNameTooLong");
   }
@@ -158,18 +163,14 @@ class MavenPublishLimitsTest {
   @Test
   @DisplayName("refuses a packaging longer than 50 characters and accepts one of 50 or none")
   void checksThePackaging() {
-    assertThatThrownBy(
-            () ->
-                MavenPublishLimits.checkPackaging(
-                    model("<packaging>" + "p".repeat(51) + "</packaging>")))
+    final var modelArg = model("<packaging>" + "p".repeat(51) + "</packaging>");
+    assertThatThrownBy(() -> MavenPublishLimits.checkPackaging(modelArg))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("pomPackagingTooLong");
-    assertThatCode(
-            () ->
-                MavenPublishLimits.checkPackaging(
-                    model("<packaging>" + "p".repeat(50) + "</packaging>")))
-        .doesNotThrowAnyException();
-    assertThatCode(() -> MavenPublishLimits.checkPackaging(model(""))).doesNotThrowAnyException();
+    final var modelArg2 = model("<packaging>" + "p".repeat(50) + "</packaging>");
+    assertThatCode(() -> MavenPublishLimits.checkPackaging(modelArg2)).doesNotThrowAnyException();
+    final var modelArg3 = model("");
+    assertThatCode(() -> MavenPublishLimits.checkPackaging(modelArg3)).doesNotThrowAnyException();
   }
 
   @Test

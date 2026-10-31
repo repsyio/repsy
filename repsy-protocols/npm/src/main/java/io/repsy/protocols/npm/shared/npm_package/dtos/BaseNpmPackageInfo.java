@@ -21,8 +21,8 @@ import lombok.experimental.SuperBuilder;
 
 @Data
 @SuperBuilder
-public class BaseNpmPackageInfo<ID> {
-  private ID id;
+public class BaseNpmPackageInfo<I> {
+  private I id;
   private String registryName;
   private String scopeName;
   private String packageName;

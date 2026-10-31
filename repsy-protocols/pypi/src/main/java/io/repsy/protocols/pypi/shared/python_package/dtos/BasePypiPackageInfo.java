@@ -21,8 +21,8 @@ import lombok.experimental.SuperBuilder;
 
 @Data
 @SuperBuilder
-public class BasePypiPackageInfo<ID> {
-  private ID id;
+public class BasePypiPackageInfo<I> {
+  private I id;
   private String name;
   private String normalizedName;
   private String latestVersion;

@@ -35,6 +35,8 @@ import io.repsy.protocols.shared.utils.ProtocolContextUtils;
 import io.repsy.protocols.shared.utils.RequestBodies;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.Map;
 import java.util.regex.Pattern;
 import org.jspecify.annotations.Nullable;
@@ -69,7 +71,7 @@ public abstract class AbstractNpmPackagePublishOrDeprecateProtocolMethodHandler
    */
   private final JsonMapper bodyMapper;
 
-  public AbstractNpmPackagePublishOrDeprecateProtocolMethodHandler(
+  protected AbstractNpmPackagePublishOrDeprecateProtocolMethodHandler(
       @Qualifier("osNpmPathParser") final PathParser basePathParser,
       final NpmProtocolFacade npmProtocolFacade,
       final NpmProtocolProvider provider,
@@ -142,14 +144,7 @@ public abstract class AbstractNpmPackagePublishOrDeprecateProtocolMethodHandler
               .orElseThrow(
                   () -> new BadRequestException(ProtocolErrorCodes.NPM_PUBLISH_BODY_EMPTY));
 
-      final byte[] bytes;
-      try {
-        bytes =
-            BoundedEntryReader.readAllBytes(
-                body, request.getContentLengthLong(), this.maxPublishBytes);
-      } catch (final EntryTooLargeException e) {
-        throw new MaxUploadSizeExceededException(this.maxPublishBytes, e);
-      }
+      final var bytes = this.readBounded(request, body);
 
       final var payload =
           this.bodyMapper.readValue(bytes, new TypeReference<Map<String, Object>>() {});
@@ -167,6 +162,16 @@ public abstract class AbstractNpmPackagePublishOrDeprecateProtocolMethodHandler
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
           .header(WWW_AUTHENTICATE, BasicAuthChallenge.REPSY)
           .build();
+    }
+  }
+
+  private byte[] readBounded(final HttpServletRequest request, final InputStream body)
+      throws IOException {
+    try {
+      return BoundedEntryReader.readAllBytes(
+          body, request.getContentLengthLong(), this.maxPublishBytes);
+    } catch (final EntryTooLargeException e) {
+      throw new MaxUploadSizeExceededException(this.maxPublishBytes, e);
     }
   }
 }

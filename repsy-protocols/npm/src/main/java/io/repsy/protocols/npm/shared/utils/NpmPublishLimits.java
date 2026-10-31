@@ -75,6 +75,8 @@ public final class NpmPublishLimits {
   public static final int MAX_AUTHOR_NAME_LENGTH = 255;
   public static final int MAX_AUTHOR_EMAIL_LENGTH = 255;
   public static final int MAX_AUTHOR_URL_LENGTH = 255;
+  private static final String LICENSE = "license";
+
   public static final int MAX_BUGS_URL_LENGTH = 255;
   public static final int MAX_BUGS_EMAIL_LENGTH = 255;
   public static final int MAX_HOMEPAGE_LENGTH = 255;
@@ -188,16 +190,16 @@ public final class NpmPublishLimits {
   }
 
   private static void dropLicense(final Map<String, Object> version) {
-    final var license = version.get("license");
+    final var license = version.get(LICENSE);
 
     if (license instanceof String) {
-      dropStringField(version, "license", MAX_LICENSE_LENGTH);
+      dropStringField(version, LICENSE, MAX_LICENSE_LENGTH);
     } else if (license instanceof final Map<?, ?> map) {
       final var typed = (Map<String, Object>) map;
       nullIfNotString(typed, "type");
       dropStringField(typed, "type", MAX_LICENSE_LENGTH);
     } else if (license != null) {
-      version.put("license", null);
+      version.put(LICENSE, null);
     }
   }
 

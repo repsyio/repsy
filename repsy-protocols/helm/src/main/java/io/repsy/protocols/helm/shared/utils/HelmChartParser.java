@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -58,11 +59,13 @@ public class HelmChartParser {
   private static final ObjectMapper DEPENDENCIES_MAPPER = new ObjectMapper();
 
   private static final Pattern CHART_NAME_PATTERN = Pattern.compile("^[a-z0-9][a-z0-9-]*$");
-  private static final Pattern SEMVER_PATTERN =
-      Pattern.compile(
-          "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)"
-              + "(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))"
-              + "?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$");
+  // SemVer 2.0.0, checked part by part (core, pre-release, build metadata) rather than with one
+  // regular expression, which would be too complex to read or verify.
+  private static final Pattern SEMVER_CORE_PATTERN =
+      Pattern.compile("^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)$");
+  private static final Pattern SEMVER_PRE_RELEASE_IDENTIFIER_PATTERN =
+      Pattern.compile("^(0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)$");
+  private static final Pattern SEMVER_BUILD_IDENTIFIER_PATTERN = Pattern.compile("^[0-9a-zA-Z-]+$");
 
   public static HelmChartMetadata parseChartYaml(final InputStream tgzStream) throws IOException {
     try (final var gzip = new GZIPInputStream(tgzStream);
@@ -180,7 +183,7 @@ public class HelmChartParser {
     final String json;
     try {
       json = DEPENDENCIES_MAPPER.writeValueAsString(dependencies);
-    } catch (final JacksonException e) {
+    } catch (final JacksonException _) {
       throw new BadRequestException(ProtocolErrorCodes.CHART_DEPENDENCIES_INVALID);
     }
     if (json.getBytes(StandardCharsets.UTF_8).length > HelmConstants.MAX_CHART_DEPENDENCIES_BYTES) {
@@ -210,7 +213,7 @@ public class HelmChartParser {
     final Object parsed;
     try {
       parsed = new Yaml(new SafeConstructor(options)).load(new ByteArrayInputStream(bytes));
-    } catch (final YAMLException e) {
+    } catch (final YAMLException _) {
       throw new BadRequestException(ProtocolErrorCodes.CHART_YAML_INVALID);
     }
     if (!(parsed instanceof Map<?, ?> map)) {
@@ -255,9 +258,33 @@ public class HelmChartParser {
     if (version.length() > HelmConstants.MAX_CHART_VERSION_LENGTH) {
       throw new BadRequestException(ProtocolErrorCodes.CHART_VERSION_TOO_LONG);
     }
-    if (!SEMVER_PATTERN.matcher(version).matches()) {
+    if (!isSemver(version)) {
       throw new BadRequestException(ProtocolErrorCodes.CHART_VERSION_INVALID);
     }
     return version;
+  }
+
+  private static boolean isSemver(final String version) {
+    final var buildAt = version.indexOf('+');
+    if (buildAt < 0) {
+      return isSemverWithoutBuild(version);
+    }
+    return allMatch(version.substring(buildAt + 1), SEMVER_BUILD_IDENTIFIER_PATTERN)
+        && isSemverWithoutBuild(version.substring(0, buildAt));
+  }
+
+  private static boolean isSemverWithoutBuild(final String version) {
+    final var preReleaseAt = version.indexOf('-');
+    if (preReleaseAt < 0) {
+      return SEMVER_CORE_PATTERN.matcher(version).matches();
+    }
+    return SEMVER_CORE_PATTERN.matcher(version.substring(0, preReleaseAt)).matches()
+        && allMatch(version.substring(preReleaseAt + 1), SEMVER_PRE_RELEASE_IDENTIFIER_PATTERN);
+  }
+
+  /** Whether every dot-separated identifier of {@code dotted} (none may be empty) matches. */
+  private static boolean allMatch(final String dotted, final Pattern identifier) {
+    return Arrays.stream(dotted.split("\\.", -1))
+        .allMatch(part -> identifier.matcher(part).matches());
   }
 }

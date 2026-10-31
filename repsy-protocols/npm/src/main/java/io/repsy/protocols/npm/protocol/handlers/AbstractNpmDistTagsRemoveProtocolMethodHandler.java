@@ -42,7 +42,7 @@ public abstract class AbstractNpmDistTagsRemoveProtocolMethodHandler
   private static final Pattern DIST_TAGS_REMOVE_PATTERN =
       Pattern.compile("^/-/package/(.+)/dist-tags/([^/]+)$");
 
-  public AbstractNpmDistTagsRemoveProtocolMethodHandler(
+  protected AbstractNpmDistTagsRemoveProtocolMethodHandler(
       @Qualifier("npmPathParser") final PathParser basePathParser,
       final NpmProtocolFacade npmProtocolFacade,
       final NpmProtocolProvider provider) {

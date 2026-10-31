@@ -283,10 +283,11 @@ class AbstractDockerManifestPushProtocolMethodHandlerTest {
   void refusesMalformedManifestBeforeStoringAnything() {
     final var context = context("{}");
 
-    assertThatThrownBy(
-            () ->
-                this.handler()
-                    .handle(context, request(MANIFEST_TYPE), new MockHttpServletResponse()))
+    final var handler = this.handler();
+    final var request = request(MANIFEST_TYPE);
+    final var response = new MockHttpServletResponse();
+
+    assertThatThrownBy(() -> handler.handle(context, request, response))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("manifestConfigMissing");
 
@@ -300,7 +301,10 @@ class AbstractDockerManifestPushProtocolMethodHandlerTest {
     final var request = request(INDEX_TYPE);
     request.setContent("not json".getBytes(StandardCharsets.UTF_8));
 
-    assertThatThrownBy(() -> this.handler().handle(context, request, new MockHttpServletResponse()))
+    final var handler = this.handler();
+    final var response = new MockHttpServletResponse();
+
+    assertThatThrownBy(() -> handler.handle(context, request, response))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("manifestInvalidJson");
 
@@ -379,14 +383,14 @@ class AbstractDockerManifestPushProtocolMethodHandlerTest {
   @DisplayName("gives up after three optimistic-lock failures")
   void givesUpAfterThreeVersionCheckFailures() throws Exception {
     final var context = context();
-    final var imageInfo = BaseImageInfo.<UUID>builder().id(UUID.randomUUID()).name("app").build();
     when(this.dockerFacade.saveManifest(eq(context), eq("app"), any(ManifestForm.class)))
         .thenThrow(new OptimisticLockingFailureException("still stale"));
 
-    assertThatThrownBy(
-            () ->
-                this.handler()
-                    .handle(context, request(MANIFEST_TYPE), new MockHttpServletResponse()))
+    final var handler = this.handler();
+    final var request = request(MANIFEST_TYPE);
+    final var response = new MockHttpServletResponse();
+
+    assertThatThrownBy(() -> handler.handle(context, request, response))
         .isInstanceOf(OptimisticLockingFailureException.class);
 
     verify(this.dockerFacade, times(3))
@@ -398,14 +402,14 @@ class AbstractDockerManifestPushProtocolMethodHandlerTest {
   @DisplayName("gives up after three attempts and does not touch the image or the layers")
   void givesUpAfterThreeAttempts() throws Exception {
     final var context = context();
-    final var imageInfo = BaseImageInfo.<UUID>builder().id(UUID.randomUUID()).name("app").build();
     when(this.dockerFacade.saveManifest(eq(context), eq("app"), any(ManifestForm.class)))
         .thenThrow(new DataIntegrityViolationException("still failing"));
 
-    assertThatThrownBy(
-            () ->
-                this.handler()
-                    .handle(context, request(MANIFEST_TYPE), new MockHttpServletResponse()))
+    final var handler = this.handler();
+    final var request = request(MANIFEST_TYPE);
+    final var response = new MockHttpServletResponse();
+
+    assertThatThrownBy(() -> handler.handle(context, request, response))
         .isInstanceOf(DataIntegrityViolationException.class);
 
     verify(this.dockerFacade, times(3))
@@ -418,14 +422,14 @@ class AbstractDockerManifestPushProtocolMethodHandlerTest {
   @DisplayName("does not retry a failure that is not a lost race")
   void doesNotRetryOtherFailures() throws Exception {
     final var context = context();
-    final var imageInfo = BaseImageInfo.<UUID>builder().id(UUID.randomUUID()).name("app").build();
     when(this.dockerFacade.saveManifest(eq(context), eq("app"), any(ManifestForm.class)))
         .thenThrow(new BadRequestException("digestMismatch"));
 
-    assertThatThrownBy(
-            () ->
-                this.handler()
-                    .handle(context, request(MANIFEST_TYPE), new MockHttpServletResponse()))
+    final var handler = this.handler();
+    final var request = request(MANIFEST_TYPE);
+    final var response = new MockHttpServletResponse();
+
+    assertThatThrownBy(() -> handler.handle(context, request, response))
         .isInstanceOf(BadRequestException.class);
 
     verify(this.dockerFacade).saveManifest(eq(context), eq("app"), any(ManifestForm.class));
@@ -461,10 +465,11 @@ class AbstractDockerManifestPushProtocolMethodHandlerTest {
     when(this.dockerFacade.saveManifest(eq(context), eq("app"), any(ManifestForm.class)))
         .thenThrow(new ImageDeletedException(imageInfo.getId()));
 
-    assertThatThrownBy(
-            () ->
-                this.handler()
-                    .handle(context, request(MANIFEST_TYPE), new MockHttpServletResponse()))
+    final var handler = this.handler();
+    final var request = request(MANIFEST_TYPE);
+    final var response = new MockHttpServletResponse();
+
+    assertThatThrownBy(() -> handler.handle(context, request, response))
         .isInstanceOf(ImageDeletedException.class);
 
     // The first save plus twenty runs again.

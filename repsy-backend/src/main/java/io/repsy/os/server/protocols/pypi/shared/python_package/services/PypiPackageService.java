@@ -419,14 +419,14 @@ public class PypiPackageService extends AbstractPypiPackageService<UUID> {
       throw new IllegalStateException("Version mismatch in override operation");
     }
 
-    release.setRequiresPython(uploadForm.getRequires_python());
+    release.setRequiresPython(uploadForm.getRequiresPython());
     release.setSummary(uploadForm.getSummary());
-    release.setHomePage(uploadForm.getHome_page());
+    release.setHomePage(uploadForm.getHomePage());
     release.setAuthor(uploadForm.getAuthor());
-    release.setAuthorEmail(uploadForm.getAuthor_email());
+    release.setAuthorEmail(uploadForm.getAuthorEmail());
     release.setLicense(uploadForm.getLicense());
     release.setDescription(uploadForm.getDescription());
-    release.setDescriptionContentType(uploadForm.getDescription_content_type());
+    release.setDescriptionContentType(uploadForm.getDescriptionContentType());
 
     this.releaseRepository.save(release);
 
@@ -450,14 +450,14 @@ public class PypiPackageService extends AbstractPypiPackageService<UUID> {
     release.setPreRelease(releaseVersion.isPreRelease());
     release.setPostRelease(releaseVersion.isPostRelease());
     release.setDevRelease(releaseVersion.isDevelopmentRelease());
-    release.setRequiresPython(uploadForm.getRequires_python());
+    release.setRequiresPython(uploadForm.getRequiresPython());
     release.setSummary(uploadForm.getSummary());
-    release.setHomePage(uploadForm.getHome_page());
+    release.setHomePage(uploadForm.getHomePage());
     release.setAuthor(uploadForm.getAuthor());
-    release.setAuthorEmail(uploadForm.getAuthor_email());
+    release.setAuthorEmail(uploadForm.getAuthorEmail());
     release.setLicense(uploadForm.getLicense());
     release.setDescription(uploadForm.getDescription());
-    release.setDescriptionContentType(uploadForm.getDescription_content_type());
+    release.setDescriptionContentType(uploadForm.getDescriptionContentType());
     release.setCreatedAt(Instant.now());
 
     this.releaseRepository.save(release);
@@ -500,13 +500,13 @@ public class PypiPackageService extends AbstractPypiPackageService<UUID> {
 
   private void addReleaseProjectURLs(final PackageUploadForm uploadForm, final Release release) {
 
-    if (uploadForm.getProject_urls() == null) {
+    if (uploadForm.getProjectUrls() == null) {
       return;
     }
 
     final var releaseProjectURLs = new ArrayList<ReleaseProjectUrl>();
 
-    for (final var projectURL : uploadForm.getProject_urls()) {
+    for (final var projectURL : uploadForm.getProjectUrls()) {
       final var split = splitProjectUrl(projectURL);
 
       if (split == null || split.length != 2) {

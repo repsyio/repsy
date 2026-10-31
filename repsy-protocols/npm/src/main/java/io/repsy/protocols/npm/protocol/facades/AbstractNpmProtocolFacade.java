@@ -53,7 +53,7 @@ import org.springframework.core.io.Resource;
 
 @Slf4j
 @RequiredArgsConstructor
-public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade {
+public abstract class AbstractNpmProtocolFacade<I> implements NpmProtocolFacade {
 
   private static final String USAGES = "usages";
   private static final String PACKAGE_JSON = "package.json";
@@ -61,7 +61,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
   private static final String ARTIFACT_VERSION = "artifactVersion";
   private static final String STORAGE_PATH = "storagePath";
 
-  private final NpmPackageService<ID> npmPackageService;
+  private final NpmPackageService<I> npmPackageService;
   private final AbstractNpmStorageService npmStorageService;
 
   @Override
@@ -90,7 +90,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
       final Map<String, Object> payload)
       throws IOException {
 
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     final var packageBasePath = this.npmStorageService.getPackageBasePath(scopeName, packageName);
 
     final var metadata =
@@ -115,7 +115,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
     final var versionName =
         NpmRevPath.versionOfTarball(packageName, tarballFilename)
             .orElseThrow(() -> new BadRequestException(ProtocolErrorCodes.BAD_REQUEST));
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
 
     // The tarball is removed with the version by the packument PUT that comes first in an unpublish
     // (RPS-1289), so this request finds nothing left to delete. A version that is still published
@@ -126,7 +126,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
   }
 
   private boolean isPublished(
-      final BaseRepoInfo<ID> repoInfo,
+      final BaseRepoInfo<I> repoInfo,
       @Nullable final String scopeName,
       final String packageName,
       final String versionName) {
@@ -175,7 +175,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
   public boolean packageExists(
       final ProtocolContext context, @Nullable final String scopeName, final String packageName) {
 
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
 
     try {
       this.npmPackageService.getPackage(repoInfo.getStorageKey(), scopeName, packageName);
@@ -194,7 +194,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
       final String acceptHeader)
       throws IOException {
 
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     final var isAbbreviated = NpmMetadataUtils.isRequestedAbbreviatedMetadata(acceptHeader);
 
     // A package the database has and storage lost is served from the rows (RPS-1300): it is what a
@@ -211,7 +211,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
   public Map<String, String> getMappedDistributionTags(
       final ProtocolContext context, @Nullable final String scopeName, final String packageName) {
 
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
 
     // In the order of the tags the service returns (by name), not a HashMap's (RPS-1614).
     return this.getDistributionTags(repoInfo, scopeName, packageName).stream()
@@ -234,7 +234,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
 
     NpmPublishLimits.checkDistTagName(tagName);
 
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     final var packageBasePath = this.npmStorageService.getPackageBasePath(scopeName, packageName);
     final var version = versionName.replace("\"", "");
     final var storagePath =
@@ -281,7 +281,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
       throw new BadRequestException(ProtocolErrorCodes.CAN_NOT_REMOVE_TAG_LATEST);
     }
 
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     final var packageBasePath = this.npmStorageService.getPackageBasePath(scopeName, packageName);
 
     final var usages =
@@ -310,7 +310,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
    * first (RPS-1300): see {@link AbstractNpmStorageService#changeMetadata}.
    */
   private BaseUsages rewriteMetadata(
-      final BaseRepoInfo<ID> repoInfo,
+      final BaseRepoInfo<I> repoInfo,
       final @Nullable String scopeName,
       final String packageName,
       final Path packageBasePath,
@@ -325,10 +325,9 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
             change));
   }
 
-  /** The rows of the package as the transaction that is open sees them, when asked for. */
   /** The versions stored for the package, none when it is not there yet. */
   private List<String> storedVersionNames(
-      final BaseRepoInfo<ID> repoInfo, final @Nullable String scopeName, final String packageName) {
+      final BaseRepoInfo<I> repoInfo, final @Nullable String scopeName, final String packageName) {
 
     try {
       return this.npmPackageService
@@ -342,8 +341,9 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
     }
   }
 
+  /** The rows of the package as the transaction that is open sees them, when asked for. */
   private Supplier<NpmPackageSnapshot> snapshotOf(
-      final BaseRepoInfo<ID> repoInfo, final @Nullable String scopeName, final String packageName) {
+      final BaseRepoInfo<I> repoInfo, final @Nullable String scopeName, final String packageName) {
 
     return () ->
         this.npmPackageService.getSnapshot(repoInfo.getStorageKey(), scopeName, packageName);
@@ -353,7 +353,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
   public void deletePackage(
       final ProtocolContext context, @Nullable final String scopeName, final String packageName) {
 
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     final var packageBasePath = this.npmStorageService.getPackageBasePath(scopeName, packageName);
 
     // The rows are deleted first and the files second, in one transaction that holds the package
@@ -369,14 +369,14 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
   }
 
   private BaseUsages removePackageFiles(
-      final BaseRepoInfo<ID> repoInfo, final Path packageBasePath) {
+      final BaseRepoInfo<I> repoInfo, final Path packageBasePath) {
 
     return BaseUsages.ofDisk(
         -1L * this.npmStorageService.deletePackage(repoInfo.getStorageKey(), packageBasePath));
   }
 
   private List<PackageDistributionTagMapListItem> getDistributionTags(
-      final BaseRepoInfo<ID> baseRepoInfo,
+      final BaseRepoInfo<I> baseRepoInfo,
       final @Nullable String scopeName,
       final String packageName) {
 
@@ -393,7 +393,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
       final String versionName)
       throws IOException {
 
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     final var packageBasePath = this.npmStorageService.getPackageBasePath(scopeName, packageName);
 
     // The rows are deleted first and the files second, in one transaction that holds the package
@@ -426,7 +426,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
       final Map<String, Object> payload)
       throws IOException {
 
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     final var packageBasePath = this.npmStorageService.getPackageBasePath(scopeName, packageName);
 
     final var metadata =
@@ -465,7 +465,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
       final Map<String, Object> payload)
       throws IOException {
 
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
 
     try {
       final var packageBasePath = this.npmStorageService.getPackageBasePath(scopeName, packageName);
@@ -524,7 +524,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
    * publish was adding are removed, so storage does not keep a version the database does not know.
    */
   private BaseUsages storeVersion(
-      final BaseRepoInfo<ID> repoInfo,
+      final BaseRepoInfo<I> repoInfo,
       final @Nullable String scopeName,
       final Path packageBasePath,
       final String packageName,
@@ -580,7 +580,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
    * it fails the tarball is discarded with the rest of the partial version.
    */
   private void noteOrphanedTarball(
-      final BaseRepoInfo<ID> repoInfo,
+      final BaseRepoInfo<I> repoInfo,
       final Path packageBasePath,
       final String packageName,
       final String versionName) {
@@ -597,7 +597,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
   }
 
   private BaseUsages writeFiles(
-      final BaseRepoInfo<ID> repoInfo,
+      final BaseRepoInfo<I> repoInfo,
       final @Nullable String scopeName,
       final Path packageBasePath,
       final String packageName,
@@ -622,8 +622,7 @@ public abstract class AbstractNpmProtocolFacade<ID> implements NpmProtocolFacade
   }
 
   private Map<String, Object> processNewPackage(
-      final BaseRepoInfo<ID> repoInfo, final Map<String, Object> payload)
-      throws URISyntaxException {
+      final BaseRepoInfo<I> repoInfo, final Map<String, Object> payload) throws URISyntaxException {
 
     this.npmStorageService.processPackagePayload(payload, repoInfo.getName());
 

@@ -94,7 +94,7 @@ describe('SeverityBreakdownComponent', () => {
       const badges = Array.from(element().querySelectorAll('app-severity-badge')).map((badge) =>
         badge.textContent?.replace(/\s+/g, ' ').trim(),
       );
-      expect(badges.length).toBe(3);
+      expect(badges).toHaveSize(3);
       expect(badges[0]).toContain('1');
       expect(badges[1]).toContain('2');
       expect(badges[2]).toContain('3');

@@ -153,9 +153,7 @@ export class MavenService {
       VERSION_PROBE_SIZE,
     ).pipe(
       switchMap((probe) => (isLastVersion(probe) ? this.fetchGroupSummary(groupName) : of(null))),
-      map((summary) =>
-        summary && summary.artifactCount === 1 ? lastVersionOfGroupWarning(groupName, artifactName) : null,
-      ),
+      map((summary) => (summary?.artifactCount === 1 ? lastVersionOfGroupWarning(groupName, artifactName) : null)),
       catchError(() => of(null)),
     );
   }

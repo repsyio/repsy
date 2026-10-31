@@ -21,7 +21,6 @@ import { Component, OnInit } from '@angular/core';
   selector: 'app-welcome-card',
   imports: [NgOptimizedImage],
   templateUrl: './welcome-card.component.html',
-  styleUrl: './welcome-card.component.css',
 })
 export class WelcomeCardComponent implements OnInit {
   username: string;

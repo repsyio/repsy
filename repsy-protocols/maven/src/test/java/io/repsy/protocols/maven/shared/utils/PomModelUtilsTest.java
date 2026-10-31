@@ -108,8 +108,8 @@ class PomModelUtilsTest {
     final var secret = "do-not-reflect-this-marker";
     final var malformed = "<project><modelVersion>4.0.0</modelVersion><!-- " + secret + " -->";
 
-    assertThatThrownBy(
-            () -> PomModelUtils.readModel(new ByteArrayResource(malformed.getBytes(UTF_8))))
+    final var byteArrayResourceArg = new ByteArrayResource(malformed.getBytes(UTF_8));
+    assertThatThrownBy(() -> PomModelUtils.readModel(byteArrayResourceArg))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("malformedPomFile")
         .satisfies(e -> assertThat(e.toString()).doesNotContain(secret));
@@ -200,7 +200,8 @@ class PomModelUtilsTest {
   void binaryBodyYieldsFixedMessageId() {
     final var binary = new byte[] {'P', 'K', 3, 4, 0, 0};
 
-    assertThatThrownBy(() -> PomModelUtils.readModel(new ByteArrayInputStream(binary)))
+    final var byteArrayInputStreamArg = new ByteArrayInputStream(binary);
+    assertThatThrownBy(() -> PomModelUtils.readModel(byteArrayInputStreamArg))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("malformedPomFile");
   }
@@ -304,18 +305,16 @@ class PomModelUtilsTest {
     logger.addAppender(logs);
 
     try {
-      assertThatThrownBy(
-              () ->
-                  PomModelUtils.readModel(
-                      new ByteArrayInputStream(
-                          "<project><s3cr3t-token-value></project>".getBytes(UTF_8))))
+      final var byteArrayInputStreamArg =
+          new ByteArrayInputStream("<project><s3cr3t-token-value></project>".getBytes(UTF_8));
+      assertThatThrownBy(() -> PomModelUtils.readModel(byteArrayInputStreamArg))
           .isInstanceOf(BadRequestException.class);
     } finally {
       logger.detachAppender(logs);
     }
 
-    assertThat(logs.list).isNotEmpty();
     assertThat(logs.list)
+        .isNotEmpty()
         .noneMatch(event -> event.getFormattedMessage().contains("s3cr3t-token-value"));
   }
 }

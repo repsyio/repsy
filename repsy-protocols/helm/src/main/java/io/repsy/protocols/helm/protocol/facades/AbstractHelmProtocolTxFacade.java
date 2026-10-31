@@ -43,24 +43,24 @@ import org.springframework.core.io.Resource;
  * HelmOciManifestFacade}, which this class delegates to. The constructor and the protected
  * collaborators are the contract of a subclass.
  */
-public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmProtocolFacade<ID> {
+public abstract class AbstractHelmProtocolTxFacade<I> implements HelmProtocolFacade<I> {
 
-  protected final HelmStorageService<ID> helmStorageService;
-  protected final ChartService<ID> chartService;
-  protected final OciBlobService<ID> ociBlobService;
-  protected final OciManifestService<ID> ociManifestService;
-  protected final AbstractHelmChartFilesService<ID> chartFilesService;
+  protected final HelmStorageService<I> helmStorageService;
+  protected final ChartService<I> chartService;
+  protected final OciBlobService<I> ociBlobService;
+  protected final OciManifestService<I> ociManifestService;
+  protected final AbstractHelmChartFilesService<I> chartFilesService;
 
-  private final HelmClassicChartFacade<ID> classic;
-  private final HelmOciBlobFacade<ID> blobs;
-  private final HelmOciManifestFacade<ID> manifests;
+  private final HelmClassicChartFacade<I> classic;
+  private final HelmOciBlobFacade<I> blobs;
+  private final HelmOciManifestFacade<I> manifests;
 
   protected AbstractHelmProtocolTxFacade(
-      final HelmStorageService<ID> helmStorageService,
-      final ChartService<ID> chartService,
-      final OciBlobService<ID> ociBlobService,
-      final OciManifestService<ID> ociManifestService,
-      final AbstractHelmChartFilesService<ID> chartFilesService) {
+      final HelmStorageService<I> helmStorageService,
+      final ChartService<I> chartService,
+      final OciBlobService<I> ociBlobService,
+      final OciManifestService<I> ociManifestService,
+      final AbstractHelmChartFilesService<I> chartFilesService) {
 
     this.helmStorageService = helmStorageService;
     this.chartService = chartService;
@@ -112,7 +112,7 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmProtocolFa
 
   @Override
   public UUID startBlobUpload(final ProtocolContext context) {
-    return this.blobs.startBlobUpload(context);
+    return this.blobs.startBlobUpload();
   }
 
   @Override
@@ -122,7 +122,7 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmProtocolFa
       final InputStream stream,
       final long contentLength)
       throws IOException {
-    return this.blobs.uploadBlobChunk(context, uploadId, stream, contentLength);
+    return this.blobs.uploadBlobChunk(context, uploadId, stream);
   }
 
   @Override
@@ -153,7 +153,7 @@ public abstract class AbstractHelmProtocolTxFacade<ID> implements HelmProtocolFa
   }
 
   @Override
-  public HelmOciBlobInfo getOrCreateBlob(final HelmOciBlobForm form, final ID repoId) {
+  public HelmOciBlobInfo getOrCreateBlob(final HelmOciBlobForm form, final I repoId) {
     return this.blobs.getOrCreateBlob(form, repoId);
   }
 

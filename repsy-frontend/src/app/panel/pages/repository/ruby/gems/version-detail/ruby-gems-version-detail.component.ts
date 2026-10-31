@@ -79,7 +79,7 @@ export class RubyGemsVersionDetailComponent implements OnDestroy {
     this.activeRepo = {} as RepoPermissionInfo;
     this.repositoryChanges$ = this.rubyService.repoChanges$.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
-        this.activeRepo = Object.assign({}, repo);
+        this.activeRepo = { ...repo };
         this.loadVersion();
       }
     });
@@ -137,7 +137,7 @@ export class RubyGemsVersionDetailComponent implements OnDestroy {
         )
         .subscribe({
           next: (wasLastVersion) => {
-            landAfterVersionDelete(
+            void landAfterVersionDelete(
               this.router,
               this.route,
               this.toastService,

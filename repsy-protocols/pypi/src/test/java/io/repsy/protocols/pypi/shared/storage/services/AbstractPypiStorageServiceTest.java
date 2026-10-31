@@ -288,7 +288,7 @@ class AbstractPypiStorageServiceTest {
       final var uploadForm = new PackageUploadForm();
       uploadForm.setNormalizedName(NORMALIZED_NAME);
       // As set by the facade before this is ever called: the server-computed, lowercase digest.
-      uploadForm.setSha256_digest("cafef00d");
+      uploadForm.setSha256Digest("cafef00d");
       final var file = new MockMultipartFile("content", FILENAME, null, new byte[] {1, 2, 3});
 
       when(storageStrategy.write(eq(REPO_NAME), any(StoragePath.class), any(InputStream.class)))
@@ -317,14 +317,15 @@ class AbstractPypiStorageServiceTest {
     void throwsOnNullDigestInsteadOfNpe() {
       final var uploadForm = new PackageUploadForm();
       uploadForm.setNormalizedName(NORMALIZED_NAME);
-      uploadForm.setSha256_digest(null);
+      uploadForm.setSha256Digest(null);
       final var file = new MockMultipartFile("content", FILENAME, null, new byte[] {1, 2, 3});
 
       when(storageStrategy.write(eq(REPO_NAME), any(StoragePath.class), any(InputStream.class)))
           .thenReturn(BaseUsages.ofDisk(100));
 
-      assertThatThrownBy(
-              () -> service.writePackageArchive(new RepoRef(REPO_ID, REPO_NAME), uploadForm, file))
+      final var repoRef = new RepoRef(REPO_ID, REPO_NAME);
+
+      assertThatThrownBy(() -> service.writePackageArchive(repoRef, uploadForm, file))
           .isInstanceOf(NullPointerException.class);
     }
   }

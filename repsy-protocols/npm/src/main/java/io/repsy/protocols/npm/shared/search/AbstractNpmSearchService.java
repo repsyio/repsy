@@ -19,4 +19,4 @@ package io.repsy.protocols.npm.shared.search;
  * Base of the backend implementation of {@link NpmSearchService}; the abstract methods are
  * inherited from the contract.
  */
-public abstract class AbstractNpmSearchService<ID> implements NpmSearchService<ID> {}
+public abstract class AbstractNpmSearchService<I> implements NpmSearchService<I> {}

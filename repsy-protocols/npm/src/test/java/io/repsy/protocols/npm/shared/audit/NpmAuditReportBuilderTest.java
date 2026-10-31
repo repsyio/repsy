@@ -124,9 +124,7 @@ class NpmAuditReportBuilderTest {
     assertThat(NpmAuditReportBuilder.bulk(List.of())).isEmpty();
   }
 
-  @Test
-  @DisplayName("legacy reports the places of the vulnerable version, with actions and counts")
-  void legacyShape() {
+  private static JsonNode legacyShapeReport() {
     final var tree =
         tree(
             """
@@ -139,8 +137,13 @@ class NpmAuditReportBuilderTest {
         NpmAuditReportBuilder.legacy(
             tree, List.of(advisory(5, "lodash", NpmSeverity.HIGH, ">=4.17.21", "4.17.20")));
 
-    final var json = json(report);
-    final var advisory = json.get("advisories").get("5");
+    return json(report);
+  }
+
+  @Test
+  @DisplayName("legacy reports the fields of an advisory, as npm 6 reads them")
+  void legacyAdvisoryShape() {
+    final var advisory = legacyShapeReport().get("advisories").get("5");
 
     assertThat(advisory.get("id").asLong()).isEqualTo(5);
     assertThat(advisory.get("module_name").asString()).isEqualTo("lodash");
@@ -162,8 +165,13 @@ class NpmAuditReportBuilderTest {
     assertThat(advisory.get("found_by").get("name").asString()).isEqualTo("Repsy");
     assertThat(advisory.get("reported_by").get("name").asString()).isEqualTo("trivy");
     assertThat(advisory.get("metadata").get("exploitability").asInt()).isZero();
+  }
 
-    final var finding = advisory.get("findings").get(0);
+  @Test
+  @DisplayName("legacy reports the paths of the vulnerable version in a finding")
+  void legacyFindingShape() {
+    final var finding = legacyShapeReport().get("advisories").get("5").get("findings").get(0);
+
     assertThat(finding.get("version").asString()).isEqualTo("4.17.20");
     assertThat(finding.get("paths"))
         .extracting(JsonNode::asString)
@@ -171,8 +179,14 @@ class NpmAuditReportBuilderTest {
     assertThat(finding.get("dev").asBoolean()).isFalse();
     assertThat(finding.get("optional").asBoolean()).isFalse();
     assertThat(finding.get("bundled").asBoolean()).isFalse();
+  }
 
+  @Test
+  @DisplayName("legacy reports a review action that resolves each path of the advisory")
+  void legacyActionShape() {
+    final var json = legacyShapeReport();
     final var action = json.get("actions").get(0);
+
     assertThat(action.get("action").asString()).isEqualTo("review");
     assertThat(action.get("module").asString()).isEqualTo("lodash");
     assertThat(action.get("isMajor").asBoolean()).isFalse();
@@ -180,8 +194,13 @@ class NpmAuditReportBuilderTest {
     assertThat(action.get("resolves").get(0).get("id").asLong()).isEqualTo(5);
     assertThat(action.get("resolves").get(0).get("path").asString()).isEqualTo("a>lodash");
     assertThat(json.get("muted")).isEmpty();
+  }
 
-    final var metadata = json.get("metadata");
+  @Test
+  @DisplayName("legacy reports the counts of the vulnerabilities and the dependencies")
+  void legacyMetadataShape() {
+    final var metadata = legacyShapeReport().get("metadata");
+
     assertThat(metadata.get("vulnerabilities").get("high").asInt()).isEqualTo(1);
     assertThat(metadata.get("dependencies").asInt()).isEqualTo(3);
     assertThat(metadata.get("devDependencies").asInt()).isEqualTo(2);

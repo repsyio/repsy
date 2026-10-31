@@ -36,12 +36,12 @@ import org.springframework.core.io.Resource;
  * layer (stored by digest, or by uuid before the rename), and whether a layer's file exists.
  */
 @RequiredArgsConstructor
-final class DockerBlobResolver<ID> {
+final class DockerBlobResolver<I> {
 
-  private final DockerStorageService<ID> dockerStorageService;
-  private final LayerService<ID> layerService;
+  private final DockerStorageService<I> dockerStorageService;
+  private final LayerService<I> layerService;
 
-  Resource getResource(final BaseRepoInfo<ID> repoInfo, final RelativePath relativePath) {
+  Resource getResource(final BaseRepoInfo<I> repoInfo, final RelativePath relativePath) {
 
     final var storagePath = StoragePath.of(repoInfo.getStorageKey(), relativePath.getPath());
 
@@ -50,7 +50,7 @@ final class DockerBlobResolver<ID> {
         .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.RESOURCE_NOT_FOUND));
   }
 
-  String getConfig(final BaseRepoInfo<ID> repoInfo, final LayerInfo layerInfo) throws IOException {
+  String getConfig(final BaseRepoInfo<I> repoInfo, final LayerInfo layerInfo) throws IOException {
 
     Resource resource;
 
@@ -73,7 +73,7 @@ final class DockerBlobResolver<ID> {
     return resource.getContentAsString(StandardCharsets.UTF_8);
   }
 
-  LayerInfo findLayerInfoByRepoIdAndDigest(final ID repoId, final String digest) {
+  LayerInfo findLayerInfoByRepoIdAndDigest(final I repoId, final String digest) {
 
     return this.layerService
         .findLayerInfoByRepoIdAndDigest(repoId, digest)
@@ -81,7 +81,7 @@ final class DockerBlobResolver<ID> {
   }
 
   boolean checkLayerExistsInStorage(
-      final BaseRepoInfo<ID> repoInfo, final RelativePath relativePath, final LayerInfo layerInfo) {
+      final BaseRepoInfo<I> repoInfo, final RelativePath relativePath, final LayerInfo layerInfo) {
 
     final var idx = BlobDigests.indexOfDigestPrefix(relativePath.getPath());
 
@@ -94,7 +94,7 @@ final class DockerBlobResolver<ID> {
 
   boolean checkLayerForUuid(
       final int idx,
-      final BaseRepoInfo<ID> repoInfo,
+      final BaseRepoInfo<I> repoInfo,
       final RelativePath relativePath,
       final LayerInfo layerInfo) {
 
@@ -110,7 +110,7 @@ final class DockerBlobResolver<ID> {
 
   boolean checkLayerForSha(
       final int idx,
-      final BaseRepoInfo<ID> repoInfo,
+      final BaseRepoInfo<I> repoInfo,
       final RelativePath relativePath,
       final LayerInfo layerInfo) {
 
@@ -124,14 +124,14 @@ final class DockerBlobResolver<ID> {
     return this.dockerStorageService.existsResource(storagePath, repoInfo.getName());
   }
 
-  boolean existsResource(final BaseRepoInfo<ID> repoInfo, final RelativePath relativePath) {
+  boolean existsResource(final BaseRepoInfo<I> repoInfo, final RelativePath relativePath) {
 
     return this.dockerStorageService.existsResource(
         StoragePath.of(repoInfo.getStorageKey(), relativePath.getPath()), repoInfo.getName());
   }
 
   Resource getLayerResource(
-      final String digest, final BaseRepoInfo<ID> repoInfo, final RelativePath relativePath) {
+      final String digest, final BaseRepoInfo<I> repoInfo, final RelativePath relativePath) {
 
     final var idx = BlobDigests.indexOfDigestPrefix(relativePath.getPath());
 

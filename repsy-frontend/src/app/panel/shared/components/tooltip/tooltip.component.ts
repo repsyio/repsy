@@ -52,7 +52,7 @@ export class TooltipComponent {
 
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
 
-  @ViewChild('label') private label?: ElementRef<HTMLElement>;
+  @ViewChild('label') private readonly label?: ElementRef<HTMLElement>;
 
   isVisible = false;
   /** True while the text is wider than its slot; measured when the pointer enters. */

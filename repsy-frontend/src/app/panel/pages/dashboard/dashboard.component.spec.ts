@@ -87,7 +87,7 @@ describe('DashboardComponent in an OnPush host (RPS-1459)', () => {
   });
 
   it('starts empty: no request has answered yet', () => {
-    expect(profileAnswers.length).toBe(2);
+    expect(profileAnswers).toHaveSize(2);
     expect(query('dashboard-create-repo')).toBeNull();
     expect(query('sidebar-link-users')).toBeNull();
     expect(text('disk-usage-repo-count')).toBe('0');
