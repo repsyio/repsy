@@ -7513,6 +7513,8 @@ schedule that arrives behind a running dispatch and a pending one cancels the pe
 
 ### The runner host and the `hetzner-e2e` label (RPS-1982)
 
+> **Superseded (RPS-2381):** the e2e workflow no longer reads `E2E_RUNNER`; every job runs on `ubicloud-standard-4`. This section describes the self-hosted host as it was and is kept for that history.
+
 The self-hosted runners are containers on ONE machine (an AMD Ryzen 5 3600: 6 cores, 12 threads, 62 GB): `hetzner-sm-1..10`
 (1 CPU, 2 GB), `hetzner-md-1..4` (2 CPUs, 6 GB) and `hetzner-lg-1..3` (4 CPUs, 15 GB), shared by the workflows of repsy and
 repsy-mono. What the e2e legs start (the stack, the Playwright runner containers) are not children of the runner

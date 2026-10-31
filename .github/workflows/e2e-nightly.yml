@@ -49,10 +49,10 @@ concurrency:
   group: e2e-nightly
   cancel-in-progress: false
 
-# Every job runs on ubuntu-24.04, not ubuntu-latest (RPS-1600): ubuntu-latest moves to Ubuntu 26 on
-# 2026-10-19, and the Chromium sandbox probe, the Docker version and the docker socket's gid of the stack
-# runner all change with the image. Move the pin (or set the repository variable E2E_RUNNER, which wins
-# for the image and e2e jobs) on purpose, in a PR of its own, after a manual `suite=all` run on the new one.
+# Every job runs on a Ubicloud runner (ubicloud-standard-*). RPS-2381 moved the last jobs off the
+# self-hosted host that the E2E_RUNNER variable pointed at. The Chromium sandbox probe, the Docker
+# version and the docker socket's gid of the stack runner all change with the runner image, so move
+# the label on purpose, in a PR of its own, after a manual `suite=all` run on the new one.
 defaults:
   run:
     shell: bash
@@ -280,7 +280,7 @@ jobs:
   # a red `tsc`, in a minute and with no stack. It runs on every trigger, whatever the suite input says.
   typecheck:
     name: E2E typecheck and lint
-    runs-on: ${{ vars.E2E_RUNNER || 'ubicloud-standard-4' }}
+    runs-on: ubicloud-standard-4
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -311,7 +311,7 @@ jobs:
   # an artifact: three legs each rebuilding it would triple the slowest step of the run.
   image:
     name: Build Repsy image
-    runs-on: ${{ vars.E2E_RUNNER || 'ubicloud-standard-4' }}
+    runs-on: ubicloud-standard-4
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -388,7 +388,7 @@ jobs:
   e2e:
     name: E2E ${{ matrix.leg }}
     needs: [plan, image]
-    runs-on: ${{ vars.E2E_RUNNER || 'ubicloud-standard-4' }}
+    runs-on: ubicloud-standard-4
     timeout-minutes: ${{ matrix.timeout }}
     strategy:
       # A red leg must not hide the result of the others.
@@ -757,7 +757,8 @@ jobs:
           retention-days: 7
           if-no-files-found: warn
 
-      # The runner VM is discarded anyway; this only keeps a self-hosted runner (E2E_RUNNER) clean.
+      # The runner VM is discarded anyway; the step is a leftover from the self-hosted E2E_RUNNER host
+      # (RPS-2381) and harmless on a fresh VM.
       - name: Stop the stack
         if: always()
         env:
