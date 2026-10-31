@@ -55,7 +55,6 @@ import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -261,11 +260,19 @@ public class FileSystemStorageStrategy implements StorageStrategy {
     }
   }
 
+  /**
+   * The creation time to the millisecond, as the {@code java.util.Date} the listing used to carry
+   * (RPS-2372): a listing's JSON and HTML show milliseconds, not the file system's finer ticks.
+   */
+  private static Instant creationInstant(final BasicFileAttributes attributes) {
+    return Instant.ofEpochMilli(attributes.creationTime().toMillis());
+  }
+
   private StorageItemInfo readStorageItemInfo(final Path path) throws IOException {
     final File file = path.toFile();
 
     final var fileAttributes = Files.readAttributes(file.toPath(), BasicFileAttributes.class);
-    final Date createdAt = Date.from(fileAttributes.creationTime().toInstant());
+    final Instant createdAt = creationInstant(fileAttributes);
 
     return StorageItemInfo.builder()
         .name(file.getName())
@@ -811,9 +818,7 @@ public class FileSystemStorageStrategy implements StorageStrategy {
       final var fileAttributes = Files.readAttributes(file.toPath(), BasicFileAttributes.class);
 
       final StorageItemInfo itemInfo =
-          StorageItemInfo.builder()
-              .createdAt(Date.from(fileAttributes.creationTime().toInstant()))
-              .build();
+          StorageItemInfo.builder().createdAt(creationInstant(fileAttributes)).build();
 
       if (Files.isDirectory(file.toPath()) && !file.getPath().equals(this.trashPath.toString())) {
         itemInfo.setName(fileName + "/");

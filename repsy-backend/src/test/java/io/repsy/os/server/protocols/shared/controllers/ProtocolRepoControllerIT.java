@@ -842,6 +842,21 @@ class ProtocolRepoControllerIT extends AbstractIT {
     }
 
     @Test
+    @DisplayName("writes createdAt as an ISO-8601 UTC timestamp, to the millisecond (RPS-2372)")
+    void createdAtWireFormat() throws Exception {
+      final var repo = this.repoWithContent();
+
+      final var items = bareList(this.contents(repo, ""));
+
+      assertThat(items)
+          .extracting(item -> (String) item.get("createdAt"))
+          .allSatisfy(
+              createdAt ->
+                  assertThat(createdAt)
+                      .matches("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{3})?Z"));
+    }
+
+    @Test
     @DisplayName("lists nested folders with a '../' entry pointing to the parent")
     void listsNestedFolders() throws Exception {
       final var repo = this.repoWithContent();
