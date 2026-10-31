@@ -1,5 +1,4 @@
 @import 'tailwindcss';
-@import 'github-markdown-css/github-markdown-dark.css';
 @plugin 'daisyui';
 
 @font-face {
@@ -527,7 +526,7 @@ code {
 }
 
 .hljs.hljs-line-numbers {
-  padding: 0 !important;
+  padding: 0;
 }
 
 pre .hljs {
@@ -540,63 +539,30 @@ pre .hljs {
 .hljs-ln {
   tr {
     &:first-child td {
-      padding-top: 10px !important;
+      padding-top: 10px;
     }
 
     &:last-child td {
-      padding-bottom: 10px !important;
+      padding-bottom: 10px;
     }
   }
 }
 
-/* for block of numbers */
-td.hljs-ln-numbers {
+/*
+ * for block of numbers; the td.class selectors outrank the .hljs-ln td { padding: 0 } that
+ * highlightjs-line-numbers injects at runtime
+ */
+.hljs-ln td.hljs-ln-numbers {
   left: 0;
   text-align: center;
   color: #cccccc6b;
   border-right: 1px solid #cccccc1c;
   vertical-align: top;
-  padding-right: 10px !important;
-  padding-left: 10px !important;
+  padding-right: 10px;
+  padding-left: 10px;
 }
 
 /* for block of code */
-td.hljs-ln-code {
-  padding-left: 10px !important;
-}
-
-.markdown-body {
-  background-color: transparent !important;
-  color: #e6edf3;
-}
-
-.markdown-body table,
-.markdown-body th,
-.markdown-body td {
-  background-color: transparent !important;
-}
-
-.markdown-body h1 {
-  font-size: 1.9rem;
-  font-weight: 700;
-  margin-top: 2rem;
-}
-
-.markdown-body h2 {
-  font-size: 1.6rem;
-  font-weight: 700;
-  margin-top: 2rem;
-  border-bottom: 1px solid #2f3031;
-  padding-bottom: 0.4rem;
-}
-
-.markdown-body h3 {
-  font-size: 1.25rem;
-  font-weight: 600;
-  margin-top: 1.5rem;
-}
-
-.markdown-body hr {
-  margin: 24px 0;
-  border-color: #30363d;
+.hljs-ln td.hljs-ln-code {
+  padding-left: 10px;
 }

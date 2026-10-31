@@ -108,6 +108,10 @@
               "zone.js/testing"
             ],
             "tsConfig": "tsconfig.spec.json",
+            "include": [
+              "**/*.spec.ts",
+              "**/*.setup.ts"
+            ],
             "codeCoverageExclude": [
               "src/generated/**"
             ],
