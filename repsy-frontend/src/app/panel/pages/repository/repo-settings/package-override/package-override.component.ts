@@ -28,7 +28,6 @@ import { saveRepoSetting } from '../save-repo-setting';
   selector: 'app-package-override',
   standalone: true,
   templateUrl: './package-override.component.html',
-  styleUrls: ['./package-override.component.css'],
   imports: [ReactiveFormsModule, ToggleComponent, RouterLink],
 })
 export class PackageOverrideComponent implements OnInit {

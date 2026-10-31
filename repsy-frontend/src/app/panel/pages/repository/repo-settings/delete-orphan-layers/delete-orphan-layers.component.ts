@@ -25,7 +25,6 @@ import { ToastService } from '../../../../shared/components/toast/toast.service'
 @Component({
   selector: 'app-delete-orphan-layers',
   templateUrl: './delete-orphan-layers.component.html',
-  styleUrls: ['./delete-orphan-layers.component.css'],
   standalone: true,
   imports: [RouterLink],
 })

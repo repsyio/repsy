@@ -22,7 +22,6 @@ import { TotalUsageInfo } from '../../../../../generated/api';
   selector: 'app-total-disk',
   imports: [],
   templateUrl: './total-disk.component.html',
-  styleUrl: './total-disk.component.css',
   standalone: true,
 })
 export class TotalDiskComponent {

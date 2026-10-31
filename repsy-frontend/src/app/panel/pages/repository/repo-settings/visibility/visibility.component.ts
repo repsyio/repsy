@@ -26,7 +26,6 @@ import { saveRepoSetting } from '../save-repo-setting';
 @Component({
   selector: 'app-visibility',
   templateUrl: './visibility.component.html',
-  styleUrls: ['./visibility.component.css'],
   standalone: true,
   imports: [ReactiveFormsModule, ToggleComponent, RouterLink],
 })

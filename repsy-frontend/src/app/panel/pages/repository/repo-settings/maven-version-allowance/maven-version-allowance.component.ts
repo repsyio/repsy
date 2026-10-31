@@ -27,7 +27,6 @@ import { saveRepoSetting } from '../save-repo-setting';
 @Component({
   selector: 'app-maven-version-allowance',
   templateUrl: './maven-version-allowance.component.html',
-  styleUrls: ['./maven-version-allowance.component.css'],
   standalone: true,
   imports: [ReactiveFormsModule, SelectorComponent, RouterLink],
 })

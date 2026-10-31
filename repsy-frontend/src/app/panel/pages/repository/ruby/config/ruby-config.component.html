@@ -3,6 +3,7 @@
     data-testid="config-modal-backdrop"
     class="bg-opacity-50 fixed inset-0 z-3 backdrop-blur-sm"
     (click)="closeModal()"
+    (keydown.escape)="closeModal()"
     aria-hidden="true"
   ></div>
 
@@ -24,7 +25,14 @@
         class="ml-2 rounded-full p-1 hover:bg-[#2A2B2B]"
         aria-label="Close modal"
       >
-        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <svg
+          aria-hidden="true"
+          width="20"
+          height="20"
+          viewBox="0 0 20 20"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
           <path
             d="M15 5L5 15M5 5L15 15"
             stroke="#FDFDFD"
