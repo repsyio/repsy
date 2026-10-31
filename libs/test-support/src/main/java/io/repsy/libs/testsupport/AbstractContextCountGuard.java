@@ -63,7 +63,7 @@ public abstract class AbstractContextCountGuard implements AfterAllCallback {
         BootstrapUtils.resolveTestContextBootstrapper(testClass).buildMergedContextConfiguration();
 
     final var known = CONFIGURATIONS.size();
-    final var overLimit = record(CONFIGURATIONS, configuration, this.maxContexts());
+    final var overLimit = recordConfiguration(CONFIGURATIONS, configuration, this.maxContexts());
 
     if (CONFIGURATIONS.size() > known) {
       LOG.info(
@@ -82,7 +82,7 @@ public abstract class AbstractContextCountGuard implements AfterAllCallback {
    * Adds {@code configuration} to {@code seen} and returns a message template (its {@code %s} is
    * the class) when that makes {@code seen} larger than {@code max}, or {@code null} while it fits.
    */
-  public static @Nullable String record(
+  public static @Nullable String recordConfiguration(
       final Collection<Object> seen, final Object configuration, final int max) {
 
     if (seen.contains(configuration)) {

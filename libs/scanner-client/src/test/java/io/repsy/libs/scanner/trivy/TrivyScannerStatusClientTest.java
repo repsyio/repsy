@@ -76,7 +76,10 @@ class TrivyScannerStatusClientTest {
           exchange.close();
         });
 
-    assertThatThrownBy(() -> this.client().fetchStatus(UUID.randomUUID()))
+    final var client = this.client();
+    final var scanId = UUID.randomUUID();
+
+    assertThatThrownBy(() -> client.fetchStatus(scanId))
         .isInstanceOf(ScanJobNotFoundException.class);
   }
 
@@ -89,7 +92,10 @@ class TrivyScannerStatusClientTest {
           exchange.close();
         });
 
-    assertThatThrownBy(() -> this.client().fetchStatus(UUID.randomUUID()))
+    final var client = this.client();
+    final var scanId = UUID.randomUUID();
+
+    assertThatThrownBy(() -> client.fetchStatus(scanId))
         .isInstanceOf(TrivyScanException.class)
         .hasMessageContaining("Scanner status check failed")
         .hasMessageContaining("503");

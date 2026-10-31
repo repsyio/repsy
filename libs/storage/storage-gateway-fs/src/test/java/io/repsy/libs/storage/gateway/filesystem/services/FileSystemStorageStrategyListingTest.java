@@ -69,10 +69,10 @@ class FileSystemStorageStrategyListingTest {
     final var items = this.strategy.listStorageItems(StoragePath.of(this.key, "com/acme/lib/1.0"));
 
     assertThat(items)
+        .hasSize(3)
         .filteredOn(item -> !item.isDirectory())
         .extracting(StorageItemInfo::getName)
         .containsExactlyInAnyOrder("lib-1.0.jar", "lib-1.0.pom");
-    assertThat(items).filteredOn(StorageItemInfo::isDirectory).hasSize(1);
   }
 
   @Test

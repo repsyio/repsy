@@ -89,14 +89,15 @@ class TrivyScannerPropertiesTest {
   @DisplayName(
       "an attempt count outside 1 to 5 stops the binding with a message naming the setting")
   void rejectsAttemptsOutsideTheBounds() {
-    assertThatThrownBy(() -> bind(Map.of("submit-max-attempts", "0")))
+    final Map<String, Object> zeroAttempts = Map.of("submit-max-attempts", "0");
+    final Map<String, Object> sixAttempts = Map.of("submit-max-attempts", "6");
+
+    assertThatThrownBy(() -> bind(zeroAttempts))
         .isInstanceOf(BindException.class)
         .rootCause()
         .hasMessageContaining("TRIVY_SUBMIT_MAX_ATTEMPTS")
         .hasMessageContaining("was 0");
-    assertThatThrownBy(() -> bind(Map.of("submit-max-attempts", "6")))
-        .rootCause()
-        .hasMessageContaining("was 6");
+    assertThatThrownBy(() -> bind(sixAttempts)).rootCause().hasMessageContaining("was 6");
     assertThat(bind(Map.of("submit-max-attempts", "5")).submitMaxAttempts()).isEqualTo(5);
     assertThat(bind(Map.of("submit-max-attempts", "1")).submitMaxAttempts()).isEqualTo(1);
   }

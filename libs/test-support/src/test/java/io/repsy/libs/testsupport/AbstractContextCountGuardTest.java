@@ -30,8 +30,8 @@ class AbstractContextCountGuardTest {
   void acceptsConfigurationsUpToTheLimit() {
     final Set<Object> seen = new HashSet<>();
 
-    assertThat(AbstractContextCountGuard.record(seen, "a", 2)).isNull();
-    assertThat(AbstractContextCountGuard.record(seen, "b", 2)).isNull();
+    assertThat(AbstractContextCountGuard.recordConfiguration(seen, "a", 2)).isNull();
+    assertThat(AbstractContextCountGuard.recordConfiguration(seen, "b", 2)).isNull();
     assertThat(seen).hasSize(2);
   }
 
@@ -40,7 +40,7 @@ class AbstractContextCountGuardTest {
   void aKnownConfigurationIsFree() {
     final Set<Object> seen = new HashSet<>(Set.of("a", "b"));
 
-    assertThat(AbstractContextCountGuard.record(seen, "a", 2)).isNull();
+    assertThat(AbstractContextCountGuard.recordConfiguration(seen, "a", 2)).isNull();
     assertThat(seen).hasSize(2);
   }
 
@@ -49,7 +49,7 @@ class AbstractContextCountGuardTest {
   void reportsTheConfigurationOverTheLimit() {
     final Set<Object> seen = new HashSet<>(Set.of("a", "b"));
 
-    final var message = AbstractContextCountGuard.record(seen, "c", 2);
+    final var message = AbstractContextCountGuard.recordConfiguration(seen, "c", 2);
 
     assertThat(message)
         .contains("number 3")

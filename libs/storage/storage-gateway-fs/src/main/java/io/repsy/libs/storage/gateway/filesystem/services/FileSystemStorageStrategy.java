@@ -75,6 +75,7 @@ import org.springframework.scheduling.annotation.Async;
 public class FileSystemStorageStrategy implements StorageStrategy {
 
   private static final String PATH_DELIMITER = "/";
+  private static final String NO_PARENT_DIRECTORY = "The storage path has no parent directory";
 
   /**
    * A {@link #write} streams into a hidden sibling named {@code .repsy-write-<uuid>.tmp} and moves
@@ -310,9 +311,7 @@ public class FileSystemStorageStrategy implements StorageStrategy {
       throw new InvalidStoragePathException("invalidStoragePath");
     }
 
-    final Path directory =
-        Objects.requireNonNull(
-            physicalPath.getParent(), "The storage path has no parent directory");
+    final Path directory = Objects.requireNonNull(physicalPath.getParent(), NO_PARENT_DIRECTORY);
 
     createDirectories(directory);
 
@@ -329,7 +328,7 @@ public class FileSystemStorageStrategy implements StorageStrategy {
 
       keepPermissions(physicalPath, tempFile);
       storageStep(() -> moveIntoPlace(tempFile, physicalPath));
-    } catch (final IOException | RuntimeException | Error e) {
+    } catch (final IOException | RuntimeException e) {
       deleteTempFile(tempFile, e);
       throw e;
     }
@@ -417,7 +416,7 @@ public class FileSystemStorageStrategy implements StorageStrategy {
   private static void moveIntoPlace(final Path tempFile, final Path target) throws IOException {
     try {
       Files.move(tempFile, target, ATOMIC_MOVE);
-    } catch (final AtomicMoveNotSupportedException e) {
+    } catch (final AtomicMoveNotSupportedException _) {
       Files.move(tempFile, target, REPLACE_EXISTING);
     }
   }
@@ -434,7 +433,7 @@ public class FileSystemStorageStrategy implements StorageStrategy {
 
     try {
       Files.setPosixFilePermissions(tempFile, Files.getPosixFilePermissions(target));
-    } catch (final IOException | UnsupportedOperationException ignored) {
+    } catch (final IOException | UnsupportedOperationException _) {
       // keep the default permissions of a new file
     }
   }
@@ -462,9 +461,7 @@ public class FileSystemStorageStrategy implements StorageStrategy {
       final String repoName, final StoragePath storagePath, final byte[] data) {
 
     final Path physicalPath = this.toPhysicalPath(storagePath);
-    createDirectories(
-        Objects.requireNonNull(
-            physicalPath.getParent(), "The storage path has no parent directory"));
+    createDirectories(Objects.requireNonNull(physicalPath.getParent(), NO_PARENT_DIRECTORY));
 
     try (final var os = openForWrite(physicalPath, CREATE, APPEND)) {
       os.write(data);
@@ -479,9 +476,7 @@ public class FileSystemStorageStrategy implements StorageStrategy {
       final String repoName, final StoragePath storagePath, final InputStream inputStream) {
 
     final Path physicalPath = this.toPhysicalPath(storagePath);
-    createDirectories(
-        Objects.requireNonNull(
-            physicalPath.getParent(), "The storage path has no parent directory"));
+    createDirectories(Objects.requireNonNull(physicalPath.getParent(), NO_PARENT_DIRECTORY));
 
     final long lengthBefore = Files.exists(physicalPath) ? Files.size(physicalPath) : 0;
     final long bytesAppended;
@@ -667,7 +662,7 @@ public class FileSystemStorageStrategy implements StorageStrategy {
             if (isTempFile(file) && attrs.lastModifiedTime().compareTo(threshold) < 0) {
               try {
                 Files.deleteIfExists(file);
-              } catch (final IOException ignored) {
+              } catch (final IOException _) {
                 // left for the next pass
               }
             }
@@ -705,7 +700,7 @@ public class FileSystemStorageStrategy implements StorageStrategy {
           }
 
           @Override
-          public FileVisitResult postVisitDirectory(final Path dir, final IOException exc)
+          public FileVisitResult postVisitDirectory(final Path dir, final @Nullable IOException exc)
               throws IOException {
             if (exc != null) {
               throw exc;
@@ -725,7 +720,7 @@ public class FileSystemStorageStrategy implements StorageStrategy {
           LocalDate.parse(dateDir.getFileName().toString())
               .atStartOfDay(ZoneId.systemDefault())
               .toInstant());
-    } catch (final DateTimeParseException e) {
+    } catch (final DateTimeParseException _) {
       return Optional.empty();
     }
   }
@@ -785,7 +780,7 @@ public class FileSystemStorageStrategy implements StorageStrategy {
     try {
       Files.move(source, target);
       return BaseUsages.ofDisk(0);
-    } catch (final FileAlreadyExistsException e) {
+    } catch (final FileAlreadyExistsException _) {
       final var size = Files.size(source);
       Files.deleteIfExists(source);
       return BaseUsages.ofDisk(-size);

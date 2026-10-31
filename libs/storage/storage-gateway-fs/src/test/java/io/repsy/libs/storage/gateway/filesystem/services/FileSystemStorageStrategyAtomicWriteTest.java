@@ -186,12 +186,9 @@ class FileSystemStorageStrategyAtomicWriteTest {
     final byte[] old = bytes("previous content");
     this.seed(old);
 
-    assertThatThrownBy(
-            () ->
-                this.strategy.write(
-                    "repo",
-                    this.storagePath,
-                    failingAfter(bytes("partial"), new IllegalStateException("boom"))))
+    final var failingStream = failingAfter(bytes("partial"), new IllegalStateException("boom"));
+
+    assertThatThrownBy(() -> this.strategy.write("repo", this.storagePath, failingStream))
         .isInstanceOf(IllegalStateException.class);
 
     assertThat(Files.readAllBytes(this.target)).isEqualTo(old);
