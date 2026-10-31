@@ -121,18 +121,6 @@ class NuGetPackageControllerIT extends AbstractIT {
         "[]");
   }
 
-  private static String nuspec(final String id, final String version) {
-    return "<package><metadata><id>"
-        + id
-        + "</id><version>"
-        + version
-        + "</version><title>NuGet fixture</title><authors>Repsy</authors>"
-        + "<description>integration fixture</description><tags>searchable fixture</tags>"
-        + "<licenseUrl>https://example.test/license</licenseUrl>"
-        + "<projectUrl>https://example.test/project</projectUrl>"
-        + "</metadata></package>";
-  }
-
   @Nested
   @DisplayName("GET endpoints")
   class GetEndpoints {

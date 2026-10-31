@@ -148,7 +148,8 @@ class PypiNullableProjectionIT extends AbstractIT {
     final var index = this.pypiProtocolFacade.fetchFromLocalStorage(repo, "index-no-requires");
     final var html = new String(index.getByteArray(), StandardCharsets.UTF_8);
 
-    assertThat(html).contains("index_no_requires-1.0.0a1-py3-none-any.whl");
-    assertThat(html).doesNotContain("data-requires-python");
+    assertThat(html)
+        .contains("index_no_requires-1.0.0a1-py3-none-any.whl")
+        .doesNotContain("data-requires-python");
   }
 }

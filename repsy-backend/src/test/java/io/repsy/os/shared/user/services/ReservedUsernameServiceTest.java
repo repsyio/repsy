@@ -17,6 +17,7 @@ package io.repsy.os.shared.user.services;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -24,13 +25,11 @@ import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.os.shared.user.repositories.ReservedUsernameRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 @DisplayName("ReservedUsernameService")
 class ReservedUsernameServiceTest {
 
-  private final ReservedUsernameRepository repository =
-      Mockito.mock(ReservedUsernameRepository.class);
+  private final ReservedUsernameRepository repository = mock(ReservedUsernameRepository.class);
   private final ReservedUsernameService service = new ReservedUsernameService(this.repository);
 
   @Test

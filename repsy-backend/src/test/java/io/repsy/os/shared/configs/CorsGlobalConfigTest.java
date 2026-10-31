@@ -16,6 +16,7 @@
 package io.repsy.os.shared.configs;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -128,7 +129,7 @@ class CorsGlobalConfigTest {
   void configuredRejectsOtherOrigin() throws Exception {
 
     final var response = new MockHttpServletResponse();
-    final var chain = Mockito.mock(jakarta.servlet.FilterChain.class);
+    final var chain = mock(jakarta.servlet.FilterChain.class);
     final var request = request(API_PORT, "OPTIONS", OTHER_ORIGIN, true);
 
     this.filter(ALLOWED_ORIGIN).doFilter(request, response, chain);

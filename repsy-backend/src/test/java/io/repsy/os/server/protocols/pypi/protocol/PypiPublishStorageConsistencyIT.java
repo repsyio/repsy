@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.protocols.pypi.protocol;
 
+import static io.repsy.os.server.protocols.shared.PostgresLockWaits.awaitBlockedOnALockOrDone;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -296,10 +297,10 @@ class PypiPublishStorageConsistencyIT extends AbstractIT {
     final var name = uniquePackageName();
     this.rejectSummaryAtTheDatabase();
 
-    assertThatThrownBy(
-            () ->
-                this.upload(
-                    repo, name, "1.0.0", wheel(name, "1.0.0"), content("wheel"), REJECTED_SUMMARY))
+    final var archiveName = wheel(name, "1.0.0");
+    final var body = content("wheel");
+
+    assertThatThrownBy(() -> this.upload(repo, name, "1.0.0", archiveName, body, REJECTED_SUMMARY))
         .isInstanceOf(DataIntegrityViolationException.class);
 
     assertThat(this.packageCount(repo, name)).isZero();
@@ -318,15 +319,10 @@ class PypiPublishStorageConsistencyIT extends AbstractIT {
     this.upload(repo, name, "1.0.0", wheel(name, "1.0.0"), original, "original");
     this.rejectSummaryAtTheDatabase();
 
-    assertThatThrownBy(
-            () ->
-                this.upload(
-                    repo,
-                    name,
-                    "1.0.0",
-                    wheel(name, "1.0.0"),
-                    content("replacement"),
-                    REJECTED_SUMMARY))
+    final var archiveName = wheel(name, "1.0.0");
+    final var body = content("replacement");
+
+    assertThatThrownBy(() -> this.upload(repo, name, "1.0.0", archiveName, body, REJECTED_SUMMARY))
         .isInstanceOf(DataIntegrityViolationException.class);
 
     assertThat(this.archive(repo, name, wheel(name, "1.0.0"))).hasBinaryContent(original);
@@ -344,10 +340,10 @@ class PypiPublishStorageConsistencyIT extends AbstractIT {
     this.upload(repo, name, "1.0.0", sdist(name, "1.0.0"), first, "first");
     this.rejectSummaryAtTheDatabase();
 
-    assertThatThrownBy(
-            () ->
-                this.upload(
-                    repo, name, "1.0.0", wheel(name, "1.0.0"), content("wheel"), REJECTED_SUMMARY))
+    final var archiveName = wheel(name, "1.0.0");
+    final var body = content("wheel");
+
+    assertThatThrownBy(() -> this.upload(repo, name, "1.0.0", archiveName, body, REJECTED_SUMMARY))
         .isInstanceOf(DataIntegrityViolationException.class);
 
     assertThat(this.archive(repo, name, wheel(name, "1.0.0"))).doesNotExist();
@@ -363,9 +359,10 @@ class PypiPublishStorageConsistencyIT extends AbstractIT {
     final var name = uniquePackageName();
     this.failAfterWritingArchive();
 
-    assertThatThrownBy(
-            () ->
-                this.upload(repo, name, "1.0.0", wheel(name, "1.0.0"), content("wheel"), "summary"))
+    final var archiveName = wheel(name, "1.0.0");
+    final var body = content("wheel");
+
+    assertThatThrownBy(() -> this.upload(repo, name, "1.0.0", archiveName, body, "summary"))
         .isInstanceOf(IllegalStateException.class);
 
     assertThat(this.packageCount(repo, name)).isZero();
@@ -382,9 +379,10 @@ class PypiPublishStorageConsistencyIT extends AbstractIT {
     this.upload(repo, name, "1.0.0", wheel(name, "1.0.0"), content("original"), "original");
     this.failAfterWritingArchive();
 
-    assertThatThrownBy(
-            () ->
-                this.upload(repo, name, "1.0.0", wheel(name, "1.0.0"), content("second"), "second"))
+    final var archiveName = wheel(name, "1.0.0");
+    final var body = content("second");
+
+    assertThatThrownBy(() -> this.upload(repo, name, "1.0.0", archiveName, body, "second"))
         .isInstanceOf(IllegalStateException.class);
 
     assertThat(this.releaseCount(repo, name)).isOne();
@@ -401,9 +399,10 @@ class PypiPublishStorageConsistencyIT extends AbstractIT {
     this.upload(repo, name, "1.0.0", sdist(name, "1.0.0"), first, "first");
     this.failAfterWritingArchive();
 
-    assertThatThrownBy(
-            () ->
-                this.upload(repo, name, "1.0.0", wheel(name, "1.0.0"), content("wheel"), "second"))
+    final var archiveName = wheel(name, "1.0.0");
+    final var body = content("wheel");
+
+    assertThatThrownBy(() -> this.upload(repo, name, "1.0.0", archiveName, body, "second"))
         .isInstanceOf(IllegalStateException.class);
 
     assertThat(this.archive(repo, name, wheel(name, "1.0.0"))).doesNotExist();
@@ -435,9 +434,9 @@ class PypiPublishStorageConsistencyIT extends AbstractIT {
       final var loser =
           executor.submit(
               () -> this.upload(repo, name, version, filename, content("loser"), "loser"));
-      // Long enough for the loser to reach the package row and wait on the winner. If it is
-      // slower, it is turned away by the existence check instead: the assertions hold both ways.
-      TimeUnit.MILLISECONDS.sleep(500);
+      // Blocked on the lock the other one holds, or already finished (turned away first):
+      // the assertions hold both ways.
+      awaitBlockedOnALockOrDone(this.jdbcTemplate, loser);
       releaseWinner.countDown();
 
       assertThat(resultOf(winner).<BaseUsages>getProperty("usages")).isNotNull();
@@ -501,7 +500,9 @@ class PypiPublishStorageConsistencyIT extends AbstractIT {
       final var second =
           executor.submit(
               () -> this.upload(repo, name, "1.0.0", wheel(name, "1.0.0"), wheelBytes, "wheel"));
-      TimeUnit.MILLISECONDS.sleep(500);
+      // Blocked on the lock the other one holds, or already finished (turned away first):
+      // the assertions hold both ways.
+      awaitBlockedOnALockOrDone(this.jdbcTemplate, second);
       releaseFirst.countDown();
 
       assertThat(failureOf(first)).isNull();
@@ -535,7 +536,9 @@ class PypiPublishStorageConsistencyIT extends AbstractIT {
       final var second =
           executor.submit(
               () -> this.upload(repo, name, "2.0.0", wheel(name, "2.0.0"), content("b"), "b"));
-      TimeUnit.MILLISECONDS.sleep(500);
+      // Blocked on the lock the other one holds, or already finished (turned away first):
+      // the assertions hold both ways.
+      awaitBlockedOnALockOrDone(this.jdbcTemplate, second);
       releaseFirst.countDown();
 
       assertThat(failureOf(first)).isNull();

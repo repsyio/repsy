@@ -100,7 +100,6 @@ class ProtocolRepoControllerIT extends AbstractIT {
   private static final String SESSION_EXPIRED_TEXT = "Session expired.";
   private static final String ITEM_NOT_FOUND_TEXT = "The requested item is not found.";
   private static final String REPO_SCOPE_NOT_MATCHED_TEXT = "Repository scope does not match.";
-  private static final String ERROR_OCCURRED_TEXT = "An error occurred.";
 
   private static final String[] SETTINGS_KEYS = {
     "privateRepo", "releases", "snapshots", "allowOverride", "securityScanEnabled"
@@ -553,10 +552,6 @@ class ProtocolRepoControllerIT extends AbstractIT {
       return envelope;
     }
   }
-
-  // ---------------------------------------------------------------------------------------------
-  // DELETE /api/repos/{repoName}
-  // ---------------------------------------------------------------------------------------------
 
   @Nested
   @DisplayName("DELETE /api/repos/{repoName}")
@@ -1107,17 +1102,6 @@ class ProtocolRepoControllerIT extends AbstractIT {
     private static final String[] SETTINGS_KEYS_WITHOUT_ALLOW_OVERRIDE = {
       "privateRepo", "securityScanEnabled"
     };
-
-    /** Repo types other than Maven and NuGet, whose publish path never reads releases/snapshots. */
-    private static final List<RepoType> RELEASES_SNAPSHOTS_UNSUPPORTED_TYPES =
-        List.of(
-            RepoType.NPM,
-            RepoType.PYPI,
-            RepoType.DOCKER,
-            RepoType.CARGO,
-            RepoType.GOLANG,
-            RepoType.HELM,
-            RepoType.RUBY);
 
     private Map<String, Object> settingsOf(final Repo repo) throws Exception {
       return bareObject(

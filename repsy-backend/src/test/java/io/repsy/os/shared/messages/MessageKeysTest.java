@@ -350,16 +350,16 @@ class MessageKeysTest {
   @DisplayName("the scan finds each kind of msgId, so it cannot pass vacuously")
   void scanFindsEachKindOfMsgId() {
     // A refactor that breaks a pattern must fail here instead of silently checking nothing.
-    assertThat(usedMsgIds.keySet())
-        .contains(
+    assertThat(usedMsgIds)
+        .containsKeys(
             "repoNotFound", // literal in an exception
             "unAuthorized", // ErrorConstants constant in an exception
             "validationError", // constant in ProtocolErrorAdvice
             "movedToPath", // constant passed straight to resp.error in ProtocolErrorAdvice
             "unauthorizedRequest", // ProtocolErrorAdvice fallback when the exception has no message
             "chartNameMissing", // BadRequestException in a protocol module
-            "gemNameMissing"); // forwarded through a helper
-    assertThat(usedMsgIds).hasSizeGreaterThan(100);
+            "gemNameMissing") // forwarded through a helper
+        .hasSizeGreaterThan(100);
   }
 
   private static void collect(

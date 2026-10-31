@@ -59,7 +59,7 @@ class PackageKeywordTest extends AbstractEntityIdentityTest<PackageKeyword> {
   void hashCodeAndToStringSkipAssociations() {
     final var packageKeyword = this.newEntity(UUID.randomUUID());
 
-    assertThat(packageKeyword.hashCode()).isEqualTo(PackageKeyword.class.hashCode());
+    assertThat(packageKeyword).hasSameHashCodeAs(PackageKeyword.class);
     assertThat(packageKeyword.toString()).doesNotContain("packageVersion=");
   }
 }

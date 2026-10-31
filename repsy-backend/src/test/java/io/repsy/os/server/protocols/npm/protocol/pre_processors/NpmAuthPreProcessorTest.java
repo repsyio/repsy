@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowableOfType;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -44,7 +45,6 @@ import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -61,18 +61,18 @@ class NpmAuthPreProcessorTest {
   private static final String BASIC_CHALLENGE = "Basic realm=\"Repsy\"";
   private static final String BEARER_CHALLENGE = "Bearer realm=\"Repsy\", " + BASIC_CHALLENGE;
 
-  private final JwtUtils jwtUtils = Mockito.mock(JwtUtils.class);
+  private final JwtUtils jwtUtils = mock(JwtUtils.class);
 
   private final NpmAuthPreProcessor preProcessor =
       new NpmAuthPreProcessor(
           new NpmAuthenticatorImpl(
-              Mockito.mock(UserTxService.class),
+              mock(UserTxService.class),
               this.jwtUtils,
-              Mockito.mock(DeployTokenService.class),
+              mock(DeployTokenService.class),
               new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
               new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()),
-              Mockito.mock(RevokedProtocolTokenService.class)),
-          Mockito.mock(NpmProtocolProvider.class));
+              mock(RevokedProtocolTokenService.class)),
+          mock(NpmProtocolProvider.class));
 
   NpmAuthPreProcessorTest() {
     when(this.jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
@@ -197,7 +197,7 @@ class NpmAuthPreProcessorTest {
                         true)));
 
     assertThat(refused).isNotNull();
-    assertThat(refused.getHeaders().get(HttpHeaders.WWW_AUTHENTICATE)).isEqualTo(BASIC_CHALLENGE);
+    assertThat(refused.getHeaders()).containsEntry(HttpHeaders.WWW_AUTHENTICATE, BASIC_CHALLENGE);
   }
 
   @Test

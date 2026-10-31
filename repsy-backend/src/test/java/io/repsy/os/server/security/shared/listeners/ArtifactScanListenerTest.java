@@ -174,7 +174,9 @@ class ArtifactScanListenerTest {
   void rejectedManualScanIsRetryable() {
     doThrow(new RejectedExecutionException()).when(this.scanTaskExecutor).execute(any());
 
-    assertThatThrownBy(() -> this.listener.executeManualScan(SCAN_ID, this.event()))
+    final var event = this.event();
+
+    assertThatThrownBy(() -> this.listener.executeManualScan(SCAN_ID, event))
         .isInstanceOf(RetryableException.class)
         .hasMessage("scanExecutorSaturated");
 
@@ -523,7 +525,7 @@ class ArtifactScanListenerTest {
   @Test
   @DisplayName("does not retry, and does not mention attempts, when the retry is switched off")
   void recordsTheFailureAtOnceWhenOneAttemptIsConfigured() {
-    final var listener =
+    final var singleAttemptListener =
         new ArtifactScanListener(
             this.scannerRegistry,
             this.scanTxService,
@@ -547,7 +549,7 @@ class ArtifactScanListenerTest {
     final var failure = unreachable();
     doThrow(failure).when(this.scanner).scan(any());
 
-    listener.onArtifactPushed(this.dockerEvent());
+    singleAttemptListener.onArtifactPushed(this.dockerEvent());
 
     verifyNoInteractions(this.taskScheduler);
     verify(this.scanTxService).recordScanFailure(SCAN_ID, failure.getMessage());

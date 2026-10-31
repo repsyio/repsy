@@ -457,8 +457,7 @@ class RubyGemApiControllerIT extends AbstractIT {
     @DisplayName("does not allow a read-only caller to delete")
     void readOnlyCallerCannotDelete() throws Exception {
       final var repo = RubyGemApiControllerIT.this.createRepo(true);
-      final var owner =
-          RubyGemApiControllerIT.this.createUser(uniqueUsername("ruby"), UserRole.ADMIN);
+      RubyGemApiControllerIT.this.createUser(uniqueUsername("ruby"), UserRole.ADMIN);
       final var user =
           RubyGemApiControllerIT.this.createUser(uniqueUsername("ruby"), UserRole.USER);
       RubyGemApiControllerIT.this.publish(repo.getName(), "existing", "1.0.0", "ruby", "fixture");

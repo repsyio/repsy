@@ -190,7 +190,9 @@ public final class PersonalAccessTokenMigrationScenario {
 
     // The hash is unique: two tokens never share one, whoever owns them.
     this.user(this.otherUserId, "other-user");
-    assertThatThrownBy(() -> this.token(UUID.randomUUID(), this.otherUserId, "ci", hash, "x"))
+    final var otherUsersTokenId = UUID.randomUUID();
+
+    assertThatThrownBy(() -> this.token(otherUsersTokenId, this.otherUserId, "ci", hash, "x"))
         .isInstanceOf(DataIntegrityViolationException.class);
 
     // The same name, twice, for one user is fine: names are not unique.
@@ -198,23 +200,36 @@ public final class PersonalAccessTokenMigrationScenario {
         .isEqualTo(1);
 
     // A token belongs to a user that exists.
-    assertThatThrownBy(
-            () -> this.token(UUID.randomUUID(), UUID.randomUUID(), "ci", "c".repeat(64), "x"))
+    final var orphanTokenId = UUID.randomUUID();
+    final var missingUserId = UUID.randomUUID();
+    final var orphanHash = "c".repeat(64);
+
+    assertThatThrownBy(() -> this.token(orphanTokenId, missingUserId, "ci", orphanHash, "x"))
         .isInstanceOf(DataIntegrityViolationException.class);
 
     // Each column is as wide as the entity says.
+    final var longNameTokenId = UUID.randomUUID();
+    final var longName = "n".repeat(151);
+    final var longNameHash = "d".repeat(64);
+
+    assertThatThrownBy(
+            () -> this.token(longNameTokenId, this.existingUserId, longName, longNameHash, "x"))
+        .isInstanceOf(DataIntegrityViolationException.class);
+
+    final var longHashTokenId = UUID.randomUUID();
+    final var longHash = "e".repeat(65);
+
+    assertThatThrownBy(() -> this.token(longHashTokenId, this.existingUserId, "ci", longHash, "x"))
+        .isInstanceOf(DataIntegrityViolationException.class);
+
+    final var longScopesTokenId = UUID.randomUUID();
+    final var longScopesHash = "f".repeat(64);
+    final var longScopes = "s".repeat(256);
+
     assertThatThrownBy(
             () ->
                 this.token(
-                    UUID.randomUUID(), this.existingUserId, "n".repeat(151), "d".repeat(64), "x"))
-        .isInstanceOf(DataIntegrityViolationException.class);
-    assertThatThrownBy(
-            () -> this.token(UUID.randomUUID(), this.existingUserId, "ci", "e".repeat(65), "x"))
-        .isInstanceOf(DataIntegrityViolationException.class);
-    assertThatThrownBy(
-            () ->
-                this.token(
-                    UUID.randomUUID(), this.existingUserId, "ci", "f".repeat(64), "s".repeat(256)))
+                    longScopesTokenId, this.existingUserId, "ci", longScopesHash, longScopes))
         .isInstanceOf(DataIntegrityViolationException.class);
     assertThat(
             this.token(

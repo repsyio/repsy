@@ -102,7 +102,7 @@ class GoneResponseTest {
 
       try {
         return (Throwable) constructor.newInstance(arguments);
-      } catch (final InvocationTargetException | IllegalArgumentException ignored) {
+      } catch (final InvocationTargetException | IllegalArgumentException _) {
         // try the next constructor
       }
     }

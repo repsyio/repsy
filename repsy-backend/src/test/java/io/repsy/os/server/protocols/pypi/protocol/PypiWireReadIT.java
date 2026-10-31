@@ -223,8 +223,9 @@ class PypiWireReadIT extends AbstractIT {
     assertThat(response.getContentType()).startsWith(MediaType.TEXT_HTML_VALUE);
 
     final var body = response.getContentAsString(StandardCharsets.UTF_8);
-    assertThat(body).doesNotContain("/pypi/" + repo.getName() + "/simple/");
-    assertThat(body).contains("/" + repo.getName() + "/simple/wireread-pkg/");
+    assertThat(body)
+        .doesNotContain("/pypi/" + repo.getName() + "/simple/")
+        .contains("/" + repo.getName() + "/simple/wireread-pkg/");
 
     // The rendered href must itself resolve, not just look plausible.
     final var hrefStart = body.indexOf("href=\"") + "href=\"".length();

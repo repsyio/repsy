@@ -177,8 +177,7 @@ class PypiPackageControllerIT extends AbstractIT {
     return result.andReturn().getResponse().getContentAsString();
   }
 
-  private static void assertErrorEnvelope(
-      final String response, final String msgId, final String data) {
+  private static void assertErrorEnvelope(final String response, final String msgId) {
     assertProblem(response, msgId);
   }
 
@@ -293,8 +292,7 @@ class PypiPackageControllerIT extends AbstractIT {
   void enforcesAuthorizationAndErrorEnvelope() throws Exception {
     final var privateRepo = this.createRepo(true);
     final var publicRepo = this.createRepo(false);
-    final var caller = this.createUser(UserRole.USER);
-    final var token = this.bearerToken(caller);
+    this.createUser(UserRole.USER);
     this.upload(privateRepo, "auth-package", "1.0.0", "auth-package-1.0.0.tar.gz");
     this.upload(publicRepo, "public-package", "1.0.0", "public-package-1.0.0.tar.gz");
 
@@ -304,14 +302,9 @@ class PypiPackageControllerIT extends AbstractIT {
             .andReturn()
             .getResponse()
             .getContentAsString();
-    assertErrorEnvelope(privateResponse, "loginRequired", "unAuthorized");
+    assertErrorEnvelope(privateResponse, "loginRequired");
 
-    final var publicResponse =
-        this.perform(get("/api/pypi/packages/" + publicRepo.getName()))
-            .andExpect(status().isOk())
-            .andReturn()
-            .getResponse()
-            .getContentAsString();
+    this.perform(get("/api/pypi/packages/" + publicRepo.getName())).andExpect(status().isOk());
 
     final var malformedResponse =
         this.perform(
@@ -321,7 +314,7 @@ class PypiPackageControllerIT extends AbstractIT {
             .andReturn()
             .getResponse()
             .getContentAsString();
-    assertErrorEnvelope(malformedResponse, "accessNotAllowed", "accessNotAllowed");
+    assertErrorEnvelope(malformedResponse, "accessNotAllowed");
   }
 
   @Test
@@ -369,13 +362,13 @@ class PypiPackageControllerIT extends AbstractIT {
 
     final var unknownPackage =
         body(this.perform(get(path + "/missing-package")).andExpect(status().isNotFound()));
-    assertErrorEnvelope(unknownPackage, "packageNotFound", "packageNotFound");
+    assertErrorEnvelope(unknownPackage, "packageNotFound");
 
     final var unknownRelease =
         body(
             this.perform(get(path + "/known-package/versions/9.9.9"))
                 .andExpect(status().isNotFound()));
-    assertErrorEnvelope(unknownRelease, "releaseNotFound", "releaseNotFound");
+    assertErrorEnvelope(unknownRelease, "releaseNotFound");
 
     final var noReleaseMatch =
         body(this.perform(get(path + "/known-package/versions?q=9.9")).andExpect(status().isOk()));
@@ -422,7 +415,7 @@ class PypiPackageControllerIT extends AbstractIT {
             .andReturn()
             .getResponse()
             .getContentAsString();
-    assertErrorEnvelope(missingResponse, "packageNotFound", "packageNotFound");
+    assertErrorEnvelope(missingResponse, "packageNotFound");
   }
 
   @Test
@@ -485,7 +478,7 @@ class PypiPackageControllerIT extends AbstractIT {
                     delete("/api/pypi/packages/" + repo.getName() + "/keep-package")
                         .header(AUTHORIZATION, userToken))
                 .andExpect(status().isForbidden()));
-    assertErrorEnvelope(readOnlyResponse, "accessDenied", "accessDenied");
+    assertErrorEnvelope(readOnlyResponse, "accessDenied");
 
     this.perform(
             delete("/api/pypi/packages/" + repo.getName() + "/KEEP_PACKAGE/versions/1.0.0")

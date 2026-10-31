@@ -59,7 +59,7 @@ class PackageDistTagTest extends AbstractEntityIdentityTest<PackageDistTag> {
   void hashCodeAndToStringSkipAssociations() {
     final var packageDistTag = this.newEntity(UUID.randomUUID());
 
-    assertThat(packageDistTag.hashCode()).isEqualTo(PackageDistTag.class.hashCode());
+    assertThat(packageDistTag).hasSameHashCodeAs(PackageDistTag.class);
     assertThat(packageDistTag.toString()).doesNotContain("packageVersion=");
   }
 }

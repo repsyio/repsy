@@ -92,9 +92,7 @@ class NuGetSearchProtocolIT extends AbstractIT {
 
     // Zero-padded, so the alphabetical order the search sorts by is also the numeric order.
     this.packageIds =
-        IntStream.range(0, PACKAGE_COUNT)
-            .mapToObj(i -> "search.fixture.%02d".formatted(i))
-            .toList();
+        IntStream.range(0, PACKAGE_COUNT).mapToObj("search.fixture.%02d"::formatted).toList();
 
     this.packageIds.forEach(
         id -> {
@@ -355,7 +353,7 @@ class NuGetSearchProtocolIT extends AbstractIT {
             jsonPath("$.data", contains("1.0.0", "1.1.0-beta2", "1.2.0+build.5", "2.0.0-beta.1")));
   }
 
-  private static Stream<Arguments> endpoints() {
+  static Stream<Arguments> endpoints() {
     return Stream.of(Arguments.of(SEARCH_PATH), Arguments.of(AUTOCOMPLETE_PATH));
   }
 

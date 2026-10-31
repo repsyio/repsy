@@ -58,7 +58,7 @@ class RubyGemDependencyTest extends AbstractEntityIdentityTest<RubyGemDependency
   void hashCodeAndToStringSkipAssociations() {
     final var rubyGemDependency = this.newEntity(UUID.randomUUID());
 
-    assertThat(rubyGemDependency.hashCode()).isEqualTo(RubyGemDependency.class.hashCode());
+    assertThat(rubyGemDependency).hasSameHashCodeAs(RubyGemDependency.class);
     assertThat(rubyGemDependency.toString()).doesNotContain("gemVersion=");
   }
 }

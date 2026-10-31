@@ -18,7 +18,6 @@ package io.repsy.os.server.protocols.nuget.shared.packages.services;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -106,7 +105,7 @@ class NuGetBuildMetadataVersionMigrationServiceTest {
     doThrow(new IOException("read-only"))
         .when(this.storage)
         .deleteBuildMetadataVersion(
-            eq(new RepoRef(this.repoId, "repo")), eq("some.package"), eq("1.0.0+build"));
+            new RepoRef(this.repoId, "repo"), "some.package", "1.0.0+build");
 
     final var report = this.service.migrate();
 

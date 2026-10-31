@@ -48,7 +48,9 @@ class ErrorResponseServiceTest {
       new RestResponseFactory(new ResourceBundleMessageSource());
 
   @SuppressWarnings("unused")
-  void handler(final String form, final String header, final String other) {}
+  void handler(final String form, final String header, final String other) {
+    // only its parameters are read, by reflection
+  }
 
   private static MethodParameter parameter(final int index) throws NoSuchMethodException {
     final Method method =

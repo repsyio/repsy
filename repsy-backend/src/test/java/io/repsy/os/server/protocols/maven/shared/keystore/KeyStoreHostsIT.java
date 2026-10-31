@@ -99,12 +99,10 @@ class KeyStoreHostsIT extends AbstractIT {
     final var file = "content".getBytes(UTF_8);
     final var sources = this.keyStoreService.getPublicKeySources(repo.getId(), true);
 
-    assertThatThrownBy(
-            () ->
-                verifier.verify(
-                    new ByteArrayResource(file),
-                    new ByteArrayResource(SIGNER.detachedSignature(file).getBytes(UTF_8)),
-                    sources))
+    final var content = new ByteArrayResource(file);
+    final var signature = new ByteArrayResource(SIGNER.detachedSignature(file).getBytes(UTF_8));
+
+    assertThatThrownBy(() -> verifier.verify(content, signature, sources))
         .isInstanceOf(ItemNotFoundException.class);
 
     assertThat(requested).noneMatch(url -> url.contains(inactive));

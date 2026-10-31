@@ -16,6 +16,7 @@
 package io.repsy.os.server.protocols.npm.protocol;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
@@ -43,6 +44,7 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Comparator;
@@ -509,13 +511,11 @@ class NpmDeleteStorageConsistencyIT extends AbstractIT {
    * would without the lock). Either way the race is set up: the operation that is being held has
    * nothing left to overtake.
    */
-  private void awaitBlockedOnALockOrDone(final Future<?> operation) throws Exception {
-    final var deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
-
-    while (!operation.isDone() && !this.someSessionWaitsForALock()) {
-      assertThat(System.nanoTime()).as("the operation blocked or finished").isLessThan(deadline);
-      TimeUnit.MILLISECONDS.sleep(10);
-    }
+  private void awaitBlockedOnALockOrDone(final Future<?> operation) {
+    await("the operation blocked or finished")
+        .atMost(Duration.ofSeconds(30))
+        .pollInterval(Duration.ofMillis(10))
+        .until(() -> operation.isDone() || this.someSessionWaitsForALock());
   }
 
   private boolean someSessionWaitsForALock() {

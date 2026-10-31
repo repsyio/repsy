@@ -256,30 +256,32 @@ class MavenArtifactControllerIT extends AbstractIT {
               + "<versioning><latest>1.0.0</latest><release>1.0.0</release>"
               + "<versions><version>1.0.0</version></versions></versioning></metadata>",
           StandardCharsets.UTF_8);
-      final var repo = MavenArtifactControllerIT.this.repoName;
+      final var versionsRepoName = MavenArtifactControllerIT.this.repoName;
 
       MavenArtifactControllerIT.this
           .mockMvc
-          .perform(get("/api/mvn/artifacts/{repo}/versions", repo).with(apiPort()))
+          .perform(get("/api/mvn/artifacts/{repo}/versions", versionsRepoName).with(apiPort()))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.content", hasSize(1)))
           .andExpect(jsonPath("$.content[0].artifactName").value("versions"));
       MavenArtifactControllerIT.this
           .mockMvc
-          .perform(get("/api/mvn/artifacts/{repo}/versions/versions", repo).with(apiPort()))
+          .perform(
+              get("/api/mvn/artifacts/{repo}/versions/versions", versionsRepoName).with(apiPort()))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.artifactName").value("versions"))
           .andExpect(jsonPath("$.artifactGroupName").value("versions"));
       MavenArtifactControllerIT.this
           .mockMvc
           .perform(
-              get("/api/mvn/artifacts/{repo}/versions/versions/versions", repo).with(apiPort()))
+              get("/api/mvn/artifacts/{repo}/versions/versions/versions", versionsRepoName)
+                  .with(apiPort()))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.content[*].versionName").value(contains("1.0.0")));
       MavenArtifactControllerIT.this
           .mockMvc
           .perform(
-              get("/api/mvn/artifacts/{repo}/versions/versions/versions/1.0.0", repo)
+              get("/api/mvn/artifacts/{repo}/versions/versions/versions/1.0.0", versionsRepoName)
                   .with(apiPort()))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.versionName").value("1.0.0"));

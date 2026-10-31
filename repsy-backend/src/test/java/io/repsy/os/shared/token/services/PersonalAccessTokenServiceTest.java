@@ -231,7 +231,9 @@ class PersonalAccessTokenServiceTest {
         new Instant[] {
           NOW.minus(Duration.ofDays(1)), NOW.minusSeconds(1), NOW, NOW.minus(Duration.ofDays(3650))
         }) {
-      assertThatThrownBy(() -> this.service.createToken(USER_ID, form(date, TokenScope.REPO_READ)))
+      final var tokenForm = form(date, TokenScope.REPO_READ);
+
+      assertThatThrownBy(() -> this.service.createToken(USER_ID, tokenForm))
           .as("%s", date)
           .isInstanceOf(BadRequestException.class)
           .hasMessage("accessTokenExpirationInPast");
@@ -265,10 +267,9 @@ class PersonalAccessTokenServiceTest {
                 .getExpirationDate())
         .isEqualTo(lastMicrosecond);
 
-    assertThatThrownBy(
-            () ->
-                this.service.createToken(
-                    USER_ID, form(Instant.parse("2027-10-07T00:00:00Z"), TokenScope.REPO_READ)))
+    final var tooLate = form(Instant.parse("2027-10-07T00:00:00Z"), TokenScope.REPO_READ);
+
+    assertThatThrownBy(() -> this.service.createToken(USER_ID, tooLate))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("accessTokenExpirationTooLate");
   }
@@ -292,10 +293,9 @@ class PersonalAccessTokenServiceTest {
   @Test
   @DisplayName("a date a nanosecond after now is now once truncated, so it is in the past")
   void aNanosecondAfterNowIsNotTheFuture() {
-    assertThatThrownBy(
-            () ->
-                this.service.createToken(
-                    USER_ID, form(NOW.plus(Duration.ofNanos(1)), TokenScope.REPO_READ)))
+    final var tokenForm = form(NOW.plus(Duration.ofNanos(1)), TokenScope.REPO_READ);
+
+    assertThatThrownBy(() -> this.service.createToken(USER_ID, tokenForm))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("accessTokenExpirationInPast");
   }
@@ -335,7 +335,9 @@ class PersonalAccessTokenServiceTest {
           NOW.plus(Duration.ofDays(3650)),
           Instant.parse("9999-12-31T23:59:59Z")
         }) {
-      assertThatThrownBy(() -> this.service.createToken(USER_ID, form(date, TokenScope.REPO_READ)))
+      final var tokenForm = form(date, TokenScope.REPO_READ);
+
+      assertThatThrownBy(() -> this.service.createToken(USER_ID, tokenForm))
           .as("%s", date)
           .isInstanceOf(BadRequestException.class)
           .hasMessage("accessTokenExpirationTooLate");
@@ -357,8 +359,9 @@ class PersonalAccessTokenServiceTest {
     final var earlyInTheEast =
         OffsetDateTime.of(lastDay, LocalTime.of(10, 0), ZoneOffset.ofHours(14)).toInstant();
 
-    assertThatThrownBy(
-            () -> this.service.createToken(USER_ID, form(lateInTheWest, TokenScope.REPO_READ)))
+    final var tooLate = form(lateInTheWest, TokenScope.REPO_READ);
+
+    assertThatThrownBy(() -> this.service.createToken(USER_ID, tooLate))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("accessTokenExpirationTooLate");
     assertThat(
@@ -377,10 +380,9 @@ class PersonalAccessTokenServiceTest {
     final var firstMomentOfTheNext = this.serviceAt(Instant.parse("2026-10-07T00:00:00Z"));
 
     // Until midnight the last day is 2027-10-06, from midnight it is 2027-10-07.
-    assertThatThrownBy(
-            () ->
-                lastMomentOfTheDay.createToken(
-                    USER_ID, form(Instant.parse("2027-10-07T00:30:00Z"), TokenScope.REPO_READ)))
+    final var tooLate = form(Instant.parse("2027-10-07T00:30:00Z"), TokenScope.REPO_READ);
+
+    assertThatThrownBy(() -> lastMomentOfTheDay.createToken(USER_ID, tooLate))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("accessTokenExpirationTooLate");
     assertThat(
@@ -397,18 +399,17 @@ class PersonalAccessTokenServiceTest {
     this.whenUserExists();
     this.whenFlushed();
     // 2028-02-29 lies between, so 365 days from 2027-10-06 is 2028-10-05.
-    final var service = this.serviceAt(Instant.parse("2027-10-06T10:00:00Z"));
+    final var laterService = this.serviceAt(Instant.parse("2027-10-06T10:00:00Z"));
 
     assertThat(
-            service
+            laterService
                 .createToken(
                     USER_ID, form(Instant.parse("2028-10-05T23:59:59Z"), TokenScope.REPO_READ))
                 .getExpirationDate())
         .isEqualTo(Instant.parse("2028-10-05T23:59:59Z"));
-    assertThatThrownBy(
-            () ->
-                service.createToken(
-                    USER_ID, form(Instant.parse("2028-10-06T00:00:00Z"), TokenScope.REPO_READ)))
+    final var tooLate = form(Instant.parse("2028-10-06T00:00:00Z"), TokenScope.REPO_READ);
+
+    assertThatThrownBy(() -> laterService.createToken(USER_ID, tooLate))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("accessTokenExpirationTooLate");
   }
@@ -440,7 +441,9 @@ class PersonalAccessTokenServiceTest {
   void refusesAUserWhoIsGone() {
     when(this.userRepository.lockUserIdForUpdate(USER_ID)).thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> this.service.createToken(USER_ID, form(null, TokenScope.REPO_READ)))
+    final var tokenForm = form(null, TokenScope.REPO_READ);
+
+    assertThatThrownBy(() -> this.service.createToken(USER_ID, tokenForm))
         .isInstanceOf(UnAuthorizedException.class);
 
     verify(this.tokenRepository, never()).saveAndFlush(any());
@@ -493,7 +496,9 @@ class PersonalAccessTokenServiceTest {
     assertThat(this.service.createToken(USER_ID, form(null, TokenScope.REPO_READ)).getToken())
         .isNotBlank();
 
-    assertThatThrownBy(() -> this.service.createToken(USER_ID, form(null, TokenScope.REPO_READ)))
+    final var tokenForm = form(null, TokenScope.REPO_READ);
+
+    assertThatThrownBy(() -> this.service.createToken(USER_ID, tokenForm))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("accessTokenLimitReached");
     verify(this.tokenRepository).saveAndFlush(any());
@@ -563,7 +568,7 @@ class PersonalAccessTokenServiceTest {
     assertThat(saved.getKind()).isEqualTo(PersonalAccessTokenKind.TEMPORARY);
     assertThat(saved.getTokenHash()).isEqualTo(TokenHash.hash(created.getToken()));
     assertThat(saved.getExpirationDate()).isEqualTo(NOW.plus(Duration.ofHours(24)));
-    assertThat(PersonalAccessTokenService.TEMPORARY_TOKEN_LIFETIME).isEqualTo(Duration.ofHours(24));
+    assertThat(Duration.ofHours(24)).isEqualTo(PersonalAccessTokenService.TEMPORARY_TOKEN_LIFETIME);
     assertThat(saved.getScopes()).containsExactly(TokenScope.PROFILE_READ, TokenScope.REPO_READ);
   }
 
@@ -636,12 +641,10 @@ class PersonalAccessTokenServiceTest {
     this.whenUserExists();
     this.whenFlushed();
 
-    assertThatThrownBy(
-            () ->
-                this.service.createToken(
-                    USER_ID,
-                    form(null, TokenScope.REPO_READ, TokenScope.REPO_WRITE),
-                    EnumSet.of(TokenScope.PROFILE_READ, TokenScope.REPO_READ)))
+    final var tokenForm = form(null, TokenScope.REPO_READ, TokenScope.REPO_WRITE);
+    final var grantable = EnumSet.of(TokenScope.PROFILE_READ, TokenScope.REPO_READ);
+
+    assertThatThrownBy(() -> this.service.createToken(USER_ID, tokenForm, grantable))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("validationError");
 
@@ -790,6 +793,6 @@ class PersonalAccessTokenServiceTest {
 
     this.service.updateLastUsedTime(tokenId);
 
-    verify(this.tokenRepository).updateLastUsedTime(eq(tokenId), eq(NOW));
+    verify(this.tokenRepository).updateLastUsedTime(tokenId, NOW);
   }
 }

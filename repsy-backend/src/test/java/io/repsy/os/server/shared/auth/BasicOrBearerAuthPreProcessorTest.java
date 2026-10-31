@@ -184,8 +184,9 @@ class BasicOrBearerAuthPreProcessorTest {
     @Test
     @DisplayName("is refused on a public repo, where a read used to be skipped")
     void refusedOnPublicRepo() {
-      assertThatThrownBy(
-              () -> this.process(false, Map.of(HandlerPropertyKeys.WRITE_OPERATION, false)))
+      final var properties = Map.<String, Object>of(HandlerPropertyKeys.WRITE_OPERATION, false);
+
+      assertThatThrownBy(() -> this.process(false, properties))
           .isInstanceOf(AccessNotAllowedException.class);
     }
 
@@ -199,8 +200,9 @@ class BasicOrBearerAuthPreProcessorTest {
     @Test
     @DisplayName("is refused even when skipPreProcessor is set")
     void refusedDespiteSkipFlag() {
-      assertThatThrownBy(
-              () -> this.process(false, Map.of(HandlerPropertyKeys.SKIP_PRE_PROCESSOR, true)))
+      final var properties = Map.<String, Object>of(HandlerPropertyKeys.SKIP_PRE_PROCESSOR, true);
+
+      assertThatThrownBy(() -> this.process(false, properties))
           .isInstanceOf(AccessNotAllowedException.class);
     }
 

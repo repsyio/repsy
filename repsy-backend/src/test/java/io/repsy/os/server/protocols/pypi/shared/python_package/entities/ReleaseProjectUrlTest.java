@@ -58,7 +58,7 @@ class ReleaseProjectUrlTest extends AbstractEntityIdentityTest<ReleaseProjectUrl
   void hashCodeAndToStringSkipAssociations() {
     final var releaseProjectURL = this.newEntity(UUID.randomUUID());
 
-    assertThat(releaseProjectURL.hashCode()).isEqualTo(ReleaseProjectUrl.class.hashCode());
+    assertThat(releaseProjectURL).hasSameHashCodeAs(ReleaseProjectUrl.class);
     assertThat(releaseProjectURL.toString()).doesNotContain("release=");
   }
 }

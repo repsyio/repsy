@@ -154,7 +154,7 @@ abstract class AbstractMultipartLimitIT extends AbstractIT {
         addEntry(
             tar,
             chartName + "/Chart.yaml",
-            "apiVersion: v2\nname: %s\nversion: 1.0.0\n"
+            "apiVersion: v2%nname: %s%nversion: 1.0.0%n"
                 .formatted(chartName)
                 .getBytes(StandardCharsets.UTF_8));
         addEntry(tar, chartName + "/files/noise.bin", noise);

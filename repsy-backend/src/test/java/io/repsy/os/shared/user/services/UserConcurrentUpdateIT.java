@@ -219,7 +219,9 @@ class UserConcurrentUpdateIT extends AbstractIT {
   @Test
   @DisplayName("updateLastLoginAt for an unknown user still answers userNotFound")
   void unknownUserIsStillNotFound() {
-    assertThatThrownBy(() -> this.userTxService.updateLastLoginAt(uniqueUsername("ghost")))
+    final var ghost = uniqueUsername("ghost");
+
+    assertThatThrownBy(() -> this.userTxService.updateLastLoginAt(ghost))
         .isExactlyInstanceOf(ItemNotFoundException.class)
         .hasMessage("userNotFound");
   }

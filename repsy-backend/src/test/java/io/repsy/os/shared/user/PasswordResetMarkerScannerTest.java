@@ -446,12 +446,15 @@ class PasswordResetMarkerScannerTest {
   @Test
   @DisplayName("the properties reject an enabled marker without a usable directory or interval")
   void rejectsUnusableProperties() {
-    assertThatThrownBy(() -> new PasswordResetMarkerProperties(true, null, Duration.ofSeconds(5)))
+    final var interval = Duration.ofSeconds(5);
+
+    assertThatThrownBy(() -> new PasswordResetMarkerProperties(true, null, interval))
         .isInstanceOf(IllegalArgumentException.class);
     assertThatThrownBy(() -> new PasswordResetMarkerProperties(true, this.dir, null))
         .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(
-            () -> new PasswordResetMarkerProperties(true, this.dir, Duration.ofMillis(999)))
+    final var tooShort = Duration.ofMillis(999);
+
+    assertThatThrownBy(() -> new PasswordResetMarkerProperties(true, this.dir, tooShort))
         .isInstanceOf(IllegalArgumentException.class);
     assertThatCode(() -> new PasswordResetMarkerProperties(true, this.dir, Duration.ofSeconds(1)))
         .doesNotThrowAnyException();

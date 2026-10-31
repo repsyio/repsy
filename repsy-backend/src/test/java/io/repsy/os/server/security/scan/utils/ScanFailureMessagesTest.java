@@ -95,8 +95,10 @@ class ScanFailureMessagesTest {
   void boundsLength() {
     final var sanitized = ScanFailureMessages.sanitize("word ".repeat(200));
 
-    assertThat(sanitized).hasSizeLessThanOrEqualTo(ScanFailureMessages.MAX_LENGTH).endsWith("...");
-    assertThat(sanitized).startsWith("word word");
+    assertThat(sanitized)
+        .hasSizeLessThanOrEqualTo(ScanFailureMessages.MAX_LENGTH)
+        .endsWith("...")
+        .startsWith("word word");
   }
 
   @Test

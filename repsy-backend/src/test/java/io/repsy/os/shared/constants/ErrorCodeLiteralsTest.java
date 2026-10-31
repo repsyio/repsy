@@ -42,7 +42,7 @@ class ErrorCodeLiteralsTest {
   private static final Pattern PRIVATE_CODE_CONSTANT =
       Pattern.compile("static\\s+final\\s+(?:@\\w+\\s+)?String\\s+ERR_\\w+\\s*=\\s*\"");
 
-  private static List<Path> mainSources() throws IOException {
+  private static List<Path> mainSources() {
     final var roots = List.of(Path.of("src/main/java"), Path.of("../repsy-protocols"));
     return roots.stream()
         .flatMap(

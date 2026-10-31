@@ -99,8 +99,9 @@ class ProtocolRoutePermissionGuardTest {
             new Route(Map.of("permission", Permission.READ), Map.of("writeOperation", false)));
 
     assertThat(ProtocolRoutePermissionGuard.routesWithoutPermission(handlers)).hasSize(2);
-    assertThatThrownBy(
-            () -> new ProtocolRoutePermissionGuard(handlers).afterSingletonsInstantiated())
+    final var guard = new ProtocolRoutePermissionGuard(handlers);
+
+    assertThatThrownBy(guard::afterSingletonsInstantiated)
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("Permission.NONE")
         .hasMessageContaining("(HEAD)");

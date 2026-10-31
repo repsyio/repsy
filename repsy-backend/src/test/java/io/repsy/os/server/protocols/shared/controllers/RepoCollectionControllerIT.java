@@ -316,8 +316,10 @@ class RepoCollectionControllerIT extends AbstractIT {
       final var first = this.readAllPages(tag);
       final var second = this.readAllPages(tag);
 
-      assertThat(first).hasSameSizeAs(expected).doesNotHaveDuplicates();
-      assertThat(first).containsExactlyInAnyOrderElementsOf(expected);
+      assertThat(first)
+          .hasSameSizeAs(expected)
+          .doesNotHaveDuplicates()
+          .containsExactlyInAnyOrderElementsOf(expected);
       assertThat(second).isEqualTo(first);
     }
 
@@ -372,8 +374,7 @@ class RepoCollectionControllerIT extends AbstractIT {
 
       final var names = RepoCollectionControllerIT.this.listedNames("q", tag);
 
-      assertThat(names).hasSize(10).first().isEqualTo(tag + "-11");
-      assertThat(names).last().isEqualTo(tag + "-2");
+      assertThat(names).hasSize(10).startsWith(tag + "-11").endsWith(tag + "-2");
     }
 
     @Test

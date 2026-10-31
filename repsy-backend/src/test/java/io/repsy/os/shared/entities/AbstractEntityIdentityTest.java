@@ -81,8 +81,7 @@ public abstract class AbstractEntityIdentityTest<T> {
     final var first = this.newEntity(uuid);
     final var second = this.newEntity(copyOf(uuid));
 
-    assertThat(first).isNotSameAs(second);
-    assertThat(first).isEqualTo(second).hasSameHashCodeAs(second);
+    assertThat(first).isNotSameAs(second).isEqualTo(second).hasSameHashCodeAs(second);
   }
 
   @Test
@@ -108,8 +107,7 @@ public abstract class AbstractEntityIdentityTest<T> {
   void transientEntitiesEqualOnlyThemselves() {
     final var entity = this.newEntity(null);
 
-    assertThat(entity).isEqualTo(entity);
-    assertThat(entity).isNotEqualTo(this.newEntity(null));
+    assertThat(entity).isEqualTo(entity).isNotEqualTo(this.newEntity(null));
   }
 
   @Test

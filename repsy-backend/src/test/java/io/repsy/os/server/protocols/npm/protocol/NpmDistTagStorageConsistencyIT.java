@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.protocols.npm.protocol;
 
+import static io.repsy.os.server.protocols.shared.PostgresLockWaits.awaitBlockedOnALockOrDone;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
@@ -535,9 +536,9 @@ class NpmDistTagStorageConsistencyIT extends AbstractIT {
       assertThat(publishWriting.await(30, TimeUnit.SECONDS)).isTrue();
 
       final var tag = executor.submit(() -> this.addTag(repo, name, "beta", "1.0.0", token));
-      // Long enough for the tag change to reach the package row and wait on the publish's lock.
-      // If it is slower the assertions still hold: it simply runs after the publish.
-      TimeUnit.MILLISECONDS.sleep(500);
+      // Blocked on the lock the other one holds, or already finished (turned away first):
+      // the assertions hold both ways.
+      awaitBlockedOnALockOrDone(this.jdbcTemplate, tag);
       releasePublish.countDown();
 
       assertThat(publish.get(30, TimeUnit.SECONDS).getStatus()).isEqualTo(200);
@@ -583,7 +584,9 @@ class NpmDistTagStorageConsistencyIT extends AbstractIT {
 
       final var publish =
           executor.submit(() -> this.publish(repo, name, "1.2.0", tarballOf("three"), token));
-      TimeUnit.MILLISECONDS.sleep(500);
+      // Blocked on the lock the other one holds, or already finished (turned away first):
+      // the assertions hold both ways.
+      awaitBlockedOnALockOrDone(this.jdbcTemplate, publish);
       releaseTag.countDown();
 
       assertThat(tag.get(30, TimeUnit.SECONDS).getStatus()).isEqualTo(200);

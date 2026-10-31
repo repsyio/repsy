@@ -47,10 +47,11 @@ class PersonalAccessTokenInfoTest {
   void scopesAreReadOnly() {
     final var info = info(EnumSet.of(TokenScope.REPO_READ), Instant.now().plusSeconds(60));
 
-    assertThatThrownBy(() -> info.scopes().add(TokenScope.REPO_MANAGE))
+    final var scopes = info.scopes();
+
+    assertThatThrownBy(() -> scopes.add(TokenScope.REPO_MANAGE))
         .isInstanceOf(UnsupportedOperationException.class);
-    assertThatThrownBy(() -> info.scopes().clear())
-        .isInstanceOf(UnsupportedOperationException.class);
+    assertThatThrownBy(scopes::clear).isInstanceOf(UnsupportedOperationException.class);
     assertThat(info.scopes()).containsExactly(TokenScope.REPO_READ);
   }
 
@@ -82,8 +83,10 @@ class PersonalAccessTokenInfoTest {
   void missingScopesGrantNothing() {
     final var info = info(null, Instant.now().plusSeconds(60));
 
-    assertThat(info.scopes()).isEmpty();
-    assertThatThrownBy(() -> info.scopes().add(TokenScope.REPO_READ))
+    final var scopes = info.scopes();
+
+    assertThat(scopes).isEmpty();
+    assertThatThrownBy(() -> scopes.add(TokenScope.REPO_READ))
         .isInstanceOf(UnsupportedOperationException.class);
   }
 

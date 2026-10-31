@@ -17,6 +17,7 @@ package io.repsy.os.server.protocols.pypi.protocol;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.awaitility.Awaitility.await;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
@@ -37,6 +38,7 @@ import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.security.MessageDigest;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HexFormat;
@@ -280,13 +282,11 @@ class PypiDeleteStorageConsistencyIT extends AbstractIT {
    * would without the lock). Either way the race is set up: the operation that is being held has
    * nothing left to overtake.
    */
-  private void awaitBlockedOnALockOrDone(final Future<?> operation) throws Exception {
-    final var deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
-
-    while (!operation.isDone() && !this.someSessionWaitsForALock()) {
-      assertThat(System.nanoTime()).as("the operation blocked or finished").isLessThan(deadline);
-      TimeUnit.MILLISECONDS.sleep(10);
-    }
+  private void awaitBlockedOnALockOrDone(final Future<?> operation) {
+    await("the operation blocked or finished")
+        .atMost(Duration.ofSeconds(30))
+        .pollInterval(Duration.ofMillis(10))
+        .until(() -> operation.isDone() || this.someSessionWaitsForALock());
   }
 
   private boolean someSessionWaitsForALock() {

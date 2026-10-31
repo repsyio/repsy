@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.protocols.npm.protocol;
 
+import static io.repsy.os.server.protocols.shared.PostgresLockWaits.awaitBlockedOnALockOrDone;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
@@ -486,10 +487,9 @@ class NpmPublishStorageConsistencyIT extends AbstractIT {
       final var loser =
           executor.submit(
               () -> this.publish(repo, name, "1.0.1", "loser", tarballOf("loser"), token));
-      // Long enough for the loser to reach the package row and wait on the winner's lock. If it is
-      // slower, it is turned away by the existing-version check instead: the assertions hold both
-      // ways.
-      TimeUnit.MILLISECONDS.sleep(500);
+      // Blocked on the lock the other one holds, or already finished (turned away first):
+      // the assertions hold both ways.
+      awaitBlockedOnALockOrDone(this.jdbcTemplate, loser);
       releaseWinner.countDown();
 
       assertThat(winner.get(30, TimeUnit.SECONDS).getStatus()).isEqualTo(200);
@@ -529,7 +529,9 @@ class NpmPublishStorageConsistencyIT extends AbstractIT {
       final var loser =
           executor.submit(
               () -> this.publish(repo, name, "1.0.0", "loser", tarballOf("loser"), token));
-      TimeUnit.MILLISECONDS.sleep(500);
+      // Blocked on the lock the other one holds, or already finished (turned away first):
+      // the assertions hold both ways.
+      awaitBlockedOnALockOrDone(this.jdbcTemplate, loser);
       releaseWinner.countDown();
 
       assertThat(winner.get(30, TimeUnit.SECONDS).getStatus()).isEqualTo(200);
@@ -567,7 +569,9 @@ class NpmPublishStorageConsistencyIT extends AbstractIT {
 
       final var second =
           executor.submit(() -> this.publish(repo, name, "2.0.0", "second", secondTarball, token));
-      TimeUnit.MILLISECONDS.sleep(500);
+      // Blocked on the lock the other one holds, or already finished (turned away first):
+      // the assertions hold both ways.
+      awaitBlockedOnALockOrDone(this.jdbcTemplate, second);
       releaseFirst.countDown();
 
       assertThat(first.get(30, TimeUnit.SECONDS).getStatus()).isEqualTo(200);
@@ -608,7 +612,9 @@ class NpmPublishStorageConsistencyIT extends AbstractIT {
 
       final var second =
           executor.submit(() -> this.publish(repo, name, "1.2.0", "second", secondTarball, token));
-      TimeUnit.MILLISECONDS.sleep(500);
+      // Blocked on the lock the other one holds, or already finished (turned away first):
+      // the assertions hold both ways.
+      awaitBlockedOnALockOrDone(this.jdbcTemplate, second);
       releaseFirst.countDown();
 
       assertThat(first.get(30, TimeUnit.SECONDS).getStatus()).isEqualTo(200);

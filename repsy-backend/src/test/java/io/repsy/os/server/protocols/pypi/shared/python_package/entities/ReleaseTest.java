@@ -62,7 +62,7 @@ class ReleaseTest extends AbstractEntityIdentityTest<Release> {
     release.setReleaseClassifiers(new UntouchableSet<>());
     release.setReleaseProjectURLS(new UntouchableSet<>());
 
-    assertThat(release.hashCode()).isEqualTo(Release.class.hashCode());
+    assertThat(release).hasSameHashCodeAs(Release.class);
     assertThat(release.toString())
         .doesNotContain("pypiPackage=", "releaseClassifiers=", "releaseProjectURLS=");
   }
