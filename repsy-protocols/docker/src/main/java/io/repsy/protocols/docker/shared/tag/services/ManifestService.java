@@ -27,7 +27,7 @@ import java.util.Optional;
  * kept for as long as something (a tag, an index, or nobody) still has it, and pullable by its
  * digest whatever tags point at it. A tag is a movable pointer to a manifest.
  */
-public interface ManifestService<ID> {
+public interface ManifestService<I> {
 
   /**
    * Refuses an index that references a manifest the image does not have, before anything of the
@@ -36,23 +36,23 @@ public interface ManifestService<ID> {
    * @throws io.repsy.core.error_handling.exceptions.ItemNotFoundException {@code manifestNotFound}
    *     for the first digest (of either algorithm) that is no manifest of the image
    */
-  void verifyManifestsExist(ID repoId, ID imageId, List<String> digests);
+  void verifyManifestsExist(I repoId, I imageId, List<String> digests);
 
   /**
    * Stores the manifest list (index) and replaces the manifests it references. When the form's
    * reference is a tag, the tag is created or moved to the index.
    */
-  void createManifestList(ID repoId, ID imageId, TagForm tagForm);
+  void createManifestList(I repoId, I imageId, TagForm tagForm);
 
   /**
    * Stores an image manifest under its digest, once per image, and, when the form's reference is a
    * tag, creates the tag or moves it to the manifest. The manifest the tag pointed at before stays
    * stored, untagged.
    */
-  void createSinglePlatformManifest(ID repoId, BaseImageInfo<ID> imageInfo, TagForm tagForm);
+  void createSinglePlatformManifest(I repoId, BaseImageInfo<I> imageInfo, TagForm tagForm);
 
-  Optional<BaseTagDetail<ID>> findActiveTagByNameAndRepoAndImage(
-      ID repoId, String imageName, String tag);
+  Optional<BaseTagDetail<I>> findActiveTagByNameAndRepoAndImage(
+      I repoId, String imageName, String tag);
 
   /**
    * Finds a manifest of the image by its digest, of either algorithm, however it got there: pushed
@@ -60,12 +60,12 @@ public interface ManifestService<ID> {
    *
    * @throws io.repsy.core.error_handling.exceptions.ItemNotFoundException {@code manifestNotFound}
    */
-  BaseManifestDetail<ID> getManifestByRepoIdAndImageNameAndDigest(
-      ID repoId, BaseImageInfo<ID> imageInfo, String digest);
+  BaseManifestDetail<I> getManifestByRepoIdAndImageNameAndDigest(
+      I repoId, BaseImageInfo<I> imageInfo, String digest);
 
   /**
    * The names of the tags of an image, in no particular order: the caller sorts and pages them, so
    * the order a listing answers in does not depend on the database's collation.
    */
-  List<String> findTagNamesByImageId(ID imageId);
+  List<String> findTagNamesByImageId(I imageId);
 }

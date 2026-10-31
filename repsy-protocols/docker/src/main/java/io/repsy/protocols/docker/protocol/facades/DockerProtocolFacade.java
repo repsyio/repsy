@@ -27,7 +27,7 @@ import java.io.InputStream;
 import org.jspecify.annotations.Nullable;
 import org.springframework.core.io.Resource;
 
-public interface DockerProtocolFacade<ID> {
+public interface DockerProtocolFacade<I> {
 
   /**
    * Appends a chunk to the layer upload, so a layer sent in several {@code PATCH} requests is
@@ -71,7 +71,7 @@ public interface DockerProtocolFacade<ID> {
    *     went with its last manifest between the moment it was found and the moment it was locked;
    *     the caller runs the save again
    */
-  SavedManifest<ID> saveManifest(ProtocolContext context, String imageName, ManifestForm form)
+  SavedManifest<I> saveManifest(ProtocolContext context, String imageName, ManifestForm form)
       throws IOException;
 
   Resource getLayer(ProtocolContext context, String digest, String servletPath) throws IOException;

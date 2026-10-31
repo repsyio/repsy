@@ -26,9 +26,9 @@ import org.jspecify.annotations.Nullable;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class BaseManifestDetail<ID> {
+public class BaseManifestDetail<I> {
 
-  private ID id;
+  private I id;
   private long configSize;
   private String digest;
   @Nullable private String storageName;

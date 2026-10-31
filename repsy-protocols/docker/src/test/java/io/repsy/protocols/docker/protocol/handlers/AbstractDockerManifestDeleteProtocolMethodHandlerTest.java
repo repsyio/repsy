@@ -184,10 +184,11 @@ class AbstractDockerManifestDeleteProtocolMethodHandlerTest {
   void refusesAMalformedReference(final String reference) {
     final var context = contextFor("/app/manifests/" + reference);
 
-    assertThatThrownBy(
-            () ->
-                this.handler()
-                    .handle(context, new MockHttpServletRequest(), new MockHttpServletResponse()))
+    final var handler = this.handler();
+    final var request = new MockHttpServletRequest();
+    final var response = new MockHttpServletResponse();
+
+    assertThatThrownBy(() -> handler.handle(context, request, response))
         .isInstanceOf(BadRequestException.class);
     verifyNoInteractions(this.dockerFacade);
   }
@@ -200,10 +201,11 @@ class AbstractDockerManifestDeleteProtocolMethodHandlerTest {
         .when(this.dockerFacade)
         .deleteManifest(context, "app", SHA256);
 
-    assertThatThrownBy(
-            () ->
-                this.handler()
-                    .handle(context, new MockHttpServletRequest(), new MockHttpServletResponse()))
+    final var handler = this.handler();
+    final var request = new MockHttpServletRequest();
+    final var response = new MockHttpServletResponse();
+
+    assertThatThrownBy(() -> handler.handle(context, request, response))
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessage("manifestNotFound");
   }

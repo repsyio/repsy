@@ -30,12 +30,12 @@ import java.util.Optional;
 import org.springframework.http.HttpMethod;
 
 /** The OCI blob check of a Docker layer, any supported digest algorithm. */
-public abstract class AbstractDockerLayerCheckProtocolMethodHandler<ID>
-    extends AbstractOciBlobCheckProtocolMethodHandler<LayerService<ID>> {
+public abstract class AbstractDockerLayerCheckProtocolMethodHandler<I>
+    extends AbstractOciBlobCheckProtocolMethodHandler<LayerService<I>> {
 
-  public AbstractDockerLayerCheckProtocolMethodHandler(
+  protected AbstractDockerLayerCheckProtocolMethodHandler(
       final PathParser basePathParser,
-      final LayerService<ID> layerTxService,
+      final LayerService<I> layerTxService,
       final DockerProtocolProvider provider) {
     super(
         HandlerRoute.of(Permission.READ, HttpMethod.HEAD),
@@ -47,7 +47,7 @@ public abstract class AbstractDockerLayerCheckProtocolMethodHandler<ID>
 
   @Override
   protected Optional<OciBlobInfo> findBlob(final ProtocolContext context, final String digest) {
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
 
     return this.facade
         .findLayerInfoByRepoIdAndDigest(repoInfo.getId(), digest)

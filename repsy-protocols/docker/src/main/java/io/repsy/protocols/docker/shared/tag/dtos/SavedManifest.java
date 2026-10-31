@@ -23,6 +23,6 @@ import io.repsy.protocols.docker.shared.image.dtos.BaseImageInfo;
  * @param digest the digest of the stored manifest
  * @param image the image it was saved into: the one the push found, or a new one when it was
  *     created (or created again after it was deleted) by the same transaction
- * @param <ID> the type of the ids
+ * @param <I> the type of the ids
  */
-public record SavedManifest<ID>(String digest, BaseImageInfo<ID> image) {}
+public record SavedManifest<I>(String digest, BaseImageInfo<I> image) {}

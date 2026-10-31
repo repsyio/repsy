@@ -20,15 +20,15 @@ import io.repsy.protocols.docker.shared.layer.dtos.LayerInfo;
 import java.util.List;
 import java.util.Optional;
 
-public interface LayerService<ID> {
+public interface LayerService<I> {
 
-  LayerInfo getOrCreate(LayerForm form, ID repoId);
+  LayerInfo getOrCreate(LayerForm form, I repoId);
 
-  void update(LayerInfo layerInfo, ID repoId);
+  void update(LayerInfo layerInfo, I repoId);
 
-  Optional<LayerInfo> findLayerInfoByRepoIdAndDigest(ID repoId, String digest);
+  Optional<LayerInfo> findLayerInfoByRepoIdAndDigest(I repoId, String digest);
 
-  void isAllExistsByRepoIdAndDigests(ID repoId, List<String> digests);
+  void isAllExistsByRepoIdAndDigests(I repoId, List<String> digests);
 
-  List<LayerInfo> findAllLayerInfoByRepoIdAndDigests(ID repoId, List<String> layerDigests);
+  List<LayerInfo> findAllLayerInfoByRepoIdAndDigests(I repoId, List<String> layerDigests);
 }

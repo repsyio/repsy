@@ -18,14 +18,14 @@ package io.repsy.protocols.docker.shared.auth.services;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.util.List;
 
-public interface DockerAuthService<ID> {
+public interface DockerAuthService<I> {
 
   /**
    * Checks that a caller without credentials may read the repo, which is what {@code /v2/token}
    * asks before it hands out an anonymous token. Only a public repo passes; a private one is
    * answered as if it did not exist.
    */
-  void authorizePublicRead(BaseRepoInfo<ID> repoInfo);
+  void authorizePublicRead(BaseRepoInfo<I> repoInfo);
 
   /**
    * Creates the token of a caller without credentials.

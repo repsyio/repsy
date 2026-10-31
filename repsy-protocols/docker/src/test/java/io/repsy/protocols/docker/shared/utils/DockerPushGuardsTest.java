@@ -43,7 +43,9 @@ class DockerPushGuardsTest {
   @Test
   @DisplayName("an image name one character over the column length is refused")
   void imageNameOverLimitIsRejected() {
-    assertThatThrownBy(() -> DockerPushGuards.rejectInvalidImageName(repeat('a', 256)))
+    final var name = repeat('a', 256);
+
+    assertThatThrownBy(() -> DockerPushGuards.rejectInvalidImageName(name))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("dockerImageNameInvalid");
   }
@@ -74,7 +76,9 @@ class DockerPushGuardsTest {
   @Test
   @DisplayName("a tag one character over the OCI grammar's 128 characters is refused")
   void tagOverGrammarLimitIsRejected() {
-    assertThatThrownBy(() -> DockerPushGuards.rejectInvalidReference(repeat('a', 129)))
+    final var tag = repeat('a', 129);
+
+    assertThatThrownBy(() -> DockerPushGuards.rejectInvalidReference(tag))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("dockerReferenceInvalid");
   }
@@ -121,7 +125,9 @@ class DockerPushGuardsTest {
   @Test
   @DisplayName("a digest longer than the reference column is refused as a digest, not a tag")
   void overLongDigestIsRejectedAsADigest() {
-    assertThatThrownBy(() -> DockerPushGuards.rejectInvalidReference("sha256:" + repeat('0', 300)))
+    final var reference = "sha256:" + repeat('0', 300);
+
+    assertThatThrownBy(() -> DockerPushGuards.rejectInvalidReference(reference))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("dockerDigestInvalid");
   }
@@ -142,7 +148,9 @@ class DockerPushGuardsTest {
   @Test
   @DisplayName("a media type one character over the column length is refused")
   void mediaTypeOverLimitIsRejected() {
-    assertThatThrownBy(() -> DockerPushGuards.rejectMediaTypeTooLong(repeat('a', 256)))
+    final var mediaType = repeat('a', 256);
+
+    assertThatThrownBy(() -> DockerPushGuards.rejectMediaTypeTooLong(mediaType))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("dockerMediaTypeTooLong");
   }
@@ -157,7 +165,9 @@ class DockerPushGuardsTest {
   @Test
   @DisplayName("a platform string one character over the column length is refused")
   void platformOverLimitIsRejected() {
-    assertThatThrownBy(() -> DockerPushGuards.rejectPlatformTooLong(repeat('a', 256)))
+    final var platform = repeat('a', 256);
+
+    assertThatThrownBy(() -> DockerPushGuards.rejectPlatformTooLong(platform))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("dockerPlatformTooLong");
   }

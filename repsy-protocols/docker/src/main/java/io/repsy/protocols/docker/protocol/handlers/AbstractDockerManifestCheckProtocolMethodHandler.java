@@ -31,12 +31,12 @@ import org.springframework.http.HttpMethod;
  * The Docker manifest check: a missing image or manifest is the facade's exception, so the 404
  * carries the OCI error body.
  */
-public abstract class AbstractDockerManifestCheckProtocolMethodHandler<ID>
-    extends AbstractOciManifestCheckProtocolMethodHandler<DockerProtocolFacade<ID>> {
+public abstract class AbstractDockerManifestCheckProtocolMethodHandler<I>
+    extends AbstractOciManifestCheckProtocolMethodHandler<DockerProtocolFacade<I>> {
 
-  public AbstractDockerManifestCheckProtocolMethodHandler(
+  protected AbstractDockerManifestCheckProtocolMethodHandler(
       final PathParser basePathParser,
-      final DockerProtocolFacade<ID> dockerFacade,
+      final DockerProtocolFacade<I> dockerFacade,
       final DockerProtocolProvider provider) {
     super(
         HandlerRoute.of(Permission.READ, HttpMethod.HEAD), basePathParser, dockerFacade, provider);
