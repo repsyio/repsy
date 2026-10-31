@@ -39,7 +39,7 @@
           <app-copy-clipboard [text]="manifestText" />
         </div>
         <pre class="max-h-[500px] text-[13px] sm:max-h-[800px]">
-        <code tabindex="0" [highlight]="manifestText" language="json" lineNumbers>
+        <code appScrollRegion="Image manifest" [highlight]="manifestText" language="json" lineNumbers>
         </code>
       </pre>
       </div>
@@ -54,7 +54,7 @@
             <app-copy-clipboard [text]="configText" />
           </div>
           <pre class="max-h-[500px] text-[13px] sm:max-h-[800px]">
-        <code tabindex="0" [highlight]="configText" language="json" lineNumbers>
+        <code appScrollRegion="Image config" [highlight]="configText" language="json" lineNumbers>
         </code>
       </pre>
         </div>

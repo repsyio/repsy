@@ -61,8 +61,8 @@
             <span class="text-[14px] text-[#FDFDFD]">config.toml</span>
             <app-copy-clipboard [text]="cargoConfig" />
           </div>
-          <pre class="text-[13px]"><code
-            tabindex="0"
+          <pre class="text-[13px]"><code appScrollRegion="Cargo registry configuration"
+           
             data-testid="pkg-detail-snippet-cargo-config-text"
             [highlight]="cargoConfig"
             language="toml"
@@ -79,7 +79,7 @@
             <app-copy-clipboard [text]="cargoToml" />
           </div>
           <pre class="max-h-[500px] text-[13px] sm:max-h-[800px]">
-        <code tabindex="0" [highlight]="cargoToml" language="toml" lineNumbers>
+        <code appScrollRegion="Cargo.toml dependency" [highlight]="cargoToml" language="toml" lineNumbers>
         </code>
       </pre>
         </div>

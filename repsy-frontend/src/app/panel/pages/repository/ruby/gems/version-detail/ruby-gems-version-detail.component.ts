@@ -28,6 +28,7 @@ import { CopyClipboardComponent } from '../../../../../shared/components/copy-cl
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
+import { ScrollRegionDirective } from '../../../../../shared/directives/scroll-region.directive';
 import { externalHttpUrl } from '../../../../../shared/utils/external-url.utils';
 import {
   deleteVersionAndCheckLast$,
@@ -45,6 +46,7 @@ import { RubyService } from '../../services/ruby.service';
     CommonModule,
     SpinnerComponent,
     CopyClipboardComponent,
+    ScrollRegionDirective,
     NgOptimizedImage,
     Highlight,
     HighlightLineNumbers,
