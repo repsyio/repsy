@@ -153,10 +153,10 @@ class AbstractNuGetPackageVersionsProtocolMethodHandlerTest {
     final var ctx = context(PATH);
     when(this.facade.getPackageVersions(ctx)).thenThrow(new IllegalStateException("db down"));
 
-    assertThatThrownBy(
-            () ->
-                this.handler.handle(
-                    ctx, new MockHttpServletRequest(), new MockHttpServletResponse()))
+    final var request = new MockHttpServletRequest();
+    final var response = new MockHttpServletResponse();
+
+    assertThatThrownBy(() -> this.handler.handle(ctx, request, response))
         .isInstanceOf(IllegalStateException.class);
   }
 }

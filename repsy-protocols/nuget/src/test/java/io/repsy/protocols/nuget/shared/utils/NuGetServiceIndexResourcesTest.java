@@ -99,7 +99,7 @@ class NuGetServiceIndexResourcesTest {
             .map(NuGetServiceIndexResource::type)
             .toList();
 
-    assertThat(types).doesNotContain("PackageDelete/2.0.0");
+    assertThat(types).isNotEmpty().doesNotContain("PackageDelete/2.0.0");
   }
 
   @Test
@@ -146,7 +146,7 @@ class NuGetServiceIndexResourcesTest {
             .map(NuGetServiceIndexResource::type)
             .toList();
 
-    assertThat(types).doesNotContain("RegistrationsBaseUrl/3.6.0");
+    assertThat(types).isNotEmpty().doesNotContain("RegistrationsBaseUrl/3.6.0");
   }
 
   @Test

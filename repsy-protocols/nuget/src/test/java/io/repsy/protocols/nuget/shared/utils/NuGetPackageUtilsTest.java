@@ -113,10 +113,9 @@ class NuGetPackageUtilsTest {
     void refusesEmptyStream() {
       final var target = NuGetPackageUtilsTest.this.tempDir.resolve("empty.nupkg");
 
-      assertThatThrownBy(
-              () ->
-                  NuGetPackageUtils.copyStreamToFile(
-                      new java.io.ByteArrayInputStream(new byte[0]), target))
+      final var emptyStream = new java.io.ByteArrayInputStream(new byte[0]);
+
+      assertThatThrownBy(() -> NuGetPackageUtils.copyStreamToFile(emptyStream, target))
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessage("NuGet package stream is empty.");
     }

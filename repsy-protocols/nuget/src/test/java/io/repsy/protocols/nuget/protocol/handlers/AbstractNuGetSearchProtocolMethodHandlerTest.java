@@ -144,14 +144,7 @@ class AbstractNuGetSearchProtocolMethodHandlerTest {
     resolving.handle(ctx, request(null), new MockHttpServletResponse());
 
     verify(this.facade)
-        .search(
-            eq(ctx),
-            eq(""),
-            eq(0),
-            eq(20),
-            eq(false),
-            eq(false),
-            eq("https://repo.example.com/prefix/nuget"));
+        .search(ctx, "", 0, 20, false, false, "https://repo.example.com/prefix/nuget");
   }
 
   @Test
@@ -245,7 +238,10 @@ class AbstractNuGetSearchProtocolMethodHandlerTest {
             eq(ctx), anyString(), anyInt(), anyInt(), anyBoolean(), anyBoolean(), anyString()))
         .thenThrow(new IllegalStateException("storage down"));
 
-    assertThatThrownBy(() -> this.handler.handle(ctx, request(null), new MockHttpServletResponse()))
+    final var request = request(null);
+    final var response = new MockHttpServletResponse();
+
+    assertThatThrownBy(() -> this.handler.handle(ctx, request, response))
         .isInstanceOf(IllegalStateException.class);
   }
 
@@ -267,8 +263,8 @@ class AbstractNuGetSearchProtocolMethodHandlerTest {
     }
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-    assertThat(this.logs.list).isNotEmpty();
     assertThat(this.logs.list)
+        .isNotEmpty()
         .noneMatch(event -> event.getFormattedMessage().contains("s3cr3t-token-value"));
   }
 }

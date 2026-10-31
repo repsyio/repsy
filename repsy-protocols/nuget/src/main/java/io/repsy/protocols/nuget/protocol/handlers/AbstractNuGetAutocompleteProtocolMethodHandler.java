@@ -34,7 +34,7 @@ import org.springframework.http.ResponseEntity;
 public abstract class AbstractNuGetAutocompleteProtocolMethodHandler
     extends AbstractFacadeProtocolMethodHandler<NuGetProtocolFacade> {
 
-  public AbstractNuGetAutocompleteProtocolMethodHandler(
+  protected AbstractNuGetAutocompleteProtocolMethodHandler(
       final PathParser basePathParser,
       final NuGetProtocolFacade facade,
       final NuGetProtocolProvider provider) {

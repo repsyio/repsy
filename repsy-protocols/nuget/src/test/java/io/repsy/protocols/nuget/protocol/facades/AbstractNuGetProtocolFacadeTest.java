@@ -115,9 +115,10 @@ class AbstractNuGetProtocolFacadeTest {
     when(packageService.publishVersion(any(), any(), any(), any(), any(), any()))
         .thenThrow(new IllegalStateException("row rejected"));
 
-    assertThatThrownBy(
-            () -> facade.publish(context("/v3/package", repoInfo), nupkg("Some.Package", "1.0.0")))
-        .isInstanceOf(IllegalStateException.class);
+    final var ctx = context("/v3/package", repoInfo);
+    final var nupkg = nupkg("Some.Package", "1.0.0");
+
+    assertThatThrownBy(() -> facade.publish(ctx, nupkg)).isInstanceOf(IllegalStateException.class);
 
     verify(storageService, never()).writePackage(any(), any(), any(), any(), any());
     verify(storageService, never()).deletePackageVersion(any(), any(), any());
@@ -188,8 +189,10 @@ class AbstractNuGetProtocolFacadeTest {
     final BaseRepoInfo<UUID> repoInfo = repoInfo();
     when(packageService.versionExists(repoInfo, "Some.Package", "1.0.0")).thenReturn(true);
 
-    assertThatThrownBy(
-            () -> facade.publish(context("/v3/package", repoInfo), nupkg("Some.Package", "1.0.0")))
+    final var ctx = context("/v3/package", repoInfo);
+    final var nupkg = nupkg("Some.Package", "1.0.0");
+
+    assertThatThrownBy(() -> facade.publish(ctx, nupkg))
         .isInstanceOfSatisfying(
             ResponseStatusException.class,
             e -> assertThat(e.getStatusCode()).isEqualTo(HttpStatus.CONFLICT));

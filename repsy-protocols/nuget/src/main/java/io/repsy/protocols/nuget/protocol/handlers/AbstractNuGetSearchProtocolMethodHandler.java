@@ -39,7 +39,7 @@ public abstract class AbstractNuGetSearchProtocolMethodHandler
 
   private final NuGetBaseUrlResolver baseUrlResolver;
 
-  public AbstractNuGetSearchProtocolMethodHandler(
+  protected AbstractNuGetSearchProtocolMethodHandler(
       final PathParser basePathParser,
       final NuGetProtocolFacade facade,
       final NuGetProtocolProvider provider,

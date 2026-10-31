@@ -147,8 +147,10 @@ class AbstractNuGetRelistProtocolMethodHandlerTest {
     final var ctx = context(PATH);
     doThrow(new IllegalStateException("db down")).when(facade).relistVersion(ctx);
 
-    assertThatThrownBy(
-            () -> handler.handle(ctx, new MockHttpServletRequest(), new MockHttpServletResponse()))
+    final var request = new MockHttpServletRequest();
+    final var response = new MockHttpServletResponse();
+
+    assertThatThrownBy(() -> handler.handle(ctx, request, response))
         .isInstanceOf(IllegalStateException.class);
   }
 }

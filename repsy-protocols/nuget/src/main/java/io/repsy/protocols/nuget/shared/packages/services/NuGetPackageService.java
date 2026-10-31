@@ -26,7 +26,7 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
-public interface NuGetPackageService<ID> {
+public interface NuGetPackageService<I> {
 
   /**
    * Records the version and, while that write is still open, stores its files through {@code
@@ -43,7 +43,7 @@ public interface NuGetPackageService<ID> {
    * @return the usages reported by {@code filesWriter}
    */
   BaseUsages publishVersion(
-      BaseRepoInfo<ID> repoInfo,
+      BaseRepoInfo<I> repoInfo,
       String packageId,
       String version,
       String nuspecXml,
@@ -51,26 +51,26 @@ public interface NuGetPackageService<ID> {
       PackageFilesWriter filesWriter)
       throws IOException;
 
-  boolean versionExists(BaseRepoInfo<ID> repoInfo, String packageId, String version);
+  boolean versionExists(BaseRepoInfo<I> repoInfo, String packageId, String version);
 
-  void incrementDownloadCount(BaseRepoInfo<ID> repoInfo, String packageId, String version);
+  void incrementDownloadCount(BaseRepoInfo<I> repoInfo, String packageId, String version);
 
-  void unlistVersion(BaseRepoInfo<ID> repoInfo, String packageId, String version);
+  void unlistVersion(BaseRepoInfo<I> repoInfo, String packageId, String version);
 
-  void relistVersion(BaseRepoInfo<ID> repoInfo, String packageId, String version);
+  void relistVersion(BaseRepoInfo<I> repoInfo, String packageId, String version);
 
-  void deletePackage(BaseRepoInfo<ID> repoInfo, String packageId);
+  void deletePackage(BaseRepoInfo<I> repoInfo, String packageId);
 
-  boolean deleteVersion(BaseRepoInfo<ID> repoInfo, String packageId, String version);
+  boolean deleteVersion(BaseRepoInfo<I> repoInfo, String packageId, String version);
 
   Optional<NuGetVersionInfo> findVersionInfo(
-      BaseRepoInfo<ID> repoInfo, String packageId, String version);
+      BaseRepoInfo<I> repoInfo, String packageId, String version);
 
-  List<String> getVersions(BaseRepoInfo<ID> repoInfo, String packageId);
+  List<String> getVersions(BaseRepoInfo<I> repoInfo, String packageId);
 
-  List<NuGetVersionInfo> getVersionInfos(BaseRepoInfo<ID> repoInfo, String packageId);
+  List<NuGetVersionInfo> getVersionInfos(BaseRepoInfo<I> repoInfo, String packageId);
 
-  List<NuGetVersionInfo> getAllVersionInfos(BaseRepoInfo<ID> repoInfo, String packageId);
+  List<NuGetVersionInfo> getAllVersionInfos(BaseRepoInfo<I> repoInfo, String packageId);
 
   /**
    * @param prerelease whether pre-release versions count: when they do not, a package that only has
@@ -79,7 +79,7 @@ public interface NuGetPackageService<ID> {
    *     has such versions is left out
    */
   List<String> autocomplete(
-      BaseRepoInfo<ID> repoInfo,
+      BaseRepoInfo<I> repoInfo,
       String query,
       int skip,
       int take,
@@ -91,7 +91,7 @@ public interface NuGetPackageService<ID> {
    *     applied before paging, so it spans all pages.
    */
   Page<NuGetVersionInfo> getVersionInfosPage(
-      BaseRepoInfo<ID> repoInfo, String packageId, String query, Pageable pageable);
+      BaseRepoInfo<I> repoInfo, String packageId, String query, Pageable pageable);
 
   /**
    * @param prerelease whether pre-release versions count: when they do not, they are left out of
@@ -100,7 +100,7 @@ public interface NuGetPackageService<ID> {
    *     each result's versions, and a package that only has such versions is not a result
    */
   Page<NuGetPackageSearchResult> search(
-      BaseRepoInfo<ID> repoInfo,
+      BaseRepoInfo<I> repoInfo,
       String query,
       int skip,
       int take,
@@ -108,7 +108,7 @@ public interface NuGetPackageService<ID> {
       boolean semVer2);
 
   Page<NuGetPackageSearchResult> searchPage(
-      BaseRepoInfo<ID> repoInfo,
+      BaseRepoInfo<I> repoInfo,
       String query,
       Pageable pageable,
       boolean prerelease,

@@ -160,7 +160,7 @@ public abstract class AbstractNuGetStorageService extends AbstractArtifactStorag
   private long deleteVersionDirectory(
       final RepoRef repo, final String normalizedId, final String versionDirectory) {
 
-    final var versionPath = PACKAGES_PATH + "/" + normalizedId + "/" + versionDirectory;
+    final var versionPath = PACKAGES_PATH + '/' + normalizedId + '/' + versionDirectory;
     final var versionStoragePath = StoragePath.of(repo.id(), versionPath);
 
     return this.deleteTreeWithUsage(versionStoragePath);
@@ -170,7 +170,7 @@ public abstract class AbstractNuGetStorageService extends AbstractArtifactStorag
   public long deletePackage(final RepoRef repo, final String packageId) {
 
     final var normalizedId = packageId.toLowerCase(Locale.ROOT);
-    final var packagePath = PACKAGES_PATH + "/" + normalizedId;
+    final var packagePath = PACKAGES_PATH + '/' + normalizedId;
     final var packageStoragePath = StoragePath.of(repo.id(), packagePath);
 
     return this.deleteTreeWithUsage(packageStoragePath);
@@ -204,11 +204,11 @@ public abstract class AbstractNuGetStorageService extends AbstractArtifactStorag
       final String normalizedId, final String versionDirectory, final String extension) {
 
     return PACKAGES_PATH
-        + "/"
+        + '/'
         + normalizedId
-        + "/"
+        + '/'
         + versionDirectory
-        + "/"
+        + '/'
         + normalizedId
         + "."
         + versionDirectory

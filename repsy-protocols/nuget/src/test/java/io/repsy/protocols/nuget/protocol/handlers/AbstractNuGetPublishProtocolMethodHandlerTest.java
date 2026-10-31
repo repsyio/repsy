@@ -152,7 +152,9 @@ class AbstractNuGetPublishProtocolMethodHandlerTest {
         .when(facade)
         .publish(eq(ctx), any(InputStream.class));
 
-    assertThatThrownBy(() -> handler.handle(ctx, request, new MockHttpServletResponse()))
+    final var response = new MockHttpServletResponse();
+
+    assertThatThrownBy(() -> handler.handle(ctx, request, response))
         .isInstanceOf(IllegalStateException.class)
         .hasMessage("db down");
   }
