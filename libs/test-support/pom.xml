@@ -19,6 +19,11 @@
     it with <scope>test</scope> only; nothing in a production classpath may depend on it
     (RPS-2067).
   -->
+  <properties>
+    <!-- RPS-2368: test helpers are not gated on coverage; the code under test is. -->
+    <jacoco.check.phase>none</jacoco.check.phase>
+  </properties>
+
   <dependencies>
     <dependency>
       <groupId>org.junit.jupiter</groupId>

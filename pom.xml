@@ -33,13 +33,12 @@
 
   <properties>
     <!--
-      TEMPORARY: core-parent enforces an 80% JaCoCo instruction-coverage gate (check-coverage
-      execution), intended for repsy-core's own modules. Every repsy module inherits it through
-      core-parent, so it is off by default here and opted into per module (set this property to
-      "verify") once a module meets the threshold. Coverage reports are still generated for
-      SonarCloud. Remove this override once every module has opted in.
+      RPS-2368: core-parent's 80% JaCoCo instruction-coverage gate (check-coverage execution) runs
+      for every module at verify, on the module's own report (integration tests of repsy-backend
+      included). A module that has nothing to gate sets this property to "none" in its pom
+      (libs/test-support).
     -->
-    <jacoco.check.phase>none</jacoco.check.phase>
+    <jacoco.check.phase>verify</jacoco.check.phase>
 
     <!--
       RPS-2265: the repsy-core release the core-bom import below manages, so the io.repsy.core
@@ -217,6 +216,13 @@
           <execution>
             <id>check-coverage</id>
             <phase>${jacoco.check.phase}</phase>
+            <configuration>
+              <!-- The same classes the aggregate report (coverage-report) leaves out. -->
+              <excludes>
+                <exclude>io/repsy/os/generated/**</exclude>
+                <exclude>**/*MapperImpl.class</exclude>
+              </excludes>
+            </configuration>
           </execution>
         </executions>
       </plugin>
