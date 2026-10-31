@@ -68,9 +68,9 @@ class SuspiciousRequestThrottleTest {
     final var throttle =
         this.throttle(SuspiciousRequestProperties.of(AuthThrottleMode.ENFORCE, 10, 3600));
 
-    assertThat(throttle.record(CLIENT, CLIENT, TRAVERSAL)).isZero();
+    assertThat(throttle.recordSuspicious(CLIENT, CLIENT, TRAVERSAL)).isZero();
     assertThat(throttle.banSecondsLeft(CLIENT)).isZero();
-    assertThat(throttle.record(CLIENT, CLIENT, TRAVERSAL)).isEqualTo(3600);
+    assertThat(throttle.recordSuspicious(CLIENT, CLIENT, TRAVERSAL)).isEqualTo(3600);
     assertThat(throttle.banSecondsLeft(CLIENT)).isEqualTo(3600);
     assertThat(this.registry.counter("repsy.security.probe_bans").count()).isEqualTo(1);
     assertThat(this.registry.counter("repsy.security.probe_strikes", "family", "traversal").count())
@@ -85,7 +85,8 @@ class SuspiciousRequestThrottleTest {
         this.throttle(SuspiciousRequestProperties.of(AuthThrottleMode.ENFORCE, 10, 3600));
 
     final var left =
-        throttle.record(CLIENT, CLIENT, Set.of(SignalFamily.TRAVERSAL, SignalFamily.SECRET_PATH));
+        throttle.recordSuspicious(
+            CLIENT, CLIENT, Set.of(SignalFamily.TRAVERSAL, SignalFamily.SECRET_PATH));
 
     assertThat(left).isEqualTo(3600);
   }
@@ -97,9 +98,9 @@ class SuspiciousRequestThrottleTest {
     final var throttle =
         this.throttle(SuspiciousRequestProperties.of(AuthThrottleMode.ENFORCE, 10, 3600));
 
-    throttle.record(CLIENT, CLIENT, TRAVERSAL);
+    throttle.recordSuspicious(CLIENT, CLIENT, TRAVERSAL);
     this.advanceSeconds(61);
-    throttle.record(CLIENT, CLIENT, TRAVERSAL);
+    throttle.recordSuspicious(CLIENT, CLIENT, TRAVERSAL);
 
     assertThat(throttle.banSecondsLeft(CLIENT)).isZero();
   }
@@ -111,7 +112,7 @@ class SuspiciousRequestThrottleTest {
     final var throttle =
         this.throttle(SuspiciousRequestProperties.of(AuthThrottleMode.ENFORCE, 5, 100));
 
-    throttle.record(CLIENT, CLIENT, TRAVERSAL);
+    throttle.recordSuspicious(CLIENT, CLIENT, TRAVERSAL);
     this.advanceSeconds(40);
     assertThat(throttle.banSecondsLeft(CLIENT)).isEqualTo(60);
     this.advanceSeconds(61);
@@ -126,7 +127,7 @@ class SuspiciousRequestThrottleTest {
     final var throttle =
         this.throttle(SuspiciousRequestProperties.of(AuthThrottleMode.ENFORCE, 5, 3600));
 
-    throttle.record(CLIENT, CLIENT, TRAVERSAL);
+    throttle.recordSuspicious(CLIENT, CLIENT, TRAVERSAL);
 
     assertThat(throttle.banSecondsLeft("203.0.113.8")).isZero();
   }
@@ -138,7 +139,7 @@ class SuspiciousRequestThrottleTest {
     final var throttle =
         this.throttle(SuspiciousRequestProperties.of(AuthThrottleMode.OBSERVE, 5, 3600));
 
-    throttle.record(CLIENT, CLIENT, TRAVERSAL);
+    throttle.recordSuspicious(CLIENT, CLIENT, TRAVERSAL);
     throttle.countWouldBlock(CLIENT, 3600);
 
     assertThat(throttle.banSecondsLeft(CLIENT)).isEqualTo(3600);
@@ -191,7 +192,7 @@ class SuspiciousRequestThrottleTest {
     final var throttle = this.throttle(SuspiciousRequestProperties.disabled());
 
     assertThat(throttle.isActive()).isFalse();
-    assertThat(throttle.record(CLIENT, CLIENT, TRAVERSAL)).isZero();
+    assertThat(throttle.recordSuspicious(CLIENT, CLIENT, TRAVERSAL)).isZero();
     assertThat(throttle.banSecondsLeft(CLIENT)).isZero();
   }
 
@@ -202,7 +203,7 @@ class SuspiciousRequestThrottleTest {
     final var throttle =
         this.throttle(SuspiciousRequestProperties.of(AuthThrottleMode.ENFORCE, 5, 3600));
 
-    throttle.record(CLIENT, CLIENT, TRAVERSAL);
+    throttle.recordSuspicious(CLIENT, CLIENT, TRAVERSAL);
     throttle.reset();
 
     assertThat(throttle.banSecondsLeft(CLIENT)).isZero();
@@ -253,11 +254,11 @@ class SuspiciousRequestThrottleTest {
     final var agent = Set.of(SignalFamily.SCANNER_UA);
 
     for (var i = 0; i < 20; i++) {
-      assertThat(throttle.record(CLIENT, CLIENT, agent)).isZero();
+      assertThat(throttle.recordSuspicious(CLIENT, CLIENT, agent)).isZero();
     }
 
     // The 60 soft strikes are already there: one more strike of a family that can ban tips it.
-    assertThat(throttle.record(CLIENT, CLIENT, Set.of(SignalFamily.DOUBLE_ENCODED)))
+    assertThat(throttle.recordSuspicious(CLIENT, CLIENT, Set.of(SignalFamily.DOUBLE_ENCODED)))
         .isEqualTo(3600);
   }
 
@@ -277,11 +278,11 @@ class SuspiciousRequestThrottleTest {
         this.throttle(SuspiciousRequestProperties.of(AuthThrottleMode.ENFORCE, 10, 3600));
     throttle.setBanListener(recordingInto(announced));
 
-    throttle.record(CLIENT, CLIENT, TRAVERSAL);
+    throttle.recordSuspicious(CLIENT, CLIENT, TRAVERSAL);
     assertThat(announced).isEmpty();
 
-    throttle.record(CLIENT, CLIENT, TRAVERSAL);
-    throttle.record(CLIENT, CLIENT, TRAVERSAL);
+    throttle.recordSuspicious(CLIENT, CLIENT, TRAVERSAL);
+    throttle.recordSuspicious(CLIENT, CLIENT, TRAVERSAL);
 
     assertThat(announced).containsExactly(new Announced(BanKind.PROBE, CLIENT, 3600));
   }
@@ -330,7 +331,7 @@ class SuspiciousRequestThrottleTest {
     final var throttle =
         this.throttle(SuspiciousRequestProperties.of(AuthThrottleMode.ENFORCE, 1, 3600));
 
-    assertThat(throttle.record(CLIENT, CLIENT, Set.of())).isZero();
+    assertThat(throttle.recordSuspicious(CLIENT, CLIENT, Set.of())).isZero();
     assertThat(throttle.banSecondsLeft(CLIENT)).isZero();
   }
 
@@ -360,7 +361,7 @@ class SuspiciousRequestThrottleTest {
             SuspiciousRequestProperties.of(AuthThrottleMode.ENFORCE, 10, 3600), noRegistry);
 
     assertThat(
-            throttle.record(
+            throttle.recordSuspicious(
                 CLIENT, CLIENT, Set.of(SignalFamily.TRAVERSAL, SignalFamily.SECRET_PATH)))
         .isEqualTo(3600);
     throttle.countWouldBlock(CLIENT, 5);
@@ -378,7 +379,7 @@ class SuspiciousRequestThrottleTest {
         });
 
     assertThat(
-            throttle.record(
+            throttle.recordSuspicious(
                 CLIENT, CLIENT, Set.of(SignalFamily.TRAVERSAL, SignalFamily.SECRET_PATH)))
         .isEqualTo(3600);
   }

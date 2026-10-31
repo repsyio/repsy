@@ -145,7 +145,7 @@ public class SuspiciousRequestFilter extends OncePerRequestFilter {
             apiPort);
 
     if (!signals.isEmpty() && !isCrossSiteBrowserRequest(request)) {
-      this.throttle.record(client, request.getRemoteAddr(), signals);
+      this.throttle.recordSuspicious(client, request.getRemoteAddr(), signals);
     }
 
     return signals;
