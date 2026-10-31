@@ -34,7 +34,7 @@
             [attr.data-testid]="'access-token-scope-' + option.scope"
             [checked]="isSelected(option.scope)"
             [disabled]="loading"
-            (change)="toggleScope(option.scope, $any($event.target).checked)"
+            (change)="$any($event.target).checked ? selectScope(option.scope) : deselectScope(option.scope)"
           />
           <span>
             {{ option.label }} <code class="text-[12px] text-[#9FA0A0]">{{ option.scope }}</code>

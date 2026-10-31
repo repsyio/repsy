@@ -104,7 +104,7 @@ export class NpmPackagesListComponent implements OnDestroy {
     this.username = this.authService.username;
     this.registryChanges$ = this.npmService.repoChanges$.subscribe((registry: RepoPermissionInfo) => {
       if (registry) {
-        this.activeRegistry = Object.assign({}, registry);
+        this.activeRegistry = { ...registry };
 
         // RPS-1668: the search, sort and page live in the URL, so a reload or a Back navigation
         // restores exactly what was left instead of an unfiltered, first page.

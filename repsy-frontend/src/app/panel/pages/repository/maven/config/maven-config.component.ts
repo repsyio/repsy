@@ -159,7 +159,7 @@ You should configure your .m2/settings.xml at your home directory;
 ${
   this.deployToken
     ? `
-  ${this.deployToken ? 'or If you are using a deploy token, the username can be empty;' : ''}
+  or If you are using a deploy token, the username can be empty;
   \`\`\`xml
 <settings>
   ...

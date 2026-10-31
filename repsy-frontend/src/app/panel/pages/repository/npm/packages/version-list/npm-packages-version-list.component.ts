@@ -112,7 +112,7 @@ export class NpmPackagesVersionListComponent implements OnDestroy {
     this.activeRegistry = {} as RepoPermissionInfo;
     this.registryChanges$ = this.npmService.repoChanges$.subscribe((registry: RepoPermissionInfo) => {
       if (registry) {
-        this.activeRegistry = Object.assign({}, registry);
+        this.activeRegistry = { ...registry };
         this.scopeName = this.route.snapshot.paramMap.get('scope');
         this.packageName = this.route.snapshot.paramMap.get('packageName');
 

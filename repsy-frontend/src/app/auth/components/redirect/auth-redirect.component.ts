@@ -51,7 +51,7 @@ export class AuthRedirectComponent implements OnInit {
     private readonly authService: AuthService,
     private readonly splashService: SplashService,
     private readonly destroyRef: DestroyRef,
-    @Inject(PLATFORM_ID) private platformId: object,
+    @Inject(PLATFORM_ID) private readonly platformId: object,
   ) {
     this.isAuthenticated = this.authService.isAuthenticated();
     this.destroyRef.onDestroy(() => {

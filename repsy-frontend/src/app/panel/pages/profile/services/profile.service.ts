@@ -17,8 +17,7 @@
 import { Injectable } from '@angular/core';
 import { Observable, tap } from 'rxjs';
 
-import { LoginInfo, ProfileInfo } from '../../../../../generated/api';
-import { ProfileApi } from '../../../../../generated/api';
+import { LoginInfo, ProfileApi, ProfileInfo } from '../../../../../generated/api';
 import { AuthService } from '../../../../auth/pages/services/auth.service';
 
 @Injectable({

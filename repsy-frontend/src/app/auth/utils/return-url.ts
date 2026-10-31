@@ -34,7 +34,7 @@ export function safeReturnUrl(value: unknown): string | null {
     return null;
   }
   try {
-    const base = 'http://return-url.invalid';
+    const base = 'https://return-url.invalid';
     return new URL(value, base).origin === base ? value : null;
   } catch {
     return null;

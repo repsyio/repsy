@@ -114,8 +114,8 @@ describe('DropdownComponent', () => {
       el('#one').click();
 
       expect(host.picked).toBe('one');
-      expect(seenByRow.length).toBe(2);
-      expect(seenByDocument.length).toBe(2);
+      expect(seenByRow).toHaveSize(2);
+      expect(seenByDocument).toHaveSize(2);
     } finally {
       document.removeEventListener('click', documentListener);
     }

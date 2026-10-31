@@ -17,8 +17,7 @@
 import { Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
 
-import { TotalUsageInfo } from '../../../../../generated/api';
-import { UsageApi } from '../../../../../generated/api';
+import { TotalUsageInfo, UsageApi } from '../../../../../generated/api';
 
 @Injectable({
   providedIn: 'root',

@@ -155,7 +155,7 @@ export class MavenBrowserComponent implements OnDestroy {
       } else {
         // A new forward navigation invalidates whatever "next" would have gone back to.
         this.forwardStack = [];
-        const prev = this.directoryStack[this.directoryStack.length - 1];
+        const prev = this.directoryStack.at(-1)!;
 
         this.directoryStack.push(new Directory(requestedDirectoryName, prev.path + requestedDirectoryName, prev));
       }
@@ -163,7 +163,7 @@ export class MavenBrowserComponent implements OnDestroy {
       this.updateRepoUrl();
       this.fetchCurrentRepoContent();
     } else {
-      this.download(this.directoryStack[this.directoryStack.length - 1].path + fsItem.name);
+      this.download(this.directoryStack.at(-1)!.path + fsItem.name);
     }
   }
 
@@ -215,7 +215,7 @@ export class MavenBrowserComponent implements OnDestroy {
     this.searchText = '';
 
     this.mavenService
-      .fetchPathContent(this.directoryStack[this.directoryStack.length - 1].path)
+      .fetchPathContent(this.directoryStack.at(-1)!.path)
       .pipe(
         finalize(() => {
           this.loading = false;
@@ -239,10 +239,6 @@ export class MavenBrowserComponent implements OnDestroy {
   }
 
   private updateRepoUrl(): void {
-    this.repoUrl =
-      environment.repoBaseUrl +
-      '/' +
-      this.activeRepo.repoName +
-      this.directoryStack[this.directoryStack.length - 1].path;
+    this.repoUrl = environment.repoBaseUrl + '/' + this.activeRepo.repoName + this.directoryStack.at(-1)!.path;
   }
 }

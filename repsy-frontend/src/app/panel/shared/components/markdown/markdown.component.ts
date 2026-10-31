@@ -168,9 +168,12 @@ export class MarkdownComponent implements OnInit, AfterViewInit {
    */
   private classifyUrl(raw: string | null): ClassifiedUrl {
     const url = Array.from(raw ?? '')
-      .filter((char) => char.charCodeAt(0) > 32 && char.charCodeAt(0) !== 127 && !/\s/.test(char))
+      .filter((char) => {
+        const code = char.codePointAt(0)!;
+        return code > 32 && code !== 127 && !/\s/.test(char);
+      })
       .join('')
-      .replace(/\\/g, '/');
+      .replaceAll('\\', '/');
     const lower = url.toLowerCase();
 
     if (lower.startsWith('//') || /^https?:/.test(lower)) {

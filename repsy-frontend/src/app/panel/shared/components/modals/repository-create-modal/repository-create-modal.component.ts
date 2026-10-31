@@ -15,8 +15,7 @@
 ///
 
 import { ChangeDetectorRef, Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
-import { FormBuilder, FormGroup, Validators } from '@angular/forms';
-import { ReactiveFormsModule } from '@angular/forms';
+import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { finalize } from 'rxjs/operators';
 
@@ -78,19 +77,12 @@ export class RepositoryCreateModalComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    if (this.selectedOption == null) {
-      this.selectedOption = RepoType.DOCKER;
-    }
+    this.selectedOption ??= RepoType.DOCKER;
 
     this.form = this.fb.group({
       name: [
         '',
-        [
-          Validators.required,
-          Validators.maxLength(25),
-          Validators.pattern(/^[a-zA-Z0-9_][a-zA-Z0-9_\-]*$/),
-          reservedRepoNameValidator(),
-        ],
+        [Validators.required, Validators.maxLength(25), Validators.pattern(/^\w[\w-]*$/), reservedRepoNameValidator()],
       ],
       privateRepo: [true],
       description: ['', descriptionValidators()],

@@ -76,7 +76,7 @@ export class HelmChartsVersionDetailComponent implements OnDestroy {
   ) {
     this.repositoryChanges$ = this.helmService.repoChanges$.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
-        this.activeRepo = Object.assign({}, repo);
+        this.activeRepo = { ...repo };
         this.loadDetail();
       }
     });
@@ -102,7 +102,7 @@ export class HelmChartsVersionDetailComponent implements OnDestroy {
         )
         .subscribe({
           next: (wasLastVersion) => {
-            landAfterVersionDelete(
+            void landAfterVersionDelete(
               this.router,
               this.route,
               this.toastService,

@@ -98,7 +98,7 @@ export class HelmChartsListComponent implements OnDestroy {
     this.username = this.authService.username;
     this.repositoryChanges$ = this.helmService.repoChanges$.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
-        this.activeRepo = Object.assign({}, repo);
+        this.activeRepo = { ...repo };
         this.fetchCharts();
         this.fetchSecuritySummary();
       }

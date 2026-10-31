@@ -58,7 +58,7 @@ function copyWithExecCommand(text: string): boolean {
   } catch {
     return false;
   } finally {
-    document.body.removeChild(textarea);
+    textarea.remove();
     activeElement?.focus?.();
   }
 }

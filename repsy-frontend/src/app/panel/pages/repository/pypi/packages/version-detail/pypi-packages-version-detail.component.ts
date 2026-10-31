@@ -40,7 +40,7 @@ import { versionLoadError } from '../../../../../shared/utils/version-load-error
 import { RepoLookupService } from '../../../repo-entry/repo-lookup.service';
 import { PypiService } from '../../services/pypi.service';
 
-type Classifiers = Record<string, [string]>;
+type Classifiers = Record<string, string[]>;
 
 @Component({
   selector: 'app-pypi-packages-version-detail',
@@ -88,7 +88,7 @@ export class PypiPackagesVersionDetailComponent implements OnDestroy {
 
     this.repositoryChanges$ = this.pypiService.repoChanges$.subscribe((registry: RepoPermissionInfo) => {
       if (registry && this.isRegistryForCurrentRoute(registry)) {
-        this.activeRepo = Object.assign({}, registry);
+        this.activeRepo = { ...registry };
         this.loadVersion();
       }
     });
@@ -130,11 +130,9 @@ export class PypiPackagesVersionDetailComponent implements OnDestroy {
       .subscribe({
         next: (releaseInfo: ReleaseDetail) => {
           this.versionInfo = releaseInfo;
-          releaseInfo.classifiers.forEach((c: ReleaseClassifierInfo) =>
-            this.classifiers[c.classifier]
-              ? this.classifiers[c.classifier].push(c.value)
-              : (this.classifiers[c.classifier] = [c.value]),
-          );
+          releaseInfo.classifiers.forEach((c: ReleaseClassifierInfo) => {
+            (this.classifiers[c.classifier] ??= []).push(c.value);
+          });
 
           releaseInfo.descriptionContentType = releaseInfo.descriptionContentType
             ? releaseInfo.descriptionContentType.split(';')[0].trim()
@@ -161,7 +159,7 @@ export class PypiPackagesVersionDetailComponent implements OnDestroy {
         )
         .subscribe({
           next: (wasLastVersion) => {
-            landAfterVersionDelete(
+            void landAfterVersionDelete(
               this.router,
               this.route,
               this.toastService,

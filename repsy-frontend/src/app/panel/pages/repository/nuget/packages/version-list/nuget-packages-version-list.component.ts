@@ -104,7 +104,7 @@ export class NuGetPackagesVersionListComponent implements OnDestroy {
     this.activeRepo = {} as RepoPermissionInfo;
     this.repositoryChanges$ = this.nugetService.repoChanges$.subscribe((repo) => {
       if (repo) {
-        this.activeRepo = Object.assign({}, repo);
+        this.activeRepo = { ...repo };
         this.packageId = this.route.snapshot.paramMap.get('packageName');
         this.fetchVersions();
         this.fetchSecuritySummary();

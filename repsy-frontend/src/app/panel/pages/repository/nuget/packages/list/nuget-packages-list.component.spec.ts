@@ -170,7 +170,7 @@ describe('NuGetPackagesListComponent', () => {
       flushMicrotasks();
 
       expect(component.error).toBeNull();
-      expect(component.packages.length).toBe(1);
+      expect(component.packages).toHaveSize(1);
     }));
 
     it('keeps the previous security summary when it cannot be loaded', fakeAsync(() => {

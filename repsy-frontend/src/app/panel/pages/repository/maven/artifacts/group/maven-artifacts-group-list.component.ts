@@ -100,7 +100,7 @@ export class MavenArtifactsGroupListComponent implements OnDestroy {
     this.activeRepo = {} as RepoPermissionInfo;
     this.repositoryChanges$ = this.mavenService.repoChanges$.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
-        this.activeRepo = Object.assign({}, repo);
+        this.activeRepo = { ...repo };
         this.fetchArtifacts();
       }
     });

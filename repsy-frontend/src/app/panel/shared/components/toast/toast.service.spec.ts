@@ -29,7 +29,7 @@ describe('ToastService', () => {
   it('shows a success toast by default', fakeAsync(() => {
     service.show('Saved');
 
-    expect(service.toasts.length).toBe(1);
+    expect(service.toasts).toHaveSize(1);
     expect(service.toasts[0].message).toBe('Saved');
     expect(service.toasts[0].type).toBe('success');
     expect(console.error).not.toHaveBeenCalled();
@@ -50,18 +50,18 @@ describe('ToastService', () => {
     service.show('Saved');
 
     tick(2999);
-    expect(service.toasts.length).toBe(1);
+    expect(service.toasts).toHaveSize(1);
     tick(1);
-    expect(service.toasts.length).toBe(0);
+    expect(service.toasts).toHaveSize(0);
   }));
 
   it('honours a custom duration', fakeAsync(() => {
     service.show('Saved', 'success', 500);
 
     tick(499);
-    expect(service.toasts.length).toBe(1);
+    expect(service.toasts).toHaveSize(1);
     tick(1);
-    expect(service.toasts.length).toBe(0);
+    expect(service.toasts).toHaveSize(0);
   }));
 
   it('gives every toast its own id, and removes only the one that expired', fakeAsync(() => {
@@ -79,7 +79,7 @@ describe('ToastService', () => {
   it('never keeps more than three toasts on screen', fakeAsync(() => {
     ['a', 'b', 'c', 'd', 'e'].forEach((message) => service.show(message));
 
-    expect(service.toasts.length).toBe(3);
+    expect(service.toasts).toHaveSize(3);
 
     tick(3000);
     expect(service.toasts).toEqual([]);
@@ -142,18 +142,18 @@ describe('ToastService', () => {
       service.show('Boom', 'error');
 
       tick(3000);
-      expect(service.toasts.length).toBe(1);
+      expect(service.toasts).toHaveSize(1);
       tick(3999);
-      expect(service.toasts.length).toBe(1);
+      expect(service.toasts).toHaveSize(1);
       tick(1);
-      expect(service.toasts.length).toBe(0);
+      expect(service.toasts).toHaveSize(0);
     }));
 
     it('still honours an explicit duration', fakeAsync(() => {
       service.show('Boom', 'error', 500);
 
       tick(500);
-      expect(service.toasts.length).toBe(0);
+      expect(service.toasts).toHaveSize(0);
     }));
 
     it('stays while paused and only counts down the time it had left after resume', fakeAsync(() => {
@@ -163,13 +163,13 @@ describe('ToastService', () => {
       tick(5000);
       service.pause(id);
       tick(60000);
-      expect(service.toasts.length).toBe(1);
+      expect(service.toasts).toHaveSize(1);
 
       service.resume(id);
       tick(1999);
-      expect(service.toasts.length).toBe(1);
+      expect(service.toasts).toHaveSize(1);
       tick(1);
-      expect(service.toasts.length).toBe(0);
+      expect(service.toasts).toHaveSize(0);
     }));
 
     it('ignores pause and resume of an unknown toast, and a second pause or resume', fakeAsync(() => {
@@ -184,7 +184,7 @@ describe('ToastService', () => {
       service.resume(id);
 
       tick(7000);
-      expect(service.toasts.length).toBe(0);
+      expect(service.toasts).toHaveSize(0);
     }));
 
     it('does not resurrect the timer of a toast removed while paused', fakeAsync(() => {

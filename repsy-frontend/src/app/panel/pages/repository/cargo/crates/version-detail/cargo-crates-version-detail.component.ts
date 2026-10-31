@@ -84,7 +84,7 @@ export class CargoCratesVersionDetailComponent implements OnDestroy {
     this.activeRepo = {} as RepoPermissionInfo;
     this.repositoryChanges$ = this.cargoService.repoChanges$.subscribe((repo: RepoPermissionInfo) => {
       if (repo) {
-        this.activeRepo = Object.assign({}, repo);
+        this.activeRepo = { ...repo };
         this.loadVersion();
       }
     });
@@ -149,7 +149,7 @@ repsy = { index = "sparse+${environment.repoBaseUrl}/${this.activeRepo.repoName}
         )
         .subscribe({
           next: (wasLastVersion) => {
-            landAfterVersionDelete(
+            void landAfterVersionDelete(
               this.router,
               this.route,
               this.toastService,
@@ -170,7 +170,8 @@ repsy = { index = "sparse+${environment.repoBaseUrl}/${this.activeRepo.repoName}
       const extras: string[] = [];
 
       if (dep.features?.length) {
-        extras.push(`features = [${dep.features.map((feature) => `"${feature}"`).join(', ')}]`);
+        const features = dep.features.map((feature) => '"' + feature + '"').join(', ');
+        extras.push(`features = [${features}]`);
       }
       if (dep.optional) {
         extras.push('optional = true');
@@ -220,7 +221,8 @@ repsy = { index = "sparse+${environment.repoBaseUrl}/${this.activeRepo.repoName}
       packageLines.push(`edition = "${crateVersion.edition}"`);
     }
     if (crate?.authors?.length) {
-      packageLines.push(`authors = [${crate.authors.map((author) => `"${author}"`).join(', ')}]`);
+      const authors = crate.authors.map((author) => '"' + author + '"').join(', ');
+      packageLines.push(`authors = [${authors}]`);
     }
 
     const sections: string[] = [packageLines.join('\n')];

@@ -17,8 +17,13 @@
 import { Injectable } from '@angular/core';
 import { map, Observable } from 'rxjs';
 
-import { PagedModelUserResponse, UserCreateForm, UserResponse, UserUpdateForm } from '../../../../../generated/api';
-import { UsersApi } from '../../../../../generated/api';
+import {
+  PagedModelUserResponse,
+  UserCreateForm,
+  UserResponse,
+  UsersApi,
+  UserUpdateForm,
+} from '../../../../../generated/api';
 
 @Injectable({
   providedIn: 'root',

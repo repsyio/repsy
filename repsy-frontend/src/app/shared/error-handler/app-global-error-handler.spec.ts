@@ -52,8 +52,8 @@ describe('AppGlobalErrorHandler', () => {
 
     const logged = (console.error as jasmine.Spy).calls.mostRecent().args[0] as string;
     const [message, stack, url] = logged.substring(PREFIX.length).split('\n');
-    expect(message.length).toBe(9_999);
-    expect(stack.length).toBe(49_999);
+    expect(message).toHaveSize(9_999);
+    expect(stack).toHaveSize(49_999);
     expect(url).toBe(`(at /${'u'.repeat(248)})`);
   });
 });
