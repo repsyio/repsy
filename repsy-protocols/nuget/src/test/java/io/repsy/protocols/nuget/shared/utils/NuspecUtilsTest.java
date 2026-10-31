@@ -755,6 +755,175 @@ class NuspecUtilsTest {
     }
   }
 
+  @Nested
+  @DisplayName("readme")
+  class Readme {
+
+    private static final String NUSPEC =
+        "<package><metadata><id>Some.Package</id><version>1.0.0</version>"
+            + "<readme>%s</readme></metadata></package>";
+
+    private Path nupkgWithReadme(final String declared, final String entryName, final byte[] body)
+        throws IOException {
+      final var file = Files.createTempFile(tempDir, "pkg", ".nupkg");
+
+      try (final var zip = new ZipOutputStream(Files.newOutputStream(file))) {
+        zip.putNextEntry(new ZipEntry("Some.Package.nuspec"));
+        zip.write(NUSPEC.formatted(declared).getBytes(StandardCharsets.UTF_8));
+        zip.closeEntry();
+        zip.putNextEntry(new ZipEntry("docs/"));
+        zip.closeEntry();
+        zip.putNextEntry(new ZipEntry(entryName));
+        zip.write(body);
+        zip.closeEntry();
+      }
+      return file;
+    }
+
+    private String read(final String declared, final String entryName, final byte[] body)
+        throws IOException {
+      final var file = nupkgWithReadme(declared, entryName, body);
+
+      return NuspecUtils.extractReadme(file, NUSPEC.formatted(declared));
+    }
+
+    private static byte[] utf8(final String text) {
+      return text.getBytes(StandardCharsets.UTF_8);
+    }
+
+    @Test
+    @DisplayName("is null when the nuspec declares none")
+    void nullWithoutDeclaration() throws IOException {
+      final var file = nupkg("Some.Package", "1.0.0");
+
+      assertThat(NuspecUtils.extractReadme(file, "<package><metadata/></package>")).isNull();
+      assertThat(NuspecUtils.readNuspecMetadata(file).readme()).isNull();
+    }
+
+    @Test
+    @DisplayName("reads the declared file, however its path is spelled")
+    void readsTheDeclaredFile() throws IOException {
+      assertThat(read("README.md", "README.md", utf8("# Hi"))).isEqualTo("# Hi");
+      assertThat(read("docs\\Readme.md", "docs/readme.md", utf8("ci"))).isEqualTo("ci");
+      assertThat(read("./docs/a.md", "/docs/a.md", utf8("dots"))).isEqualTo("dots");
+      assertThat(read("/docs/b.md", "./docs/b.md", utf8("slash"))).isEqualTo("slash");
+    }
+
+    @Test
+    @DisplayName("matches an entry whose name is percent-encoded")
+    void matchesPercentEncodedEntry() throws IOException {
+      assertThat(read("docs/My Readme.md", "docs/My%20Readme.md", utf8("spaced")))
+          .isEqualTo("spaced");
+      assertThat(read("docs/a+b.md", "docs/a+b.md", utf8("plus"))).isEqualTo("plus");
+    }
+
+    @Test
+    @DisplayName("does not match an entry with a broken percent sequence")
+    void ignoresBrokenPercentSequence() throws IOException {
+      assertThat(read("docs/a.md", "docs/a%zz.md", utf8("x"))).isNull();
+    }
+
+    @Test
+    @DisplayName("is null when the declared file is not in the package")
+    void nullWhenMissing() throws IOException {
+      assertThat(read("README.md", "other.md", utf8("x"))).isNull();
+    }
+
+    @Test
+    @DisplayName("drops a byte order mark")
+    void dropsByteOrderMark() throws IOException {
+      assertThat(read("README.md", "README.md", utf8("\uFEFFtext"))).isEqualTo("text");
+    }
+
+    @Test
+    @DisplayName("skips a file that is too large")
+    void skipsLargeFile() throws IOException {
+      final var body = new byte[256 * 1024 + 1];
+      Arrays.fill(body, (byte) 'a');
+
+      assertThat(read("README.md", "README.md", body)).isNull();
+      assertThat(warnings()).anyMatch(w -> w.contains("larger than"));
+    }
+
+    @Test
+    @DisplayName("keeps a file of exactly the limit")
+    void keepsFileAtLimit() throws IOException {
+      final var body = new byte[256 * 1024];
+      Arrays.fill(body, (byte) 'a');
+
+      assertThat(read("README.md", "README.md", body)).hasSize(256 * 1024);
+    }
+
+    @Test
+    @DisplayName("skips a file that is not text")
+    void skipsBinaryFile() throws IOException {
+      assertThat(read("README.md", "README.md", new byte[] {'a', 0, 'b'})).isNull();
+      assertThat(warnings()).anyMatch(w -> w.contains("not a text file"));
+    }
+
+    @Test
+    @DisplayName("is null when the package is not a zip")
+    void nullForUnreadablePackage() {
+      final var missing = tempDir.resolve("missing.nupkg");
+
+      assertThat(NuspecUtils.extractReadme(missing, NUSPEC.formatted("README.md"))).isNull();
+    }
+  }
+
+  @Nested
+  @DisplayName("repository url")
+  class RepositoryUrl {
+
+    private static String nuspec(final String repository) {
+      return "<package><metadata><id>A</id>" + repository + "</metadata></package>";
+    }
+
+    @Test
+    @DisplayName("comes from the url attribute")
+    void fromTheAttribute() {
+      assertThat(
+              NuspecUtils.extractRepositoryUrl(
+                  nuspec("<repository type=\"git\" url=\" https://example.com/a.git \"/>")))
+          .isEqualTo("https://example.com/a.git");
+    }
+
+    @Test
+    @DisplayName("falls back to the element text")
+    void fromTheText() {
+      assertThat(
+              NuspecUtils.extractRepositoryUrl(
+                  nuspec("<repository> https://example.com/b.git </repository>")))
+          .isEqualTo("https://example.com/b.git");
+    }
+
+    @Test
+    @DisplayName("is null when there is no repository, or it is empty")
+    void nullWhenAbsentOrEmpty() {
+      assertThat(NuspecUtils.extractRepositoryUrl(nuspec(""))).isNull();
+      assertThat(NuspecUtils.extractRepositoryUrl(nuspec("<repository url=\" \"/>"))).isNull();
+      assertThat(NuspecUtils.extractRepositoryUrl(nuspec("<repository>  </repository>"))).isNull();
+    }
+
+    @Test
+    @DisplayName("is read with a regular expression from a nuspec that is not well-formed")
+    void fromMalformedXml() {
+      assertThat(
+              NuspecUtils.extractRepositoryUrl(
+                  "<package><repository>https://example.com/c.git</repository>"))
+          .isEqualTo("https://example.com/c.git");
+      assertThat(NuspecUtils.extractRepositoryUrl("<package><broken")).isNull();
+    }
+
+    @Test
+    @DisplayName("is dropped when longer than its column")
+    void droppedWhenTooLong() {
+      final var url = "https://example.com/" + "a".repeat(NuGetPackageUtils.MAX_URL_LENGTH);
+
+      assertThat(NuspecUtils.extractRepositoryUrl(nuspec("<repository url=\"" + url + "\"/>")))
+          .isNull();
+    }
+  }
+
   private Path nupkg(final String id, final String version) throws IOException {
     return nupkgWithNuspec(
         "<package><metadata><id>%s</id><version>%s</version></metadata></package>"

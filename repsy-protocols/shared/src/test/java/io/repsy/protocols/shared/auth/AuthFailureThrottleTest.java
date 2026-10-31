@@ -329,6 +329,63 @@ class AuthFailureThrottleTest {
   }
 
   @Test
+  @DisplayName("takes no adopted ban, and forgets nothing, when it tracks nobody or bans nobody")
+  void adoptAndResetWithoutBans() {
+    final var disabled =
+        new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry());
+    final var noBans =
+        new AuthFailureThrottle(
+            AuthThrottleProperties.enforcing(MAX_FAILURES, WINDOW_SECONDS, 100, 0, 0),
+            this.meterRegistry,
+            this.ticker);
+    final var network = ClientKeys.throttleKey(CLIENT);
+    requestFrom(CLIENT);
+
+    disabled.adopt(network, 100);
+    disabled.reset();
+    noBans.adopt(network, 100);
+    noBans.reset();
+    this.throttle.adopt(network, 0);
+    this.throttle.adopt(network, -5);
+
+    assertThatCode(disabled::checkAllowed).doesNotThrowAnyException();
+    assertThatCode(noBans::checkAllowed).doesNotThrowAnyException();
+    assertThatCode(this.throttle::checkAllowed).doesNotThrowAnyException();
+  }
+
+  @Test
+  @DisplayName("tells a client outside a request to retry in a second")
+  void retryAfterWithoutARequest() {
+    RequestContextHolder.resetRequestAttributes();
+
+    assertThat(this.throttle.retryAfterSeconds()).isEqualTo(1);
+  }
+
+  @Test
+  @DisplayName("does not ban a client twice while its ban runs")
+  void doesNotBanTwice() {
+    final var banning =
+        new AuthFailureThrottle(
+            AuthThrottleProperties.enforcing(MAX_FAILURES, WINDOW_SECONDS, 100, 3600, 1),
+            this.meterRegistry,
+            this.ticker);
+    final var announced = new ArrayList<String>();
+    banning.setBanListener((kind, client, banSeconds) -> announced.add(client));
+    requestFrom(CLIENT);
+
+    for (var i = 0; i < MAX_FAILURES; i++) {
+      banning.recordFailure();
+    }
+    banning.adopt(ClientKeys.throttleKey(CLIENT), 10);
+    advance(Duration.ofSeconds(WINDOW_SECONDS + 1));
+    for (var i = 0; i < MAX_FAILURES; i++) {
+      banning.recordFailure();
+    }
+
+    assertThat(announced).hasSize(1);
+  }
+
+  @Test
   @DisplayName("loses no failure when clients fail at the same time")
   void concurrentFailuresAreAllCounted() throws Exception {
     final var threads = 8;

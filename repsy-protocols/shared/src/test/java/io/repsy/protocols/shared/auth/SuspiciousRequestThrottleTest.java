@@ -17,11 +17,13 @@ package io.repsy.protocols.shared.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.google.common.base.Ticker;
+import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.util.ArrayList;
 import java.util.List;
@@ -31,6 +33,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 
 @DisplayName("SuspiciousRequestThrottle")
 class SuspiciousRequestThrottleTest {
@@ -305,6 +308,62 @@ class SuspiciousRequestThrottleTest {
 
     assertThat(throttle.banSecondsLeft(CLIENT)).isEqualTo(60);
     assertThat(announced).isEmpty();
+  }
+
+  @Test
+  @DisplayName("in mode off an adopted ban and a reset change nothing")
+  void offIgnoresAdoptAndReset() {
+
+    final var throttle = this.throttle(SuspiciousRequestProperties.disabled());
+
+    throttle.adopt(CLIENT, 100);
+    throttle.reset();
+
+    assertThat(throttle.banSecondsLeft(CLIENT)).isZero();
+    assertThat(throttle.isAllowlisted(CLIENT)).isFalse();
+  }
+
+  @Test
+  @DisplayName("a request without signals counts for nothing")
+  void noSignalsNoStrikes() {
+
+    final var throttle =
+        this.throttle(SuspiciousRequestProperties.of(AuthThrottleMode.ENFORCE, 1, 3600));
+
+    assertThat(throttle.record(CLIENT, CLIENT, Set.of())).isZero();
+    assertThat(throttle.banSecondsLeft(CLIENT)).isZero();
+  }
+
+  @Test
+  @DisplayName("a range that stops inside a byte matches only its own addresses")
+  void allowlistRangeInsideAByte() {
+
+    final var properties =
+        new SuspiciousRequestProperties(
+            AuthThrottleMode.ENFORCE, 10, 60L, 3600L, 10_000L, List.of("10.16.0.0/12"), null);
+    final var throttle = this.throttle(properties);
+
+    assertThat(throttle.isAllowlisted("10.16.0.1")).isTrue();
+    assertThat(throttle.isAllowlisted("10.31.255.255")).isTrue();
+    assertThat(throttle.isAllowlisted("10.32.0.1")).isFalse();
+    assertThat(throttle.isAllowlisted("2001:db8::1")).isFalse();
+  }
+
+  @Test
+  @DisplayName("works without a meter registry")
+  @SuppressWarnings("unchecked")
+  void worksWithoutAMeterRegistry() {
+
+    final var noRegistry = (ObjectProvider<MeterRegistry>) mock(ObjectProvider.class);
+    final var throttle =
+        new SuspiciousRequestThrottle(
+            SuspiciousRequestProperties.of(AuthThrottleMode.ENFORCE, 10, 3600), noRegistry);
+
+    assertThat(
+            throttle.record(
+                CLIENT, CLIENT, Set.of(SignalFamily.TRAVERSAL, SignalFamily.SECRET_PATH)))
+        .isEqualTo(3600);
+    throttle.countWouldBlock(CLIENT, 5);
   }
 
   @Test
