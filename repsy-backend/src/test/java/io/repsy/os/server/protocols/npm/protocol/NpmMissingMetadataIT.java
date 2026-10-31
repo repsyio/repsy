@@ -1062,7 +1062,7 @@ class NpmMissingMetadataIT extends AbstractIT {
 
   @Test
   @DisplayName("the version page of a package the rows do not know is still not found")
-  void versionPageOfAnUnknownPackage() throws Exception {
+  void versionPageOfAnUnknownPackage() {
     final var repo = this.npmRepo();
 
     org.junit.jupiter.api.Assertions.assertThrows(

@@ -231,7 +231,9 @@ class ErrorAdviceCharacterizationTest {
   }
 
   static class Probe {
-    void m(final String parameter) {}
+    void m(final String parameter) {
+      // only its parameter is read, by reflection
+    }
 
     @SuppressWarnings("unused")
     String field;
@@ -248,7 +250,7 @@ class ErrorAdviceCharacterizationTest {
     }
   }
 
-  private static Map<String, Supplier<Throwable>> cases() throws Exception {
+  private static Map<String, Supplier<Throwable>> cases() {
     final var cases = new TreeMap<String, Supplier<Throwable>>();
 
     // core exceptions of the shared handlers

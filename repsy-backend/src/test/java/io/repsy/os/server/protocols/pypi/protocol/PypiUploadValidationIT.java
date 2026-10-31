@@ -102,7 +102,7 @@ class PypiUploadValidationIT extends AbstractIT {
 
   @Test
   @DisplayName("a missing sha256_digest is a 400 sha256DigestMissing, not a 500")
-  void missingSha256DigestIsA400NotA500() throws Exception {
+  void missingSha256DigestIsA400NotA500() {
     final var repo = this.createRepo();
     final var filename = "my_package-1.0.0-py3-none-any.whl";
     final var content = "content".getBytes(StandardCharsets.UTF_8);
@@ -117,7 +117,9 @@ class PypiUploadValidationIT extends AbstractIT {
         new MockMultipartFile(
             "content", filename, MediaType.APPLICATION_OCTET_STREAM_VALUE, content);
 
-    assertThatThrownBy(() -> this.pypiProtocolFacade.uploadPackage(context(repo), parameters, file))
+    final var uploadContext = context(repo);
+
+    assertThatThrownBy(() -> this.pypiProtocolFacade.uploadPackage(uploadContext, parameters, file))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("sha256DigestMissing")
         .satisfies(e -> assertThat(this.statusOf(e)).isEqualTo(400));
@@ -125,7 +127,7 @@ class PypiUploadValidationIT extends AbstractIT {
 
   @Test
   @DisplayName("the rejected upload leaves nothing downloadable -- the check runs before the write")
-  void missingSha256DigestLeavesNothingInStorage() throws Exception {
+  void missingSha256DigestLeavesNothingInStorage() {
     final var repo = this.createRepo();
     final var filename = "my_package-2.0.0-py3-none-any.whl";
     final var content = "content".getBytes(StandardCharsets.UTF_8);
@@ -139,13 +141,18 @@ class PypiUploadValidationIT extends AbstractIT {
         new MockMultipartFile(
             "content", filename, MediaType.APPLICATION_OCTET_STREAM_VALUE, content);
 
-    assertThatThrownBy(() -> this.pypiProtocolFacade.uploadPackage(context(repo), parameters, file))
+    final var uploadContext = context(repo);
+
+    assertThatThrownBy(() -> this.pypiProtocolFacade.uploadPackage(uploadContext, parameters, file))
         .isInstanceOf(BadRequestException.class)
         .satisfies(e -> assertThat(this.statusOf(e)).isEqualTo(400));
 
+    final var downloadContext = context(repo);
+
     assertThatThrownBy(
             () ->
-                this.pypiProtocolFacade.downloadArchiveFile(context(repo), "my-package", filename))
+                this.pypiProtocolFacade.downloadArchiveFile(
+                    downloadContext, "my-package", filename))
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessage("itemNotFound")
         .satisfies(e -> assertThat(this.statusOf(e)).isEqualTo(404));
@@ -175,7 +182,9 @@ class PypiUploadValidationIT extends AbstractIT {
         new MockMultipartFile(
             "content", "irrelevant-1.0.0.whl", MediaType.APPLICATION_OCTET_STREAM_VALUE, content);
 
-    assertThatThrownBy(() -> this.pypiProtocolFacade.uploadPackage(context(repo), parameters, file))
+    final var uploadContext = context(repo);
+
+    assertThatThrownBy(() -> this.pypiProtocolFacade.uploadPackage(uploadContext, parameters, file))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("pypiPackageNameTooLong")
         .satisfies(e -> assertThat(this.statusOf(e)).isEqualTo(400));
@@ -197,7 +206,9 @@ class PypiUploadValidationIT extends AbstractIT {
         new MockMultipartFile(
             "content", "irrelevant-1.0.0.whl", MediaType.APPLICATION_OCTET_STREAM_VALUE, content);
 
-    assertThatThrownBy(() -> this.pypiProtocolFacade.uploadPackage(context(repo), parameters, file))
+    final var uploadContext = context(repo);
+
+    assertThatThrownBy(() -> this.pypiProtocolFacade.uploadPackage(uploadContext, parameters, file))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("pypiVersionTooLong")
         .satisfies(e -> assertThat(this.statusOf(e)).isEqualTo(400));
@@ -222,7 +233,9 @@ class PypiUploadValidationIT extends AbstractIT {
             MediaType.APPLICATION_OCTET_STREAM_VALUE,
             content);
 
-    assertThatThrownBy(() -> this.pypiProtocolFacade.uploadPackage(context(repo), parameters, file))
+    final var uploadContext = context(repo);
+
+    assertThatThrownBy(() -> this.pypiProtocolFacade.uploadPackage(uploadContext, parameters, file))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("pypiArchiveFileNameTooLong")
         .satisfies(e -> assertThat(this.statusOf(e)).isEqualTo(400));
@@ -244,7 +257,9 @@ class PypiUploadValidationIT extends AbstractIT {
         new MockMultipartFile(
             "content", "irrelevant-1.0.0.whl", MediaType.APPLICATION_OCTET_STREAM_VALUE, content);
 
-    assertThatThrownBy(() -> this.pypiProtocolFacade.uploadPackage(context(repo), parameters, file))
+    final var uploadContext = context(repo);
+
+    assertThatThrownBy(() -> this.pypiProtocolFacade.uploadPackage(uploadContext, parameters, file))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("pypiRequiresPythonTooLong")
         .satisfies(e -> assertThat(this.statusOf(e)).isEqualTo(400));
@@ -267,13 +282,18 @@ class PypiUploadValidationIT extends AbstractIT {
         new MockMultipartFile(
             "content", filename, MediaType.APPLICATION_OCTET_STREAM_VALUE, content);
 
-    assertThatThrownBy(() -> this.pypiProtocolFacade.uploadPackage(context(repo), parameters, file))
+    final var uploadContext = context(repo);
+
+    assertThatThrownBy(() -> this.pypiProtocolFacade.uploadPackage(uploadContext, parameters, file))
         .isInstanceOf(BadRequestException.class)
         .satisfies(e -> assertThat(this.statusOf(e)).isEqualTo(400));
 
+    final var downloadContext = context(repo);
+
     assertThatThrownBy(
             () ->
-                this.pypiProtocolFacade.downloadArchiveFile(context(repo), "my-package", filename))
+                this.pypiProtocolFacade.downloadArchiveFile(
+                    downloadContext, "my-package", filename))
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessage("itemNotFound")
         .satisfies(e -> assertThat(this.statusOf(e)).isEqualTo(404));

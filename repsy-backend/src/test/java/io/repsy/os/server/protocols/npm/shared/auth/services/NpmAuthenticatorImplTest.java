@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -59,7 +60,6 @@ import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import org.springframework.dao.DataIntegrityViolationException;
 
 /**
@@ -75,11 +75,10 @@ class NpmAuthenticatorImplTest {
   /** BCrypt is slow on purpose, so the hash is made once for the whole class. */
   private static final String PASSWORD_HASH = PasswordHasher.hash(PASSWORD);
 
-  private final UserTxService userTxService = Mockito.mock(UserTxService.class);
-  private final JwtUtils jwtUtils = Mockito.mock(JwtUtils.class);
-  private final DeployTokenService deployTokenService = Mockito.mock(DeployTokenService.class);
-  private final RevokedProtocolTokenService revokedTokens =
-      Mockito.mock(RevokedProtocolTokenService.class);
+  private final UserTxService userTxService = mock(UserTxService.class);
+  private final JwtUtils jwtUtils = mock(JwtUtils.class);
+  private final DeployTokenService deployTokenService = mock(DeployTokenService.class);
+  private final RevokedProtocolTokenService revokedTokens = mock(RevokedProtocolTokenService.class);
 
   private final NpmAuthenticatorImpl authenticator =
       new NpmAuthenticatorImpl(

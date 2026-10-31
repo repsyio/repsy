@@ -208,12 +208,14 @@ class PypiLocalVersionIT extends AbstractIT {
 
   @Test
   @DisplayName("a form version that is not the filename's version is refused and stores nothing")
-  void versionOfTheFormMustEqualTheVersionOfTheFilename() throws Exception {
+  void versionOfTheFormMustEqualTheVersionOfTheFilename() {
     final var repo = this.createRepo();
     final var name = "lv-" + randomTag();
     final var wheel = name.replace('-', '_') + "-1.0+cu118-py3-none-any.whl";
 
-    assertThatThrownBy(() -> this.publish(repo, name, "1.0", wheel, bytes("x"), ">=3.9"))
+    final var content = bytes("x");
+
+    assertThatThrownBy(() -> this.publish(repo, name, "1.0", wheel, content, ">=3.9"))
         .isInstanceOf(BadRequestException.class)
         .hasMessageContaining("archiveVersionMismatch");
 

@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -36,13 +37,12 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-import org.mockito.Mockito;
 
 @DisplayName("UserTxService")
 class UserTxServiceTest {
 
-  private final UserRepository userRepository = Mockito.mock(UserRepository.class);
-  private final UserMapper userConverter = Mockito.mock(UserMapper.class);
+  private final UserRepository userRepository = mock(UserRepository.class);
+  private final UserMapper userConverter = mock(UserMapper.class);
   private final UserTxService service = new UserTxService(this.userRepository, this.userConverter);
 
   @Test
@@ -79,7 +79,9 @@ class UserTxServiceTest {
   @Test
   @DisplayName("getAuthenticatedUserById answers unAuthorized for an unknown id")
   void byIdUnknown() {
-    assertThatThrownBy(() -> this.service.getAuthenticatedUserById(UUID.randomUUID()))
+    final var unknownId = UUID.randomUUID();
+
+    assertThatThrownBy(() -> this.service.getAuthenticatedUserById(unknownId))
         .isExactlyInstanceOf(UnAuthorizedException.class)
         .hasMessage(ProtocolErrorCodes.UN_AUTHORIZED);
   }

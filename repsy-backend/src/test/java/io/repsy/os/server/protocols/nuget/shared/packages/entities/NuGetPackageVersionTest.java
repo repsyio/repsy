@@ -60,7 +60,7 @@ class NuGetPackageVersionTest extends AbstractEntityIdentityTest<NuGetPackageVer
   void hashCodeAndToStringSkipAssociations() {
     final var nuGetPackageVersion = this.newEntity(UUID.randomUUID());
 
-    assertThat(nuGetPackageVersion.hashCode()).isEqualTo(NuGetPackageVersion.class.hashCode());
+    assertThat(nuGetPackageVersion).hasSameHashCodeAs(NuGetPackageVersion.class);
     assertThat(nuGetPackageVersion.toString()).doesNotContain("nugetPackage=");
   }
 }

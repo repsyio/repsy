@@ -134,7 +134,7 @@ class PypiUploadDigestIT extends AbstractIT {
 
   @Test
   @DisplayName("rejects a wrong digest with 400 sha256DigestMismatch and persists nothing")
-  void rejectsAWrongDigestWithoutPersistingAnything() throws Exception {
+  void rejectsAWrongDigestWithoutPersistingAnything() {
     final var repo = this.createRepo();
     final var filename = "my_package-2.0.0-py3-none-any.whl";
     final var content = "real wheel bytes".getBytes(StandardCharsets.UTF_8);
@@ -144,9 +144,12 @@ class PypiUploadDigestIT extends AbstractIT {
         .isInstanceOf(BadRequestException.class)
         .hasMessage("sha256DigestMismatch");
 
+    final var downloadContext = context(repo);
+
     assertThatThrownBy(
             () ->
-                this.pypiProtocolFacade.downloadArchiveFile(context(repo), "my-package", filename))
+                this.pypiProtocolFacade.downloadArchiveFile(
+                    downloadContext, "my-package", filename))
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessage("itemNotFound");
   }

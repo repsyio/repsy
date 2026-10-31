@@ -55,7 +55,7 @@ class RubyGemSizeLimitIT extends AbstractIT {
   void acceptsGemUnderLimit() throws Exception {
     final var repo = this.seedRepo(RepoType.RUBY, uniqueRepoName("ruby"));
     final var gem = gem("small-gem", "1.0.0");
-    assertThat(gem.length).isLessThan(4 * 1024);
+    assertThat(gem).hasSizeLessThan(4 * 1024);
 
     this.push(repo.getName(), gem).andExpect(status().isOk());
 

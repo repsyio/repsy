@@ -78,7 +78,9 @@ class ArtifactDeleterTest {
         .when(this.artifactQueryService)
         .requireArtifact(REPO_ID, GROUP, "ghost");
 
-    assertThatThrownBy(() -> this.component.deleteArtifact(repo(), GROUP, "ghost"))
+    final var repoInfo = repo();
+
+    assertThatThrownBy(() -> this.component.deleteArtifact(repoInfo, GROUP, "ghost"))
         .isInstanceOf(ItemNotFoundException.class);
 
     // The group holds exactly one artifact in the reported case: the answer must not depend on it,
@@ -95,7 +97,9 @@ class ArtifactDeleterTest {
         .when(this.artifactQueryService)
         .requireGroup(REPO_ID, GROUP);
 
-    assertThatThrownBy(() -> this.component.deleteGroup(repo(), GROUP))
+    final var repoInfo = repo();
+
+    assertThatThrownBy(() -> this.component.deleteGroup(repoInfo, GROUP))
         .isInstanceOf(ItemNotFoundException.class);
 
     verify(this.artifactQueryService).requireGroup(REPO_ID, GROUP);

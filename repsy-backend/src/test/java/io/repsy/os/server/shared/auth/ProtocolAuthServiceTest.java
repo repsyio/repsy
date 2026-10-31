@@ -69,7 +69,6 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
-import org.mockito.Mockito;
 import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -85,13 +84,13 @@ class ProtocolAuthServiceTest {
   /** BCrypt is slow on purpose, so the hash is made once for the whole class. */
   private static final String PASSWORD_HASH = PasswordHasher.hash(PASSWORD);
 
-  private final UserTxService userTxService = Mockito.mock(UserTxService.class);
+  private final UserTxService userTxService = mock(UserTxService.class);
 
   private final ProtocolAuthService authService =
       new ProtocolAuthService(
           this.userTxService,
-          Mockito.mock(JwtUtils.class),
-          Mockito.mock(DeployTokenService.class),
+          mock(JwtUtils.class),
+          mock(DeployTokenService.class),
           new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
           new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()));
 
@@ -336,14 +335,14 @@ class ProtocolAuthServiceTest {
   @DisplayName("remembered password checks")
   class RememberedChecks {
 
-    private final UserTxService users = Mockito.mock(UserTxService.class);
+    private final UserTxService users = mock(UserTxService.class);
     private final VerifiedPasswordCache cache =
         new VerifiedPasswordCache(new BasicAuthCacheProperties(true, 300, 100));
     private final ProtocolAuthService service =
         new ProtocolAuthService(
             this.users,
-            Mockito.mock(JwtUtils.class),
-            Mockito.mock(DeployTokenService.class),
+            mock(JwtUtils.class),
+            mock(DeployTokenService.class),
             this.cache,
             new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()));
 
@@ -445,14 +444,14 @@ class ProtocolAuthServiceTest {
 
     private static final int LIMIT = 2;
 
-    private final UserTxService users = Mockito.mock(UserTxService.class);
+    private final UserTxService users = mock(UserTxService.class);
     private final VerifiedPasswordCache cache =
         new VerifiedPasswordCache(new BasicAuthCacheProperties(true, 300, 100));
     private final AuthFailureThrottle throttle =
         new AuthFailureThrottle(
             AuthThrottleProperties.enforcing(LIMIT, 60, 100), new SimpleMeterRegistry());
-    private final JwtUtils jwt = Mockito.mock(JwtUtils.class);
-    private final DeployTokenService deployTokens = Mockito.mock(DeployTokenService.class);
+    private final JwtUtils jwt = mock(JwtUtils.class);
+    private final DeployTokenService deployTokens = mock(DeployTokenService.class);
     private final ProtocolAuthService service =
         new ProtocolAuthService(this.users, this.jwt, this.deployTokens, this.cache, this.throttle);
 
@@ -686,14 +685,14 @@ class ProtocolAuthServiceTest {
 
     private static final String BEARER = "Bearer signed.jwt.token";
 
-    private final JwtUtils jwtUtils = Mockito.mock(JwtUtils.class);
+    private final JwtUtils jwtUtils = mock(JwtUtils.class);
 
     // A real UserTxService over an empty repository: the lookup itself is under test.
     private final ProtocolAuthService ghostAuthService =
         new ProtocolAuthService(
-            new UserTxService(Mockito.mock(UserRepository.class), Mockito.mock(UserMapper.class)),
+            new UserTxService(mock(UserRepository.class), mock(UserMapper.class)),
             this.jwtUtils,
-            Mockito.mock(DeployTokenService.class),
+            mock(DeployTokenService.class),
             new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
             new AuthFailureThrottle(AuthThrottleProperties.disabled(), new SimpleMeterRegistry()));
 
@@ -729,8 +728,8 @@ class ProtocolAuthServiceTest {
 
     private static final String BEARER = "Bearer signed.jwt.token";
 
-    private final JwtUtils jwtUtils = Mockito.mock(JwtUtils.class);
-    private final DeployTokenService deployTokenService = Mockito.mock(DeployTokenService.class);
+    private final JwtUtils jwtUtils = mock(JwtUtils.class);
+    private final DeployTokenService deployTokenService = mock(DeployTokenService.class);
     private final UUID repoId = UUID.randomUUID();
     private final UUID tokenId = UUID.randomUUID();
 
@@ -953,31 +952,30 @@ class ProtocolAuthServiceTest {
     @Test
     @DisplayName("a non-admin user can read and write, but not manage")
     void userCanReadAndWriteButNotManage() {
-      final var authService = ProtocolAuthServiceTest.this.authService;
+      final var auth = ProtocolAuthServiceTest.this.authService;
 
-      final var permissionInfo = authService.authorizeUser(ALICE, Permission.WRITE);
+      final var permissionInfo = auth.authorizeUser(ALICE, Permission.WRITE);
 
-      assertThat(authService.authorizeUser(ALICE, Permission.READ).isCanRead()).isTrue();
+      assertThat(auth.authorizeUser(ALICE, Permission.READ).isCanRead()).isTrue();
       assertThat(permissionInfo.isCanRead()).isTrue();
       assertThat(permissionInfo.isCanWrite()).isTrue();
       assertThat(permissionInfo.isCanManage()).isFalse();
       // The protocol (wire) answer stays 401 unAuthorized: package managers act on it.
-      assertUnauthorized(() -> authService.authorizeUser(ALICE, Permission.MANAGE));
+      assertUnauthorized(() -> auth.authorizeUser(ALICE, Permission.MANAGE));
     }
 
     @Test
     @DisplayName("the web UI answers a non-admin user 403 accessDenied for MANAGE, not 401")
     void panelAnswersForbiddenForManage() {
-      final var authService = ProtocolAuthServiceTest.this.authService;
+      final var auth = ProtocolAuthServiceTest.this.authService;
 
-      assertThat(authService.authorizePanelUser(ALICE, Permission.WRITE).isCanWrite()).isTrue();
-      assertThat(authService.authorizePanelUser(this.admin, Permission.MANAGE).isCanManage())
-          .isTrue();
-      assertThatThrownBy(() -> authService.authorizePanelUser(ALICE, Permission.MANAGE))
+      assertThat(auth.authorizePanelUser(ALICE, Permission.WRITE).isCanWrite()).isTrue();
+      assertThat(auth.authorizePanelUser(this.admin, Permission.MANAGE).isCanManage()).isTrue();
+      assertThatThrownBy(() -> auth.authorizePanelUser(ALICE, Permission.MANAGE))
           .isInstanceOf(AccessNotAllowedException.class)
           .hasMessage("accessDenied");
       // No user at all is still a missing credential.
-      assertUnauthorized(() -> authService.authorizePanelUser(null, Permission.MANAGE));
+      assertUnauthorized(() -> auth.authorizePanelUser(null, Permission.MANAGE));
     }
 
     @Test
@@ -994,21 +992,18 @@ class ProtocolAuthServiceTest {
     @Test
     @DisplayName("a non-admin user with valid credentials gets read and write on a private repo")
     void userReachesPrivateRepo() {
-      final var authService = ProtocolAuthServiceTest.this.authService;
+      final var auth = ProtocolAuthServiceTest.this.authService;
       final var authHeader = basicAuth(USERNAME, PASSWORD);
 
-      final var read =
-          authService.authorizeUserRequest(this.privateRepo, authHeader, Permission.READ);
-      final var write =
-          authService.authorizeUserRequest(this.privateRepo, authHeader, Permission.WRITE);
+      final var read = auth.authorizeUserRequest(this.privateRepo, authHeader, Permission.READ);
+      final var write = auth.authorizeUserRequest(this.privateRepo, authHeader, Permission.WRITE);
 
       assertThat(read.getCanRead()).isTrue();
       assertThat(write.getCanRead()).isTrue();
       assertThat(write.getCanWrite()).isTrue();
       assertThat(write.getCanManage()).isFalse();
       assertThatThrownBy(
-              () ->
-                  authService.authorizeUserRequest(this.privateRepo, authHeader, Permission.MANAGE))
+              () -> auth.authorizeUserRequest(this.privateRepo, authHeader, Permission.MANAGE))
           .isInstanceOf(AccessNotAllowedException.class)
           .hasMessage("accessDenied");
     }
@@ -1126,11 +1121,10 @@ class ProtocolAuthServiceTest {
 
     private static final String BEARER = "Bearer signed.jwt.token";
 
-    private final JwtUtils jwtUtils = Mockito.mock(JwtUtils.class);
-    private final RevokedProtocolTokenService revoked =
-        Mockito.mock(RevokedProtocolTokenService.class);
-    private final UserTxService users = Mockito.mock(UserTxService.class);
-    private final DeployTokenService deployTokens = Mockito.mock(DeployTokenService.class);
+    private final JwtUtils jwtUtils = mock(JwtUtils.class);
+    private final RevokedProtocolTokenService revoked = mock(RevokedProtocolTokenService.class);
+    private final UserTxService users = mock(UserTxService.class);
+    private final DeployTokenService deployTokens = mock(DeployTokenService.class);
 
     private final ProtocolAuthService service =
         new ProtocolAuthService(
@@ -1188,7 +1182,7 @@ class ProtocolAuthServiceTest {
     @Test
     @DisplayName("a revoked token is not counted against the client, as a wrong password is")
     void revokedIsNotCounted() {
-      final var throttle = Mockito.mock(AuthFailureThrottle.class);
+      final var throttle = mock(AuthFailureThrottle.class);
       final var counting =
           new ProtocolAuthService(
               this.users,
@@ -1217,15 +1211,15 @@ class ProtocolAuthServiceTest {
 
     private static final String BEARER = "Bearer signed.jwt.token";
 
-    private final JwtUtils jwtUtils = Mockito.mock(JwtUtils.class);
-    private final UserTxService users = Mockito.mock(UserTxService.class);
-    private final AuthFailureThrottle throttle = Mockito.mock(AuthFailureThrottle.class);
+    private final JwtUtils jwtUtils = mock(JwtUtils.class);
+    private final UserTxService users = mock(UserTxService.class);
+    private final AuthFailureThrottle throttle = mock(AuthFailureThrottle.class);
 
     private final ProtocolAuthService service =
         new ProtocolAuthService(
             this.users,
             this.jwtUtils,
-            Mockito.mock(DeployTokenService.class),
+            mock(DeployTokenService.class),
             new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
             this.throttle);
 
@@ -1257,8 +1251,9 @@ class ProtocolAuthServiceTest {
     void otherVersionIsRefused(final int version) {
       this.tokenCarries(version);
 
-      assertThatThrownBy(
-              () -> this.service.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.READ))
+      final var clientId = UUID.randomUUID();
+
+      assertThatThrownBy(() -> this.service.handleBearerAuth(BEARER, clientId, Permission.READ))
           .isExactlyInstanceOf(UnAuthorizedException.class)
           .hasMessage(ErrorConstants.SESSION_EXPIRED);
     }
@@ -1268,8 +1263,9 @@ class ProtocolAuthServiceTest {
     void refusedVersionIsNotCounted() {
       this.tokenCarries(1);
 
-      assertThatThrownBy(
-              () -> this.service.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.READ))
+      final var clientId = UUID.randomUUID();
+
+      assertThatThrownBy(() -> this.service.handleBearerAuth(BEARER, clientId, Permission.READ))
           .isInstanceOf(UnAuthorizedException.class);
       verify(this.throttle, never()).recordFailure();
       verify(this.throttle, never()).checkAllowed();
@@ -1295,8 +1291,9 @@ class ProtocolAuthServiceTest {
       when(this.jwtUtils.extractProtocolUserClaims(anyString()))
           .thenReturn(new ProtocolUserClaims(UUID.randomUUID(), USERNAME, 4));
 
-      assertThatThrownBy(
-              () -> this.service.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.READ))
+      final var clientId = UUID.randomUUID();
+
+      assertThatThrownBy(() -> this.service.handleBearerAuth(BEARER, clientId, Permission.READ))
           .isExactlyInstanceOf(UnAuthorizedException.class)
           .hasMessage(ErrorConstants.SESSION_EXPIRED);
       verify(this.throttle, never()).recordFailure();
@@ -1309,8 +1306,9 @@ class ProtocolAuthServiceTest {
       when(this.jwtUtils.extractProtocolUserClaims(anyString()))
           .thenReturn(new ProtocolUserClaims(UUID.randomUUID(), USERNAME, null));
 
-      assertThatThrownBy(
-              () -> this.service.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.READ))
+      final var clientId = UUID.randomUUID();
+
+      assertThatThrownBy(() -> this.service.handleBearerAuth(BEARER, clientId, Permission.READ))
           .isExactlyInstanceOf(UnAuthorizedException.class)
           .hasMessage(ErrorConstants.SESSION_EXPIRED);
     }
@@ -1321,8 +1319,9 @@ class ProtocolAuthServiceTest {
       when(this.jwtUtils.extractProtocolUserClaims(anyString()))
           .thenReturn(new ProtocolUserClaims(null, USERNAME, 4));
 
-      assertThatThrownBy(
-              () -> this.service.handleBearerAuth(BEARER, UUID.randomUUID(), Permission.READ))
+      final var clientId = UUID.randomUUID();
+
+      assertThatThrownBy(() -> this.service.handleBearerAuth(BEARER, clientId, Permission.READ))
           .isExactlyInstanceOf(UnAuthorizedException.class)
           .hasMessage(ErrorConstants.SESSION_EXPIRED);
     }
@@ -1350,15 +1349,15 @@ class ProtocolAuthServiceTest {
 
     private static final String BEARER = "Bearer signed.jwt.token";
 
-    private final JwtUtils jwtUtils = Mockito.mock(JwtUtils.class);
-    private final UserTxService users = Mockito.mock(UserTxService.class);
-    private final AuthFailureThrottle throttle = Mockito.mock(AuthFailureThrottle.class);
+    private final JwtUtils jwtUtils = mock(JwtUtils.class);
+    private final UserTxService users = mock(UserTxService.class);
+    private final AuthFailureThrottle throttle = mock(AuthFailureThrottle.class);
 
     private final ProtocolAuthService service =
         new ProtocolAuthService(
             this.users,
             this.jwtUtils,
-            Mockito.mock(DeployTokenService.class),
+            mock(DeployTokenService.class),
             new VerifiedPasswordCache(BasicAuthCacheProperties.disabled()),
             this.throttle);
 

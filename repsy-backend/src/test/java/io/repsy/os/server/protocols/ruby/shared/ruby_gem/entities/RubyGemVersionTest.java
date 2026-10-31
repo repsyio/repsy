@@ -61,7 +61,7 @@ class RubyGemVersionTest extends AbstractEntityIdentityTest<RubyGemVersion> {
     final var rubyGemVersion = this.newEntity(UUID.randomUUID());
     rubyGemVersion.setDependencies(new UntouchableSet<>());
 
-    assertThat(rubyGemVersion.hashCode()).isEqualTo(RubyGemVersion.class.hashCode());
+    assertThat(rubyGemVersion).hasSameHashCodeAs(RubyGemVersion.class);
     assertThat(rubyGemVersion.toString()).doesNotContain("gem=", "dependencies=");
   }
 }

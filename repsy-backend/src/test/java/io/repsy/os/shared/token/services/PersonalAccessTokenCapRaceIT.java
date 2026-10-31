@@ -123,7 +123,7 @@ class PersonalAccessTokenCapRaceIT extends AbstractIT {
   private static String outcomeOf(final Throwable failure) {
     return switch (failure) {
       case final BadRequestException e -> e.getMessage();
-      case final UnAuthorizedException ignored -> "unAuthorized";
+      case UnAuthorizedException _ -> "unAuthorized";
       default -> failure.getClass().getSimpleName() + ": " + failure.getMessage();
     };
   }

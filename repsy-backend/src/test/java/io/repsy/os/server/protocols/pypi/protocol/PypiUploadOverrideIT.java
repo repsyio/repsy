@@ -118,10 +118,10 @@ class PypiUploadOverrideIT extends AbstractIT {
 
     this.upload(repo, "my-package", "1.0.0", filename, wheelContent("original"));
 
+    final var bypassContent = wheelContent("bypass attempt");
+
     assertThatThrownBy(
-            () ->
-                this.upload(
-                    repo, "my-package", "1.0.0.post9", filename, wheelContent("bypass attempt")))
+            () -> this.upload(repo, "my-package", "1.0.0.post9", filename, bypassContent))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("archiveVersionMismatch");
   }
@@ -135,8 +135,9 @@ class PypiUploadOverrideIT extends AbstractIT {
 
     this.upload(repo, "my-package", "1.0.0", filename, wheelContent("original"));
 
-    assertThatThrownBy(
-            () -> this.upload(repo, "my-package", "1.0.0", filename, wheelContent("again")))
+    final var againContent = wheelContent("again");
+
+    assertThatThrownBy(() -> this.upload(repo, "my-package", "1.0.0", filename, againContent))
         .isInstanceOf(AccessNotAllowedException.class)
         .hasMessage("fileAlreadyExists");
   }

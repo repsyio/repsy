@@ -204,8 +204,9 @@ class RepoTxServiceTest {
 
       final var settings = RepoSettingsForm.builder().releases(false).build();
 
-      assertThatThrownBy(
-              () -> RepoTxServiceTest.this.service.updateSettings(repo.getId(), settings))
+      final var repoId = repo.getId();
+
+      assertThatThrownBy(() -> RepoTxServiceTest.this.service.updateSettings(repoId, settings))
           .isInstanceOf(BadRequestException.class)
           .hasMessage("releasesSnapshotsUnsupported");
 
@@ -224,8 +225,9 @@ class RepoTxServiceTest {
 
       final var settings = RepoSettingsForm.builder().snapshots(false).build();
 
-      assertThatThrownBy(
-              () -> RepoTxServiceTest.this.service.updateSettings(repo.getId(), settings))
+      final var repoId = repo.getId();
+
+      assertThatThrownBy(() -> RepoTxServiceTest.this.service.updateSettings(repoId, settings))
           .isInstanceOf(BadRequestException.class)
           .hasMessage("releasesSnapshotsUnsupported");
 
@@ -265,8 +267,9 @@ class RepoTxServiceTest {
       final var settings =
           RepoSettingsForm.builder().securityScanEnabled(false).releases(false).build();
 
-      assertThatThrownBy(
-              () -> RepoTxServiceTest.this.service.updateSettings(repo.getId(), settings))
+      final var repoId = repo.getId();
+
+      assertThatThrownBy(() -> RepoTxServiceTest.this.service.updateSettings(repoId, settings))
           .isInstanceOf(BadRequestException.class);
 
       assertThat(repo.isSecurityScanEnabled()).isTrue();
@@ -485,8 +488,9 @@ class RepoTxServiceTest {
                   .securityScanEnabled(false)
                   .pgpKeyServerLookupEnabled(false)
                   .build())) {
-        assertThatThrownBy(
-                () -> RepoTxServiceTest.this.service.updateSettings(repo.getId(), settings))
+        final var repoId = repo.getId();
+
+        assertThatThrownBy(() -> RepoTxServiceTest.this.service.updateSettings(repoId, settings))
             .isInstanceOf(BadRequestException.class)
             .hasMessage("pgpSettingsUnsupported");
       }

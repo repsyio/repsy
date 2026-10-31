@@ -17,8 +17,10 @@ package io.repsy.os.shared.configs;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import io.repsy.libs.multiport.configs.props.MultiPortProperties;
 import jakarta.servlet.FilterChain;
@@ -46,7 +48,7 @@ class SecurityHeadersFilterTest {
   private static final int OTHER_PORT = 9090;
 
   private final MultiPortProperties multiPortProperties = new MultiPortProperties();
-  private final FilterChain filterChain = Mockito.mock(FilterChain.class);
+  private final FilterChain filterChain = mock(FilterChain.class);
 
   @BeforeEach
   void setUp() {
@@ -66,7 +68,7 @@ class SecurityHeadersFilterTest {
             new AppHstsProperties(0));
 
     final var request = request(API_PORT, "/repos/some-repo/overview");
-    final var response = Mockito.mock(HttpServletResponse.class);
+    final var response = mock(HttpServletResponse.class);
 
     filter.doFilterInternal(request, response, this.filterChain);
 
@@ -87,7 +89,7 @@ class SecurityHeadersFilterTest {
             new AppHstsProperties(0));
 
     final var request = request(API_PORT, "/");
-    final var response = Mockito.mock(HttpServletResponse.class);
+    final var response = mock(HttpServletResponse.class);
 
     filter.doFilterInternal(request, response, this.filterChain);
 
@@ -107,7 +109,7 @@ class SecurityHeadersFilterTest {
             new AppHstsProperties(0));
 
     final var request = request(API_PORT, "/api/profile");
-    final var response = Mockito.mock(HttpServletResponse.class);
+    final var response = mock(HttpServletResponse.class);
 
     filter.doFilterInternal(request, response, this.filterChain);
 
@@ -127,7 +129,7 @@ class SecurityHeadersFilterTest {
             new AppHstsProperties(0));
 
     final var request = request(OTHER_PORT, "/");
-    final var response = Mockito.mock(HttpServletResponse.class);
+    final var response = mock(HttpServletResponse.class);
 
     filter.doFilterInternal(request, response, this.filterChain);
 
@@ -147,7 +149,7 @@ class SecurityHeadersFilterTest {
             new AppHstsProperties(0));
 
     final var request = request(API_PORT, "/");
-    final var response = Mockito.mock(HttpServletResponse.class);
+    final var response = mock(HttpServletResponse.class);
 
     filter.doFilterInternal(request, response, this.filterChain);
 
@@ -167,7 +169,7 @@ class SecurityHeadersFilterTest {
             new AppHstsProperties(0));
 
     final var request = request(API_PORT, "/");
-    final var response = Mockito.mock(HttpServletResponse.class);
+    final var response = mock(HttpServletResponse.class);
 
     filter.doFilterInternal(request, response, this.filterChain);
 
@@ -186,7 +188,7 @@ class SecurityHeadersFilterTest {
             new AppHstsProperties(0));
 
     final var request = request(8443, "/");
-    final var response = Mockito.mock(HttpServletResponse.class);
+    final var response = mock(HttpServletResponse.class);
 
     filter.doFilterInternal(request, response, this.filterChain);
 
@@ -205,7 +207,7 @@ class SecurityHeadersFilterTest {
             new AppHstsProperties(0));
 
     final var request = request(API_PORT, "/");
-    final var response = Mockito.mock(HttpServletResponse.class);
+    final var response = mock(HttpServletResponse.class);
     final var policy = new String[1];
     Mockito.doAnswer(
             invocation -> {
@@ -237,7 +239,7 @@ class SecurityHeadersFilterTest {
             new AppHstsProperties(0));
 
     final var request = request(API_PORT, "/");
-    final var response = Mockito.mock(HttpServletResponse.class);
+    final var response = mock(HttpServletResponse.class);
     final var policy = new String[1];
     Mockito.doAnswer(
             invocation -> {
@@ -271,7 +273,7 @@ class SecurityHeadersFilterTest {
 
     for (final var target :
         new Object[][] {{API_PORT, "/"}, {API_PORT, "/api/profile"}, {OTHER_PORT, "/v2/"}}) {
-      final var response = Mockito.mock(HttpServletResponse.class);
+      final var response = mock(HttpServletResponse.class);
 
       filter.doFilterInternal(
           request((int) target[0], (String) target[1]), response, this.filterChain);
@@ -290,7 +292,7 @@ class SecurityHeadersFilterTest {
             new AppCorsProperties(null),
             new ContentSecurityPolicyProperties(false, false, null),
             new AppHstsProperties(0));
-    final var response = Mockito.mock(HttpServletResponse.class);
+    final var response = mock(HttpServletResponse.class);
 
     filter.doFilterInternal(request(OTHER_PORT, "/x"), response, this.filterChain);
 
@@ -306,7 +308,7 @@ class SecurityHeadersFilterTest {
 
     for (final var target :
         new Object[][] {{API_PORT, "/"}, {API_PORT, "/api/profile"}, {8443, "/api/profile"}}) {
-      final var response = Mockito.mock(HttpServletResponse.class);
+      final var response = mock(HttpServletResponse.class);
 
       filter.doFilterInternal(
           request((int) target[0], (String) target[1]), response, this.filterChain);
@@ -320,7 +322,7 @@ class SecurityHeadersFilterTest {
   @DisplayName("does not send Referrer-Policy or X-Frame-Options on the protocol port")
   void doesNotSendReferrerOrFrameOptionsOnProtocolPort() throws Exception {
 
-    final var response = Mockito.mock(HttpServletResponse.class);
+    final var response = mock(HttpServletResponse.class);
 
     this.defaultFilter(0).doFilterInternal(request(OTHER_PORT, "/v2/"), response, this.filterChain);
 
@@ -333,8 +335,8 @@ class SecurityHeadersFilterTest {
   void hstsIsOffByDefault() throws Exception {
 
     final var request = request(API_PORT, "/");
-    Mockito.when(request.isSecure()).thenReturn(true);
-    final var response = Mockito.mock(HttpServletResponse.class);
+    when(request.isSecure()).thenReturn(true);
+    final var response = mock(HttpServletResponse.class);
 
     this.defaultFilter(0).doFilterInternal(request, response, this.filterChain);
 
@@ -347,8 +349,8 @@ class SecurityHeadersFilterTest {
 
     for (final var port : new int[] {8443, OTHER_PORT}) {
       final var request = request(port, "/");
-      Mockito.when(request.isSecure()).thenReturn(true);
-      final var response = Mockito.mock(HttpServletResponse.class);
+      when(request.isSecure()).thenReturn(true);
+      final var response = mock(HttpServletResponse.class);
 
       this.defaultFilter(31_536_000).doFilterInternal(request, response, this.filterChain);
 
@@ -362,8 +364,8 @@ class SecurityHeadersFilterTest {
   void hstsIsNotSentOnPlainRequest() throws Exception {
 
     final var request = request(API_PORT, "/");
-    Mockito.when(request.isSecure()).thenReturn(false);
-    final var response = Mockito.mock(HttpServletResponse.class);
+    when(request.isSecure()).thenReturn(false);
+    final var response = mock(HttpServletResponse.class);
 
     this.defaultFilter(31_536_000).doFilterInternal(request, response, this.filterChain);
 
@@ -380,9 +382,9 @@ class SecurityHeadersFilterTest {
   }
 
   private static HttpServletRequest request(final int localPort, final String uri) {
-    final var request = Mockito.mock(HttpServletRequest.class);
-    Mockito.when(request.getLocalPort()).thenReturn(localPort);
-    Mockito.when(request.getRequestURI()).thenReturn(uri);
+    final var request = mock(HttpServletRequest.class);
+    when(request.getLocalPort()).thenReturn(localPort);
+    when(request.getRequestURI()).thenReturn(uri);
     return request;
   }
 }

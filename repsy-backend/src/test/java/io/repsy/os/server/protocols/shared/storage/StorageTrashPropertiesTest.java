@@ -61,7 +61,9 @@ class StorageTrashPropertiesTest {
   @Test
   @DisplayName("a retention below one day stops the binding with a message that names the property")
   void rejectsLessThanOneDay() {
-    assertThatThrownBy(() -> bind(Map.of(PREFIX + ".trash-retention", "PT23H")))
+    final var source = Map.<String, Object>of(PREFIX + ".trash-retention", "PT23H");
+
+    assertThatThrownBy(() -> bind(source))
         .isInstanceOf(BindException.class)
         .hasRootCauseInstanceOf(IllegalArgumentException.class)
         .rootCause()
@@ -75,7 +77,9 @@ class StorageTrashPropertiesTest {
   void rejectsZeroAndNegative() {
     assertThatThrownBy(() -> new StorageTrashProperties(Duration.ZERO))
         .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(() -> new StorageTrashProperties(Duration.ofDays(-1)))
+    final var negative = Duration.ofDays(-1);
+
+    assertThatThrownBy(() -> new StorageTrashProperties(negative))
         .isInstanceOf(IllegalArgumentException.class);
   }
 

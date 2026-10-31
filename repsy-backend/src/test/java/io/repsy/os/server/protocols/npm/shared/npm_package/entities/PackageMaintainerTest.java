@@ -60,7 +60,7 @@ class PackageMaintainerTest extends AbstractEntityIdentityTest<PackageMaintainer
   void hashCodeAndToStringSkipAssociations() {
     final var packageMaintainer = this.newEntity(UUID.randomUUID());
 
-    assertThat(packageMaintainer.hashCode()).isEqualTo(PackageMaintainer.class.hashCode());
+    assertThat(packageMaintainer).hasSameHashCodeAs(PackageMaintainer.class);
     assertThat(packageMaintainer.toString()).doesNotContain("packageVersion=");
   }
 }

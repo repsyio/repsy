@@ -58,7 +58,7 @@ class ReleaseClassifierTest extends AbstractEntityIdentityTest<ReleaseClassifier
   void hashCodeAndToStringSkipAssociations() {
     final var releaseClassifier = this.newEntity(UUID.randomUUID());
 
-    assertThat(releaseClassifier.hashCode()).isEqualTo(ReleaseClassifier.class.hashCode());
+    assertThat(releaseClassifier).hasSameHashCodeAs(ReleaseClassifier.class);
     assertThat(releaseClassifier.toString()).doesNotContain("release=");
   }
 }

@@ -114,8 +114,10 @@ class H2RepoCollectionIT extends H2IntegrationTest {
     final var first = this.readAllPages(tag);
     final var second = this.readAllPages(tag);
 
-    assertThat(first).hasSameSizeAs(expected).doesNotHaveDuplicates();
-    assertThat(first).containsExactlyInAnyOrderElementsOf(expected);
+    assertThat(first)
+        .hasSameSizeAs(expected)
+        .doesNotHaveDuplicates()
+        .containsExactlyInAnyOrderElementsOf(expected);
     assertThat(second).isEqualTo(first);
   }
 

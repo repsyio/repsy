@@ -95,7 +95,9 @@ class H2AdminUserInitializerIT extends H2IntegrationTest {
   @Test
   @DisplayName("users.hash is NOT NULL, so the recovery cannot use NULL")
   void nullHashIsRejectedBySchema() {
-    assertThatThrownBy(() -> this.jdbcTemplate.update(asOperatorShell(NULL_HASH_SQL)))
+    final var sql = asOperatorShell(NULL_HASH_SQL);
+
+    assertThatThrownBy(() -> this.jdbcTemplate.update(sql))
         .isInstanceOf(DataIntegrityViolationException.class);
   }
 

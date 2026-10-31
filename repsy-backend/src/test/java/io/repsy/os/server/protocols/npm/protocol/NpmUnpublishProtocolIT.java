@@ -257,7 +257,7 @@ class NpmUnpublishProtocolIT extends AbstractIT {
 
     assertThat(((Map<String, Object>) packument.get("versions")).keySet())
         .containsExactlyInAnyOrder(versions);
-    assertThat(((Map<String, String>) packument.get("dist-tags")).get("latest")).isEqualTo(latest);
+    assertThat((Map<String, String>) packument.get("dist-tags")).containsEntry("latest", latest);
   }
 
   /** The whole {@code npm unpublish pkg@version} sequence, with the asserts a client makes. */
@@ -456,8 +456,8 @@ class NpmUnpublishProtocolIT extends AbstractIT {
 
       assertThat(response.getStatus()).isEqualTo(200);
       final var stored = (Map<String, Object>) this.readPackument(repo, name).get("versions");
-      assertThat(((Map<String, Object>) stored.get("1.0.0")).get("deprecated"))
-          .isEqualTo("use 1.1.0");
+      assertThat((Map<String, Object>) stored.get("1.0.0"))
+          .containsEntry("deprecated", "use 1.1.0");
       assertThat(this.storedVersions(repo, name)).containsExactly("1.0.0", "1.1.0");
     }
   }

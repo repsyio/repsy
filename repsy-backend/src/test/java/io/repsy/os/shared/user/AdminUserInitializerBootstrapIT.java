@@ -105,7 +105,9 @@ class AdminUserInitializerBootstrapIT extends AbstractIT {
   @Test
   @DisplayName("a password of more than 72 bytes stops the startup, since it could never log in")
   void overlongPasswordStopsTheStartup() {
-    assertThatThrownBy(() -> this.bootstrapWith("Aa1" + "x".repeat(70)))
+    final var password = "Aa1" + "x".repeat(70);
+
+    assertThatThrownBy(() -> this.bootstrapWith(password))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("passwordTooLong");
   }

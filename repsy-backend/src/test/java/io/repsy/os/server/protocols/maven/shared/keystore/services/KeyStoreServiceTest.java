@@ -113,7 +113,9 @@ class KeyStoreServiceTest {
   void aRefusedKeyPublishesNothing() {
     when(this.pgpPublicKeyRepository.existsByRepoIdAndFingerprint(any(), any())).thenReturn(true);
 
-    assertThatThrownBy(() -> this.service.createPublicKey(this.repoInfo, this.keyForm()))
+    final var form = this.keyForm();
+
+    assertThatThrownBy(() -> this.service.createPublicKey(this.repoInfo, form))
         .isInstanceOf(ItemAlreadyExistException.class);
 
     verify(this.eventPublisher, never()).publishEvent(any(Object.class));

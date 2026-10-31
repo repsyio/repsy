@@ -17,6 +17,7 @@ package io.repsy.os.shared.auth;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
@@ -35,7 +36,6 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 
 @DisplayName("PanelAuthHelper")
 class PanelAuthHelperTest {
@@ -44,9 +44,9 @@ class PanelAuthHelperTest {
   private static final UUID USER_ID = UUID.randomUUID();
   private static final Instant SESSION_START = Instant.parse("2026-09-01T10:00:00Z");
 
-  private final JwtUtils jwtUtils = Mockito.mock(JwtUtils.class);
-  private final UserRepository userRepository = Mockito.mock(UserRepository.class);
-  private final UserMapper userConverter = Mockito.mock(UserMapper.class);
+  private final JwtUtils jwtUtils = mock(JwtUtils.class);
+  private final UserRepository userRepository = mock(UserRepository.class);
+  private final UserMapper userConverter = mock(UserMapper.class);
 
   // A real UserTxService over a mocked repository: the lookup itself is under test.
   private final PanelAuthHelper helper =

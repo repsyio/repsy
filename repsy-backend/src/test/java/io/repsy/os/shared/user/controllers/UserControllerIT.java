@@ -894,10 +894,6 @@ class UserControllerIT extends AbstractIT {
     }
   }
 
-  // ---------------------------------------------------------------------------------------------
-  // PUT /api/users/{userId}
-  // ---------------------------------------------------------------------------------------------
-
   @Nested
   @DisplayName("PUT /api/users/{userId}")
   class UpdateUser {
@@ -1164,10 +1160,6 @@ class UserControllerIT extends AbstractIT {
       assertThat(UserControllerIT.this.reload(self.getId()).getRole()).isEqualTo(UserRole.USER);
     }
   }
-
-  // ---------------------------------------------------------------------------------------------
-  // DELETE /api/users/{userId}
-  // ---------------------------------------------------------------------------------------------
 
   @Nested
   @DisplayName("DELETE /api/users/{userId}")

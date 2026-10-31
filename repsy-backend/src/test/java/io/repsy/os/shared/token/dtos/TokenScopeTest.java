@@ -49,8 +49,8 @@ class TokenScopeTest {
   void declarationOrderIsCanonical() {
     final var values = Arrays.stream(TokenScope.values()).map(TokenScope::getValue).toList();
 
-    assertThat(values).isSorted();
     assertThat(values)
+        .isSorted()
         .containsExactly("profile:read", "repo:manage", "repo:read", "repo:write", "scan:read");
   }
 
@@ -68,8 +68,9 @@ class TokenScopeTest {
     final var schemas =
         (Map<String, Map<String, Object>>) ((Map<?, ?>) doc.get("components")).get("schemas");
 
-    assertThat(schemas.get("AccessTokenScope").get("enum"))
-        .isEqualTo(Arrays.stream(TokenScope.values()).map(TokenScope::getValue).toList());
+    assertThat(schemas.get("AccessTokenScope"))
+        .containsEntry(
+            "enum", Arrays.stream(TokenScope.values()).map(TokenScope::getValue).toList());
   }
 
   @Test

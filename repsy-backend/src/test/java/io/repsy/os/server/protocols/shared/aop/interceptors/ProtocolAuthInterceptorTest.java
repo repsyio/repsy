@@ -59,14 +59,14 @@ class ProtocolAuthInterceptorTest {
 
   @Test
   @DisplayName("refuses a @RepoOperation route without a repoName variable, even with a repoType")
-  void refusesARepoOperationWithoutARepoName() throws Exception {
+  void refusesARepoOperationWithoutARepoName() throws NoSuchMethodException {
     final var request = new MockHttpServletRequest();
     request.setAttribute(URI_TEMPLATE_VARIABLES_ATTRIBUTE, Map.of("repoType", "MAVEN"));
 
-    assertThatThrownBy(
-            () ->
-                this.interceptor.preHandle(
-                    request, new MockHttpServletResponse(), handler("withoutARepo")))
+    final var response = new MockHttpServletResponse();
+    final var handler = handler("withoutARepo");
+
+    assertThatThrownBy(() -> this.interceptor.preHandle(request, response, handler))
         .isInstanceOf(IllegalStateException.class)
         .hasMessageContaining("{repoName}");
     verifyNoInteractions(this.repoTxService, this.authService);

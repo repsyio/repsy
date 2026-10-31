@@ -92,10 +92,6 @@ class KeyStoreControllerIT extends AbstractIT {
     return "{\"allowedKeyserverId\":\"%s\"}".formatted(keyserverId);
   }
 
-  private static String responseBody(final String body) {
-    return body;
-  }
-
   /** A created key store: the bare {@code KeyStoreItem}, not an envelope. */
   private static void assertKeyStoreItem(final String body) {
     final Map<String, Object> item = JsonPath.read(body, "$");
@@ -141,8 +137,8 @@ class KeyStoreControllerIT extends AbstractIT {
               .getContentAsString();
 
       final List<Map<String, Object>> items = JsonPath.read(response, "$");
-      assertThat(items).hasSize(3);
       assertThat(items)
+          .hasSize(3)
           .allSatisfy(
               item ->
                   assertThat(item)

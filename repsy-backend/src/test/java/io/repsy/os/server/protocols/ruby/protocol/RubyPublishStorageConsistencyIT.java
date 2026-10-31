@@ -17,6 +17,7 @@ package io.repsy.os.server.protocols.ruby.protocol;
 
 import static io.repsy.os.server.protocols.ruby.RubyGemFixtures.PUBLISH_PATH;
 import static io.repsy.os.server.protocols.ruby.RubyGemFixtures.gem;
+import static io.repsy.os.server.protocols.shared.PostgresLockWaits.awaitBlockedOnALockOrDone;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
@@ -301,10 +302,9 @@ class RubyPublishStorageConsistencyIT extends AbstractIT {
       assertThat(winnerWriting.await(30, TimeUnit.SECONDS)).isTrue();
 
       final var loser = executor.submit(() -> this.push(repo, loserGem, token));
-      // Long enough for the loser to reach its row insert and wait on the winner's row. If it is
-      // slower, it is turned away by the existing-version check instead: the assertions hold both
-      // ways.
-      TimeUnit.MILLISECONDS.sleep(500);
+      // Blocked on the lock the other one holds, or already finished (turned away first):
+      // the assertions hold both ways.
+      awaitBlockedOnALockOrDone(this.jdbcTemplate, loser);
       releaseWinner.countDown();
 
       assertThat(winner.get(30, TimeUnit.SECONDS).getStatus()).isEqualTo(200);
@@ -354,7 +354,9 @@ class RubyPublishStorageConsistencyIT extends AbstractIT {
 
       final var second =
           executor.submit(() -> this.push(repo, gem(name, "2.0.0", "ruby", "b"), token));
-      TimeUnit.MILLISECONDS.sleep(500);
+      // Blocked on the lock the other one holds, or already finished (turned away first):
+      // the assertions hold both ways.
+      awaitBlockedOnALockOrDone(this.jdbcTemplate, second);
       releaseFirst.countDown();
 
       assertThat(first.get(30, TimeUnit.SECONDS).getStatus()).isEqualTo(200);
@@ -399,7 +401,9 @@ class RubyPublishStorageConsistencyIT extends AbstractIT {
 
       final var loser =
           executor.submit(() -> this.push(repo, gem(name, "1.0.0", "ruby", "loser"), token));
-      TimeUnit.MILLISECONDS.sleep(500);
+      // Blocked on the lock the other one holds, or already finished (turned away first):
+      // the assertions hold both ways.
+      awaitBlockedOnALockOrDone(this.jdbcTemplate, loser);
       releaseWinner.countDown();
 
       assertThat(winner.get(30, TimeUnit.SECONDS).getStatus()).isEqualTo(200);

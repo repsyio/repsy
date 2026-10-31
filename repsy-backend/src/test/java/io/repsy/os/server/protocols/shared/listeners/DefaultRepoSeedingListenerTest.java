@@ -20,6 +20,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import io.repsy.core.events.UserCreatedEvent;
@@ -129,8 +130,7 @@ class DefaultRepoSeedingListenerTest {
     publish();
 
     final ArgumentCaptor<RepoType> types = ArgumentCaptor.forClass(RepoType.class);
-    verify(this.seeder, org.mockito.Mockito.times(RepoType.values().length))
-        .seed(any(), types.capture(), any());
+    verify(this.seeder, times(RepoType.values().length)).seed(any(), types.capture(), any());
     assertThat(types.getAllValues()).containsExactlyInAnyOrder(RepoType.values());
   }
 

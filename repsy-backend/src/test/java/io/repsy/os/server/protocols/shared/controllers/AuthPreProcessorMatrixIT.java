@@ -191,7 +191,7 @@ class AuthPreProcessorMatrixIT extends AbstractIT {
         .toList();
   }
 
-  private static synchronized void record(final String label, final List<String> actual)
+  private static synchronized void recordExpected(final String label, final List<String> actual)
       throws IOException {
 
     final var others =
@@ -301,7 +301,7 @@ class AuthPreProcessorMatrixIT extends AbstractIT {
     actual.add(protocol.label() + " throttled => " + outcome(throttled, privateRepo));
 
     if (Boolean.getBoolean("characterization.write")) {
-      record(protocol.label(), actual);
+      recordExpected(protocol.label(), actual);
     }
 
     assertThat(actual).containsExactlyElementsOf(expected(protocol.label()));

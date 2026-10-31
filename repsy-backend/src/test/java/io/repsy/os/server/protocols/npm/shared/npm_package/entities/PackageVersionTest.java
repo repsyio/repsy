@@ -63,7 +63,7 @@ class PackageVersionTest extends AbstractEntityIdentityTest<PackageVersion> {
     packageVersion.setPackageDistTags(new UntouchableSet<>());
     packageVersion.setPackageMaintainers(new UntouchableSet<>());
 
-    assertThat(packageVersion.hashCode()).isEqualTo(PackageVersion.class.hashCode());
+    assertThat(packageVersion).hasSameHashCodeAs(PackageVersion.class);
     assertThat(packageVersion.toString())
         .doesNotContain(
             "npmPackage=", "packageKeywords=", "packageDistTags=", "packageMaintainers=");

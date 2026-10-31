@@ -415,12 +415,12 @@ class OciWireCharacterizationIT extends AbstractIT {
     }
 
     void call(final String label, final MockHttpServletRequestBuilder request) throws Exception {
-      this.record(label, OciWireCharacterizationIT.this.mockMvc, request, true);
+      this.recordResponse(label, OciWireCharacterizationIT.this.mockMvc, request, true);
     }
 
     void anonymous(final String label, final MockHttpServletRequestBuilder request)
         throws Exception {
-      this.record(label, OciWireCharacterizationIT.this.mockMvc, request, false);
+      this.recordResponse(label, OciWireCharacterizationIT.this.mockMvc, request, false);
     }
 
     /**
@@ -429,12 +429,12 @@ class OciWireCharacterizationIT extends AbstractIT {
      */
     void unfiltered(final String label, final MockHttpServletRequestBuilder request)
         throws Exception {
-      this.record(label, this.unfilteredMockMvc, request, true);
+      this.recordResponse(label, this.unfilteredMockMvc, request, true);
     }
 
     String startUpload(final String label, final String base) throws Exception {
       final var response =
-          this.record(
+          this.recordResponse(
               label, OciWireCharacterizationIT.this.mockMvc, post(base + "/blobs/uploads/"), true);
       assertThat(response.getStatus()).as(label).isEqualTo(202);
 
@@ -442,7 +442,7 @@ class OciWireCharacterizationIT extends AbstractIT {
       return location.substring(location.lastIndexOf('/') + 1);
     }
 
-    private MockHttpServletResponse record(
+    private MockHttpServletResponse recordResponse(
         final String label,
         final MockMvc mockMvc,
         final MockHttpServletRequestBuilder request,

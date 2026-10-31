@@ -268,7 +268,6 @@ class ErrorAdviceTest {
     final var errors =
         new ErrorResponseService(new RestResponseFactory(new ResourceBundleMessageSource()));
     final var panel = new PanelProblemDetailAdvice(errors);
-    final var protocol = new ProtocolErrorAdvice(errors);
     final var request = new MockHttpServletRequest();
 
     assertThat(
@@ -417,7 +416,6 @@ class ErrorAdviceTest {
   void violationWithoutResponse() {
     final var errors =
         new ErrorResponseService(new RestResponseFactory(new ResourceBundleMessageSource()));
-    final var panel = new PanelProblemDetailAdvice(errors);
     final var protocol = new ProtocolErrorAdvice(errors);
 
     assertThat(
@@ -495,7 +493,6 @@ class ErrorAdviceTest {
   void optimisticLockFailureWithoutResponse() {
     final var errors =
         new ErrorResponseService(new RestResponseFactory(new ResourceBundleMessageSource()));
-    final var panel = new PanelProblemDetailAdvice(errors);
     final var protocol = new ProtocolErrorAdvice(errors);
 
     assertThat(
@@ -569,7 +566,6 @@ class ErrorAdviceTest {
   void lockFailuresWithoutResponse() {
     final var errors =
         new ErrorResponseService(new RestResponseFactory(new ResourceBundleMessageSource()));
-    final var panel = new PanelProblemDetailAdvice(errors);
     final var protocol = new ProtocolErrorAdvice(errors);
     final var request = new MockHttpServletRequest();
 
@@ -625,7 +621,6 @@ class ErrorAdviceTest {
   void tooManyRequestsWithoutResponse() {
     final var errors =
         new ErrorResponseService(new RestResponseFactory(new ResourceBundleMessageSource()));
-    final var panel = new PanelProblemDetailAdvice(errors);
     final var protocol = new ProtocolErrorAdvice(errors);
 
     assertThat(
@@ -753,7 +748,6 @@ class ErrorAdviceTest {
   void retryableFailureWithoutResponse() {
     final var errors =
         new ErrorResponseService(new RestResponseFactory(new ResourceBundleMessageSource()));
-    final var panel = new PanelProblemDetailAdvice(errors);
     final var protocol = new ProtocolErrorAdvice(errors);
 
     assertThat(

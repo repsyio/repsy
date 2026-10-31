@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -212,8 +213,7 @@ class ProtocolAuthServicePatTest {
     @DisplayName("a blocked client is answered 429 before the lookup result matters")
     void aBlockedClientIsRefused() {
       when(tokens.findByToken(secret)).thenReturn(Optional.empty());
-      org.mockito.Mockito.doThrow(
-              new io.repsy.protocols.shared.exceptions.TooManyRequestsException(7))
+      doThrow(new io.repsy.protocols.shared.exceptions.TooManyRequestsException(7))
           .when(throttle)
           .checkAllowed();
 
@@ -511,7 +511,9 @@ class ProtocolAuthServicePatTest {
       found(live(TokenScope.REPO_READ));
       ownerIs(UserRole.ADMIN);
 
-      assertThatThrownBy(() -> authService.authorizeUserRequest(repo, bearer(), Permission.WRITE))
+      final var bearer = bearer();
+
+      assertThatThrownBy(() -> authService.authorizeUserRequest(repo, bearer, Permission.WRITE))
           .isExactlyInstanceOf(AccessNotAllowedException.class)
           .hasMessage("accessDenied");
 
@@ -524,7 +526,9 @@ class ProtocolAuthServicePatTest {
       found(live(TokenScope.REPO_MANAGE));
       ownerIs(UserRole.USER);
 
-      assertThatThrownBy(() -> authService.authorizeUserRequest(repo, bearer(), Permission.MANAGE))
+      final var bearer = bearer();
+
+      assertThatThrownBy(() -> authService.authorizeUserRequest(repo, bearer, Permission.MANAGE))
           .isExactlyInstanceOf(AccessNotAllowedException.class);
     }
 
@@ -544,9 +548,11 @@ class ProtocolAuthServicePatTest {
       found(live(TokenScope.REPO_READ));
       ownerIs(UserRole.USER);
 
-      assertThatCode(() -> authService.authorizeUnknownRepoRequest(bearer(), Permission.READ))
+      final var bearer = bearer();
+
+      assertThatCode(() -> authService.authorizeUnknownRepoRequest(bearer, Permission.READ))
           .doesNotThrowAnyException();
-      assertThatThrownBy(() -> authService.authorizeUnknownRepoRequest(bearer(), Permission.WRITE))
+      assertThatThrownBy(() -> authService.authorizeUnknownRepoRequest(bearer, Permission.WRITE))
           .isExactlyInstanceOf(AccessNotAllowedException.class);
     }
 
@@ -556,19 +562,19 @@ class ProtocolAuthServicePatTest {
       found(live(TokenScope.SCAN_READ));
       ownerIs(UserRole.USER);
 
-      final var permissions =
-          authService.authorizeUserRequest(repo, bearer(), Permission.READ, true);
+      final var bearer = bearer();
+      final var permissions = authService.authorizeUserRequest(repo, bearer, Permission.READ, true);
 
       assertThat(permissions.getCanRead()).isTrue();
       assertThat(permissions.getCanWrite()).isFalse();
       assertThat(permissions.getCanManage()).isFalse();
 
       // the same token on a route that is not a scan route
-      assertThatThrownBy(() -> authService.authorizeUserRequest(repo, bearer(), Permission.READ))
+      assertThatThrownBy(() -> authService.authorizeUserRequest(repo, bearer, Permission.READ))
           .isExactlyInstanceOf(AccessNotAllowedException.class)
           .hasMessage("accessDenied");
       assertThatThrownBy(
-              () -> authService.authorizeUserRequest(repo, bearer(), Permission.READ, false))
+              () -> authService.authorizeUserRequest(repo, bearer, Permission.READ, false))
           .isExactlyInstanceOf(AccessNotAllowedException.class);
     }
 
@@ -578,11 +584,13 @@ class ProtocolAuthServicePatTest {
       found(live(TokenScope.SCAN_READ));
       ownerIs(UserRole.ADMIN);
 
+      final var bearer = bearer();
+
       assertThatThrownBy(
-              () -> authService.authorizeUserRequest(repo, bearer(), Permission.WRITE, true))
+              () -> authService.authorizeUserRequest(repo, bearer, Permission.WRITE, true))
           .isExactlyInstanceOf(AccessNotAllowedException.class);
       assertThatThrownBy(
-              () -> authService.authorizeUserRequest(repo, bearer(), Permission.MANAGE, true))
+              () -> authService.authorizeUserRequest(repo, bearer, Permission.MANAGE, true))
           .isExactlyInstanceOf(AccessNotAllowedException.class);
     }
 
@@ -592,14 +600,15 @@ class ProtocolAuthServicePatTest {
       found(live(TokenScope.REPO_READ));
       ownerIs(UserRole.USER);
 
-      assertThat(
-              authService.authorizeUserRequest(repo, bearer(), Permission.READ, true).getCanRead())
+      final var bearer = bearer();
+
+      assertThat(authService.authorizeUserRequest(repo, bearer, Permission.READ, true).getCanRead())
           .isTrue();
 
       found(live());
 
       assertThatThrownBy(
-              () -> authService.authorizeUserRequest(repo, bearer(), Permission.READ, true))
+              () -> authService.authorizeUserRequest(repo, bearer, Permission.READ, true))
           .isExactlyInstanceOf(AccessNotAllowedException.class);
     }
 
@@ -609,9 +618,11 @@ class ProtocolAuthServicePatTest {
       found(live(TokenScope.SCAN_READ));
       ownerIs(UserRole.USER);
 
-      assertThatCode(() -> authService.authorizeUnknownRepoRequest(bearer(), Permission.READ, true))
+      final var bearer = bearer();
+
+      assertThatCode(() -> authService.authorizeUnknownRepoRequest(bearer, Permission.READ, true))
           .doesNotThrowAnyException();
-      assertThatThrownBy(() -> authService.authorizeUnknownRepoRequest(bearer(), Permission.READ))
+      assertThatThrownBy(() -> authService.authorizeUnknownRepoRequest(bearer, Permission.READ))
           .isExactlyInstanceOf(AccessNotAllowedException.class);
     }
 
@@ -721,8 +732,9 @@ class ProtocolAuthServicePatTest {
 
     assertThat(token.scopes())
         .containsExactly(TokenScope.PROFILE_READ, TokenScope.REPO_READ, TokenScope.SCAN_READ);
-    assertThatThrownBy(() -> token.scopes().add(TokenScope.REPO_MANAGE))
+    final var scopes = token.scopes();
+    assertThatThrownBy(() -> scopes.add(TokenScope.REPO_MANAGE))
         .isInstanceOf(UnsupportedOperationException.class);
-    assertThat(EnumSet.copyOf(token.scopes())).doesNotContain(TokenScope.REPO_MANAGE);
+    assertThat(EnumSet.copyOf(scopes)).isNotEmpty().doesNotContain(TokenScope.REPO_MANAGE);
   }
 }

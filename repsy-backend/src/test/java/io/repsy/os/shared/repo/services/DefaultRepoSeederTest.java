@@ -19,7 +19,6 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -168,7 +167,7 @@ class DefaultRepoSeederTest {
         .thenReturn(Optional.of(repoInfo(RepoType.MAVEN)));
     when(this.repoTxService.createRepo(NAME, RepoType.MAVEN, true, null))
         .thenReturn(repoInfo(RepoType.MAVEN));
-    doThrow(failure).doNothing().when(this.storageCreator).accept(eq(STORAGE_KEY));
+    doThrow(failure).doNothing().when(this.storageCreator).accept(STORAGE_KEY);
 
     assertThatThrownBy(this::seedMaven).isSameAs(failure);
     assertThatCode(this::seedMaven).doesNotThrowAnyException();

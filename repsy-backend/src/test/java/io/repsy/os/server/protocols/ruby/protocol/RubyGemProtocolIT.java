@@ -342,9 +342,9 @@ class RubyGemProtocolIT extends AbstractIT {
         .contains("dependent-gem")
         .contains("1.0.0")
         .contains("rack")
-        .contains(">= 3.0.0");
-    // Only the requested gem is resolved, not every gem in the repo.
-    assertThat(marshal).doesNotContain("other-gem");
+        .contains(">= 3.0.0")
+        // Only the requested gem is resolved, not every gem in the repo.
+        .doesNotContain("other-gem");
   }
 
   @Test
@@ -807,8 +807,9 @@ class RubyGemProtocolIT extends AbstractIT {
           .andExpect(status().isOk());
 
       final var stored = (String) this.storedVersion(repo).get("authors");
-      assertThat(stored).isEqualTo(String.join(", ", authors(42)));
-      assertThat(stored).hasSizeLessThanOrEqualTo(GemspecParser.MAX_AUTHORS_LENGTH);
+      assertThat(stored)
+          .isEqualTo(String.join(", ", authors(42)))
+          .hasSizeLessThanOrEqualTo(GemspecParser.MAX_AUTHORS_LENGTH);
     }
 
     @Test
