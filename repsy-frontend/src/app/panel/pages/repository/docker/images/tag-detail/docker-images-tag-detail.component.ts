@@ -28,6 +28,7 @@ import { CopyClipboardComponent } from '../../../../../shared/components/copy-cl
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
+import { ScrollRegionDirective } from '../../../../../shared/directives/scroll-region.directive';
 import { BreadcrumbSecurityLinkService } from '../../../../../shared/services/breadcrumb-security-link.service';
 import { versionLoadError } from '../../../../../shared/utils/version-load-error.utils';
 import { RepoLookupService } from '../../../repo-entry/repo-lookup.service';
@@ -42,6 +43,7 @@ type Classifiers = Record<string, [string]>;
   imports: [
     CommonModule,
     CopyClipboardComponent,
+    ScrollRegionDirective,
     NgOptimizedImage,
     SpinnerComponent,
     HighlightLineNumbers,

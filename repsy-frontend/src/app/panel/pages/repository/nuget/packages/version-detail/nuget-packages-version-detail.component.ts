@@ -33,6 +33,7 @@ import { MarkdownComponent } from '../../../../../shared/components/markdown/mar
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
 import { ToastService } from '../../../../../shared/components/toast/toast.service';
+import { ScrollRegionDirective } from '../../../../../shared/directives/scroll-region.directive';
 import { Sort } from '../../../../../shared/dtos/sort';
 import {
   isLastVersion,
@@ -52,6 +53,7 @@ const PROBE_SORT: Sort = { name: 'Newest', column: 'publishedAt', type: 'DESC' }
     CommonModule,
     SpinnerComponent,
     CopyClipboardComponent,
+    ScrollRegionDirective,
     NgOptimizedImage,
     Highlight,
     SecurityScanSectionComponent,
