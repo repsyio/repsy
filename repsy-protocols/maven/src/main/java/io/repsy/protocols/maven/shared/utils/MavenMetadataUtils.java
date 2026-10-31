@@ -20,15 +20,32 @@ import io.repsy.protocols.maven.shared.artifact.services.VersionComparator;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.maven.artifact.repository.metadata.Metadata;
+import org.apache.maven.artifact.repository.metadata.Versioning;
 import org.apache.maven.artifact.repository.metadata.io.xpp3.MetadataXpp3Reader;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 
 @Slf4j
 @UtilityClass
 public class MavenMetadataUtils {
+
+  /** The {@code <lastUpdated>} format of a {@code maven-metadata.xml}: UTC, to the second. */
+  private static final DateTimeFormatter LAST_UPDATED_FORMAT =
+      DateTimeFormatter.ofPattern("yyyyMMddHHmmss").withZone(ZoneOffset.UTC);
+
+  /**
+   * Sets {@code <lastUpdated>} to {@code instant}, the same text {@link
+   * Versioning#setLastUpdatedTimestamp} writes, without going through {@link java.util.Date}.
+   */
+  public static void setLastUpdated(final Versioning versioning, final Instant instant) {
+
+    versioning.setLastUpdated(LAST_UPDATED_FORMAT.format(instant));
+  }
 
   /**
    * Parses a {@code maven-metadata.xml}. Never returns {@code null}: content that cannot be parsed

@@ -21,7 +21,7 @@ import java.io.InputStream;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import org.springframework.core.io.Resource;
 
-public interface MavenProtocolFacade<ID> {
+public interface MavenProtocolFacade<I> {
 
   Resource download(ProtocolContext context);
 

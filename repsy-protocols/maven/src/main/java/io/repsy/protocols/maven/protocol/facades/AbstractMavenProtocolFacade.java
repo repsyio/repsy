@@ -56,7 +56,7 @@ import org.springframework.core.io.Resource;
 
 @Slf4j
 @RequiredArgsConstructor
-public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFacade<ID> {
+public abstract class AbstractMavenProtocolFacade<I> implements MavenProtocolFacade<I> {
 
   private static final String USAGES = "usages";
   private static final String ARTIFACT_NAME = "artifactName";
@@ -64,8 +64,8 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
 
   private static final Set<String> SCANNABLE_EXTENSIONS = Set.of("jar", "war", "ear");
 
-  private final MavenStorageService<ID> mavenStorageService;
-  private final ArtifactService<ID> artifactService;
+  private final MavenStorageService<I> mavenStorageService;
+  private final ArtifactService<I> artifactService;
 
   /**
    * Answers a path with what is stored there. Only the artifact-level {@code maven-metadata.xml}
@@ -88,7 +88,7 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
   @Override
   public Resource download(final ProtocolContext context) {
 
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     final var relativePath = ProtocolContextUtils.getRelativePath(context);
 
     final var storagePath = StoragePath.of(repoInfo.getStorageKey(), relativePath.getPath());
@@ -111,7 +111,7 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
   }
 
   private @Nullable Resource synthesizeArtifactMetadata(
-      final BaseRepoInfo<ID> repoInfo, final String path) {
+      final BaseRepoInfo<I> repoInfo, final String path) {
 
     final var request = ArtifactMetadataSynthesizer.parse(path);
 
@@ -136,7 +136,7 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
   }
 
   private @Nullable Resource synthesizeGroupMetadata(
-      final BaseRepoInfo<ID> repoInfo, final String path) {
+      final BaseRepoInfo<I> repoInfo, final String path) {
 
     final var request = ArtifactMetadataSynthesizer.parseGroupLevel(path);
 
@@ -160,7 +160,7 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
 
   /** A checksum is not generated when the file it belongs to is stored: it would not match it. */
   private boolean isChecksumOfStoredFile(
-      final BaseRepoInfo<ID> repoInfo,
+      final BaseRepoInfo<I> repoInfo,
       final @Nullable String checksumAlgorithm,
       final String metadataPath) {
 
@@ -231,7 +231,7 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
     final var inputStream =
         RequestBodies.nonEmpty(requestBody)
             .orElseThrow(() -> new BadRequestException(ProtocolErrorCodes.MAVEN_UPLOAD_BODY_EMPTY));
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     final var relativePath = ProtocolContextUtils.getRelativePath(context);
     final var storagePath = StoragePath.of(repoInfo.getStorageKey(), relativePath.getPath());
 
@@ -288,7 +288,7 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
    * taken back like a POM whose registration failed.
    */
   private boolean isNewRegisteredFile(
-      final BaseRepoInfo<ID> repoInfo, final StoragePath storagePath) {
+      final BaseRepoInfo<I> repoInfo, final StoragePath storagePath) {
 
     final var verifyAll = repoInfo.isPgpVerifyAllSignaturesEnabled();
 
@@ -314,7 +314,7 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
    */
   private void register(
       final ProtocolContext context,
-      final BaseRepoInfo<ID> repoInfo,
+      final BaseRepoInfo<I> repoInfo,
       final StoragePath storagePath,
       final Stored stored,
       final boolean newRegisteredFile) {
@@ -343,7 +343,7 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
    * jar of a plugin triggers (see {@code refreshPluginPrefix}).
    */
   private BaseUsages usageAfterRegistration(
-      final BaseRepoInfo<ID> repoInfo, final StoragePath storagePath, final Stored stored) {
+      final BaseRepoInfo<I> repoInfo, final StoragePath storagePath, final Stored stored) {
 
     final var usage = stored.usage();
 
@@ -374,7 +374,7 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
    * @return the change of the disk usage the rewrite of the group-level file caused, {@code 0} when
    *     there was none
    */
-  private long refreshPluginPrefix(final BaseRepoInfo<ID> repoInfo, final StoragePath storagePath) {
+  private long refreshPluginPrefix(final BaseRepoInfo<I> repoInfo, final StoragePath storagePath) {
 
     return this.bestEffort(
         repoInfo,
@@ -418,7 +418,7 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
    * @return the change of the disk usage the rewrite caused, {@code 0} when there was none
    */
   private long reconcileStoredMetadata(
-      final BaseRepoInfo<ID> repoInfo, final StoragePath storagePath) {
+      final BaseRepoInfo<I> repoInfo, final StoragePath storagePath) {
 
     return this.bestEffort(
         repoInfo,
@@ -465,7 +465,7 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
    * @return the change of the disk usage the rewrite caused, {@code 0} when there was none
    */
   private long reconcileStoredGroupMetadata(
-      final BaseRepoInfo<ID> repoInfo, final StoragePath storagePath) {
+      final BaseRepoInfo<I> repoInfo, final StoragePath storagePath) {
 
     return this.bestEffort(
         repoInfo,
@@ -487,7 +487,7 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
 
   /** A rewrite of a stored metadata file that is logged and counted as {@code 0} if it fails. */
   private long bestEffort(
-      final BaseRepoInfo<ID> repoInfo,
+      final BaseRepoInfo<I> repoInfo,
       final StoragePath storagePath,
       final String what,
       final MetadataRewrite rewrite) {
@@ -599,7 +599,7 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
             this.mavenStorageService.writeInputStreamToPath(storagePath, pomStream, repoName),
             PomModelUtils.artifactIsPlugin(model));
       }
-    } catch (final EntryTooLargeException e) {
+    } catch (final EntryTooLargeException _) {
       throw new BadRequestException(ProtocolErrorCodes.POM_FILE_TOO_LARGE);
     }
   }
@@ -615,7 +615,7 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
     try {
       return BoundedEntryReader.readAllBytes(
           inputStream, contentLength, MavenUploadLimits.MAX_METADATA_BYTES);
-    } catch (final EntryTooLargeException e) {
+    } catch (final EntryTooLargeException _) {
       throw new BadRequestException(ProtocolErrorCodes.MAVEN_METADATA_TOO_LARGE);
     }
   }
@@ -631,7 +631,7 @@ public abstract class AbstractMavenProtocolFacade<ID> implements MavenProtocolFa
     try {
       return BoundedEntryReader.readAllBytes(
           inputStream, contentLength, MavenUploadLimits.MAX_SIGNATURE_BYTES);
-    } catch (final EntryTooLargeException e) {
+    } catch (final EntryTooLargeException _) {
       throw new BadRequestException(ProtocolErrorCodes.MAVEN_SIGNATURE_TOO_LARGE);
     }
   }
