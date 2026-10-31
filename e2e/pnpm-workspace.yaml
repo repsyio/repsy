@@ -5,3 +5,7 @@
 # pnpm exec tsx and pnpm exec playwright all work without it).
 allowBuilds:
   esbuild: false
+# Dependabot (RPS-2392). minimatch is fixed only in 11.x (GHSA-g3hv-75wg-m249: no backport to the 3 and 10
+# lines that eslint and its dependencies use), so every copy is forced to 11.
+overrides:
+  minimatch: ^11.0.1

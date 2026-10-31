@@ -16,3 +16,10 @@ allowBuilds:
   "@parcel/watcher": false
   lmdb: false
   msgpackr-extract: false
+# Dependabot (RPS-2392). @tailwindcss/typography (latest, 0.5.20) pins postcss-selector-parser 6.0.10
+# exactly; 6.1.5 is the same major with the fix for the quadratic selector parsing.
+# minimatch (GHSA-g3hv-75wg-m249) is deliberately NOT overridden: only 11.x is patched, but karma 6.4.4
+# (the unit test runner, no newer release) calls require('minimatch') as a function, which 11 no longer
+# exports ("mm is not a function"), so forcing 11 breaks `ng test`.
+overrides:
+  "postcss-selector-parser@6.0.10": 6.1.5
