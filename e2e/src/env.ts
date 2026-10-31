@@ -15,6 +15,7 @@
 ///
 
 import 'dotenv/config';
+import { randomInt } from 'node:crypto';
 
 /**
  * Where the harness is pointed:
@@ -69,7 +70,7 @@ const RUN_ID_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
 function randomRunId(length = 6): string {
   let id = '';
   for (let i = 0; i < length; i += 1) {
-    id += RUN_ID_ALPHABET[Math.floor(Math.random() * RUN_ID_ALPHABET.length)];
+    id += RUN_ID_ALPHABET[randomInt(RUN_ID_ALPHABET.length)];
   }
   return id;
 }
