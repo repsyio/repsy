@@ -35,12 +35,12 @@ public class ReleaseVersion {
               + "(?<release>\\d+(?:\\.\\d+)*+)"
               + "(?<pre>[-_.]?(?<preSignifier>(?:alpha|a|beta|b|rc|c|preview|pre))[-_.]?(?<preNumeral>\\d+)?)?"
               + "(?<post>-(?<postNumeral1>\\d+)|[-_.]?(post|rev|r)[-_.]?(?<postNumeral2>\\d+)?)?"
-              + "(?<dev>[-_.]?(dev)[-_.]?(?<devNumeral>\\d+)?)?(?:\\+(?<local>[a-z0-9]+(?:[-_.][a-z0-9]+)*))?$");
+              + "(?<dev>[-_.]?(dev)[-_.]?(?<devNumeral>\\d+)?)?(?:\\+(?<local>[a-z0-9]+(?:[-_.][a-z0-9]+)*+))?$");
   private static final Pattern NORMALIZED_VERSION_PATTERN =
       Pattern.compile(
           "^([1-9]\\d*!)?(0|[1-9]\\d*)"
               + "(\\.(0|[1-9]\\d*))*+(?<pre>(a|b|rc)(0|[1-9]\\d*))?(?<post>\\.post(0|[1-9]\\d*))?"
-              + "(?<dev>\\.dev(0|[1-9]\\d*))?(?:\\+(?<local>[a-z0-9]+(?:\\.[a-z0-9]+)*))?$");
+              + "(?<dev>\\.dev(0|[1-9]\\d*))?(?:\\+(?<local>[a-z0-9]+(?:\\.[a-z0-9]+)*+))?$");
   private static final Pattern LOCAL_SEPARATOR = Pattern.compile("[-_.]");
 
   private boolean preRelease;
