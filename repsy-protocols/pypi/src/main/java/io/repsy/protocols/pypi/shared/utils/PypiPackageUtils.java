@@ -90,8 +90,8 @@ public final class PypiPackageUtils {
       final var parameterMapString = MAPPER.writeValueAsString(parameterMap);
       final var uploadForm = MAPPER.readValue(parameterMapString, PackageUploadForm.class);
 
-      if (!org.springframework.util.StringUtils.hasText(uploadForm.getRequires_python())) {
-        uploadForm.setRequires_python(MINIMUM_REQUIRED_PYTHON_VERSION);
+      if (!org.springframework.util.StringUtils.hasText(uploadForm.getRequiresPython())) {
+        uploadForm.setRequiresPython(MINIMUM_REQUIRED_PYTHON_VERSION);
       }
 
       return uploadForm;

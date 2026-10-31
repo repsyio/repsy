@@ -32,14 +32,14 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
-public abstract class AbstractPypiSimpleProtocolMethodHandler<ID>
-    extends AbstractFacadeProtocolMethodHandler<PypiProtocolFacade<ID>> {
+public abstract class AbstractPypiSimpleProtocolMethodHandler<I>
+    extends AbstractFacadeProtocolMethodHandler<PypiProtocolFacade<I>> {
 
   private static final Pattern SIMPLE_PATTERN = Pattern.compile("^/simple(?:/([^/]+))?/?$");
 
-  public AbstractPypiSimpleProtocolMethodHandler(
+  protected AbstractPypiSimpleProtocolMethodHandler(
       final PathParser basePathParser,
-      final PypiProtocolFacade<ID> pypiProtocolFacade,
+      final PypiProtocolFacade<I> pypiProtocolFacade,
       final PypiProtocolProvider provider) {
     super(
         HandlerRoute.read(HttpMethod.GET)

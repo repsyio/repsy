@@ -27,7 +27,7 @@ import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.web.multipart.MultipartFile;
 
-public interface PypiStorageService<ID> {
+public interface PypiStorageService<I> {
   long deletePackage(UUID repoId, String packageNormalizedName);
 
   long deleteRelease(UUID repoId, String packageNormalizedName, String releaseVersion);
@@ -35,9 +35,7 @@ public interface PypiStorageService<ID> {
   Resource getArchiveFile(RepoRef repo, String packageName, String fileName);
 
   ByteArrayResource getPackageArchiveFileList(
-      BaseRepoInfo<ID> repoInfo,
-      String packageName,
-      Map<String, String> versionAndRequiresPythonMap)
+      BaseRepoInfo<I> repoInfo, String packageName, Map<String, String> versionAndRequiresPythonMap)
       throws IOException, TemplateException;
 
   void deleteRepo(UUID repoId);

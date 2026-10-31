@@ -149,15 +149,15 @@ public final class PypiPublishLimits {
    * be nulled loses only that one entry.
    */
   public static void dropOverLongFields(final PackageUploadForm uploadForm) {
-    uploadForm.setHome_page(
-        FieldLimits.dropIfTooLong(uploadForm.getHome_page(), MAX_HOME_PAGE_LENGTH));
+    uploadForm.setHomePage(
+        FieldLimits.dropIfTooLong(uploadForm.getHomePage(), MAX_HOME_PAGE_LENGTH));
     uploadForm.setAuthor(FieldLimits.dropIfTooLong(uploadForm.getAuthor(), MAX_AUTHOR_LENGTH));
-    uploadForm.setAuthor_email(
-        FieldLimits.dropIfTooLong(uploadForm.getAuthor_email(), MAX_AUTHOR_EMAIL_LENGTH));
+    uploadForm.setAuthorEmail(
+        FieldLimits.dropIfTooLong(uploadForm.getAuthorEmail(), MAX_AUTHOR_EMAIL_LENGTH));
     uploadForm.setLicense(FieldLimits.dropIfTooLong(uploadForm.getLicense(), MAX_LICENSE_LENGTH));
-    uploadForm.setDescription_content_type(
+    uploadForm.setDescriptionContentType(
         FieldLimits.dropIfTooLong(
-            uploadForm.getDescription_content_type(), MAX_DESCRIPTION_CONTENT_TYPE_LENGTH));
+            uploadForm.getDescriptionContentType(), MAX_DESCRIPTION_CONTENT_TYPE_LENGTH));
 
     dropOverLongClassifiers(uploadForm);
     dropOverLongProjectUrls(uploadForm);
@@ -197,7 +197,7 @@ public final class PypiPublishLimits {
   }
 
   private static void dropOverLongProjectUrls(final PackageUploadForm uploadForm) {
-    final var projectUrls = uploadForm.getProject_urls();
+    final var projectUrls = uploadForm.getProjectUrls();
 
     if (projectUrls == null) {
       return;
@@ -211,7 +211,7 @@ public final class PypiPublishLimits {
       }
     }
 
-    uploadForm.setProject_urls(kept.toArray(new String[0]));
+    uploadForm.setProjectUrls(kept.toArray(new String[0]));
   }
 
   private static boolean fitsAsProjectUrl(final @Nullable String projectUrl) {

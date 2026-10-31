@@ -165,7 +165,7 @@ class PackageStorageUtilsTest {
     @DisplayName("throws sha256DigestMissing when the field is null")
     void throwsWhenNull() {
       final var form = new PackageUploadForm();
-      form.setSha256_digest(null);
+      form.setSha256Digest(null);
 
       assertThatThrownBy(() -> PackageStorageUtils.checkSha256Digest(form))
           .isInstanceOf(BadRequestException.class)
@@ -176,7 +176,7 @@ class PackageStorageUtilsTest {
     @DisplayName("throws sha256DigestMissing when the field is blank")
     void throwsWhenBlank() {
       final var form = new PackageUploadForm();
-      form.setSha256_digest("   ");
+      form.setSha256Digest("   ");
 
       assertThatThrownBy(() -> PackageStorageUtils.checkSha256Digest(form))
           .isInstanceOf(BadRequestException.class)
@@ -187,7 +187,7 @@ class PackageStorageUtilsTest {
     @DisplayName("passes for a present, non-blank digest")
     void passesWhenPresent() {
       final var form = new PackageUploadForm();
-      form.setSha256_digest("deadbeef");
+      form.setSha256Digest("deadbeef");
 
       assertThatCode(() -> PackageStorageUtils.checkSha256Digest(form)).doesNotThrowAnyException();
     }

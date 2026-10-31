@@ -24,7 +24,7 @@ import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.web.multipart.MultipartFile;
 
-public interface PypiProtocolFacade<ID> {
+public interface PypiProtocolFacade<I> {
 
   void uploadPackage(ProtocolContext context, Map<String, Object> parameterMap, MultipartFile file)
       throws IOException;
@@ -35,7 +35,7 @@ public interface PypiProtocolFacade<ID> {
   Resource downloadArchiveFile(ProtocolContext context, String packageName, String fileName)
       throws IOException;
 
-  ByteArrayResource fetchFromLocalStorage(BaseRepoInfo<ID> repoInfo, String packageNormalizedName)
+  ByteArrayResource fetchFromLocalStorage(BaseRepoInfo<I> repoInfo, String packageNormalizedName)
       throws TemplateException, IOException;
 
   /** Existence-only check, never {@link #getPackageList}: used to answer {@code HEAD}. */
