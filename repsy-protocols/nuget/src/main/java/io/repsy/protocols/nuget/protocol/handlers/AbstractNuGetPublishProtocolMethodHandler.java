@@ -40,7 +40,7 @@ import org.springframework.web.server.ResponseStatusException;
 public abstract class AbstractNuGetPublishProtocolMethodHandler
     extends AbstractFacadeProtocolMethodHandler<NuGetProtocolFacade> {
 
-  public AbstractNuGetPublishProtocolMethodHandler(
+  protected AbstractNuGetPublishProtocolMethodHandler(
       final PathParser basePathParser,
       final NuGetProtocolFacade facade,
       final NuGetProtocolProvider provider) {

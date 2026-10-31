@@ -214,10 +214,11 @@ class AbstractNuGetDownloadProtocolMethodHandlerTest {
       final var ctx = context(NUPKG_PATH);
       when(facade.downloadNuPackage(ctx)).thenThrow(new IllegalStateException("storage down"));
 
-      assertThatThrownBy(
-              () ->
-                  handler(true)
-                      .handle(ctx, new MockHttpServletRequest(), new MockHttpServletResponse()))
+      final var handler = handler(true);
+      final var request = new MockHttpServletRequest();
+      final var response = new MockHttpServletResponse();
+
+      assertThatThrownBy(() -> handler.handle(ctx, request, response))
           .isInstanceOf(IllegalStateException.class);
     }
   }
@@ -272,10 +273,11 @@ class AbstractNuGetDownloadProtocolMethodHandlerTest {
       final var ctx = context(NUSPEC_PATH);
       when(facade.downloadNuspec(ctx)).thenThrow(new IllegalStateException("storage down"));
 
-      assertThatThrownBy(
-              () ->
-                  handler(false)
-                      .handle(ctx, new MockHttpServletRequest(), new MockHttpServletResponse()))
+      final var handler = handler(false);
+      final var request = new MockHttpServletRequest();
+      final var response = new MockHttpServletResponse();
+
+      assertThatThrownBy(() -> handler.handle(ctx, request, response))
           .isInstanceOf(IllegalStateException.class);
     }
   }

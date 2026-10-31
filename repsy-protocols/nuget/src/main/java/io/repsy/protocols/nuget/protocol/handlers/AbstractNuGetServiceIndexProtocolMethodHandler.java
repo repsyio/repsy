@@ -35,7 +35,7 @@ public abstract class AbstractNuGetServiceIndexProtocolMethodHandler
 
   private final NuGetBaseUrlResolver baseUrlResolver;
 
-  public AbstractNuGetServiceIndexProtocolMethodHandler(
+  protected AbstractNuGetServiceIndexProtocolMethodHandler(
       final PathParser basePathParser,
       final NuGetProtocolFacade facade,
       final NuGetProtocolProvider provider,

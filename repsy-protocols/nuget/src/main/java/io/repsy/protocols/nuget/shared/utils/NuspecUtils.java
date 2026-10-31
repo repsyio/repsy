@@ -36,6 +36,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 import lombok.experimental.UtilityClass;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
@@ -45,6 +46,7 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
 
 /** Reads the {@code .nuspec} of a NuGet package: its metadata, README and dependencies. */
 @Slf4j
@@ -68,12 +70,14 @@ public final class NuspecUtils {
    */
   private static final String SYMBOLS_PACKAGE_TYPE = "SymbolsPackage";
 
+  private static final String VERSION_NAME = "version";
+
   private static final Pattern NUGET_ID_PATTERN =
       Pattern.compile("^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$");
   private static final Pattern NUGET_VERSION_PATTERN =
       Pattern.compile(
-          "^(0|[1-9][0-9]*)(?:\\.(0|[1-9][0-9]*)){0,3}(?:-[a-zA-Z0-9][a-zA-Z0-9.-]*)?"
-              + "(?:\\+[a-zA-Z0-9][a-zA-Z0-9.-]*)?$");
+          "^(0|[1-9]\\d*)(?:\\.(0|[1-9]\\d*)){0,3}(?:-\\p{Alnum}[\\p{Alnum}.-]*)?"
+              + "(?:\\+\\p{Alnum}[\\p{Alnum}.-]*)?$");
 
   /**
    * Reads a tag with a regular expression, tolerant of a nuspec that is not well-formed XML. Used
@@ -258,7 +262,7 @@ public final class NuspecUtils {
       log.warn("Skipping README '{}': not a text file", readmePath);
       return null;
     }
-    return content.startsWith("﻿") ? content.substring(1) : content;
+    return content.startsWith("\uFEFF") ? content.substring(1) : content;
   }
 
   private static boolean matchesEntry(final String entryName, final String wanted) {
@@ -270,7 +274,7 @@ public final class NuspecUtils {
     try {
       final var decoded = URLDecoder.decode(normalized.replace("+", "%2B"), StandardCharsets.UTF_8);
       return decoded.equalsIgnoreCase(wanted);
-    } catch (final IllegalArgumentException e) {
+    } catch (final IllegalArgumentException _) {
       return false;
     }
   }
@@ -283,7 +287,8 @@ public final class NuspecUtils {
     return normalized;
   }
 
-  private static Document parseNuspec(final String nuspecXml) throws Exception {
+  private static Document parseNuspec(final String nuspecXml)
+      throws ParserConfigurationException, SAXException, IOException {
     final var factory = DocumentBuilderFactory.newInstance();
     factory.setNamespaceAware(false);
     factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
@@ -397,7 +402,7 @@ public final class NuspecUtils {
       for (int j = 0; j < deps.getLength(); j++) {
         final var dep = (Element) deps.item(j);
         final var id = dep.getAttribute("id");
-        final var version = dep.getAttribute("version");
+        final var version = dep.getAttribute(VERSION_NAME);
         if (!id.isBlank()) {
           members.add(
               new NuGetDependencyInfo(id, version.isBlank() ? "" : version, targetFramework));
@@ -417,7 +422,7 @@ public final class NuspecUtils {
     for (int i = 0; i < deps.getLength(); i++) {
       final var dep = (Element) deps.item(i);
       final var id = dep.getAttribute("id");
-      final var version = dep.getAttribute("version");
+      final var version = dep.getAttribute(VERSION_NAME);
 
       if (!id.isBlank()) {
         members.add(new NuGetDependencyInfo(id, version.isBlank() ? "" : version, null));
@@ -443,7 +448,7 @@ public final class NuspecUtils {
     validateNotSymbolsPackage(nuspecXml);
 
     final var packageId = extractMetadataField(nuspecXml, "id");
-    final var version = extractMetadataField(nuspecXml, "version");
+    final var version = extractMetadataField(nuspecXml, VERSION_NAME);
 
     if (packageId == null || packageId.isBlank() || version == null || version.isBlank()) {
       throw new IllegalArgumentException("Missing 'id' or 'version' in nuspec.");
@@ -483,7 +488,7 @@ public final class NuspecUtils {
     final NodeList packageTypes;
     try {
       packageTypes = parseNuspec(nuspecXml).getElementsByTagName("packageType");
-    } catch (final Exception e) {
+    } catch (final Exception _) {
       // The caller already rejected a nuspec that is not well-formed XML before this runs.
       return;
     }

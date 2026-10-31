@@ -31,7 +31,7 @@ public final class NuGetVersionUtils {
   private static final int THREE = 3;
   private static final int FOUR = 4;
   private static final String ZERO_VERSION = "0.0.0";
-  private static final Pattern SEMVER_LEVEL_PATTERN = Pattern.compile("^([0-9]+)(?:[.+-].*)?$");
+  private static final Pattern SEMVER_LEVEL_PATTERN = Pattern.compile("^(\\d+)(?:[.+-].*)?$");
 
   /**
    * Orders NuGet versions the way NuGet does (see {@link #compareVersions}), lowest first. Reverse
@@ -56,7 +56,7 @@ public final class NuGetVersionUtils {
       }
       return Objects.requireNonNull(Semver.parse(ZERO_VERSION + preRelease(first)))
           .compareTo(Objects.requireNonNull(Semver.parse(ZERO_VERSION + preRelease(second))));
-    } catch (final Exception e) {
+    } catch (final Exception _) {
       return v1.compareToIgnoreCase(v2);
     }
   }

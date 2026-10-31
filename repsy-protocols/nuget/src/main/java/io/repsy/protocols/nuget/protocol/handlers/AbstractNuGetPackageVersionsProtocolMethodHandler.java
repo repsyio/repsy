@@ -40,7 +40,7 @@ public abstract class AbstractNuGetPackageVersionsProtocolMethodHandler
   static final Pattern VERSIONS_PATTERN =
       Pattern.compile("^.*/v3/package/[^/]+/index\\.json$", Pattern.CASE_INSENSITIVE);
 
-  public AbstractNuGetPackageVersionsProtocolMethodHandler(
+  protected AbstractNuGetPackageVersionsProtocolMethodHandler(
       final PathParser basePathParser,
       final NuGetProtocolFacade facade,
       final NuGetProtocolProvider provider) {

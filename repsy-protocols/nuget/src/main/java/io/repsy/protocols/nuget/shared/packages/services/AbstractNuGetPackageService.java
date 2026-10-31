@@ -19,4 +19,4 @@ package io.repsy.protocols.nuget.shared.packages.services;
  * Base of the backend implementation of {@link NuGetPackageService}; the abstract methods are
  * inherited from the contract.
  */
-public abstract class AbstractNuGetPackageService<ID> implements NuGetPackageService<ID> {}
+public abstract class AbstractNuGetPackageService<I> implements NuGetPackageService<I> {}

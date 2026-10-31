@@ -40,6 +40,9 @@ import org.jspecify.annotations.Nullable;
 @UtilityClass
 public final class NuGetResponseMapper {
 
+  private static final String PACKAGE_TYPE = "Package";
+  private static final String INDEX_JSON = "/index.json";
+
   public static NuGetSearchData toSearchData(
       final NuGetPackageSearchResult result, final String baseUrl) {
 
@@ -62,8 +65,8 @@ public final class NuGetResponseMapper {
 
     return new NuGetSearchData(
         leafId,
-        "Package",
-        registrationBase + "/index.json",
+        PACKAGE_TYPE,
+        registrationBase + INDEX_JSON,
         result.packageId(),
         result.latestVersion(),
         result.description(),
@@ -119,19 +122,22 @@ public final class NuGetResponseMapper {
     }
 
     return groups.stream()
+        .map(g -> NuGetDependencyGroup.of(g.targetFramework(), toCatalogDependencies(g)))
+        .toList();
+  }
+
+  private static @Nullable List<NuGetCatalogDependency> toCatalogDependencies(
+      final NuGetDependencyGroupInfo group) {
+
+    if (group.dependencies().isEmpty()) {
+      return null;
+    }
+
+    return group.dependencies().stream()
         .map(
-            g ->
-                NuGetDependencyGroup.of(
-                    g.targetFramework(),
-                    g.dependencies().isEmpty()
-                        ? null
-                        : g.dependencies().stream()
-                            .map(
-                                dep ->
-                                    NuGetCatalogDependency.of(
-                                        dep.packageId(),
-                                        dep.versionRange().isBlank() ? null : dep.versionRange()))
-                            .toList()))
+            dep ->
+                NuGetCatalogDependency.of(
+                    dep.packageId(), dep.versionRange().isBlank() ? null : dep.versionRange()))
         .toList();
   }
 
@@ -170,12 +176,12 @@ public final class NuGetResponseMapper {
 
     return new NuGetRegistrationLeafItem(
         leafUrl,
-        "Package",
+        PACKAGE_TYPE,
         toCatalogEntry(v, packageId, leafUrl),
         v.listed(),
         packageContent,
         v.publishedAt(),
-        registrationBase + "/index.json");
+        registrationBase + INDEX_JSON);
   }
 
   public static NuGetRegistrationLeafResponse toLeafResponse(
@@ -192,12 +198,12 @@ public final class NuGetResponseMapper {
     return new NuGetRegistrationLeafResponse(
         NUGET_CONTEXT,
         leafUrl,
-        "Package",
+        PACKAGE_TYPE,
         toCatalogEntry(v, packageId, leafUrl),
         v.listed(),
         packageContent,
         v.publishedAt(),
-        registrationBase + "/index.json");
+        registrationBase + INDEX_JSON);
   }
 
   private static @Nullable List<String> splitTags(final @Nullable String tags) {

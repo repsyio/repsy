@@ -115,8 +115,7 @@ class AbstractNuGetAutocompleteProtocolMethodHandlerTest {
     final var response = this.handler.handle(ctx, request(null), new MockHttpServletResponse());
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-    verify(this.facade)
-        .autocomplete(eq(ctx), eq(""), eq(null), eq(0), eq(20), eq(false), eq(false));
+    verify(this.facade).autocomplete(ctx, "", null, 0, 20, false, false);
   }
 
   @Test
@@ -131,8 +130,7 @@ class AbstractNuGetAutocompleteProtocolMethodHandlerTest {
         this.handler.handle(ctx, request("take=2000000000"), new MockHttpServletResponse());
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-    verify(this.facade)
-        .autocomplete(eq(ctx), eq(""), eq(null), eq(0), eq(1000), eq(false), eq(false));
+    verify(this.facade).autocomplete(ctx, "", null, 0, 1000, false, false);
   }
 
   @ParameterizedTest(name = "semVerLevel={0} opts in: {1}")
@@ -159,8 +157,7 @@ class AbstractNuGetAutocompleteProtocolMethodHandlerTest {
             ctx, request("semVerLevel=" + level.replace("'", "")), new MockHttpServletResponse());
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-    verify(this.facade)
-        .autocomplete(eq(ctx), eq(""), eq(null), eq(0), eq(20), eq(false), eq(optedIn));
+    verify(this.facade).autocomplete(ctx, "", null, 0, 20, false, optedIn);
   }
 
   @Test
@@ -173,8 +170,7 @@ class AbstractNuGetAutocompleteProtocolMethodHandlerTest {
 
     this.handler.handle(ctx, request("q=x"), new MockHttpServletResponse());
 
-    verify(this.facade)
-        .autocomplete(eq(ctx), eq("x"), eq(null), eq(0), eq(20), eq(false), eq(false));
+    verify(this.facade).autocomplete(ctx, "x", null, 0, 20, false, false);
   }
 
   @ParameterizedTest(name = "skip={0}")
@@ -228,7 +224,10 @@ class AbstractNuGetAutocompleteProtocolMethodHandlerTest {
             eq(ctx), anyString(), any(), anyInt(), anyInt(), anyBoolean(), anyBoolean()))
         .thenThrow(new IllegalStateException("storage down"));
 
-    assertThatThrownBy(() -> this.handler.handle(ctx, request(null), new MockHttpServletResponse()))
+    final var request = request(null);
+    final var response = new MockHttpServletResponse();
+
+    assertThatThrownBy(() -> this.handler.handle(ctx, request, response))
         .isInstanceOf(IllegalStateException.class);
   }
 
@@ -250,8 +249,8 @@ class AbstractNuGetAutocompleteProtocolMethodHandlerTest {
     }
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-    assertThat(this.logs.list).isNotEmpty();
     assertThat(this.logs.list)
+        .isNotEmpty()
         .noneMatch(event -> event.getFormattedMessage().contains("s3cr3t-token-value"));
   }
 }

@@ -61,10 +61,10 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Slf4j
 @RequiredArgsConstructor
-public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFacade {
+public abstract class AbstractNuGetProtocolFacade<I> implements NuGetProtocolFacade {
 
   private final NuGetStorageService storageService;
-  private final NuGetPackageService<ID> packageService;
+  private final NuGetPackageService<I> packageService;
 
   public static final String USAGES = "usages";
   public static final String SUPPORTED_VERSION = "3.0.0";
@@ -79,7 +79,7 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
    * NuGetPackageService#publishVersion}.
    */
   protected BaseUsages doPublish(
-      final BaseRepoInfo<ID> repoInfo, final NuspecMetadata metadata, final Path tempFile)
+      final BaseRepoInfo<I> repoInfo, final NuspecMetadata metadata, final Path tempFile)
       throws IOException {
 
     return this.packageService.publishVersion(
@@ -108,7 +108,7 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
       copyStreamToFile(pureZipStream, tempFile);
 
       final var metadata = readNuspecMetadata(tempFile);
-      final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+      final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
 
       checkVersionAllowance(metadata.version(), repoInfo);
 
@@ -150,7 +150,7 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
   @Override
   public List<String> getPackageVersions(final ProtocolContext context) {
 
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     final var packageId = extractPackageId(context);
 
     return this.packageService.getAllVersionInfos(repoInfo, packageId).stream()
@@ -161,7 +161,7 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
   @Override
   public Resource downloadNuPackage(final ProtocolContext context) {
 
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     final var packageId = extractPackageId(context);
     final var packageIdVersion = extractPackageIdAndVersion(context);
     final var resource = this.getNuPackage(context);
@@ -182,7 +182,7 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
   @Override
   public Resource getNuPackage(final ProtocolContext context) {
 
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     final var packageIdVersion = extractPackageIdAndVersion(context);
 
     return this.storageService.getNuPkg(
@@ -192,7 +192,7 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
   @Override
   public void unlistVersion(final ProtocolContext context) {
 
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     final var packageIdVersion = extractPackageIdAndVersion(context);
 
     this.packageService.unlistVersion(repoInfo, packageIdVersion.id(), packageIdVersion.version());
@@ -201,7 +201,7 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
   @Override
   public void relistVersion(final ProtocolContext context) {
 
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     final var packageIdVersion = extractPackageIdAndVersion(context);
 
     this.packageService.relistVersion(repoInfo, packageIdVersion.id(), packageIdVersion.version());
@@ -210,7 +210,7 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
   @Override
   public Resource downloadNuspec(final ProtocolContext context) {
 
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     final var packageIdVersion = extractPackageIdAndVersion(context);
 
     return this.storageService.getNuspec(
@@ -227,7 +227,7 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
       final boolean semVer2,
       final String baseUrl) {
 
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     final var page = this.packageService.search(repoInfo, q, skip, take, prerelease, semVer2);
 
     final var data =
@@ -248,7 +248,7 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
       final boolean prerelease,
       final boolean semVer2) {
 
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
 
     if (id != null && !id.isBlank()) {
       final var versions =
@@ -268,7 +268,7 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
   public NuGetRegistrationIndexResponse getRegistrationIndex(
       final ProtocolContext context, final String baseUrl) {
 
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     final var packageId = extractPackageId(context);
     final var idLower = packageId.toLowerCase(Locale.ROOT);
     final var registrationBase = NuGetUrlBuilder.registrationBase(baseUrl, idLower);
@@ -298,7 +298,7 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
   public NuGetRegistrationLeafResponse getRegistrationLeaf(
       final ProtocolContext context, final String baseUrl) {
 
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     final var packageIdVersion = extractPackageIdAndVersion(context);
     final var packageId = packageIdVersion.id();
     final var rawVersion = packageIdVersion.version();
@@ -328,7 +328,7 @@ public abstract class AbstractNuGetProtocolFacade<ID> implements NuGetProtocolFa
   }
 
   private BaseUsages storePackage(
-      final BaseRepoInfo<ID> repoInfo,
+      final BaseRepoInfo<I> repoInfo,
       final NuspecMetadata metadata,
       final Path tempFile,
       final boolean replacesExisting)
