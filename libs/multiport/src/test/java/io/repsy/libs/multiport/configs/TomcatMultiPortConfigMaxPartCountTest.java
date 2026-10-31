@@ -158,7 +158,7 @@ class TomcatMultiPortConfigMaxPartCountTest {
       try {
         req.getParts();
         resp.setStatus(HttpServletResponse.SC_OK);
-      } catch (final IOException | IllegalStateException | ServletException e) {
+      } catch (final IOException | IllegalStateException | ServletException _) {
         resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
       }
     }

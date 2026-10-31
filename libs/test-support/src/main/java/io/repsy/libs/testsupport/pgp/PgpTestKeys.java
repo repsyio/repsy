@@ -27,6 +27,7 @@ import java.util.Date;
 import org.bouncycastle.bcpg.ArmoredOutputStream;
 import org.bouncycastle.bcpg.BCPGOutputStream;
 import org.bouncycastle.bcpg.HashAlgorithmTags;
+import org.bouncycastle.bcpg.PublicKeyAlgorithmTags;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 import org.bouncycastle.openpgp.PGPException;
 import org.bouncycastle.openpgp.PGPKeyPair;
@@ -88,7 +89,8 @@ public final class PgpTestKeys {
       final var generator = KeyPairGenerator.getInstance("RSA", BouncyCastleProvider.PROVIDER_NAME);
       generator.initialize(RSA_BITS);
 
-      return new JcaPGPKeyPair(PGPPublicKey.RSA_GENERAL, generator.generateKeyPair(), creationTime);
+      return new JcaPGPKeyPair(
+          PublicKeyAlgorithmTags.RSA_GENERAL, generator.generateKeyPair(), creationTime);
     } catch (final GeneralSecurityException | PGPException e) {
       throw new IllegalStateException("cannot generate a test key pair", e);
     }
@@ -139,7 +141,8 @@ public final class PgpTestKeys {
     try {
       final var generator =
           new PGPSignatureGenerator(
-              new JcaPGPContentSignerBuilder(PGPPublicKey.RSA_GENERAL, HashAlgorithmTags.SHA256)
+              new JcaPGPContentSignerBuilder(
+                      PublicKeyAlgorithmTags.RSA_GENERAL, HashAlgorithmTags.SHA256)
                   .setProvider(BouncyCastleProvider.PROVIDER_NAME),
               this.keyPair.getPublicKey());
       generator.init(signatureType, this.keyPair.getPrivateKey());
@@ -182,7 +185,8 @@ public final class PgpTestKeys {
 
       final var revocationGenerator =
           new PGPSignatureGenerator(
-              new JcaPGPContentSignerBuilder(PGPPublicKey.RSA_GENERAL, HashAlgorithmTags.SHA256)
+              new JcaPGPContentSignerBuilder(
+                      PublicKeyAlgorithmTags.RSA_GENERAL, HashAlgorithmTags.SHA256)
                   .setProvider(BouncyCastleProvider.PROVIDER_NAME),
               primary.getPublicKey());
       revocationGenerator.init(PGPSignature.SUBKEY_REVOCATION, primary.getPrivateKey());
@@ -216,7 +220,8 @@ public final class PgpTestKeys {
       final var primary = this.keyPair;
       final var bindingGenerator =
           new PGPSignatureGenerator(
-              new JcaPGPContentSignerBuilder(PGPPublicKey.RSA_GENERAL, HashAlgorithmTags.SHA256)
+              new JcaPGPContentSignerBuilder(
+                      PublicKeyAlgorithmTags.RSA_GENERAL, HashAlgorithmTags.SHA256)
                   .setProvider(BouncyCastleProvider.PROVIDER_NAME),
               primary.getPublicKey());
       bindingGenerator.init(PGPSignature.SUBKEY_BINDING, primary.getPrivateKey());
@@ -341,7 +346,8 @@ public final class PgpTestKeys {
     try {
       final var generator =
           new PGPSignatureGenerator(
-              new JcaPGPContentSignerBuilder(PGPPublicKey.RSA_GENERAL, HashAlgorithmTags.SHA256)
+              new JcaPGPContentSignerBuilder(
+                      PublicKeyAlgorithmTags.RSA_GENERAL, HashAlgorithmTags.SHA256)
                   .setProvider(BouncyCastleProvider.PROVIDER_NAME),
               this.keyPair.getPublicKey());
       generator.init(PGPSignature.CANONICAL_TEXT_DOCUMENT, this.keyPair.getPrivateKey());
@@ -372,7 +378,7 @@ public final class PgpTestKeys {
 
     final var generator =
         new PGPSignatureGenerator(
-            new JcaPGPContentSignerBuilder(PGPPublicKey.RSA_GENERAL, hashAlgorithm)
+            new JcaPGPContentSignerBuilder(PublicKeyAlgorithmTags.RSA_GENERAL, hashAlgorithm)
                 .setProvider(BouncyCastleProvider.PROVIDER_NAME),
             this.keyPair.getPublicKey());
     generator.init(PGPSignature.BINARY_DOCUMENT, this.keyPair.getPrivateKey());

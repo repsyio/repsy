@@ -40,6 +40,17 @@ public abstract class ProtocolProcessor implements Comparable<ProtocolProcessor>
     return false;
   }
 
+  /** Identity equality, which is what {@link #compareTo} reports as equal (see its last step). */
+  @Override
+  public boolean equals(final Object obj) {
+    return this == obj;
+  }
+
+  @Override
+  public int hashCode() {
+    return System.identityHashCode(this);
+  }
+
   @Override
   public int compareTo(final ProtocolProcessor processor) {
     final int priorityComparison = Integer.compare(this.getPriority(), processor.getPriority());

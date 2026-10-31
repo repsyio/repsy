@@ -194,17 +194,17 @@ class FileSystemStorageStrategyIT {
     void appendsChunksInOrder() throws Exception {
       final var key = UUID.randomUUID();
       final var sp = FileSystemStorageStrategyIT.this.storagePath(key, "upload");
-      final var strategy = FileSystemStorageStrategyIT.this.strategy;
+      final var fsStrategy = FileSystemStorageStrategyIT.this.strategy;
 
-      final var first = strategy.appendStream("repo", sp, chunk("first-"));
-      final var second = strategy.appendStream("repo", sp, chunk("second-"));
-      final var third = strategy.appendStream("repo", sp, chunk("third"));
+      final var first = fsStrategy.appendStream("repo", sp, chunk("first-"));
+      final var second = fsStrategy.appendStream("repo", sp, chunk("second-"));
+      final var third = fsStrategy.appendStream("repo", sp, chunk("third"));
 
       final var file = FileSystemStorageStrategyIT.this.basePath.resolve(key + "/upload");
       assertThat(Files.readString(file)).isEqualTo("first-second-third");
       assertThat(first.getDiskUsage() + second.getDiskUsage() + third.getDiskUsage())
           .isEqualTo(Files.size(file));
-      assertThat(strategy.getFileUsage(sp, "repo")).isEqualTo(Files.size(file));
+      assertThat(fsStrategy.getFileUsage(sp, "repo")).isEqualTo(Files.size(file));
     }
 
     @Test
