@@ -58,7 +58,7 @@ class CargoCrateMetaTest extends AbstractEntityIdentityTest<CargoCrateMeta> {
   void hashCodeAndToStringSkipAssociations() {
     final var cargoCrateMeta = this.newEntity(UUID.randomUUID());
 
-    assertThat(cargoCrateMeta.hashCode()).isEqualTo(CargoCrateMeta.class.hashCode());
+    assertThat(cargoCrateMeta).hasSameHashCodeAs(CargoCrateMeta.class);
     assertThat(cargoCrateMeta.toString()).doesNotContain("crate=");
   }
 }

@@ -62,7 +62,7 @@ class ImageTest extends AbstractEntityIdentityTest<Image> {
   void hashCodeAndToStringSkipAssociations() {
     final var image = this.newEntity(UUID.randomUUID());
 
-    assertThat(image.hashCode()).isEqualTo(Image.class.hashCode());
+    assertThat(image).hasSameHashCodeAs(Image.class);
     assertThat(image.toString()).doesNotContain("repo=");
   }
 }

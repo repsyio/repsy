@@ -67,7 +67,14 @@ class CargoPublishMetadataLengthIT extends AbstractIT {
 
   private static byte[] crateArchive() {
     final var manifest =
-        "[package]\nname = \"%s\"\n\n[lib]\n".formatted(CRATE).getBytes(StandardCharsets.UTF_8);
+        """
+        [package]
+        name = "%s"
+
+        [lib]
+        """
+            .formatted(CRATE)
+            .getBytes(StandardCharsets.UTF_8);
     final var bytes = new ByteArrayOutputStream();
 
     try (final var tar = new TarArchiveOutputStream(new GzipCompressorOutputStream(bytes))) {

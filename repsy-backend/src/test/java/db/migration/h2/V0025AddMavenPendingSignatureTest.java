@@ -122,7 +122,8 @@ class V0025AddMavenPendingSignatureTest {
   @Test
   @DisplayName("holds a whole armored signature (text) and refuses a repo that does not exist")
   void holdsTextAndNeedsARepo() {
-    assertThatThrownBy(() -> this.insertPending(UUID.randomUUID(), "a/b/1/b-1.jar"))
+    final var orphanPendingId = UUID.randomUUID();
+    assertThatThrownBy(() -> this.insertPending(orphanPendingId, "a/b/1/b-1.jar"))
         .isInstanceOf(DataIntegrityViolationException.class);
 
     final var repo = this.insertRepo();

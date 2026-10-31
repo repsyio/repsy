@@ -84,12 +84,26 @@ public final class HelmChartFixtures {
       final String name, final String version, final String appVersion, final String type) {
     final var yaml = new StringBuilder();
 
-    yaml.append("apiVersion: v2\nname: \"%s\"\nversion: \"%s\"\n".formatted(name, version));
+    yaml.append(
+        """
+        apiVersion: v2
+        name: "%s"
+        version: "%s"
+        """
+            .formatted(name, version));
     if (appVersion != null) {
-      yaml.append("appVersion: \"%s\"\n".formatted(appVersion));
+      yaml.append(
+          """
+          appVersion: "%s"
+          """
+              .formatted(appVersion));
     }
     if (type != null) {
-      yaml.append("type: \"%s\"\n".formatted(type));
+      yaml.append(
+          """
+          type: "%s"
+          """
+              .formatted(type));
     }
 
     return yaml.toString();

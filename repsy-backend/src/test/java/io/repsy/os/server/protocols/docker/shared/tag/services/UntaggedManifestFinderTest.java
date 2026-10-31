@@ -131,8 +131,9 @@ class UntaggedManifestFinderTest {
             List.of(top),
             Map.of(top, List.of(middle), middle, List.of(bottom), bottom, List.of(leaf)));
 
-    assertThat(reached).containsExactlyInAnyOrder(top, middle, bottom, leaf);
-    assertThat(reached).doesNotContain(elsewhere);
+    assertThat(reached)
+        .containsExactlyInAnyOrder(top, middle, bottom, leaf)
+        .doesNotContain(elsewhere);
   }
 
   @Test

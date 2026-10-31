@@ -290,12 +290,15 @@ public final class DockerManifestMigrationScenario {
             this.d1);
 
     // one manifest per (image, digest) and one tag per (image, name)
-    assertThatThrownBy(() -> this.insertManifest(UUID.randomUUID(), image, this.d1))
+    final var duplicateManifestId = UUID.randomUUID();
+    final var duplicateTagId = UUID.randomUUID();
+    final var orphanTagId = UUID.randomUUID();
+    assertThatThrownBy(() -> this.insertManifest(duplicateManifestId, image, this.d1))
         .isInstanceOf(DataAccessException.class);
-    assertThatThrownBy(() -> this.insertTag(UUID.randomUUID(), image, "v1", this.d1, manifest))
+    assertThatThrownBy(() -> this.insertTag(duplicateTagId, image, "v1", this.d1, manifest))
         .isInstanceOf(DataAccessException.class);
     // a tag needs a manifest
-    assertThatThrownBy(() -> this.insertTag(UUID.randomUUID(), image, "orphan", this.d1, null))
+    assertThatThrownBy(() -> this.insertTag(orphanTagId, image, "orphan", this.d1, null))
         .isInstanceOf(DataAccessException.class);
 
     // a new manifest, a tag, and a second tag of another platform; both directions of the cascade

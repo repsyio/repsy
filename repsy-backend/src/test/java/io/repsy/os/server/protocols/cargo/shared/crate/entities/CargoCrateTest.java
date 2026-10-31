@@ -66,7 +66,7 @@ class CargoCrateTest extends AbstractEntityIdentityTest<CargoCrate> {
     cargoCrate.setKeywords(new UntouchableSet<>());
     cargoCrate.setCategories(new UntouchableSet<>());
 
-    assertThat(cargoCrate.hashCode()).isEqualTo(CargoCrate.class.hashCode());
+    assertThat(cargoCrate).hasSameHashCodeAs(CargoCrate.class);
     assertThat(cargoCrate.toString())
         .doesNotContain(
             "repo=", "crateIndexes=", "crateMetas=", "authors=", "keywords=", "categories=");

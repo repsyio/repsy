@@ -62,7 +62,7 @@ class ArtifactVersionTest extends AbstractEntityIdentityTest<ArtifactVersion> {
     artifactVersion.setVersionLicenses(new UntouchableSet<>());
     artifactVersion.setVersionDevelopers(new UntouchableSet<>());
 
-    assertThat(artifactVersion.hashCode()).isEqualTo(ArtifactVersion.class.hashCode());
+    assertThat(artifactVersion).hasSameHashCodeAs(ArtifactVersion.class);
     assertThat(artifactVersion.toString())
         .doesNotContain("artifact=", "versionLicenses=", "versionDevelopers=");
   }

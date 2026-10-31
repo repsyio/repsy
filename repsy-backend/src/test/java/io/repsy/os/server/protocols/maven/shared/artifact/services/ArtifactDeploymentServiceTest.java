@@ -29,7 +29,10 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -201,7 +204,7 @@ class ArtifactDeploymentServiceTest {
             this.artifactConverter,
             this.storageStrategyRegistry);
     this.versionSignatureService =
-        org.mockito.Mockito.spy(
+        spy(
             new ArtifactSignatureService(
                 this.versionSignatureRepository,
                 this.artifactVersionRepository,
@@ -598,10 +601,9 @@ class ArtifactDeploymentServiceTest {
     final var noGav = StoragePath.of(id, GROUP_METADATA_PATH);
 
     assertThat(MavenGavUtils.getGavByFile(noGav)).isNull();
-    assertThatThrownBy(
-            () ->
-                this.artifactService.checkDeploymentRules(
-                    repo(id, true, false, true), SNAPSHOT, noGav))
+    final var deployRepo = repo(id, true, false, true);
+
+    assertThatThrownBy(() -> this.artifactService.checkDeploymentRules(deployRepo, SNAPSHOT, noGav))
         .isInstanceOf(AccessNotAllowedException.class)
         .hasMessage("snapshotVersionsAreProhibited");
     assertThatCode(
@@ -616,12 +618,11 @@ class ArtifactDeploymentServiceTest {
   void versionTypeRuleAppliesToVersionLevelMetadataPath() {
     final var id = UUID.randomUUID();
 
+    final var deployRepo = repo(id, true, false, true);
+    final var deployPath = StoragePath.of(id, SNAPSHOT_VERSION_METADATA);
+
     assertThatThrownBy(
-            () ->
-                this.artifactService.checkDeploymentRules(
-                    repo(id, true, false, true),
-                    SNAPSHOT,
-                    StoragePath.of(id, SNAPSHOT_VERSION_METADATA)))
+            () -> this.artifactService.checkDeploymentRules(deployRepo, SNAPSHOT, deployPath))
         .isInstanceOf(AccessNotAllowedException.class)
         .hasMessage("snapshotVersionsAreProhibited");
   }
@@ -651,10 +652,10 @@ class ArtifactDeploymentServiceTest {
   void refusesAPathOutsideTheArtifactLayoutBeforeAnyQuery(final String path) {
     final var id = UUID.randomUUID();
 
-    assertThatThrownBy(
-            () ->
-                this.artifactService.getVersionType(
-                    repo(id, true, true, true), StoragePath.of(id, path)))
+    final var deployRepo = repo(id, true, true, true);
+    final var deployPath = StoragePath.of(id, path);
+
+    assertThatThrownBy(() -> this.artifactService.getVersionType(deployRepo, deployPath))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("invalidArtifactPath");
     verifyNoInteractions(this.artifactRepository, this.artifactVersionRepository);
@@ -1258,12 +1259,12 @@ class ArtifactDeploymentServiceTest {
   void markSignedAnswersItemNotFoundForANonLayoutPath() {
     final var id = UUID.randomUUID();
 
+    final var deployRepo = repo(id, true, true, true);
+    final var deployPath = StoragePath.of(id, "io/stray.pom.asc");
+    final var deployBody = new ByteArrayResource(new byte[0]);
+
     assertThatThrownBy(
-            () ->
-                this.artifactService.createOrUpdateArtifact(
-                    repo(id, true, true, true),
-                    StoragePath.of(id, "io/stray.pom.asc"),
-                    new ByteArrayResource(new byte[0])))
+            () -> this.artifactService.createOrUpdateArtifact(deployRepo, deployPath, deployBody))
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessage("itemNotFound");
 
@@ -1344,12 +1345,12 @@ class ArtifactDeploymentServiceTest {
         .thenReturn(Optional.of(new ByteArrayResource(new byte[0])));
     this.stubVersion(this.stubArtifact(id), "1.0", false);
 
+    final var deployRepo = repo(id, true, true, true);
+    final var deployPath = StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.jar.asc");
+    final var deployBody = new ByteArrayResource(new byte[0]);
+
     assertThatThrownBy(
-            () ->
-                this.artifactService.verifySignature(
-                    repo(id, true, true, true),
-                    StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.jar.asc"),
-                    new ByteArrayResource(new byte[0])))
+            () -> this.artifactService.verifySignature(deployRepo, deployPath, deployBody))
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessage("artifactVersionNotFound");
 
@@ -1377,7 +1378,7 @@ class ArtifactDeploymentServiceTest {
             () -> this.artifactService.verifySignature(repo(id, true, true, true), path, signature))
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessage("itemNotFound");
-    verify(this.pendingSignatureService, org.mockito.Mockito.times(1)).park(any(), any(), any());
+    verify(this.pendingSignatureService, times(1)).park(any(), any(), any());
   }
 
   @Test
@@ -1421,12 +1422,12 @@ class ArtifactDeploymentServiceTest {
         .when(this.pgpVerifierService)
         .verify(any(), any(), any());
 
+    final var deployRepo = repoVerifyingAllSignatures(id);
+    final var deployPath = StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.jar.asc");
+    final var deployBody = new ByteArrayResource("sig".getBytes(UTF_8));
+
     assertThatThrownBy(
-            () ->
-                this.artifactService.verifySignature(
-                    repoVerifyingAllSignatures(id),
-                    StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.jar.asc"),
-                    new ByteArrayResource("sig".getBytes(UTF_8))))
+            () -> this.artifactService.verifySignature(deployRepo, deployPath, deployBody))
         .isInstanceOf(SignatureNotVerifiedException.class);
 
     verify(this.pendingSignatureService).discard(id, "com/acme/lib/1.0/lib-1.0.jar");
@@ -1475,12 +1476,12 @@ class ArtifactDeploymentServiceTest {
     when(this.pendingSignatureService.reconcileFile(any(), any()))
         .thenThrow(new SignatureNotVerifiedException("pendingSignatureNotVerified"));
 
+    final var deployRepo = repoVerifyingAllSignatures(id);
+    final var deployPath = StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.jar");
+    final var deployBody = new ByteArrayResource(new byte[0]);
+
     assertThatThrownBy(
-            () ->
-                this.artifactService.createOrUpdateArtifact(
-                    repoVerifyingAllSignatures(id),
-                    StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.jar"),
-                    new ByteArrayResource(new byte[0])))
+            () -> this.artifactService.createOrUpdateArtifact(deployRepo, deployPath, deployBody))
         .isInstanceOf(SignatureNotVerifiedException.class)
         .hasMessage("pendingSignatureNotVerified");
 
@@ -1522,12 +1523,11 @@ class ArtifactDeploymentServiceTest {
         .when(this.pendingSignatureService)
         .verifyDirectory(repoInfo, "com/acme/lib/1.0");
 
+    final var deployPath = StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.pom");
+    final var deployBody = new ByteArrayResource(POM_OF_GROUP.formatted("").getBytes(UTF_8));
+
     assertThatThrownBy(
-            () ->
-                this.artifactService.createOrUpdateArtifact(
-                    repoInfo,
-                    StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.pom"),
-                    new ByteArrayResource(POM_OF_GROUP.formatted("").getBytes(UTF_8))))
+            () -> this.artifactService.createOrUpdateArtifact(repoInfo, deployPath, deployBody))
         .isInstanceOf(SignatureNotVerifiedException.class);
 
     verifyNoInteractions(this.artifactUpsertHelper);
@@ -1602,7 +1602,7 @@ class ArtifactDeploymentServiceTest {
 
     verify(this.pendingSignatureRepository)
         .deleteByRepoIdAndSignedFilePathStartingWith(id, "com/acme/lib/1.0/");
-    verify(this.pendingSignatureRepository, org.mockito.Mockito.times(2))
+    verify(this.pendingSignatureRepository, times(2))
         .deleteByRepoIdAndSignedFilePathStartingWith(id, "com/acme/lib/");
   }
 
@@ -1636,12 +1636,11 @@ class ArtifactDeploymentServiceTest {
         .when(this.pgpVerifierService)
         .verify(pom, signature, sources);
 
+    final var deployRepo = repo(id, true, true, true);
+    final var deployPath = StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.pom.asc");
+
     assertThatThrownBy(
-            () ->
-                this.artifactService.verifySignature(
-                    repo(id, true, true, true),
-                    StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.pom.asc"),
-                    signature))
+            () -> this.artifactService.verifySignature(deployRepo, deployPath, signature))
         .isInstanceOf(SignatureNotVerifiedException.class)
         .hasMessage("artifactSignatureNotVerified");
   }
@@ -1653,12 +1652,12 @@ class ArtifactDeploymentServiceTest {
     when(this.storageStrategy.get(any(StoragePath.class), any(String.class)))
         .thenReturn(Optional.empty());
 
+    final var deployRepo = repo(id, true, true, true);
+    final var deployPath = StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.pom.asc");
+    final var deployBody = new ByteArrayResource(new byte[0]);
+
     assertThatThrownBy(
-            () ->
-                this.artifactService.verifySignature(
-                    repo(id, true, true, true),
-                    StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.pom.asc"),
-                    new ByteArrayResource(new byte[0])))
+            () -> this.artifactService.verifySignature(deployRepo, deployPath, deployBody))
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessage("itemNotFound");
 
@@ -1673,12 +1672,12 @@ class ArtifactDeploymentServiceTest {
     when(this.artifactRepository.findByRepoIdAndGroupNameAndArtifactName(id, "com.acme", "lib"))
         .thenReturn(Optional.empty());
 
+    final var deployRepo = repo(id, true, true, true);
+    final var deployPath = StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.pom.asc");
+    final var deployBody = new ByteArrayResource(new byte[0]);
+
     assertThatThrownBy(
-            () ->
-                this.artifactService.verifySignature(
-                    repo(id, true, true, true),
-                    StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.pom.asc"),
-                    new ByteArrayResource(new byte[0])))
+            () -> this.artifactService.verifySignature(deployRepo, deployPath, deployBody))
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessage("artifactVersionNotFound");
 
@@ -1692,12 +1691,12 @@ class ArtifactDeploymentServiceTest {
     this.stubStoredPom("com/acme/lib/1.0/lib-1.0.pom");
     this.stubVersion(this.stubArtifact(id), "1.0", false);
 
+    final var deployRepo = repo(id, true, true, true);
+    final var deployPath = StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.pom.asc");
+    final var deployBody = new ByteArrayResource(new byte[0]);
+
     assertThatThrownBy(
-            () ->
-                this.artifactService.verifySignature(
-                    repo(id, true, true, true),
-                    StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.pom.asc"),
-                    new ByteArrayResource(new byte[0])))
+            () -> this.artifactService.verifySignature(deployRepo, deployPath, deployBody))
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessage("artifactVersionNotFound");
 
@@ -1728,12 +1727,12 @@ class ArtifactDeploymentServiceTest {
     final var id = UUID.randomUUID();
     this.stubVersion(this.stubArtifact(id), "1.0", false);
 
+    final var deployRepo = repo(id, true, true, true);
+    final var deployPath = StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.pom.asc");
+    final var deployBody = new ByteArrayResource(new byte[0]);
+
     assertThatThrownBy(
-            () ->
-                this.artifactService.createOrUpdateArtifact(
-                    repo(id, true, true, true),
-                    StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.pom.asc"),
-                    new ByteArrayResource(new byte[0])))
+            () -> this.artifactService.createOrUpdateArtifact(deployRepo, deployPath, deployBody))
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessage("artifactVersionNotFound");
 
@@ -1932,12 +1931,12 @@ class ArtifactDeploymentServiceTest {
     when(this.repoTxService.requireRepo("mvn", RepoType.MAVEN))
         .thenThrow(new ItemNotFoundException(ProtocolErrorCodes.REPO_NOT_FOUND));
 
+    final var deployRepo = repo(id, true, true, true);
+    final var deployPath = StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.pom");
+    final var deployBody = new ByteArrayResource(POM_OF_GROUP.formatted("").getBytes(UTF_8));
+
     assertThatThrownBy(
-            () ->
-                this.artifactService.createOrUpdateArtifact(
-                    repo(id, true, true, true),
-                    StoragePath.of(id, "com/acme/lib/1.0/lib-1.0.pom"),
-                    new ByteArrayResource(POM_OF_GROUP.formatted("").getBytes(UTF_8))))
+            () -> this.artifactService.createOrUpdateArtifact(deployRepo, deployPath, deployBody))
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessage("repoNotFound");
   }
@@ -2090,10 +2089,10 @@ class ArtifactDeploymentServiceTest {
               "com/acme/lib/" + tooLong + "-SNAPSHOT/lib-" + tooLong + "-20260921.101010-1.jar";
         };
 
-    assertThatThrownBy(
-            () ->
-                this.artifactService.getVersionType(
-                    repo(id, true, true, true), StoragePath.of(id, path)))
+    final var deployRepo = repo(id, true, true, true);
+    final var deployPath = StoragePath.of(id, path);
+
+    assertThatThrownBy(() -> this.artifactService.getVersionType(deployRepo, deployPath))
         .isInstanceOf(BadRequestException.class)
         .hasMessage(messageId);
 
@@ -2144,10 +2143,10 @@ class ArtifactDeploymentServiceTest {
     final var limit = "a".repeat(255);
     final var path = "com/" + limit + "/1.0/" + limit + "-1.0.jar";
 
-    assertThatThrownBy(
-            () ->
-                this.artifactService.getVersionType(
-                    repo(id, true, true, true), StoragePath.of(id, path)))
+    final var deployRepo = repo(id, true, true, true);
+    final var deployPath = StoragePath.of(id, path);
+
+    assertThatThrownBy(() -> this.artifactService.getVersionType(deployRepo, deployPath))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("mavenFileNameTooLong");
 
@@ -2466,7 +2465,7 @@ class ArtifactDeploymentServiceTest {
   void theJarOfAnOrdinaryArtifactIsNotRead() throws Exception {
     final var id = UUID.randomUUID();
     this.registeredPlugin(id, false);
-    final var jar = org.mockito.Mockito.mock(Resource.class);
+    final var jar = mock(Resource.class);
 
     assertThat(
             this.artifactService.refreshPluginPrefixFromJar(
@@ -2547,7 +2546,7 @@ class ArtifactDeploymentServiceTest {
       final List<ArtifactVersionListItem> rows =
           Arrays.stream(versionNames)
               .map(VersionRow::new)
-              .map(row -> (ArtifactVersionListItem) row)
+              .map(ArtifactVersionListItem.class::cast)
               .toList();
 
       when(ArtifactDeploymentServiceTest.this.artifactVersionRepository

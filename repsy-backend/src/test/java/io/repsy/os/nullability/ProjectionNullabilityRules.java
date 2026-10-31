@@ -60,7 +60,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
  */
 final class ProjectionNullabilityRules {
 
-  private static final Pattern PATH = Pattern.compile("\\w+(\\.\\w+)+");
+  private static final Pattern PATH = Pattern.compile("\\w++(\\.\\w++)++");
   private static final Pattern CAST =
       Pattern.compile("cast\\s*\\((.+)\\s+as\\s+\\w+\\)", Pattern.CASE_INSENSITIVE);
   private static final Pattern COUNT = Pattern.compile("count\\s*\\(.*", Pattern.CASE_INSENSITIVE);
@@ -326,7 +326,7 @@ final class ProjectionNullabilityRules {
               && singular.getType() instanceof EntityType<?>
           ? singular
           : null;
-    } catch (final IllegalArgumentException e) {
+    } catch (final IllegalArgumentException _) {
       return null;
     }
   }
@@ -337,7 +337,7 @@ final class ProjectionNullabilityRules {
 
     try {
       attribute = this.entityManagerFactory.getMetamodel().entity(entity).getAttribute(name);
-    } catch (final IllegalArgumentException e) {
+    } catch (final IllegalArgumentException _) {
       return new Derived(
           Verdict.UNKNOWN,
           backing + "." + name,
@@ -451,7 +451,7 @@ final class ProjectionNullabilityRules {
       return attribute instanceof jakarta.persistence.metamodel.PluralAttribute<?, ?, ?> plural
           ? plural.getElementType().getJavaType()
           : null;
-    } catch (final IllegalArgumentException e) {
+    } catch (final IllegalArgumentException _) {
       return null;
     }
   }

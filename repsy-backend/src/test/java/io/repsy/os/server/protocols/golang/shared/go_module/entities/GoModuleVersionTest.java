@@ -59,7 +59,7 @@ class GoModuleVersionTest extends AbstractEntityIdentityTest<GoModuleVersion> {
   void hashCodeAndToStringSkipAssociations() {
     final var goModuleVersion = this.newEntity(UUID.randomUUID());
 
-    assertThat(goModuleVersion.hashCode()).isEqualTo(GoModuleVersion.class.hashCode());
+    assertThat(goModuleVersion).hasSameHashCodeAs(GoModuleVersion.class);
     assertThat(goModuleVersion.toString()).doesNotContain("goModule=");
   }
 }

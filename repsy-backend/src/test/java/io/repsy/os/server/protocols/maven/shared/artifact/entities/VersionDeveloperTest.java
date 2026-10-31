@@ -58,7 +58,7 @@ class VersionDeveloperTest extends AbstractEntityIdentityTest<VersionDeveloper> 
   void hashCodeAndToStringSkipAssociations() {
     final var versionDeveloper = this.newEntity(UUID.randomUUID());
 
-    assertThat(versionDeveloper.hashCode()).isEqualTo(VersionDeveloper.class.hashCode());
+    assertThat(versionDeveloper).hasSameHashCodeAs(VersionDeveloper.class);
     assertThat(versionDeveloper.toString()).doesNotContain("artifactVersion=");
   }
 }

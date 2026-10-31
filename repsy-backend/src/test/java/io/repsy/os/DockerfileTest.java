@@ -82,7 +82,7 @@ class DockerfileTest {
 
   private static List<String> volumes(final String stage) {
     final var result = new ArrayList<String>();
-    final Matcher m = Pattern.compile("^VOLUME\\s+(.+)$", Pattern.MULTILINE).matcher(stage);
+    final Matcher m = Pattern.compile("^VOLUME\\s++(\\S.*)$", Pattern.MULTILINE).matcher(stage);
     while (m.find()) {
       for (final String v : m.group(1).replaceAll("[\\[\\]\",]", " ").trim().split("\\s+")) {
         result.add(v);

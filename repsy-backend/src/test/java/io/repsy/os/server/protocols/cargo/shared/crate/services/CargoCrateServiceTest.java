@@ -356,11 +356,13 @@ class CargoCrateServiceTest {
           .when(CargoCrateServiceTest.this.crateIndexRepository)
           .flush();
 
+      final var request = this.request();
+
       assertThatThrownBy(
               () ->
                   CargoCrateServiceTest.this.cargoCrateService.publish(
                       this.repoInfo,
-                      this.request(),
+                      request,
                       null,
                       () -> {
                         writerRan.set(true);
@@ -379,11 +381,13 @@ class CargoCrateServiceTest {
       final var other = this.violation("23514", "violates check constraint ch_other");
       doThrow(other).when(CargoCrateServiceTest.this.crateIndexRepository).flush();
 
+      final var request = this.request();
+
       assertThatThrownBy(
               () ->
                   CargoCrateServiceTest.this.cargoCrateService.publish(
                       this.repoInfo,
-                      this.request(),
+                      request,
                       null,
                       () -> {
                         writerRan.set(true);
@@ -412,11 +416,13 @@ class CargoCrateServiceTest {
     void propagatesAWriterFailure() {
       final var failure = new IOException("disk full");
 
+      final var request = this.request();
+
       assertThatThrownBy(
               () ->
                   CargoCrateServiceTest.this.cargoCrateService.publish(
                       this.repoInfo,
-                      this.request(),
+                      request,
                       null,
                       () -> {
                         throw failure;
@@ -468,11 +474,13 @@ class CargoCrateServiceTest {
           .thenReturn(Optional.of(new CargoCrateIndex()));
       final var writerRan = new AtomicBoolean();
 
+      final var request = this.request();
+
       assertThatThrownBy(
               () ->
                   CargoCrateServiceTest.this.cargoCrateService.publish(
                       this.repoInfo,
-                      this.request(),
+                      request,
                       null,
                       () -> {
                         writerRan.set(true);

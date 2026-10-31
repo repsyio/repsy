@@ -771,15 +771,6 @@ class HelmChartControllerIT extends AbstractIT {
         result, HttpStatus.NOT_FOUND, "repoNotFound", "repoNotFound", "Repository not found");
   }
 
-  private static void expectInternalError(final ResultActions result) throws Exception {
-    expectError(
-        result, HttpStatus.INTERNAL_SERVER_ERROR, "errorOccurred", null, "An error occurred.");
-  }
-
-  // ---------------------------------------------------------------------------------------------
-  // GET /api/helm/charts/{repoName}
-  // ---------------------------------------------------------------------------------------------
-
   @Nested
   @DisplayName("GET /api/helm/charts/{repoName} (search)")
   class Search {
@@ -1120,10 +1111,6 @@ class HelmChartControllerIT extends AbstractIT {
     }
   }
 
-  // ---------------------------------------------------------------------------------------------
-  // GET /api/helm/charts/{repoName}/{packageName}
-  // ---------------------------------------------------------------------------------------------
-
   @Nested
   @DisplayName("GET /api/helm/charts/{repoName}/{packageName} (chart)")
   class Chart {
@@ -1215,10 +1202,6 @@ class HelmChartControllerIT extends AbstractIT {
       expectChartNotFound(it.chartRequest(repo, "PAYMENTS", token));
     }
   }
-
-  // ---------------------------------------------------------------------------------------------
-  // GET /api/helm/charts/{repoName}/{packageName}/versions
-  // ---------------------------------------------------------------------------------------------
 
   @Nested
   @DisplayName("GET /api/helm/charts/{repoName}/{packageName}/versions")
@@ -1511,10 +1494,6 @@ class HelmChartControllerIT extends AbstractIT {
     }
   }
 
-  // ---------------------------------------------------------------------------------------------
-  // GET /api/helm/charts/{repoName}/{name}/{version}
-  // ---------------------------------------------------------------------------------------------
-
   @Nested
   @DisplayName("GET /api/helm/charts/{repoName}/{packageName}/versions/{version} (detail)")
   class Detail {
@@ -1620,10 +1599,6 @@ class HelmChartControllerIT extends AbstractIT {
       expectChartNotFound(it.detailRequest(repo, "PAYMENTS", "1.0.0", token));
     }
   }
-
-  // ---------------------------------------------------------------------------------------------
-  // GET /api/helm/charts/{repoName}/{name}/tags
-  // ---------------------------------------------------------------------------------------------
 
   @Nested
   @DisplayName("GET /api/helm/charts/{repoName}/{name}/tags (OCI tags)")
@@ -1779,10 +1754,6 @@ class HelmChartControllerIT extends AbstractIT {
     }
   }
 
-  // ---------------------------------------------------------------------------------------------
-  // DELETE /api/helm/charts/{repoName}/{name}/versions/{version}
-  // ---------------------------------------------------------------------------------------------
-
   @Nested
   @DisplayName("DELETE /api/helm/charts/{repoName}/{name}/versions/{version}")
   class DeleteVersion {
@@ -1897,10 +1868,6 @@ class HelmChartControllerIT extends AbstractIT {
       assertThat(Files.exists(it.chartFile(repo, "payments", "1.0.0"))).isTrue();
     }
   }
-
-  // ---------------------------------------------------------------------------------------------
-  // DELETE /api/helm/charts/{repoName}/{name}
-  // ---------------------------------------------------------------------------------------------
 
   @Nested
   @DisplayName("DELETE /api/helm/charts/{repoName}/{name}")

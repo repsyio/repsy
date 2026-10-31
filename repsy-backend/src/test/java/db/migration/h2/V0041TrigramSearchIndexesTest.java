@@ -33,13 +33,12 @@ class V0041TrigramSearchIndexesTest {
   @Test
   @DisplayName("the H2 history migrates through 41")
   void migrates() {
-    final var dataSource =
+    try (final var dataSource =
         new SingleConnectionDataSource(
             "jdbc:h2:mem:" + UUID.randomUUID() + ";MODE=PostgreSQL;DB_CLOSE_DELAY=-1",
             "sa",
             "",
-            true);
-    try {
+            true)) {
       final var flyway =
           Flyway.configure()
               .dataSource(dataSource)
@@ -51,8 +50,6 @@ class V0041TrigramSearchIndexesTest {
 
       assertThat(flyway.migrate().success).isTrue();
       assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("0041");
-    } finally {
-      dataSource.destroy();
     }
   }
 }

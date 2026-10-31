@@ -106,12 +106,10 @@ class ProjectionNullabilityIT extends AbstractIT {
     final var rules = new ProjectionNullabilityRules(this.entityManagerFactory, this.jdbcTemplate);
     final var projections = new TreeSet<String>();
     final var violations = new TreeMap<String, String>();
-    final var seen = new TreeSet<String>();
 
     for (final var repository : RepositoryNullabilityTest.repositories()) {
       for (final var finding : rules.check(repository, true)) {
         projections.add(finding.projection().getName());
-        seen.add(finding.key());
 
         if (finding.violates()) {
           violations.putIfAbsent(finding.key(), finding.toString());
@@ -119,9 +117,9 @@ class ProjectionNullabilityIT extends AbstractIT {
       }
     }
 
-    assertThat(projections.size())
+    assertThat(projections)
         .as("projections found in the marked packages: %s", projections)
-        .isGreaterThan(15);
+        .hasSizeGreaterThan(15);
 
     final var unexpected = new TreeMap<>(violations);
     unexpected.keySet().removeAll(FROZEN.keySet());

@@ -43,6 +43,7 @@ import io.repsy.protocols.helm.shared.chart.dtos.HelmChartForm;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -50,6 +51,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -250,24 +252,28 @@ class HelmConcurrentOverrideIT extends AbstractIT {
    * Both are the states the assertions after it are written for: a push that is done here got its
    * answer without waiting, which the assertions then judge.
    */
-  private void awaitBlockedOrDone(final Future<?> second) throws Exception {
-    final var deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(TIMEOUT_SECONDS);
+  private void awaitBlockedOrDone(final Future<?> second) {
+    Awaitility.await("the second push is blocked on a lock or done")
+        .atMost(Duration.ofSeconds(TIMEOUT_SECONDS))
+        .pollInterval(Duration.ofMillis(20))
+        .until(
+            () -> {
+              if (second.isDone()) {
+                return true;
+              }
 
-    while (!second.isDone() && System.nanoTime() < deadline) {
-      final var blocked =
-          this.jdbcTemplate.queryForObject(
-              """
-              select count(*) from pg_stat_activity
-              where datname = current_database()
-                and wait_event_type = 'Lock'
-                and query ilike '%helm_chart%'
-              """,
-              Integer.class);
-      if (blocked != null && blocked > 0) {
-        return;
-      }
-      TimeUnit.MILLISECONDS.sleep(20);
-    }
+              final var blocked =
+                  this.jdbcTemplate.queryForObject(
+                      """
+                      select count(*) from pg_stat_activity
+                      where datname = current_database()
+                        and wait_event_type = 'Lock'
+                        and query ilike '%helm_chart%'
+                      """,
+                      Integer.class);
+
+              return blocked != null && blocked > 0;
+            });
   }
 
   @Test
@@ -384,7 +390,7 @@ class HelmConcurrentOverrideIT extends AbstractIT {
   private boolean await(final CountDownLatch latch) {
     try {
       return latch.await(TIMEOUT_SECONDS, TimeUnit.SECONDS);
-    } catch (final InterruptedException e) {
+    } catch (final InterruptedException _) {
       Thread.currentThread().interrupt();
       return false;
     }

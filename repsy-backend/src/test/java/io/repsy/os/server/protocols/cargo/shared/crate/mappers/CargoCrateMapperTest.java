@@ -122,7 +122,6 @@ class CargoCrateMapperTest {
     final var objectMapper = new ObjectMapper();
     final var json = objectMapper.writeValueAsString(entry);
 
-    assertThat(json).doesNotContain("features2");
-    assertThat(json).contains("\"features\":{}");
+    assertThat(json).doesNotContain("features2").contains("\"features\":{}");
   }
 }

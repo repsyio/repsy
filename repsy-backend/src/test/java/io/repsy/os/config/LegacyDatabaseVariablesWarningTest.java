@@ -117,8 +117,10 @@ class LegacyDatabaseVariablesWarningTest {
 
     final var message = LegacyDatabaseVariablesWarning.warningFor(env).orElseThrow();
 
-    assertThat(message).doesNotContain("s3cr3t").doesNotContain("DB_PASSWORD=");
-    assertThat(message).doesNotContain("jdbc:h2");
+    assertThat(message)
+        .doesNotContain("s3cr3t")
+        .doesNotContain("DB_PASSWORD=")
+        .doesNotContain("jdbc:h2");
   }
 
   @Test

@@ -56,7 +56,9 @@ class NullMarkedRepositoryIT extends AbstractIT {
 
   @Test
   void aBareAggregateThatIsNullIsRefused() {
-    assertThatThrownBy(() -> this.probe.bareAggregate(UUID.randomUUID()))
+    final var unknownId = UUID.randomUUID();
+
+    assertThatThrownBy(() -> this.probe.bareAggregate(unknownId))
         .isInstanceOf(EmptyResultDataAccessException.class);
   }
 

@@ -361,8 +361,8 @@ class HelmConcurrentModificationIT extends AbstractIT {
       final int afterReads,
       final int times) {
     final var reads = new AtomicInteger();
-    final var bumps = new AtomicInteger();
-    this.bumps = bumps;
+    final var forcedBumps = new AtomicInteger();
+    this.bumps = forcedBumps;
 
     this.runs.set(0);
 
@@ -373,8 +373,8 @@ class HelmConcurrentModificationIT extends AbstractIT {
           }
           if (called.equals(method)
               && reads.incrementAndGet() >= afterReads
-              && bumps.get() < times) {
-            bumps.incrementAndGet();
+              && forcedBumps.get() < times) {
+            forcedBumps.incrementAndGet();
             this.jdbcTemplate.update(sql, repo.getId());
           }
         });
@@ -626,10 +626,9 @@ class HelmConcurrentModificationIT extends AbstractIT {
     assertThat(this.rows("helm_oci_blob", repo)).as("one row for the one blob").isEqualTo(1);
   }
 
-  /** Pushes {@code content} of {@code name} 1.0.0 through the classic chart upload. */
+  /** Pushes {@code content} as version 1.0.0 through the classic chart upload. */
   private MockHttpServletResponse classicPush(
-      final Repo repo, final String name, final byte[] content, final String token)
-      throws Exception {
+      final Repo repo, final byte[] content, final String token) throws Exception {
     return this.mockMvc
         .perform(
             multipart(UPLOAD_PATH, repo.getName())
@@ -743,7 +742,7 @@ class HelmConcurrentModificationIT extends AbstractIT {
     // The override reads the version row once, then updates it with the @Version it read.
     this.bumpAfterRead(VERSION_READ, BUMP_VERSION, repo, 1, 1);
 
-    final var lost = this.classicPush(repo, name, chart(name, "1.0.0", "2", null), token);
+    final var lost = this.classicPush(repo, chart(name, "1.0.0", "2", null), token);
 
     assertThat(lost.getStatus()).as("a protocol port asks the client to retry").isEqualTo(503);
     assertThat(lost.getHeader("Retry-After")).isEqualTo("1");
@@ -754,7 +753,7 @@ class HelmConcurrentModificationIT extends AbstractIT {
 
     AFTER_READ.set(null);
 
-    assertThat(this.classicPush(repo, name, chart(name, "1.0.0", "2", null), token).getStatus())
+    assertThat(this.classicPush(repo, chart(name, "1.0.0", "2", null), token).getStatus())
         .as("the same push repeated without contention")
         .isEqualTo(201);
     assertThat(this.chartDigest(repo, name)).isNotEqualTo(before);
@@ -767,7 +766,7 @@ class HelmConcurrentModificationIT extends AbstractIT {
   private static boolean await(final CountDownLatch latch) {
     try {
       return latch.await(HOLD_SECONDS, TimeUnit.SECONDS);
-    } catch (final InterruptedException e) {
+    } catch (final InterruptedException _) {
       Thread.currentThread().interrupt();
       return false;
     }

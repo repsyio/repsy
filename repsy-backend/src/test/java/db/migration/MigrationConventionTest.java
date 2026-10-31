@@ -125,8 +125,12 @@ class MigrationConventionTest {
     write(
         pg,
         "V0005__Safe_Alter.sql",
-        "SET lock_timeout = '5s';\nALTER TABLE repo ADD COLUMN w integer;\n"
-            + "CREATE TABLE fresh (id bigint);\nCREATE INDEX ix_d ON fresh (id);");
+        """
+        SET lock_timeout = '5s';
+        ALTER TABLE repo ADD COLUMN w integer;
+        CREATE TABLE fresh (id bigint);
+        CREATE INDEX ix_d ON fresh (id);\
+        """);
     write(h2, "V0005__Safe_Alter.sql", "ALTER TABLE repo ADD COLUMN w integer;");
     write(
         pg,

@@ -198,9 +198,10 @@ class HelmIndexChartMetadataIT extends AbstractIT {
 
     final var entry = this.entries(repo).get("1.0.0");
 
-    assertThat(entry.get("apiVersion")).isEqualTo("v2");
-    assertThat(entry.get("dependencies"))
-        .isEqualTo(
+    assertThat(entry).containsEntry("apiVersion", "v2");
+    assertThat(entry)
+        .containsEntry(
+            "dependencies",
             List.of(
                 Map.of(
                     "name", "postgresql",
@@ -224,10 +225,12 @@ class HelmIndexChartMetadataIT extends AbstractIT {
 
     final var entry = this.entries(repo).get("1.0.0");
 
-    assertThat(entry.get("apiVersion")).isEqualTo("v2");
+    assertThat(entry).containsEntry("apiVersion", "v2");
     assertThat((List<?>) entry.get("dependencies")).hasSize(2);
-    assertThat(((Map<?, ?>) ((List<?>) entry.get("dependencies")).getFirst()).get("name"))
-        .isEqualTo("postgresql");
+    @SuppressWarnings("unchecked")
+    final var firstDependency =
+        (Map<String, Object>) ((List<?>) entry.get("dependencies")).getFirst();
+    assertThat(firstDependency).containsEntry("name", "postgresql");
   }
 
   @Test
@@ -263,8 +266,8 @@ class HelmIndexChartMetadataIT extends AbstractIT {
     final var entries = this.entries(repo);
 
     assertThat(entries.get("1.0.0")).doesNotContainKey("dependencies");
-    assertThat(entries.get("2.0.0").get("dependencies"))
-        .isEqualTo(List.of(Map.of("name", "kafka")));
+    assertThat(entries.get("2.0.0"))
+        .containsEntry("dependencies", List.of(Map.of("name", "kafka")));
   }
 
   @Test

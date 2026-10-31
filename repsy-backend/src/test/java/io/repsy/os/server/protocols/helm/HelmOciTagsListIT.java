@@ -215,8 +215,7 @@ class HelmOciTagsListIT extends AbstractIT {
 
     final var body = response.getContentAsString(StandardCharsets.UTF_8);
     final List<String> tags = JsonPath.read(body, "$.tags");
-    assertThat(tags).containsExactly("1.0.0");
-    assertThat(tags).doesNotContain(manifestDigest);
+    assertThat(tags).containsExactly("1.0.0").doesNotContain(manifestDigest);
   }
 
   @Test

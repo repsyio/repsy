@@ -48,6 +48,7 @@ import java.util.zip.ZipOutputStream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.invocation.InvocationOnMock;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -335,7 +336,7 @@ class GolangPublishStorageConsistencyIT extends AbstractIT {
     assertThat(this.upload(repo, modulePath, "v1.0.0", zip, token).getStatus()).isEqualTo(500);
     assertThat(storedFiles(repo)).isEmpty();
 
-    doAnswer(invocation -> invocation.callRealMethod())
+    doAnswer(InvocationOnMock::callRealMethod)
         .when(this.golangStorageService)
         .writeInputStreamToPath(any(), any(), any());
 
@@ -407,7 +408,7 @@ class GolangPublishStorageConsistencyIT extends AbstractIT {
               releaseWinner.await(30, TimeUnit.SECONDS);
               return invocation.callRealMethod();
             })
-        .doAnswer(invocation -> invocation.callRealMethod())
+        .doAnswer(InvocationOnMock::callRealMethod)
         .when(this.golangStorageService)
         .writeInputStreamToPath(any(), any(), any());
 
@@ -456,7 +457,7 @@ class GolangPublishStorageConsistencyIT extends AbstractIT {
               releaseFirst.await(30, TimeUnit.SECONDS);
               return invocation.callRealMethod();
             })
-        .doAnswer(invocation -> invocation.callRealMethod())
+        .doAnswer(InvocationOnMock::callRealMethod)
         .when(this.golangStorageService)
         .writeInputStreamToPath(any(), any(), any());
 
@@ -503,7 +504,7 @@ class GolangPublishStorageConsistencyIT extends AbstractIT {
               releaseWinner.await(30, TimeUnit.SECONDS);
               return invocation.callRealMethod();
             })
-        .doAnswer(invocation -> invocation.callRealMethod())
+        .doAnswer(InvocationOnMock::callRealMethod)
         .when(this.golangStorageService)
         .writeInputStreamToPath(any(), any(), any());
 

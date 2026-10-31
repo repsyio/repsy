@@ -34,6 +34,7 @@ import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -45,6 +46,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -180,23 +182,19 @@ class DockerImageDeleteRaceIT extends AbstractIT {
   }
 
   /** Waits until some backend is blocked on a row lock, i.e. the two requests have met. */
-  private void awaitABlockedBackend() throws InterruptedException {
-    final var deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(TIMEOUT_SECONDS);
+  private void awaitABlockedBackend() {
+    Awaitility.await("a request waits for the other one's lock")
+        .atMost(Duration.ofSeconds(TIMEOUT_SECONDS))
+        .pollInterval(Duration.ofMillis(20))
+        .until(
+            () -> {
+              final var waiting =
+                  this.jdbcTemplate.queryForObject(
+                      "select count(*) from pg_stat_activity where wait_event_type = 'Lock'",
+                      Integer.class);
 
-    while (System.nanoTime() < deadline) {
-      final var waiting =
-          this.jdbcTemplate.queryForObject(
-              "select count(*) from pg_stat_activity where wait_event_type = 'Lock'",
-              Integer.class);
-
-      if (waiting != null && waiting > 0) {
-        return;
-      }
-
-      Thread.sleep(20);
-    }
-
-    throw new IllegalStateException("no request ever waited for the other one's lock");
+              return waiting != null && waiting > 0;
+            });
   }
 
   @Test

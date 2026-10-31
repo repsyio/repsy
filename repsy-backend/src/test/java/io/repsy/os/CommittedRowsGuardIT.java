@@ -160,8 +160,8 @@ class CommittedRowsGuardIT extends AbstractIT {
 
     @Test
     void commitsAndForgetsToClean() {
-      commitUser(this);
-      commitRepo(this);
+      assertThat(commitUser(this)).isNotNull();
+      assertThat(commitRepo(this).getId()).isNotNull();
     }
   }
 
@@ -173,6 +173,8 @@ class CommittedRowsGuardIT extends AbstractIT {
     void commitsAndCleansUp() {
       final var userId = commitUser(this);
       final var repo = commitRepo(this);
+      assertThat(userId).isNotNull();
+      assertThat(repo.getId()).isNotNull();
 
       this.repoRepository.deleteById(repo.getId());
       this.userRepository.deleteById(userId);
@@ -197,6 +199,7 @@ class CommittedRowsGuardIT extends AbstractIT {
       @Test
       void commitsAndLeavesTheCleanupToTheOuterClass() {
         COMMITTED_USERS.add(commitUser(NestedFixture.this));
+        assertThat(COMMITTED_USERS).isNotEmpty();
       }
     }
   }
@@ -206,8 +209,8 @@ class CommittedRowsGuardIT extends AbstractIT {
 
     @Test
     void createsRowsInsideTheTestTransaction() {
-      this.createUser(uniqueUsername("guard"), UserRole.USER);
-      this.seedRepo(RepoType.NPM, uniqueRepoName("guard"));
+      assertThat(this.createUser(uniqueUsername("guard"), UserRole.USER)).isNotNull();
+      assertThat(this.seedRepo(RepoType.NPM, uniqueRepoName("guard"))).isNotNull();
     }
   }
 }

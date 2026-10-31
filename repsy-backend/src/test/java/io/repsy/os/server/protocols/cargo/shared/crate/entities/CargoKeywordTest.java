@@ -58,7 +58,7 @@ class CargoKeywordTest extends AbstractEntityIdentityTest<CargoKeyword> {
     final var cargoKeyword = this.newEntity(UUID.randomUUID());
     cargoKeyword.setCrates(new UntouchableSet<>());
 
-    assertThat(cargoKeyword.hashCode()).isEqualTo(CargoKeyword.class.hashCode());
+    assertThat(cargoKeyword).hasSameHashCodeAs(CargoKeyword.class);
     assertThat(cargoKeyword.toString()).doesNotContain("crates=");
   }
 }

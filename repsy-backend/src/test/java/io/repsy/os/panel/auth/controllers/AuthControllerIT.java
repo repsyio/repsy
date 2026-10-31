@@ -102,7 +102,6 @@ class AuthControllerIT extends AbstractIT {
   private static final String PASSWORD_TOO_LONG_TEXT =
       "Password is too long. Use at most 72 bytes; non-ASCII characters take more than one.";
   private static final String ACCESS_NOT_ALLOWED_TEXT = "Access isn't allowed.";
-  private static final String INTERNAL_ERROR_TEXT = "An error occurred.";
 
   private static final String[] LOGIN_INFO_KEYS = {"username", "token", "refreshToken"};
 
@@ -248,11 +247,6 @@ class AuthControllerIT extends AbstractIT {
         "refreshTokenExpired",
         "refreshTokenExpired",
         "Refresh token expired.");
-  }
-
-  private static void expectInternalError(final ResultActions result) throws Exception {
-    expectError(
-        result, HttpStatus.INTERNAL_SERVER_ERROR, "errorOccurred", null, INTERNAL_ERROR_TEXT);
   }
 
   /**
@@ -1431,7 +1425,7 @@ class AuthControllerIT extends AbstractIT {
     @DisplayName("are deleted with the user when an admin deletes the account")
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     void adminDeletesUser() throws Exception {
-      final var userId = UserDeletion.this.committedUserWithSessions();
+      final var userId = this.committedUserWithSessions();
 
       try {
         expectNoContent(
@@ -1442,7 +1436,7 @@ class AuthControllerIT extends AbstractIT {
                         AuthControllerIT.this.bearerTokenFor(
                             AuthControllerIT.this.seededAdmin()))));
 
-        assertThat(UserDeletion.this.refreshTokenRows(userId)).isZero();
+        assertThat(this.refreshTokenRows(userId)).isZero();
       } finally {
         AuthControllerIT.this.deleteCommittedUsers(List.of(userId));
       }
@@ -1452,7 +1446,7 @@ class AuthControllerIT extends AbstractIT {
     @DisplayName("are deleted with the user when the user deletes their own profile")
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     void userDeletesProfile() throws Exception {
-      final var userId = UserDeletion.this.committedUserWithSessions();
+      final var userId = this.committedUserWithSessions();
 
       try {
         expectNoContent(
@@ -1463,7 +1457,7 @@ class AuthControllerIT extends AbstractIT {
                         AuthControllerIT.this.bearerTokenFor(
                             AuthControllerIT.this.userRepository.findById(userId).orElseThrow()))));
 
-        assertThat(UserDeletion.this.refreshTokenRows(userId)).isZero();
+        assertThat(this.refreshTokenRows(userId)).isZero();
       } finally {
         AuthControllerIT.this.deleteCommittedUsers(List.of(userId));
       }
@@ -1473,14 +1467,14 @@ class AuthControllerIT extends AbstractIT {
     @DisplayName("of other users are left alone")
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     void otherUsersKeepTheirTokens() throws Exception {
-      final var deletedId = UserDeletion.this.committedUserWithSessions();
-      final var keptId = UserDeletion.this.committedUserWithSessions();
+      final var deletedId = this.committedUserWithSessions();
+      final var keptId = this.committedUserWithSessions();
 
       try {
         AuthControllerIT.this.userTxService.deleteUserById(deletedId);
 
-        assertThat(UserDeletion.this.refreshTokenRows(deletedId)).isZero();
-        assertThat(UserDeletion.this.refreshTokenRows(keptId)).isEqualTo(2);
+        assertThat(this.refreshTokenRows(deletedId)).isZero();
+        assertThat(this.refreshTokenRows(keptId)).isEqualTo(2);
       } finally {
         AuthControllerIT.this.deleteCommittedUsers(List.of(deletedId, keptId));
       }
@@ -1498,7 +1492,7 @@ class AuthControllerIT extends AbstractIT {
       try {
         expectBare(AuthControllerIT.this.login(username, VALID_PASSWORD));
         expectBare(AuthControllerIT.this.login(username, VALID_PASSWORD));
-        assertThat(UserDeletion.this.refreshTokenRows(userId)).isEqualTo(2);
+        assertThat(this.refreshTokenRows(userId)).isEqualTo(2);
       } catch (final Exception | AssertionError e) {
         AuthControllerIT.this.deleteCommittedUsers(List.of(userId));
         throw e;

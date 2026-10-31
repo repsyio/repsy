@@ -21,7 +21,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -367,10 +366,12 @@ class ArtifactServiceQueriesTest {
   void pomFileNameOfAVersionWithoutATypeThrows() {
     final var repoInfo = RepoInfo.builder().id(REPO_ID).storageKey(REPO_ID).name("mvn").build();
 
+    final var directory = Path.of("/com/acme/lib");
+
     assertThatThrownBy(
             () ->
                 this.artifactQueryService.getArtifactVersionPomFilename(
-                    repoInfo, Path.of("/com/acme/lib"), null, "lib", "1.0"))
+                    repoInfo, directory, null, "lib", "1.0"))
         .isInstanceOf(NullPointerException.class);
   }
 
@@ -407,7 +408,7 @@ class ArtifactServiceQueriesTest {
   void registeredPluginsAndVersions() {
     final var storageKey = UUID.randomUUID();
     final var repoInfo = RepoInfo.builder().id(REPO_ID).storageKey(storageKey).name("mvn").build();
-    when(this.artifactRepository.findRegisteredPlugins(eq(storageKey), eq("com.acme")))
+    when(this.artifactRepository.findRegisteredPlugins(storageKey, "com.acme"))
         .thenReturn(List.of());
     when(this.artifactVersionRepository.findRegisteredVersions(storageKey, "com.acme", "lib"))
         .thenReturn(List.of());

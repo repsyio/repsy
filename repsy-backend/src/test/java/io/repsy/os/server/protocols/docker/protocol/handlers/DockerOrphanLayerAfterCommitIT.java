@@ -28,6 +28,7 @@ import static org.mockito.Mockito.verify;
 
 import io.repsy.libs.storage.core.dtos.BaseUsages;
 import io.repsy.os.AbstractIT;
+import io.repsy.os.server.protocols.docker.shared.layer.dtos.OrphanLayerInfo;
 import io.repsy.os.server.protocols.docker.shared.storage.services.DockerStorageService;
 import io.repsy.os.server.protocols.docker.ui.facades.DockerApiFacade;
 import io.repsy.os.shared.repo.entities.Repo;
@@ -135,7 +136,7 @@ class DockerOrphanLayerAfterCommitIT extends AbstractIT {
     await()
         .atMost(Duration.ofSeconds(15))
         .untilAsserted(() -> assertThat(blobOf(repo, LAYER)).doesNotExist());
-    final var freed = orphans.stream().mapToLong(orphan -> orphan.size()).sum();
+    final var freed = orphans.stream().mapToLong(OrphanLayerInfo::size).sum();
     verify(this.usageUpdateService, timeout(15_000))
         .updateUsage(new UsageChangedInfo(repo.getId(), BaseUsages.ofDisk(-freed)));
   }

@@ -134,8 +134,9 @@ class AsyncTaskExecutorIT extends AbstractIT {
     gate.countDown();
     final var threadNames = awaitAll(futures);
 
-    assertThat(threadNames).allMatch(name -> name.startsWith("async-"));
-    assertThat(threadNames).hasSizeLessThanOrEqualTo(MAX_POOL_SIZE);
+    assertThat(threadNames)
+        .allMatch(name -> name.startsWith("async-"))
+        .hasSizeLessThanOrEqualTo(MAX_POOL_SIZE);
   }
 
   private static Set<String> awaitAll(final List<CompletableFuture<String>> futures)

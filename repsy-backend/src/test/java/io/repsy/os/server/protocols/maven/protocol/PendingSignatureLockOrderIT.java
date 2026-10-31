@@ -35,6 +35,7 @@ import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.nio.file.Files;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -45,6 +46,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -273,24 +275,17 @@ class PendingSignatureLockOrderIT extends AbstractIT {
           repo.getId());
 
       return false;
-    } catch (final CannotAcquireLockException e) {
+    } catch (final CannotAcquireLockException _) {
       return true;
     }
   }
 
   /** Waits until at least {@code count} backends are blocked on a row lock. */
-  private void awaitLockWaiters(final int count) throws InterruptedException {
-    final var deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(TIMEOUT_SECONDS);
-
-    while (System.nanoTime() < deadline) {
-      if (this.lockWaiters() >= count) {
-        return;
-      }
-
-      Thread.sleep(20);
-    }
-
-    throw new IllegalStateException("fewer than " + count + " requests ever waited for a lock");
+  private void awaitLockWaiters(final int count) {
+    Awaitility.await("at least " + count + " requests wait for a lock")
+        .atMost(Duration.ofSeconds(TIMEOUT_SECONDS))
+        .pollInterval(Duration.ofMillis(20))
+        .until(() -> this.lockWaiters() >= count);
   }
 
   private static void await(final CountDownLatch latch) throws InterruptedException {

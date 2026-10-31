@@ -208,7 +208,7 @@ class CargoHeadIT extends AbstractIT {
   @Test
   @DisplayName("HEAD config.json of unknown repo is 404")
   void headConfigJsonUnknownRepoIs404() throws Exception {
-    final var repo = this.cargoRepo();
+    this.cargoRepo();
     final var token = this.adminProtocolBearerToken();
 
     final var result =

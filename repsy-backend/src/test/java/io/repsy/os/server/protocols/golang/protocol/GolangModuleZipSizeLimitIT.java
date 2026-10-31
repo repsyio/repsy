@@ -75,7 +75,7 @@ class GolangModuleZipSizeLimitIT extends AbstractIT {
   void acceptsZipUnderLimit() throws Exception {
     final var repo = this.seedRepo(RepoType.GOLANG, uniqueRepoName("zipsize"));
     final var zip = validModuleZip();
-    assertThat(zip.length).isLessThan(4 * 1024);
+    assertThat(zip).hasSizeLessThan(4 * 1024);
 
     this.mockMvc
         .perform(

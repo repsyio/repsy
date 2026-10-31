@@ -25,6 +25,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import com.jayway.jsonpath.JsonPath;
 import io.repsy.os.AbstractIT;
 import io.repsy.os.server.protocols.docker.shared.image.repositories.ImageRepository;
+import io.repsy.os.server.protocols.docker.shared.tag.entities.Tag;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.ManifestRepository;
 import io.repsy.os.server.protocols.docker.shared.tag.repositories.TagRepository;
 import io.repsy.os.server.shared.http.BareBodyAssertions;
@@ -285,7 +286,7 @@ class DockerSha512ReferenceIT extends AbstractIT {
     assertThat(push.getStatus()).as(push.getContentAsString()).isEqualTo(201);
     final var image = this.imageRepository.findByRepoIdAndName(repo.getId(), IMAGE).orElseThrow();
     assertThat(this.tagRepository.findAllByImageRepoIdAndImageId(repo.getId(), image.getId()))
-        .extracting(tag -> tag.getName())
+        .extracting(Tag::getName)
         .containsExactly("latest");
     final var tags =
         BareBodyAssertions.expectBare(
@@ -429,7 +430,7 @@ class DockerSha512ReferenceIT extends AbstractIT {
     final var token = this.adminProtocolBearerToken();
     final var manifest = this.pushManifestBlobs(repo, token);
 
-    final var wrong = "sha512".equals(algorithm) ? "0".repeat(128) : "0".repeat(64);
+    final var wrong = "0".repeat("sha512".equals(algorithm) ? 128 : 64);
     final var push = this.putManifest(repo, algorithm + ":" + wrong, manifest, token);
 
     assertThat(push.getStatus()).as(push.getContentAsString()).isEqualTo(400);

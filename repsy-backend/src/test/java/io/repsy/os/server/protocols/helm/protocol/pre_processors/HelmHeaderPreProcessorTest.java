@@ -67,9 +67,11 @@ class HelmHeaderPreProcessorTest {
   @Test
   @DisplayName("a route without a permission is refused on a public repo, even with the skip flag")
   void undeclaredPermissionIsRefused() {
+    final Map<String, Object> skipFlagOnly =
+        Map.of(HandlerPropertyKeys.SKIP_HEADER_PRE_PROCESSOR, true);
+
     assertThatThrownBy(() -> this.process(Map.of())).isInstanceOf(AccessNotAllowedException.class);
-    assertThatThrownBy(
-            () -> this.process(Map.of(HandlerPropertyKeys.SKIP_HEADER_PRE_PROCESSOR, true)))
+    assertThatThrownBy(() -> this.process(skipFlagOnly))
         .isInstanceOf(AccessNotAllowedException.class);
   }
 
