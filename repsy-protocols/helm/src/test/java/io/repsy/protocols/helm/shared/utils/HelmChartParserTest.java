@@ -24,12 +24,15 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.stream.Stream;
 import java.util.zip.GZIPOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 
 class HelmChartParserTest {
 
@@ -323,5 +326,109 @@ class HelmChartParserTest {
     final var metadata = HelmChartParser.parseChartYaml(chart(BASE + "type: operator\n"));
 
     assertThat(metadata.getType()).isEqualTo("operator");
+  }
+
+  /** A chart archive of the given entries; a name ending in {@code /} is a directory. */
+  private static ByteArrayInputStream archive(final String... namesAndContents) throws IOException {
+    final var bytes = new ByteArrayOutputStream();
+    try (final var gzip = new GZIPOutputStream(bytes);
+        final var tar = new TarArchiveOutputStream(gzip)) {
+      for (var i = 0; i < namesAndContents.length; i += 2) {
+        final var name = namesAndContents[i];
+        final var data = namesAndContents[i + 1].getBytes(StandardCharsets.UTF_8);
+        final var entry = new TarArchiveEntry(name);
+        if (!name.endsWith("/")) {
+          entry.setSize(data.length);
+        }
+        tar.putArchiveEntry(entry);
+        if (!name.endsWith("/")) {
+          tar.write(data);
+        }
+        tar.closeArchiveEntry();
+      }
+    }
+    return new ByteArrayInputStream(bytes.toByteArray());
+  }
+
+  @Test
+  void findsChartYamlAfterOtherEntries() throws IOException {
+    final var metadata =
+        HelmChartParser.parseChartYaml(
+            archive(
+                "payments/",
+                "",
+                "payments/values.yaml",
+                "replicas: 1\n",
+                "payments/Chart.yaml",
+                BASE));
+
+    assertThat(metadata.getName()).isEqualTo("payments");
+  }
+
+  @Test
+  void readsAChartYamlAtTheRootOfTheArchive() throws IOException {
+    final var metadata = HelmChartParser.parseChartYaml(archive("Chart.yaml", BASE));
+
+    assertThat(metadata.getVersion()).isEqualTo("1.0.0");
+  }
+
+  @Test
+  void ignoresFilesAndDirectoriesThatOnlyLookLikeChartYaml() {
+    assertThatThrownBy(
+            () ->
+                HelmChartParser.parseChartYaml(
+                    archive(
+                        "payments/NotChart.yaml",
+                        BASE,
+                        "payments/Chart.yaml/",
+                        "",
+                        "payments/chart.yaml",
+                        BASE)))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("chartYamlNotFound");
+  }
+
+  @Test
+  void anArchiveWithoutEntriesHasNoChartYaml() {
+    assertThatThrownBy(() -> HelmChartParser.parseChartYaml(archive()))
+        .hasMessage("chartYamlNotFound");
+  }
+
+  private static Stream<Arguments> blankAndMalformed() {
+    return Stream.of(
+        Arguments.of("name: ''\nversion: 1.0.0", "chartNameMissing"),
+        Arguments.of("name: '  '\nversion: 1.0.0", "chartNameMissing"),
+        Arguments.of("name: Payments\nversion: 1.0.0", "chartNameInvalid"),
+        Arguments.of("name: -payments\nversion: 1.0.0", "chartNameInvalid"),
+        Arguments.of("name: pay_ments\nversion: 1.0.0", "chartNameInvalid"),
+        Arguments.of("name: payments\nversion: ''", "chartVersionMissing"),
+        Arguments.of("name: payments\nversion: '  '", "chartVersionMissing"),
+        Arguments.of("name: payments\nversion: '1.0'", "chartVersionInvalid"),
+        Arguments.of("name: payments\nversion: v1.0.0", "chartVersionInvalid"),
+        Arguments.of("name: payments\nversion: '01.0.0'", "chartVersionInvalid"));
+  }
+
+  @ParameterizedTest
+  @MethodSource("blankAndMalformed")
+  void rejectsBlankAndMalformedNamesAndVersions(final String chartYaml, final String msgId) {
+    assertThatThrownBy(() -> HelmChartParser.parseChartYaml(chart(chartYaml + "\n")))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage(msgId);
+  }
+
+  @ParameterizedTest
+  @CsvSource({"1.0.0-rc.1+build.5", "0.0.1-alpha", "2.0.0+meta", "1.2.3-0.3.7"})
+  void acceptsSemanticVersionsWithPreReleaseAndBuild(final String version) throws IOException {
+    final var metadata =
+        HelmChartParser.parseChartYaml(chart("name: payments\nversion: " + version + "\n"));
+
+    assertThat(metadata.getVersion()).isEqualTo(version);
+  }
+
+  @Test
+  void aBlankApiVersionIsTheDefault() throws IOException {
+    final var metadata = HelmChartParser.parseChartYaml(chart(BASE + "apiVersion: '  '\n"));
+
+    assertThat(metadata.getApiVersion()).isEqualTo(HelmConstants.DEFAULT_CHART_API_VERSION);
   }
 }
