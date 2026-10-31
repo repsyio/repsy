@@ -570,7 +570,11 @@ export function createScannerStub(options: StubOptions): ScannerStub {
   const server = createServer((request, response) => {
     route(request, response).catch((error: unknown) => {
       const status = error instanceof HttpError ? error.status : 500;
-      const message = error instanceof Error ? error.message : String(error);
+      // Only deliberate HttpErrors reach the client; anything else is logged, not echoed back.
+      if (!(error instanceof HttpError)) {
+        console.error(error);
+      }
+      const message = error instanceof HttpError ? error.message : 'internal server error';
       if (!response.headersSent) {
         sendJson(response, status, { message });
       } else {

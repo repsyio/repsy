@@ -488,9 +488,9 @@ function unescapeHtml(value: string): string {
   return value
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
-    .replace(/&amp;/g, '&')
     .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'");
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&'); // last, so `&amp;lt;` decodes to the text `&lt;`, not `<`
 }
 
 /** Parses a PEP 503 project page's anchors (`package-versions.ftl`'s exact shape: an optional
