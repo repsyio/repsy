@@ -303,6 +303,8 @@ class AbstractHelmProtocolTxFacadeTest {
               eq(new RepoRef(REPO_ID, REPO_NAME)), eq(UPLOAD_ID), any()))
           .thenReturn(BaseUsages.ofDisk(BLOB_SIZE - 1));
 
+      final var stream = new ByteArrayInputStream(new byte[BLOB_SIZE - 1]);
+
       assertThatThrownBy(
               () ->
                   AbstractHelmProtocolTxFacadeTest.this.facade.finalizeBlob(
@@ -310,7 +312,7 @@ class AbstractHelmProtocolTxFacadeTest {
                       UPLOAD_ID,
                       DIGEST,
                       "application/octet-stream",
-                      new ByteArrayInputStream(new byte[BLOB_SIZE - 1]),
+                      stream,
                       BLOB_SIZE - 1))
           .isInstanceOf(BadRequestException.class)
           .hasMessage("digestMismatch");
@@ -326,6 +328,8 @@ class AbstractHelmProtocolTxFacadeTest {
     void refusesMalformedDigest() {
       AbstractHelmProtocolTxFacadeTest.this.uploadHolds(new byte[BLOB_SIZE]);
 
+      final var stream = body();
+
       assertThatThrownBy(
               () ->
                   AbstractHelmProtocolTxFacadeTest.this.facade.finalizeBlob(
@@ -333,7 +337,7 @@ class AbstractHelmProtocolTxFacadeTest {
                       UPLOAD_ID,
                       "sha256:abc",
                       "application/octet-stream",
-                      body(),
+                      stream,
                       0))
           .isInstanceOf(BadRequestException.class);
 
@@ -348,6 +352,8 @@ class AbstractHelmProtocolTxFacadeTest {
               new RepoRef(REPO_ID, REPO_NAME), UPLOAD_ID.toString()))
           .thenReturn(Optional.empty());
 
+      final var stream = body();
+
       assertThatThrownBy(
               () ->
                   AbstractHelmProtocolTxFacadeTest.this.facade.finalizeBlob(
@@ -355,7 +361,7 @@ class AbstractHelmProtocolTxFacadeTest {
                       UPLOAD_ID,
                       DIGEST,
                       "application/octet-stream",
-                      body(),
+                      stream,
                       0))
           .isInstanceOf(ItemNotFoundException.class);
     }
@@ -619,7 +625,7 @@ class AbstractHelmProtocolTxFacadeTest {
 
     @Test
     @DisplayName("leaves the file of a replaced manifest alone when the new one cannot be written")
-    void leavesTheFileOfAReplacedManifest() throws Exception {
+    void leavesTheFileOfAReplacedManifest() {
       final var it = AbstractHelmProtocolTxFacadeTest.this;
       this.rowsAreWritten(true);
       final var failure = new IllegalStateException("disk full");
@@ -909,10 +915,10 @@ class AbstractHelmProtocolTxFacadeTest {
       when(AbstractHelmProtocolTxFacadeTest.this.ociManifestService.findAllByChartId(chartId))
           .thenReturn(List.of(manifest));
       when(AbstractHelmProtocolTxFacadeTest.this.chartFilesService.deleteFiles(
-              eq(REPO_ID),
-              eq(REPO_ID),
-              eq(REPO_NAME),
-              eq(List.of(new DeletedChart("payments", "1.0.0", DIGEST, List.of(manifest))))))
+              REPO_ID,
+              REPO_ID,
+              REPO_NAME,
+              List.of(new DeletedChart("payments", "1.0.0", DIGEST, List.of(manifest)))))
           .thenReturn(1234L);
 
       AbstractHelmProtocolTxFacadeTest.this.facade.deleteChart(

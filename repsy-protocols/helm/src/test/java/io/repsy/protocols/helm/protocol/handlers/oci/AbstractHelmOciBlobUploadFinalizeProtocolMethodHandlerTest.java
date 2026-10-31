@@ -135,7 +135,9 @@ class AbstractHelmOciBlobUploadFinalizeProtocolMethodHandlerTest {
   void rejectsSha512() {
     assertThat(SHA512).hasSizeGreaterThan(HelmConstants.MAX_DIGEST_LENGTH);
 
-    assertThatThrownBy(() -> this.finalizeUpload(context(), SHA512, OCTET_STREAM))
+    final var context = context();
+
+    assertThatThrownBy(() -> this.finalizeUpload(context, SHA512, OCTET_STREAM))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("blobDigestUnsupported");
 

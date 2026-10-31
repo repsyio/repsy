@@ -28,12 +28,12 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.HttpMethod;
 
 /** Handles GET /v2/{repo}/{name}/blobs/{digest} — downloads a blob. */
-public abstract class AbstractHelmOciBlobPullProtocolMethodHandler<ID>
-    extends AbstractOciBlobPullProtocolMethodHandler<HelmProtocolFacade<ID>> {
+public abstract class AbstractHelmOciBlobPullProtocolMethodHandler<I>
+    extends AbstractOciBlobPullProtocolMethodHandler<HelmProtocolFacade<I>> {
 
-  public AbstractHelmOciBlobPullProtocolMethodHandler(
+  protected AbstractHelmOciBlobPullProtocolMethodHandler(
       final PathParser basePathParser,
-      final HelmProtocolFacade<ID> helmFacade,
+      final HelmProtocolFacade<I> helmFacade,
       final HelmProtocolProvider provider) {
     super(
         HandlerRoute.of(Permission.READ, HttpMethod.GET).writeOperation(false),

@@ -22,11 +22,11 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Stream;
 
-public interface OciManifestService<ID> {
+public interface OciManifestService<I> {
 
-  HelmOciManifestInfo save(HelmOciManifestForm form, ID repoId);
+  HelmOciManifestInfo save(HelmOciManifestForm form, I repoId);
 
-  Optional<HelmOciManifestInfo> findByNameAndReference(ID repoId, String name, String reference);
+  Optional<HelmOciManifestInfo> findByNameAndReference(I repoId, String name, String reference);
 
   Optional<HelmOciManifestInfo> findById(UUID manifestId);
 
@@ -36,11 +36,11 @@ public interface OciManifestService<ID> {
 
   List<HelmOciManifestInfo> findAllByChartId(UUID chartId);
 
-  List<String> listTagsByName(ID repoId, String name);
+  List<String> listTagsByName(I repoId, String name);
 
   /**
    * The JSON of every manifest of the repo. The stream reads from the database as it is consumed,
    * so it has to be closed, and it needs an active transaction.
    */
-  Stream<String> streamContentByRepoId(ID repoId);
+  Stream<String> streamContentByRepoId(I repoId);
 }

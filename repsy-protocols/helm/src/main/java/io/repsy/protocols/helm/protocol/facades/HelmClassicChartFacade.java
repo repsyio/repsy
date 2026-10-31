@@ -51,27 +51,29 @@ import org.springframework.core.io.Resource;
  */
 @Slf4j
 @RequiredArgsConstructor
-final class HelmClassicChartFacade<ID> {
+final class HelmClassicChartFacade<I> {
 
   private static final String ARTIFACT_NAME = "artifactName";
   private static final String ARTIFACT_VERSION = "artifactVersion";
   private static final String STORAGE_PATH = "storagePath";
 
-  private final HelmStorageService<ID> helmStorageService;
-  private final ChartService<ID> chartService;
-  private final OciManifestService<ID> ociManifestService;
-  private final AbstractHelmChartFilesService<ID> chartFilesService;
+  private final HelmStorageService<I> helmStorageService;
+  private final ChartService<I> chartService;
+  private final OciManifestService<I> ociManifestService;
+  private final AbstractHelmChartFilesService<I> chartFilesService;
 
   HelmIndexInfo generateIndex(final ProtocolContext context) {
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
 
     return HelmIndexUtils.buildIndex(this.chartService.findAllByRepoId(repoInfo.getId()));
   }
 
   Resource getChart(final ProtocolContext context, final String filename) throws IOException {
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     final var storagePath =
-        StoragePath.of(repoInfo.getStorageKey(), HelmConstants.CHARTS_PATH + "/" + filename);
+        StoragePath.of(
+            repoInfo.getStorageKey(),
+            HelmConstants.CHARTS_PATH + HelmConstants.PATH_SEPARATOR + filename);
     final var classic = this.helmStorageService.findResource(storagePath, repoInfo.getName());
     if (classic.isPresent()) {
       return classic.get();
@@ -93,7 +95,7 @@ final class HelmClassicChartFacade<ID> {
    * used to build the URL in the first place.
    */
   private Optional<HelmChartInfo> findChartByArchiveFileName(
-      final BaseRepoInfo<ID> repoInfo, final String filename) {
+      final BaseRepoInfo<I> repoInfo, final String filename) {
     return this.chartService.findAllByRepoId(repoInfo.getId()).stream()
         .filter(
             chart ->
@@ -109,7 +111,7 @@ final class HelmClassicChartFacade<ID> {
       final long size)
       throws IOException {
 
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     final var name = metadata.getName();
     final var version = metadata.getVersion();
     final var form =
@@ -147,7 +149,7 @@ final class HelmClassicChartFacade<ID> {
    */
   private void storeChart(
       final ProtocolContext context,
-      final BaseRepoInfo<ID> repoInfo,
+      final BaseRepoInfo<I> repoInfo,
       final StoragePath storagePath,
       final InputStream chartStream,
       final HelmChartForm form,
@@ -170,7 +172,7 @@ final class HelmClassicChartFacade<ID> {
 
   void deleteChart(final ProtocolContext context, final String name, final String version)
       throws IOException {
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     // The chart first, as a push takes it (RPS-1365), and before the version and its manifests are
     // read: what a push that was running commits is then part of what is deleted.
     this.chartService.lockChart(repoInfo.getId(), name);
@@ -196,7 +198,7 @@ final class HelmClassicChartFacade<ID> {
 
   Optional<HelmChartInfo> findChartByNameAndVersion(
       final ProtocolContext context, final String name, final String version) {
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     return this.chartService.findOptionalByNameAndVersion(repoInfo.getId(), name, version);
   }
 }

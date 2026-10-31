@@ -224,8 +224,9 @@ class AbstractHelmStorageServiceTest {
     when(this.storageStrategy.getFileUsage(any(), eq(REPO_NAME)))
         .thenThrow(new IOException("disk"));
     final var service = new TestStorageService(this.storageStrategy);
+    final var repo = new RepoRef(REPO_UUID, REPO_NAME);
 
-    assertThatThrownBy(() -> service.deleteBlobFile(new RepoRef(REPO_UUID, REPO_NAME), "upload"))
+    assertThatThrownBy(() -> service.deleteBlobFile(repo, "upload"))
         .isInstanceOf(ErrorOccurredException.class)
         .hasCauseInstanceOf(IOException.class);
     verify(this.storageStrategy, never()).delete(any());
@@ -252,11 +253,9 @@ class AbstractHelmStorageServiceTest {
     when(this.storageStrategy.getFileUsage(any(), eq(REPO_NAME)))
         .thenThrow(new IOException("disk"));
     final var service = new TestStorageService(this.storageStrategy);
+    final var repo = new RepoRef(REPO_UUID, REPO_NAME);
 
-    assertThatThrownBy(
-            () ->
-                service.deleteChartFile(
-                    new RepoRef(REPO_UUID, REPO_NAME), "a-1.0.0.tgz", "sha256:abc"))
+    assertThatThrownBy(() -> service.deleteChartFile(repo, "a-1.0.0.tgz", "sha256:abc"))
         .isInstanceOf(ErrorOccurredException.class)
         .hasCauseInstanceOf(IOException.class);
     verify(this.storageStrategy, never()).delete(any());
@@ -269,10 +268,9 @@ class AbstractHelmStorageServiceTest {
     when(this.storageStrategy.getFileUsage(any(), eq(REPO_NAME)))
         .thenThrow(new IOException("disk"));
     final var service = new TestStorageService(this.storageStrategy);
+    final var repo = new RepoRef(REPO_UUID, REPO_NAME);
 
-    assertThatThrownBy(
-            () ->
-                service.deleteManifestFile(new RepoRef(REPO_UUID, REPO_NAME), "payments", "1.0.0"))
+    assertThatThrownBy(() -> service.deleteManifestFile(repo, "payments", "1.0.0"))
         .isInstanceOf(ErrorOccurredException.class)
         .hasCauseInstanceOf(IOException.class);
     verify(this.storageStrategy, never()).delete(any());
@@ -286,8 +284,9 @@ class AbstractHelmStorageServiceTest {
     when(blob.contentLength()).thenThrow(new IOException("disk"));
     when(this.storageStrategy.get(any(), eq(REPO_NAME))).thenReturn(Optional.of(blob));
     final var service = new TestStorageService(this.storageStrategy);
+    final var repo = new RepoRef(REPO_UUID, REPO_NAME);
 
-    assertThatThrownBy(() -> service.deleteBlob(new RepoRef(REPO_UUID, REPO_NAME), "sha256:abc"))
+    assertThatThrownBy(() -> service.deleteBlob(repo, "sha256:abc"))
         .isInstanceOf(ErrorOccurredException.class)
         .hasCauseInstanceOf(IOException.class);
     verify(this.storageStrategy, never()).delete(any());

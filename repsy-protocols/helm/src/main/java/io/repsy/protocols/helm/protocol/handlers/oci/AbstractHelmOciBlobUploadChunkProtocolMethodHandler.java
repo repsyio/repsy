@@ -28,12 +28,12 @@ import java.util.UUID;
 import org.springframework.http.HttpMethod;
 
 /** Handles PATCH /v2/{repo}/{name}/blobs/uploads/{uuid} — uploads a blob chunk. */
-public abstract class AbstractHelmOciBlobUploadChunkProtocolMethodHandler<ID>
-    extends AbstractOciUploadChunkProtocolMethodHandler<HelmProtocolFacade<ID>> {
+public abstract class AbstractHelmOciBlobUploadChunkProtocolMethodHandler<I>
+    extends AbstractOciUploadChunkProtocolMethodHandler<HelmProtocolFacade<I>> {
 
-  public AbstractHelmOciBlobUploadChunkProtocolMethodHandler(
+  protected AbstractHelmOciBlobUploadChunkProtocolMethodHandler(
       final PathParser basePathParser,
-      final HelmProtocolFacade<ID> helmFacade,
+      final HelmProtocolFacade<I> helmFacade,
       final HelmProtocolProvider provider) {
     super(
         HandlerRoute.of(Permission.WRITE, HttpMethod.PATCH)

@@ -31,7 +31,7 @@ import java.util.Optional;
 import java.util.UUID;
 import org.springframework.core.io.Resource;
 
-public interface HelmProtocolFacade<ID> {
+public interface HelmProtocolFacade<I> {
 
   HelmIndexInfo generateIndex(ProtocolContext context);
 
@@ -98,7 +98,7 @@ public interface HelmProtocolFacade<ID> {
   Optional<HelmChartInfo> findChartByNameAndVersion(
       ProtocolContext context, String name, String version);
 
-  HelmOciBlobInfo getOrCreateBlob(HelmOciBlobForm form, ID repoId);
+  HelmOciBlobInfo getOrCreateBlob(HelmOciBlobForm form, I repoId);
 
   /**
    * Writes the chart version, the manifest that points at it and the manifest file as one unit
