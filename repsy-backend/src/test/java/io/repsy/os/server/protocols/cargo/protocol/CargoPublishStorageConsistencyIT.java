@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.protocols.cargo.protocol;
 
+import static io.repsy.os.server.protocols.shared.PostgresLockWaits.awaitBlockedOnALockOrDone;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
@@ -432,10 +433,9 @@ class CargoPublishStorageConsistencyIT extends AbstractIT {
       assertThat(winnerWriting.await(30, TimeUnit.SECONDS)).isTrue();
 
       final var loser = executor.submit(() -> this.push(repo, name, "1.0.1", loserCrate, token));
-      // Long enough for the loser to reach its row write and wait on the winner's row. If it is
-      // slower, it is turned away by the existing-version check instead: the assertions hold both
-      // ways.
-      TimeUnit.MILLISECONDS.sleep(500);
+      // Blocked on the lock the other one holds, or already finished (turned away first):
+      // the assertions hold both ways.
+      awaitBlockedOnALockOrDone(this.jdbcTemplate, loser);
       releaseWinner.countDown();
 
       assertThat(winner.get(30, TimeUnit.SECONDS).getStatus()).isEqualTo(200);
@@ -488,7 +488,7 @@ class CargoPublishStorageConsistencyIT extends AbstractIT {
       final var second =
           executor.submit(
               () -> this.push(repo, name, "2.0.0", crateArchive(name, "2.0.0", "b"), token));
-      TimeUnit.MILLISECONDS.sleep(500);
+      awaitBlockedOnALockOrDone(this.jdbcTemplate, second);
       releaseFirst.countDown();
 
       assertThat(first.get(30, TimeUnit.SECONDS).getStatus()).isEqualTo(200);
@@ -533,7 +533,7 @@ class CargoPublishStorageConsistencyIT extends AbstractIT {
       final var loser =
           executor.submit(
               () -> this.push(repo, name, "1.0.0", crateArchive(name, "1.0.0", "loser"), token));
-      TimeUnit.MILLISECONDS.sleep(500);
+      awaitBlockedOnALockOrDone(this.jdbcTemplate, loser);
       releaseWinner.countDown();
 
       assertThat(winner.get(30, TimeUnit.SECONDS).getStatus()).isEqualTo(200);

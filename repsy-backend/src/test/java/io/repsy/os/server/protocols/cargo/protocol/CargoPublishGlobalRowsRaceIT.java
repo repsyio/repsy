@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.protocols.cargo.protocol;
 
+import static io.repsy.os.server.protocols.shared.PostgresLockWaits.awaitBlockedOnALockOrDone;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
@@ -297,8 +298,9 @@ class CargoPublishGlobalRowsRaceIT extends AbstractIT {
                       List.of(keyword),
                       List.of(category),
                       token));
-      // Long enough for the second publish to reach its inserts and wait on the first's rows.
-      TimeUnit.MILLISECONDS.sleep(500);
+      // Blocked on the lock the other one holds, or already finished (turned away first):
+      // the assertions hold both ways.
+      awaitBlockedOnALockOrDone(this.jdbcTemplate, second);
       releaseFirst.countDown();
 
       final var firstResponse = first.get(30, TimeUnit.SECONDS);

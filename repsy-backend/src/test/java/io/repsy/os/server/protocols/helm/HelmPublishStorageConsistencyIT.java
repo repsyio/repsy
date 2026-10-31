@@ -17,6 +17,7 @@ package io.repsy.os.server.protocols.helm;
 
 import static io.repsy.os.server.protocols.helm.HelmChartFixtures.UPLOAD_PATH;
 import static io.repsy.os.server.protocols.helm.HelmChartFixtures.chart;
+import static io.repsy.os.server.protocols.shared.PostgresLockWaits.awaitBlockedOnALockOrDone;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doAnswer;
@@ -296,10 +297,9 @@ class HelmPublishStorageConsistencyIT extends AbstractIT {
       assertThat(winnerWriting.await(30, TimeUnit.SECONDS)).isTrue();
 
       final var loser = executor.submit(() -> this.push(repo, loserChart, token));
-      // Long enough for the loser to reach its row insert and wait on the winner's row. If it is
-      // slower, it is turned away by the existing-version check instead: the assertions hold both
-      // ways.
-      TimeUnit.MILLISECONDS.sleep(500);
+      // Blocked on the lock the other one holds, or already finished (turned away first):
+      // the assertions hold both ways.
+      awaitBlockedOnALockOrDone(this.jdbcTemplate, loser);
       releaseWinner.countDown();
 
       assertThat(winner.get(30, TimeUnit.SECONDS).getStatus()).isEqualTo(201);
@@ -348,7 +348,7 @@ class HelmPublishStorageConsistencyIT extends AbstractIT {
 
       final var second =
           executor.submit(() -> this.push(repo, chart(name, "2.0.0", "b", null), token));
-      TimeUnit.MILLISECONDS.sleep(500);
+      awaitBlockedOnALockOrDone(this.jdbcTemplate, second);
       releaseFirst.countDown();
 
       assertThat(first.get(30, TimeUnit.SECONDS).getStatus()).isEqualTo(201);
@@ -393,7 +393,7 @@ class HelmPublishStorageConsistencyIT extends AbstractIT {
 
       final var loser =
           executor.submit(() -> this.push(repo, chart(name, "1.0.0", "loser", null), token));
-      TimeUnit.MILLISECONDS.sleep(500);
+      awaitBlockedOnALockOrDone(this.jdbcTemplate, loser);
       releaseWinner.countDown();
 
       assertThat(winner.get(30, TimeUnit.SECONDS).getStatus()).isEqualTo(201);
