@@ -43,7 +43,7 @@ public abstract class AbstractNpmPackageDownloadProtocolMethodHandler
 
   private static final Pattern DOWNLOAD_PATTERN = Pattern.compile("^/(.+?)/-/(.+)");
 
-  public AbstractNpmPackageDownloadProtocolMethodHandler(
+  protected AbstractNpmPackageDownloadProtocolMethodHandler(
       @Qualifier("osNpmPathParser") final PathParser basePathParser,
       final NpmProtocolFacade npmProtocolFacade,
       final NpmProtocolProvider provider) {
@@ -95,7 +95,7 @@ public abstract class AbstractNpmPackageDownloadProtocolMethodHandler
               HttpHeaders.CONTENT_DISPOSITION, ResourceResponses.attachment(bareFilename(filename)))
           .body(resource);
 
-    } catch (final UnAuthorizedException e) {
+    } catch (final UnAuthorizedException _) {
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
           .header(WWW_AUTHENTICATE, BasicAuthChallenge.REPSY)
           .build();

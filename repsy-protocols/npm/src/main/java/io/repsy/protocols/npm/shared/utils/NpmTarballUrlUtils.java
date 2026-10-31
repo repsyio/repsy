@@ -66,6 +66,19 @@ public final class NpmTarballUrlUtils {
   }
 
   /**
+   * Drops the slashes at the end of {@code base}, which a linear scan does without backtracking.
+   */
+  public static String stripTrailingSlashes(final String base) {
+    var end = base.length();
+
+    while (end > 0 && base.charAt(end - 1) == '/') {
+      end--;
+    }
+
+    return base.substring(0, end);
+  }
+
+  /**
    * The address of a version's tarball in the registry: {@code <base>/<repoName>/<fullName>/-/<bare
    * name>-<version>.tgz}, the layout every client and {@code
    * AbstractNpmPackageDownloadProtocolMethodHandler} agree on. A trailing slash on {@code base} is
@@ -74,7 +87,7 @@ public final class NpmTarballUrlUtils {
   public static String buildTarballUrl(
       final String base, final String repoName, final String fullName, final String versionName) {
 
-    return base.replaceAll("/+$", "")
+    return stripTrailingSlashes(base)
         + "/"
         + repoName
         + "/"

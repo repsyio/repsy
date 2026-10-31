@@ -42,7 +42,7 @@ import org.springframework.http.ResponseEntity;
  * request. It needs credentials on a public repository too, so the handler asks the pre-processor
  * to authenticate ({@code requireAuthentication}) and still verifies everything itself.
  */
-public abstract class AbstractNpmWhoamiProtocolMethodHandler<ID>
+public abstract class AbstractNpmWhoamiProtocolMethodHandler<I>
     extends AbstractRoutedProtocolMethodHandler {
 
   private static final String CHALLENGE = BasicAuthChallenge.REPSY;
@@ -50,11 +50,11 @@ public abstract class AbstractNpmWhoamiProtocolMethodHandler<ID>
       "Bearer realm=\"" + BasicAuthChallenge.REALM + "\", " + CHALLENGE;
   private static final String BEARER_PREFIX = "Bearer ";
 
-  private final NpmIdentityResolver<ID> identityResolver;
+  private final NpmIdentityResolver<I> identityResolver;
 
-  public AbstractNpmWhoamiProtocolMethodHandler(
+  protected AbstractNpmWhoamiProtocolMethodHandler(
       @Qualifier("npmPathParser") final PathParser basePathParser,
-      final NpmIdentityResolver<ID> identityResolver,
+      final NpmIdentityResolver<I> identityResolver,
       final NpmProtocolProvider provider) {
     super(
         HandlerRoute.read(HttpMethod.GET).requireAuthentication(true).skipUsagePostProcessor(true),
@@ -72,14 +72,14 @@ public abstract class AbstractNpmWhoamiProtocolMethodHandler<ID>
     final var authHeader = request.getHeader(AUTHORIZATION);
 
     try {
-      final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+      final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
       final var username = this.identityResolver.resolveUsername(repoInfo, authHeader);
 
       return ResponseEntity.ok()
           .contentType(MediaType.APPLICATION_JSON)
           .body(Map.of("username", username));
 
-    } catch (final UnAuthorizedException e) {
+    } catch (final UnAuthorizedException _) {
       // A TooManyRequestsException is not caught: 429 is the answer, not another login.
       final var challenge =
           authHeader != null && authHeader.startsWith(BEARER_PREFIX) ? BEARER_CHALLENGE : CHALLENGE;

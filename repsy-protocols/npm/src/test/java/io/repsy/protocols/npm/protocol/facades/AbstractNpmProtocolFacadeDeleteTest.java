@@ -185,10 +185,10 @@ class AbstractNpmProtocolFacadeDeleteTest {
             eq(new RepoRef(REPO_ID, REPO_NAME)), eq(BASE_PATH), any()))
         .thenReturn(metadataWithVersions("1.0.0"));
 
+    final var stalePayload = metadataWithVersions("1.0.0");
+
     assertThatThrownBy(
-            () ->
-                this.facade.unPublishPackageVersion(
-                    this.context, null, PACKAGE, metadataWithVersions("1.0.0")))
+            () -> this.facade.unPublishPackageVersion(this.context, null, PACKAGE, stalePayload))
         .isInstanceOf(ItemAlreadyExistException.class)
         .hasMessage("unpublishPayloadStale");
 
@@ -204,10 +204,10 @@ class AbstractNpmProtocolFacadeDeleteTest {
             eq(new RepoRef(REPO_ID, REPO_NAME)), eq(BASE_PATH), any()))
         .thenReturn(metadataWithVersions("1.0.0", "2.0.0"));
 
+    final var emptyPayload = metadataWithVersions();
+
     assertThatThrownBy(
-            () ->
-                this.facade.unPublishPackageVersion(
-                    this.context, null, PACKAGE, metadataWithVersions()))
+            () -> this.facade.unPublishPackageVersion(this.context, null, PACKAGE, emptyPayload))
         .isInstanceOf(ItemAlreadyExistException.class)
         .hasMessage("unpublishPayloadStale");
 

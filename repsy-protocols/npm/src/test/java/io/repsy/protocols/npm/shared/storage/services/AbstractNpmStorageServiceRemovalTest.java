@@ -143,10 +143,13 @@ class AbstractNpmStorageServiceRemovalTest {
 
     assertThat(growth).as("the metadata shrank by 100, the tarball freed 40").isEqualTo(-140L);
     final var written = this.written();
-    assertThat(written).doesNotContain("\"1.2.0\"");
-    assertThat(written).contains("\"latest\":\"1.1.0\"").contains("\"old\":\"1.0.0\"");
-    assertThat(written).doesNotContain("beta");
-    assertThat(written).contains("\"description\":\"two\"").contains("\"readme\":\"r2\"");
+    assertThat(written)
+        .doesNotContain("\"1.2.0\"")
+        .contains("\"latest\":\"1.1.0\"")
+        .contains("\"old\":\"1.0.0\"")
+        .doesNotContain("beta")
+        .contains("\"description\":\"two\"")
+        .contains("\"readme\":\"r2\"");
     verify(this.storageStrategy).delete(at(TARBALL_FILE));
   }
 
@@ -165,8 +168,11 @@ class AbstractNpmStorageServiceRemovalTest {
 
     assertThat(growth).as("a tarball that is gone frees nothing").isEqualTo(-10L);
     final var written = this.written();
-    assertThat(written).contains("\"latest\":\"1.2.0\"").contains("\"beta\":\"1.2.0\"");
-    assertThat(written).doesNotContain("\"old\"").doesNotContain("\"1.0.0\"");
+    assertThat(written)
+        .contains("\"latest\":\"1.2.0\"")
+        .contains("\"beta\":\"1.2.0\"")
+        .doesNotContain("\"old\"")
+        .doesNotContain("\"1.0.0\"");
     verify(this.storageStrategy, never()).delete(any());
   }
 
@@ -217,10 +223,11 @@ class AbstractNpmStorageServiceRemovalTest {
         .thenThrow(new IllegalStateException("disk full"))
         .thenReturn(BaseUsages.ofDisk(0L));
 
+    final var repoRef = new RepoRef(REPO_ID, REPO_NAME);
+
     assertThatThrownBy(
             () ->
-                this.service.deleteVersion(
-                    new RepoRef(REPO_ID, REPO_NAME), BASE_PATH, PACKAGE, "1.2.0", "1.1.0", NO_ROWS))
+                this.service.deleteVersion(repoRef, BASE_PATH, PACKAGE, "1.2.0", "1.1.0", NO_ROWS))
         .isInstanceOf(IllegalStateException.class)
         .hasMessage("disk full");
 
@@ -253,15 +260,12 @@ class AbstractNpmStorageServiceRemovalTest {
   void aMissingMetadataFileIsNotFound() {
     when(this.storageStrategy.get(at(METADATA_FILE), anyString())).thenReturn(Optional.empty());
 
+    final var repoRef = new RepoRef(REPO_ID, REPO_NAME);
+
     assertThatThrownBy(
             () ->
                 this.service.deleteVersion(
-                    new RepoRef(REPO_ID, REPO_NAME),
-                    BASE_PATH,
-                    PACKAGE,
-                    "1.2.0",
-                    "1.1.0",
-                    NO_PACKAGE))
+                    repoRef, BASE_PATH, PACKAGE, "1.2.0", "1.1.0", NO_PACKAGE))
         .isInstanceOf(ItemNotFoundException.class);
 
     verify(this.storageStrategy, never()).delete(any());
@@ -283,9 +287,12 @@ class AbstractNpmStorageServiceRemovalTest {
 
     assertThat(growth).isEqualTo(23L);
     final var written = this.written();
-    assertThat(written).contains("\"deprecated\":\"old\"").doesNotContain("\"deprecated\":\"\"");
-    assertThat(written).contains("\"1.2.0\"").doesNotContain("9.9.9");
-    assertThat(written).doesNotContain("\"modified\":\"then\"");
+    assertThat(written)
+        .contains("\"deprecated\":\"old\"")
+        .doesNotContain("\"deprecated\":\"\"")
+        .contains("\"1.2.0\"")
+        .doesNotContain("9.9.9")
+        .doesNotContain("\"modified\":\"then\"");
   }
 
   @Test

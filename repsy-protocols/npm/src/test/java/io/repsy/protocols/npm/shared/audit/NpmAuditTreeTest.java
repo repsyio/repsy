@@ -150,7 +150,9 @@ class NpmAuditTreeTest {
     // Parsed with a mapper without the nesting limit, which is what the real limit is checked for.
     final var unlimited = unlimitedMapper();
 
-    assertThatThrownBy(() -> NpmAuditTree.parse(unlimited.readTree(text.toString())))
+    final var tree = unlimited.readTree(text.toString());
+
+    assertThatThrownBy(() -> NpmAuditTree.parse(tree))
         .isInstanceOf(InvalidAuditRequestException.class)
         .hasMessageContaining("deeply");
   }
@@ -183,7 +185,9 @@ class NpmAuditTreeTest {
     }
     text.append("}}");
 
-    assertThatThrownBy(() -> NpmAuditTree.parse(json(text.toString())))
+    final var tree = json(text.toString());
+
+    assertThatThrownBy(() -> NpmAuditTree.parse(tree))
         .isInstanceOf(InvalidAuditRequestException.class)
         .hasMessageContaining("too many");
   }
@@ -204,7 +208,9 @@ class NpmAuditTreeTest {
     }
     text.append("}}");
 
-    assertThatThrownBy(() -> NpmAuditTree.parse(unlimitedMapper().readTree(text.toString())))
+    final var tree = unlimitedMapper().readTree(text.toString());
+
+    assertThatThrownBy(() -> NpmAuditTree.parse(tree))
         .isInstanceOf(InvalidAuditRequestException.class);
   }
 }

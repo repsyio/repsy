@@ -19,4 +19,4 @@ package io.repsy.protocols.npm.shared.audit;
  * Base of the backend implementation of {@link NpmAdvisorySource}; the abstract methods are
  * inherited from the contract.
  */
-public abstract class AbstractNpmAdvisorySource<ID> implements NpmAdvisorySource<ID> {}
+public abstract class AbstractNpmAdvisorySource<I> implements NpmAdvisorySource<I> {}

@@ -31,18 +31,18 @@ import tools.jackson.databind.JsonNode;
  * (as its fallback) and pnpm 9 and 10 call for {@code audit}. The body is the dependency tree of
  * the project and the answer is the legacy report of the advisories found in it.
  */
-public abstract class AbstractNpmAuditLegacyProtocolMethodHandler<ID>
-    extends AbstractNpmAuditProtocolMethodHandler<ID> {
+public abstract class AbstractNpmAuditLegacyProtocolMethodHandler<I>
+    extends AbstractNpmAuditProtocolMethodHandler<I> {
 
-  public AbstractNpmAuditLegacyProtocolMethodHandler(
+  protected AbstractNpmAuditLegacyProtocolMethodHandler(
       @Qualifier("npmPathParser") final PathParser basePathParser,
-      final NpmAdvisorySource<ID> advisorySource,
+      final NpmAdvisorySource<I> advisorySource,
       final NpmProtocolProvider provider) {
     super(basePathParser, "/-/npm/v1/security/audits(?:/quick)?", advisorySource, provider);
   }
 
   @Override
-  protected Object report(final BaseRepoInfo<ID> repoInfo, final JsonNode body) {
+  protected Object report(final BaseRepoInfo<I> repoInfo, final JsonNode body) {
 
     final var tree = NpmAuditTree.parse(body);
     final var advisories =

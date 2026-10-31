@@ -36,7 +36,7 @@ import org.springframework.http.ResponseEntity;
 public abstract class AbstractNpmPingProtocolMethodHandler
     extends AbstractRoutedProtocolMethodHandler {
 
-  public AbstractNpmPingProtocolMethodHandler(
+  protected AbstractNpmPingProtocolMethodHandler(
       @Qualifier("npmPathParser") final PathParser basePathParser,
       final NpmProtocolProvider provider) {
     super(

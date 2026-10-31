@@ -93,9 +93,9 @@ class AbstractNpmStorageServiceTarballAccessTest {
     when(this.storageStrategy.get(any(StoragePath.class), anyString()))
         .thenReturn(Optional.empty());
 
-    assertThatThrownBy(
-            () ->
-                this.service.getTarball(new RepoRef(REPO_ID, "r"), null, "demo", "demo-1.0.0.tgz"))
+    final var repoRef = new RepoRef(REPO_ID, "r");
+
+    assertThatThrownBy(() -> this.service.getTarball(repoRef, null, "demo", "demo-1.0.0.tgz"))
         .isInstanceOf(ItemNotFoundException.class);
   }
 }

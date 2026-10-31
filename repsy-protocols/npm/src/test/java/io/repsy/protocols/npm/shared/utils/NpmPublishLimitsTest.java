@@ -49,7 +49,9 @@ class NpmPublishLimitsTest {
     @Test
     @DisplayName("refuses a scope longer than 214 characters")
     void refusesOverLongScope() {
-      assertThatThrownBy(() -> NpmPublishLimits.checkScopeAndName(repeat('s', 215), "demo"))
+      final var longScope = repeat('s', 215);
+
+      assertThatThrownBy(() -> NpmPublishLimits.checkScopeAndName(longScope, "demo"))
           .isInstanceOf(BadRequestException.class)
           .hasMessage("packageScopeTooLong");
     }
@@ -57,7 +59,9 @@ class NpmPublishLimitsTest {
     @Test
     @DisplayName("refuses a name longer than 214 characters")
     void refusesOverLongName() {
-      assertThatThrownBy(() -> NpmPublishLimits.checkScopeAndName(null, repeat('n', 215)))
+      final var longName = repeat('n', 215);
+
+      assertThatThrownBy(() -> NpmPublishLimits.checkScopeAndName(null, longName))
           .isInstanceOf(BadRequestException.class)
           .hasMessage("packageNameTooLong");
     }
@@ -65,7 +69,9 @@ class NpmPublishLimitsTest {
     @Test
     @DisplayName("refuses a version longer than 128 characters")
     void refusesOverLongVersion() {
-      assertThatThrownBy(() -> NpmPublishLimits.checkVersion(repeat('1', 129)))
+      final var longVersion = repeat('1', 129);
+
+      assertThatThrownBy(() -> NpmPublishLimits.checkVersion(longVersion))
           .isInstanceOf(BadRequestException.class)
           .hasMessage("packageVersionTooLong");
     }
@@ -108,7 +114,9 @@ class NpmPublishLimitsTest {
     void checksLoneDistTagName() {
       NpmPublishLimits.checkDistTagName(repeat('t', 255));
 
-      assertThatThrownBy(() -> NpmPublishLimits.checkDistTagName(repeat('t', 256)))
+      final var longTag = repeat('t', 256);
+
+      assertThatThrownBy(() -> NpmPublishLimits.checkDistTagName(longTag))
           .isInstanceOf(BadRequestException.class)
           .hasMessage("distTagNameTooLong");
     }
@@ -119,7 +127,9 @@ class NpmPublishLimitsTest {
       NpmPublishLimits.checkDeprecationMessage(repeat('m', 4096));
       NpmPublishLimits.checkDeprecationMessage("");
 
-      assertThatThrownBy(() -> NpmPublishLimits.checkDeprecationMessage(repeat('m', 4097)))
+      final var longMessage = repeat('m', 4097);
+
+      assertThatThrownBy(() -> NpmPublishLimits.checkDeprecationMessage(longMessage))
           .isInstanceOf(BadRequestException.class)
           .hasMessage("deprecationMessageTooLong");
     }
@@ -146,7 +156,7 @@ class NpmPublishLimitsTest {
       final var version2 = this.version();
       version2.put("homepage", "https://example.test");
       NpmPublishLimits.dropOverLongFields(version2);
-      assertThat(version2.get("homepage")).isEqualTo("https://example.test");
+      assertThat(version2).containsEntry("homepage", "https://example.test");
     }
 
     @Test
@@ -177,9 +187,9 @@ class NpmPublishLimitsTest {
 
       NpmPublishLimits.dropOverLongFields(version);
 
-      assertThat(author.get("name")).isEqualTo("Barney Rubble");
+      assertThat(author).containsEntry("name", "Barney Rubble");
       assertThat(author.get("email")).isNull();
-      assertThat(author.get("url")).isEqualTo("https://example.test");
+      assertThat(author).containsEntry("url", "https://example.test");
     }
 
     @Test
@@ -209,7 +219,7 @@ class NpmPublishLimitsTest {
       NpmPublishLimits.dropOverLongFields(version);
 
       assertThat(repository.get("type")).isNull();
-      assertThat(repository.get("url")).isEqualTo("https://example.test/repo.git");
+      assertThat(repository).containsEntry("url", "https://example.test/repo.git");
     }
 
     @Test
@@ -271,9 +281,9 @@ class NpmPublishLimitsTest {
       NpmPublishLimits.dropOverLongFields(version);
 
       assertThat(maintainers).hasSize(1);
-      assertThat(maintainer.get("name")).isEqualTo("ok-maintainer");
+      assertThat(maintainer).containsEntry("name", "ok-maintainer");
       assertThat(maintainer.get("email")).isNull();
-      assertThat(maintainer.get("url")).isEqualTo("https://example.test");
+      assertThat(maintainer).containsEntry("url", "https://example.test");
     }
 
     @Test
@@ -290,7 +300,7 @@ class NpmPublishLimitsTest {
       NpmPublishLimits.dropOverLongFields(version);
 
       assertThat(maintainers).hasSize(1);
-      assertThat(maintainer.get("name")).isEqualTo("ok-maintainer");
+      assertThat(maintainer).containsEntry("name", "ok-maintainer");
       assertThat(maintainer.get("email")).isNull();
       assertThat(maintainer.get("url")).isNull();
     }
@@ -306,8 +316,8 @@ class NpmPublishLimitsTest {
 
       NpmPublishLimits.dropOverLongFields(version);
 
-      assertThat(version.get("homepage")).isEqualTo("https://example.test");
-      assertThat(version.get("license")).isEqualTo("MIT");
+      assertThat(version).containsEntry("homepage", "https://example.test");
+      assertThat(version).containsEntry("license", "MIT");
       assertThat((List<String>) version.get("keywords")).containsExactly("a", "b");
     }
 
@@ -332,11 +342,11 @@ class NpmPublishLimitsTest {
       final var author = (Map<String, Object>) version.get("author");
       assertThat(author.get("name")).isNull();
       assertThat(author.get("email")).isNull();
-      assertThat(author.get("url")).isEqualTo("u");
+      assertThat(author).containsEntry("url", "u");
       assertThat(version.get("bugs")).isNull();
       final var repository = (Map<String, Object>) version.get("repository");
       assertThat(repository.get("type")).isNull();
-      assertThat(repository.get("url")).isEqualTo("git://x");
+      assertThat(repository).containsEntry("url", "git://x");
     }
 
     @Test
@@ -349,9 +359,9 @@ class NpmPublishLimitsTest {
 
       NpmPublishLimits.dropOverLongFields(version);
 
-      assertThat(version.get("license")).isEqualTo("MIT");
-      assertThat(version.get("author")).isEqualTo("Jane <jane@example.org>");
-      assertThat(version.get("repository")).isEqualTo("github:a/b");
+      assertThat(version).containsEntry("license", "MIT");
+      assertThat(version).containsEntry("author", "Jane <jane@example.org>");
+      assertThat(version).containsEntry("repository", "github:a/b");
     }
 
     @Test

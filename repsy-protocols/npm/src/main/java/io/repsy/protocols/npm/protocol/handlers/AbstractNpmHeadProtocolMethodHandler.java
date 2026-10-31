@@ -40,9 +40,9 @@ public abstract class AbstractNpmHeadProtocolMethodHandler
     extends AbstractFacadeProtocolMethodHandler<NpmProtocolFacade> {
 
   private static final Pattern DOWNLOAD_PATTERN = Pattern.compile("^/(.+?)/-/(.+)");
-  private static final Pattern PACKAGE_PATTERN = Pattern.compile("^/(.+?)$");
+  private static final Pattern PACKAGE_PATTERN = Pattern.compile("^/(.+)$");
 
-  public AbstractNpmHeadProtocolMethodHandler(
+  protected AbstractNpmHeadProtocolMethodHandler(
       final PathParser basePathParser,
       final NpmProtocolFacade npmProtocolFacade,
       final ProtocolProvider provider) {

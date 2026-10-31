@@ -125,9 +125,10 @@ class NpmPackageUtilsPayloadTest {
 
     final var versions = (Map<String, Map<String, Object>>) payload.get("versions");
     final var dist = (Map<String, Object>) versions.get("1.2.3").get("dist");
-    assertThat(dist.get("shasum")).isEqualTo(DigestUtils.sha1Hex(bytes));
-    assertThat(dist.get("integrity"))
-        .isEqualTo(
+    assertThat(dist).containsEntry("shasum", DigestUtils.sha1Hex(bytes));
+    assertThat(dist)
+        .containsEntry(
+            "integrity",
             "sha512-" + Base64.encodeBase64String(DigestUtils.getSha512Digest().digest(bytes)));
   }
 
@@ -138,7 +139,7 @@ class NpmPackageUtilsPayloadTest {
 
     NpmMetadataUtils.updateModifiedTime(payload);
 
-    assertThat(((Map<String, String>) payload.get("time")).get("modified")).isNotEqualTo("old");
+    assertThat((Map<String, String>) payload.get("time")).doesNotContainEntry("modified", "old");
 
     final var noTime = new HashMap<String, Object>();
     NpmMetadataUtils.updateModifiedTime(noTime);

@@ -52,7 +52,7 @@ import org.springframework.http.ResponseEntity;
  * token is refused ({@code deployTokenNotRevocable}) and the text says why and what to do instead
  * (RPS-1391).
  */
-public abstract class AbstractNpmTokenRevokeProtocolMethodHandler<ID>
+public abstract class AbstractNpmTokenRevokeProtocolMethodHandler<I>
     extends AbstractRoutedProtocolMethodHandler {
 
   private static final String CHALLENGE = BasicAuthChallenge.REPSY;
@@ -62,11 +62,11 @@ public abstract class AbstractNpmTokenRevokeProtocolMethodHandler<ID>
   private static final String TOKEN_PATH_REGEX = "/-/user/token/[^/]+";
   private static final String TOKEN_PATH_PREFIX = "/-/user/token/";
 
-  private final NpmTokenRevoker<ID> tokenRevoker;
+  private final NpmTokenRevoker<I> tokenRevoker;
 
-  public AbstractNpmTokenRevokeProtocolMethodHandler(
+  protected AbstractNpmTokenRevokeProtocolMethodHandler(
       @Qualifier("npmPathParser") final PathParser basePathParser,
-      final NpmTokenRevoker<ID> tokenRevoker,
+      final NpmTokenRevoker<I> tokenRevoker,
       final NpmProtocolProvider provider) {
     super(
         HandlerRoute.read(HttpMethod.DELETE)
@@ -88,13 +88,13 @@ public abstract class AbstractNpmTokenRevokeProtocolMethodHandler<ID>
     final var token = relativePath.substring(TOKEN_PATH_PREFIX.length());
 
     try {
-      final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+      final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
 
       this.tokenRevoker.revokeToken(repoInfo, authHeader, token);
 
       return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(Map.of("ok", true));
 
-    } catch (final UnAuthorizedException e) {
+    } catch (final UnAuthorizedException _) {
       // A TooManyRequestsException is not caught: 429 is the answer, not another login.
       final var challenge =
           authHeader != null && authHeader.startsWith(BEARER_PREFIX) ? BEARER_CHALLENGE : CHALLENGE;

@@ -42,11 +42,11 @@ import org.springframework.http.ResponseEntity;
 public abstract class AbstractNpmPackageMetadataProtocolMethodHandler
     extends AbstractFacadeProtocolMethodHandler<NpmProtocolFacade> {
 
-  private static final Pattern METADATA_PATTERN = Pattern.compile("^/(.+?)$");
+  private static final Pattern METADATA_PATTERN = Pattern.compile("^/(.+)$");
   private static final MediaType ABBREVIATED_METADATA_TYPE =
       MediaType.parseMediaType("application/vnd.npm.install-v1+json");
 
-  public AbstractNpmPackageMetadataProtocolMethodHandler(
+  protected AbstractNpmPackageMetadataProtocolMethodHandler(
       @Qualifier("osNpmPathParser") final PathParser basePathParser,
       final NpmProtocolFacade npmProtocolFacade,
       final NpmProtocolProvider provider) {
@@ -104,7 +104,7 @@ public abstract class AbstractNpmPackageMetadataProtocolMethodHandler
 
       return builder.body(metadata);
 
-    } catch (final UnAuthorizedException e) {
+    } catch (final UnAuthorizedException _) {
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
           .header(WWW_AUTHENTICATE, BasicAuthChallenge.REPSY)
           .build();

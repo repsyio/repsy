@@ -19,4 +19,4 @@ package io.repsy.protocols.npm.shared.npm_package.services;
  * Base of the backend implementation of {@link NpmPackageService}; the abstract methods are
  * inherited from the contract.
  */
-public abstract class AbstractNpmPackageService<ID> implements NpmPackageService<ID> {}
+public abstract class AbstractNpmPackageService<I> implements NpmPackageService<I> {}

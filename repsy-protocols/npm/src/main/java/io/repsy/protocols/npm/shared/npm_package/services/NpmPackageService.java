@@ -28,7 +28,7 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.util.Pair;
 
-public interface NpmPackageService<ID> {
+public interface NpmPackageService<I> {
 
   /**
    * Records the published version and, while that write is still open, stores its files through
@@ -46,7 +46,7 @@ public interface NpmPackageService<ID> {
    *     exists and the repo does not allow overrides
    */
   BaseUsages publishVersion(
-      BaseRepoInfo<ID> repoInfo,
+      BaseRepoInfo<I> repoInfo,
       @Nullable String scopeName,
       String packageName,
       String versionName,
@@ -77,8 +77,7 @@ public interface NpmPackageService<ID> {
     BaseUsages write(PublishKind kind) throws IOException, URISyntaxException;
   }
 
-  BaseNpmPackageInfo<ID> getPackage(
-      UUID storageKey, @Nullable String scopeName, String packageName);
+  BaseNpmPackageInfo<I> getPackage(UUID storageKey, @Nullable String scopeName, String packageName);
 
   /**
    * The package as the rows have it, for rebuilding its metadata file when storage lost it
@@ -91,7 +90,7 @@ public interface NpmPackageService<ID> {
   NpmPackageSnapshot getSnapshot(UUID storageKey, @Nullable String scopeName, String packageName);
 
   /** The names of the versions the package has. */
-  List<String> getVersionNames(ID packageId);
+  List<String> getVersionNames(I packageId);
 
   /**
    * Deletes the package and its versions and, while that write is still open, removes its files
@@ -107,7 +106,7 @@ public interface NpmPackageService<ID> {
    *     exist
    */
   PackageDeletion deletePackage(
-      BaseRepoInfo<ID> repoInfo,
+      BaseRepoInfo<I> repoInfo,
       @Nullable String scopeName,
       String packageName,
       PackageRemover remover);
@@ -125,7 +124,7 @@ public interface NpmPackageService<ID> {
    *     version does not exist
    */
   PackageDeletion deletePackageVersion(
-      BaseRepoInfo<ID> repoInfo,
+      BaseRepoInfo<I> repoInfo,
       @Nullable String scopeName,
       String packageName,
       String versionName,
@@ -175,14 +174,14 @@ public interface NpmPackageService<ID> {
    *     version does not exist
    */
   BaseUsages handleDeprecations(
-      BaseRepoInfo<ID> repoInfo,
+      BaseRepoInfo<I> repoInfo,
       @Nullable String scopeName,
       String packageName,
       List<Pair<String, String>> deprecations,
       MetadataWriter writer)
       throws IOException;
 
-  List<PackageDistributionTagMapListItem> getDistributionTags(ID id);
+  List<PackageDistributionTagMapListItem> getDistributionTags(I id);
 
   /**
    * Points {@code tagName} at {@code versionName} and, while that write is still open, stores the
@@ -201,7 +200,7 @@ public interface NpmPackageService<ID> {
    *     exist
    */
   BaseUsages addDistributionTag(
-      BaseRepoInfo<ID> repoInfo,
+      BaseRepoInfo<I> repoInfo,
       @Nullable String scopeName,
       String packageName,
       String tagName,
@@ -218,7 +217,7 @@ public interface NpmPackageService<ID> {
    *     exist
    */
   BaseUsages deleteDistributionTag(
-      BaseRepoInfo<ID> repoInfo,
+      BaseRepoInfo<I> repoInfo,
       @Nullable String scopeName,
       String packageName,
       String tagName,

@@ -202,6 +202,8 @@ public final class NpmMetadataUtils {
     distTags.entrySet().removeIf(entry -> entry.getValue().equals(versionName));
   }
 
+  private static final String HAS_INSTALL_SCRIPT = "hasInstallScript";
+
   /** What the abbreviated document carries of a version when the version has it. */
   private static final List<String> ABBREVIATED_OPTIONAL_FIELDS =
       List.of(
@@ -211,7 +213,7 @@ public final class NpmMetadataUtils {
           "cpu",
           "libc",
           "peerDependenciesMeta",
-          "hasInstallScript",
+          HAS_INSTALL_SCRIPT,
           "funding",
           "acceptDependencies");
 
@@ -268,7 +270,7 @@ public final class NpmMetadataUtils {
     // The public registry derives this from the scripts of the version, so a version that was
     // published without the flag (an older client) still tells the installer to expect a script
     if (hasInstallScript(version)) {
-      abbreviatedVersion.put("hasInstallScript", true);
+      abbreviatedVersion.put(HAS_INSTALL_SCRIPT, true);
     }
 
     // Optional fields that have default values
@@ -293,7 +295,7 @@ public final class NpmMetadataUtils {
    * {@code install} or {@code postinstall} in its {@code scripts} (RPS-1390).
    */
   private static boolean hasInstallScript(final Map<String, Object> version) {
-    if (Boolean.TRUE.equals(version.get("hasInstallScript"))) {
+    if (Boolean.TRUE.equals(version.get(HAS_INSTALL_SCRIPT))) {
       return true;
     }
 

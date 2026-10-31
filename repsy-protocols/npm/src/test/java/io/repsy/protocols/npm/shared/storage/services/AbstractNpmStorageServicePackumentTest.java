@@ -387,9 +387,10 @@ class AbstractNpmStorageServicePackumentTest {
     final var packument = this.writtenPackument();
 
     assertThat(packument).doesNotContainKey("_attachments");
-    assertThat(packument.get("versions"))
+    assertThat(packument)
         .as("the versions are what they were")
-        .isEqualTo(
+        .containsEntry(
+            "versions",
             MAPPER.readValue(CLEAN, new TypeReference<Map<String, Object>>() {}).get("versions"));
     assertThat(this.written).as("no tarball is written or rewritten").hasSize(1);
   }
@@ -403,7 +404,7 @@ class AbstractNpmStorageServicePackumentTest {
     this.service.deleteDistributionTag(new RepoRef(REPO_ID, REPO_NAME), BASE_PATH, "old");
 
     this.assertRewrittenWithoutAttachmentsAndUntouched();
-    assertThat(this.writtenPackument().get("dist-tags")).isEqualTo(Map.of("latest", "1.1.0"));
+    assertThat(this.writtenPackument()).containsEntry("dist-tags", Map.of("latest", "1.1.0"));
   }
 
   @Test
@@ -419,8 +420,8 @@ class AbstractNpmStorageServicePackumentTest {
     this.service.writeMetadataToFile(REPO_NAME, metadataAndUsage.getFirst(), storagePath);
 
     this.assertRewrittenWithoutAttachmentsAndUntouched();
-    assertThat(this.writtenPackument().get("dist-tags"))
-        .isEqualTo(Map.of("latest", "1.1.0", "old", "1.0.0", "next", "1.0.0"));
+    assertThat(this.writtenPackument())
+        .containsEntry("dist-tags", Map.of("latest", "1.1.0", "old", "1.0.0", "next", "1.0.0"));
   }
 
   @Test

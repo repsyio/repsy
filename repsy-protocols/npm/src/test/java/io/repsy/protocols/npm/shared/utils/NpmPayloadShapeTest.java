@@ -31,6 +31,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.springframework.data.util.Pair;
 
 @DisplayName("NpmPayloadUtils shape checks (RPS-2210)")
 @SuppressWarnings("unchecked")
@@ -208,7 +209,7 @@ class NpmPayloadShapeTest {
     final var old = versionsOf(null, false);
 
     assertThat(NpmPayloadUtils.findDeprecatedVersions(old, versionsOf("use 2.x", true)))
-        .extracting(pair -> pair.getSecond())
+        .extracting(Pair::getSecond)
         .containsExactly("use 2.x");
     assertThat(NpmPayloadUtils.findDeprecatedVersions(old, versionsOf(null, true))).isEmpty();
     assertThat(NpmPayloadUtils.findDeprecatedVersions(old, versionsOf(null, false))).isEmpty();
@@ -219,15 +220,13 @@ class NpmPayloadShapeTest {
   @DisplayName("findDeprecatedVersions refuses a deprecated that is not a string (RPS-2219)")
   void findDeprecatedVersionsRefusesNonString(final String label, final Object value) {
     final var stored = versionsOf("old message", true);
+    final var unstored = versionsOf(null, false);
+    final var incoming = versionsOf(value, true);
 
-    assertThatThrownBy(
-            () -> NpmPayloadUtils.findDeprecatedVersions(stored, versionsOf(value, true)))
+    assertThatThrownBy(() -> NpmPayloadUtils.findDeprecatedVersions(stored, incoming))
         .as(label)
         .isInstanceOf(BadRequestException.class);
-    assertThatThrownBy(
-            () ->
-                NpmPayloadUtils.findDeprecatedVersions(
-                    versionsOf(null, false), versionsOf(value, true)))
+    assertThatThrownBy(() -> NpmPayloadUtils.findDeprecatedVersions(unstored, incoming))
         .as(label)
         .isInstanceOf(BadRequestException.class);
   }

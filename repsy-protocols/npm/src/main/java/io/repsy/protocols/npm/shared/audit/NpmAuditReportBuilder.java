@@ -111,7 +111,9 @@ public class NpmAuditReportBuilder {
   }
 
   private static Cvss cvss(final NpmAdvisory advisory) {
-    return new Cvss(advisory.cvssScore() == null ? 0 : advisory.cvssScore(), advisory.cvssVector());
+    final var score = advisory.cvssScore();
+
+    return new Cvss(score == null ? 0 : score, advisory.cvssVector());
   }
 
   private static Map<String, Long> severityCounts() {
@@ -179,6 +181,9 @@ public class NpmAuditReportBuilder {
       final NpmAdvisory advisory, final List<Finding> findings) {
 
     final var updated = NpmSearchResult.format(advisory.updated());
+    final var reportedBy = advisory.reportedBy();
+    final var patchedVersions = advisory.patchedVersions();
+    final var githubAdvisoryId = advisory.githubAdvisoryId();
 
     return new LegacyAdvisory(
         findings,
@@ -188,18 +193,18 @@ public class NpmAuditReportBuilder {
         false,
         advisory.title(),
         new Person(FINDER),
-        new Person(advisory.reportedBy() == null ? UNKNOWN_SCANNER : advisory.reportedBy()),
+        new Person(reportedBy == null ? UNKNOWN_SCANNER : reportedBy),
         advisory.packageName(),
         advisory.cves(),
         String.join(VERSION_SEPARATOR, advisory.vulnerableVersions()),
-        advisory.patchedVersions() == null ? NO_FIX : advisory.patchedVersions(),
+        patchedVersions == null ? NO_FIX : patchedVersions,
         advisory.overview(),
         advisory.recommendation(),
         advisory.references(),
         "public",
         advisory.severity(),
         "",
-        advisory.githubAdvisoryId() == null ? "" : advisory.githubAdvisoryId(),
+        githubAdvisoryId == null ? "" : githubAdvisoryId,
         new AdvisoryMetadata("", 0, ""),
         advisory.url());
   }
@@ -211,7 +216,7 @@ public class NpmAuditReportBuilder {
 
     if (aValid && bValid) {
       final var byPrecedence = NpmSemver.parse(a).compareTo(NpmSemver.parse(b));
-      return byPrecedence != 0 ? byPrecedence : a.compareTo(b);
+      return byPrecedence == 0 ? a.compareTo(b) : byPrecedence;
     }
 
     if (aValid != bValid) {
