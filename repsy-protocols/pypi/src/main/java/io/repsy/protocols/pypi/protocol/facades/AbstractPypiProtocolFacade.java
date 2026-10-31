@@ -49,14 +49,14 @@ import org.springframework.web.util.HtmlUtils;
 
 @Slf4j
 @RequiredArgsConstructor
-public abstract class AbstractPypiProtocolFacade<ID> implements PypiProtocolFacade<ID> {
+public abstract class AbstractPypiProtocolFacade<I> implements PypiProtocolFacade<I> {
 
   private static final String ARTIFACT_NAME = "artifactName";
   private static final String ARTIFACT_VERSION = "artifactVersion";
   private static final String STORAGE_PATH = "storagePath";
 
-  private final PypiStorageService<ID> pypiStorageService;
-  private final PypiPackageService<ID> pypiPackageService;
+  private final PypiStorageService<I> pypiStorageService;
+  private final PypiPackageService<I> pypiPackageService;
 
   @Override
   public void uploadPackage(
@@ -71,7 +71,7 @@ public abstract class AbstractPypiProtocolFacade<ID> implements PypiProtocolFaca
       throw new BadRequestException(ProtocolErrorCodes.PYPI_ARCHIVE_EMPTY);
     }
 
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
 
     final var uploadForm = parseUploadForm(parameterMap);
     uploadForm.setNormalizedName(PypiPackageUtils.normalizePackageName(uploadForm.getName()));
@@ -80,7 +80,7 @@ public abstract class AbstractPypiProtocolFacade<ID> implements PypiProtocolFaca
     // refuses leaves no orphan archive, and one it lets through never fails the row insert.
     PypiPublishLimits.checkPackageName(uploadForm.getName());
     PypiPublishLimits.checkVersion(uploadForm.getVersion());
-    PypiPublishLimits.checkRequiresPython(uploadForm.getRequires_python());
+    PypiPublishLimits.checkRequiresPython(uploadForm.getRequiresPython());
     PypiPublishLimits.dropOverLongFields(uploadForm);
 
     PackageStorageUtils.checkArchiveFilename(file);
@@ -90,10 +90,10 @@ public abstract class AbstractPypiProtocolFacade<ID> implements PypiProtocolFaca
     PackageStorageUtils.checkSha256Digest(uploadForm);
 
     final var actualDigest = PackageStorageUtils.computeSha256(file);
-    if (!actualDigest.equalsIgnoreCase(uploadForm.getSha256_digest())) {
+    if (!actualDigest.equalsIgnoreCase(uploadForm.getSha256Digest())) {
       throw new BadRequestException(ProtocolErrorCodes.SHA256_DIGEST_MISMATCH);
     }
-    uploadForm.setSha256_digest(actualDigest);
+    uploadForm.setSha256Digest(actualDigest);
 
     this.checkOverridePermission(repoInfo, uploadForm, file);
 
@@ -122,14 +122,14 @@ public abstract class AbstractPypiProtocolFacade<ID> implements PypiProtocolFaca
       final ProtocolContext context, final String packageNormalizedName)
       throws IOException, TemplateException {
 
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
 
     return this.fetchFromLocalStorage(repoInfo, packageNormalizedName);
   }
 
   @Override
   public ByteArrayResource fetchFromLocalStorage(
-      final BaseRepoInfo<ID> repoInfo, final String packageNormalizedName)
+      final BaseRepoInfo<I> repoInfo, final String packageNormalizedName)
       throws TemplateException, IOException {
 
     final var packageInfo =
@@ -156,7 +156,7 @@ public abstract class AbstractPypiProtocolFacade<ID> implements PypiProtocolFaca
   @Override
   public boolean packageExists(final ProtocolContext context, final String packageNormalizedName) {
 
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
 
     return this.pypiPackageService.packageExists(repoInfo.getId(), packageNormalizedName);
   }
@@ -165,14 +165,14 @@ public abstract class AbstractPypiProtocolFacade<ID> implements PypiProtocolFaca
   public boolean archiveFileExists(
       final ProtocolContext context, final String packageName, final String fileName) {
 
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
 
     return this.pypiStorageService.isPackageFileExist(
         repoInfo.getStorageKey(), packageName, fileName);
   }
 
   private void checkOverridePermission(
-      final BaseRepoInfo<ID> repoInfo,
+      final BaseRepoInfo<I> repoInfo,
       final PackageUploadForm uploadForm,
       final MultipartFile file) {
 
@@ -186,7 +186,7 @@ public abstract class AbstractPypiProtocolFacade<ID> implements PypiProtocolFaca
   }
 
   private boolean archiveExists(
-      final BaseRepoInfo<ID> repoInfo,
+      final BaseRepoInfo<I> repoInfo,
       final PackageUploadForm uploadForm,
       final MultipartFile file) {
 
@@ -197,7 +197,7 @@ public abstract class AbstractPypiProtocolFacade<ID> implements PypiProtocolFaca
   }
 
   private BaseUsages savePackage(
-      final BaseRepoInfo<ID> repoInfo, final PackageUploadForm uploadForm, final MultipartFile file)
+      final BaseRepoInfo<I> repoInfo, final PackageUploadForm uploadForm, final MultipartFile file)
       throws IOException {
 
     return this.pypiPackageService.publishRelease(
@@ -210,7 +210,7 @@ public abstract class AbstractPypiProtocolFacade<ID> implements PypiProtocolFaca
    * written files are removed. A file being replaced keeps its row and is left alone.
    */
   private BaseUsages storeArchive(
-      final BaseRepoInfo<ID> repoInfo, final PackageUploadForm uploadForm, final MultipartFile file)
+      final BaseRepoInfo<I> repoInfo, final PackageUploadForm uploadForm, final MultipartFile file)
       throws IOException {
 
     // The check before the transaction cannot see a concurrent upload of the same file. Every

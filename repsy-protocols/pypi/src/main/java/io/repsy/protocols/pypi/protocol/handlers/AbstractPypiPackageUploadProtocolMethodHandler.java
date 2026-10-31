@@ -29,15 +29,15 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.multipart.MultipartHttpServletRequest;
 
-public abstract class AbstractPypiPackageUploadProtocolMethodHandler<ID>
-    extends AbstractFacadeProtocolMethodHandler<PypiProtocolFacade<ID>> {
+public abstract class AbstractPypiPackageUploadProtocolMethodHandler<I>
+    extends AbstractFacadeProtocolMethodHandler<PypiProtocolFacade<I>> {
 
   // Upload endpoint pattern: POST /{owner}/{repo} (root level)
   private static final Pattern UPLOAD_PATTERN = Pattern.compile("^/?$");
 
-  public AbstractPypiPackageUploadProtocolMethodHandler(
+  protected AbstractPypiPackageUploadProtocolMethodHandler(
       final PathParser basePathParser,
-      final PypiProtocolFacade<ID> pypiProtocolFacade,
+      final PypiProtocolFacade<I> pypiProtocolFacade,
       final ProtocolProvider provider) {
     super(
         HandlerRoute.write(HttpMethod.POST).path(UPLOAD_PATTERN.asMatchPredicate()),

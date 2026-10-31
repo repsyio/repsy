@@ -41,8 +41,8 @@ public final class PackageStorageUtils {
    * {@code .}), so it can never contain the {@code -} that separates the parts of a wheel name.
    */
   private static final String VERSION_REGEX =
-      "(?:[1-9][0-9]*!)?(?:0|[1-9][0-9]*)(?:\\.(?:0|[1-9][0-9]*))*"
-          + "(?:(?:a|b|rc)(?:0|[1-9][0-9]*))?(?:\\.post(?:0|[1-9][0-9]*))?(?:\\.dev(?:0|[1-9][0-9]*))?"
+      "(?:[1-9]\\d*!)?(?:0|[1-9]\\d*)(?:\\.(?:0|[1-9]\\d*))*"
+          + "(?:(?:a|b|rc)(?:0|[1-9]\\d*))?(?:\\.post(?:0|[1-9]\\d*))?(?:\\.dev(?:0|[1-9]\\d*))?"
           + "(?:\\+[a-z0-9]+(?:\\.[a-z0-9]+)*)?";
 
   private static final String SIDECAR_SUFFIX = "." + HASH_ALGORITHM;
@@ -52,7 +52,7 @@ public final class PackageStorageUtils {
   private static final Pattern VERSION_PATTERN = Pattern.compile(VERSION_REGEX);
 
   /** A wheel build tag: it starts with a digit, unlike a python tag, and has no dot. */
-  private static final Pattern BUILD_TAG_PATTERN = Pattern.compile("[0-9][a-zA-Z0-9_]*");
+  private static final Pattern BUILD_TAG_PATTERN = Pattern.compile("\\d\\w*");
 
   private static final Pattern PART_SEPARATOR = Pattern.compile("-");
 
@@ -180,7 +180,7 @@ public final class PackageStorageUtils {
   /** Rejects an upload whose {@code sha256_digest} form field is missing or blank. */
   public static void checkSha256Digest(final PackageUploadForm uploadForm) {
 
-    if (!StringUtils.hasText(uploadForm.getSha256_digest())) {
+    if (!StringUtils.hasText(uploadForm.getSha256Digest())) {
       throw new BadRequestException(ProtocolErrorCodes.SHA256_DIGEST_MISSING);
     }
   }

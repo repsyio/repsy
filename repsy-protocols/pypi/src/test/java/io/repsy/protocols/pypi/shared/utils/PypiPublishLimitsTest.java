@@ -48,7 +48,9 @@ class PypiPublishLimitsTest {
     @Test
     @DisplayName("refuses a package name longer than 255 characters")
     void refusesOverLongName() {
-      assertThatThrownBy(() -> PypiPublishLimits.checkPackageName(repeat('n', 256)))
+      final var tooLongName = repeat('n', 256);
+
+      assertThatThrownBy(() -> PypiPublishLimits.checkPackageName(tooLongName))
           .isInstanceOf(BadRequestException.class)
           .hasMessage("pypiPackageNameTooLong");
     }
@@ -56,7 +58,9 @@ class PypiPublishLimitsTest {
     @Test
     @DisplayName("refuses a version longer than 255 characters")
     void refusesOverLongVersion() {
-      assertThatThrownBy(() -> PypiPublishLimits.checkVersion(repeat('1', 256)))
+      final var tooLongVersion = repeat('1', 256);
+
+      assertThatThrownBy(() -> PypiPublishLimits.checkVersion(tooLongVersion))
           .isInstanceOf(BadRequestException.class)
           .hasMessage("pypiVersionTooLong");
     }
@@ -70,7 +74,9 @@ class PypiPublishLimitsTest {
     @Test
     @DisplayName("refuses an archive file name longer than 255 characters (RPS-1155)")
     void refusesOverLongArchiveFilename() {
-      assertThatThrownBy(() -> PypiPublishLimits.checkArchiveFilename(repeat('a', 256)))
+      final var tooLongFilename = repeat('a', 256);
+
+      assertThatThrownBy(() -> PypiPublishLimits.checkArchiveFilename(tooLongFilename))
           .isInstanceOf(BadRequestException.class)
           .hasMessage("pypiArchiveFileNameTooLong");
     }
@@ -78,7 +84,9 @@ class PypiPublishLimitsTest {
     @Test
     @DisplayName("refuses a requires_python longer than 255 characters")
     void refusesOverLongRequiresPython() {
-      assertThatThrownBy(() -> PypiPublishLimits.checkRequiresPython(repeat('p', 256)))
+      final var tooLongRequiresPython = repeat('p', 256);
+
+      assertThatThrownBy(() -> PypiPublishLimits.checkRequiresPython(tooLongRequiresPython))
           .isInstanceOf(BadRequestException.class)
           .hasMessage("pypiRequiresPythonTooLong");
     }
@@ -96,14 +104,14 @@ class PypiPublishLimitsTest {
     @DisplayName("nulls an over-long home_page but leaves a short one alone")
     void dropsOverLongHomePage() {
       final var form = this.form();
-      form.setHome_page(repeat('h', 256));
+      form.setHomePage(repeat('h', 256));
       PypiPublishLimits.dropOverLongFields(form);
-      assertThat(form.getHome_page()).isNull();
+      assertThat(form.getHomePage()).isNull();
 
       final var form2 = this.form();
-      form2.setHome_page("https://example.test");
+      form2.setHomePage("https://example.test");
       PypiPublishLimits.dropOverLongFields(form2);
-      assertThat(form2.getHome_page()).isEqualTo("https://example.test");
+      assertThat(form2.getHomePage()).isEqualTo("https://example.test");
     }
 
     @Test
@@ -111,10 +119,10 @@ class PypiPublishLimitsTest {
     void dropsOverLongAuthorFields() {
       final var form = this.form();
       form.setAuthor(repeat('a', 256));
-      form.setAuthor_email("short@example.test");
+      form.setAuthorEmail("short@example.test");
       PypiPublishLimits.dropOverLongFields(form);
       assertThat(form.getAuthor()).isNull();
-      assertThat(form.getAuthor_email()).isEqualTo("short@example.test");
+      assertThat(form.getAuthorEmail()).isEqualTo("short@example.test");
     }
 
     @Test
@@ -130,9 +138,9 @@ class PypiPublishLimitsTest {
     @DisplayName("nulls an over-long description_content_type")
     void dropsOverLongDescriptionContentType() {
       final var form = this.form();
-      form.setDescription_content_type(repeat('d', 256));
+      form.setDescriptionContentType(repeat('d', 256));
       PypiPublishLimits.dropOverLongFields(form);
-      assertThat(form.getDescription_content_type()).isNull();
+      assertThat(form.getDescriptionContentType()).isNull();
     }
 
     @Test
@@ -170,14 +178,14 @@ class PypiPublishLimitsTest {
     @DisplayName("drops only the project_url whose label is over 32 characters")
     void dropsOnlyOverLongProjectUrlLabel() {
       final var form = this.form();
-      form.setProject_urls(
+      form.setProjectUrls(
           new String[] {
             "Homepage,https://example.test", repeat('l', 33) + ",https://example.test/other"
           });
 
       PypiPublishLimits.dropOverLongFields(form);
 
-      assertThat(form.getProject_urls()).containsExactly("Homepage,https://example.test");
+      assertThat(form.getProjectUrls()).containsExactly("Homepage,https://example.test");
     }
 
     @Test
@@ -185,11 +193,11 @@ class PypiPublishLimitsTest {
     void keepsProjectUrlLabelAtLimit() {
       final var form = this.form();
       final var entry = repeat('l', 32) + ",https://example.test";
-      form.setProject_urls(new String[] {entry});
+      form.setProjectUrls(new String[] {entry});
 
       PypiPublishLimits.dropOverLongFields(form);
 
-      assertThat(form.getProject_urls()).containsExactly(entry);
+      assertThat(form.getProjectUrls()).containsExactly(entry);
     }
 
     @Test
@@ -199,32 +207,32 @@ class PypiPublishLimitsTest {
       form.setSummary(repeat('s', 5000));
       form.setDescription(repeat('d', 5000));
       final var entry = "Homepage," + "https://example.test/" + repeat('u', 5000);
-      form.setProject_urls(new String[] {entry});
+      form.setProjectUrls(new String[] {entry});
 
       PypiPublishLimits.dropOverLongFields(form);
 
       assertThat(form.getSummary()).hasSize(5000);
       assertThat(form.getDescription()).hasSize(5000);
-      assertThat(form.getProject_urls()).containsExactly(entry);
+      assertThat(form.getProjectUrls()).containsExactly(entry);
     }
 
     @Test
     @DisplayName("does nothing to a form with no over-long fields")
     void leavesShortFieldsUntouched() {
       final var form = this.form();
-      form.setHome_page("https://example.test");
+      form.setHomePage("https://example.test");
       form.setAuthor("Barney Rubble");
       form.setLicense("MIT");
       form.setClassifiers(new String[] {"Programming Language :: Python :: 3"});
-      form.setProject_urls(new String[] {"Homepage,https://example.test"});
+      form.setProjectUrls(new String[] {"Homepage,https://example.test"});
 
       PypiPublishLimits.dropOverLongFields(form);
 
-      assertThat(form.getHome_page()).isEqualTo("https://example.test");
+      assertThat(form.getHomePage()).isEqualTo("https://example.test");
       assertThat(form.getAuthor()).isEqualTo("Barney Rubble");
       assertThat(form.getLicense()).isEqualTo("MIT");
       assertThat(form.getClassifiers()).containsExactly("Programming Language :: Python :: 3");
-      assertThat(form.getProject_urls()).containsExactly("Homepage,https://example.test");
+      assertThat(form.getProjectUrls()).containsExactly("Homepage,https://example.test");
     }
   }
 }

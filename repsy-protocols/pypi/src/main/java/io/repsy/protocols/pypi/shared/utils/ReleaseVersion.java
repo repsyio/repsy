@@ -31,16 +31,16 @@ public class ReleaseVersion {
   // https://www.python.org/dev/peps/pep-0440/#appendix-b-parsing-version-strings-with-regular-expressions
   private static final Pattern VERSION_PATTERN =
       Pattern.compile(
-          "^v?(?:(?:(?<epoch>[0-9]+)!)?"
-              + "(?<release>[0-9]+(?:\\.[0-9]+)*)"
-              + "(?<pre>[-_.]?(?<preSignifier>(?:alpha|a|beta|b|rc|c|preview|pre))[-_.]?(?<preNumeral>[0-9]+)?)?"
-              + "(?<post>(?:-(?<postNumeral1>[0-9]+))|(?:[-_.]?(post|rev|r)[-_.]?(?<postNumeral2>[0-9]+)?))?"
-              + "(?<dev>[-_.]?(dev)[-_.]?(?<devNumeral>[0-9]+)?)?)(?:\\+(?<local>[a-z0-9]+(?:[-_.][a-z0-9]+)*))?$");
+          "^v?(?:(?<epoch>\\d+)!)?"
+              + "(?<release>\\d+(?:\\.\\d+)*)"
+              + "(?<pre>[-_.]?(?<preSignifier>(?:alpha|a|beta|b|rc|c|preview|pre))[-_.]?(?<preNumeral>\\d+)?)?"
+              + "(?<post>-(?<postNumeral1>\\d+)|[-_.]?(post|rev|r)[-_.]?(?<postNumeral2>\\d+)?)?"
+              + "(?<dev>[-_.]?(dev)[-_.]?(?<devNumeral>\\d+)?)?(?:\\+(?<local>[a-z0-9]+(?:[-_.][a-z0-9]+)*))?$");
   private static final Pattern NORMALIZED_VERSION_PATTERN =
       Pattern.compile(
-          "^([1-9][0-9]*!)?(0|[1-9][0-9]*)"
-              + "(\\.(0|[1-9][0-9]*))*(?<pre>(a|b|rc)(0|[1-9][0-9]*))?(?<post>\\.post(0|[1-9][0-9]*))?"
-              + "(?<dev>\\.dev(0|[1-9][0-9]*))?(?:\\+(?<local>[a-z0-9]+(?:\\.[a-z0-9]+)*))?$");
+          "^([1-9]\\d*!)?(0|[1-9]\\d*)"
+              + "(\\.(0|[1-9]\\d*))*(?<pre>(a|b|rc)(0|[1-9]\\d*))?(?<post>\\.post(0|[1-9]\\d*))?"
+              + "(?<dev>\\.dev(0|[1-9]\\d*))?(?:\\+(?<local>[a-z0-9]+(?:\\.[a-z0-9]+)*))?$");
   private static final Pattern LOCAL_SEPARATOR = Pattern.compile("[-_.]");
 
   private boolean preRelease;
@@ -89,12 +89,16 @@ public class ReleaseVersion {
         versionMatcher.group("release"),
         versionMatcher.group("preSignifier"),
         versionMatcher.group("preNumeral"),
-        versionMatcher.group("postNumeral1"),
-        versionMatcher.group("postNumeral2"),
+        firstNonNull(versionMatcher.group("postNumeral1"), versionMatcher.group("postNumeral2")),
         versionMatcher.group("devNumeral"),
         versionMatcher.group("local"));
 
     return rv;
+  }
+
+  private static @Nullable String firstNonNull(
+      final @Nullable String first, final @Nullable String second) {
+    return first != null ? first : second;
   }
 
   private static boolean isNormalizedLocal(final @Nullable String local) {
@@ -135,8 +139,7 @@ public class ReleaseVersion {
       final @Nullable String release,
       final @Nullable String preSignifier,
       final @Nullable String preNumeral,
-      final @Nullable String postNumeral1,
-      final @Nullable String postNumeral2,
+      final @Nullable String postNumeral,
       final @Nullable String devNumeral,
       final @Nullable String local) {
 
@@ -155,9 +158,7 @@ public class ReleaseVersion {
 
     if (this.postRelease) {
       normalizedVersionBuilder.append(".post");
-      normalizedVersionBuilder.append(
-          Objects.requireNonNullElseGet(
-              postNumeral1, () -> Objects.requireNonNullElse(postNumeral2, "0")));
+      normalizedVersionBuilder.append(Objects.requireNonNullElse(postNumeral, "0"));
     }
 
     if (this.developmentRelease) {

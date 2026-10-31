@@ -19,4 +19,4 @@ package io.repsy.protocols.pypi.shared.python_package.services;
  * Base of the backend implementation of {@link PypiPackageService}; the abstract methods are
  * inherited from the contract.
  */
-public abstract class AbstractPypiPackageService<ID> implements PypiPackageService<ID> {}
+public abstract class AbstractPypiPackageService<I> implements PypiPackageService<I> {}

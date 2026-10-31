@@ -17,6 +17,7 @@ package io.repsy.protocols.pypi.shared.utils;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
+import java.util.Objects;
 import lombok.experimental.UtilityClass;
 import org.jspecify.annotations.Nullable;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -30,7 +31,7 @@ public class UriUtils {
       final @Nullable String packageName,
       final String repoOrigin) {
 
-    final var requestURI = httpServletRequest.getRequestURI();
+    final var requestURI = Objects.requireNonNull(httpServletRequest.getRequestURI());
 
     if ((packageName != null && !PypiPackageUtils.isPackageNameNormalized(packageName))
         || !requestURI.endsWith("/")) {
