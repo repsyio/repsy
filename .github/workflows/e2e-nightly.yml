@@ -52,7 +52,8 @@ concurrency:
 # Every job runs on ubuntu-24.04, not ubuntu-latest (RPS-1600): ubuntu-latest moves to Ubuntu 26 on
 # 2026-10-19, and the Chromium sandbox probe, the Docker version and the docker socket's gid of the stack
 # runner all change with the image. Move the pin (or set the repository variable E2E_RUNNER, which wins
-# for the image and e2e jobs) on purpose, in a PR of its own, after a manual `suite=all` run on the new one.
+# for the typecheck and e2e jobs; the image job always runs on Ubicloud, RPS-2381) on purpose, in a PR
+# of its own, after a manual `suite=all` run on the new one.
 defaults:
   run:
     shell: bash
@@ -311,7 +312,7 @@ jobs:
   # an artifact: three legs each rebuilding it would triple the slowest step of the run.
   image:
     name: Build Repsy image
-    runs-on: ${{ vars.E2E_RUNNER || 'ubicloud-standard-4' }}
+    runs-on: ubicloud-standard-4
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
