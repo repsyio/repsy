@@ -182,7 +182,9 @@ class AbstractCargoDownloadProtocolMethodHandlerTest {
       final var request = new MockHttpServletRequest();
       when(facade.download(ctx)).thenThrow(new IllegalStateException("storage down"));
 
-      assertThatThrownBy(() -> handler.handle(ctx, request, new MockHttpServletResponse()))
+      final var response = new MockHttpServletResponse();
+
+      assertThatThrownBy(() -> handler.handle(ctx, request, response))
           .isInstanceOf(IllegalStateException.class);
       assertThat(request.getAttribute(CargoConstants.ERROR_BODY_ATTRIBUTE)).isEqualTo(true);
     }

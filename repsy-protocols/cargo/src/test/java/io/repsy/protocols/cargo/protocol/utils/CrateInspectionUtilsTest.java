@@ -24,6 +24,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.stream.Stream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
@@ -31,6 +32,9 @@ import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
 
 @DisplayName("CrateInspectionUtils")
 class CrateInspectionUtilsTest {
@@ -162,31 +166,24 @@ class CrateInspectionUtilsTest {
       assertThat(edition(crate(files))).isEqualTo("2021");
     }
 
-    @Test
-    @DisplayName("returns null when Cargo.toml declares no edition")
-    void returnsNullWhenNoEdition() throws IOException {
-      final var files = new LinkedHashMap<String, String>();
-      files.put("demo-1.0.0/Cargo.toml", "[package]\nname = \"demo\"\n");
-
-      assertThat(edition(crate(files))).isNull();
+    static Stream<Arguments> manifestsWithoutUsableEdition() {
+      return Stream.of(
+          Arguments.of(
+              "returns null when Cargo.toml declares no edition", "[package]\nname = \"demo\"\n"),
+          Arguments.of(
+              "ignores an edition key outside the [package] table",
+              "[package]\nname = \"demo\"\n\n[workspace.package]\nedition = \"2018\"\n"),
+          Arguments.of(
+              "drops an edition longer than the 10-character column width",
+              "[package]\nname = \"demo\"\nedition = \"12345678901\"\n"));
     }
 
-    @Test
-    @DisplayName("ignores an edition key outside the [package] table")
-    void ignoresEditionOutsidePackageTable() throws IOException {
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("manifestsWithoutUsableEdition")
+    void returnsNullForManifestWithoutUsableEdition(final String description, final String toml)
+        throws IOException {
       final var files = new LinkedHashMap<String, String>();
-      files.put(
-          "demo-1.0.0/Cargo.toml",
-          "[package]\nname = \"demo\"\n\n[workspace.package]\nedition = \"2018\"\n");
-
-      assertThat(edition(crate(files))).isNull();
-    }
-
-    @Test
-    @DisplayName("drops an edition longer than the 10-character column width")
-    void dropsOverLongEdition() throws IOException {
-      final var files = new LinkedHashMap<String, String>();
-      files.put("demo-1.0.0/Cargo.toml", "[package]\nname = \"demo\"\nedition = \"12345678901\"\n");
+      files.put("demo-1.0.0/Cargo.toml", toml);
 
       assertThat(edition(crate(files))).isNull();
     }

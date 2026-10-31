@@ -25,7 +25,7 @@ import lombok.Setter;
 import lombok.experimental.SuperBuilder;
 import org.jspecify.annotations.Nullable;
 
-// The no-args constructor (Jackson, MapStruct) leaves the required fields to be set afterwards;
+// The no-args constructor (Jackson, MapStruct) leaves the required fields to be set afterwards, so
 // every reader gets them populated.
 @SuppressWarnings("NullAway.Init")
 @Getter
@@ -33,9 +33,9 @@ import org.jspecify.annotations.Nullable;
 @SuperBuilder
 @NoArgsConstructor
 @AllArgsConstructor
-public class BaseCrateVersionInfo<ID> {
+public class BaseCrateVersionInfo<I> {
 
-  private ID crateId;
+  private I crateId;
 
   private String name;
 

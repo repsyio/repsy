@@ -322,10 +322,9 @@ class CratePublishRequestUtilsTest {
         })
     @DisplayName("refuses a name that is blank or has characters Cargo does not allow")
     void refusesName(final @Nullable String name, final String message) {
-      assertThatThrownBy(
-              () ->
-                  CratePublishRequestUtils.validatePublishRequest(
-                      this.request(name, "1.0.0", null)))
+      final var publishRequest = this.request(name, "1.0.0", null);
+
+      assertThatThrownBy(() -> CratePublishRequestUtils.validatePublishRequest(publishRequest))
           .isInstanceOf(IllegalArgumentException.class)
           .hasMessage(message);
     }
@@ -335,10 +334,9 @@ class CratePublishRequestUtilsTest {
     void refusesLongName() {
       final var name = "a".repeat(65);
 
-      assertThatThrownBy(
-              () ->
-                  CratePublishRequestUtils.validatePublishRequest(
-                      this.request(name, "1.0.0", null)))
+      final var publishRequest = this.request(name, "1.0.0", null);
+
+      assertThatThrownBy(() -> CratePublishRequestUtils.validatePublishRequest(publishRequest))
           .hasMessage("crate name `%s` must be at most 64 characters".formatted(name));
     }
 

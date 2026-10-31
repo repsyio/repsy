@@ -168,8 +168,9 @@ class AbstractCargoConfigProtocolMethodHandlerTest {
     @DisplayName("lets a failure propagate to the error advice, marked for the cargo error body")
     void errorResponse() {
       final var response = new MockHttpServletResponse();
+      final var context = new ProtocolContext();
 
-      assertThatThrownBy(() -> handler.handle(new ProtocolContext(), request, response))
+      assertThatThrownBy(() -> handler.handle(context, request, response))
           .isInstanceOf(NullPointerException.class);
       assertThat(request.getAttribute(CargoConstants.ERROR_BODY_ATTRIBUTE)).isEqualTo(true);
     }

@@ -28,10 +28,10 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
-public interface CargoCrateService<ID> {
+public interface CargoCrateService<I> {
 
   /** Publishes without an edition (RPS-1141): kept for callers that have none to report. */
-  default void publish(final BaseRepoInfo<ID> repoInfo, final CratePublishRequest request) {
+  default void publish(final BaseRepoInfo<I> repoInfo, final CratePublishRequest request) {
     this.publish(repoInfo, request, null);
   }
 
@@ -39,7 +39,7 @@ public interface CargoCrateService<ID> {
    * @param edition The {@code edition} key the crate's {@code Cargo.toml} declares, or {@code null}
    *     when it has none or the value did not fit {@code cargo_crate_meta.edition} (RPS-1141).
    */
-  void publish(BaseRepoInfo<ID> repoInfo, CratePublishRequest request, @Nullable String edition);
+  void publish(BaseRepoInfo<I> repoInfo, CratePublishRequest request, @Nullable String edition);
 
   /**
    * Records the crate version and, while that write is still open, stores its files through {@code
@@ -56,29 +56,29 @@ public interface CargoCrateService<ID> {
    *     already published, including when a concurrent publish of it won the race
    */
   BaseUsages publish(
-      BaseRepoInfo<ID> repoInfo,
+      BaseRepoInfo<I> repoInfo,
       CratePublishRequest request,
       @Nullable String edition,
       CrateFilesWriter filesWriter)
       throws IOException;
 
-  void yank(BaseRepoInfo<ID> repoInfo, String name, String vers);
+  void yank(BaseRepoInfo<I> repoInfo, String name, String vers);
 
-  void unyank(BaseRepoInfo<ID> repoInfo, String name, String vers);
+  void unyank(BaseRepoInfo<I> repoInfo, String name, String vers);
 
-  void deleteCrate(BaseRepoInfo<ID> repoInfo, String name);
+  void deleteCrate(BaseRepoInfo<I> repoInfo, String name);
 
-  void deleteCrateVersion(BaseRepoInfo<ID> repoInfo, String name, String vers);
+  void deleteCrateVersion(BaseRepoInfo<I> repoInfo, String name, String vers);
 
-  void incrementDownloadCount(BaseRepoInfo<ID> repoInfo, String crateName, String version);
+  void incrementDownloadCount(BaseRepoInfo<I> repoInfo, String crateName, String version);
 
-  List<CrateIndexEntry> getIndexEntries(BaseRepoInfo<ID> repoInfo, String name);
+  List<CrateIndexEntry> getIndexEntries(BaseRepoInfo<I> repoInfo, String name);
 
-  BaseCrateInfo<ID> getCrate(BaseRepoInfo<ID> repoInfo, String name);
+  BaseCrateInfo<I> getCrate(BaseRepoInfo<I> repoInfo, String name);
 
-  BaseCrateVersionInfo<ID> getCrateVersion(BaseRepoInfo<ID> repoInfo, String name, String vers);
+  BaseCrateVersionInfo<I> getCrateVersion(BaseRepoInfo<I> repoInfo, String name, String vers);
 
-  Page<CrateListItem> search(BaseRepoInfo<ID> repoInfo, String query, Pageable pageable);
+  Page<CrateListItem> search(BaseRepoInfo<I> repoInfo, String query, Pageable pageable);
 
   /** Stores the files of a version whose rows {@link #publish} has just written. */
   @FunctionalInterface

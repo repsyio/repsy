@@ -43,7 +43,7 @@ public abstract class AbstractCargoMeProtocolMethodHandler
 
   private final CargoAuthenticator authenticator;
 
-  public AbstractCargoMeProtocolMethodHandler(
+  protected AbstractCargoMeProtocolMethodHandler(
       final CargoAuthenticator authenticator, final CargoProtocolProvider provider) {
     super(
         HandlerRoute.of(Permission.NONE, HttpMethod.GET, HttpMethod.HEAD)

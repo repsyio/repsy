@@ -167,7 +167,9 @@ class AbstractCargoYankProtocolMethodHandlerTest {
       final var request = new MockHttpServletRequest();
       doThrow(new IllegalStateException("db down")).when(facade).yank(ctx);
 
-      assertThatThrownBy(() -> handler.handle(ctx, request, new MockHttpServletResponse()))
+      final var response = new MockHttpServletResponse();
+
+      assertThatThrownBy(() -> handler.handle(ctx, request, response))
           .isInstanceOf(IllegalStateException.class);
       assertThat(request.getAttribute(CargoConstants.ERROR_BODY_ATTRIBUTE)).isEqualTo(true);
     }

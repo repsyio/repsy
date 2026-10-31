@@ -122,7 +122,7 @@ public class CratePublishRequestUtils {
 
     try {
       new Semver(vers);
-    } catch (final SemverException ex) {
+    } catch (final SemverException _) {
       throw new IllegalArgumentException(
           "version `%s` is not a valid semver format (expected MAJOR.MINOR.PATCH)".formatted(vers));
     }

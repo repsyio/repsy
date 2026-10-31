@@ -210,12 +210,10 @@ class AbstractCargoPublishProtocolMethodHandlerTest {
           "duplicate key value violates unique constraint \"cargo_crate_pkey\"";
       doThrow(new RuntimeException(sensitiveMessage)).when(facade).publish(eq(ctx), any());
 
-      assertThatThrownBy(
-              () ->
-                  handler.handle(
-                      ctx,
-                      new MockHttpServletRequest("PUT", PUBLISH_PATH),
-                      new MockHttpServletResponse()))
+      final var request = new MockHttpServletRequest("PUT", PUBLISH_PATH);
+      final var response = new MockHttpServletResponse();
+
+      assertThatThrownBy(() -> handler.handle(ctx, request, response))
           .isInstanceOf(RuntimeException.class)
           .hasMessageContaining(sensitiveMessage);
     }

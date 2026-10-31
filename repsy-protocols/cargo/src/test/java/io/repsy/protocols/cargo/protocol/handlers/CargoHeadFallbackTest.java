@@ -18,6 +18,8 @@ package io.repsy.protocols.cargo.protocol.handlers;
 import static io.repsy.protocols.cargo.protocol.handlers.CargoHandlerTestSupport.context;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -168,7 +170,7 @@ class CargoHeadFallbackTest {
         .isEqualTo(MediaType.APPLICATION_OCTET_STREAM);
     assertThat(response.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION))
         .isEqualTo("attachment; filename=\"serde-1.0.0.crate\"");
-    verify(facade, org.mockito.Mockito.never()).download(ctx);
+    verify(facade, never()).download(ctx);
   }
 
   @Test
@@ -189,8 +191,7 @@ class CargoHeadFallbackTest {
   @DisplayName("a sparse index file with entries answers 200 text/plain")
   void indexExists() {
     final var ctx = context("/se/rd/serde");
-    when(facade.getIndexEntries(ctx))
-        .thenReturn(List.of(org.mockito.Mockito.mock(CrateIndexEntry.class)));
+    when(facade.getIndexEntries(ctx)).thenReturn(List.of(mock(CrateIndexEntry.class)));
 
     final var response =
         sparse.handleHead(
@@ -221,7 +222,9 @@ class CargoHeadFallbackTest {
     when(facade.getIndexEntries(ctx)).thenThrow(new IllegalStateException("boom"));
     final var request = new MockHttpServletRequest("HEAD", "/se/rd/serde");
 
-    assertThatThrownBy(() -> sparse.handleHead(ctx, request, new MockHttpServletResponse()))
+    final var response = new MockHttpServletResponse();
+
+    assertThatThrownBy(() -> sparse.handleHead(ctx, request, response))
         .isInstanceOf(IllegalStateException.class);
   }
 

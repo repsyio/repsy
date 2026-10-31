@@ -248,7 +248,9 @@ class AbstractCargoSparseIndexProtocolMethodHandlerTest {
     void unexpectedFailurePropagates() {
       when(facade.getIndexEntries(ctx)).thenThrow(new IllegalStateException("boom"));
 
-      assertThatThrownBy(() -> handler.handle(ctx, request, new MockHttpServletResponse()))
+      final var response = new MockHttpServletResponse();
+
+      assertThatThrownBy(() -> handler.handle(ctx, request, response))
           .isInstanceOf(IllegalStateException.class);
       verify(request).setAttribute(CargoConstants.ERROR_BODY_ATTRIBUTE, true);
     }

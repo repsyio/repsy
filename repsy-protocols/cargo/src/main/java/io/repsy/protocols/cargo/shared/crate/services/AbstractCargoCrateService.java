@@ -19,4 +19,4 @@ package io.repsy.protocols.cargo.shared.crate.services;
  * Base of the backend implementation of {@link CargoCrateService}; the abstract methods are
  * inherited from the contract.
  */
-public abstract class AbstractCargoCrateService<ID> implements CargoCrateService<ID> {}
+public abstract class AbstractCargoCrateService<I> implements CargoCrateService<I> {}
