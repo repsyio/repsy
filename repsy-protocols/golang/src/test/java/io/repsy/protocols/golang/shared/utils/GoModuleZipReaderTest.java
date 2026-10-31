@@ -166,7 +166,9 @@ class GoModuleZipReaderTest {
   void reportsMissingGoMod() {
     final var files = Map.of(MODULE + "@" + VERSION + "/hello.go", "package hello\n");
 
-    assertThatThrownBy(() -> extractGoMod(zip(files), MODULE, VERSION))
+    final var zip = zip(files);
+
+    assertThatThrownBy(() -> extractGoMod(zip, MODULE, VERSION))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("goModNotFoundInZip");
   }

@@ -63,7 +63,7 @@ public final class ForwardedHostUtils {
     if (forwardedPort != null && !forwardedPort.isBlank()) {
       try {
         return Integer.parseInt(forwardedPort.trim());
-      } catch (final NumberFormatException e) {
+      } catch (final NumberFormatException _) {
         // Falls through to the host-embedded or fallback port below.
       }
     }
@@ -91,7 +91,7 @@ public final class ForwardedHostUtils {
 
     try {
       return URI.create("//" + host).getPort();
-    } catch (final IllegalArgumentException e) {
+    } catch (final IllegalArgumentException _) {
       return -1;
     }
   }

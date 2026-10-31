@@ -146,7 +146,7 @@ class AbstractGoProtocolFacadeTest {
     assertThat(ctx.<BaseUsages>getProperty("usages").getDiskUsage()).isEqualTo(30);
     assertThat(ctx.<String>getProperty("artifactName")).isEqualTo(MODULE);
     assertThat(ctx.<String>getProperty("artifactVersion")).isEqualTo(VERSION);
-    verify(this.storageService, org.mockito.Mockito.times(3))
+    verify(this.storageService, times(3))
         .writeInputStreamToPath(any(), any(InputStream.class), eq("golang"));
     verify(this.storageService, never()).deleteVersionFiles(any(), any());
   }
@@ -257,7 +257,9 @@ class AbstractGoProtocolFacadeTest {
   void versionListOfAnUnknownModuleIsNotFound() {
     when(this.storageService.listDirectory(any())).thenReturn(List.of());
 
-    assertThatThrownBy(() -> this.facade.download(this.listContext(MODULE)))
+    final var context = this.listContext(MODULE);
+
+    assertThatThrownBy(() -> this.facade.download(context))
         .isInstanceOf(ItemNotFoundException.class);
   }
 
@@ -270,7 +272,9 @@ class AbstractGoProtocolFacadeTest {
                 StorageItemInfo.builder().name("v1.0.0.info").directory(true).build(),
                 StorageItemInfo.builder().name("v1.0.0.zip").directory(false).build()));
 
-    assertThatThrownBy(() -> this.facade.download(this.listContext(MODULE)))
+    final var context = this.listContext(MODULE);
+
+    assertThatThrownBy(() -> this.facade.download(context))
         .isInstanceOf(ItemNotFoundException.class);
   }
 
@@ -308,7 +312,9 @@ class AbstractGoProtocolFacadeTest {
   void versionListOfAnUnknownMixedCaseModuleIsNotFound() {
     when(this.storageService.listDirectory(any())).thenReturn(List.of());
 
-    assertThatThrownBy(() -> this.facade.download(this.listContext("example.com/!mod")))
+    final var context = this.listContext("example.com/!mod");
+
+    assertThatThrownBy(() -> this.facade.download(context))
         .isInstanceOf(ItemNotFoundException.class);
     verify(this.storageService, times(2)).listDirectory(any());
   }
@@ -317,10 +323,10 @@ class AbstractGoProtocolFacadeTest {
   @DisplayName(
       "refuses a body with no byte in it with goModuleZipEmpty, storing nothing (RPS-1466)")
   void refusesAnEmptyBody() throws IOException {
-    assertThatThrownBy(
-            () ->
-                this.facade.upload(
-                    this.context(MODULE, VERSION), new ByteArrayInputStream(new byte[0]), 0))
+    final var context = this.context(MODULE, VERSION);
+    final var body = new ByteArrayInputStream(new byte[0]);
+
+    assertThatThrownBy(() -> this.facade.upload(context, body, 0))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("goModuleZipEmpty");
 

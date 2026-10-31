@@ -112,7 +112,9 @@ public record SuspiciousRequestProperties(
       return 0;
     }
 
-    return Objects.requireNonNullElse(signal.weight(), family.defaultWeight());
+    final var weight = signal.weight();
+
+    return weight == null ? family.defaultWeight() : weight;
   }
 
   /** Whether the family is only checked on the API port, by default or as the settings say. */
@@ -120,11 +122,9 @@ public record SuspiciousRequestProperties(
 
     final var signal = this.signals.get(family.key());
 
-    if (signal == null || signal.apiPortOnly() == null) {
-      return family.apiPortOnly();
-    }
+    final var apiPortOnly = signal == null ? null : signal.apiPortOnly();
 
-    return signal.apiPortOnly();
+    return apiPortOnly == null ? family.apiPortOnly() : apiPortOnly;
   }
 
   /** Settings under which nothing is tracked, refused or answered early. */

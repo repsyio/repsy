@@ -22,7 +22,7 @@ import lombok.experimental.SuperBuilder;
 
 @Data
 @SuperBuilder
-public class BaseUrlParserProperties<ID, T extends BaseRepoInfo<ID>> {
+public class BaseUrlParserProperties<I, T extends BaseRepoInfo<I>> {
   private final String repoName;
   private final RelativePath relativePath;
   private final T repoInfo;

@@ -23,6 +23,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.repsy.protocols.shared.exceptions.TooManyRequestsException;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
@@ -98,7 +99,7 @@ public class AuthFailureThrottle {
   private final long banNanos;
   private final LogGate bannedLog;
   private final LogGate windowLog;
-  private volatile @Nullable ClientBanListener banListener;
+  private final AtomicReference<@Nullable ClientBanListener> banListener = new AtomicReference<>();
   private final int banAfterBlockedWindows;
 
   /**
@@ -258,7 +259,7 @@ public class AuthFailureThrottle {
   @Autowired(required = false)
   public void setBanListener(final @Nullable ClientBanListener banListener) {
 
-    this.banListener = banListener;
+    this.banListener.set(banListener);
   }
 
   /**
@@ -328,7 +329,7 @@ public class AuthFailureThrottle {
 
   private void announce(final String client) {
 
-    final var listener = this.banListener;
+    final var listener = this.banListener.get();
 
     if (listener == null) {
       return;

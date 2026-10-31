@@ -107,16 +107,17 @@ class GoDownloadHeadTest {
     when(this.facade.download(context)).thenReturn(new ByteArrayResource(new byte[] {1, 2, 3, 4}));
 
     final var head = this.get.handleHead(context, null, null);
-    final var get = this.get.handle(context, null, null);
+    final var getResponse = this.get.handle(context, null, null);
 
     assertThat(head.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(head.getBody()).isNull();
     assertThat(head.getHeaders().getContentLength()).isEqualTo(4);
     assertThat(head.getHeaders().getContentType()).isEqualTo(MediaType.parseMediaType(type));
     assertThat(head.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION)).isEqualTo(disposition);
-    assertThat(head.getHeaders().getContentType()).isEqualTo(get.getHeaders().getContentType());
+    assertThat(head.getHeaders().getContentType())
+        .isEqualTo(getResponse.getHeaders().getContentType());
     assertThat(head.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION))
-        .isEqualTo(get.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION));
+        .isEqualTo(getResponse.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION));
   }
 
   @ParameterizedTest
@@ -127,13 +128,14 @@ class GoDownloadHeadTest {
     when(this.facade.download(context)).thenThrow(new ItemNotFoundException("itemNotFound"));
 
     final var head = this.get.handleHead(context, null, null);
-    final var get = this.get.handle(context, null, null);
+    final var getResponse = this.get.handle(context, null, null);
 
     assertThat(head.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     assertThat(head.getBody()).isNull();
     assertThat(head.getHeaders().getContentType()).isEqualTo(MediaType.TEXT_PLAIN);
     assertThat(head.getHeaders().getFirst(HttpHeaders.CONTENT_DISPOSITION)).isEqualTo("inline");
-    assertThat(head.getHeaders().getContentType()).isEqualTo(get.getHeaders().getContentType());
+    assertThat(head.getHeaders().getContentType())
+        .isEqualTo(getResponse.getHeaders().getContentType());
   }
 
   @Test

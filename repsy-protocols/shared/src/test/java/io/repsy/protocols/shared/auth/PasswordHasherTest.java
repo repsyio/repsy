@@ -108,10 +108,13 @@ class PasswordHasherTest {
     @Test
     @DisplayName("rejects 73 bytes, counting bytes and not characters")
     void rejectsOverTheLimit() {
-      assertThatThrownBy(() -> PasswordHasher.requireFitsBcrypt("a".repeat(73)))
+      final var tooLongAscii = "a".repeat(73);
+      final var tooLongMultiByte = "é".repeat(37);
+
+      assertThatThrownBy(() -> PasswordHasher.requireFitsBcrypt(tooLongAscii))
           .isInstanceOf(BadRequestException.class)
           .hasMessage("passwordTooLong");
-      assertThatThrownBy(() -> PasswordHasher.requireFitsBcrypt("é".repeat(37)))
+      assertThatThrownBy(() -> PasswordHasher.requireFitsBcrypt(tooLongMultiByte))
           .isInstanceOf(BadRequestException.class)
           .hasMessage("passwordTooLong");
     }

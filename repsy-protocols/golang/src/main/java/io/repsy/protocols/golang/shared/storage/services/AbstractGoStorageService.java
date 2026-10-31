@@ -31,8 +31,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.io.Resource;
 
 @Slf4j
-public abstract class AbstractGoStorageService<ID> extends AbstractArtifactStorageService
-    implements GoStorageService<ID> {
+public abstract class AbstractGoStorageService<I> extends AbstractArtifactStorageService
+    implements GoStorageService<I> {
 
   private static final String ZIP_EXTENSION = ".zip";
 

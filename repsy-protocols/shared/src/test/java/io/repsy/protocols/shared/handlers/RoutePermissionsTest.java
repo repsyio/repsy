@@ -43,7 +43,9 @@ class RoutePermissionsTest {
   void undeclared() {
     assertThat(RoutePermissions.find(Map.of())).isNull();
     assertThat(RoutePermissions.find(Map.of("permission", "READ"))).isNull();
-    assertThatThrownBy(() -> RoutePermissions.require(Map.of("writeOperation", false)))
+    final var properties = Map.<String, Object>of("writeOperation", false);
+
+    assertThatThrownBy(() -> RoutePermissions.require(properties))
         .isInstanceOf(AccessNotAllowedException.class)
         .hasMessageContaining(ProtocolErrorCodes.ACCESS_DENIED);
   }

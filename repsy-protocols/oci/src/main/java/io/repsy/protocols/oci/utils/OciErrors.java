@@ -91,7 +91,7 @@ public final class OciErrors {
 
     final var path = request.getServletPath();
 
-    return OCI_ROOT.equals(path) || path.startsWith(OCI_PREFIX);
+    return OCI_ROOT.equals(path) || (path != null && path.startsWith(OCI_PREFIX));
   }
 
   /**

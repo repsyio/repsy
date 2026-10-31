@@ -265,12 +265,12 @@ public class RubyGemspecMarshalWriter {
     0x49, 0x22, 0x09, 'r', 'u', 'b', 'y', 0x06, 0x3b, 0x00, 0x54
   };
 
-  // licenses = [] and metadata = {} (array slots 17..18)
+  // An empty licenses array and an empty metadata hash (array slots 17..18)
   private static final byte[] TAIL_END = {
-    // licenses = []
+    // empty licenses array
     0x5b,
     0x00,
-    // metadata = {}
+    // empty metadata hash
     0x7b,
     0x00
   };

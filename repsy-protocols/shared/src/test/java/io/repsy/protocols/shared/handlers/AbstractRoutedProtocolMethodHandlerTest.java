@@ -135,7 +135,9 @@ class AbstractRoutedProtocolMethodHandlerTest {
                 true,
                 HandlerPropertyKeys.METHOD,
                 "chartDelete"));
-    assertThatThrownBy(() -> handler.getProperties().put("x", "y"))
+    final var properties = handler.getProperties();
+
+    assertThatThrownBy(() -> properties.put("x", "y"))
         .isInstanceOf(UnsupportedOperationException.class);
     assertThat(handler.getSupportedMethods()).containsExactly(HttpMethod.DELETE);
     assertThat(route.properties()).doesNotContainKey(HandlerPropertyKeys.METHOD);

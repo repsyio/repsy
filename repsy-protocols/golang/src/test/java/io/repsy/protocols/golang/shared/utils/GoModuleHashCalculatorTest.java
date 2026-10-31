@@ -60,10 +60,6 @@ class GoModuleHashCalculatorTest {
    */
   private static final String EXPECTED_H1_ZIP = "h1:zDM7FWRTVC2I9HVwUb0GbzZhaoKSkjFwg+lIvej2LYs=";
 
-  /** Well-known SHA-256 test vector: the digest of the empty string. */
-  private static final String SHA256_OF_EMPTY =
-      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
-
   private static byte[] zip(final Map<String, String> entries) {
     final var out = new ByteArrayOutputStream();
 
@@ -132,7 +128,9 @@ class GoModuleHashCalculatorTest {
   void refusesNewlineInEntryName() {
     final var zip = zip(Map.of("example.com/mod@v1.0.0/weird\nname.txt", "content"));
 
-    assertThatThrownBy(() -> GoModuleHashCalculator.hashZip(new ByteArrayInputStream(zip)))
+    final var input = new ByteArrayInputStream(zip);
+
+    assertThatThrownBy(() -> GoModuleHashCalculator.hashZip(input))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("moduleZipEntryNameInvalid");
   }
@@ -142,10 +140,11 @@ class GoModuleHashCalculatorTest {
   void refusesOversizedInflation() {
     final var zip = zip(Map.of("example.com/mod@v1.0.0/big.txt", "a".repeat(1000)));
 
+    final var input = new ByteArrayInputStream(zip);
+
     assertThatThrownBy(
             () ->
-                GoModuleHashCalculator.hashZip(
-                    new ByteArrayInputStream(zip), 999L, GoModuleHashCalculator.MAX_ENTRY_COUNT))
+                GoModuleHashCalculator.hashZip(input, 999L, GoModuleHashCalculator.MAX_ENTRY_COUNT))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("moduleZipTooLarge");
   }
@@ -170,10 +169,11 @@ class GoModuleHashCalculatorTest {
     entries.put("example.com/mod@v1.0.0/b.txt", "b");
     final var zip = zip(entries);
 
+    final var input = new ByteArrayInputStream(zip);
+
     assertThatThrownBy(
             () ->
-                GoModuleHashCalculator.hashZip(
-                    new ByteArrayInputStream(zip), GoModuleHashCalculator.MAX_INFLATED_BYTES, 1))
+                GoModuleHashCalculator.hashZip(input, GoModuleHashCalculator.MAX_INFLATED_BYTES, 1))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("moduleZipTooManyFiles");
   }

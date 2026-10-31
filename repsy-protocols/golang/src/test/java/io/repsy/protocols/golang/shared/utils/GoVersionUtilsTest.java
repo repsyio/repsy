@@ -20,7 +20,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Locale;
-import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -248,7 +247,7 @@ class GoVersionUtilsTest {
                 List.of(
                     "v0.0.0-20230101000000-aaaaaaaaaaaa", "v0.0.0-20240101000000-bbbbbbbbbbbb")))
         .contains("v0.0.0-20240101000000-bbbbbbbbbbbb");
-    assertThat(GoVersionUtils.latestOf(List.of())).isEqualTo(Optional.empty());
+    assertThat(GoVersionUtils.latestOf(List.of())).isEmpty();
   }
 
   @ParameterizedTest

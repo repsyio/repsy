@@ -34,7 +34,7 @@ public final class OciPushGuardUtils {
    * (github.com/opencontainers/distribution-spec/blob/main/spec.md#pulling-manifests): a tag never
    * starts with {@code .} or {@code -}, and is at most 128 characters.
    */
-  private static final Pattern TAG_PATTERN = Pattern.compile("^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$");
+  private static final Pattern TAG_PATTERN = Pattern.compile("^\\w[A-Za-z0-9._-]{0,127}$");
 
   /**
    * Refuses a reference that is too long for its column, or that is neither a well-formed tag nor a

@@ -128,10 +128,11 @@ class AbstractRubyGemPublishProtocolMethodHandlerTest {
   void refusesDeclaredOversizedBody() throws Exception {
     final var request = push(new byte[(int) MAX_GEM_BYTES + 1]);
 
-    assertThatThrownBy(
-            () ->
-                this.handler()
-                    .handle(new ProtocolContext(), request, new MockHttpServletResponse()))
+    final var handler = this.handler();
+    final var context = new ProtocolContext();
+    final var response = new MockHttpServletResponse();
+
+    assertThatThrownBy(() -> handler.handle(context, request, response))
         .isInstanceOf(MaxUploadSizeExceededException.class);
 
     verify(this.facade, never()).publishGem(any(), any());
@@ -149,10 +150,11 @@ class AbstractRubyGemPublishProtocolMethodHandlerTest {
         };
     request.setContent(new byte[(int) MAX_GEM_BYTES + 1]);
 
-    assertThatThrownBy(
-            () ->
-                this.handler()
-                    .handle(new ProtocolContext(), request, new MockHttpServletResponse()))
+    final var handler = this.handler();
+    final var context = new ProtocolContext();
+    final var response = new MockHttpServletResponse();
+
+    assertThatThrownBy(() -> handler.handle(context, request, response))
         .isInstanceOf(MaxUploadSizeExceededException.class);
 
     verify(this.facade, never()).publishGem(any(), any());

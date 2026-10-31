@@ -66,8 +66,8 @@ class RubyGemspecMarshalWriterTest {
     assertThat(dump[afterFirst + 1]).isEqualTo((byte) 0x00);
     // The pure gem's "ruby" new_platform is gone, and nothing else changed.
     assertThat(indexOf(dump, ivarString("ruby"), 0)).isNegative();
-    assertThat(dump.length)
-        .isEqualTo(
+    assertThat(dump)
+        .hasSize(
             RubyGemspecMarshalWriter.dumpGemspec("demo", "1.2.3").length
                 - 1 // the nil original_platform
                 - ivarString("ruby").length

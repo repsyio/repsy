@@ -15,8 +15,6 @@
  */
 package io.repsy.protocols.shared.constants;
 
-import lombok.NoArgsConstructor;
-
 /**
  * The error codes (the {@code msgId} of a failure, the {@code code} of a problem document) that the
  * protocol libraries and the shared backend code emit. The strings are the wire contract: the panel
@@ -27,7 +25,6 @@ import lombok.NoArgsConstructor;
  * named after its value in {@code UPPER_SNAKE_CASE}; the pin test {@code ProtocolErrorCodesTest}
  * fails on a changed, added or removed value.
  */
-@NoArgsConstructor
 public final class ProtocolErrorCodes {
 
   public static final String ACCESS_DENIED = "accessDenied";
@@ -230,4 +227,6 @@ public final class ProtocolErrorCodes {
   public static final String VERSION_NOT_FOUND = "versionNotFound";
   public static final String VULNERABILITY_SCAN_NOT_FOUND = "vulnerabilityScanNotFound";
   public static final String WELLKNOWN_KEY_STORE_HOST = "wellknownKeyStoreHost";
+
+  private ProtocolErrorCodes() {}
 }

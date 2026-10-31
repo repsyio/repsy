@@ -59,7 +59,7 @@ public final class ClientKeys {
 
     try {
       address = InetAddresses.forString(remoteAddr);
-    } catch (final IllegalArgumentException notALiteralAddress) {
+    } catch (final IllegalArgumentException _) {
       return remoteAddr;
     }
 

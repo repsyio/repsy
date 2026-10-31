@@ -34,12 +34,12 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 
-public abstract class AbstractGoUploadProtocolMethodHandler<ID>
-    extends AbstractFacadeProtocolMethodHandler<GoProtocolFacade<ID>> {
+public abstract class AbstractGoUploadProtocolMethodHandler<I>
+    extends AbstractFacadeProtocolMethodHandler<GoProtocolFacade<I>> {
 
-  public AbstractGoUploadProtocolMethodHandler(
+  protected AbstractGoUploadProtocolMethodHandler(
       final PathParser pathParser,
-      final GoProtocolFacade<ID> goProtocolFacade,
+      final GoProtocolFacade<I> goProtocolFacade,
       final GolangProtocolProvider provider) {
 
     super(

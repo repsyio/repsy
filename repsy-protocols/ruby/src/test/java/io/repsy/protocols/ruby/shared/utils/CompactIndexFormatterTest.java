@@ -65,8 +65,7 @@ class CompactIndexFormatterTest {
 
     final var body = CompactIndexFormatter.formatGemInfo(List.of(yankedEntry, nonYanked));
 
-    assertThat(body).doesNotContain("1.0.0");
-    assertThat(body).contains("2.0.0 rack:>= 3.0.0|checksum:abc123");
+    assertThat(body).doesNotContain("1.0.0").contains("2.0.0 rack:>= 3.0.0|checksum:abc123");
   }
 
   @Test
@@ -86,8 +85,7 @@ class CompactIndexFormatterTest {
 
     final var body = CompactIndexFormatter.formatGemInfo(List.of(yanked));
 
-    assertThat(body).isEqualTo("created_at: " + createdAt + "\n---\n");
-    assertThat(body).doesNotContain("1970-01-01");
+    assertThat(body).isEqualTo("created_at: " + createdAt + "\n---\n").doesNotContain("1970-01-01");
   }
 
   @Test

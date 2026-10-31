@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.core.io.Resource;
 
-public interface GoStorageService<ID> {
+public interface GoStorageService<I> {
 
   void createRepo(UUID repoId);
 
