@@ -83,8 +83,9 @@ class AbstractRubyGemYankProtocolMethodHandlerTest {
   void yankIsAWriteOperation() {
     final var properties = this.handler().getProperties();
 
-    assertThat(properties).containsEntry("permission", Permission.WRITE);
-    assertThat(properties).containsEntry("writeOperation", true);
+    assertThat(properties)
+        .containsEntry("permission", Permission.WRITE)
+        .containsEntry("writeOperation", true);
   }
 
   @Test

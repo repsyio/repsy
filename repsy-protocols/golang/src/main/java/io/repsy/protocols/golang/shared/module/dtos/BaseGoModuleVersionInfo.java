@@ -22,9 +22,9 @@ import org.jspecify.annotations.Nullable;
 
 @Data
 @SuperBuilder
-public class BaseGoModuleVersionInfo<ID> {
+public class BaseGoModuleVersionInfo<I> {
 
-  private final ID id;
+  private final I id;
   private final String version;
   private final @Nullable String goVersion;
   private final Instant createdAt;

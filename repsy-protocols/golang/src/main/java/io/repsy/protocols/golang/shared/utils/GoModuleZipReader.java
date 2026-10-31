@@ -64,7 +64,7 @@ public class GoModuleZipReader {
         zis.closeEntry();
         entry = zis.getNextEntry();
       }
-    } catch (final EntryTooLargeException e) {
+    } catch (final EntryTooLargeException _) {
       throw new BadRequestException(ProtocolErrorCodes.GO_MOD_TOO_LARGE);
     }
 

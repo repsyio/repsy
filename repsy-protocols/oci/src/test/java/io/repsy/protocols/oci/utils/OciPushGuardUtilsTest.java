@@ -64,7 +64,9 @@ class OciPushGuardUtilsTest {
   @Test
   @DisplayName("refuses a reference longer than the column")
   void refusesOverLongReference() {
-    assertThatThrownBy(() -> OciPushGuardUtils.rejectInvalidReference("a".repeat(129), 128))
+    final var reference = "a".repeat(129);
+
+    assertThatThrownBy(() -> OciPushGuardUtils.rejectInvalidReference(reference, 128))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("dockerReferenceInvalid");
   }

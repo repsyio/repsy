@@ -21,9 +21,9 @@ import lombok.experimental.SuperBuilder;
 
 @Data
 @SuperBuilder
-public class BaseGoModuleInfo<ID> {
+public class BaseGoModuleInfo<I> {
 
-  private final ID id;
+  private final I id;
   private final String modulePath;
   private final Instant createdAt;
 }

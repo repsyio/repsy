@@ -26,6 +26,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import org.jspecify.annotations.Nullable;
 import org.springframework.http.HttpMethod;
 
@@ -50,8 +51,10 @@ public abstract class AbstractRoutedProtocolMethodHandler implements ProtocolMet
   private final HandlerRoute route;
   private final PathParser basePathParser;
   private final PathParser pathParser = this::route;
-  private volatile @Nullable Map<String, Object> resolvedProperties;
-  private volatile @Nullable Map<String, Object> resolvedHeadProperties;
+  private final AtomicReference<@Nullable Map<String, Object>> resolvedProperties =
+      new AtomicReference<>();
+  private final AtomicReference<@Nullable Map<String, Object>> resolvedHeadProperties =
+      new AtomicReference<>();
 
   /**
    * For a handler that builds its context itself and so overrides {@link #parse}; the base parser
@@ -87,11 +90,11 @@ public abstract class AbstractRoutedProtocolMethodHandler implements ProtocolMet
    */
   @Override
   public final Map<String, Object> getProperties() {
-    var resolved = this.resolvedProperties;
+    var resolved = this.resolvedProperties.get();
 
     if (resolved == null) {
       resolved = this.withAdditional(this.route.properties());
-      this.resolvedProperties = resolved;
+      this.resolvedProperties.set(resolved);
     }
 
     return resolved;
@@ -173,14 +176,14 @@ public abstract class AbstractRoutedProtocolMethodHandler implements ProtocolMet
 
   @Override
   public final Map<String, Object> getHeadProperties() {
-    var resolved = this.resolvedHeadProperties;
+    var resolved = this.resolvedHeadProperties.get();
 
     if (resolved == null) {
       final var headProperties = this.route.headProperties();
 
       resolved =
           this.withAdditional(headProperties == null ? this.route.properties() : headProperties);
-      this.resolvedHeadProperties = resolved;
+      this.resolvedHeadProperties.set(resolved);
     }
 
     return resolved;

@@ -99,6 +99,7 @@ public class GemspecParser {
   public static final int MAX_DEPENDENCY_REQUIREMENTS_LENGTH = 255;
 
   private static final String AUTHOR_SEPARATOR = ", ";
+  private static final String VERSION_KEY = "version";
   private static final String RUNTIME_DEP = "runtime";
   private static final String DEFAULT_PLATFORM = "ruby";
   private static final String RUBY_TAG_PREFIX = "!ruby/";
@@ -117,7 +118,7 @@ public class GemspecParser {
         }
         entry = tar.getNextEntry();
       }
-    } catch (final IOException e) {
+    } catch (final IOException _) {
       throw new BadRequestException(ProtocolErrorCodes.INVALID_GEM_FILE);
     }
     throw new BadRequestException(ProtocolErrorCodes.INVALID_GEM_FILE);
@@ -127,7 +128,7 @@ public class GemspecParser {
       throws IOException {
     try {
       return BoundedEntryReader.readAllBytes(tar, entry.getSize(), MAX_METADATA_GZ_BYTES);
-    } catch (final EntryTooLargeException e) {
+    } catch (final EntryTooLargeException _) {
       throw new BadRequestException(ProtocolErrorCodes.GEM_METADATA_TOO_LARGE);
     }
   }
@@ -154,7 +155,7 @@ public class GemspecParser {
     final @Nullable Map<String, Object> spec;
     try (final var gzip = new GZIPInputStream(new ByteArrayInputStream(gzBytes))) {
       spec = loadGemspec(gzip);
-    } catch (final IOException | RuntimeException e) {
+    } catch (final IOException | RuntimeException _) {
       throw new BadRequestException(ProtocolErrorCodes.INVALID_GEM_FILE);
     }
 
@@ -255,9 +256,9 @@ public class GemspecParser {
 
   @Nullable
   private static String extractVersion(final Map<String, Object> spec) {
-    final var versionObj = spec.get("version");
+    final var versionObj = spec.get(VERSION_KEY);
     if (versionObj instanceof final Map<?, ?> versionMap) {
-      final var v = versionMap.get("version");
+      final var v = versionMap.get(VERSION_KEY);
       return v instanceof final String s ? s.trim() : null;
     }
     return versionObj instanceof final String s ? s.trim() : null;
@@ -306,16 +307,12 @@ public class GemspecParser {
 
     final var result = new ArrayList<GemDependency>(depList.size());
     for (final var dep : depList) {
-      if (!(dep instanceof final Map<?, ?> depMap)) {
+      if (!(dep instanceof final Map<?, ?> depMap)
+          || !(depMap.get("name") instanceof final String name)) {
         continue;
       }
-      final var depName = depMap.get("name");
       final var depType = depMap.get("type");
       final var depReqs = depMap.get("requirement");
-
-      if (!(depName instanceof final String name)) {
-        continue;
-      }
 
       final var typeStr = depType instanceof final String s ? normalizeType(s) : RUNTIME_DEP;
       final var reqStr = formatDepRequirement(depReqs);
@@ -365,7 +362,7 @@ public class GemspecParser {
     }
     final var op = pair.get(0);
     final var ver = pair.get(1);
-    final var verStr = ver instanceof final Map<?, ?> m ? m.get("version") : ver;
+    final var verStr = ver instanceof final Map<?, ?> m ? m.get(VERSION_KEY) : ver;
     return op + " " + verStr;
   }
 

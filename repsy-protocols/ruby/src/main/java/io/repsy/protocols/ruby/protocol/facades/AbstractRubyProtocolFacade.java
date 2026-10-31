@@ -43,7 +43,7 @@ import org.springframework.core.io.Resource;
 
 @Slf4j
 @RequiredArgsConstructor
-public abstract class AbstractRubyProtocolFacade<ID> implements RubyProtocolFacade {
+public abstract class AbstractRubyProtocolFacade<I> implements RubyProtocolFacade {
 
   private static final String USAGES = "usages";
   private static final String GEM_NAME = "gemName";
@@ -51,26 +51,26 @@ public abstract class AbstractRubyProtocolFacade<ID> implements RubyProtocolFaca
   private static final String ARTIFACT_NAME = "artifactName";
   private static final String ARTIFACT_VERSION = "artifactVersion";
 
-  private final RubyGemProtocolService<ID> gemService;
+  private final RubyGemProtocolService<I> gemService;
   private final RubyStorageService storageService;
 
   @Override
   public String getNames(final ProtocolContext context) {
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     final var names = this.gemService.getGemNames(repoInfo);
     return CompactIndexFormatter.formatNames(names);
   }
 
   @Override
   public String getVersionsIndex(final ProtocolContext context) {
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     return CompactIndexFormatter.formatVersionsIndex(
         this.gemService.getVersionsChecksums(repoInfo));
   }
 
   @Override
   public byte[] getGemspec(final ProtocolContext context, final String gemspecName) {
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     final var entry =
         this.findLiveGemspecEntry(repoInfo, gemspecName)
             .orElseThrow(() -> new ItemNotFoundException(ProtocolErrorCodes.GEM_VERSION_NOT_FOUND));
@@ -83,7 +83,7 @@ public abstract class AbstractRubyProtocolFacade<ID> implements RubyProtocolFaca
 
   @Override
   public String getGemInfo(final ProtocolContext context, final String gemName) {
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     final var entries = this.gemService.getCompactEntriesByGemName(repoInfo, gemName);
     return CompactIndexFormatter.formatGemInfo(entries);
   }
@@ -96,7 +96,7 @@ public abstract class AbstractRubyProtocolFacade<ID> implements RubyProtocolFaca
    */
   @Override
   public Resource downloadGem(final ProtocolContext context, final String filename) {
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     final var entry =
         this.gemService
             .findByGemFilename(repoInfo, filename)
@@ -107,19 +107,19 @@ public abstract class AbstractRubyProtocolFacade<ID> implements RubyProtocolFaca
 
   @Override
   public boolean gemExists(final ProtocolContext context, final String gemName) {
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     return this.gemService.gemNameExists(repoInfo, gemName);
   }
 
   @Override
   public boolean gemFileExists(final ProtocolContext context, final String filename) {
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     return this.gemService.findByGemFilename(repoInfo, filename).isPresent();
   }
 
   @Override
   public boolean gemspecExists(final ProtocolContext context, final String gemspecName) {
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     return this.findLiveGemspecEntry(repoInfo, gemspecName).isPresent();
   }
 
@@ -129,7 +129,7 @@ public abstract class AbstractRubyProtocolFacade<ID> implements RubyProtocolFaca
    * knows how a name, a version and a platform are told apart.
    */
   private Optional<GemCompactEntry> findLiveGemspecEntry(
-      final BaseRepoInfo<ID> repoInfo, final String gemspecName) {
+      final BaseRepoInfo<I> repoInfo, final String gemspecName) {
     return this.gemService
         .findByGemFilename(repoInfo, gemspecName + ".gem")
         .filter(entry -> !entry.isYanked());
@@ -138,7 +138,7 @@ public abstract class AbstractRubyProtocolFacade<ID> implements RubyProtocolFaca
   @Override
   public void publishGem(final ProtocolContext context, final SpooledUpload gem)
       throws IOException {
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
 
     final GemMetadata metadata;
     try (final var in = gem.openStream()) {
@@ -165,7 +165,7 @@ public abstract class AbstractRubyProtocolFacade<ID> implements RubyProtocolFaca
    * row back, and for a new version the partly written file is removed.
    */
   private BaseUsages storeGem(
-      final BaseRepoInfo<ID> repoInfo,
+      final BaseRepoInfo<I> repoInfo,
       final GemMetadata metadata,
       final SpooledUpload gem,
       final boolean replacesExisting)
@@ -203,38 +203,38 @@ public abstract class AbstractRubyProtocolFacade<ID> implements RubyProtocolFaca
       final String gemName,
       final String version,
       final String platform) {
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     this.gemService.yankGem(repoInfo, gemName, version, platform);
     this.refreshVersionsChecksum(repoInfo, gemName);
   }
 
   @Override
   public byte[] getSpecs(final ProtocolContext context) {
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     return RubySpecsIndexWriter.dumpSpecs(this.gemService.getAllNonYankedEntries(repoInfo));
   }
 
   @Override
   public byte[] getLatestSpecs(final ProtocolContext context) {
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     return RubySpecsIndexWriter.dumpLatestSpecs(this.gemService.getAllNonYankedEntries(repoInfo));
   }
 
   @Override
   public byte[] getPrereleaseSpecs(final ProtocolContext context) {
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     return RubySpecsIndexWriter.dumpPrereleaseSpecs(
         this.gemService.getAllNonYankedEntries(repoInfo));
   }
 
   @Override
   public byte[] getDependencies(final ProtocolContext context, final List<String> gemNames) {
-    final var repoInfo = ProtocolContextUtils.<ID>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
     final var entries = this.gemService.getCompactEntriesByGemNames(repoInfo, gemNames);
     return RubyMarshalWriter.dumpDependencies(entries);
   }
 
-  private void refreshVersionsChecksum(final BaseRepoInfo<ID> repoInfo, final String gemName) {
+  private void refreshVersionsChecksum(final BaseRepoInfo<I> repoInfo, final String gemName) {
     final var entries = this.gemService.getCompactEntriesByGemName(repoInfo, gemName);
     final var checksum = CompactIndexFormatter.md5Hex(CompactIndexFormatter.formatGemInfo(entries));
     this.gemService.saveVersionsChecksum(repoInfo, gemName, checksum);

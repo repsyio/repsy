@@ -134,10 +134,10 @@ class AbstractRubyStorageServiceTest {
     final var repoId = UUID.fromString("00000000-0000-0000-0000-000000000001");
     when(this.storageStrategy.get(any(), eq("gems"))).thenReturn(Optional.empty());
 
-    assertThatThrownBy(
-            () ->
-                new TestService(this.storageStrategy)
-                    .getGem(new RepoRef(repoId, "gems"), "demo", "1.0.0", "ruby"))
+    final var service = new TestService(this.storageStrategy);
+    final var repo = new RepoRef(repoId, "gems");
+
+    assertThatThrownBy(() -> service.getGem(repo, "demo", "1.0.0", "ruby"))
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessageContaining("gemNotFound");
   }
@@ -164,10 +164,10 @@ class AbstractRubyStorageServiceTest {
     final var repoId = UUID.fromString("00000000-0000-0000-0000-000000000001");
     when(this.storageStrategy.getFileUsage(any(), eq("gems"))).thenThrow(new IOException("disk"));
 
-    assertThatThrownBy(
-            () ->
-                new TestService(this.storageStrategy)
-                    .deleteGem(new RepoRef(repoId, "gems"), "rack", "2.2.8", "ruby"))
+    final var service = new TestService(this.storageStrategy);
+    final var repo = new RepoRef(repoId, "gems");
+
+    assertThatThrownBy(() -> service.deleteGem(repo, "rack", "2.2.8", "ruby"))
         .isInstanceOf(ErrorOccurredException.class)
         .hasCauseInstanceOf(IOException.class);
     verify(this.storageStrategy, never()).delete(any());

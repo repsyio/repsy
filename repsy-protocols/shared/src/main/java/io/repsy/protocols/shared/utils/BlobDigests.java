@@ -36,15 +36,18 @@ public class BlobDigests {
 
   private static final int BUFFER_SIZE = 64 * 1024;
 
+  private static final String SHA256 = "sha256";
+  private static final String SHA512 = "sha512";
+
   private static final Pattern DIGEST_PATTERN =
       Pattern.compile("^(?<algorithm>[a-z0-9]+):(?<hex>[0-9a-fA-F]+)$");
 
   /** The hex length of a digest, by the OCI name of its algorithm. */
   private static final Map<String, Integer> HEX_LENGTH_BY_ALGORITHM =
-      Map.of("sha256", 64, "sha512", 128);
+      Map.of(SHA256, 64, SHA512, 128);
 
   private static final Map<String, String> JCA_NAME_BY_ALGORITHM =
-      Map.of("sha256", "SHA-256", "sha512", "SHA-512");
+      Map.of(SHA256, "SHA-256", SHA512, "SHA-512");
 
   /**
    * A regular expression fragment (no capturing groups, no anchors) matching exactly the digests
@@ -169,7 +172,7 @@ public class BlobDigests {
    */
   public static String sha256Hex(final byte[] content) {
 
-    return HexFormat.of().formatHex(newMessageDigest("sha256").digest(content));
+    return HexFormat.of().formatHex(newMessageDigest(SHA256).digest(content));
   }
 
   /**
@@ -182,7 +185,7 @@ public class BlobDigests {
    */
   public static String sha256Hex(final InputStream content) throws IOException {
 
-    final var messageDigest = newMessageDigest("sha256");
+    final var messageDigest = newMessageDigest(SHA256);
     final var buffer = new byte[BUFFER_SIZE];
 
     int read;

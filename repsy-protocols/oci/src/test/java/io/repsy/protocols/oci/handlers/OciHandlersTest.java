@@ -265,8 +265,11 @@ class OciHandlersTest {
     assertThat(response.getHeaders().getFirst("Docker-Upload-UUID")).isEqualTo(SESSION);
 
     this.uploads.clear();
-    assertThatThrownBy(
-            () -> new Status().handle(context, request("GET", ""), new MockHttpServletResponse()))
+    final var statusRequest = request("GET", "");
+    final var statusResponse = new MockHttpServletResponse();
+    final var status = new Status();
+
+    assertThatThrownBy(() -> status.handle(context, statusRequest, statusResponse))
         .isInstanceOf(ItemNotFoundException.class);
   }
 
@@ -275,8 +278,11 @@ class OciHandlersTest {
   void finalizeNeedsADigest() throws Exception {
     final var context = context("/app/blobs/uploads/" + SESSION);
 
-    assertThatThrownBy(
-            () -> new Finalize().handle(context, request("PUT", ""), new MockHttpServletResponse()))
+    final var emptyRequest = request("PUT", "");
+    final var emptyResponse = new MockHttpServletResponse();
+    final var finalizer = new Finalize();
+
+    assertThatThrownBy(() -> finalizer.handle(context, emptyRequest, emptyResponse))
         .isInstanceOf(BadRequestException.class);
 
     final var request = request("PUT", "");

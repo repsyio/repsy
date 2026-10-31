@@ -95,7 +95,7 @@ public final class OciTagPagingUtils {
       }
 
       return limit;
-    } catch (final NumberFormatException e) {
+    } catch (final NumberFormatException _) {
       throw new BadRequestException(ProtocolErrorCodes.PAGINATION_NUMBER_INVALID);
     }
   }

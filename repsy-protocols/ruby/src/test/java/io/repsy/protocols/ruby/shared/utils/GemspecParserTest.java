@@ -390,8 +390,9 @@ class GemspecParserTest {
 
       final var stored = parse(gemWithAuthors(all)).getAuthors();
 
-      assertThat(stored).isEqualTo(String.join(", ", all));
-      assertThat(stored).hasSize(GemspecParser.MAX_AUTHORS_LENGTH);
+      assertThat(stored)
+          .isEqualTo(String.join(", ", all))
+          .hasSize(GemspecParser.MAX_AUTHORS_LENGTH);
     }
 
     @Test
@@ -489,7 +490,9 @@ class GemspecParserTest {
     void rejectsOverLongDependencyName() throws IOException {
       final var name = "d".repeat(GemspecParser.MAX_DEPENDENCY_NAME_LENGTH + 1);
 
-      assertThatThrownBy(() -> parse(gemWithDependency(name, "1.0")))
+      final var gem = gemWithDependency(name, "1.0");
+
+      assertThatThrownBy(() -> parse(gem))
           .isInstanceOf(BadRequestException.class)
           .hasMessageContaining("gemDependencyNameTooLong");
     }
@@ -512,7 +515,9 @@ class GemspecParserTest {
       // Stored as ">= <version>", so 3 characters longer than the version alone.
       final var version = "1".repeat(GemspecParser.MAX_DEPENDENCY_REQUIREMENTS_LENGTH - 2);
 
-      assertThatThrownBy(() -> parse(gemWithDependency("demo-dep", version)))
+      final var gem = gemWithDependency("demo-dep", version);
+
+      assertThatThrownBy(() -> parse(gem))
           .isInstanceOf(BadRequestException.class)
           .hasMessageContaining("gemDependencyRequirementsTooLong");
     }

@@ -224,8 +224,7 @@ class AbstractRubyProtocolFacadeTest {
       assertThatThrownBy(() -> this.facade.publishGem(this.context, upload)).isSameAs(failure);
     }
 
-    verify(this.storageService)
-        .deleteGem(eq(new RepoRef(REPO_ID, REPO_NAME)), eq("demo"), eq("1.2.3"), eq("ruby"));
+    verify(this.storageService).deleteGem(new RepoRef(REPO_ID, REPO_NAME), "demo", "1.2.3", "ruby");
     assertThat(this.context.<BaseUsages>getProperty("usages")).isNull();
   }
 

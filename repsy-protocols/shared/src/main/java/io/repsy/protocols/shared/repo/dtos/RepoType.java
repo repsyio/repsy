@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 
 public enum RepoType {
   MAVEN("mvn__"),
@@ -50,7 +51,7 @@ public enum RepoType {
    * and ignoring surrounding whitespace. The canonical spelling everywhere is the upper-case {@link
    * #name()}; this is the one place that accepts the lower-case slug too.
    */
-  public static Optional<RepoType> fromString(final String value) {
+  public static Optional<RepoType> fromString(final @Nullable String value) {
     if (value == null) {
       return Optional.empty();
     }

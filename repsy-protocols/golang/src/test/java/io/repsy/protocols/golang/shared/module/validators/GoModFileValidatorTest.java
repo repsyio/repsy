@@ -48,7 +48,9 @@ class GoModFileValidatorTest {
   @Test
   @DisplayName("rejects a go.mod without a module directive")
   void rejectsMissingModuleDirective() {
-    assertThatThrownBy(() -> GoModFileValidator.validate(bytes("go 1.22\n"), EXPECTED_PATH))
+    final var content = bytes("go 1.22\n");
+
+    assertThatThrownBy(() -> GoModFileValidator.validate(content, EXPECTED_PATH))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("goModMissingModuleDirective");
   }
@@ -72,7 +74,9 @@ class GoModFileValidatorTest {
   @ValueSource(strings = {"module acme/tool\n", "module tool\n", "module /tool\n"})
   @DisplayName("rejects a module path whose first segment has no dot")
   void rejectsModulePathWithoutDomain(final String goMod) {
-    assertThatThrownBy(() -> GoModFileValidator.validate(bytes(goMod), EXPECTED_PATH))
+    final var content = bytes(goMod);
+
+    assertThatThrownBy(() -> GoModFileValidator.validate(content, EXPECTED_PATH))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("goModInvalidModulePath");
   }
@@ -84,7 +88,9 @@ class GoModFileValidatorTest {
   void rejectsMismatchedModulePath() {
     final var goMod = "module example.com/other\n\ngo 1.22\n";
 
-    assertThatThrownBy(() -> GoModFileValidator.validate(bytes(goMod), EXPECTED_PATH))
+    final var content = bytes(goMod);
+
+    assertThatThrownBy(() -> GoModFileValidator.validate(content, EXPECTED_PATH))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("goModModulePathMismatch");
   }
@@ -112,7 +118,9 @@ class GoModFileValidatorTest {
   void rejectsCaseOnlyMismatch() {
     final var goMod = "module example.com/Foo\n\ngo 1.22\n";
 
-    assertThatThrownBy(() -> GoModFileValidator.validate(bytes(goMod), "example.com/foo"))
+    final var content = bytes(goMod);
+
+    assertThatThrownBy(() -> GoModFileValidator.validate(content, "example.com/foo"))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("goModModulePathMismatch");
   }

@@ -90,7 +90,9 @@ class BoundedEntryReaderTest {
   @Test
   @DisplayName("refuses an entry one byte over the limit when the header says nothing")
   void refusesOneByteOverWithoutHeaderSize() {
-    assertThatThrownBy(() -> BoundedEntryReader.readAllBytes(stream((int) LIMIT + 1), -1, LIMIT))
+    final var oversized = stream((int) LIMIT + 1);
+
+    assertThatThrownBy(() -> BoundedEntryReader.readAllBytes(oversized, -1, LIMIT))
         .isInstanceOf(EntryTooLargeException.class);
   }
 
@@ -108,9 +110,11 @@ class BoundedEntryReaderTest {
   @Test
   @DisplayName("rejects a limit that is not positive or does not fit an array")
   void rejectsInvalidLimit() {
-    assertThatThrownBy(() -> BoundedEntryReader.readAllBytes(stream(1), 1, 0))
+    final var single = stream(1);
+
+    assertThatThrownBy(() -> BoundedEntryReader.readAllBytes(single, 1, 0))
         .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(() -> BoundedEntryReader.readAllBytes(stream(1), 1, Integer.MAX_VALUE))
+    assertThatThrownBy(() -> BoundedEntryReader.readAllBytes(single, 1, Integer.MAX_VALUE))
         .isInstanceOf(IllegalArgumentException.class);
   }
 }

@@ -25,11 +25,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-public interface RubyGemProtocolService<ID> {
+public interface RubyGemProtocolService<I> {
 
-  List<String> getGemNames(BaseRepoInfo<ID> repoInfo);
+  List<String> getGemNames(BaseRepoInfo<I> repoInfo);
 
-  List<GemCompactEntry> getCompactEntriesByGemName(BaseRepoInfo<ID> repoInfo, String gemName);
+  List<GemCompactEntry> getCompactEntriesByGemName(BaseRepoInfo<I> repoInfo, String gemName);
 
   /**
    * The non-yanked entries of every gem in {@code gemNames}, for the legacy {@code GET
@@ -38,7 +38,7 @@ public interface RubyGemProtocolService<ID> {
    * a client sends its whole candidate set and expects back only what a repo actually has.
    */
   List<GemCompactEntry> getCompactEntriesByGemNames(
-      BaseRepoInfo<ID> repoInfo, List<String> gemNames);
+      BaseRepoInfo<I> repoInfo, List<String> gemNames);
 
   /**
    * Resolves a {@code .gem} filename against the stored rows, trying each of {@link
@@ -46,10 +46,10 @@ public interface RubyGemProtocolService<ID> {
    * longest-name first and returning the first that matches a real gem and version. Unlike {@link
    * #getCompactEntriesByGemName}, this never throws for an unresolved filename.
    */
-  Optional<GemCompactEntry> findByGemFilename(BaseRepoInfo<ID> repoInfo, String filename);
+  Optional<GemCompactEntry> findByGemFilename(BaseRepoInfo<I> repoInfo, String filename);
 
   /** Cheap existence check for {@code /info/<gemName>}: whether the gem has any row at all. */
-  boolean gemNameExists(BaseRepoInfo<ID> repoInfo, String gemName);
+  boolean gemNameExists(BaseRepoInfo<I> repoInfo, String gemName);
 
   /**
    * Records the gem version and, while that write is still open, stores its file through {@code
@@ -63,16 +63,16 @@ public interface RubyGemProtocolService<ID> {
    * @return the usages reported by {@code fileWriter}
    */
   BaseUsages publishGem(
-      BaseRepoInfo<ID> repoInfo, GemMetadata metadata, String checksum, GemFileWriter fileWriter)
+      BaseRepoInfo<I> repoInfo, GemMetadata metadata, String checksum, GemFileWriter fileWriter)
       throws IOException;
 
-  void yankGem(BaseRepoInfo<ID> repoInfo, String gemName, String version, String platform);
+  void yankGem(BaseRepoInfo<I> repoInfo, String gemName, String version, String platform);
 
-  Map<String, GemVersionsEntry> getVersionsChecksums(BaseRepoInfo<ID> repoInfo);
+  Map<String, GemVersionsEntry> getVersionsChecksums(BaseRepoInfo<I> repoInfo);
 
-  void saveVersionsChecksum(BaseRepoInfo<ID> repoInfo, String gemName, String checksum);
+  void saveVersionsChecksum(BaseRepoInfo<I> repoInfo, String gemName, String checksum);
 
-  List<GemCompactEntry> getAllNonYankedEntries(BaseRepoInfo<ID> repoInfo);
+  List<GemCompactEntry> getAllNonYankedEntries(BaseRepoInfo<I> repoInfo);
 
   /** Stores the file of a version whose row {@link #publishGem} has just written. */
   @FunctionalInterface

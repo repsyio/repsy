@@ -41,7 +41,7 @@ import java.util.regex.Pattern;
  */
 public class RubyGemVersionComparator implements Comparator<String> {
 
-  private static final Pattern SEGMENT_PATTERN = Pattern.compile("[0-9]+|[A-Za-z]+");
+  private static final Pattern SEGMENT_PATTERN = Pattern.compile("\\d+|[A-Za-z]+");
 
   @Override
   public int compare(final String v1, final String v2) {

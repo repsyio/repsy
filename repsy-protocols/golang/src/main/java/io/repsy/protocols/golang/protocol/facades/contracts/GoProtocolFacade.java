@@ -20,7 +20,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import org.springframework.core.io.Resource;
 
-public interface GoProtocolFacade<ID> {
+public interface GoProtocolFacade<I> {
 
   Resource download(ProtocolContext context);
 

@@ -30,8 +30,8 @@ public class ProtocolContextUtils {
   private static final String USAGES = "usages";
 
   @SuppressWarnings("unchecked")
-  public static <ID> BaseRepoInfo<ID> getRepoInfo(final ProtocolContext context) {
-    return (BaseRepoInfo<ID>) urlProperties(context).getRepoInfo();
+  public static <I> BaseRepoInfo<I> getRepoInfo(final ProtocolContext context) {
+    return (BaseRepoInfo<I>) urlProperties(context).getRepoInfo();
   }
 
   public static RelativePath getRelativePath(final ProtocolContext context) {
@@ -51,10 +51,10 @@ public class ProtocolContextUtils {
   }
 
   @SuppressWarnings("unchecked")
-  public static <ID, REPO_INFO extends BaseRepoInfo<ID>>
-      BaseUrlParserProperties<ID, REPO_INFO> getUrlProperties(final ProtocolContext context) {
+  public static <I, R extends BaseRepoInfo<I>> BaseUrlParserProperties<I, R> getUrlProperties(
+      final ProtocolContext context) {
 
-    return (BaseUrlParserProperties<ID, REPO_INFO>) urlProperties(context);
+    return (BaseUrlParserProperties<I, R>) urlProperties(context);
   }
 
   private static BaseUrlParserProperties<?, ?> urlProperties(final ProtocolContext context) {

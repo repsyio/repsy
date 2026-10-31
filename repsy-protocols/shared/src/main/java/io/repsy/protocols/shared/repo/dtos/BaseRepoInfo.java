@@ -31,8 +31,8 @@ import org.jspecify.annotations.Nullable;
 // The no-args constructor (Jackson, MapStruct) leaves id, storageKey, name and type to be set
 // afterwards; every reader gets them populated.
 @SuppressWarnings("NullAway.Init")
-public class BaseRepoInfo<ID> {
-  private @JsonIgnore ID id;
+public class BaseRepoInfo<I> {
+  private @JsonIgnore I id;
   private UUID storageKey;
   private String name;
   private @Nullable String description;

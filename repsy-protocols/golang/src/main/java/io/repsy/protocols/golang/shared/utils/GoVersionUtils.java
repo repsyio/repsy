@@ -16,6 +16,7 @@
 package io.repsy.protocols.golang.shared.utils;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.Optional;
@@ -67,12 +68,27 @@ public class GoVersionUtils {
   // numeric identifiers. Deliberately separate from SEMVER_PATTERN above, which is intentionally
   // loose so COMPARATOR can still order a pre-existing non-standard version instead of throwing.
   private static final String NUM = "(0|[1-9]\\d*)";
-  private static final String PRE_ID = "(?:0|[1-9]\\d*|\\d*[A-Za-z-][0-9A-Za-z-]*)";
-  private static final String BUILD_ID = "[0-9A-Za-z-]+";
+  private static final String IDENTIFIERS = "[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*";
   private static final Pattern STRICT_SEMVER =
       Pattern.compile(
-          "v" + NUM + "\\." + NUM + "\\." + NUM + "(?:-" + PRE_ID + "(?:\\." + PRE_ID + ")*)?"
-              + "(?:\\+" + BUILD_ID + "(?:\\." + BUILD_ID + ")*)?");
+          "v"
+              + NUM
+              + "\\."
+              + NUM
+              + "\\."
+              + NUM
+              + "(?:-("
+              + IDENTIFIERS
+              + "))?"
+              + "(?:\\+"
+              + IDENTIFIERS
+              + ")?");
+
+  // A pre-release identifier is split from the dotted list and checked on its own, so the pattern
+  // above has no repeated alternation (which can overflow the stack on a very long input).
+  private static final Pattern PRE_RELEASE_IDENTIFIER =
+      Pattern.compile("0|[1-9]\\d*|\\d*[A-Za-z-][0-9A-Za-z-]*");
+  private static final int STRICT_PRE_RELEASE_GROUP = 4;
 
   /**
    * Whether {@code version} is a syntactically valid Go semver string: {@code vMAJOR.MINOR.PATCH}
@@ -82,7 +98,17 @@ public class GoVersionUtils {
    * (RPS-1227).
    */
   public static boolean isValidSemver(final String version) {
-    return STRICT_SEMVER.matcher(version).matches();
+    final var matcher = STRICT_SEMVER.matcher(version);
+
+    if (!matcher.matches()) {
+      return false;
+    }
+
+    final var preRelease = matcher.group(STRICT_PRE_RELEASE_GROUP);
+
+    return preRelease == null
+        || Arrays.stream(preRelease.split("\\.", -1))
+            .allMatch(id -> PRE_RELEASE_IDENTIFIER.matcher(id).matches());
   }
 
   /**

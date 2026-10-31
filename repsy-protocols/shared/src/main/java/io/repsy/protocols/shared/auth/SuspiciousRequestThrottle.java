@@ -26,6 +26,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
@@ -73,7 +74,7 @@ public class SuspiciousRequestThrottle {
   private final long windowNanos;
   private final long banNanos;
   private final LogGate wouldBlockLog;
-  private volatile @Nullable ClientBanListener banListener;
+  private final AtomicReference<@Nullable ClientBanListener> banListener = new AtomicReference<>();
 
   @Autowired
   public SuspiciousRequestThrottle(
@@ -128,7 +129,7 @@ public class SuspiciousRequestThrottle {
   @Autowired(required = false)
   public void setBanListener(final @Nullable ClientBanListener banListener) {
 
-    this.banListener = banListener;
+    this.banListener.set(banListener);
   }
 
   /**
@@ -168,7 +169,7 @@ public class SuspiciousRequestThrottle {
 
     try {
       address = InetAddresses.forString(remoteAddr);
-    } catch (final IllegalArgumentException notALiteralAddress) {
+    } catch (final IllegalArgumentException _) {
       return false;
     }
 
@@ -276,7 +277,7 @@ public class SuspiciousRequestThrottle {
 
   private void announce(final String client) {
 
-    final var listener = this.banListener;
+    final var listener = this.banListener.get();
 
     if (listener == null) {
       return;
