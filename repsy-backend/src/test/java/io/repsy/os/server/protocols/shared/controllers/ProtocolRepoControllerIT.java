@@ -850,6 +850,7 @@ class ProtocolRepoControllerIT extends AbstractIT {
 
       assertThat(items)
           .extracting(item -> (String) item.get("createdAt"))
+          .isNotEmpty()
           .allSatisfy(
               createdAt ->
                   assertThat(createdAt)
