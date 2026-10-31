@@ -298,6 +298,19 @@ class PackageStorageUtilsTest {
     }
 
     @Test
+    @DisplayName("a local segment named like an archive extension is still cut off the extension")
+    void localSegmentMayLookLikeAnExtension() {
+      assertThat(PackageStorageUtils.extractVersionFromArchiveFilename("pkg-1.0+abc.tar.gz"))
+          .isEqualTo("1.0+abc");
+      assertThat(PackageStorageUtils.extractVersionFromArchiveFilename("pkg-1.0+abc.whl.zip"))
+          .isEqualTo("1.0+abc.whl");
+      assertThat(PackageStorageUtils.extractVersionFromArchiveFilename("pkg-1.0+tar.gz.tar.gz"))
+          .isEqualTo("1.0+tar.gz");
+      assertThat(PackageStorageUtils.extractVersionFromArchiveFilename("+abc.tar.gz")).isNull();
+      assertThat(PackageStorageUtils.extractVersionFromArchiveFilename("pkg-1.0+abc.tar")).isNull();
+    }
+
+    @Test
     @DisplayName("a wheel build tag is not taken for the version")
     void buildTagIsNotTheVersion() {
       assertThat(

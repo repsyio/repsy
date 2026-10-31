@@ -51,7 +51,7 @@ public final class Pep440Version implements Comparable<Pep440Version> {
       Pattern.compile(
           "^\\s*v?"
               + "(?:(?<epoch>\\d+)!)?"
-              + "(?<release>\\d+(?:\\.\\d+)*)"
+              + "(?<release>\\d+(?:\\.\\d+)*+)"
               + "(?:[-_.]?(?<prelabel>alpha|a|beta|b|preview|pre|c|rc)[-_.]?(?<prenum>\\d+)?)?"
               + "(?:-(?<postnum1>\\d+)"
               + "|[-_.]?(?<postlabel>post|rev|r)[-_.]?(?<postnum2>\\d+)?)?"

@@ -68,7 +68,7 @@ public class GoVersionUtils {
   // numeric identifiers. Deliberately separate from SEMVER_PATTERN above, which is intentionally
   // loose so COMPARATOR can still order a pre-existing non-standard version instead of throwing.
   private static final String NUM = "(0|[1-9]\\d*)";
-  private static final String IDENTIFIERS = "[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*";
+  private static final String IDENTIFIERS = "[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*+";
   private static final Pattern STRICT_SEMVER =
       Pattern.compile(
           "v"

@@ -155,4 +155,12 @@ class Pep440VersionTest {
     assertThat(a).isEqualTo(b).hasSameHashCodeAs(b);
     assertThat(a).isNotEqualTo(Pep440Version.parse("1.0.1")).isNotEqualTo("1.0");
   }
+
+  @Test
+  @DisplayName("parses a 50k-segment dotted release without overflowing the regex stack")
+  void parsesAVeryLongDottedRelease() {
+    final var release = "1" + ".1".repeat(50_000);
+
+    assertThat(Pep440Version.parse(release)).isEqualTo(Pep440Version.parse(release + ".0"));
+  }
 }
