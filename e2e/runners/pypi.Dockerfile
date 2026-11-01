@@ -57,7 +57,7 @@ RUN npm install -g --ignore-scripts pnpm@12.15.0
 WORKDIR /app
 RUN chmod 777 /app
 
-COPY ${HARNESS_DIR}/package.json ${HARNESS_DIR}/pnpm-lock.yaml ./
+COPY ${HARNESS_DIR}/package.json ${HARNESS_DIR}/pnpm-lock.yaml ${HARNESS_DIR}/pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile --ignore-scripts
 
 COPY ${HARNESS_DIR}/tsconfig.json ${HARNESS_DIR}/playwright.config.ts ./

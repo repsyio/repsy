@@ -36,7 +36,7 @@ WORKDIR /app
 # outright, which needs write access to their parent, not just to themselves.
 RUN chmod 777 /app
 
-COPY ${HARNESS_DIR}/package.json ${HARNESS_DIR}/pnpm-lock.yaml ./
+COPY ${HARNESS_DIR}/package.json ${HARNESS_DIR}/pnpm-lock.yaml ${HARNESS_DIR}/pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile --ignore-scripts
 
 COPY ${HARNESS_DIR}/tsconfig.json ${HARNESS_DIR}/playwright.config.ts ./
