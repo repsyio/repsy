@@ -68,6 +68,8 @@ class ScanFailureMessagesTest {
         "read /var/lib/repsy/storage/uuid/file.jar: no such file|read [redacted]: no such file",
         "cannot read C:\\Users\\svc\\trivy\\db|cannot read [redacted]",
         "connect to [fe80::1]:8090 failed|connect to [redacted] failed",
+        "connect to fd00::1:50051 failed|connect to [redacted] failed",
+        "peer ::1:50051 closed|peer [redacted] closed",
       })
   @DisplayName("URLs, addresses, host:port pairs and file paths are redacted")
   void redactsInternals(final String raw, final String expected) {

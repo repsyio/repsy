@@ -43,7 +43,7 @@ public final class ScanFailureMessages {
       Pattern.compile("(?:[\\w.-]+/)?\\b(?:\\d{1,3}+\\.){3}+\\d{1,3}\\b(?::\\d{1,5})?");
   private static final Pattern IPV6 =
       Pattern.compile(
-          "(?<![\\w:])\\[?(?:[0-9a-fA-F]{0,4}+:){2,7}+[0-9a-fA-F]{0,4}\\]?(?::\\d{1,5})?(?![\\w:])");
+          "(?<![\\w:])\\[?(?:[0-9a-fA-F]{0,4}+:){2,7}[0-9a-fA-F]{0,4}\\]?(?::\\d{1,5})?(?![\\w:])");
   private static final Pattern HOST_PORT = Pattern.compile("\\b[a-zA-Z][\\w.-]*:\\d{2,5}\\b");
   private static final Pattern UNIX_PATH =
       Pattern.compile("(?<![\\w/.:-])/[\\w.@+~=-]++(?:/[\\w.@+~=-]++)*+/?");
