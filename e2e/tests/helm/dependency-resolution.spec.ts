@@ -75,6 +75,7 @@ import {
   sha256Hex,
 } from '../../src/clients/helm-raw.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
+import { target } from '../../src/target.js';
 
 const CLIENT_TIMEOUT_MS = 90_000;
 
@@ -253,6 +254,11 @@ test.describe('helm classic > dependency resolution (RPS-1479)', () => {
       'tgz match what Repsy serves (private repo, read-only token in the repo entry)',
     { tag: ['@smoke'] },
     async ({ seeder }) => {
+      // eslint-disable-next-line playwright/no-skipped-test -- RPS-2374: the FREE plan (DEV, PROD) holds one deploy token per repo
+      test.skip(
+        target.maxDeployTokensPerRepo < 2,
+        'RPS-2374: needs a read-write and a read-only deploy token in one repo',
+      );
       const repo = await seeder.createRepo(RepoType.HELM, { privateRepo: true });
       const writer = await seeder.createToken(repo.name, { readOnly: false });
       const reader = await seeder.createToken(repo.name, { readOnly: true });
