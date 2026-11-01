@@ -73,6 +73,8 @@ updates:
       # release (0.16.3 is the latest) supports it. Stay on the 6.x line until zone.js does.
       - dependency-name: "jasmine-core"
         update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "docker"
     directory: "/"
@@ -94,6 +96,7 @@ updates:
       # Stay on the Node 24 LTS line; only patch/minor tag bumps are proposed.
       - dependency-name: "node"
         update-types: ["version-update:semver-major"]
+      - dependency-name: "maven"
 
   - package-ecosystem: "docker"
     directory: "/repsy-scanner-trivy"
@@ -111,3 +114,6 @@ updates:
     ignore:
       - dependency-name: "eclipse-temurin"
         update-types: ["version-update:semver-major"]
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "maven"
