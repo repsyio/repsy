@@ -52,7 +52,7 @@
     "@angular-eslint/eslint-plugin": "^22.6.0",
     "@angular-eslint/eslint-plugin-template": "^22.6.0",
     "@angular/build": "^21.2.29",
-    "@angular/cli": "^22.2.4",
+    "@angular/cli": "^22.2.5",
     "@angular/compiler-cli": "^21.2.23",
     "@eslint/js": "^10.0.1",
     "@ngx-env/builder": "^21.0.1",
