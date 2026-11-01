@@ -16,7 +16,7 @@ jobs:
   pr-title:
     name: PR title
     # Runs on the Self Hosted Runner like every other job in this repository.
-    runs-on: ubicloud-standard-2
+    runs-on: repsy-sm
     timeout-minutes: 5
     steps:
       - name: Check the PR title

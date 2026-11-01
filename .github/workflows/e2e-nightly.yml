@@ -49,8 +49,8 @@ concurrency:
   group: e2e-nightly
   cancel-in-progress: false
 
-# Every job runs on a Ubicloud runner (ubicloud-standard-*). RPS-2381 moved the last jobs off the
-# self-hosted host that the E2E_RUNNER variable pointed at. The Chromium sandbox probe, the Docker
+# Every job runs on a self-hosted runnerd runner (repsy-sm, repsy-md). RPS-2416 moved the jobs back from
+# Ubicloud (RPS-2381 had moved them there). The Chromium sandbox probe, the Docker
 # version and the docker socket's gid of the stack runner all change with the runner image, so move
 # the label on purpose, in a PR of its own, after a manual `suite=all` run on the new one.
 defaults:
@@ -70,7 +70,7 @@ jobs:
   # Decides which legs run, from the dispatch inputs (a scheduled run has none: everything).
   plan:
     name: Plan
-    runs-on: ubicloud-standard-2
+    runs-on: repsy-sm
     timeout-minutes: 5
     outputs:
       matrix: ${{ steps.plan.outputs.matrix }}
@@ -280,7 +280,7 @@ jobs:
   # a red `tsc`, in a minute and with no stack. It runs on every trigger, whatever the suite input says.
   typecheck:
     name: E2E typecheck and lint
-    runs-on: ubicloud-standard-4
+    runs-on: repsy-md
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -311,7 +311,7 @@ jobs:
   # an artifact: three legs each rebuilding it would triple the slowest step of the run.
   image:
     name: Build Repsy image
-    runs-on: ubicloud-standard-4
+    runs-on: repsy-md
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -388,7 +388,7 @@ jobs:
   e2e:
     name: E2E ${{ matrix.leg }}
     needs: [plan, image]
-    runs-on: ubicloud-standard-4
+    runs-on: repsy-md
     timeout-minutes: ${{ matrix.timeout }}
     strategy:
       # A red leg must not hide the result of the others.
