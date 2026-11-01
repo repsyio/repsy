@@ -315,9 +315,29 @@ function parseUrlScheme(value: string | undefined, fallback: UrlScheme): UrlSche
   return value as UrlScheme;
 }
 
+/**
+ * `REPSY_E2E_MAX_DEPLOY_TOKENS` overrides how many deploy tokens one repo may have, for an owner whose plan allows more than the
+ * target's default (a cloud-local owner on the POPULAR plan allows 2, RPS-2374). Unset, it is the target's own, so a run
+ * on the FREE plan (DEV, PROD) keeps the default of 1.
+ */
+export function parseMaxDeployTokens(value: string | undefined, fallback: number): number {
+  if (!value) {
+    return fallback;
+  }
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    throw new Error(`REPSY_E2E_MAX_DEPLOY_TOKENS must be a positive integer, got "${value}"`);
+  }
+  return parsed;
+}
+
 const defaults = capabilitiesFor(env.target);
 
 export const target: TargetCapabilities = {
   ...defaults,
   urlScheme: parseUrlScheme(process.env.REPSY_E2E_URL_SCHEME, defaults.urlScheme),
+  maxDeployTokensPerRepo: parseMaxDeployTokens(
+    process.env.REPSY_E2E_MAX_DEPLOY_TOKENS,
+    defaults.maxDeployTokensPerRepo,
+  ),
 };

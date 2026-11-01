@@ -49,6 +49,7 @@ import { adminCredential } from '../../../src/clients/raw-http.js';
 import { repoUrl } from '../../../src/repo-url.js';
 import { expect, test } from '../../../src/scenarios/fixtures.js';
 import type { Seeder } from '../../../src/seed/seeder.js';
+import { target } from '../../../src/target.js';
 
 /** What a client says when a frozen install finds bytes that differ from its lockfile. */
 const INTEGRITY_FAILURE: Partial<Record<ClientId, RegExp>> = {
@@ -162,6 +163,11 @@ for (const client of clientsWith('frozenInstall')) {
         tag: [client.tag, '@lockfile', '@smoke'],
       },
       async ({ seeder }) => {
+        // eslint-disable-next-line playwright/no-skipped-test -- RPS-2374: the FREE plan (DEV, PROD) holds one deploy token per repo
+        test.skip(
+          target.maxDeployTokensPerRepo < 2,
+          'RPS-2374: needs a read-write and a read-only deploy token in one repo',
+        );
         const graph = await publishGraph(client, seeder);
 
         const first = await client.prepare('lock-first', [graph.readonly]);

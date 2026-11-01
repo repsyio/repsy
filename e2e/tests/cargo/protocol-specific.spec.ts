@@ -105,6 +105,7 @@ import {
 import { clientEnv } from '../../src/clients/client-env.js';
 import { isolatedWorkDir, run } from '../../src/clients/exec.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
+import { target as targetCapabilities } from '../../src/target.js';
 import type { Scenario } from '../../src/scenarios/types.js';
 import type { Coordinates, MaterializedCredential, World } from '../../src/scenarios/world.js';
 import type { Seeder } from '../../src/seed/seeder.js';
@@ -408,6 +409,11 @@ test(
   'cargo > yank is refused for a read-only token (HC-6, permission: WRITE enforced live)',
   { tag: ['@smoke', '@auth', '@negative'] },
   async ({ seeder }) => {
+    // eslint-disable-next-line playwright/no-skipped-test -- RPS-2374: the FREE plan (DEV, PROD) holds one deploy token per repo
+    test.skip(
+      targetCapabilities.maxDeployTokensPerRepo < 2,
+      'RPS-2374: needs a read-write and a read-only deploy token in one repo',
+    );
     const repo = await seeder.createRepo(RepoType.CARGO, { privateRepo: true });
     const rwToken = await seeder.createToken(repo.name, { readOnly: false });
     const roToken = await seeder.createToken(repo.name, { readOnly: true });

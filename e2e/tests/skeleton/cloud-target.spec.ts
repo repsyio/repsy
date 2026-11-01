@@ -49,7 +49,7 @@ import {
   type ScenarioExpectation,
 } from '../../src/scenarios/types.js';
 import { Seeder } from '../../src/seed/seeder.js';
-import { capabilitiesFor } from '../../src/target.js';
+import { capabilitiesFor, parseMaxDeployTokens } from '../../src/target.js';
 import { RepoType } from '../../src/api/panel-backend.js';
 import {
   FAKE_CLOUD_CAPABILITIES,
@@ -103,6 +103,15 @@ test.describe('target capabilities', () => {
       expect(cloud.maxDeployTokensPerRepo, name).toBe(1);
       expect(cloud.supportsRepoUsers, name).toBe(true);
       expect(cloud.supportsUserRole, name).toBe(false);
+    }
+  });
+
+  test('REPSY_E2E_MAX_DEPLOY_TOKENS raises the deploy token limit of a POPULAR owner, unset keeps the plan default (RPS-2374)', () => {
+    expect(parseMaxDeployTokens(undefined, 1)).toBe(1);
+    expect(parseMaxDeployTokens('', 1)).toBe(1);
+    expect(parseMaxDeployTokens('2', 1)).toBe(2);
+    for (const bad of ['0', '-1', '1.5', 'two']) {
+      expect(() => parseMaxDeployTokens(bad, 1), bad).toThrow(/positive integer/);
     }
   });
 
