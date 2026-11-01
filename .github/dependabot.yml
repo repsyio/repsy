@@ -9,6 +9,8 @@ updates:
       - "/.github/actions/setup-pnpm"
     schedule:
       interval: "daily"
+      time: "01:50"
+      timezone: "Europe/Amsterdam"
     open-pull-requests-limit: 3
     # Minor and patch bumps share one PR; majors stay individual so they get reviewed alone.
     groups:
@@ -21,6 +23,8 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+      time: "01:50"
+      timezone: "Europe/Amsterdam"
     open-pull-requests-limit: 3
     # Minor and patch bumps share one PR; majors stay individual so they get reviewed alone.
     groups:
@@ -40,6 +44,8 @@ updates:
     directory: "/repsy-scanner-trivy"
     schedule:
       interval: "daily"
+      time: "01:50"
+      timezone: "Europe/Amsterdam"
     open-pull-requests-limit: 3
     # Minor and patch bumps share one PR; majors stay individual so they get reviewed alone.
     groups:
@@ -52,6 +58,8 @@ updates:
     directory: "/repsy-frontend"
     schedule:
       interval: "daily"
+      time: "01:50"
+      timezone: "Europe/Amsterdam"
     open-pull-requests-limit: 3
     # Minor and patch bumps share one PR; majors stay individual so they get reviewed alone.
     groups:
@@ -70,6 +78,8 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+      time: "01:50"
+      timezone: "Europe/Amsterdam"
     open-pull-requests-limit: 3
     # Minor and patch bumps share one PR; majors stay individual so they get reviewed alone.
     groups:
@@ -89,6 +99,8 @@ updates:
     directory: "/repsy-scanner-trivy"
     schedule:
       interval: "daily"
+      time: "01:50"
+      timezone: "Europe/Amsterdam"
     open-pull-requests-limit: 3
     # Minor and patch bumps share one PR; majors stay individual so they get reviewed alone.
     groups:
