@@ -317,6 +317,22 @@ class TemporaryCliTokenIT extends AbstractPatIT {
   }
 
   @Test
+  @DisplayName("a narrow personal token lists a broader one but cannot revoke it: 403, row stays")
+  void narrowPersonalTokenListsButCannotRevokeABroaderToken() throws Exception {
+    final var narrow = this.seedPat(this.alice, TokenScope.REPO_READ);
+    final var broad = this.seedPat(this.alice, TokenScope.REPO_MANAGE);
+
+    assertThat(this.listPats(bearer(narrow)).andReturn().getResponse().getContentAsString())
+        .contains(broad.id().toString())
+        .contains(narrow.id().toString());
+    assertThat(this.revokePat(bearer(narrow), broad.id()).andReturn().getResponse().getStatus())
+        .isEqualTo(403);
+    assertThat(this.row(broad.id())).isNotNull();
+    assertThat(this.revokePat(bearer(narrow), narrow.id()).andReturn().getResponse().getStatus())
+        .isEqualTo(204);
+  }
+
+  @Test
   @DisplayName("the login keeps working on all three routes")
   void loginStillManagesPersonalTokens() throws Exception {
     final var created = this.createPat(this.aliceLogin, "repo:read").andReturn().getResponse();

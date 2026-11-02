@@ -120,9 +120,9 @@ class PersonalAccessTokenController {
   public ResponseEntity<Void> revoke(
       @RequestHeader(AUTHORIZATION) final String authHeader, @PathVariable final UUID tokenId) {
 
-    final var userId = this.panelAuthHelper.authenticateTokenManager(authHeader).user().getId();
+    final var caller = this.panelAuthHelper.authenticateTokenManager(authHeader);
 
-    this.tokenService.revokeToken(userId, tokenId);
+    this.tokenService.revokeToken(caller.user().getId(), tokenId, caller.grantable());
 
     return ResponseEntities.noContent();
   }

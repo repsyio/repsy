@@ -419,7 +419,10 @@ paths:
         Revokes the token at once. A token of another user is a 404, as is one that is already gone
         and a temporary token (those are not managed here). Takes the access token of a login, a
         temporary token (`rct-...`) or a long-lived personal access token; an unknown or expired
-        token answers 401.
+        token answers 401. With a temporary or a personal token the token to revoke may have only
+        scopes that the calling token has itself, otherwise the answer is 403 `accessDenied` and
+        the token stays: a credential that cannot create a token cannot end one either. The list
+        is not narrowed this way, it shows every token of the user.
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -428,6 +431,8 @@ paths:
           "$ref": "#/components/responses/NoContent"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
         '404':
           "$ref": "#/components/responses/NotFound"
       summary: Revoke a personal access token

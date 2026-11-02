@@ -279,15 +279,24 @@ public class PersonalAccessTokenService {
    * is not managed from the panel), answer the same as one that does not exist, so nobody learns
    * which ids are taken.
    *
+   * <p>The caller must be able to hand on every scope of the token ({@code grantable}), as {@link
+   * #createToken} and {@link #rotateToken} require: a credential that cannot mint a token cannot
+   * end one either, so a {@code repo:read} token cannot revoke a {@code repo:manage} one.
+   *
    * @throws ItemNotFoundException if the user holds no such token
+   * @throws AccessNotAllowedException if {@code grantable} does not cover the scopes of the token
    */
   @Transactional
-  public void revokeToken(final UUID userId, final UUID tokenId) {
+  public void revokeToken(final UUID userId, final UUID tokenId, final Set<TokenScope> grantable) {
 
     final var token =
         this.tokenRepository
             .findByUserIdAndIdAndKind(userId, tokenId, PersonalAccessTokenKind.PERSONAL)
             .orElseThrow(() -> new ItemNotFoundException(ErrorConstants.ACCESS_TOKEN_NOT_FOUND));
+
+    if (!grantable.containsAll(token.getScopes())) {
+      throw new AccessNotAllowedException(ProtocolErrorCodes.ACCESS_DENIED);
+    }
 
     this.tokenRepository.delete(token);
   }
