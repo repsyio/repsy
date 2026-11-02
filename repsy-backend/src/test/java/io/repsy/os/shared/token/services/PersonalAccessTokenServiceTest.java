@@ -531,7 +531,7 @@ class PersonalAccessTokenServiceTest {
             USER_ID, token.getId(), PersonalAccessTokenKind.PERSONAL))
         .thenReturn(Optional.of(token));
 
-    this.service.revokeToken(USER_ID, token.getId());
+    this.service.revokeToken(USER_ID, token.getId(), EnumSet.allOf(TokenScope.class));
 
     verify(this.tokenRepository).delete(token);
   }
@@ -544,11 +544,41 @@ class PersonalAccessTokenServiceTest {
             USER_ID, tokenId, PersonalAccessTokenKind.PERSONAL))
         .thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> this.service.revokeToken(USER_ID, tokenId))
+    assertThatThrownBy(
+            () -> this.service.revokeToken(USER_ID, tokenId, EnumSet.allOf(TokenScope.class)))
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessage("accessTokenNotFound");
 
     verify(this.tokenRepository, never()).delete(any());
+  }
+
+  @Test
+  @DisplayName("refuses to revoke a token with a scope the caller cannot hand on")
+  void refusesToRevokeABroaderToken() {
+    final var token = this.tokenOf(this.user);
+    token.setScopes(EnumSet.of(TokenScope.PROFILE_READ, TokenScope.REPO_MANAGE));
+    when(this.tokenRepository.findByUserIdAndIdAndKind(
+            USER_ID, token.getId(), PersonalAccessTokenKind.PERSONAL))
+        .thenReturn(Optional.of(token));
+    final var narrow = EnumSet.of(TokenScope.PROFILE_READ, TokenScope.REPO_READ);
+
+    assertThatThrownBy(() -> this.service.revokeToken(USER_ID, token.getId(), narrow))
+        .isInstanceOf(AccessNotAllowedException.class);
+
+    verify(this.tokenRepository, never()).delete(any());
+  }
+
+  @Test
+  @DisplayName("revokes a token whose scopes the caller covers, itself included")
+  void revokesATokenWithinTheCallersScopes() {
+    final var token = this.tokenOf(this.user);
+    when(this.tokenRepository.findByUserIdAndIdAndKind(
+            USER_ID, token.getId(), PersonalAccessTokenKind.PERSONAL))
+        .thenReturn(Optional.of(token));
+
+    this.service.revokeToken(USER_ID, token.getId(), token.getScopes());
+
+    verify(this.tokenRepository).delete(token);
   }
 
   // -------------------------------------------------------------------------------------------
@@ -819,7 +849,7 @@ class PersonalAccessTokenServiceTest {
   }
 
   @Test
-  @DisplayName("a temporary token cannot hand on a scope it does not have")
+  @DisplayName("a temporary or personal token cannot hand on a scope it does not have")
   void grantableScopesCapTheForm() {
     this.whenUserExists();
     this.whenFlushed();
@@ -835,7 +865,7 @@ class PersonalAccessTokenServiceTest {
   }
 
   @Test
-  @DisplayName("a temporary token can hand on its own scopes")
+  @DisplayName("a temporary or personal token can hand on its own scopes")
   void grantableScopesAllowASubset() {
     this.whenUserExists();
     this.whenFlushed();
@@ -860,7 +890,8 @@ class PersonalAccessTokenServiceTest {
             USER_ID, tokenId, PersonalAccessTokenKind.PERSONAL))
         .thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> this.service.revokeToken(USER_ID, tokenId))
+    assertThatThrownBy(
+            () -> this.service.revokeToken(USER_ID, tokenId, EnumSet.allOf(TokenScope.class)))
         .isInstanceOf(ItemNotFoundException.class);
 
     verify(this.tokenRepository, never()).delete(any());

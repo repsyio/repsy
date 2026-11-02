@@ -162,6 +162,15 @@ class OpenApiSpecConsistencyIT extends AbstractIT {
           "getSecurityScansSummary");
 
   /**
+   * The operations whose 403 is not a role refusal but "the calling token lacks a scope of the
+   * token in the request" (RPS-2440). A login never gets it, so the e2e role sweep does not call
+   * them "USER gets 403" operations; the spec marks each with {@code x-forbidden-by: token-scope},
+   * which the sweep reads.
+   */
+  private static final Set<String> TOKEN_SCOPE_OPERATIONS =
+      Set.of("revokeAccessToken", "rotateAccessToken");
+
+  /**
    * RPS-1269: the one name a path variable has for each role, across every panel controller. A
    * generated client names its arguments after these, so two names for one role are two spellings
    * of the same thing in every client. A new variable is added here on purpose, with its role, and
@@ -583,13 +592,46 @@ class OpenApiSpecConsistencyIT extends AbstractIT {
                           route.repoOperation() != null
                               && route.repoOperation().permission() == Permission.MANAGE);
 
-      if (!manage && !ADMIN_OPERATIONS.contains(operation.id())) {
+      if (!manage
+          && !ADMIN_OPERATIONS.contains(operation.id())
+          && !TOKEN_SCOPE_OPERATIONS.contains(operation.id())) {
         findings.add(
             operation.key()
                 + " ("
                 + operation.id()
                 + "): documents 403 but is neither @RepoOperation(MANAGE) nor listed in"
-                + " ADMIN_OPERATIONS");
+                + " ADMIN_OPERATIONS or TOKEN_SCOPE_OPERATIONS");
+      }
+
+      final var marked = "token-scope".equals(operation.raw().get("x-forbidden-by"));
+
+      if (marked != TOKEN_SCOPE_OPERATIONS.contains(operation.id())) {
+        findings.add(
+            operation.key()
+                + " ("
+                + operation.id()
+                + "): x-forbidden-by: token-scope and TOKEN_SCOPE_OPERATIONS must agree");
+      }
+    }
+
+    for (final var id : TOKEN_SCOPE_OPERATIONS) {
+      final var operation =
+          operations.values().stream().filter(candidate -> candidate.id().equals(id)).findFirst();
+
+      if (operation.isEmpty()) {
+        findings.add(id + ": listed in TOKEN_SCOPE_OPERATIONS but not in the spec");
+        continue;
+      }
+
+      final var documents403 = asMap(operation.get().raw().get("responses")).containsKey("403");
+      final var handlers =
+          routes.stream().filter(route -> route.key().equals(operation.get().key())).toList();
+
+      if (!documents403) {
+        findings.add(id + ": listed in TOKEN_SCOPE_OPERATIONS but does not document 403");
+      }
+      if (handlers.stream().anyMatch(route -> route.repoOperation() != null)) {
+        findings.add(id + ": listed in TOKEN_SCOPE_OPERATIONS but its handler is a repo route");
       }
     }
 

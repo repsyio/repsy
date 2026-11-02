@@ -34,10 +34,12 @@ import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.util.EnumSet;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public final class PanelAuthHelper implements AdminAuthenticator {
@@ -124,11 +126,20 @@ public final class PanelAuthHelper implements AdminAuthenticator {
 
   /**
    * Authenticates the caller of the personal access token routes ({@code POST}, {@code GET}, {@code
-   * DELETE /api/profile/access-tokens}): a login, or a <em>temporary</em> token (RPS-2039), which
-   * is what lets {@code rp token create} mint the long-lived token of a CI after {@code rp auth
-   * login}. A personal token is refused with 401, as before: a personal token never manages
-   * personal tokens. A temporary token hands on at most its own scopes, and cannot reach the routes
-   * that mint a temporary token ({@link #authenticate} takes a login only).
+   * DELETE /api/profile/access-tokens} and {@code POST .../actions/rotate}): a login, a
+   * <em>temporary</em> token (RPS-2039), or a long-lived personal token (RPS-2440). A personal
+   * token used to be refused with 401 because a leaked token should not mint its replacement, but
+   * it already holds the scopes to mint deploy tokens, so the refusal only stopped a CI from
+   * rotating its own credentials.
+   *
+   * <p>What does not change is the limit on what a token can hand on: a login may hand on every
+   * scope, any other token only its own ({@link TokenManagerSession#grantable()}), so a narrow
+   * token cannot widen itself. A token that is unknown or expired is still refused with 401, and
+   * the routes act on the user of the token only. {@link #authenticate} stays login-only, so no
+   * personal or temporary token can reach the routes that mint a temporary token.
+   *
+   * <p>A call made with a token is logged with the kind and id of the token (never its secret), so
+   * it can be told from one made with a login.
    */
   public TokenManagerSession authenticateTokenManager(final String authHeader) {
 
@@ -141,13 +152,15 @@ public final class PanelAuthHelper implements AdminAuthenticator {
 
     final var token = this.liveToken(secret);
 
-    if (!token.isTemporary()) {
-      throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
-    }
-
     final var user = this.userTxService.getAuthenticatedUserById(token.userId());
 
     this.touch(token);
+
+    log.info(
+        "Token management with a {} token: tokenId={}, userId={}",
+        token.kind(),
+        token.id(),
+        token.userId());
 
     return new TokenManagerSession(user, token.scopes());
   }

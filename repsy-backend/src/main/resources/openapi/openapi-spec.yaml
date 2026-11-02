@@ -417,8 +417,13 @@ paths:
       operationId: revokeAccessToken
       description: >-
         Revokes the token at once. A token of another user is a 404, as is one that is already gone
-        and a temporary token (those are not managed here). Takes the access token of a login or a
-        temporary token (`rct-...`); a long-lived token answers 401.
+        and a temporary token (those are not managed here). Takes the access token of a login, a
+        temporary token (`rct-...`) or a long-lived personal access token; an unknown or expired
+        token answers 401. With a temporary or a personal token the token to revoke may have only
+        scopes that the calling token has itself, otherwise the answer is 403 `accessDenied` and
+        the token stays: a credential that cannot create a token cannot end one either. The list
+        is not narrowed this way, it shows every token of the user.
+      x-forbidden-by: token-scope
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -427,6 +432,8 @@ paths:
           "$ref": "#/components/responses/NoContent"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
       summary: Revoke a personal access token
@@ -450,9 +457,11 @@ paths:
         days. Rotating does not change how many tokens the user holds, so it works at the limit of
         50; only a token that has expired needs room, as it counts again (`accessTokenLimitReached`,
         400). A token of another user is a 404, as is one that is gone and a temporary token. Takes
-        the access token of a login or a temporary token (`rct-...`); a long-lived token answers
-        401. With a temporary token the token to rotate may have only scopes that the temporary
-        token has itself, otherwise the answer is 403 `accessDenied` and nothing changes.
+        the access token of a login, a temporary token (`rct-...`) or a long-lived personal access
+        token; an unknown or expired token answers 401. With a temporary or a personal token the
+        token to rotate may have only scopes that the calling token has itself, otherwise the
+        answer is 403 `accessDenied` and nothing changes.
+      x-forbidden-by: token-scope
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -479,6 +488,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
       summary: Rotate a personal access token
@@ -497,8 +508,8 @@ paths:
       description: >-
         The personal access tokens of the current user. Temporary tokens (`rct-...`) are not listed.
         Sortable by `id`, `name`, `expirationDate`, `lastUsedAt`, `createdAt` (`property,direction`).
-        The default is `id,desc`. Takes the access token of a login or a temporary token; a
-        long-lived token answers 401.
+        The default is `id,desc`. Takes the access token of a login, a temporary token or a
+        long-lived personal access token; an unknown or expired token answers 401.
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -528,9 +539,10 @@ paths:
         the expiration date is in the past (`accessTokenExpirationInPast`) or more than 365 days
         ahead by UTC calendar day (`accessTokenExpirationTooLate`), and when the user already holds
         50 tokens that have not expired (`accessTokenLimitReached`); an expired token and a temporary
-        token do not count. Takes the access token of a login or a temporary token (`rct-...`).
-        With a temporary token the form may ask only for scopes that token has itself, otherwise
-        the answer is 403 `accessDenied`; a long-lived token answers 401.
+        token do not count. Takes the access token of a login, a temporary token (`rct-...`) or a
+        long-lived personal access token. With a temporary or a personal token the form may ask
+        only for scopes that token has itself, otherwise the answer is 400 `validationError` and
+        nothing is created; an unknown or expired token answers 401.
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -5286,11 +5298,11 @@ components:
         hours, is never listed and does not count against the 50 token cap. An operation that
         accepts them lists `personalAccessToken` next to `bearerAuth` in its `security`: the
         operations on a repository (every path with `{repoName}`), `listRepos`, `createRepo`,
-        `getCurrentAccessToken`, and `createAccessToken`, `listAccessTokens` and
-        `revokeAccessToken`, which take a **temporary** token only (a long-lived token answers 401
-        there, so a long-lived token never manages tokens, and a temporary token cannot create or
-        revoke a temporary one). Every other operation takes the access token of a login only, so a
-        token cannot change a password or a username.
+        `getCurrentAccessToken`, and `createAccessToken`, `listAccessTokens`, `revokeAccessToken`
+        and `rotateAccessToken`, which take either kind (RPS-2440). A token that manages tokens
+        can hand on at most its own scopes, so a narrow token cannot create or rotate a wider one,
+        and a temporary token cannot create or revoke a temporary one. Every other operation takes
+        the access token of a login only, so a token cannot change a password or a username.
 
 
         What a token may do is the permission of its owner intersected with its scopes:
@@ -5388,6 +5400,16 @@ components:
         rename, delete, deploy tokens, key stores, deleting packages and versions, creating a
         repository) answers a user who is not an admin with this status, whether or not the
         repository exists. The session stays valid.
+      content:
+        application/problem+json:
+          schema:
+            "$ref": "#/components/schemas/ProblemDetail"
+    ForbiddenByTokenScope:
+      description: >-
+        The calling token is a temporary or a long-lived personal access token, and the token the
+        request names holds a scope the calling token does not hold (`accessDenied`). A token hands
+        on, revokes and rotates only tokens whose scopes it has itself. A login never gets this
+        status, as it holds every scope. Nothing changes.
       content:
         application/problem+json:
           schema:
