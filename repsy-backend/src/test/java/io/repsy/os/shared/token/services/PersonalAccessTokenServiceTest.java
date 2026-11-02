@@ -657,7 +657,10 @@ class PersonalAccessTokenServiceTest {
             USER_ID, PersonalAccessTokenKind.PERSONAL, NOW))
         .thenReturn((long) PersonalAccessTokenService.MAX_TOKENS_PER_USER);
 
-    assertThatThrownBy(() -> this.service.rotateToken(USER_ID, old.getId(), everything()))
+    final var oldId = old.getId();
+    final var everything = everything();
+
+    assertThatThrownBy(() -> this.service.rotateToken(USER_ID, oldId, everything))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("accessTokenLimitReached");
 
@@ -675,7 +678,9 @@ class PersonalAccessTokenServiceTest {
         this.rotatable(NOW.plus(Duration.ofDays(5)), TokenScope.REPO_READ, TokenScope.REPO_MANAGE);
     final var narrow = TokenScope.withImplicit(java.util.List.of(TokenScope.REPO_READ));
 
-    assertThatThrownBy(() -> this.service.rotateToken(USER_ID, old.getId(), narrow))
+    final var oldId = old.getId();
+
+    assertThatThrownBy(() -> this.service.rotateToken(USER_ID, oldId, narrow))
         .isInstanceOf(AccessNotAllowedException.class)
         .hasMessage("accessDenied");
 
@@ -704,7 +709,9 @@ class PersonalAccessTokenServiceTest {
             USER_ID, tokenId, PersonalAccessTokenKind.PERSONAL))
         .thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> this.service.rotateToken(USER_ID, tokenId, everything()))
+    final var everything = everything();
+
+    assertThatThrownBy(() -> this.service.rotateToken(USER_ID, tokenId, everything))
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessage("accessTokenNotFound");
 
@@ -717,7 +724,10 @@ class PersonalAccessTokenServiceTest {
   void rotationOfAGoneUser() {
     when(this.userRepository.lockUserIdForUpdate(USER_ID)).thenReturn(Optional.empty());
 
-    assertThatThrownBy(() -> this.service.rotateToken(USER_ID, UUID.randomUUID(), everything()))
+    final var tokenId = UUID.randomUUID();
+    final var everything = everything();
+
+    assertThatThrownBy(() -> this.service.rotateToken(USER_ID, tokenId, everything))
         .isInstanceOf(UnAuthorizedException.class);
 
     verifyNoInteractions(this.tokenRepository);
