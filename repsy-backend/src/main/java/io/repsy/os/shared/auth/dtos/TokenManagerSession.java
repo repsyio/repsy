@@ -20,8 +20,9 @@ import io.repsy.os.shared.user.dtos.UserInfo;
 import java.util.Set;
 
 /**
- * The caller of a personal access token management route (RPS-2039): the user, and the scopes the
- * credential may hand on to a token it creates. A login may hand on every scope; a temporary token
- * only its own, which is what keeps a temporary token from minting a personal one that is wider.
+ * The caller of a personal access token management route (RPS-2039, RPS-2440): the user, and the
+ * scopes the credential may hand on to a token it creates or rotates. A login may hand on every
+ * scope; a temporary or a long-lived personal token only its own, which is what keeps a narrow
+ * token from minting or rotating one that is wider than itself.
  */
 public record TokenManagerSession(UserInfo user, Set<TokenScope> grantable) {}

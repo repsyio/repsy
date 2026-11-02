@@ -272,21 +272,48 @@ class TemporaryCliTokenIT extends AbstractPatIT {
   }
 
   @Test
-  @DisplayName("a personal token cannot create, list or revoke personal tokens: 401 on all three")
-  void personalTokenManagesNothing() throws Exception {
+  @DisplayName("a personal token creates, lists and revokes personal tokens (RPS-2440)")
+  void personalTokenManagesPersonalTokens() throws Exception {
     final var personal =
         this.seedPat(
             this.alice, TokenScope.REPO_MANAGE, TokenScope.REPO_WRITE, TokenScope.REPO_READ);
-    final var victim = this.seedPat(this.alice, TokenScope.REPO_READ);
 
-    assertThat(this.createPat(bearer(personal), "repo:read").andReturn().getResponse().getStatus())
-        .isEqualTo(401);
-    assertThat(this.listPats(bearer(personal)).andReturn().getResponse().getStatus())
-        .isEqualTo(401);
-    assertThat(this.revokePat(bearer(personal), victim.id()).andReturn().getResponse().getStatus())
-        .isEqualTo(401);
-    assertThat(this.row(victim.id())).isNotNull();
-    assertThat(this.patRepository.countByUserId(this.alice.getId())).isEqualTo(2);
+    final var created = this.createPat(bearer(personal), "repo:read").andReturn().getResponse();
+    assertThat(created.getStatus()).isEqualTo(201);
+    final var id = UUID.fromString(JsonPath.read(created.getContentAsString(), "$.id"));
+    assertThat(this.row(id).getKind()).isEqualTo(PersonalAccessTokenKind.PERSONAL);
+
+    assertThat(this.listPats(bearer(personal)).andReturn().getResponse().getContentAsString())
+        .contains(id.toString());
+    assertThat(this.revokePat(bearer(personal), id).andReturn().getResponse().getStatus())
+        .isEqualTo(204);
+    assertThat(this.row(id)).isNull();
+  }
+
+  @Test
+  @DisplayName("a personal token cannot hand on a scope it does not have: 400, nothing created")
+  void personalTokenCannotWidenItself() throws Exception {
+    final var narrow = this.seedPat(this.alice, TokenScope.REPO_READ);
+
+    final var response =
+        this.createPat(bearer(narrow), "repo:read", "repo:manage").andReturn().getResponse();
+
+    assertThat(response.getStatus()).isEqualTo(400);
+    assertThat(response.getContentAsString()).contains("validationError").doesNotContain("rut-");
+    assertThat(this.patRepository.countByUserId(this.alice.getId())).isEqualTo(1);
+  }
+
+  @Test
+  @DisplayName("a personal token cannot revoke the token of another user: 404, nothing changes")
+  void personalTokenRespectsTheUserBoundary() throws Exception {
+    final var personal = this.seedPat(this.alice, TokenScope.REPO_MANAGE);
+    final var others = this.seedPat(this.bob, TokenScope.REPO_READ);
+
+    assertThat(this.revokePat(bearer(personal), others.id()).andReturn().getResponse().getStatus())
+        .isEqualTo(404);
+    assertThat(this.listPats(bearer(personal)).andReturn().getResponse().getContentAsString())
+        .doesNotContain(others.id().toString());
+    assertThat(this.row(others.id())).isNotNull();
   }
 
   @Test

@@ -819,7 +819,7 @@ class PersonalAccessTokenServiceTest {
   }
 
   @Test
-  @DisplayName("a temporary token cannot hand on a scope it does not have")
+  @DisplayName("a temporary or personal token cannot hand on a scope it does not have")
   void grantableScopesCapTheForm() {
     this.whenUserExists();
     this.whenFlushed();
@@ -835,7 +835,7 @@ class PersonalAccessTokenServiceTest {
   }
 
   @Test
-  @DisplayName("a temporary token can hand on its own scopes")
+  @DisplayName("a temporary or personal token can hand on its own scopes")
   void grantableScopesAllowASubset() {
     this.whenUserExists();
     this.whenFlushed();

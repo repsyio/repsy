@@ -296,18 +296,28 @@ class PersonalAccessTokenRotationIT extends AbstractPatIT {
   }
 
   @Test
-  @DisplayName("a long-lived token cannot rotate any token: 401, nothing changes")
-  void aPersonalTokenRotatesNothing() throws Exception {
+  @DisplayName(
+      "a personal token with enough scopes rotates a token, and a narrow one cannot (RPS-2440)")
+  void aPersonalTokenRotatesWithinItsScopes() throws Exception {
     final var personal =
         this.seedPat(
             this.alice, TokenScope.REPO_MANAGE, TokenScope.REPO_WRITE, TokenScope.REPO_READ);
+    final var narrow = this.seedPat(this.alice, TokenScope.REPO_READ);
     final var victim = this.seedPat(this.alice, TokenScope.REPO_READ);
+    final var broad = this.seedPat(this.alice, TokenScope.REPO_READ, TokenScope.REPO_MANAGE);
 
-    assertThat(this.rotate(bearer(personal), victim.id()).getStatus()).isEqualTo(401);
-    assertThat(this.rotate(bearer(personal), personal.id()).getStatus()).isEqualTo(401);
+    assertThat(this.rotate(bearer(personal), victim.id()).getStatus()).isEqualTo(200);
+    assertThat(this.row(victim.id())).isNull();
 
-    assertThat(this.row(victim.id())).isNotNull();
-    assertThat(this.row(personal.id())).isNotNull();
+    // The token that rotates itself is rotated too, and its old secret is gone.
+    assertThat(this.rotate(bearer(personal), personal.id()).getStatus()).isEqualTo(200);
+    assertThat(this.row(personal.id())).isNull();
+
+    // A narrow token cannot rotate a broader one: 403, and nothing changes.
+    final var refused = this.rotate(bearer(narrow), broad.id());
+    assertThat(refused.getStatus()).isEqualTo(403);
+    assertThat(refused.getContentAsString()).contains("accessDenied").doesNotContain("rut-");
+    assertThat(this.row(broad.id())).isNotNull();
   }
 
   @Test

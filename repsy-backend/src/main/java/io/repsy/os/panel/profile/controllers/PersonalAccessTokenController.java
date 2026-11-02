@@ -51,11 +51,12 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * The personal access tokens of the signed-in user. Creating, listing, revoking and rotating work
- * with the access token of a login or with a <em>temporary</em> token of a CLI login (RPS-2039), so
- * that {@code rp token create} can mint a CI token after {@code rp auth login}; a long-lived token
- * never manages tokens (it answers 401). {@link #current} takes a token of either kind. Temporary
- * tokens are neither listed nor revocable here. The secret of a token is shown by {@link #create}
- * only.
+ * with the access token of a login, with a <em>temporary</em> token of a CLI login (RPS-2039) or
+ * with a long-lived personal token (RPS-2440), so that {@code rp token create} can mint a CI token
+ * after {@code rp auth login} and a CI can rotate its own credentials. A token hands on at most its
+ * own scopes (see {@code TokenManagerSession}). {@link #current} takes a token of either kind.
+ * Temporary tokens are neither listed nor revocable here. The secret of a token is shown by {@link
+ * #create} only.
  */
 @RestApiPort(MultiPortNames.PORT_API)
 @RestController
