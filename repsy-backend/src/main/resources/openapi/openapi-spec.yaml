@@ -437,6 +437,58 @@ paths:
         schema:
           type: string
           format: uuid
+  "/api/profile/access-tokens/{tokenId}/actions/rotate":
+    post:
+      tags:
+        - access-tokens
+      operationId: rotateAccessToken
+      description: >-
+        Replaces the secret of a personal access token and returns the new one, once. The old secret
+        stops working at once (there is no grace period), and so does a JWT that was issued for it.
+        The token keeps its name and scopes and gets a new id, which is in the answer and in
+        `Location`. It keeps its expiration date, or, if it has already expired, expires in 365
+        days. Rotating does not change how many tokens the user holds, so it works at the limit of
+        50; only a token that has expired needs room, as it counts again (`accessTokenLimitReached`,
+        400). A token of another user is a 404, as is one that is gone and a temporary token. Takes
+        the access token of a login or a temporary token (`rct-...`); a long-lived token answers
+        401. With a temporary token the token to rotate may have only scopes that the temporary
+        token has itself, otherwise the answer is 403 `accessDenied` and nothing changes.
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
+      responses:
+        '200':
+          description: OK
+          headers:
+            Cache-Control:
+              description: "`no-store`, the response carries a secret"
+              schema:
+                type: string
+            Location:
+              description: >-
+                The URL of the rotated token, `/api/profile/access-tokens/{tokenId}`. The token id is
+                the one DELETE accepts and differs from the id in the request path.
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/AccessTokenCreated"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+      summary: Rotate a personal access token
+    parameters:
+      - name: tokenId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
   "/api/profile/access-tokens":
     get:
       tags:
