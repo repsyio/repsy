@@ -53,6 +53,7 @@ import {
 import { repoPath } from '../../src/repo-url.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
 import type { Seeder } from '../../src/seed/seeder.js';
+import { target } from '../../src/target.js';
 
 interface Layout {
   repoName: string;
@@ -824,6 +825,11 @@ test.describe('helm registry rules (raw HTTP)', () => {
       'index and, for an OCI-pushed chart, the manifest too',
     { tag: ['@settings'] },
     async ({ seeder }) => {
+      // eslint-disable-next-line playwright/no-skipped-test -- RPS-2410: the FREE plan (DEV, PROD) holds one deploy token per repo
+      test.skip(
+        target.maxDeployTokensPerRepo < 2,
+        'RPS-2410: needs a read-write and a read-only deploy token in one repo',
+      );
       const layout = await newRepo(seeder, 'delete');
       const admin = adminCredential();
       const built = await buildChart({ name: layout.chart, version: '0.1.0', marker: 'r14' });
