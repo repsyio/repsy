@@ -634,6 +634,11 @@ test.describe('helm OCI > dependency resolution (RPS-1479)', () => {
       'Chart.lock and the layer bytes match what was pushed',
     { tag: ['@smoke'] },
     async ({ seeder }) => {
+      // eslint-disable-next-line playwright/no-skipped-test -- RPS-2410: the FREE plan (DEV, PROD) holds one deploy token per repo
+      test.skip(
+        target.maxDeployTokensPerRepo < 2,
+        'RPS-2410: needs a read-write and a read-only deploy token in one repo',
+      );
       const repo = await seeder.createRepo(RepoType.HELM, { privateRepo: true });
       const writer = await seeder.createToken(repo.name, { readOnly: false });
       const reader = await seeder.createToken(repo.name, { readOnly: true });
