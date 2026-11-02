@@ -38,6 +38,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.data.web.PagedModel;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -49,11 +50,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * The personal access tokens of the signed-in user. Creating, listing and revoking work with the
- * access token of a login or with a <em>temporary</em> token of a CLI login (RPS-2039), so that
- * {@code rp token create} can mint a CI token after {@code rp auth login}; a long-lived token never
- * manages tokens (it answers 401). {@link #current} takes a token of either kind. Temporary tokens
- * are neither listed nor revocable here. The secret of a token is shown by {@link #create} only.
+ * The personal access tokens of the signed-in user. Creating, listing, revoking and rotating work
+ * with the access token of a login or with a <em>temporary</em> token of a CLI login (RPS-2039), so
+ * that {@code rp token create} can mint a CI token after {@code rp auth login}; a long-lived token
+ * never manages tokens (it answers 401). {@link #current} takes a token of either kind. Temporary
+ * tokens are neither listed nor revocable here. The secret of a token is shown by {@link #create}
+ * only.
  */
 @RestApiPort(MultiPortNames.PORT_API)
 @RestController
@@ -122,5 +124,27 @@ class PersonalAccessTokenController {
     this.tokenService.revokeToken(userId, tokenId);
 
     return ResponseEntities.noContent();
+  }
+
+  /**
+   * Replaces the secret of a personal token (RPS-2429). The answer is the token as {@link #create}
+   * answers it, with the new secret, which is shown here only, and the new id, which is also in
+   * {@code Location}: the old id and the old secret are gone.
+   */
+  @PostMapping("/{tokenId}/actions/rotate")
+  public ResponseEntity<AccessTokenCreated> rotate(
+      @RequestHeader(AUTHORIZATION) final String authHeader,
+      @PathVariable final UUID tokenId,
+      final HttpServletResponse response) {
+
+    final var caller = this.panelAuthHelper.authenticateTokenManager(authHeader);
+
+    final var rotated =
+        this.tokenService.rotateToken(caller.user().getId(), tokenId, caller.grantable());
+
+    NoStore.apply(response);
+    response.setHeader(HttpHeaders.LOCATION, "/api/profile/access-tokens/" + rotated.getId());
+
+    return ResponseEntity.ok(rotated);
   }
 }

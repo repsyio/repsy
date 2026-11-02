@@ -27,6 +27,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
@@ -548,6 +549,178 @@ class PersonalAccessTokenServiceTest {
         .hasMessage("accessTokenNotFound");
 
     verify(this.tokenRepository, never()).delete(any());
+  }
+
+  // -------------------------------------------------------------------------------------------
+  // rotateToken (RPS-2429)
+  // -------------------------------------------------------------------------------------------
+
+  private PersonalAccessToken rotatable(final Instant expirationDate, final TokenScope... scopes) {
+    final var token = this.tokenOf(this.user);
+
+    token.setName("deploy-ci");
+    token.setScopes(TokenScope.withImplicit(java.util.List.of(scopes)));
+    token.setExpirationDate(expirationDate);
+    when(this.tokenRepository.findByUserIdAndIdAndKind(
+            USER_ID, token.getId(), PersonalAccessTokenKind.PERSONAL))
+        .thenReturn(Optional.of(token));
+
+    return token;
+  }
+
+  private static Set<TokenScope> everything() {
+    return EnumSet.allOf(TokenScope.class);
+  }
+
+  @Test
+  @DisplayName(
+      "rotating deletes the old row and inserts a new one with a new secret, the same name and"
+          + " scopes and the same expiry")
+  void rotationReplacesTheSecretAndKeepsTheRest() {
+    this.whenUserExists();
+    this.whenFlushed();
+    final var expiry = NOW.plus(Duration.ofDays(40));
+    final var old = this.rotatable(expiry, TokenScope.REPO_READ, TokenScope.REPO_WRITE);
+    final var oldId = old.getId();
+    final var oldHash = old.getTokenHash();
+
+    final var rotated = this.service.rotateToken(USER_ID, oldId, everything());
+
+    final var order = inOrder(this.tokenRepository);
+    order.verify(this.tokenRepository).delete(old);
+    final var inserted = this.savedToken();
+    assertThat(rotated.getToken()).startsWith("rut-");
+    assertThat(inserted.getTokenHash()).isEqualTo(TokenHash.hash(rotated.getToken()));
+    assertThat(inserted.getTokenHash()).isNotEqualTo(oldHash);
+    assertThat(inserted.getId()).isNotEqualTo(oldId);
+    assertThat(rotated.getId()).isEqualTo(inserted.getId()).isNotEqualTo(oldId);
+    assertThat(inserted.getName()).isEqualTo("deploy-ci");
+    assertThat(inserted.getKind()).isEqualTo(PersonalAccessTokenKind.PERSONAL);
+    assertThat(inserted.getScopes())
+        .containsExactlyInAnyOrder(
+            TokenScope.PROFILE_READ, TokenScope.REPO_READ, TokenScope.REPO_WRITE);
+    assertThat(inserted.getExpirationDate()).isEqualTo(expiry);
+    assertThat(rotated.getExpirationDate()).isEqualTo(expiry);
+    assertThat(inserted.getLastUsedAt()).isNull();
+  }
+
+  @Test
+  @DisplayName("rotating a token that has not expired is not counted against the limit")
+  void rotationDoesNotChangeTheCount() {
+    this.whenUserExists();
+    this.whenFlushed();
+    final var old = this.rotatable(NOW.plus(Duration.ofDays(1)), TokenScope.REPO_READ);
+    when(this.tokenRepository.countByUserIdAndKindAndExpirationDateAfter(
+            USER_ID, PersonalAccessTokenKind.PERSONAL, NOW))
+        .thenReturn((long) PersonalAccessTokenService.MAX_TOKENS_PER_USER);
+
+    this.service.rotateToken(USER_ID, old.getId(), everything());
+
+    verify(this.tokenRepository).delete(old);
+    verify(this.tokenRepository, never())
+        .countByUserIdAndKindAndExpirationDateAfter(any(), any(), any());
+  }
+
+  @Test
+  @DisplayName("an expired token comes back with 365 days from now, not from its old date")
+  void anExpiredTokenStartsAgain() {
+    this.whenUserExists();
+    this.whenFlushed();
+    final var old = this.rotatable(NOW.minus(Duration.ofDays(3)), TokenScope.REPO_READ);
+
+    final var rotated = this.service.rotateToken(USER_ID, old.getId(), everything());
+
+    assertThat(this.savedToken().getExpirationDate()).isEqualTo(NOW.plus(Duration.ofDays(365)));
+    assertThat(rotated.getExpirationDate()).isEqualTo(NOW.plus(Duration.ofDays(365)));
+  }
+
+  @Test
+  @DisplayName("a token that expires exactly now is expired")
+  void expiringNowIsExpired() {
+    this.whenUserExists();
+    this.whenFlushed();
+    final var old = this.rotatable(NOW, TokenScope.REPO_READ);
+
+    this.service.rotateToken(USER_ID, old.getId(), everything());
+
+    assertThat(this.savedToken().getExpirationDate()).isEqualTo(NOW.plus(Duration.ofDays(365)));
+  }
+
+  @Test
+  @DisplayName(
+      "an expired token is live again, so at the limit it needs room: accessTokenLimitReached,"
+          + " and nothing changes")
+  void anExpiredTokenNeedsRoomAtTheLimit() {
+    this.whenUserExists();
+    final var old = this.rotatable(NOW.minus(Duration.ofDays(1)), TokenScope.REPO_READ);
+    when(this.tokenRepository.countByUserIdAndKindAndExpirationDateAfter(
+            USER_ID, PersonalAccessTokenKind.PERSONAL, NOW))
+        .thenReturn((long) PersonalAccessTokenService.MAX_TOKENS_PER_USER);
+
+    assertThatThrownBy(() -> this.service.rotateToken(USER_ID, old.getId(), everything()))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("accessTokenLimitReached");
+
+    verify(this.tokenRepository, never()).delete(any());
+    verify(this.tokenRepository, never()).saveAndFlush(any());
+  }
+
+  @Test
+  @DisplayName(
+      "a caller that cannot hand on every scope of the token is refused with accessDenied,"
+          + " and nothing changes")
+  void rotationNeedsTheScopesOfTheToken() {
+    this.whenUserExists();
+    final var old =
+        this.rotatable(NOW.plus(Duration.ofDays(5)), TokenScope.REPO_READ, TokenScope.REPO_MANAGE);
+    final var narrow = TokenScope.withImplicit(java.util.List.of(TokenScope.REPO_READ));
+
+    assertThatThrownBy(() -> this.service.rotateToken(USER_ID, old.getId(), narrow))
+        .isInstanceOf(AccessNotAllowedException.class)
+        .hasMessage("accessDenied");
+
+    verify(this.tokenRepository, never()).delete(any());
+    verify(this.tokenRepository, never()).saveAndFlush(any());
+  }
+
+  @Test
+  @DisplayName("a caller whose scopes are the scopes of the token can rotate it")
+  void rotationWithExactlyTheScopesOfTheToken() {
+    this.whenUserExists();
+    this.whenFlushed();
+    final var old = this.rotatable(NOW.plus(Duration.ofDays(5)), TokenScope.REPO_READ);
+
+    this.service.rotateToken(USER_ID, old.getId(), EnumSet.copyOf(old.getScopes()));
+
+    verify(this.tokenRepository).delete(old);
+  }
+
+  @Test
+  @DisplayName("answers a token of another user, or a temporary one, as one that does not exist")
+  void rotationOfAnUnknownToken() {
+    this.whenUserExists();
+    final var tokenId = UUID.randomUUID();
+    when(this.tokenRepository.findByUserIdAndIdAndKind(
+            USER_ID, tokenId, PersonalAccessTokenKind.PERSONAL))
+        .thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> this.service.rotateToken(USER_ID, tokenId, everything()))
+        .isInstanceOf(ItemNotFoundException.class)
+        .hasMessage("accessTokenNotFound");
+
+    verify(this.tokenRepository, never()).delete(any());
+    verify(this.tokenRepository, never()).saveAndFlush(any());
+  }
+
+  @Test
+  @DisplayName("a user that is gone is unauthorized, before the token is looked at")
+  void rotationOfAGoneUser() {
+    when(this.userRepository.lockUserIdForUpdate(USER_ID)).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> this.service.rotateToken(USER_ID, UUID.randomUUID(), everything()))
+        .isInstanceOf(UnAuthorizedException.class);
+
+    verifyNoInteractions(this.tokenRepository);
   }
 
   // -------------------------------------------------------------------------------------------
