@@ -423,6 +423,7 @@ paths:
         scopes that the calling token has itself, otherwise the answer is 403 `accessDenied` and
         the token stays: a credential that cannot create a token cannot end one either. The list
         is not narrowed this way, it shows every token of the user.
+      x-forbidden-by: token-scope
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -431,6 +432,8 @@ paths:
           "$ref": "#/components/responses/NoContent"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
       summary: Revoke a personal access token
@@ -458,6 +461,7 @@ paths:
         token; an unknown or expired token answers 401. With a temporary or a personal token the
         token to rotate may have only scopes that the calling token has itself, otherwise the
         answer is 403 `accessDenied` and nothing changes.
+      x-forbidden-by: token-scope
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -484,6 +488,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
       summary: Rotate a personal access token
@@ -5394,6 +5400,16 @@ components:
         rename, delete, deploy tokens, key stores, deleting packages and versions, creating a
         repository) answers a user who is not an admin with this status, whether or not the
         repository exists. The session stays valid.
+      content:
+        application/problem+json:
+          schema:
+            "$ref": "#/components/schemas/ProblemDetail"
+    ForbiddenByTokenScope:
+      description: >-
+        The calling token is a temporary or a long-lived personal access token, and the token the
+        request names holds a scope the calling token does not hold (`accessDenied`). A token hands
+        on, revokes and rotates only tokens whose scopes it has itself. A login never gets this
+        status, as it holds every scope. Nothing changes.
       content:
         application/problem+json:
           schema:

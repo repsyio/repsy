@@ -28,7 +28,9 @@
  *
  * Its static twin is `OpenApiSpecConsistencyIT.everyDocumented403IsManageOrAdmin` (RPS-1593): every
  * documented 403 is a MANAGE route or in its literal `ADMIN_OPERATIONS`, with the same floor, in every
- * `mvn verify`. A new `requireAdmin` route is added to both.
+ * `mvn verify`. A new `requireAdmin` route is added to both. A 403 marked `x-forbidden-by: token-scope`
+ * (revoke and rotate of an access token, RPS-2440) is the refusal of a calling token, which a login never
+ * gets: those operations are in the reverse sweep, and the IT lists them in `TOKEN_SCOPE_OPERATIONS`.
  *
  * A floor on the size of the set (48 today) and a check of names that must be in it stop a parser bug
  * from emptying the sweep without a failure.
