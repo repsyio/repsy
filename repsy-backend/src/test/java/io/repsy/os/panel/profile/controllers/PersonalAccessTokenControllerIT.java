@@ -810,7 +810,11 @@ class PersonalAccessTokenControllerIT extends AbstractIT {
   @MethodSource("managementEndpoints")
   @DisplayName("the routes that manage tokens take a personal access token as Bearer (RPS-2440)")
   void acceptsAPersonalAccessTokenAsBearerOnly(final Endpoint endpoint) throws Exception {
-    final var body = expectCreated(this.create(this.aliceBearer, form("ci", "repo:manage")));
+    // The token holds repo:read itself: a token hands on only the scopes it holds, and the create
+    // route of this test asks for repo:read.
+    final var body =
+        expectCreated(
+            this.create(this.aliceBearer, form("ci", "repo:manage", "repo:write", "repo:read")));
     final String secret = JsonPath.read(body, "$.token");
     final var expected =
         endpoint.name().startsWith("DELETE") ? 404 : endpoint.hasBody() ? 201 : 200;
