@@ -69,7 +69,7 @@ describe('AccessTokenFormComponent', () => {
     expect(component.canSubmit).toBeFalse();
     expect(api.createAccessToken).not.toHaveBeenCalled();
 
-    component.selectScope('scan:read');
+    component.selectScope('repo:read');
     component.form.patchValue({ name: '  ' });
     expect(component.form.value.name.trim()).toBe('');
   });
@@ -137,20 +137,20 @@ describe('AccessTokenFormComponent', () => {
       profile.get.and.returnValue(of({ role: 'ADMIN' } as ProfileInfo));
       init('cli', ['repo:read']);
 
-      expect(offered()).toEqual(['repo:read', 'repo:write', 'repo:manage', 'scan:read']);
+      expect(offered()).toEqual(['repo:read', 'repo:write', 'repo:manage']);
     });
 
     it('does not offer repo:manage to a user who is not an administrator', () => {
       init('cli', ['repo:read']);
 
-      expect(offered()).toEqual(['repo:read', 'repo:write', 'scan:read']);
+      expect(offered()).toEqual(['repo:read', 'repo:write']);
     });
 
     it('does not offer repo:manage while the profile is unknown or when it fails', () => {
       profile.get.and.returnValue(throwError(() => new Error('boom')));
       init('cli', ['repo:read']);
 
-      expect(offered()).toEqual(['repo:read', 'repo:write', 'scan:read']);
+      expect(offered()).toEqual(['repo:read', 'repo:write']);
     });
 
     it('drops a repo:manage that a link asked for when the user is not an administrator', () => {
@@ -166,13 +166,10 @@ describe('AccessTokenFormComponent', () => {
       expect([...component.selectedScopes].sort()).toEqual(['repo:manage', 'repo:read']);
     });
 
-    it('sends scan:read alone when that is all that was picked', () => {
-      init('ci', []);
-      component.selectScope('scan:read');
+    it('does not offer scan:read: repo:read covers the scan results (RPS-2436)', () => {
+      init('ci', ['repo:read']);
 
-      component.submit();
-
-      expect(api.createAccessToken.calls.mostRecent().args[0].scopes as unknown).toEqual(['scan:read']);
+      expect(offered()).not.toContain('scan:read');
     });
 
     it('never sends repo:manage for a user who is not an administrator', () => {

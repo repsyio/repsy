@@ -28,9 +28,8 @@ describe('access token scopes', () => {
     ]);
   });
 
-  it('offers scan:read, which says it does not read the repository, but a link cannot ask for it', () => {
-    const scan = SELECTABLE_SCOPES.find((s) => s.scope === 'scan:read');
-    expect(scan?.description).toContain('does not read the repository');
+  it('does not offer scan:read, which repo:read covers, and a link cannot ask for it', () => {
+    expect(SELECTABLE_SCOPES.map((s) => s.scope)).not.toContain('scan:read');
     expect(parseRequestedScopes('scan:read,repo:read')).toEqual(['repo:read']);
   });
 
@@ -44,13 +43,12 @@ describe('access token scopes', () => {
     expect(parseRequestedScopes('')).toEqual([]);
   });
 
-  it('offers repo:manage to an administrator only, and scan:read to everybody', () => {
+  it('offers repo:manage to an administrator only', () => {
     expect(selectableScopesFor(true).map((s) => s.scope)).toEqual([
       'repo:read',
       'repo:write',
       'repo:manage',
-      'scan:read',
     ]);
-    expect(selectableScopesFor(false).map((s) => s.scope)).toEqual(['repo:read', 'repo:write', 'scan:read']);
+    expect(selectableScopesFor(false).map((s) => s.scope)).toEqual(['repo:read', 'repo:write']);
   });
 });

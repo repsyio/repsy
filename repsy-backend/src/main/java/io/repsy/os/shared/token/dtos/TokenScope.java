@@ -47,7 +47,13 @@ public enum TokenScope {
   /** Publishing. Implies read. */
   REPO_WRITE("repo:write", Permission.WRITE),
   /**
-   * Reading the results of security scans of a repo, without being able to read the repo itself
+   * <b>Deprecated (RPS-2436): no longer offered when a token is created.</b> {@link #REPO_READ}
+   * covers every scan read route, so this narrower scope has no use left. It keeps its meaning
+   * exactly: a token that holds it is accepted, stored and honoured as before, and a create request
+   * that names it still succeeds, so no existing token or script breaks. The scope runs out as
+   * those tokens expire.
+   *
+   * <p>Reading the results of security scans of a repo, without being able to read the repo itself
    * (RPS-2260): the scan results and their state, which are the routes marked
    * {@code @RepoOperation(scanRead = true)} (the per-version scan overview, scans, the findings and
    * the security summaries and details of a repo or an artifact). It grants no repo permission, so

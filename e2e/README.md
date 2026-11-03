@@ -6338,7 +6338,7 @@ The API helper is `src/ui/access-token-api.ts` (plain `fetch`, like `RepoSetting
 | PAT-29   | `[::1]` is accepted; where the browser policy cannot name it (Repsy OS `form-action`) the page shows the token to copy, elsewhere the listener gets it       |
 | PAT-30   | signed out: sign-in, then the authorize screen with the same parameters; Authorize posts the same `state` (the END state only)                               |
 | PAT-31   | signed out, a refused `redirect_uri` is still refused after sign-in                                                                                          |
-| PAT-32   | `@cloud-skip`: an administrator is offered `repo:manage` and `scan:read`, a user only `scan:read` (PAT-02)                                                   |
+| PAT-32   | `@cloud-skip`: an administrator is offered `repo:manage` too, a user is not; neither is offered the deprecated `scan:read` (PAT-02, RPS-2436)                                                   |
 | PAT-33   | a temporary token creates, lists and revokes a personal token (`rp token create`)                                                                            |
 | PAT-34   | a personal token cannot create, list or revoke personal tokens (401); it still answers `/current`                                                            |
 | PAT-35   | a temporary token cannot mint a temporary token (401) nor a personal token with a scope it does not have (400)                                               |

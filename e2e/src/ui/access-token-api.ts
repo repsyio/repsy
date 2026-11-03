@@ -24,7 +24,10 @@ import { env } from '../env.js';
 
 const PATH = '/api/profile/access-tokens';
 
-/** The scopes a person can ask for in the UI (`profile:read` is implicit). */
+/**
+ * The scopes a person can ask for in the UI (`profile:read` is implicit). `scan:read` is deprecated (RPS-2436): the
+ * server still accepts it, the UI no longer offers it.
+ */
 export type AccessTokenScope = 'repo:read' | 'repo:write' | 'repo:manage' | 'scan:read';
 
 /**
@@ -35,13 +38,13 @@ export type AccessTokenScope = 'repo:read' | 'repo:write' | 'repo:manage' | 'sca
  */
 export function scopesOfferedToAccount(): AccessTokenScope[] {
   return env.target.startsWith('cloud-')
-    ? ['repo:read', 'repo:write', 'repo:manage', 'scan:read']
-    : ['repo:read', 'repo:write', 'scan:read'];
+    ? ['repo:read', 'repo:write', 'repo:manage']
+    : ['repo:read', 'repo:write'];
 }
 
 /** The scopes that are ticked when `/cli/auth` has no scope to start from: the repository ones on offer. */
 export function defaultScopesOfAccount(): AccessTokenScope[] {
-  return scopesOfferedToAccount().filter((scope) => scope !== 'scan:read');
+  return scopesOfferedToAccount();
 }
 
 /** `profile:read` is on every token without being asked for. */

@@ -35,6 +35,7 @@ import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
@@ -186,6 +187,33 @@ class PatScanReadScopeIT extends AbstractPatIT {
     } else {
       assertThat(status).isEqualTo(403);
     }
+  }
+
+  @Test
+  @DisplayName(
+      "the cross-repo security summary takes repo:read and repo:write, not scan:read alone")
+  void securitySummaryTakesRepoRead() throws Exception {
+    final var path = "/api/repos/security-summary?repoNames=" + this.repo.getName();
+
+    for (final var scope : List.of(TokenScope.REPO_READ, TokenScope.REPO_WRITE)) {
+      final var pat = this.seedPat(this.user, scope);
+      final var response =
+          this.mockMvc
+              .perform(get(path).with(apiPort()).header(AUTHORIZATION, "Bearer " + pat.secret()))
+              .andReturn()
+              .getResponse();
+
+      assertThat(response.getStatus()).as(scope.getValue()).isEqualTo(200);
+      assertThat(response.getContentAsString()).as(scope.getValue()).contains(this.repo.getName());
+    }
+
+    // scan:read keeps its narrow meaning: it reads the scans of a repo, not the cross-repo summary,
+    // exactly as it does not read the repo list.
+    assertThat(this.statusOf(get(path), this.seedPat(this.user, TokenScope.SCAN_READ)))
+        .isEqualTo(403);
+    assertThat(
+            this.mockMvc.perform(get(path).with(apiPort())).andReturn().getResponse().getStatus())
+        .isEqualTo(401);
   }
 
   static Stream<Arguments> scopesThatReadScans() {

@@ -157,7 +157,7 @@ test.describe('Access tokens: create', () => {
     await expect(form.submit).toBeEnabled();
 
     // The scopes on offer: the ones this account can use. `repo:manage` is for an administrator on Repsy OS (the role
-    // is read on every request, so it would be refused for anyone else); `scan:read` needs no role.
+    // is read on every request, so it would be refused for anyone else); `scan:read` is deprecated and never offered (RPS-2436).
     const offered = scopesOfferedToAccount();
     await expect(form.offeredScopes).toHaveCount(offered.length);
     for (const scope of ['repo:read', 'repo:write', 'repo:manage', 'scan:read'] as const) {
@@ -174,9 +174,9 @@ test.describe('Access tokens: create', () => {
       await tokens.openCreateModal();
 
       const form = tokens.createModal;
-      await expect(form.offeredScopes).toHaveCount(4);
+      await expect(form.offeredScopes).toHaveCount(3);
       await expect(form.scope('repo:manage')).toBeVisible();
-      await expect(form.scope('scan:read')).toBeVisible();
+      await expect(form.scope('scan:read')).toHaveCount(0);
     },
   );
 });
