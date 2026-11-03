@@ -739,7 +739,7 @@ class PersonalAccessTokenControllerIT extends AbstractIT {
   }
 
   // ---------------------------------------------------------------------------------------------
-  // Authentication: a login token only
+  // Authentication: a login token, a temporary token or a personal token
   // ---------------------------------------------------------------------------------------------
 
   private record Endpoint(
@@ -801,24 +801,30 @@ class PersonalAccessTokenControllerIT extends AbstractIT {
     }
   }
 
-  /** The routes that manage tokens: a personal access token cannot mint or revoke tokens. */
+  /** The routes that manage tokens; {@code /current} is the one route that is for a token. */
   static Stream<Endpoint> managementEndpoints() {
     return endpoints().filter(endpoint -> !endpoint.name().endsWith("/current"));
   }
 
-  @ParameterizedTest(name = "{0} does not accept a personal access token")
+  @ParameterizedTest(name = "{0} takes a personal access token as Bearer and not as Basic")
   @MethodSource("managementEndpoints")
-  @DisplayName("the routes that manage tokens refuse a personal access token (RPS-1903)")
-  void refusesAPersonalAccessToken(final Endpoint endpoint) throws Exception {
-    final var body = expectCreated(this.create(this.aliceBearer, form("ci", "repo:manage")));
+  @DisplayName("the routes that manage tokens take a personal access token as Bearer (RPS-2440)")
+  void acceptsAPersonalAccessTokenAsBearerOnly(final Endpoint endpoint) throws Exception {
+    // The token holds repo:read itself: a token hands on only the scopes it holds, and the create
+    // route of this test asks for repo:read.
+    final var body =
+        expectCreated(
+            this.create(this.aliceBearer, form("ci", "repo:manage", "repo:write", "repo:read")));
     final String secret = JsonPath.read(body, "$.token");
+    final var expected =
+        endpoint.name().startsWith("DELETE") ? 404 : endpoint.hasBody() ? 201 : 200;
 
+    // Past the authentication: a created token, a list, and the 404 of a token that does not exist.
     this.perform(endpoint.request().apply("Bearer " + secret).with(apiPort()))
-        .andExpect(status().isUnauthorized());
+        .andExpect(status().is(expected));
+    // A token is never a password: as Basic credentials it is still refused.
     this.perform(endpoint.request().apply(basicAuth("anyone", secret)).with(apiPort()))
         .andExpect(status().isUnauthorized());
-
-    assertThat(this.countOf(this.alice)).isEqualTo(1);
   }
 
   @Test

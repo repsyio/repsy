@@ -257,17 +257,7 @@ class PatPanelRepoRoutesIT extends AbstractPatIT {
             new Route("GET /api/usage", () -> get("/api/usage")),
             new Route("GET /api/users", () -> get("/api/users")),
             new Route("GET /api/security/scans", () -> get("/api/security/scans")),
-            new Route("GET /api/repos/security-summary", () -> get("/api/repos/security-summary")),
-            new Route("GET /api/profile/access-tokens", () -> get("/api/profile/access-tokens")),
-            new Route(
-                "POST /api/profile/access-tokens",
-                () ->
-                    post("/api/profile/access-tokens")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"name\":\"x\",\"scopes\":[\"repo:read\"]}")),
-            new Route(
-                "DELETE /api/profile/access-tokens/{id}",
-                () -> delete("/api/profile/access-tokens/" + java.util.UUID.randomUUID())))
+            new Route("GET /api/repos/security-summary", () -> get("/api/repos/security-summary")))
         .map(Arguments::of);
   }
 

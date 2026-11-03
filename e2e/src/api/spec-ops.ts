@@ -47,7 +47,11 @@ export interface SpecOperation {
   /** The path template, e.g. `/api/repos/{repoName}/settings`. */
   path: string;
   operationId: string;
-  /** True when the operation documents a `403` response: a MANAGE route or an admin-only one. */
+  /**
+   * True when the operation documents a `403` response that a plain USER gets: a MANAGE route or an
+   * admin-only one. Not a 403 marked `x-forbidden-by: token-scope` (RPS-2440): only a calling token can
+   * get that one, a login never does.
+   */
   declares403: boolean;
   security: SecurityKind;
   /** The `{name}` placeholders of `path`, in order. */
@@ -63,6 +67,8 @@ interface RawOperation {
   security?: unknown[];
   parameters?: { name?: string; in?: string; required?: boolean }[];
   requestBody?: unknown;
+  /** `token-scope`: the 403 is a refusal of the calling token, not of a role (RPS-2440). */
+  'x-forbidden-by'?: string;
 }
 
 /** The setting that names the spec: the same one the runner's client generation reads (`runners/entrypoint.sh`). */
@@ -150,7 +156,7 @@ export function loadSpecOperations(): SpecOperation[] {
         method: method.toUpperCase() as SpecOperation['method'],
         path,
         operationId: raw.operationId,
-        declares403: '403' in raw.responses,
+        declares403: '403' in raw.responses && raw['x-forbidden-by'] !== 'token-scope',
         security: securityKind(raw.security),
         pathParams: [...path.matchAll(/\{([^}]+)\}/g)].map((match) => match[1] as string),
         requiredQuery: (raw.parameters ?? [])

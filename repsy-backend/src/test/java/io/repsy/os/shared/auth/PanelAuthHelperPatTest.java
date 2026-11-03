@@ -226,7 +226,7 @@ class PanelAuthHelperPatTest {
   }
 
   // -------------------------------------------------------------------------------------------
-  // RPS-2039: the token management routes take a temporary token, never a personal one
+  // RPS-2039, RPS-2440: the token management routes take a temporary or a personal token
   // -------------------------------------------------------------------------------------------
 
   private PersonalAccessTokenInfo foundTemporary(final TokenScope... scopes) {
@@ -264,13 +264,55 @@ class PanelAuthHelperPatTest {
   }
 
   @Test
-  @DisplayName("the token routes refuse a personal token with 401, found or not")
-  void tokenManagerRefusesAPersonalToken() {
+  @DisplayName("the token routes take a personal token and hand on only its own scopes (RPS-2440)")
+  void tokenManagerTakesAPersonalToken() {
+    final var token = found(TokenScope.REPO_READ);
+
+    final var session = this.helper.authenticateTokenManager(this.header);
+
+    assertThat(session.user().getId()).isEqualTo(OWNER_ID);
+    // A narrow token must not widen itself: what it can hand on is exactly what it holds.
+    assertThat(session.grantable())
+        .containsExactlyInAnyOrder(TokenScope.PROFILE_READ, TokenScope.REPO_READ)
+        .doesNotContain(TokenScope.REPO_WRITE, TokenScope.REPO_MANAGE);
+    verify(this.tokens).updateLastUsedTime(token.id());
+  }
+
+  @Test
+  @DisplayName("a personal token with every scope hands on every scope it holds, and no more")
+  void tokenManagerHandsOnTheScopesOfABroadPersonalToken() {
     found(TokenScope.REPO_MANAGE, TokenScope.REPO_WRITE, TokenScope.REPO_READ);
+
+    final var session = this.helper.authenticateTokenManager(this.header);
+
+    assertThat(session.grantable())
+        .containsExactlyInAnyOrder(
+            TokenScope.PROFILE_READ,
+            TokenScope.REPO_READ,
+            TokenScope.REPO_WRITE,
+            TokenScope.REPO_MANAGE);
+  }
+
+  @Test
+  @DisplayName("the token routes refuse an unknown personal token with 401 and touch nothing")
+  void tokenManagerRefusesAnUnknownPersonalToken() {
+    when(this.tokens.findByToken(this.secret)).thenReturn(Optional.empty());
 
     assertThatThrownBy(() -> this.helper.authenticateTokenManager(this.header))
         .isExactlyInstanceOf(UnAuthorizedException.class)
         .hasMessage("unAuthorized");
+    verify(this.tokens, never()).updateLastUsedTime(any());
+    verifyNoInteractions(this.userTxService);
+  }
+
+  @Test
+  @DisplayName("the token routes refuse an expired personal token with 401 and touch nothing")
+  void tokenManagerRefusesAnExpiredPersonalToken() {
+    when(this.tokens.findByToken(this.secret))
+        .thenReturn(Optional.of(token(Instant.now().minusSeconds(1), TokenScope.REPO_MANAGE)));
+
+    assertThatThrownBy(() -> this.helper.authenticateTokenManager(this.header))
+        .isExactlyInstanceOf(UnAuthorizedException.class);
     verify(this.tokens, never()).updateLastUsedTime(any());
   }
 

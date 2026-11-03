@@ -15,6 +15,7 @@
  */
 package io.repsy.os.shared.token.services;
 
+import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
@@ -51,7 +52,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * The personal access tokens of a user: create, list, revoke, and the lookup by secret that
+ * The personal access tokens of a user: create, list, revoke, rotate, and the lookup by secret that
  * authenticating with one will need. It does not authenticate anything itself.
  */
 @Service
@@ -278,17 +279,87 @@ public class PersonalAccessTokenService {
    * is not managed from the panel), answer the same as one that does not exist, so nobody learns
    * which ids are taken.
    *
+   * <p>The caller must be able to hand on every scope of the token ({@code grantable}), as {@link
+   * #createToken} and {@link #rotateToken} require: a credential that cannot mint a token cannot
+   * end one either, so a {@code repo:read} token cannot revoke a {@code repo:manage} one.
+   *
    * @throws ItemNotFoundException if the user holds no such token
+   * @throws AccessNotAllowedException if {@code grantable} does not cover the scopes of the token
    */
   @Transactional
-  public void revokeToken(final UUID userId, final UUID tokenId) {
+  public void revokeToken(final UUID userId, final UUID tokenId, final Set<TokenScope> grantable) {
 
     final var token =
         this.tokenRepository
             .findByUserIdAndIdAndKind(userId, tokenId, PersonalAccessTokenKind.PERSONAL)
             .orElseThrow(() -> new ItemNotFoundException(ErrorConstants.ACCESS_TOKEN_NOT_FOUND));
 
+    if (!grantable.containsAll(token.getScopes())) {
+      throw new AccessNotAllowedException(ProtocolErrorCodes.ACCESS_DENIED);
+    }
+
     this.tokenRepository.delete(token);
+  }
+
+  /**
+   * Replaces the secret of a personal token of {@code userId} (RPS-2429): the old secret stops
+   * working with this transaction and the answer carries the new one, once. The token keeps its
+   * name and its scopes and gets a <em>new id</em>, which is what makes the old secret end
+   * everywhere: a JWT that a protocol client got in exchange for the old secret is read against the
+   * id of its token on every request, so it would outlive an update in place until its own timeout.
+   * The expiration date is the old one, unless the token has already expired: then it is 365 days
+   * from now, as a new token without a date would be.
+   *
+   * <p>The caller must be able to hand on every scope of the token ({@code grantable}), or the
+   * answer would give a narrow credential the secret of a broad one, which {@link #createToken}
+   * refuses. A temporary token is not rotatable, and one of another user is not found, like in
+   * {@link #revokeToken}.
+   *
+   * <p>The count against {@link #MAX_TOKENS_PER_USER} does not change, so a user at the limit can
+   * rotate: the old row is deleted and the new one inserted in this transaction, under the same
+   * lock on the user as {@link #createToken}. The one exception is an expired token, which was not
+   * counted and is live again afterwards; it needs room like a new token.
+   *
+   * @throws ItemNotFoundException if the user holds no such token
+   * @throws AccessNotAllowedException if {@code grantable} does not cover the scopes of the token
+   * @throws BadRequestException if the token has expired and the user already holds {@link
+   *     #MAX_TOKENS_PER_USER} tokens that have not
+   */
+  @Transactional
+  public AccessTokenCreated rotateToken(
+      final UUID userId, final UUID tokenId, final Set<TokenScope> grantable) {
+
+    final var now = this.now();
+
+    this.lockUser(userId);
+
+    final var token =
+        this.tokenRepository
+            .findByUserIdAndIdAndKind(userId, tokenId, PersonalAccessTokenKind.PERSONAL)
+            .orElseThrow(() -> new ItemNotFoundException(ErrorConstants.ACCESS_TOKEN_NOT_FOUND));
+
+    if (!grantable.containsAll(token.getScopes())) {
+      throw new AccessNotAllowedException(ProtocolErrorCodes.ACCESS_DENIED);
+    }
+
+    final var expired = !token.getExpirationDate().isAfter(now);
+
+    if (expired) {
+      this.requireRoom(userId, now);
+    }
+
+    final var expirationDate =
+        expired ? now.plus(DEFAULT_EXPIRATION_DURATION) : token.getExpirationDate();
+
+    this.tokenRepository.delete(token);
+
+    return this.insert(
+        userId,
+        PersonalAccessTokenKind.PERSONAL,
+        TokenFactory.personalAccessToken(),
+        token.getName(),
+        token.getScopes(),
+        expirationDate);
   }
 
   @Transactional
