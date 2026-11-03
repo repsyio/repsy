@@ -384,10 +384,9 @@ class PatScanReadScopeIT extends AbstractPatIT {
   void theAdminScanBrowserStaysAdminOnly() throws Exception {
     final var admin = this.createUser(uniqueUsername("patscanadmin"), UserRole.ADMIN);
 
-    final var paths =
-        new String[] {
-          "/api/security/scans", "/api/security/scans/summary", "/api/repos/security-summary"
-        };
+    // /api/repos/security-summary is not here since RPS-2436: it takes repo:read, see
+    // securitySummaryTakesRepoRead.
+    final var paths = new String[] {"/api/security/scans", "/api/security/scans/summary"};
 
     for (final var path : paths) {
       for (final var owner : new User[] {this.user, admin}) {
