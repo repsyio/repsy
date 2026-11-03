@@ -50,7 +50,10 @@ import org.springframework.beans.factory.annotation.Autowired;
  * RPS-2260: the scan routes accept {@code repo:read} or {@code scan:read}. This is the scope matrix
  * (repo:read, scan:read, both, neither) against every route of {@code VulnerabilityScanController},
  * the reads and the two that start a scan, plus what {@code scan:read} must not open: the repo and
- * its contents, and the admin-only cross-repo scan browser.
+ * its contents, and the cross-repo scan browser ({@code /api/security/scans} and its {@code
+ * /summary}), which takes a login only, so no scope of a token opens it, whatever the role of the
+ * token's owner. {@code /api/repos/security-summary} is not part of that browser: it is open to
+ * every signed-in user (RPS-919) and takes {@code repo:read} since RPS-2436.
  *
  * <p>A route that lets the token in is only asserted to be neither {@code 401} nor {@code 403}: the
  * repo has no scans, so what is left (an empty page, a {@code 404} for an unknown scan) is not what
@@ -381,7 +384,7 @@ class PatScanReadScopeIT extends AbstractPatIT {
 
   @Test
   @DisplayName("the cross-repo scan browser is for a login: no scope of a token opens it")
-  void theAdminScanBrowserStaysAdminOnly() throws Exception {
+  void noTokenScopeOpensTheCrossRepoScanBrowser() throws Exception {
     final var admin = this.createUser(uniqueUsername("patscanadmin"), UserRole.ADMIN);
 
     // /api/repos/security-summary is not here since RPS-2436: it takes repo:read, see
