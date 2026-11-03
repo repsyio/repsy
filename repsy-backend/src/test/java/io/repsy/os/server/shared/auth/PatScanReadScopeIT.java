@@ -35,6 +35,7 @@ import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,7 +50,10 @@ import org.springframework.beans.factory.annotation.Autowired;
  * RPS-2260: the scan routes accept {@code repo:read} or {@code scan:read}. This is the scope matrix
  * (repo:read, scan:read, both, neither) against every route of {@code VulnerabilityScanController},
  * the reads and the two that start a scan, plus what {@code scan:read} must not open: the repo and
- * its contents, and the admin-only cross-repo scan browser.
+ * its contents, and the cross-repo scan browser ({@code /api/security/scans} and its {@code
+ * /summary}), which takes a login only, so no scope of a token opens it, whatever the role of the
+ * token's owner. {@code /api/repos/security-summary} is not part of that browser: it is open to
+ * every signed-in user (RPS-919) and takes {@code repo:read} since RPS-2436.
  *
  * <p>A route that lets the token in is only asserted to be neither {@code 401} nor {@code 403}: the
  * repo has no scans, so what is left (an empty page, a {@code 404} for an unknown scan) is not what
@@ -186,6 +190,33 @@ class PatScanReadScopeIT extends AbstractPatIT {
     } else {
       assertThat(status).isEqualTo(403);
     }
+  }
+
+  @Test
+  @DisplayName(
+      "the cross-repo security summary takes repo:read and repo:write, not scan:read alone")
+  void securitySummaryTakesRepoRead() throws Exception {
+    final var path = "/api/repos/security-summary?repoNames=" + this.repo.getName();
+
+    for (final var scope : List.of(TokenScope.REPO_READ, TokenScope.REPO_WRITE)) {
+      final var pat = this.seedPat(this.user, scope);
+      final var response =
+          this.mockMvc
+              .perform(get(path).with(apiPort()).header(AUTHORIZATION, "Bearer " + pat.secret()))
+              .andReturn()
+              .getResponse();
+
+      assertThat(response.getStatus()).as(scope.getValue()).isEqualTo(200);
+      assertThat(response.getContentAsString()).as(scope.getValue()).contains(this.repo.getName());
+    }
+
+    // scan:read keeps its narrow meaning: it reads the scans of a repo, not the cross-repo summary,
+    // exactly as it does not read the repo list.
+    assertThat(this.statusOf(get(path), this.seedPat(this.user, TokenScope.SCAN_READ)))
+        .isEqualTo(403);
+    assertThat(
+            this.mockMvc.perform(get(path).with(apiPort())).andReturn().getResponse().getStatus())
+        .isEqualTo(401);
   }
 
   static Stream<Arguments> scopesThatReadScans() {
@@ -353,13 +384,12 @@ class PatScanReadScopeIT extends AbstractPatIT {
 
   @Test
   @DisplayName("the cross-repo scan browser is for a login: no scope of a token opens it")
-  void theAdminScanBrowserStaysAdminOnly() throws Exception {
+  void noTokenScopeOpensTheCrossRepoScanBrowser() throws Exception {
     final var admin = this.createUser(uniqueUsername("patscanadmin"), UserRole.ADMIN);
 
-    final var paths =
-        new String[] {
-          "/api/security/scans", "/api/security/scans/summary", "/api/repos/security-summary"
-        };
+    // /api/repos/security-summary is not here since RPS-2436: it takes repo:read, see
+    // securitySummaryTakesRepoRead.
+    final var paths = new String[] {"/api/security/scans", "/api/security/scans/summary"};
 
     for (final var path : paths) {
       for (final var owner : new User[] {this.user, admin}) {

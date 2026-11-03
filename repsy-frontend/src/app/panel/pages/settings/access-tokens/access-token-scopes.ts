@@ -29,8 +29,9 @@ export interface SelectableScope {
 
 /**
  * The scopes a person can ask for. `profile:read` is not listed: every token has it, so it is never
- * asked for. `repo:manage` is never implied by another scope, so it is a choice of its own. `scan:read` reads
- * scan results only (RPS-2260); it needs no role, so everybody is offered it.
+ * asked for. `repo:manage` is never implied by another scope, so it is a choice of its own. `scan:read` is not
+ * listed (RPS-2436): `repo:read` reads every scan result, so the narrower scope has no use left. The server
+ * still accepts it, so a token that holds it, or a script that asks for it, keeps working.
  */
 export const SELECTABLE_SCOPES: readonly SelectableScope[] = [
   { scope: 'repo:read', label: 'Read repositories', description: 'Download packages and read metadata.' },
@@ -41,16 +42,11 @@ export const SELECTABLE_SCOPES: readonly SelectableScope[] = [
     description: 'Delete packages and change repository settings (and write, read).',
     adminOnly: true,
   },
-  {
-    scope: 'scan:read',
-    label: 'Read scan results',
-    description: 'Reads scan results and their state; does not read the repository itself.',
-  },
 ];
 
 /**
- * The scopes a `/cli/auth` link can ask for. `scan:read` is offered in the form but not yet by a link: what the approval
- * screen of the CLI grants is decided there (RPS-2039), so a link that names it still gets it dropped.
+ * The scopes a `/cli/auth` link can ask for. `scan:read` is not offered (RPS-2436), so a link that names it
+ * still gets it dropped.
  */
 const LINKABLE_SCOPES: readonly AccessTokenScope[] = ['repo:read', 'repo:write', 'repo:manage'];
 

@@ -1849,6 +1849,12 @@ paths:
             type: array
             items:
               type: string
+      description: >-
+        Takes the access token of a login or a personal access token with `repo:read` (RPS-2436); a
+        token with `scan:read` alone is answered 403, as it is on the repo list.
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -5298,7 +5304,7 @@ components:
         hours, is never listed and does not count against the 50 token cap. An operation that
         accepts them lists `personalAccessToken` next to `bearerAuth` in its `security`: the
         operations on a repository (every path with `{repoName}`), `listRepos`, `createRepo`,
-        `getCurrentAccessToken`, and `createAccessToken`, `listAccessTokens`, `revokeAccessToken`
+        `getSecuritySummary`, `getCurrentAccessToken`, and `createAccessToken`, `listAccessTokens`, `revokeAccessToken`
         and `rotateAccessToken`, which take either kind (RPS-2440). A token that manages tokens
         can hand on at most its own scopes, so a narrow token cannot create or rotate a wider one,
         and a temporary token cannot create or revoke a temporary one. Every other operation takes
@@ -6003,7 +6009,9 @@ components:
         - repo:write
         - scan:read
       description: >-
-        What a token may do. `repo:read` downloads and reads, `repo:write` publishes (and reads),
+        What a token may do. `scan:read` is deprecated (RPS-2436) and no longer offered by the panel
+        or the CLI: `repo:read` reads every scan result as well. A token that holds `scan:read` keeps
+        working exactly as before, and a create request that names it is still accepted. `repo:read` downloads and reads, `repo:write` publishes (and reads),
         `repo:manage` deletes and changes settings (and writes and reads), `scan:read` reads the
         scan results and their state of a repository (the scan, scan overview, findings and security
         summary and detail routes) without reading the repository itself: it does not list or

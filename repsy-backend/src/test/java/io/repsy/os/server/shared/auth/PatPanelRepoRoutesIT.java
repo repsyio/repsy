@@ -256,8 +256,7 @@ class PatPanelRepoRoutesIT extends AbstractPatIT {
             new Route("GET /api/repos/counts", () -> get("/api/repos/counts")),
             new Route("GET /api/usage", () -> get("/api/usage")),
             new Route("GET /api/users", () -> get("/api/users")),
-            new Route("GET /api/security/scans", () -> get("/api/security/scans")),
-            new Route("GET /api/repos/security-summary", () -> get("/api/repos/security-summary")))
+            new Route("GET /api/security/scans", () -> get("/api/security/scans")))
         .map(Arguments::of);
   }
 
