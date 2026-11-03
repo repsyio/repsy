@@ -44,11 +44,7 @@ describe('access token scopes', () => {
   });
 
   it('offers repo:manage to an administrator only', () => {
-    expect(selectableScopesFor(true).map((s) => s.scope)).toEqual([
-      'repo:read',
-      'repo:write',
-      'repo:manage',
-    ]);
+    expect(selectableScopesFor(true).map((s) => s.scope)).toEqual(['repo:read', 'repo:write', 'repo:manage']);
     expect(selectableScopesFor(false).map((s) => s.scope)).toEqual(['repo:read', 'repo:write']);
   });
 });
