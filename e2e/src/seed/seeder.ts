@@ -21,8 +21,11 @@ import {
   type RepoType,
   UserRole,
 } from '../api/panel-backend.js';
+import { test } from '@playwright/test';
+
 import { env } from '../env.js';
 import { retryWhileBusy } from './retry-busy.js';
+import { target } from '../target.js';
 import { password, repoName, RUN_PREFIX, userName } from './run-id.js';
 
 const NOT_FOUND = 404;
@@ -203,6 +206,17 @@ export class Seeder {
   }
 
   async createToken(repoName: string, opts: CreateTokenOptions = {}): Promise<SeededToken> {
+    // RPS-2410: a target whose plan holds fewer deploy tokens per repo than a test seeds (the FREE plan of DEV and PROD
+    // holds one) cannot run that test, so the test is skipped at the call that would be refused (`403
+    // deployTokenLimitReached`). The tests that seed at most `maxDeployTokensPerRepo` tokens, and every test on a
+    // target without the limit (OS, cloud-local on POPULAR), run as before.
+    const held = this.created.filter((c) => c.kind === 'token' && c.repoName === repoName).length;
+    if (held >= target.maxDeployTokensPerRepo) {
+      test.skip(
+        true,
+        `RPS-2410: needs ${held + 1} deploy tokens in repo ${repoName}, this target allows ${target.maxDeployTokensPerRepo}`,
+      );
+    }
     const seq = (this.tokenSeq.get(repoName) ?? 0) + 1;
     this.tokenSeq.set(repoName, seq);
     const name = opts.name ?? `${RUN_PREFIX}-${this.runId}-token-${seq}`;
