@@ -15,12 +15,12 @@
  */
 package io.repsy.os.server.core.post_processors;
 
+import io.repsy.core.web_error.UrlMasking;
 import io.repsy.libs.protocol.router.ProcessorResult;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.protocol.router.ProtocolProcessor;
 import io.repsy.libs.protocol.router.ProtocolProvider;
 import io.repsy.protocols.shared.handlers.HandlerPropertyKeys;
-import io.repsy.protocols.shared.http.UrlMaskingUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.sql.Connection;
@@ -107,7 +107,7 @@ public class H2CheckpointPostProcessor extends ProtocolProcessor {
           "{} after {} {} took {} ms",
           CHECKPOINT_SQL,
           request.getMethod(),
-          UrlMaskingUtils.maskPath(request.getRequestURI()),
+          UrlMasking.maskPath(request.getRequestURI()),
           TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
     }
 
