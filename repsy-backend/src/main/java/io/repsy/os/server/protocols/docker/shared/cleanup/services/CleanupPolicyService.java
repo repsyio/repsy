@@ -176,14 +176,12 @@ public class CleanupPolicyService {
     final var deletions = new ArrayList<TagDeletionInfo>();
 
     for (final var image : this.imageRepository.findAllByRepoId(policy.getId())) {
-      if (image.getName() != null) {
-        final var allTags =
-            this.tagRepository.findAllByImageRepoIdAndImageId(policy.getId(), image.getId());
+      final var allTags =
+          this.tagRepository.findAllByImageRepoIdAndImageId(policy.getId(), image.getId());
 
-        this.selectTags(allTags, rules, now).stream()
-            .map(tag -> new TagDeletionInfo(repoInfo, image.getName(), tag, rules.keepDays()))
-            .forEach(deletions::add);
-      }
+      this.selectTags(allTags, rules, now).stream()
+          .map(tag -> new TagDeletionInfo(repoInfo, image.getName(), tag, rules.keepDays()))
+          .forEach(deletions::add);
     }
 
     policy.setLastRunAt(now);

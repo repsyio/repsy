@@ -544,8 +544,9 @@ class PersonalAccessTokenServiceTest {
             USER_ID, tokenId, PersonalAccessTokenKind.PERSONAL))
         .thenReturn(Optional.empty());
 
-    assertThatThrownBy(
-            () -> this.service.revokeToken(USER_ID, tokenId, EnumSet.allOf(TokenScope.class)))
+    final var allScopes = EnumSet.allOf(TokenScope.class);
+
+    assertThatThrownBy(() -> this.service.revokeToken(USER_ID, tokenId, allScopes))
         .isInstanceOf(ItemNotFoundException.class)
         .hasMessage("accessTokenNotFound");
 
@@ -562,7 +563,9 @@ class PersonalAccessTokenServiceTest {
         .thenReturn(Optional.of(token));
     final var narrow = EnumSet.of(TokenScope.PROFILE_READ, TokenScope.REPO_READ);
 
-    assertThatThrownBy(() -> this.service.revokeToken(USER_ID, token.getId(), narrow))
+    final var tokenId = token.getId();
+
+    assertThatThrownBy(() -> this.service.revokeToken(USER_ID, tokenId, narrow))
         .isInstanceOf(AccessNotAllowedException.class);
 
     verify(this.tokenRepository, never()).delete(any());
@@ -890,8 +893,9 @@ class PersonalAccessTokenServiceTest {
             USER_ID, tokenId, PersonalAccessTokenKind.PERSONAL))
         .thenReturn(Optional.empty());
 
-    assertThatThrownBy(
-            () -> this.service.revokeToken(USER_ID, tokenId, EnumSet.allOf(TokenScope.class)))
+    final var allScopes = EnumSet.allOf(TokenScope.class);
+
+    assertThatThrownBy(() -> this.service.revokeToken(USER_ID, tokenId, allScopes))
         .isInstanceOf(ItemNotFoundException.class);
 
     verify(this.tokenRepository, never()).delete(any());
