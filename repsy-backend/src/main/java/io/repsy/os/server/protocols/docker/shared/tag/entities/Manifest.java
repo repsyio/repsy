@@ -58,7 +58,7 @@ public class Manifest {
   private UUID id;
 
   @Version
-  @Column(nullable = false)
+  @Column(name = "version", nullable = false)
   private Integer version;
 
   @Column(name = "platform", nullable = false, length = DockerConstants.MAX_PLATFORM_LENGTH)

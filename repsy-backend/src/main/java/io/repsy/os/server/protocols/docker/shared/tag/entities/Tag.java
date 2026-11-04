@@ -50,7 +50,7 @@ public class Tag {
   private UUID id;
 
   @Version
-  @Column(nullable = false)
+  @Column(name = "version", nullable = false)
   private Integer version;
 
   @Column(name = "name", nullable = false, length = DockerConstants.MAX_REFERENCE_LENGTH)

@@ -199,7 +199,7 @@ public final class EntityColumnSchemaChecks {
     if (join != null && !join.name().isEmpty()) {
       return join.name();
     }
-    // Spring's CamelCaseToUnderscoresNamingStrategy, which the application uses.
+    // Spring Boot's default CamelCaseToUnderscoresNamingStrategy (no physical-strategy is set).
     return field.getName().replaceAll("([a-z0-9])([A-Z])", "$1_$2").toLowerCase(Locale.ROOT);
   }
 
