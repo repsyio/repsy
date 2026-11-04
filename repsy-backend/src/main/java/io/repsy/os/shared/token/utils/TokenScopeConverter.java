@@ -19,6 +19,7 @@ import io.repsy.os.shared.token.dtos.TokenScope;
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
 import java.util.EnumSet;
+import java.util.Set;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
@@ -37,21 +38,24 @@ import org.jspecify.annotations.Nullable;
  */
 @Slf4j
 @Converter
-public class TokenScopeConverter implements AttributeConverter<EnumSet<TokenScope>, String> {
+public class TokenScopeConverter implements AttributeConverter<Set<TokenScope>, String> {
 
   private static final String SEPARATOR = ",";
 
   @Override
-  public String convertToDatabaseColumn(final @Nullable EnumSet<TokenScope> scopes) {
+  public String convertToDatabaseColumn(final @Nullable Set<TokenScope> scopes) {
     if (scopes == null) {
       return "";
     }
 
-    return scopes.stream().map(TokenScope::getValue).collect(Collectors.joining(SEPARATOR));
+    return scopes.stream()
+        .sorted()
+        .map(TokenScope::getValue)
+        .collect(Collectors.joining(SEPARATOR));
   }
 
   @Override
-  public EnumSet<TokenScope> convertToEntityAttribute(final @Nullable String column) {
+  public Set<TokenScope> convertToEntityAttribute(final @Nullable String column) {
     final var scopes = EnumSet.noneOf(TokenScope.class);
 
     if (column == null || column.isBlank()) {
