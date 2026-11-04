@@ -26,10 +26,10 @@ import com.google.common.cache.CacheStats;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.SignatureNotVerifiedException;
+import io.repsy.core.web_error.UrlMasking;
 import io.repsy.protocols.maven.shared.keystore.dtos.ParsedPublicKey;
 import io.repsy.protocols.maven.shared.keystore.dtos.PublicKeySources;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
-import io.repsy.protocols.shared.http.UrlMaskingUtils;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -484,8 +484,8 @@ public class PgpVerifierService {
       // key" so the loop tries the next one, not as an infrastructure failure of the whole upload.
       log.warn(
           "the key server at {} answered a key that could not be parsed. Cause: {}",
-          UrlMaskingUtils.mask(serverUrl),
-          UrlMaskingUtils.mask(exception.toString()));
+          UrlMasking.mask(serverUrl),
+          UrlMasking.mask(exception.toString()));
       return Optional.empty();
     }
   }
@@ -497,8 +497,8 @@ public class PgpVerifierService {
     } catch (final RestClientException exception) {
       log.debug(
           "Failed to fetch key from server {}: {}",
-          UrlMaskingUtils.mask(serverUrl),
-          UrlMaskingUtils.mask(exception.getMessage()));
+          UrlMasking.mask(serverUrl),
+          UrlMasking.mask(exception.getMessage()));
 
       return "";
     }

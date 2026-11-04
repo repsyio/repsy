@@ -19,9 +19,9 @@ import static io.repsy.core.error_handling.utils.ErrorUtils.exceptionToString;
 
 import io.repsy.core.error_handling.exceptions.MfaException;
 import io.repsy.core.web.paging.InvalidPagingParameterException;
+import io.repsy.core.web_error.MaskedPathRequest;
 import io.repsy.os.shared.error_handling.services.ErrorResponseService;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
-import io.repsy.protocols.shared.http.MaskedPathRequestWrapper;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.ValidationException;
@@ -94,12 +94,11 @@ public class PanelProblemDetailAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug(
-          "Missing request value: {}", exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
+      log.debug("Missing request value: {}", exceptionToString(ex, MaskedPathRequest.of(request)));
       return null;
     }
 
-    log.info(exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
+    log.info(exceptionToString(ex, MaskedPathRequest.of(request)));
 
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
         .contentType(this.errors.contentType(request))
@@ -115,13 +114,12 @@ public class PanelProblemDetailAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug(
-          "Conversion failed: {}", exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
+      log.debug("Conversion failed: {}", exceptionToString(ex, MaskedPathRequest.of(request)));
 
       return null;
     }
 
-    log.info(exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
+    log.info(exceptionToString(ex, MaskedPathRequest.of(request)));
 
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
         .contentType(this.errors.contentType(request))
@@ -139,12 +137,12 @@ public class PanelProblemDetailAdvice {
     if (response == null) {
       log.debug(
           "Method argument type mismatch: {}",
-          exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
+          exceptionToString(ex, MaskedPathRequest.of(request)));
 
       return null;
     }
 
-    log.info(exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
+    log.info(exceptionToString(ex, MaskedPathRequest.of(request)));
 
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
         .contentType(this.errors.contentType(request))
@@ -171,13 +169,12 @@ public class PanelProblemDetailAdvice {
 
     if (response == null) {
       log.debug(
-          "Method validation failed: {}",
-          exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
+          "Method validation failed: {}", exceptionToString(ex, MaskedPathRequest.of(request)));
 
       return null;
     }
 
-    log.info(exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
+    log.info(exceptionToString(ex, MaskedPathRequest.of(request)));
 
     final var invalidParameters =
         ex.getParameterValidationResults().stream()
@@ -210,12 +207,11 @@ public class PanelProblemDetailAdvice {
 
     if (response == null) {
       log.debug(
-          "Invalid paging parameter: {}",
-          exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
+          "Invalid paging parameter: {}", exceptionToString(ex, MaskedPathRequest.of(request)));
       return null;
     }
 
-    log.info(exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
+    log.info(exceptionToString(ex, MaskedPathRequest.of(request)));
 
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
         .contentType(this.errors.contentType(request))
@@ -234,14 +230,12 @@ public class PanelProblemDetailAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug(
-          "Malformed body request: {}",
-          exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
+      log.debug("Malformed body request: {}", exceptionToString(ex, MaskedPathRequest.of(request)));
 
       return null;
     }
 
-    log.info(exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
+    log.info(exceptionToString(ex, MaskedPathRequest.of(request)));
 
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
         .contentType(this.errors.contentType(request))
@@ -265,13 +259,12 @@ public class PanelProblemDetailAdvice {
 
     if (response == null) {
       log.debug(
-          "HTTP method not supported: {}",
-          exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
+          "HTTP method not supported: {}", exceptionToString(ex, MaskedPathRequest.of(request)));
 
       return null;
     }
 
-    log.info(exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
+    log.info(exceptionToString(ex, MaskedPathRequest.of(request)));
 
     return ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED)
         .headers(ex.getHeaders())
@@ -288,13 +281,12 @@ public class PanelProblemDetailAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug(
-          "Resource not found: {}", exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
+      log.debug("Resource not found: {}", exceptionToString(ex, MaskedPathRequest.of(request)));
 
       return null;
     }
 
-    log.info(exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
+    log.info(exceptionToString(ex, MaskedPathRequest.of(request)));
 
     return ResponseEntity.status(HttpStatus.NOT_FOUND)
         .contentType(this.errors.contentType(request))
@@ -309,13 +301,12 @@ public class PanelProblemDetailAdvice {
 
     if (response == null) {
       log.debug(
-          "Method argument not valid: {}",
-          exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
+          "Method argument not valid: {}", exceptionToString(ex, MaskedPathRequest.of(request)));
 
       return null;
     }
 
-    log.info(exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
+    log.info(exceptionToString(ex, MaskedPathRequest.of(request)));
 
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
         .contentType(this.errors.contentType(request))
@@ -336,13 +327,12 @@ public class PanelProblemDetailAdvice {
 
     if (response == null) {
       log.debug(
-          "Missing request parameter: {}",
-          exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
+          "Missing request parameter: {}", exceptionToString(ex, MaskedPathRequest.of(request)));
 
       return null;
     }
 
-    log.info(exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
+    log.info(exceptionToString(ex, MaskedPathRequest.of(request)));
 
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
         .contentType(this.errors.contentType(request))
@@ -369,13 +359,12 @@ public class PanelProblemDetailAdvice {
 
     if (response == null) {
       log.debug(
-          "Media type not supported: {}",
-          exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
+          "Media type not supported: {}", exceptionToString(ex, MaskedPathRequest.of(request)));
 
       return null;
     }
 
-    log.info(exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
+    log.info(exceptionToString(ex, MaskedPathRequest.of(request)));
 
     return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
         .headers(ex.getHeaders())
@@ -403,13 +392,12 @@ public class PanelProblemDetailAdvice {
 
     if (response == null) {
       log.debug(
-          "Media type not acceptable: {}",
-          exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
+          "Media type not acceptable: {}", exceptionToString(ex, MaskedPathRequest.of(request)));
 
       return null;
     }
 
-    log.info(exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
+    log.info(exceptionToString(ex, MaskedPathRequest.of(request)));
 
     return ResponseEntity.status(HttpStatus.NOT_ACCEPTABLE)
         .headers(ex.getHeaders())
@@ -433,13 +421,12 @@ public class PanelProblemDetailAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug(
-          "Upload too large: {}", exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
+      log.debug("Upload too large: {}", exceptionToString(ex, MaskedPathRequest.of(request)));
 
       return null;
     }
 
-    log.info(exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
+    log.info(exceptionToString(ex, MaskedPathRequest.of(request)));
 
     return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
         .contentType(this.errors.contentType(request))
@@ -464,12 +451,12 @@ public class PanelProblemDetailAdvice {
     if (response == null) {
       log.debug(
           "Request parameter condition not satisfied: {}",
-          exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
+          exceptionToString(ex, MaskedPathRequest.of(request)));
 
       return null;
     }
 
-    log.info(exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
+    log.info(exceptionToString(ex, MaskedPathRequest.of(request)));
 
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
         .contentType(this.errors.contentType(request))
@@ -489,12 +476,12 @@ public class PanelProblemDetailAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("Invalid request: {}", exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
+      log.debug("Invalid request: {}", exceptionToString(ex, MaskedPathRequest.of(request)));
 
       return null;
     }
 
-    log.info(exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
+    log.info(exceptionToString(ex, MaskedPathRequest.of(request)));
 
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
         .contentType(this.errors.contentType(request))
@@ -514,7 +501,7 @@ public class PanelProblemDetailAdvice {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug("MFA Exception: {}", exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
+      log.debug("MFA Exception: {}", exceptionToString(ex, MaskedPathRequest.of(request)));
       return null;
     }
 
@@ -522,7 +509,7 @@ public class PanelProblemDetailAdvice {
     final var messageText =
         exceptionMessage != null ? exceptionMessage : ProtocolErrorCodes.MFA_EXCEPTION;
 
-    log.info(exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
+    log.info(exceptionToString(ex, MaskedPathRequest.of(request)));
 
     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
         .contentType(this.errors.contentType(request))
@@ -547,11 +534,11 @@ public class PanelProblemDetailAdvice {
     if (response == null) {
       log.debug(
           "Request Header resolution failed: {}",
-          exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
+          exceptionToString(ex, MaskedPathRequest.of(request)));
       return null;
     }
 
-    log.info(exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
+    log.info(exceptionToString(ex, MaskedPathRequest.of(request)));
 
     final var authorizationMissing = HttpHeaders.AUTHORIZATION.equalsIgnoreCase(ex.getHeaderName());
 

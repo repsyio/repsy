@@ -20,13 +20,13 @@ import static io.repsy.core.error_handling.utils.ErrorUtils.exceptionToString;
 import com.google.common.base.Splitter;
 import io.repsy.core.response.dtos.RestResponse;
 import io.repsy.core.response.services.RestResponseFactory;
+import io.repsy.core.web_error.MaskedPathRequest;
 import io.repsy.core.web_error.ProblemField;
+import io.repsy.core.web_error.UrlMasking;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.libs.multiport.configs.props.MultiPortProperties;
 import io.repsy.os.shared.utils.MultiPortNames;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
-import io.repsy.protocols.shared.http.MaskedPathRequestWrapper;
-import io.repsy.protocols.shared.http.UrlMaskingUtils;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.ConstraintViolationException;
@@ -321,8 +321,7 @@ public class ErrorResponseService {
       final @Nullable HttpServletResponse response) {
 
     if (response == null) {
-      log.debug(
-          "An exception occurred: {}", exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
+      log.debug("An exception occurred: {}", exceptionToString(ex, MaskedPathRequest.of(request)));
       return null;
     }
 
@@ -334,9 +333,9 @@ public class ErrorResponseService {
           exception.getStatusCode().value(),
           exception.getClass().getName(),
           request.getMethod(),
-          UrlMaskingUtils.maskPath(request.getRequestURI()));
+          UrlMasking.maskPath(request.getRequestURI()));
     } else if (!NOT_LOGGED_EXCEPTIONS.contains(ex.getClass().getName())) {
-      log.error(exceptionToString(ex, MaskedPathRequestWrapper.of(request)));
+      log.error(exceptionToString(ex, MaskedPathRequest.of(request)));
     }
 
     if (response.isCommitted()) {
