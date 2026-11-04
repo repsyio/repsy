@@ -31,7 +31,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.Instant;
-import java.util.EnumSet;
+import java.util.Set;
 import java.util.UUID;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -79,7 +79,7 @@ public class PersonalAccessToken {
 
   @Convert(converter = TokenScopeConverter.class)
   @Column(name = "scopes", nullable = false, length = 255)
-  private EnumSet<TokenScope> scopes;
+  private Set<TokenScope> scopes;
 
   @Column(name = "expiration_date", nullable = false)
   private Instant expirationDate;

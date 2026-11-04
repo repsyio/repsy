@@ -22,6 +22,7 @@ import java.util.Collection;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * What a personal access token may do. A token holds a set of these and can only narrow what its
@@ -109,7 +110,7 @@ public enum TokenScope {
    * The scopes a token is created with: the requested ones plus the implicit {@link #PROFILE_READ},
    * as a set in canonical order.
    */
-  public static EnumSet<TokenScope> withImplicit(final Collection<TokenScope> requested) {
+  public static Set<TokenScope> withImplicit(final Collection<TokenScope> requested) {
     final var scopes = EnumSet.of(PROFILE_READ);
 
     scopes.addAll(requested);
