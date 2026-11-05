@@ -5915,9 +5915,11 @@ Updating the baselines (on purpose, after a visible change of the panel): `./run
 --update-snapshots` writes the PNGs into `tests/ui/__screenshots__/` (the `ui-visual` service mounts that one folder
 writable, the rest of `tests/` stays read-only), then run the command again without the flag (it must pass), open every
 changed PNG and commit them with the change that caused it. The PNGs are about 0.6 MB together; a new baseline needs a
-reason to exist ("small, stable set" above). It is not a nightly leg: the comparison is a per-change check, and a leg
-that fails for a font-hinting change of a new Chromium would train people to update baselines without looking. Add it
-to `e2e-nightly.yml` (a `LEGS` row `("visual", "", ["ui-visual"], "", 15, "", False)`) when the set has proven itself.
+reason to exist ("small, stable set" above). It runs nightly (RPS-1756) as the `ui-visual` leg of `e2e-nightly.yml`
+(`LEGS` row `("ui", "", ["ui-visual"], "", 20, "", False)`, part of `suite=ui`, or alone with `protocol=ui-visual`; the
+`grep` input does not apply to it). A nightly failure from a font-hinting change of a new Chromium is a reason to open
+the diff and decide, not to update the baselines blindly. There is still no pull_request trigger (a PR gate is the
+product owner's decision, see the header of the workflow).
 
 ### UI suite: route stubs typed from the OpenAPI models (RPS-1652)
 

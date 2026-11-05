@@ -23,7 +23,7 @@ on:
         options: [all, ui, wire, h2, scanner, throttle, limits, upload-ttl, cors, browsers, proxy, upgrade, trivy, tls, probe-ban]
         default: all
       protocol:
-        description: "Only these runner services, comma separated (skeleton,maven,npm,npm-clients,cargo,nuget,docker,helm,pypi,go,ruby,stack,api,ui,ui-firefox,ui-webkit). Empty: every runner of the chosen legs"
+        description: "Only these runner services, comma separated (skeleton,maven,npm,npm-clients,cargo,nuget,docker,helm,pypi,go,ruby,stack,api,ui,ui-firefox,ui-webkit,ui-visual). Empty: every runner of the chosen legs"
         type: string
         default: ""
       grep:
@@ -100,6 +100,11 @@ jobs:
           # REPSY_E2E_OPT_IN, whether the --grep input may replace the default)
           LEGS = {
               "ui": ("ui", "", ["ui"], "", 60, "", True),
+              # The screenshot comparison against the committed baselines (RPS-1652, RPS-1756, README.md "UI suite: visual
+              # regression"). Its own leg and not a second runner of `ui`, because the `grep` input applies to the `ui` leg
+              # and the visual specs are tagged @visual only (an @smoke grep would find none and fail it). It belongs to the
+              # `ui` suite, so suite=ui runs it next to the full panel suite; protocol=ui-visual runs it alone. Never retried.
+              "ui-visual": ("ui", "", ["ui-visual"], "", 20, "", False),
               # The wire runners, split in three so the slowest does not set the pace of the whole suite: maven alone
               # is about 30 of the 65 minutes the single leg took on a runner (its catalog is the largest), and the stack
               # runner restarts, crashes and recreates the Repsy container for another 10. All three belong to the `wire`
@@ -221,7 +226,7 @@ jobs:
 
           suite = os.environ["SUITE"]
           only = [p for p in re.split(r"[,\s]+", os.environ["ONLY"]) if p]
-          unknown = [p for p in only if p not in WIRE + UI]
+          unknown = [p for p in only if p not in WIRE + UI + ["ui-visual"]]
           if unknown:
               fail(f"unknown protocol(s): {', '.join(unknown)}")
           if H2_FULL and H2_FULL not in WIRE + UI:
@@ -257,7 +262,7 @@ jobs:
                   "port_offset": 11 * (len(include) + 1),
                   "stack": stack,
                   "protocols": " ".join(runners),
-                  "ui": "ui" in runners,
+                  "ui": "ui" in runners or "ui-visual" in runners,
                   "grep": (os.environ["GREP"] if grep_input else "") or default_grep,
                   "runner_grep": {} if os.environ["GREP"] and grep_input else RUNNER_GREP.get(leg, {}),
                   "opt_in": opt_in,
