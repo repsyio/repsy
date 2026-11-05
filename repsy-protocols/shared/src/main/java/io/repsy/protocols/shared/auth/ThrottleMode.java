@@ -20,7 +20,7 @@ package io.repsy.protocols.shared.auth;
  * {@code observe} in Repsy Cloud; Repsy OS keeps {@link #ENFORCE} as its default, so the behaviour
  * of an existing installation does not change.
  */
-public enum AuthThrottleMode {
+public enum ThrottleMode {
 
   /** No client is ever tracked or refused. Equivalent to the former {@code enabled: false}. */
   OFF,

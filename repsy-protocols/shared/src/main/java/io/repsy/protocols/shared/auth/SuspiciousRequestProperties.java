@@ -25,7 +25,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * Settings of {@link SuspiciousRequestThrottle} (RPS-2319). The fields are boxed and the compact
  * constructor defaults every one of them, like {@link AuthThrottleProperties}.
  *
- * @param mode see {@link AuthThrottleMode}; defaults to {@code enforce}
+ * @param mode see {@link ThrottleMode}; defaults to {@code enforce}
  * @param maxStrikes the strikes of one client in one window that ban it; a single request whose
  *     signals weigh this much bans at once
  * @param windowSeconds the length of the strike window
@@ -37,7 +37,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  */
 @ConfigurationProperties(prefix = "repsy.security.probe-throttle")
 public record SuspiciousRequestProperties(
-    AuthThrottleMode mode,
+    ThrottleMode mode,
     Integer maxStrikes,
     Long windowSeconds,
     Long banSeconds,
@@ -58,7 +58,7 @@ public record SuspiciousRequestProperties(
       @Nullable Boolean enabled, @Nullable Integer weight, @Nullable Boolean apiPortOnly) {}
 
   public SuspiciousRequestProperties {
-    mode = Objects.requireNonNullElse(mode, AuthThrottleMode.ENFORCE);
+    mode = Objects.requireNonNullElse(mode, ThrottleMode.ENFORCE);
     maxStrikes = Objects.requireNonNullElse(maxStrikes, DEFAULT_MAX_STRIKES);
     windowSeconds = Objects.requireNonNullElse(windowSeconds, DEFAULT_WINDOW_SECONDS);
     banSeconds = Objects.requireNonNullElse(banSeconds, DEFAULT_BAN_SECONDS);
@@ -71,13 +71,13 @@ public record SuspiciousRequestProperties(
   }
 
   private static void requirePositiveUnlessOff(
-      final AuthThrottleMode mode,
+      final ThrottleMode mode,
       final int maxStrikes,
       final long windowSeconds,
       final long banSeconds,
       final long maxClients) {
 
-    if (mode != AuthThrottleMode.OFF
+    if (mode != ThrottleMode.OFF
         && (maxStrikes <= 0 || windowSeconds <= 0 || banSeconds <= 0 || maxClients <= 0)) {
       throw new IllegalArgumentException(
           "repsy.security.probe-throttle.max-strikes, window-seconds, ban-seconds and max-clients"
@@ -130,13 +130,12 @@ public record SuspiciousRequestProperties(
   /** Settings under which nothing is tracked, refused or answered early. */
   public static SuspiciousRequestProperties disabled() {
 
-    return new SuspiciousRequestProperties(
-        AuthThrottleMode.OFF, 0, 0L, 0L, 0L, List.of(), Map.of());
+    return new SuspiciousRequestProperties(ThrottleMode.OFF, 0, 0L, 0L, 0L, List.of(), Map.of());
   }
 
   /** The defaults in the given mode, with the strike limit and ban time of a test. */
   public static SuspiciousRequestProperties of(
-      final AuthThrottleMode mode, final int maxStrikes, final long banSeconds) {
+      final ThrottleMode mode, final int maxStrikes, final long banSeconds) {
 
     return new SuspiciousRequestProperties(
         mode,

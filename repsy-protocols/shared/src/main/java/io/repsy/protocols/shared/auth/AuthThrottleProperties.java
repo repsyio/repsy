@@ -26,7 +26,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  * context that binds the {@code repsy.security.auth-throttle} prefix to nothing at all still gets
  * the defaults instead of {@code 0}.
  *
- * @param mode see {@link AuthThrottleMode}; defaults to {@code enforce}
+ * @param mode see {@link ThrottleMode}; defaults to {@code enforce}
  * @param enabled legacy switch ({@code AUTH_THROTTLE_ENABLED}): {@code false} turns the throttle
  *     off whatever the mode says; {@code null} or {@code true} leave the mode alone
  * @param maxFailures how many failed password checks a client may make in one window before the
@@ -41,7 +41,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  */
 @ConfigurationProperties(prefix = "repsy.security.auth-throttle")
 public record AuthThrottleProperties(
-    AuthThrottleMode mode,
+    ThrottleMode mode,
     @Nullable Boolean enabled,
     Integer maxFailures,
     Long windowSeconds,
@@ -56,10 +56,10 @@ public record AuthThrottleProperties(
   static final int DEFAULT_BAN_AFTER_BLOCKED_WINDOWS = 3;
 
   public AuthThrottleProperties {
-    mode = Boolean.FALSE.equals(enabled) ? AuthThrottleMode.OFF : mode;
+    mode = Boolean.FALSE.equals(enabled) ? ThrottleMode.OFF : mode;
     // Only an explicit false means anything; true is the same as not set.
     enabled = Boolean.FALSE.equals(enabled) ? Boolean.FALSE : null;
-    mode = Objects.requireNonNullElse(mode, AuthThrottleMode.ENFORCE);
+    mode = Objects.requireNonNullElse(mode, ThrottleMode.ENFORCE);
     maxFailures = Objects.requireNonNullElse(maxFailures, DEFAULT_MAX_FAILURES);
     windowSeconds = Objects.requireNonNullElse(windowSeconds, DEFAULT_WINDOW_SECONDS);
     maxClients = Objects.requireNonNullElse(maxClients, DEFAULT_MAX_CLIENTS);
@@ -72,12 +72,12 @@ public record AuthThrottleProperties(
   }
 
   private static void requirePositiveUnlessOff(
-      final AuthThrottleMode mode,
+      final ThrottleMode mode,
       final int maxFailures,
       final long windowSeconds,
       final long maxClients) {
 
-    final var wouldTrackClients = mode != AuthThrottleMode.OFF;
+    final var wouldTrackClients = mode != ThrottleMode.OFF;
     final var hasNonPositiveSetting = maxFailures <= 0 || windowSeconds <= 0 || maxClients <= 0;
 
     if (wouldTrackClients && hasNonPositiveSetting) {
@@ -88,9 +88,9 @@ public record AuthThrottleProperties(
   }
 
   private static void requireValidBanUnlessOff(
-      final AuthThrottleMode mode, final long banSeconds, final int banAfterBlockedWindows) {
+      final ThrottleMode mode, final long banSeconds, final int banAfterBlockedWindows) {
 
-    if (mode == AuthThrottleMode.OFF) {
+    if (mode == ThrottleMode.OFF) {
       return;
     }
 
@@ -104,7 +104,7 @@ public record AuthThrottleProperties(
   /** Settings under which no client is ever tracked or refused. */
   public static AuthThrottleProperties disabled() {
 
-    return new AuthThrottleProperties(AuthThrottleMode.OFF, null, 0, 0L, 0L, 0L, 0);
+    return new AuthThrottleProperties(ThrottleMode.OFF, null, 0, 0L, 0L, 0L, 0);
   }
 
   /** Settings under which every check runs in full and a saturated client is refused. */
@@ -112,7 +112,7 @@ public record AuthThrottleProperties(
       final int maxFailures, final long windowSeconds, final long maxClients) {
 
     return new AuthThrottleProperties(
-        AuthThrottleMode.ENFORCE,
+        ThrottleMode.ENFORCE,
         null,
         maxFailures,
         windowSeconds,
@@ -130,7 +130,7 @@ public record AuthThrottleProperties(
       final int banAfterBlockedWindows) {
 
     return new AuthThrottleProperties(
-        AuthThrottleMode.ENFORCE,
+        ThrottleMode.ENFORCE,
         null,
         maxFailures,
         windowSeconds,
@@ -144,7 +144,7 @@ public record AuthThrottleProperties(
       final int maxFailures, final long windowSeconds, final long maxClients) {
 
     return new AuthThrottleProperties(
-        AuthThrottleMode.OBSERVE,
+        ThrottleMode.OBSERVE,
         null,
         maxFailures,
         windowSeconds,

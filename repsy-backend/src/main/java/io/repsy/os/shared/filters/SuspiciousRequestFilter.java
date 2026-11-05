@@ -17,11 +17,11 @@ package io.repsy.os.shared.filters;
 
 import io.repsy.os.shared.configs.ApiPortMatcher;
 import io.repsy.os.shared.configs.SecurityHeadersFilter;
-import io.repsy.protocols.shared.auth.AuthThrottleMode;
 import io.repsy.protocols.shared.auth.ClientKeys;
 import io.repsy.protocols.shared.auth.SignalFamily;
 import io.repsy.protocols.shared.auth.SuspiciousRequestClassifier;
 import io.repsy.protocols.shared.auth.SuspiciousRequestThrottle;
+import io.repsy.protocols.shared.auth.ThrottleMode;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -122,7 +122,7 @@ public class SuspiciousRequestFilter extends OncePerRequestFilter {
       return false;
     }
 
-    if (this.throttle.mode() != AuthThrottleMode.ENFORCE) {
+    if (this.throttle.mode() != ThrottleMode.ENFORCE) {
       this.throttle.countWouldBlock(client, banSecondsLeft);
       return false;
     }

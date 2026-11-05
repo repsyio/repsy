@@ -29,7 +29,7 @@ class AuthThrottlePropertiesTest {
   void defaults() {
     final var properties = new AuthThrottleProperties(null, null, null, null, null, null, null);
 
-    assertThat(properties.mode()).isEqualTo(AuthThrottleMode.ENFORCE);
+    assertThat(properties.mode()).isEqualTo(ThrottleMode.ENFORCE);
     assertThat(properties.enabled()).isNull();
     assertThat(properties.maxFailures()).isEqualTo(20);
     assertThat(properties.windowSeconds()).isEqualTo(60);
@@ -51,17 +51,17 @@ class AuthThrottlePropertiesTest {
         .isThrownBy(() -> new AuthThrottleProperties(null, null, null, null, null, -1L, null));
     assertThatIllegalArgumentException()
         .isThrownBy(() -> new AuthThrottleProperties(null, null, null, null, null, 60L, 0));
-    assertThat(new AuthThrottleProperties(AuthThrottleMode.OFF, null, 0, 0L, 0L, -1L, 0).mode())
-        .isEqualTo(AuthThrottleMode.OFF);
+    assertThat(new AuthThrottleProperties(ThrottleMode.OFF, null, 0, 0L, 0L, -1L, 0).mode())
+        .isEqualTo(ThrottleMode.OFF);
   }
 
   @Test
   @DisplayName("the legacy enabled=false turns the throttle off whatever the mode says")
   void legacyDisabledWinsOverMode() {
     final var properties =
-        new AuthThrottleProperties(AuthThrottleMode.ENFORCE, false, null, null, null, null, null);
+        new AuthThrottleProperties(ThrottleMode.ENFORCE, false, null, null, null, null, null);
 
-    assertThat(properties.mode()).isEqualTo(AuthThrottleMode.OFF);
+    assertThat(properties.mode()).isEqualTo(ThrottleMode.OFF);
     assertThat(properties.enabled()).isFalse();
   }
 
@@ -69,9 +69,9 @@ class AuthThrottlePropertiesTest {
   @DisplayName("the legacy enabled=true leaves the mode alone")
   void legacyEnabledKeepsMode() {
     final var properties =
-        new AuthThrottleProperties(AuthThrottleMode.OBSERVE, true, null, null, null, null, null);
+        new AuthThrottleProperties(ThrottleMode.OBSERVE, true, null, null, null, null, null);
 
-    assertThat(properties.mode()).isEqualTo(AuthThrottleMode.OBSERVE);
+    assertThat(properties.mode()).isEqualTo(ThrottleMode.OBSERVE);
     assertThat(properties.enabled()).isNull();
   }
 
@@ -82,18 +82,16 @@ class AuthThrottlePropertiesTest {
         .isThrownBy(() -> new AuthThrottleProperties(null, null, 0, null, null, null, null));
     assertThatIllegalArgumentException()
         .isThrownBy(
-            () ->
-                new AuthThrottleProperties(AuthThrottleMode.OBSERVE, null, 5, -1L, 5L, null, null));
-    assertThat(new AuthThrottleProperties(AuthThrottleMode.OFF, null, 0, 0L, 0L, null, null).mode())
-        .isEqualTo(AuthThrottleMode.OFF);
+            () -> new AuthThrottleProperties(ThrottleMode.OBSERVE, null, 5, -1L, 5L, null, null));
+    assertThat(new AuthThrottleProperties(ThrottleMode.OFF, null, 0, 0L, 0L, null, null).mode())
+        .isEqualTo(ThrottleMode.OFF);
   }
 
   @Test
   @DisplayName("the factory methods set the mode and keep the numbers")
   void factories() {
-    assertThat(AuthThrottleProperties.disabled().mode()).isEqualTo(AuthThrottleMode.OFF);
-    assertThat(AuthThrottleProperties.enforcing(3, 30, 7).mode())
-        .isEqualTo(AuthThrottleMode.ENFORCE);
+    assertThat(AuthThrottleProperties.disabled().mode()).isEqualTo(ThrottleMode.OFF);
+    assertThat(AuthThrottleProperties.enforcing(3, 30, 7).mode()).isEqualTo(ThrottleMode.ENFORCE);
     assertThat(AuthThrottleProperties.observing(3, 30, 7).maxClients()).isEqualTo(7);
   }
 }
