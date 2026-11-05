@@ -40,6 +40,7 @@ import io.repsy.os.shared.token.dtos.PersonalAccessTokenInfo;
 import io.repsy.os.shared.token.dtos.TokenScope;
 import io.repsy.os.shared.token.dtos.TokenType;
 import io.repsy.os.shared.token.services.PersonalAccessTokenService;
+import io.repsy.os.shared.token.utils.DeployTokenFingerprintUtils;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.os.shared.user.services.UserTxService;
@@ -50,6 +51,8 @@ import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.Credentials;
 import io.repsy.protocols.shared.repo.dtos.Permission;
 import jakarta.servlet.http.HttpServletRequest;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
@@ -155,7 +158,10 @@ public class ProtocolAuthService {
     switch (authenticationType) {
       case DEPLOY_TOKEN ->
           this.authorizeTokenRequestTokenId(
-              repoId, this.jwtUtils.extractUserId(authHeader, TokenRealm.PROTOCOL), permission);
+              repoId,
+              this.jwtUtils.extractUserId(authHeader, TokenRealm.PROTOCOL),
+              this.jwtUtils.extractDeployTokenFingerprint(authHeader, TokenRealm.PROTOCOL),
+              permission);
 
       // The JWT of a personal access token exchange (Docker): the token row is read again.
       case PERSONAL_ACCESS_TOKEN -> this.authorizePersonalAccessTokenJwt(authHeader, permission);
@@ -599,15 +605,26 @@ public class ProtocolAuthService {
     return true;
   }
 
+  /**
+   * Authorizes the JWT of a deploy token. {@code fingerprint} is its {@code tf} claim: a JWT
+   * without it, or with one that is not the current row's, was minted before the token was rotated
+   * (or before RPS-2431) and is refused (RPS-2431).
+   */
   public void authorizeTokenRequestTokenId(
-      final UUID repoId, final UUID tokenId, final Permission permission) {
+      final UUID repoId,
+      final UUID tokenId,
+      final @Nullable String fingerprint,
+      final Permission permission) {
 
     // A deploy token never manages, whatever its read-only flag says (RPS-1424).
     if (permission == Permission.MANAGE) {
       throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
 
-    final var deployTokenInfo = this.deployTokenService.findByRepoIdAndTokenId(repoId, tokenId);
+    final var deployTokenInfo =
+        this.deployTokenService
+            .findByRepoIdAndTokenId(repoId, tokenId)
+            .filter(token -> isCurrentDeployTokenJwt(token, fingerprint));
 
     if (deployTokenInfo.isEmpty()) {
       throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
@@ -624,6 +641,16 @@ public class ProtocolAuthService {
     }
 
     this.deployTokenService.updateLastUsedTime(deployToken.getId());
+  }
+
+  /** Whether the {@code tf} claim of a deploy-token JWT is the fingerprint of the stored hash. */
+  protected static boolean isCurrentDeployTokenJwt(
+      final DeployTokenInfo deployToken, final @Nullable String fingerprint) {
+
+    return fingerprint != null
+        && MessageDigest.isEqual(
+            DeployTokenFingerprintUtils.of(deployToken.getToken()).getBytes(StandardCharsets.UTF_8),
+            fingerprint.getBytes(StandardCharsets.UTF_8));
   }
 
   protected boolean isWritePermissionRequired(final Permission permission) {

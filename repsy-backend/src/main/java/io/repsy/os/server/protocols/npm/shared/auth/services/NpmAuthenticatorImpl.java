@@ -30,6 +30,7 @@ import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.token.dtos.PersonalAccessTokenInfo;
 import io.repsy.os.shared.token.dtos.TokenType;
+import io.repsy.os.shared.token.utils.DeployTokenFingerprintUtils;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.npm.shared.auth.services.NpmAuthenticator;
 import io.repsy.protocols.npm.shared.auth.services.NpmIdentityResolver;
@@ -40,6 +41,7 @@ import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.repo.dtos.Credentials;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.Period;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
@@ -131,11 +133,22 @@ public class NpmAuthenticatorImpl extends ProtocolAuthService
 
     this.deployTokenService.updateLastUsedTime(deployTokenInfo.getId());
 
-    return super.jwtUtils.createProtocolToken(
+    // The JWT never outlives the token, and ends at its rotation (RPS-2431).
+    var lifetime = Duration.ofDays(TOKEN_EXPIRATION_DAYS);
+    final var expirationDate = deployTokenInfo.getExpirationDate();
+
+    if (expirationDate != null) {
+      final var untilExpiry = Duration.between(Instant.now(), expirationDate);
+
+      lifetime = untilExpiry.compareTo(lifetime) < 0 ? untilExpiry : lifetime;
+    }
+
+    return super.jwtUtils.createDeployTokenProtocolToken(
         deployTokenInfo.getId(),
         username,
-        Period.ofDays(TOKEN_EXPIRATION_DAYS),
-        AuthenticationType.DEPLOY_TOKEN);
+        lifetime,
+        DeployTokenFingerprintUtils.of(deployTokenInfo.getToken()),
+        null);
   }
 
   /**
@@ -269,8 +282,12 @@ public class NpmAuthenticatorImpl extends ProtocolAuthService
       case DEPLOY_TOKEN -> {
         final var tokenId = this.jwtUtils.extractUserId(header, TokenRealm.PROTOCOL);
 
+        final var fingerprint =
+            this.jwtUtils.extractDeployTokenFingerprint(header, TokenRealm.PROTOCOL);
+
         yield this.deployTokenService
             .findByRepoIdAndTokenId(repoId, tokenId)
+            .filter(token -> isCurrentDeployTokenJwt(token, fingerprint))
             .map(NpmAuthenticatorImpl::callerOf)
             .orElseThrow(() -> new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED));
       }

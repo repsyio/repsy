@@ -56,6 +56,7 @@ public class JwtUtils {
   private static final String CLAIM_TOKEN_FAMILY = "token_family";
   private static final String CLAIM_PATH = "path";
   private static final String CLAIM_ACCESS = "access";
+  private static final String CLAIM_TOKEN_FINGERPRINT = "tf";
   private static final String TOKEN_TYPE_REFRESH = "refresh";
   private static final Pattern SLASHES = Pattern.compile("/{2,}");
   private static final int SECRET_BYTE_LENGTH = 32;
@@ -200,10 +201,9 @@ public class JwtUtils {
   }
 
   /**
-   * Creates a protocol token that is not a user's login: an anonymous token, or the JWT of a deploy
-   * token, whose subject is the deploy token id. It carries no {@code tv} claim, as there is no
-   * user version to bind it to: a deploy-token JWT is checked against its token row on every
-   * request instead.
+   * Creates a protocol token that is not a user's login, such as an anonymous token. It carries no
+   * {@code tv} claim, as there is no user version to bind it to. A deploy-token JWT is minted by
+   * {@link #createDeployTokenProtocolToken} instead (RPS-2431).
    */
   public String createProtocolToken(
       final UUID userId,
@@ -243,6 +243,47 @@ public class JwtUtils {
         .withClaim(CLAIM_ACCESS, access)
         .withExpiresAt(Instant.now().plus(timeoutDuration))
         .sign(this.algorithm());
+  }
+
+  /**
+   * Creates the protocol token of a deploy token exchange (RPS-2431): the subject is the deploy
+   * token id and {@code fingerprint} (see {@code DeployTokenFingerprintUtils}) is the {@code tf}
+   * claim, which every request compares with the current row so that the token ends when the deploy
+   * token is rotated. {@code access} is what the exchange granted (Docker), or {@code null} for a
+   * protocol that records none.
+   */
+  public String createDeployTokenProtocolToken(
+      final UUID tokenId,
+      final String username,
+      final TemporalAmount timeoutDuration,
+      final String fingerprint,
+      final @Nullable List<String> access) {
+    final var builder =
+        JWT.create()
+            .withJWTId(UUID.randomUUID().toString())
+            .withSubject(tokenId.toString())
+            .withAudience(TokenRealm.PROTOCOL.getAudience())
+            .withClaim(CLAIM_USERNAME, username)
+            .withClaim(AUTH_TYPE, AuthenticationType.DEPLOY_TOKEN.getValue())
+            .withClaim(CLAIM_TOKEN_FINGERPRINT, fingerprint)
+            .withExpiresAt(Instant.now().plus(timeoutDuration));
+
+    if (access != null) {
+      builder.withClaim(CLAIM_ACCESS, access);
+    }
+
+    return builder.sign(this.algorithm());
+  }
+
+  /**
+   * Returns the {@code tf} claim of a deploy-token JWT, or {@code null} for a token that has none
+   * (minted before RPS-2431), which the caller must refuse.
+   */
+  public @Nullable String extractDeployTokenFingerprint(
+      final String authHeader, final TokenRealm realm) {
+    return this.verifyAndDecode(this.getToken(authHeader), realm)
+        .getClaim(CLAIM_TOKEN_FINGERPRINT)
+        .asString();
   }
 
   private Algorithm algorithm() {
