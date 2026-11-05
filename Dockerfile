@@ -99,7 +99,7 @@ RUN apk add --no-cache openjdk21-jre-headless
 # finds <version>.jar there and skips the download; the version is pinned only in that file.
 COPY --from=openapi-jar / /root/.cache/openapi-generator-cli/
 
-COPY repsy-frontend/package.json repsy-frontend/pnpm-lock.yaml ./
+COPY repsy-frontend/package.json repsy-frontend/pnpm-lock.yaml repsy-frontend/pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile --ignore-scripts
 
 COPY repsy-backend/src/main/resources/openapi/openapi-spec.yaml /tmp/openapi-spec.yaml
