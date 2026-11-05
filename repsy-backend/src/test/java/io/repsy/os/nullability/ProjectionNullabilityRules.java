@@ -27,6 +27,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 import org.hibernate.engine.spi.SessionFactoryImplementor;
 import org.hibernate.metamodel.mapping.SelectableMapping;
@@ -62,7 +63,9 @@ final class ProjectionNullabilityRules {
 
   private static final Pattern PATH = Pattern.compile("\\w++(\\.\\w++)++");
   private static final Pattern CAST =
-      Pattern.compile("cast\\s*\\((.+)\\s+as\\s+\\w+\\)", Pattern.CASE_INSENSITIVE);
+      Pattern.compile("cast\\s*\\(((?:.*\\S|.))\\s+as\\s+\\w+\\)", Pattern.CASE_INSENSITIVE);
+  private static final Set<Class<? extends Annotation>> NULLABLE_ANNOTATIONS =
+      Set.of(org.jspecify.annotations.Nullable.class, org.springframework.lang.Nullable.class);
   private static final Pattern COUNT = Pattern.compile("count\\s*\\(.*", Pattern.CASE_INSENSITIVE);
   private static final Pattern FROM_ALIAS =
       Pattern.compile("\\bfrom\\s+(\\w+)\\s+(?:as\\s+)?(\\w+)", Pattern.CASE_INSENSITIVE);
@@ -208,7 +211,7 @@ final class ProjectionNullabilityRules {
 
   private static boolean hasNullable(final Annotation[] annotations) {
     return Arrays.stream(annotations)
-        .anyMatch(annotation -> "Nullable".equals(annotation.annotationType().getSimpleName()));
+        .anyMatch(annotation -> NULLABLE_ANNOTATIONS.contains(annotation.annotationType()));
   }
 
   private Finding finding(
