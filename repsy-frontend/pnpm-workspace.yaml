@@ -16,10 +16,18 @@ allowBuilds:
   "@parcel/watcher": false
   lmdb: false
   msgpackr-extract: false
-# Dependabot (RPS-2392). @tailwindcss/typography (latest, 0.5.20) pins postcss-selector-parser 6.0.10
-# exactly; 6.1.5 is the same major with the fix for the quadratic selector parsing.
-# minimatch (GHSA-g3hv-75wg-m249) is deliberately NOT overridden: only 11.x is patched, but karma 6.4.4
-# (the unit test runner, no newer release) calls require('minimatch') as a function, which 11 no longer
-# exports ("mm is not a function"), so forcing 11 breaks `ng test`.
+# Security overrides for transitive dependencies (Dependabot, RPS-2392 and RPS-2462, the OS copy of
+# RPS-2460). Drop an entry once every parent resolves a patched version on its own (check with
+# `pnpm why <package>`).
+#   - minimatch < 11.0.1 and glob 9-14.0.1: eslint, typescript-eslint, karma and @angular/build pull
+#     several majors; the fix exists only in the 11.x / 14.x lines.
+#   - postcss-selector-parser: @tailwindcss/typography pins 6.0.10 (same major, quadratic parsing fix).
+#   - basic-ftp: reached through the openapi-generator-cli proxy agent (generation tooling only).
+# minimatch 3 is deliberately NOT overridden (the ranges start at 4): karma 6.4.4 (the unit test runner,
+# no newer release) and glob 7 call require('minimatch') as a function, which 11 no longer exports
+# ("mm is not a function"), so forcing 11 onto them breaks `ng test`.
 overrides:
-  "postcss-selector-parser@6.0.10": 6.1.5
+  minimatch@>=4.0.0 <11.0.1: ^11.0.1
+  glob@>=9.0.0 <14.0.2: ^14.0.2
+  postcss-selector-parser@<6.1.5: ^6.1.5
+  basic-ftp@<6.2.1: ^6.2.1
