@@ -40,6 +40,7 @@ import io.repsy.os.shared.auth.services.RevokedProtocolTokenService;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.constants.ErrorConstants;
+import io.repsy.os.shared.token.utils.DeployTokenFingerprintUtils;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.os.shared.user.services.UserTxService;
@@ -50,8 +51,11 @@ import io.repsy.protocols.shared.auth.PasswordHasher;
 import io.repsy.protocols.shared.auth.VerifiedPasswordCache;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.Period;
+import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalAmount;
 import java.util.Base64;
 import java.util.List;
 import java.util.Optional;
@@ -60,6 +64,7 @@ import org.assertj.core.api.ThrowableAssert.ThrowingCallable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.dao.DataIntegrityViolationException;
 
 /**
@@ -137,8 +142,12 @@ class NpmAuthenticatorImplTest {
   @DisplayName("authenticateRepoUser answers a deploy-token JWT for a deploy token, not its hash")
   void deployTokenLoginAnswersAJwt() {
     final var info = seedDeployToken("stored-sha-256-hash", null);
-    when(this.jwtUtils.createProtocolToken(
-            info.getId(), "typed", Period.ofDays(90), AuthenticationType.DEPLOY_TOKEN))
+    when(this.jwtUtils.createDeployTokenProtocolToken(
+            info.getId(),
+            "typed",
+            Duration.ofDays(90),
+            DeployTokenFingerprintUtils.of("stored-sha-256-hash"),
+            null))
         .thenReturn("the-jwt");
 
     final var token = this.authenticator.authenticateRepoUser(this.repo, "typed", "the-secret");
@@ -156,8 +165,25 @@ class NpmAuthenticatorImplTest {
     assertUnauthorized(
         () -> this.authenticator.authenticateRepoUser(this.repo, "typed", "the-secret"));
     verify(this.jwtUtils, never())
-        .createProtocolToken(any(), anyString(), any(), any(AuthenticationType.class));
+        .createDeployTokenProtocolToken(any(), anyString(), any(), anyString(), any());
     verify(this.deployTokenService, never()).updateLastUsedTime(any());
+  }
+
+  @Test
+  @DisplayName("authenticateRepoUser caps the JWT lifetime at the token's own expiry")
+  void deployTokenJwtDoesNotOutliveTheToken() {
+    seedDeployToken("stored-sha-256-hash", Instant.now().plus(2, ChronoUnit.DAYS));
+    when(this.jwtUtils.createDeployTokenProtocolToken(
+            any(), anyString(), any(), anyString(), any()))
+        .thenReturn("the-jwt");
+
+    this.authenticator.authenticateRepoUser(this.repo, "typed", "the-secret");
+
+    final var lifetime = ArgumentCaptor.forClass(TemporalAmount.class);
+
+    verify(this.jwtUtils)
+        .createDeployTokenProtocolToken(any(), anyString(), lifetime.capture(), anyString(), any());
+    assertThat(Duration.from(lifetime.getValue())).isLessThanOrEqualTo(Duration.ofDays(2));
   }
 
   // whoami: who the credentials of a request belong to.
@@ -354,6 +380,9 @@ class NpmAuthenticatorImplTest {
     final var info = new DeployTokenInfo();
     info.setId(UUID.randomUUID());
     info.setUsername(username);
+    info.setToken("stored-hash");
+    when(this.jwtUtils.extractDeployTokenFingerprint(anyString(), any(TokenRealm.class)))
+        .thenReturn(DeployTokenFingerprintUtils.of("stored-hash"));
     when(this.deployTokenService.findByRepoIdAndTokenId(this.repo.getStorageKey(), info.getId()))
         .thenReturn(Optional.of(info));
     return info;

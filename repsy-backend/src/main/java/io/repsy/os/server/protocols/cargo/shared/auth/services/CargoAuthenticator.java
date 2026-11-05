@@ -32,6 +32,7 @@ import io.repsy.os.shared.auth.utils.AuthUtils;
 import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.token.dtos.TokenType;
+import io.repsy.os.shared.token.utils.DeployTokenFingerprintUtils;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.shared.auth.AuthFailureThrottle;
 import io.repsy.protocols.shared.auth.VerifiedPasswordCache;
@@ -142,11 +143,12 @@ public class CargoAuthenticator extends ProtocolAuthService {
     this.deployTokenService.updateLastUsedTime(deployTokenOpt.get().getId());
 
     final var token =
-        this.jwtUtils.createProtocolToken(
+        this.jwtUtils.createDeployTokenProtocolToken(
             deployTokenOpt.get().getId(),
             credentials.getUsername(),
             TIMEOUT_ACCESS_TOKEN,
-            AuthenticationType.DEPLOY_TOKEN);
+            DeployTokenFingerprintUtils.of(deployTokenOpt.get().getToken()),
+            null);
 
     return Optional.of(token);
   }

@@ -41,6 +41,7 @@ import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.repo.dtos.RepoInfo;
+import io.repsy.os.shared.token.utils.DeployTokenFingerprintUtils;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.os.shared.user.mappers.UserMapper;
@@ -655,6 +656,8 @@ class ProtocolAuthServiceTest {
       when(this.jwt.extractAuthenticationType(anyString(), any(TokenRealm.class)))
           .thenReturn(AuthenticationType.DEPLOY_TOKEN);
       when(this.jwt.extractUserId(anyString(), any(TokenRealm.class))).thenReturn(tokenId);
+      when(this.jwt.extractDeployTokenFingerprint(anyString(), any(TokenRealm.class)))
+          .thenReturn(DeployTokenFingerprintUtils.of("stored-hash"));
 
       for (var i = 0; i <= LIMIT; i++) {
         // Revoked: the token id is gone.
@@ -663,6 +666,7 @@ class ProtocolAuthServiceTest {
 
       final var readOnly = new DeployTokenInfo();
       readOnly.setId(tokenId);
+      readOnly.setToken("stored-hash");
       readOnly.setReadOnly(true);
       when(this.deployTokens.findByRepoIdAndTokenId(this.repoId, tokenId))
           .thenReturn(Optional.of(readOnly));
@@ -746,6 +750,8 @@ class ProtocolAuthServiceTest {
           .thenReturn(AuthenticationType.DEPLOY_TOKEN);
       when(this.jwtUtils.extractUserId(anyString(), any(TokenRealm.class)))
           .thenReturn(this.tokenId);
+      when(this.jwtUtils.extractDeployTokenFingerprint(anyString(), any(TokenRealm.class)))
+          .thenReturn(DeployTokenFingerprintUtils.of("stored-hash"));
       // The claim names a real user; it must not be looked at.
       when(this.jwtUtils.extractProtocolUserClaims(anyString()))
           .thenReturn(new ProtocolUserClaims(ALICE.getId(), USERNAME, null));
@@ -754,6 +760,7 @@ class ProtocolAuthServiceTest {
     private void storeToken(final boolean readOnly, final Instant expirationDate) {
       final var info = new DeployTokenInfo();
       info.setId(this.tokenId);
+      info.setToken("stored-hash");
       info.setReadOnly(readOnly);
       info.setExpirationDate(expirationDate);
       when(this.deployTokenService.findByRepoIdAndTokenId(this.repoId, this.tokenId))
@@ -805,6 +812,24 @@ class ProtocolAuthServiceTest {
               () -> this.jwtAuthService.handleBearerAuth(BEARER, this.repoId, Permission.READ))
           .isExactlyInstanceOf(UnAuthorizedException.class)
           .hasMessage("deployTokenExpired");
+    }
+
+    @Test
+    @DisplayName("a JWT minted before the token was rotated, or without a fingerprint, is refused")
+    void rotatedTokenOrMissingFingerprint() {
+      this.storeToken(false, null);
+      when(this.jwtUtils.extractDeployTokenFingerprint(anyString(), any(TokenRealm.class)))
+          .thenReturn(DeployTokenFingerprintUtils.of("the-hash-before-rotation"));
+
+      assertUnauthorized(
+          () -> this.jwtAuthService.handleBearerAuth(BEARER, this.repoId, Permission.READ));
+
+      when(this.jwtUtils.extractDeployTokenFingerprint(anyString(), any(TokenRealm.class)))
+          .thenReturn(null);
+
+      assertUnauthorized(
+          () -> this.jwtAuthService.handleBearerAuth(BEARER, this.repoId, Permission.READ));
+      verify(this.deployTokenService, never()).updateLastUsedTime(any());
     }
 
     @Test

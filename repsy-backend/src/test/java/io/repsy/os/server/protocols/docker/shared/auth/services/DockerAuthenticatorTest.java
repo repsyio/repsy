@@ -40,6 +40,7 @@ import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.repo.services.RepoTxService;
+import io.repsy.os.shared.token.utils.DeployTokenFingerprintUtils;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.os.shared.user.mappers.UserMapper;
@@ -643,11 +644,14 @@ class DockerAuthenticatorTest {
       when(this.jwtUtils.extractAuthenticationType(anyString(), any(TokenRealm.class)))
           .thenReturn(AuthenticationType.DEPLOY_TOKEN);
       when(this.jwtUtils.extractUserId(BEARER, TokenRealm.PROTOCOL)).thenReturn(this.tokenId);
+      when(this.jwtUtils.extractDeployTokenFingerprint(BEARER, TokenRealm.PROTOCOL))
+          .thenReturn(DeployTokenFingerprintUtils.of("stored-hash"));
     }
 
     private void stubToken(final boolean readOnly) {
       final var info = new DeployTokenInfo();
       info.setId(this.tokenId);
+      info.setToken("stored-hash");
       info.setReadOnly(readOnly);
       when(this.deployTokenService.findByRepoIdAndTokenId(this.repoId, this.tokenId))
           .thenReturn(Optional.of(info));

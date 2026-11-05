@@ -32,6 +32,7 @@ import io.repsy.os.shared.auth.utils.JwtUtils;
 import io.repsy.os.shared.auth.utils.TokenRealm;
 import io.repsy.os.shared.repo.services.RepoTxService;
 import io.repsy.os.shared.token.dtos.TokenType;
+import io.repsy.os.shared.token.utils.DeployTokenFingerprintUtils;
 import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.os.shared.user.services.UserTxService;
@@ -220,11 +221,11 @@ public class DockerAuthenticator extends ProtocolAuthService implements DockerAu
     final var deployToken = deployTokenOpt.get();
 
     final var token =
-        this.jwtUtils.createProtocolToken(
+        this.jwtUtils.createDeployTokenProtocolToken(
             deployToken.getId(),
             credentials.getUsername(),
             TIMEOUT_ACCESS_TOKEN,
-            AuthenticationType.DEPLOY_TOKEN,
+            DeployTokenFingerprintUtils.of(deployToken.getToken()),
             PatDockerGrants.narrow(grants, name -> this.deployTokenRights(deployToken, name)));
 
     return Optional.of(token);
@@ -301,13 +302,16 @@ public class DockerAuthenticator extends ProtocolAuthService implements DockerAu
    */
   @Override
   public void authorizeTokenRequestTokenId(
-      final UUID repoId, final UUID tokenId, final Permission permission) {
+      final UUID repoId,
+      final UUID tokenId,
+      final @Nullable String fingerprint,
+      final Permission permission) {
 
     if (permission == Permission.MANAGE) {
       throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
 
-    super.authorizeTokenRequestTokenId(repoId, tokenId, permission);
+    super.authorizeTokenRequestTokenId(repoId, tokenId, fingerprint, permission);
   }
 
   /**
