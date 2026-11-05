@@ -191,6 +191,21 @@ class DockerfileTest {
     }
   }
 
+  @Test
+  @DisplayName("RPS-2497: the frontend install copies the pnpm workspace file with the lockfile")
+  void frontendInstallCopiesWorkspaceFile() throws IOException {
+    final String dockerfile = read(ROOT.resolve("Dockerfile"));
+    final int install = dockerfile.indexOf("RUN pnpm install --frozen-lockfile");
+    assertThat(install).as("the frontend pnpm install").isPositive();
+    final int copy = dockerfile.lastIndexOf("\nCOPY ", install);
+    final String copyLine = dockerfile.substring(copy + 1, dockerfile.indexOf('\n', copy + 1));
+
+    assertThat(copyLine)
+        .as("the COPY before the frozen install carries every config pnpm reads (overrides)")
+        .contains("repsy-frontend/pnpm-lock.yaml")
+        .contains("repsy-frontend/pnpm-workspace.yaml");
+  }
+
   /** The {@code pnpm@x.y.z} version on the first line of the file that contains {@code marker}. */
   private static String pin(final Path file, final String marker) throws IOException {
     for (final String line : Files.readAllLines(file)) {
