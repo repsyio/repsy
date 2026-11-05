@@ -519,6 +519,15 @@ class AuthFailureThrottleTest {
                   .counter()
                   .count())
           .isEqualTo(25.0);
+      assertThat(
+              AuthFailureThrottleTest.this
+                  .meterRegistry
+                  .find(AuthFailureThrottle.WOULD_BLOCK_METRIC)
+                  .counter()
+                  .getId()
+                  .getTags())
+          .as("no per-client tag, it would be unbounded cardinality")
+          .isEmpty();
     }
 
     @Test
@@ -750,7 +759,7 @@ class AuthFailureThrottleTest {
       final var observing =
           new AuthFailureThrottle(
               new AuthThrottleProperties(
-                  AuthThrottleMode.OBSERVE,
+                  ThrottleMode.OBSERVE,
                   null,
                   MAX_FAILURES,
                   WINDOW_SECONDS,
@@ -821,24 +830,23 @@ class AuthFailureThrottleTest {
   @DisplayName("defaults to enforce when the mode is not set at all")
   void defaultsToEnforce() {
     assertThat(new AuthThrottleProperties(null, null, 5, 30L, 50L, null, null).mode())
-        .isEqualTo(AuthThrottleMode.ENFORCE);
+        .isEqualTo(ThrottleMode.ENFORCE);
   }
 
   @Test
   @DisplayName("the legacy enabled=false switches the throttle off whatever the mode says")
   void legacyEnabledFalseMeansOff() {
     assertThat(
-            new AuthThrottleProperties(AuthThrottleMode.ENFORCE, false, 5, 30L, 50L, null, null)
-                .mode())
-        .isEqualTo(AuthThrottleMode.OFF);
+            new AuthThrottleProperties(ThrottleMode.ENFORCE, false, 5, 30L, 50L, null, null).mode())
+        .isEqualTo(ThrottleMode.OFF);
     assertThat(new AuthThrottleProperties(null, true, 5, 30L, 50L, null, null).mode())
-        .isEqualTo(AuthThrottleMode.ENFORCE);
+        .isEqualTo(ThrottleMode.ENFORCE);
   }
 
   @Test
   @DisplayName("refuses settings that could not hold a window, unless the mode is off")
   void rejectsNonPositiveSettings() {
-    for (final var mode : List.of(AuthThrottleMode.OBSERVE, AuthThrottleMode.ENFORCE)) {
+    for (final var mode : List.of(ThrottleMode.OBSERVE, ThrottleMode.ENFORCE)) {
       assertThatThrownBy(() -> new AuthThrottleProperties(mode, null, 0, 60L, 10L, null, null))
           .isInstanceOf(IllegalArgumentException.class);
       assertThatThrownBy(() -> new AuthThrottleProperties(mode, null, 10, 0L, 10L, null, null))
@@ -847,6 +855,6 @@ class AuthFailureThrottleTest {
           .isInstanceOf(IllegalArgumentException.class);
     }
 
-    assertThat(AuthThrottleProperties.disabled().mode()).isEqualTo(AuthThrottleMode.OFF);
+    assertThat(AuthThrottleProperties.disabled().mode()).isEqualTo(ThrottleMode.OFF);
   }
 }

@@ -31,7 +31,7 @@ class SuspiciousRequestFamiliesTest {
 
   private final SuspiciousRequestClassifier classifier =
       new SuspiciousRequestClassifier(
-          SuspiciousRequestProperties.of(AuthThrottleMode.ENFORCE, 10, 3600));
+          SuspiciousRequestProperties.of(ThrottleMode.ENFORCE, 10, 3600));
 
   private Set<SignalFamily> api(final String uri) {
 
@@ -282,7 +282,7 @@ class SuspiciousRequestFamiliesTest {
     final var widened =
         new SuspiciousRequestClassifier(
             new SuspiciousRequestProperties(
-                AuthThrottleMode.ENFORCE,
+                ThrottleMode.ENFORCE,
                 10,
                 60L,
                 3600L,

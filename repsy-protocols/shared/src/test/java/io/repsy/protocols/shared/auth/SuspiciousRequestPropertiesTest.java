@@ -40,7 +40,7 @@ class SuspiciousRequestPropertiesTest {
 
     final var properties = bind(Map.of());
 
-    assertThat(properties.mode()).isEqualTo(AuthThrottleMode.ENFORCE);
+    assertThat(properties.mode()).isEqualTo(ThrottleMode.ENFORCE);
     assertThat(properties.maxStrikes()).isEqualTo(10);
     assertThat(properties.windowSeconds()).isEqualTo(60);
     assertThat(properties.banSeconds()).isEqualTo(3600);
@@ -61,7 +61,7 @@ class SuspiciousRequestPropertiesTest {
                 "repsy.security.probe-throttle.signals.secret-path.weight", "7",
                 "repsy.security.probe-throttle.signals.null-byte.enabled", "false"));
 
-    assertThat(properties.mode()).isEqualTo(AuthThrottleMode.OBSERVE);
+    assertThat(properties.mode()).isEqualTo(ThrottleMode.OBSERVE);
     assertThat(properties.allowlist()).containsExactly("10.0.0.0/8", "192.0.2.1");
     assertThat(properties.weight(SignalFamily.SECRET_PATH)).isEqualTo(7);
     assertThat(properties.weight(SignalFamily.NULL_BYTE)).isZero();
@@ -79,7 +79,7 @@ class SuspiciousRequestPropertiesTest {
                     "repsy.security.probe-throttle.mode", "off",
                     "repsy.security.probe-throttle.max-strikes", "0"))
                 .mode())
-        .isEqualTo(AuthThrottleMode.OFF);
+        .isEqualTo(ThrottleMode.OFF);
   }
 
   @Test

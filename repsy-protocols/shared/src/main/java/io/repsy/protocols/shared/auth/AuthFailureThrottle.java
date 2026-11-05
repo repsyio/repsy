@@ -55,12 +55,12 @@ import org.springframework.stereotype.Component;
  *       client cannot clear it by logging in with an account of its own; only the end of the window
  *       does.
  *   <li>A fixed window per client: after {@code maxFailures} failures the next password check would
- *       be refused. In {@link AuthThrottleMode#ENFORCE} (the default) it is refused, with {@code
- *       429} and {@code Retry-After}; in {@link AuthThrottleMode#OBSERVE} it is logged and counted
- *       against {@value #WOULD_BLOCK_METRIC} instead, and let through exactly as {@link
- *       AuthThrottleMode#OFF} would. A refused (or would-refuse) attempt costs no BCrypt, but it is
- *       counted too, so a client that keeps sending guesses reaches {@link #isSaturated()
- *       saturation} after {@value #SATURATION_FACTOR} times the limit.
+ *       be refused. In {@link ThrottleMode#ENFORCE} (the default) it is refused, with {@code 429}
+ *       and {@code Retry-After}; in {@link ThrottleMode#OBSERVE} it is logged and counted against
+ *       {@value #WOULD_BLOCK_METRIC} instead, and let through exactly as {@link ThrottleMode#OFF}
+ *       would. A refused (or would-refuse) attempt costs no BCrypt, but it is counted too, so a
+ *       client that keeps sending guesses reaches {@link #isSaturated() saturation} after {@value
+ *       #SATURATION_FACTOR} times the limit.
  *   <li>A client that keeps going is banned (RPS-2306): one that has used up its failures in {@code
  *       banAfterBlockedWindows} windows in a row is refused outright for {@code banSeconds},
  *       whatever its windows say, so it no longer gets a fresh {@code maxFailures} checks every
@@ -85,12 +85,12 @@ public class AuthFailureThrottle {
    */
   public static final int SATURATION_FACTOR = 10;
 
-  /** Counted in {@link AuthThrottleMode#OBSERVE} for a client that {@code enforce} would refuse. */
+  /** Counted in {@link ThrottleMode#OBSERVE} for a client that {@code enforce} would refuse. */
   static final String WOULD_BLOCK_METRIC = "repsy.auth.throttle_would_block";
 
   private final @Nullable Cache<String, Window> windows;
   private final @Nullable Cache<String, Long> bans;
-  private final AuthThrottleMode mode;
+  private final ThrottleMode mode;
   private final Supplier<@Nullable MeterRegistry> meterRegistry;
   private final Ticker ticker;
   private final long maxFailures;
@@ -103,7 +103,7 @@ public class AuthFailureThrottle {
   private final int banAfterBlockedWindows;
 
   /**
-   * The registry is optional: without Micrometer the {@link AuthThrottleMode#OBSERVE} counter is
+   * The registry is optional: without Micrometer the {@link ThrottleMode#OBSERVE} counter is
    * skipped and the log line remains.
    */
   @Autowired
@@ -144,7 +144,7 @@ public class AuthFailureThrottle {
     this.windowLog = new LogGate(ticker, properties.maxClients());
     this.banAfterBlockedWindows = properties.banAfterBlockedWindows();
 
-    final var tracksClients = this.mode != AuthThrottleMode.OFF;
+    final var tracksClients = this.mode != ThrottleMode.OFF;
     final var bansClients = tracksClients && properties.banSeconds() > 0;
 
     // A ban counts windows in a row, so the previous window has to outlive its own end by one more.
@@ -172,9 +172,8 @@ public class AuthFailureThrottle {
 
   /**
    * Refuses the request when its client has used up its failures for the current window and the
-   * mode is {@link AuthThrottleMode#ENFORCE}. In {@link AuthThrottleMode#OBSERVE} the same client
-   * is logged and counted instead of refused; in {@link AuthThrottleMode#OFF} nothing is tracked at
-   * all.
+   * mode is {@link ThrottleMode#ENFORCE}. In {@link ThrottleMode#OBSERVE} the same client is logged
+   * and counted instead of refused; in {@link ThrottleMode#OFF} nothing is tracked at all.
    *
    * @throws TooManyRequestsException when the client is blocked and the mode is {@code enforce}
    */
@@ -208,7 +207,7 @@ public class AuthFailureThrottle {
     // The refused (or would-refuse) attempt is counted, see SATURATION_FACTOR.
     clientWindows.asMap().computeIfPresent(client, (key, current) -> this.next(current, now));
 
-    if (this.mode == AuthThrottleMode.OBSERVE) {
+    if (this.mode == ThrottleMode.OBSERVE) {
       if (this.windowLog.allows(client)) {
         log.info(
             "repsy.security.auth-throttle.mode=observe: client {} would be refused (429) for {}"
@@ -219,7 +218,7 @@ public class AuthFailureThrottle {
             WOULD_BLOCK_METRIC);
       }
 
-      this.countWouldBlock(client);
+      this.countWouldBlock();
       return;
     }
 
@@ -229,7 +228,7 @@ public class AuthFailureThrottle {
   /** Refuses a banned client, or in {@code observe} only logs and counts it. */
   private void refuseBanned(final String client, final long banSecondsLeft) {
 
-    if (this.mode != AuthThrottleMode.OBSERVE) {
+    if (this.mode != ThrottleMode.OBSERVE) {
       throw new TooManyRequestsException(banSecondsLeft);
     }
 
@@ -243,15 +242,16 @@ public class AuthFailureThrottle {
           WOULD_BLOCK_METRIC);
     }
 
-    this.countWouldBlock(client);
+    this.countWouldBlock();
   }
 
-  private void countWouldBlock(final String client) {
+  /** One counter, no per-client tag: a tag per network would be unbounded cardinality. */
+  private void countWouldBlock() {
 
     final var registry = this.meterRegistry.get();
 
     if (registry != null) {
-      registry.counter(WOULD_BLOCK_METRIC, "network", client).increment();
+      registry.counter(WOULD_BLOCK_METRIC).increment();
     }
   }
 
@@ -299,7 +299,7 @@ public class AuthFailureThrottle {
           remoteAddr,
           client,
           this.maxFailures,
-          this.mode == AuthThrottleMode.ENFORCE
+          this.mode == ThrottleMode.ENFORCE
               ? "refusing its password checks until its window ends"
               : "would be refused if repsy.security.auth-throttle.mode were enforce");
       this.banIfRepeated(client, remoteAddr, window, now);
@@ -320,7 +320,7 @@ public class AuthFailureThrottle {
           remoteAddr,
           client,
           this.banAfterBlockedWindows,
-          this.mode == AuthThrottleMode.ENFORCE
+          this.mode == ThrottleMode.ENFORCE
               ? "banning it for " + TimeUnit.NANOSECONDS.toSeconds(this.banNanos) + "s"
               : "would be banned if repsy.security.auth-throttle.mode were enforce");
       this.announce(client);

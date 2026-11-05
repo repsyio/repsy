@@ -66,7 +66,7 @@ class SuspiciousRequestThrottleTest {
   void strikesBanAtTheLimit() {
 
     final var throttle =
-        this.throttle(SuspiciousRequestProperties.of(AuthThrottleMode.ENFORCE, 10, 3600));
+        this.throttle(SuspiciousRequestProperties.of(ThrottleMode.ENFORCE, 10, 3600));
 
     assertThat(throttle.recordSuspicious(CLIENT, CLIENT, TRAVERSAL)).isZero();
     assertThat(throttle.banSecondsLeft(CLIENT)).isZero();
@@ -82,7 +82,7 @@ class SuspiciousRequestThrottleTest {
   void heavyRequestBansAtOnce() {
 
     final var throttle =
-        this.throttle(SuspiciousRequestProperties.of(AuthThrottleMode.ENFORCE, 10, 3600));
+        this.throttle(SuspiciousRequestProperties.of(ThrottleMode.ENFORCE, 10, 3600));
 
     final var left =
         throttle.recordSuspicious(
@@ -96,7 +96,7 @@ class SuspiciousRequestThrottleTest {
   void windowExpires() {
 
     final var throttle =
-        this.throttle(SuspiciousRequestProperties.of(AuthThrottleMode.ENFORCE, 10, 3600));
+        this.throttle(SuspiciousRequestProperties.of(ThrottleMode.ENFORCE, 10, 3600));
 
     throttle.recordSuspicious(CLIENT, CLIENT, TRAVERSAL);
     this.advanceSeconds(61);
@@ -110,7 +110,7 @@ class SuspiciousRequestThrottleTest {
   void banExpires() {
 
     final var throttle =
-        this.throttle(SuspiciousRequestProperties.of(AuthThrottleMode.ENFORCE, 5, 100));
+        this.throttle(SuspiciousRequestProperties.of(ThrottleMode.ENFORCE, 5, 100));
 
     throttle.recordSuspicious(CLIENT, CLIENT, TRAVERSAL);
     this.advanceSeconds(40);
@@ -125,7 +125,7 @@ class SuspiciousRequestThrottleTest {
   void clientsAreSeparate() {
 
     final var throttle =
-        this.throttle(SuspiciousRequestProperties.of(AuthThrottleMode.ENFORCE, 5, 3600));
+        this.throttle(SuspiciousRequestProperties.of(ThrottleMode.ENFORCE, 5, 3600));
 
     throttle.recordSuspicious(CLIENT, CLIENT, TRAVERSAL);
 
@@ -137,7 +137,7 @@ class SuspiciousRequestThrottleTest {
   void observeTracksTheSame() {
 
     final var throttle =
-        this.throttle(SuspiciousRequestProperties.of(AuthThrottleMode.OBSERVE, 5, 3600));
+        this.throttle(SuspiciousRequestProperties.of(ThrottleMode.OBSERVE, 5, 3600));
 
     throttle.recordSuspicious(CLIENT, CLIENT, TRAVERSAL);
     throttle.countWouldBlock(CLIENT, 3600);
@@ -158,7 +158,7 @@ class SuspiciousRequestThrottleTest {
 
     try {
       final var throttle =
-          this.throttle(SuspiciousRequestProperties.of(AuthThrottleMode.OBSERVE, 5, 3600));
+          this.throttle(SuspiciousRequestProperties.of(ThrottleMode.OBSERVE, 5, 3600));
 
       for (var i = 0; i < 50; i++) {
         throttle.countWouldBlock(CLIENT, 3600);
@@ -201,7 +201,7 @@ class SuspiciousRequestThrottleTest {
   void resetForgets() {
 
     final var throttle =
-        this.throttle(SuspiciousRequestProperties.of(AuthThrottleMode.ENFORCE, 5, 3600));
+        this.throttle(SuspiciousRequestProperties.of(ThrottleMode.ENFORCE, 5, 3600));
 
     throttle.recordSuspicious(CLIENT, CLIENT, TRAVERSAL);
     throttle.reset();
@@ -215,7 +215,7 @@ class SuspiciousRequestThrottleTest {
 
     final var properties =
         new SuspiciousRequestProperties(
-            AuthThrottleMode.ENFORCE,
+            ThrottleMode.ENFORCE,
             10,
             60L,
             3600L,
@@ -239,7 +239,7 @@ class SuspiciousRequestThrottleTest {
 
     final var properties =
         new SuspiciousRequestProperties(
-            AuthThrottleMode.ENFORCE, 10, 60L, 3600L, 10_000L, List.of("10.0.0.0/33"), null);
+            ThrottleMode.ENFORCE, 10, 60L, 3600L, 10_000L, List.of("10.0.0.0/33"), null);
 
     assertThatThrownBy(() -> this.throttle(properties))
         .isInstanceOf(IllegalArgumentException.class);
@@ -250,7 +250,7 @@ class SuspiciousRequestThrottleTest {
   void scannerAgentNeverBansAlone() {
 
     final var throttle =
-        this.throttle(SuspiciousRequestProperties.of(AuthThrottleMode.ENFORCE, 10, 3600));
+        this.throttle(SuspiciousRequestProperties.of(ThrottleMode.ENFORCE, 10, 3600));
     final var agent = Set.of(SignalFamily.SCANNER_UA);
 
     for (var i = 0; i < 20; i++) {
@@ -275,7 +275,7 @@ class SuspiciousRequestThrottleTest {
 
     final var announced = new ArrayList<Announced>();
     final var throttle =
-        this.throttle(SuspiciousRequestProperties.of(AuthThrottleMode.ENFORCE, 10, 3600));
+        this.throttle(SuspiciousRequestProperties.of(ThrottleMode.ENFORCE, 10, 3600));
     throttle.setBanListener(recordingInto(announced));
 
     throttle.recordSuspicious(CLIENT, CLIENT, TRAVERSAL);
@@ -293,7 +293,7 @@ class SuspiciousRequestThrottleTest {
 
     final var announced = new ArrayList<Announced>();
     final var throttle =
-        this.throttle(SuspiciousRequestProperties.of(AuthThrottleMode.ENFORCE, 10, 3600));
+        this.throttle(SuspiciousRequestProperties.of(ThrottleMode.ENFORCE, 10, 3600));
     throttle.setBanListener(recordingInto(announced));
 
     throttle.adopt(CLIENT, 120);
@@ -329,7 +329,7 @@ class SuspiciousRequestThrottleTest {
   void noSignalsNoStrikes() {
 
     final var throttle =
-        this.throttle(SuspiciousRequestProperties.of(AuthThrottleMode.ENFORCE, 1, 3600));
+        this.throttle(SuspiciousRequestProperties.of(ThrottleMode.ENFORCE, 1, 3600));
 
     assertThat(throttle.recordSuspicious(CLIENT, CLIENT, Set.of())).isZero();
     assertThat(throttle.banSecondsLeft(CLIENT)).isZero();
@@ -341,7 +341,7 @@ class SuspiciousRequestThrottleTest {
 
     final var properties =
         new SuspiciousRequestProperties(
-            AuthThrottleMode.ENFORCE, 10, 60L, 3600L, 10_000L, List.of("10.16.0.0/12"), null);
+            ThrottleMode.ENFORCE, 10, 60L, 3600L, 10_000L, List.of("10.16.0.0/12"), null);
     final var throttle = this.throttle(properties);
 
     assertThat(throttle.isAllowlisted("10.16.0.1")).isTrue();
@@ -358,7 +358,7 @@ class SuspiciousRequestThrottleTest {
     final var noRegistry = (ObjectProvider<MeterRegistry>) mock(ObjectProvider.class);
     final var throttle =
         new SuspiciousRequestThrottle(
-            SuspiciousRequestProperties.of(AuthThrottleMode.ENFORCE, 10, 3600), noRegistry);
+            SuspiciousRequestProperties.of(ThrottleMode.ENFORCE, 10, 3600), noRegistry);
 
     assertThat(
             throttle.recordSuspicious(
@@ -372,7 +372,7 @@ class SuspiciousRequestThrottleTest {
   void failingListenerIsIgnored() {
 
     final var throttle =
-        this.throttle(SuspiciousRequestProperties.of(AuthThrottleMode.ENFORCE, 10, 3600));
+        this.throttle(SuspiciousRequestProperties.of(ThrottleMode.ENFORCE, 10, 3600));
     throttle.setBanListener(
         (kind, client, banSeconds) -> {
           throw new IllegalStateException("store is down");

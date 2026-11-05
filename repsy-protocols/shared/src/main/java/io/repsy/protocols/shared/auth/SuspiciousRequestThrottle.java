@@ -46,10 +46,9 @@ import org.springframework.stereotype.Component;
  *       strikes. A client that collects {@code maxStrikes} in one fixed window is banned for {@code
  *       banSeconds}; a single request that weighs that much bans at once. Scanners send bursts, so
  *       there is no "windows in a row" rule as there is for logins.
- *   <li>In {@link AuthThrottleMode#ENFORCE} the {@code SuspiciousRequestFilter} refuses a banned
- *       client with 429 on every path. In {@link AuthThrottleMode#OBSERVE} the same client is
- *       tracked and banned in the books, and only logged and counted against {@value
- *       #WOULD_BLOCK_METRIC}.
+ *   <li>In {@link ThrottleMode#ENFORCE} the {@code SuspiciousRequestFilter} refuses a banned client
+ *       with 429 on every path. In {@link ThrottleMode#OBSERVE} the same client is tracked and
+ *       banned in the books, and only logged and counted against {@value #WOULD_BLOCK_METRIC}.
  *   <li>Clients are held in bounded in-memory caches, per instance; a restart clears them.
  * </ul>
  */
@@ -57,9 +56,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class SuspiciousRequestThrottle {
 
-  /**
-   * Counted in {@link AuthThrottleMode#OBSERVE} for a banned client that {@code enforce} refuses.
-   */
+  /** Counted in {@link ThrottleMode#OBSERVE} for a banned client that {@code enforce} refuses. */
   static final String WOULD_BLOCK_METRIC = "repsy.security.probe_would_block";
 
   static final String STRIKES_METRIC = "repsy.security.probe_strikes";
@@ -106,7 +103,7 @@ public class SuspiciousRequestThrottle {
     this.banNanos = TimeUnit.SECONDS.toNanos(properties.banSeconds());
     this.wouldBlockLog = new LogGate(ticker, properties.maxClients());
 
-    if (properties.mode() == AuthThrottleMode.OFF) {
+    if (properties.mode() == ThrottleMode.OFF) {
       this.windows = null;
       this.bans = null;
     } else {
@@ -147,7 +144,7 @@ public class SuspiciousRequestThrottle {
     this.bans.asMap().putIfAbsent(client, this.ticker.read() - (this.banNanos - leftNanos));
   }
 
-  public AuthThrottleMode mode() {
+  public ThrottleMode mode() {
 
     return this.properties.mode();
   }
@@ -268,7 +265,7 @@ public class SuspiciousRequestThrottle {
         client,
         signals,
         this.properties.maxStrikes(),
-        this.mode() == AuthThrottleMode.ENFORCE
+        this.mode() == ThrottleMode.ENFORCE
             ? "banning it for " + this.properties.banSeconds() + "s"
             : "would be banned if repsy.security.probe-throttle.mode were enforce");
     this.count(BANS_METRIC);
