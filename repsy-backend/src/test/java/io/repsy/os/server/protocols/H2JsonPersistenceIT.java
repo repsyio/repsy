@@ -54,7 +54,7 @@ class H2JsonPersistenceIT extends H2IntegrationTest {
   @Autowired private NuGetPackageRepository nuGetPackageRepository;
   @Autowired private NuGetPackageVersionRepository nuGetPackageVersionRepository;
   @Autowired private NuGetPackageService<UUID> nuGetPackageService;
-  @Autowired private CargoCrateService<UUID> cargoCrateService;
+  @Autowired private CargoCrateService<UUID, UUID> cargoCrateService;
   @Autowired private CargoCrateIndexRepository cargoCrateIndexRepository;
   @Autowired private KeyStoreService keyStoreService;
   @Autowired private RepoMapper repoConverter;

@@ -73,7 +73,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
 @SuppressWarnings("unchecked")
-public class NpmPackageService extends AbstractNpmPackageService<UUID> {
+public class NpmPackageService extends AbstractNpmPackageService<UUID, UUID> {
 
   private static final String VERSION_UNIQUE_CONSTRAINT =
       "ux_npm_package_version__package_id_version";

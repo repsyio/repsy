@@ -71,7 +71,7 @@ import tools.jackson.databind.ObjectMapper;
 @Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
-public class CargoCrateService extends AbstractCargoCrateService<UUID> {
+public class CargoCrateService extends AbstractCargoCrateService<UUID, UUID> {
 
   private static final String VERSION_UNIQUE_CONSTRAINT = "ux_cargo_crate_index__crate_id_vers";
 

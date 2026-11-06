@@ -75,16 +75,17 @@ class AbstractNpmProtocolFacadeDeleteTest {
   private static final NpmPackageSnapshot SNAPSHOT =
       new NpmPackageSnapshot(null, PACKAGE, "1.0.0", Instant.EPOCH, List.of(), Map.of());
 
-  @Mock private NpmPackageService<UUID> packageService;
+  @Mock private NpmPackageService<UUID, UUID> packageService;
   @Mock private AbstractNpmStorageService storageService;
 
   private TestFacade facade;
   private ProtocolContext context;
 
-  private static class TestFacade extends AbstractNpmProtocolFacade<UUID> {
+  private static class TestFacade extends AbstractNpmProtocolFacade<UUID, UUID> {
 
     TestFacade(
-        final NpmPackageService<UUID> packageService, final AbstractNpmStorageService storage) {
+        final NpmPackageService<UUID, UUID> packageService,
+        final AbstractNpmStorageService storage) {
       super(packageService, storage);
     }
   }

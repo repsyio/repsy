@@ -82,7 +82,7 @@ class AbstractCargoProtocolFacadeTest {
   private static final long MAX_CRATE_BYTES = 10L * 1024 * 1024;
 
   @Mock private CargoStorageService storageService;
-  @Mock private CargoCrateService<UUID> crateService;
+  @Mock private CargoCrateService<UUID, UUID> crateService;
   @Mock private ObjectMapper objectMapper;
   @Mock private BaseRepoInfo<UUID> repoInfo;
 
@@ -93,7 +93,7 @@ class AbstractCargoProtocolFacadeTest {
   @Mock private BaseUsages usages;
   @Mock private Resource resource;
 
-  private AbstractCargoProtocolFacade<UUID> facade;
+  private AbstractCargoProtocolFacade<UUID, UUID> facade;
 
   @BeforeEach
   @SuppressWarnings("unchecked")
@@ -106,11 +106,11 @@ class AbstractCargoProtocolFacadeTest {
 
   // ── Concrete subclass for testing the abstract facade ────────────────────
 
-  static class TestFacade extends AbstractCargoProtocolFacade<UUID> {
+  static class TestFacade extends AbstractCargoProtocolFacade<UUID, UUID> {
 
     TestFacade(
         final CargoStorageService s,
-        final CargoCrateService<UUID> c,
+        final CargoCrateService<UUID, UUID> c,
         final ObjectMapper o,
         final long maxCrateBytes) {
       super(s, c, o, maxCrateBytes);

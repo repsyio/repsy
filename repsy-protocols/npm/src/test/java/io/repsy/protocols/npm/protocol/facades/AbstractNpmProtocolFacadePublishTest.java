@@ -69,16 +69,17 @@ class AbstractNpmProtocolFacadePublishTest {
   private static final Path BASE_PATH = Path.of(PACKAGE);
   private static final byte[] PREVIOUS_METADATA = "{\"name\":\"demo\"}".getBytes();
 
-  @Mock private NpmPackageService<UUID> packageService;
+  @Mock private NpmPackageService<UUID, UUID> packageService;
   @Mock private AbstractNpmStorageService storageService;
 
   private TestFacade facade;
   private ProtocolContext context;
 
-  private static class TestFacade extends AbstractNpmProtocolFacade<UUID> {
+  private static class TestFacade extends AbstractNpmProtocolFacade<UUID, UUID> {
 
     TestFacade(
-        final NpmPackageService<UUID> packageService, final AbstractNpmStorageService storage) {
+        final NpmPackageService<UUID, UUID> packageService,
+        final AbstractNpmStorageService storage) {
       super(packageService, storage);
     }
   }
