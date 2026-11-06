@@ -27,6 +27,7 @@
 import { createPanelBackend } from '../api/backend-registry.js';
 import { env } from '../env.js';
 import { isRunPrefixed, RUN_PREFIX } from './run-id.js';
+import { retryWhileBusy } from './retry-busy.js';
 
 const DEFAULT_SWEEP_HOURS = 24;
 const MS_PER_HOUR = 60 * 60 * 1000;
@@ -90,7 +91,7 @@ export async function sweep(opts: SweepOptions): Promise<SweepResult> {
       continue;
     }
 
-    await api.deleteRepo(repo.name);
+    await retryWhileBusy(() => api.deleteRepo(repo.name));
     deletedRepos += 1;
     console.log(`deleted repo ${repo.name}`);
   }
@@ -112,7 +113,7 @@ export async function sweep(opts: SweepOptions): Promise<SweepResult> {
       continue;
     }
 
-    await api.deleteRepoUser(user.id);
+    await retryWhileBusy(() => api.deleteRepoUser(user.id));
     deletedUsers += 1;
     console.log(`deleted user ${user.username}`);
   }

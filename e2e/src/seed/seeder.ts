@@ -22,6 +22,7 @@ import {
   UserRole,
 } from '../api/panel-backend.js';
 import { env } from '../env.js';
+import { retryWhileBusy } from './retry-busy.js';
 import { password, repoName, RUN_PREFIX, userName } from './run-id.js';
 
 const NOT_FOUND = 404;
@@ -290,13 +291,13 @@ export class Seeder {
   private async deleteTracked(entity: Tracked): Promise<void> {
     switch (entity.kind) {
       case 'token':
-        await this.api.revokeDeployToken(entity.repoName, entity.tokenId);
+        await retryWhileBusy(() => this.api.revokeDeployToken(entity.repoName, entity.tokenId));
         return;
       case 'repo':
-        await this.api.deleteRepo(entity.name);
+        await retryWhileBusy(() => this.api.deleteRepo(entity.name));
         return;
       case 'user':
-        await this.api.deleteRepoUser(entity.id);
+        await retryWhileBusy(() => this.api.deleteRepoUser(entity.id));
         return;
     }
   }
