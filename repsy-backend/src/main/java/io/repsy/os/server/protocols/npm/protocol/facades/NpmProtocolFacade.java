@@ -22,10 +22,11 @@ import java.util.UUID;
 import org.springframework.stereotype.Component;
 
 @Component
-public class NpmProtocolFacade extends AbstractNpmProtocolFacade<UUID> {
+public class NpmProtocolFacade extends AbstractNpmProtocolFacade<UUID, UUID> {
 
   public NpmProtocolFacade(
-      final NpmPackageService<UUID> npmPackageService, final NpmStorageService npmStorageService) {
+      final NpmPackageService<UUID, UUID> npmPackageService,
+      final NpmStorageService npmStorageService) {
 
     super(npmPackageService, npmStorageService);
   }

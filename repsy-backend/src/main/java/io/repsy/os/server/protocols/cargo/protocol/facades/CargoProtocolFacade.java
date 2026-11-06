@@ -25,11 +25,11 @@ import org.springframework.util.unit.DataSize;
 import tools.jackson.databind.ObjectMapper;
 
 @Component
-public class CargoProtocolFacade extends AbstractCargoProtocolFacade<UUID> {
+public class CargoProtocolFacade extends AbstractCargoProtocolFacade<UUID, UUID> {
 
   public CargoProtocolFacade(
       final CargoStorageService cargoStorageService,
-      final CargoCrateService<UUID> cargoCrateService,
+      final CargoCrateService<UUID, UUID> cargoCrateService,
       final ObjectMapper objectMapper,
       @Value("${repsy.cargo.max-crate-size:100MB}") final DataSize maxCrateSize) {
 
