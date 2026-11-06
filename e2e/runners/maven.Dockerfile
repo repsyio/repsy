@@ -130,9 +130,9 @@ RUN mkdir -p "${ANT_HOME}/bin" "${ANT_HOME}/lib" \
     && curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 --connect-timeout 20 -o "${ANT_HOME}/lib/ant-launcher.jar" "https://repo.maven.apache.org/maven2/org/apache/ant/ant-launcher/${ANT_VERSION}/ant-launcher-${ANT_VERSION}.jar" \
     && echo "${ANT_SHA512}  ${ANT_HOME}/lib/ant.jar" | sha512sum -c - \
     && echo "${ANT_LAUNCHER_SHA512}  ${ANT_HOME}/lib/ant-launcher.jar" | sha512sum -c - \
-    && printf '%s\n' '#!/bin/sh' 'exec java -classpath "${ANT_HOME}/lib/ant-launcher.jar" "-Dant.home=${ANT_HOME}" "-Dant.library.dir=${ANT_HOME}/lib" org.apache.tools.ant.launch.Launcher "$@"' > "${ANT_HOME}/bin/ant" \
-    && chmod -R a+rX "${ANT_HOME}" \
-    && chmod a+rx "${ANT_HOME}/bin/ant"
+    && chmod -R a+rX "${ANT_HOME}"
+
+COPY --chmod=755 ${HARNESS_DIR}/runners/ant-wrapper.sh ${ANT_HOME}/bin/ant
 
 RUN mkdir -p /opt/ivy \
     && curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 --connect-timeout 20 -o "${IVY_JAR}" "https://repo.maven.apache.org/maven2/org/apache/ivy/ivy/${IVY_VERSION}/ivy-${IVY_VERSION}.jar" \
