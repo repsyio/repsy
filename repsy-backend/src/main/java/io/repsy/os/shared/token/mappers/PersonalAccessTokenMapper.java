@@ -16,7 +16,7 @@
 package io.repsy.os.shared.token.mappers;
 
 import io.repsy.os.generated.model.AccessTokenCreated;
-import io.repsy.os.generated.model.AccessTokenWhoAmI;
+import io.repsy.os.generated.model.AccessTokenInfo;
 import io.repsy.os.shared.token.dtos.PersonalAccessTokenInfo;
 import io.repsy.os.shared.token.entities.PersonalAccessToken;
 import org.mapstruct.Mapper;
@@ -35,7 +35,7 @@ public interface PersonalAccessTokenMapper {
   @Mapping(target = "scopes", source = "scopes")
   PersonalAccessTokenInfo toInfo(PersonalAccessToken token);
 
-  AccessTokenWhoAmI toWhoAmI(PersonalAccessTokenInfo info);
+  AccessTokenInfo toWhoAmI(PersonalAccessTokenInfo info);
 
   /** The response of a create: the metadata of the token and, once, its secret. */
   @Mapping(target = "id", source = "info.id")

@@ -73,7 +73,7 @@ export interface CreatedAccessToken {
   token: string;
 }
 
-export interface AccessTokenWhoAmI {
+export interface AccessTokenInfo {
   username: string;
   name: string;
   scopes: StoredScope[];
@@ -133,16 +133,14 @@ export class AccessTokenApi {
  * `GET /api/profile/access-tokens/current` with a token's secret as the Bearer credential: the status, and the
  * body when it answered 200. A revoked token must answer 401 at once.
  */
-export async function whoAmI(
-  secret: string,
-): Promise<{ status: number; body?: AccessTokenWhoAmI }> {
+export async function whoAmI(secret: string): Promise<{ status: number; body?: AccessTokenInfo }> {
   const res = await fetch(`${env.apiBaseUrl}${PATH}/current`, {
     headers: { Authorization: `Bearer ${secret}` },
   });
   if (res.status !== 200) {
     return { status: res.status };
   }
-  return { status: res.status, body: (await res.json()) as AccessTokenWhoAmI };
+  return { status: res.status, body: (await res.json()) as AccessTokenInfo };
 }
 
 /**

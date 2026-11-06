@@ -21,7 +21,7 @@ import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.generated.model.AccessTokenCreated;
 import io.repsy.os.generated.model.AccessTokenForm;
-import io.repsy.os.generated.model.AccessTokenWhoAmI;
+import io.repsy.os.generated.model.AccessTokenInfo;
 import io.repsy.os.shared.constants.ErrorConstants;
 import io.repsy.os.shared.token.dtos.PersonalAccessTokenInfo;
 import io.repsy.os.shared.token.dtos.PersonalAccessTokenKind;
@@ -138,7 +138,7 @@ public class PersonalAccessTokenService {
    *
    * @throws ItemNotFoundException if there is no such token
    */
-  public AccessTokenWhoAmI getWhoAmI(final UUID tokenId) {
+  public AccessTokenInfo getWhoAmI(final UUID tokenId) {
 
     final var token =
         this.tokenRepository

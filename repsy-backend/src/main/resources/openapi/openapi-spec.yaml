@@ -404,7 +404,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/AccessTokenWhoAmI"
+                "$ref": "#/components/schemas/AccessTokenInfo"
         '400':
           "$ref": "#/components/responses/BadRequest"
         '401':
@@ -6126,7 +6126,7 @@ components:
       required:
         - content
         - page
-    AccessTokenWhoAmI:
+    AccessTokenInfo:
       type: object
       properties:
         username:
