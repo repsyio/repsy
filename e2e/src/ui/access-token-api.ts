@@ -73,7 +73,7 @@ export interface CreatedAccessToken {
   token: string;
 }
 
-export interface AccessTokenWhoAmI {
+export interface AccessTokenInfo {
   username: string;
   name: string;
   scopes: StoredScope[];
@@ -135,14 +135,14 @@ export class AccessTokenApi {
  */
 export async function whoAmI(
   secret: string,
-): Promise<{ status: number; body?: AccessTokenWhoAmI }> {
+): Promise<{ status: number; body?: AccessTokenInfo }> {
   const res = await fetch(`${env.apiBaseUrl}${PATH}/current`, {
     headers: { Authorization: `Bearer ${secret}` },
   });
   if (res.status !== 200) {
     return { status: res.status };
   }
-  return { status: res.status, body: (await res.json()) as AccessTokenWhoAmI };
+  return { status: res.status, body: (await res.json()) as AccessTokenInfo };
 }
 
 /**

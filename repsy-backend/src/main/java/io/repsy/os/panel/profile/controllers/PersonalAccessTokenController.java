@@ -24,7 +24,7 @@ import io.repsy.core.web.paging.SortValidator;
 import io.repsy.libs.multiport.annotations.RestApiPort;
 import io.repsy.os.generated.model.AccessTokenCreated;
 import io.repsy.os.generated.model.AccessTokenForm;
-import io.repsy.os.generated.model.AccessTokenWhoAmI;
+import io.repsy.os.generated.model.AccessTokenInfo;
 import io.repsy.os.shared.auth.PanelAuthHelper;
 import io.repsy.os.shared.token.dtos.PersonalAccessTokenListItem;
 import io.repsy.os.shared.token.services.PersonalAccessTokenService;
@@ -109,7 +109,7 @@ class PersonalAccessTokenController {
    * token of a login it answers {@code notAnAccessToken} (400), as there is no token to describe.
    */
   @GetMapping("/current")
-  public AccessTokenWhoAmI current(@RequestHeader(AUTHORIZATION) final String authHeader) {
+  public AccessTokenInfo current(@RequestHeader(AUTHORIZATION) final String authHeader) {
 
     final var token = this.panelAuthHelper.authenticateAccessToken(authHeader);
 
