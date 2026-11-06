@@ -147,8 +147,8 @@ export async function whoAmI(
 
 /**
  * The token routes (`POST`, `GET`, `DELETE /api/profile/access-tokens`) called with a token's secret as the Bearer
- * credential instead of a login (RPS-2039): a temporary `rct-` token is accepted, a `rut-` personal token is refused
- * with 401. Each call answers its status, and the body when there is one.
+ * credential instead of a login (RPS-2039): a temporary `rct-` token is accepted, and so is a `rut-` personal
+ * token (RPS-2440), each limited to its own scopes. Each call answers its status, and the body when there is one.
  */
 export class TokenRoutesAs {
   constructor(private readonly secret: string) {}
