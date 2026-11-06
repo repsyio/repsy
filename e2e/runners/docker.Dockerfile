@@ -74,7 +74,7 @@ RUN case "${TARGETARCH:-amd64}" in \
       arm64) sha="${REGCTL_SHA256_ARM64}" ;; \
       *) echo "regctl: no pinned checksum for ${TARGETARCH}" >&2; exit 1 ;; \
     esac \
- && curl -fsSL -o /regctl "https://github.com/regclient/regclient/releases/download/${REGCTL_VERSION}/regctl-linux-${TARGETARCH:-amd64}" \
+ && curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 --connect-timeout 20 -o /regctl "https://github.com/regclient/regclient/releases/download/${REGCTL_VERSION}/regctl-linux-${TARGETARCH:-amd64}" \
  && echo "${sha}  /regctl" | sha256sum -c - \
  && chmod a+rx /regctl
 
@@ -95,7 +95,7 @@ RUN case "${TARGETARCH:-amd64}" in \
       arm64) sha="${ORAS_SHA256_ARM64}" ;; \
       *) echo "oras: no pinned checksum for ${TARGETARCH}" >&2; exit 1 ;; \
     esac \
- && curl -fsSL -o /oras.tar.gz "https://github.com/oras-project/oras/releases/download/${ORAS_VERSION}/oras_${ORAS_VERSION#v}_linux_${TARGETARCH:-amd64}.tar.gz" \
+ && curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 --connect-timeout 20 -o /oras.tar.gz "https://github.com/oras-project/oras/releases/download/${ORAS_VERSION}/oras_${ORAS_VERSION#v}_linux_${TARGETARCH:-amd64}.tar.gz" \
  && echo "${sha}  /oras.tar.gz" | sha256sum -c - \
  && tar -xzf /oras.tar.gz -C / oras \
  && chmod a+rx /oras

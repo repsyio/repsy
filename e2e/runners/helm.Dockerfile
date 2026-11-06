@@ -59,7 +59,7 @@ RUN case "${TARGETARCH:-amd64}" in \
       arm64) sha="${HELM_SHA256_ARM64}" ;; \
       *) echo "helm: no pinned checksum for ${TARGETARCH}" >&2; exit 1 ;; \
     esac \
-    && curl -fsSLO "https://get.helm.sh/helm-${HELM_VERSION}-linux-${TARGETARCH}.tar.gz" \
+    && curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 --connect-timeout 20 -O "https://get.helm.sh/helm-${HELM_VERSION}-linux-${TARGETARCH}.tar.gz" \
     && echo "${sha}  helm-${HELM_VERSION}-linux-${TARGETARCH}.tar.gz" | sha256sum -c - \
     && tar -xzf "helm-${HELM_VERSION}-linux-${TARGETARCH}.tar.gz" \
     && install -m 0755 "linux-${TARGETARCH}/helm" /usr/local/bin/helm
