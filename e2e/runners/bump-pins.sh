@@ -101,8 +101,8 @@ done < <(grep -h -E '^FROM [^ ]+@\$\{[A-Z0-9_]+_IMAGE_DIGEST\}' runners/*.Docker
 
 fetch() { curl -fsSL --retry 3 --retry-delay 2 "$1"; }
 
-# The first field of the first line: `<checksum>  <file>` and a bare checksum both work (archive.apache.org
-# serves some of them with CRLF line ends).
+# The first field of the first line: `<checksum>  <file>` and a bare checksum both work (some servers
+# serve them with CRLF line ends).
 first_word() { tr -d '\r' | awk 'NR == 1 { print $1 }'; }
 
 # regctl and oras name a release file per architecture.
@@ -126,7 +126,7 @@ resolve() {
       ;;
     MAVEN_SHA512)
       v="${VALUE[MAVEN_VERSION]}"
-      fetch "https://archive.apache.org/dist/maven/maven-${v%%.*}/${v}/binaries/apache-maven-${v}-bin.tar.gz.sha512" | first_word
+      fetch "https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/${v}/apache-maven-${v}-bin.tar.gz.sha512" | first_word
       ;;
     GRADLE_SHA256)
       fetch "https://services.gradle.org/distributions/gradle-${VALUE[GRADLE_VERSION]}-bin.zip.sha256" | first_word
@@ -137,11 +137,15 @@ resolve() {
       ;;
     ANT_SHA512)
       v="${VALUE[ANT_VERSION]}"
-      fetch "https://archive.apache.org/dist/ant/binaries/apache-ant-${v}-bin.tar.gz.sha512" | first_word
+      fetch "https://repo.maven.apache.org/maven2/org/apache/ant/ant/${v}/ant-${v}.jar" | sha512sum | first_word
+      ;;
+    ANT_LAUNCHER_SHA512)
+      v="${VALUE[ANT_VERSION]}"
+      fetch "https://repo.maven.apache.org/maven2/org/apache/ant/ant-launcher/${v}/ant-launcher-${v}.jar" | sha512sum | first_word
       ;;
     IVY_SHA512)
       v="${VALUE[IVY_VERSION]}"
-      fetch "https://archive.apache.org/dist/ant/ivy/${v}/apache-ivy-${v}-bin.tar.gz.sha512" | first_word
+      fetch "https://repo.maven.apache.org/maven2/org/apache/ivy/ivy/${v}/ivy-${v}.jar" | sha512sum | first_word
       ;;
     HELM_SHA256_*)
       arch="$(arch_of "$key")"

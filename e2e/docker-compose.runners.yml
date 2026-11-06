@@ -102,7 +102,7 @@ services:
       dockerfile: runners/maven.Dockerfile
       args:
         # Exact JDK release and its linux/x64 tarball SHA-256 (api.adoptium.net/v3/assets), Maven's SHA-512
-        # (archive.apache.org): the build fails on a mismatch. RPS-1597: bump with runners/bump-pins.sh.
+        # (Maven Central; Ant's and Ivy's are those of their jars there): the build fails on a mismatch. RPS-1597: bump with runners/bump-pins.sh.
         TEMURIN_VERSION: '21.0.12.1+1'
         TEMURIN_SHA256: 'ce79869e1307ed8ee1e2baa86a412b1eb5b75d10a01006d788a6f968bcfaee94'
         MAVEN_VERSION: '3.9.9'
@@ -110,9 +110,10 @@ services:
         GRADLE_VERSION: '8.14.3'
         GRADLE_SHA256: 'bd71102213493060956ec229d946beee57158dbd89d0e62b91bca0fa2c5f3531'
         ANT_VERSION: '1.10.15'
-        ANT_SHA512: 'd78427aff207592c024ff1552dc04f7b57065a195c42d398fcffe7a0145e8d00cd46786f5aa52e77ab0fdf81334f065eb8011eecd2b48f7228e97ff4cb20d16c'
+        ANT_SHA512: 'd5109838090a4463098c4a82c171d07b92d42633010e045388fb8a68744fdcdd2b07a75a9fb56783e83ecbcc80664119ccc44537993125d6724956e114508316'
+        ANT_LAUNCHER_SHA512: '6fc2b33cde07493704c201b759e6813ba5f60ffd3925a52bb097a7fffedbc950bcc4fbc93fe0a86ec2a41872b16b92868b6be87632d3e8e0dc89a5b4143ccb9e'
         IVY_VERSION: '2.5.3'
-        IVY_SHA512: '19e38998eda66a635643f50eec1fe62aeaa4b66e7b12540e38ae9ab67f2402a4df1230c0fa142e391234abf8491b5cd46fa8a3b004324b511a495701be848470'
+        IVY_SHA512: 'be291ddf612703fd3657a72820199430d053a8e06f7631e78477b428ba343631bc36b16bde8c25df544b64b420be84568d3898921f8db63fe676fb590586355b'
     environment:
       <<: *runner-environment
       # Read by clients/maven.ts: Maven's shared, third-party-only "local repository tail" (see that
