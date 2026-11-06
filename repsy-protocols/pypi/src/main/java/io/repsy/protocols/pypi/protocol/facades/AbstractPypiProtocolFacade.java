@@ -47,16 +47,22 @@ import org.springframework.core.io.Resource;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.util.HtmlUtils;
 
+/**
+ * Base of the backend implementation of {@link PypiProtocolFacade}.
+ *
+ * @param <R> the type of the repo id
+ * @param <P> the type of the package id, which can differ from the repo id's
+ */
 @Slf4j
 @RequiredArgsConstructor
-public abstract class AbstractPypiProtocolFacade<I> implements PypiProtocolFacade<I> {
+public abstract class AbstractPypiProtocolFacade<R, P> implements PypiProtocolFacade<R> {
 
   private static final String ARTIFACT_NAME = "artifactName";
   private static final String ARTIFACT_VERSION = "artifactVersion";
   private static final String STORAGE_PATH = "storagePath";
 
-  private final PypiStorageService<I> pypiStorageService;
-  private final PypiPackageService<I> pypiPackageService;
+  private final PypiStorageService<R> pypiStorageService;
+  private final PypiPackageService<R, P> pypiPackageService;
 
   @Override
   public void uploadPackage(
@@ -71,7 +77,7 @@ public abstract class AbstractPypiProtocolFacade<I> implements PypiProtocolFacad
       throw new BadRequestException(ProtocolErrorCodes.PYPI_ARCHIVE_EMPTY);
     }
 
-    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<R>getRepoInfo(context);
 
     final var uploadForm = parseUploadForm(parameterMap);
     uploadForm.setNormalizedName(PypiPackageUtils.normalizePackageName(uploadForm.getName()));
@@ -122,14 +128,14 @@ public abstract class AbstractPypiProtocolFacade<I> implements PypiProtocolFacad
       final ProtocolContext context, final String packageNormalizedName)
       throws IOException, TemplateException {
 
-    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<R>getRepoInfo(context);
 
     return this.fetchFromLocalStorage(repoInfo, packageNormalizedName);
   }
 
   @Override
   public ByteArrayResource fetchFromLocalStorage(
-      final BaseRepoInfo<I> repoInfo, final String packageNormalizedName)
+      final BaseRepoInfo<R> repoInfo, final String packageNormalizedName)
       throws TemplateException, IOException {
 
     final var packageInfo =
@@ -156,7 +162,7 @@ public abstract class AbstractPypiProtocolFacade<I> implements PypiProtocolFacad
   @Override
   public boolean packageExists(final ProtocolContext context, final String packageNormalizedName) {
 
-    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<R>getRepoInfo(context);
 
     return this.pypiPackageService.packageExists(repoInfo.getId(), packageNormalizedName);
   }
@@ -165,14 +171,14 @@ public abstract class AbstractPypiProtocolFacade<I> implements PypiProtocolFacad
   public boolean archiveFileExists(
       final ProtocolContext context, final String packageName, final String fileName) {
 
-    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<R>getRepoInfo(context);
 
     return this.pypiStorageService.isPackageFileExist(
         repoInfo.getStorageKey(), packageName, fileName);
   }
 
   private void checkOverridePermission(
-      final BaseRepoInfo<I> repoInfo,
+      final BaseRepoInfo<R> repoInfo,
       final PackageUploadForm uploadForm,
       final MultipartFile file) {
 
@@ -186,7 +192,7 @@ public abstract class AbstractPypiProtocolFacade<I> implements PypiProtocolFacad
   }
 
   private boolean archiveExists(
-      final BaseRepoInfo<I> repoInfo,
+      final BaseRepoInfo<R> repoInfo,
       final PackageUploadForm uploadForm,
       final MultipartFile file) {
 
@@ -197,7 +203,7 @@ public abstract class AbstractPypiProtocolFacade<I> implements PypiProtocolFacad
   }
 
   private BaseUsages savePackage(
-      final BaseRepoInfo<I> repoInfo, final PackageUploadForm uploadForm, final MultipartFile file)
+      final BaseRepoInfo<R> repoInfo, final PackageUploadForm uploadForm, final MultipartFile file)
       throws IOException {
 
     return this.pypiPackageService.publishRelease(
@@ -210,7 +216,7 @@ public abstract class AbstractPypiProtocolFacade<I> implements PypiProtocolFacad
    * written files are removed. A file being replaced keeps its row and is left alone.
    */
   private BaseUsages storeArchive(
-      final BaseRepoInfo<I> repoInfo, final PackageUploadForm uploadForm, final MultipartFile file)
+      final BaseRepoInfo<R> repoInfo, final PackageUploadForm uploadForm, final MultipartFile file)
       throws IOException {
 
     // The check before the transaction cannot see a concurrent upload of the same file. Every

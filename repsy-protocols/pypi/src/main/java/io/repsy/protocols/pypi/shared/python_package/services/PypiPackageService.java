@@ -23,7 +23,13 @@ import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import java.io.IOException;
 import java.util.List;
 
-public interface PypiPackageService<I> {
+/**
+ * The package and release rows of a PyPI repo.
+ *
+ * @param <R> the type of the repo id
+ * @param <P> the type of the package id
+ */
+public interface PypiPackageService<R, P> {
 
   /**
    * Records the release of the upload and, while that write is still open, stores its archive
@@ -39,15 +45,15 @@ public interface PypiPackageService<I> {
    * @return the usages reported by {@code fileWriter}
    */
   BaseUsages publishRelease(
-      BaseRepoInfo<I> repoInfo, PackageUploadForm uploadForm, ReleaseFileWriter fileWriter)
+      BaseRepoInfo<R> repoInfo, PackageUploadForm uploadForm, ReleaseFileWriter fileWriter)
       throws IOException;
 
-  BasePypiPackageInfo<I> getPackage(I repoId, String packageNormalizedName);
+  BasePypiPackageInfo<P> getPackage(R repoId, String packageNormalizedName);
 
   /** Existence-only check, never {@link #getPackage}: used to answer {@code HEAD}. */
-  boolean packageExists(I repoId, String packageNormalizedName);
+  boolean packageExists(R repoId, String packageNormalizedName);
 
-  List<ReleaseVersionRequiresPython> getReleaseIndexListItemInfos(I packageId);
+  List<ReleaseVersionRequiresPython> getReleaseIndexListItemInfos(P packageId);
 
   /** Stores the archive of a release whose rows {@link #publishRelease} has just written. */
   @FunctionalInterface
