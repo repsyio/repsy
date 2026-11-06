@@ -26,7 +26,7 @@
     <fmt-maven-plugin.version>2.29</fmt-maven-plugin.version>
     <maven-checkstyle-plugin.version>3.6.0</maven-checkstyle-plugin.version>
     <checkstyle.version>14.4.0</checkstyle.version>
-    <error-prone.version>2.51.0</error-prone.version>
+    <error-prone.version>2.52.0</error-prone.version>
     <nullaway.version>0.14.3</nullaway.version>
   </properties>
 
