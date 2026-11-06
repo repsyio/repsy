@@ -133,9 +133,7 @@ export class AccessTokenApi {
  * `GET /api/profile/access-tokens/current` with a token's secret as the Bearer credential: the status, and the
  * body when it answered 200. A revoked token must answer 401 at once.
  */
-export async function whoAmI(
-  secret: string,
-): Promise<{ status: number; body?: AccessTokenInfo }> {
+export async function whoAmI(secret: string): Promise<{ status: number; body?: AccessTokenInfo }> {
   const res = await fetch(`${env.apiBaseUrl}${PATH}/current`, {
     headers: { Authorization: `Bearer ${secret}` },
   });
