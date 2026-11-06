@@ -398,6 +398,11 @@ jobs:
     strategy:
       # A red leg must not hide the result of the others.
       fail-fast: false
+      # Every leg runs its own stack, a Maven/Gradle/Playwright runner and downloads from Maven Central, all on the
+      # one Docker host of the self hosted runners. All of them at once starved it (RPS-2534): Gradle killed at its
+      # timeout, `mvn dependency:get` timeouts, stacks slower than the 180 s health wait, Firefox and WebKit specs
+      # timing out, while the same legs passed one at a time. Raise it only with the host's capacity.
+      max-parallel: 6
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     defaults:
       run:
