@@ -96,39 +96,39 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /opt/java \
-    && curl -fsSL -o /tmp/temurin.tgz "https://api.adoptium.net/v3/binary/version/jdk-${TEMURIN_VERSION}/linux/x64/jdk/hotspot/normal/eclipse" \
+    && curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 --connect-timeout 20 -o /tmp/temurin.tgz "https://api.adoptium.net/v3/binary/version/jdk-${TEMURIN_VERSION}/linux/x64/jdk/hotspot/normal/eclipse" \
     && echo "${TEMURIN_SHA256}  /tmp/temurin.tgz" | sha256sum -c - \
     && tar -xzf /tmp/temurin.tgz -C /opt/java \
     && rm /tmp/temurin.tgz \
     && mv /opt/java/jdk-* "${JAVA_HOME}"
 
-RUN curl -fsSL -o /tmp/maven.tgz "https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz" \
+RUN curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 --connect-timeout 20 -o /tmp/maven.tgz "https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz" \
     && echo "${MAVEN_SHA512}  /tmp/maven.tgz" | sha512sum -c - \
     && tar -xzf /tmp/maven.tgz -C /opt \
     && rm /tmp/maven.tgz \
     && mv "/opt/apache-maven-${MAVEN_VERSION}" "${MAVEN_HOME}"
 
-RUN curl -fsSL -o /tmp/gradle.zip "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" \
+RUN curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 --connect-timeout 20 -o /tmp/gradle.zip "https://services.gradle.org/distributions/gradle-${GRADLE_VERSION}-bin.zip" \
     && echo "${GRADLE_SHA256}  /tmp/gradle.zip" | sha256sum -c - \
     && unzip -q /tmp/gradle.zip -d /opt \
     && mv "/opt/gradle-${GRADLE_VERSION}" "${GRADLE_HOME}" \
     && rm /tmp/gradle.zip \
     && chmod -R a+rX "${GRADLE_HOME}"
 
-RUN curl -fsSL -o /tmp/sbt.tgz "https://github.com/sbt/sbt/releases/download/v${SBT_VERSION}/sbt-${SBT_VERSION}.tgz" \
+RUN curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 --connect-timeout 20 -o /tmp/sbt.tgz "https://github.com/sbt/sbt/releases/download/v${SBT_VERSION}/sbt-${SBT_VERSION}.tgz" \
     && echo "${SBT_SHA256}  /tmp/sbt.tgz" | sha256sum -c - \
     && tar -xzf /tmp/sbt.tgz -C /opt \
     && rm /tmp/sbt.tgz \
     && chmod -R a+rX "${SBT_HOME}"
 
-RUN curl -fsSL -o /tmp/ant.tgz "https://archive.apache.org/dist/ant/binaries/apache-ant-${ANT_VERSION}-bin.tar.gz" \
+RUN curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 --connect-timeout 20 -o /tmp/ant.tgz "https://archive.apache.org/dist/ant/binaries/apache-ant-${ANT_VERSION}-bin.tar.gz" \
     && echo "${ANT_SHA512}  /tmp/ant.tgz" | sha512sum -c - \
     && tar -xzf /tmp/ant.tgz -C /opt \
     && mv "/opt/apache-ant-${ANT_VERSION}" "${ANT_HOME}" \
     && rm /tmp/ant.tgz \
     && chmod -R a+rX "${ANT_HOME}"
 
-RUN curl -fsSL -o /tmp/ivy.tgz "https://archive.apache.org/dist/ant/ivy/${IVY_VERSION}/apache-ivy-${IVY_VERSION}-bin.tar.gz" \
+RUN curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 --connect-timeout 20 -o /tmp/ivy.tgz "https://archive.apache.org/dist/ant/ivy/${IVY_VERSION}/apache-ivy-${IVY_VERSION}-bin.tar.gz" \
     && echo "${IVY_SHA512}  /tmp/ivy.tgz" | sha512sum -c - \
     && mkdir -p /opt/ivy \
     && tar -xzf /tmp/ivy.tgz -C /opt/ivy --strip-components=1 "apache-ivy-${IVY_VERSION}/ivy-${IVY_VERSION}.jar" \

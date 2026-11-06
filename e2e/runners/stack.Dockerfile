@@ -67,7 +67,7 @@ RUN case "${TARGETARCH:-amd64}" in \
       arm64) sha="${HELM_SHA256_ARM64}" ;; \
       *) echo "helm: no pinned checksum for ${TARGETARCH}" >&2; exit 1 ;; \
     esac \
-    && curl -fsSLO "https://get.helm.sh/helm-${HELM_VERSION}-linux-${TARGETARCH}.tar.gz" \
+    && curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 --connect-timeout 20O "https://get.helm.sh/helm-${HELM_VERSION}-linux-${TARGETARCH}.tar.gz" \
     && echo "${sha}  helm-${HELM_VERSION}-linux-${TARGETARCH}.tar.gz" | sha256sum -c - \
     && tar -xzf "helm-${HELM_VERSION}-linux-${TARGETARCH}.tar.gz" \
     && install -m 0755 "linux-${TARGETARCH}/helm" /usr/local/bin/helm
@@ -122,13 +122,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir -p /opt/java \
-    && curl -fsSL -o /tmp/temurin.tgz "https://api.adoptium.net/v3/binary/version/jdk-${TEMURIN_VERSION}/linux/x64/jdk/hotspot/normal/eclipse" \
+    && curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 --connect-timeout 20 -o /tmp/temurin.tgz "https://api.adoptium.net/v3/binary/version/jdk-${TEMURIN_VERSION}/linux/x64/jdk/hotspot/normal/eclipse" \
     && echo "${TEMURIN_SHA256}  /tmp/temurin.tgz" | sha256sum -c - \
     && tar -xzf /tmp/temurin.tgz -C /opt/java \
     && rm /tmp/temurin.tgz \
     && mv /opt/java/jdk-* "${JAVA_HOME}"
 
-RUN curl -fsSL -o /tmp/maven.tgz "https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz" \
+RUN curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 --connect-timeout 20 -o /tmp/maven.tgz "https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz" \
     && echo "${MAVEN_SHA512}  /tmp/maven.tgz" | sha512sum -c - \
     && tar -xzf /tmp/maven.tgz -C /opt \
     && rm /tmp/maven.tgz \
