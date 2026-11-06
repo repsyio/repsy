@@ -24,7 +24,7 @@
  * NEW tab), so PAT-27 pins the fallback instead: the page always offers "Send again" and "Show the token to copy".
  *
  * PAT-33..PAT-37 cover what a temporary token may do: it manages personal tokens (`rp token create`), a personal
- * token does not, and a newer login replaces it.
+ * token does too within its own scopes (RPS-2440), and a newer login replaces it.
  */
 import { explicitScopes, TokenRoutesAs, whoAmI } from '../../../src/ui/access-token-api.js';
 import { expect, test } from '../../../src/ui/access-token-fixtures.js';
@@ -437,24 +437,35 @@ test.describe('what a temporary CLI token may do', () => {
     expect(await tokenApi.list()).toHaveLength(0);
   });
 
-  test('PAT-34 a personal token cannot create, list or revoke personal tokens', async ({
+  test('PAT-34 a personal token creates, lists and revokes personal tokens, never wider than itself (RPS-2440)', async ({
     tokenApi,
     seeder,
   }) => {
-    const personal = await tokenApi.create(`pat-${seeder.runId}-manager`, [
+    const manager = await tokenApi.create(`pat-${seeder.runId}-manager`, [
       'repo:read',
       'repo:write',
       'repo:manage',
     ]);
     const victim = await tokenApi.create(`pat-${seeder.runId}-victim`);
-    const as = new TokenRoutesAs(personal.token);
+    const narrow = await tokenApi.create(`pat-${seeder.runId}-narrow`, ['repo:read']);
+    const as = new TokenRoutesAs(manager.token);
+    const minted = `pat-${seeder.runId}-minted`;
 
-    expect((await as.create('minted', ['repo:read'])).status).toBe(401);
-    expect((await as.list()).status).toBe(401);
-    expect(await as.revoke(victim.id)).toBe(401);
-    expect(await tokenApi.list()).toHaveLength(2);
+    const created = await as.create(minted, ['repo:read']);
+
+    expect(created.status).toBe(201);
+    expect(created.body?.token).toMatch(/^rut-/);
+    expect((await as.list()).status).toBe(200);
+    expect(await as.revoke(victim.id)).toBe(204);
+    // A narrow token can neither mint nor end a token wider than itself.
+    const asNarrow = new TokenRoutesAs(narrow.token);
+    expect((await asNarrow.create('wider', ['repo:read', 'repo:manage'])).status).toBe(400);
+    expect(await asNarrow.revoke(manager.id)).toBe(403);
+    expect((await tokenApi.list()).map((t) => t.name).sort()).toEqual(
+      [manager.name, minted, narrow.name].sort(),
+    );
     // It still says who it is.
-    expect((await whoAmI(personal.token)).status).toBe(200);
+    expect((await whoAmI(manager.token)).status).toBe(200);
   });
 
   test('PAT-35 a temporary token cannot mint a temporary token or a personal token wider than itself', async ({
@@ -491,6 +502,8 @@ test.describe('what a temporary CLI token may do', () => {
     expect(await new TokenRoutesAs(first).list().then((r) => r.status)).toBe(200);
 
     const second = await authorize(cli, 'repo:read');
+    // The page ends the previous token in a call of its own, after it shows the new one.
+    await expect(cli.revoked).toBeVisible();
 
     expect(second).not.toBe(first);
     expect((await whoAmI(first)).status).toBe(401);

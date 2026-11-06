@@ -6342,7 +6342,7 @@ The API helper is `src/ui/access-token-api.ts` (plain `fetch`, like `RepoSetting
 | PAT-31   | signed out, a refused `redirect_uri` is still refused after sign-in                                                                                          |
 | PAT-32   | `@cloud-skip`: an administrator is offered `repo:manage` too, a user is not; neither is offered the deprecated `scan:read` (PAT-02, RPS-2436)                |
 | PAT-33   | a temporary token creates, lists and revokes a personal token (`rp token create`)                                                                            |
-| PAT-34   | a personal token cannot create, list or revoke personal tokens (401); it still answers `/current`                                                            |
+| PAT-34   | a personal token creates, lists and revokes personal tokens within its own scopes (RPS-2440): wider is 400 / 403                                             |
 | PAT-35   | a temporary token cannot mint a temporary token (401) nor a personal token with a scope it does not have (400)                                               |
 | PAT-36   | a temporary token is not in the Settings list of personal tokens                                                                                             |
 | PAT-37   | a replaced temporary token is refused on every route at once                                                                                                 |
