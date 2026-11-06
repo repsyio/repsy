@@ -128,7 +128,7 @@ RUN mkdir -p /opt/java \
     && rm /tmp/temurin.tgz \
     && mv /opt/java/jdk-* "${JAVA_HOME}"
 
-RUN curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 --connect-timeout 20 -o /tmp/maven.tgz "https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz" \
+RUN curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 --connect-timeout 20 -o /tmp/maven.tgz "https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/${MAVEN_VERSION}/apache-maven-${MAVEN_VERSION}-bin.tar.gz" \
     && echo "${MAVEN_SHA512}  /tmp/maven.tgz" | sha512sum -c - \
     && tar -xzf /tmp/maven.tgz -C /opt \
     && rm /tmp/maven.tgz \

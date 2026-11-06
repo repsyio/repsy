@@ -48,7 +48,7 @@ RUN chmod +x ./entrypoint.sh
 
 # Temurin: the exact release (`21.0.12.1+1`, api.adoptium.net names it jdk-<version>) and the SHA-256 of its
 # linux/x64 tarball (the `.sha256.txt` next to it on GitHub = `package.checksum` of api.adoptium.net/v3/assets), not `latest/21/ga`, which moves under a
-# green build (RPS-1597). x64 only, as before. Maven: the SHA-512 next to the tarball on archive.apache.org.
+# green build (RPS-1597). x64 only, as before. Maven: the SHA-512 of the tarball (Maven Central; archive.apache.org is unreachable from the CI runner host, RPS-2530).
 # The checksums have no default on purpose: docker-compose.runners.yml is their single source and
 # runners/bump-pins.sh keeps them (README.md "Runner images and pins"), so a build without them fails loudly.
 ARG TEMURIN_VERSION=21.0.12.1+1
@@ -66,15 +66,19 @@ ARG GRADLE_SHA256=bd71102213493060956ec229d946beee57158dbd89d0e62b91bca0fa2c5f35
 ARG SBT_VERSION=1.13.0
 ARG SBT_SHA256=06806805ffd26232727326216766ed4793b549f8c1e6ffeef2e610db7245b698
 
-# The published SHA-512 of apache-ant-${ANT_VERSION}-bin.tar.gz and apache-ivy-${IVY_VERSION}-bin.tar.gz
-# (the .sha512 files next to them on archive.apache.org); change each version and its checksum together.
-# The build fails on a mismatch. Ivy is only its jar, on Ant's classpath (`-lib /opt/ivy/ivy.jar`): the
+# Ant and Ivy come from Maven Central (archive.apache.org is unreachable from the CI runner host, RPS-2530),
+# which has no Ant distribution: ANT_HOME is assembled from ant.jar and ant-launcher.jar (byte-identical to
+# the lib/ jars of apache-ant-${ANT_VERSION}-bin.tar.gz) plus a bin/ant wrapper around the launcher, which is
+# what the distribution's script ends up running. The SHA-512 of each jar is pinned, change each version and
+# its checksums together; the build fails on a mismatch. Ivy is only its jar (ivy-${IVY_VERSION}.jar, the
+# same file as in apache-ivy-${IVY_VERSION}-bin.tar.gz), on Ant's classpath (`-lib /opt/ivy/ivy.jar`): the
 # plain jar without Apache HttpClient, so Ivy talks HTTP through its own URL handler, the way an Ivy
 # dropped into ANT_HOME/lib does.
 ARG ANT_VERSION=1.10.15
-ARG ANT_SHA512=d78427aff207592c024ff1552dc04f7b57065a195c42d398fcffe7a0145e8d00cd46786f5aa52e77ab0fdf81334f065eb8011eecd2b48f7228e97ff4cb20d16c
+ARG ANT_SHA512=d5109838090a4463098c4a82c171d07b92d42633010e045388fb8a68744fdcdd2b07a75a9fb56783e83ecbcc80664119ccc44537993125d6724956e114508316
+ARG ANT_LAUNCHER_SHA512=6fc2b33cde07493704c201b759e6813ba5f60ffd3925a52bb097a7fffedbc950bcc4fbc93fe0a86ec2a41872b16b92868b6be87632d3e8e0dc89a5b4143ccb9e
 ARG IVY_VERSION=2.5.3
-ARG IVY_SHA512=19e38998eda66a635643f50eec1fe62aeaa4b66e7b12540e38ae9ab67f2402a4df1230c0fa142e391234abf8491b5cd46fa8a3b004324b511a495701be848470
+ARG IVY_SHA512=be291ddf612703fd3657a72820199430d053a8e06f7631e78477b428ba343631bc36b16bde8c25df544b64b420be84568d3898921f8db63fe676fb590586355b
 
 ENV JAVA_HOME="/opt/java/temurin"
 ENV MAVEN_HOME="/opt/maven"
@@ -102,7 +106,7 @@ RUN mkdir -p /opt/java \
     && rm /tmp/temurin.tgz \
     && mv /opt/java/jdk-* "${JAVA_HOME}"
 
-RUN curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 --connect-timeout 20 -o /tmp/maven.tgz "https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz" \
+RUN curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 --connect-timeout 20 -o /tmp/maven.tgz "https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/${MAVEN_VERSION}/apache-maven-${MAVEN_VERSION}-bin.tar.gz" \
     && echo "${MAVEN_SHA512}  /tmp/maven.tgz" | sha512sum -c - \
     && tar -xzf /tmp/maven.tgz -C /opt \
     && rm /tmp/maven.tgz \
@@ -121,19 +125,18 @@ RUN curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 --connect-timeout 20
     && rm /tmp/sbt.tgz \
     && chmod -R a+rX "${SBT_HOME}"
 
-RUN curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 --connect-timeout 20 -o /tmp/ant.tgz "https://archive.apache.org/dist/ant/binaries/apache-ant-${ANT_VERSION}-bin.tar.gz" \
-    && echo "${ANT_SHA512}  /tmp/ant.tgz" | sha512sum -c - \
-    && tar -xzf /tmp/ant.tgz -C /opt \
-    && mv "/opt/apache-ant-${ANT_VERSION}" "${ANT_HOME}" \
-    && rm /tmp/ant.tgz \
+RUN mkdir -p "${ANT_HOME}/bin" "${ANT_HOME}/lib" \
+    && curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 --connect-timeout 20 -o "${ANT_HOME}/lib/ant.jar" "https://repo.maven.apache.org/maven2/org/apache/ant/ant/${ANT_VERSION}/ant-${ANT_VERSION}.jar" \
+    && curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 --connect-timeout 20 -o "${ANT_HOME}/lib/ant-launcher.jar" "https://repo.maven.apache.org/maven2/org/apache/ant/ant-launcher/${ANT_VERSION}/ant-launcher-${ANT_VERSION}.jar" \
+    && echo "${ANT_SHA512}  ${ANT_HOME}/lib/ant.jar" | sha512sum -c - \
+    && echo "${ANT_LAUNCHER_SHA512}  ${ANT_HOME}/lib/ant-launcher.jar" | sha512sum -c - \
     && chmod -R a+rX "${ANT_HOME}"
 
-RUN curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 --connect-timeout 20 -o /tmp/ivy.tgz "https://archive.apache.org/dist/ant/ivy/${IVY_VERSION}/apache-ivy-${IVY_VERSION}-bin.tar.gz" \
-    && echo "${IVY_SHA512}  /tmp/ivy.tgz" | sha512sum -c - \
-    && mkdir -p /opt/ivy \
-    && tar -xzf /tmp/ivy.tgz -C /opt/ivy --strip-components=1 "apache-ivy-${IVY_VERSION}/ivy-${IVY_VERSION}.jar" \
-    && mv "/opt/ivy/ivy-${IVY_VERSION}.jar" "${IVY_JAR}" \
-    && rm /tmp/ivy.tgz \
+COPY --chmod=755 ${HARNESS_DIR}/runners/ant-wrapper.sh ${ANT_HOME}/bin/ant
+
+RUN mkdir -p /opt/ivy \
+    && curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 --connect-timeout 20 -o "${IVY_JAR}" "https://repo.maven.apache.org/maven2/org/apache/ivy/ivy/${IVY_VERSION}/ivy-${IVY_VERSION}.jar" \
+    && echo "${IVY_SHA512}  ${IVY_JAR}" | sha512sum -c - \
     && chmod -R a+rX /opt/ivy
 
 # Readable/executable (not necessarily owned) by whatever uid the container runs as

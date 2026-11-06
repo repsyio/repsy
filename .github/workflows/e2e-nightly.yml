@@ -534,7 +534,7 @@ jobs:
               grep_args+=("$SPLIT_FLAG" "$SPLIT_PATTERN")
             fi
             echo "::group::$protocol"
-            ./run.sh test --target ci --protocol "$protocol" "${grep_args[@]}" || failed=1
+            ./run.sh test --target ci -b --protocol "$protocol" "${grep_args[@]}" || failed=1
             mkdir -p "$ARTIFACTS/$protocol"
             cp -a test-results "$ARTIFACTS/$protocol/test-results" || true
             cp -a playwright-report "$ARTIFACTS/$protocol/playwright-report" || true
