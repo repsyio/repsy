@@ -24,11 +24,11 @@ import org.springframework.stereotype.Component;
 
 @Slf4j
 @Component
-public class PypiProtocolFacade extends AbstractPypiProtocolFacade<UUID> {
+public class PypiProtocolFacade extends AbstractPypiProtocolFacade<UUID, UUID> {
 
   public PypiProtocolFacade(
       final PypiStorageService<UUID> pypiStorageService,
-      final PypiPackageService<UUID> pypiPackageService) {
+      final PypiPackageService<UUID, UUID> pypiPackageService) {
 
     super(pypiStorageService, pypiPackageService);
   }

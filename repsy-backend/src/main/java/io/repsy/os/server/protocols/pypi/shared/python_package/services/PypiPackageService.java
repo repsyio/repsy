@@ -73,7 +73,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 @Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
-public class PypiPackageService extends AbstractPypiPackageService<UUID> {
+public class PypiPackageService extends AbstractPypiPackageService<UUID, UUID> {
 
   private final RepoTxService repoTxService;
   private final PypiStorageService pypiStorageService;

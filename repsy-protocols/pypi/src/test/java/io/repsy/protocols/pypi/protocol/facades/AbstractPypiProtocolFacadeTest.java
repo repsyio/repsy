@@ -65,10 +65,10 @@ class AbstractPypiProtocolFacadeTest {
   private static final String REPO_NAME = "pypi";
 
   @Mock private PypiStorageService<UUID> storageService;
-  @Mock private PypiPackageService<UUID> packageService;
+  @Mock private PypiPackageService<UUID, UUID> packageService;
   @Mock private BaseUsages usages;
 
-  private AbstractPypiProtocolFacade<UUID> facade;
+  private AbstractPypiProtocolFacade<UUID, UUID> facade;
   private BaseRepoInfo<UUID> repoInfo;
 
   @BeforeEach
@@ -84,11 +84,11 @@ class AbstractPypiProtocolFacadeTest {
             .build();
   }
 
-  static class TestFacade extends AbstractPypiProtocolFacade<UUID> {
+  static class TestFacade extends AbstractPypiProtocolFacade<UUID, UUID> {
 
     TestFacade(
         final PypiStorageService<UUID> storageService,
-        final PypiPackageService<UUID> packageService) {
+        final PypiPackageService<UUID, UUID> packageService) {
       super(storageService, packageService);
     }
   }
