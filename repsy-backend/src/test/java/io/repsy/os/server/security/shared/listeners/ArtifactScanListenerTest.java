@@ -33,6 +33,7 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.RetryableException;
 import io.repsy.core.events.ArtifactPushedEvent;
@@ -95,6 +96,8 @@ class ArtifactScanListenerTest {
   @Mock private TaskScheduler taskScheduler;
   @Mock private VulnerabilityScanner scanner;
 
+  private final SimpleMeterRegistry meterRegistry = new SimpleMeterRegistry();
+
   private static final Instant NOW = Instant.parse("2026-09-26T10:00:00Z");
   private static final TrivyScannerClientProperties PROPERTIES =
       new TrivyScannerClientProperties(
@@ -130,6 +133,7 @@ class ArtifactScanListenerTest {
             this.dockerScanTokenIssuer,
             this.taskScheduler,
             PROPERTIES,
+            this.meterRegistry,
             this.scanTaskExecutor,
             Map.<String, StorageStrategy>of());
   }
@@ -181,6 +185,35 @@ class ArtifactScanListenerTest {
         .hasMessage("scanExecutorSaturated");
 
     verify(this.scanTxService).recordScanFailure(SCAN_ID, SATURATED_MESSAGE);
+  }
+
+  @Test
+  @DisplayName("counts every scan the saturated executor refuses, by kind (RPS-2538)")
+  void rejectedScansAreCounted() {
+    when(this.scannerRegistry.findScanner("MAVEN")).thenReturn(Optional.empty());
+    when(this.scanTxService.createPendingScan(REPO_ID, "artifact", "1.0.0", "none"))
+        .thenReturn(SCAN_ID);
+    doThrow(new RejectedExecutionException()).when(this.scanTaskExecutor).execute(any());
+
+    this.listener.onArtifactPushed(this.event());
+    assertThatThrownBy(() -> this.listener.executeManualScan(SCAN_ID, this.event()))
+        .isInstanceOf(RetryableException.class);
+
+    assertThat(this.rejected("push")).isEqualTo(1);
+    assertThat(this.rejected("manual")).isEqualTo(1);
+    assertThat(this.rejected("retry")).isZero();
+  }
+
+  @Test
+  @DisplayName("does not count a scan the executor accepted (RPS-2538)")
+  void acceptedScanIsNotCounted() {
+    when(this.scannerRegistry.findScanner("MAVEN")).thenReturn(Optional.empty());
+    when(this.scanTxService.createPendingScan(REPO_ID, "artifact", "1.0.0", "none"))
+        .thenReturn(SCAN_ID);
+
+    this.listener.onArtifactPushed(this.event());
+
+    assertThat(this.rejected("push")).isZero();
   }
 
   @Test
@@ -479,6 +512,7 @@ class ArtifactScanListenerTest {
 
     verify(this.scanner, times(1)).scan(any());
     verify(this.scanTxService).recordScanFailure(SCAN_ID, SATURATED_MESSAGE);
+    assertThat(this.rejected("retry")).isEqualTo(1);
     assertThat(this.logAppender.list)
         .anyMatch(
             logEvent ->
@@ -542,6 +576,7 @@ class ArtifactScanListenerTest {
                 15,
                 60,
                 TrivyScannerClientProperties.DEFAULT_SUPPORTED_REPO_TYPES),
+            this.meterRegistry,
             this.scanTaskExecutor,
             Map.<String, StorageStrategy>of());
     this.givenDockerScanIsQueued();
@@ -553,6 +588,11 @@ class ArtifactScanListenerTest {
 
     verifyNoInteractions(this.taskScheduler);
     verify(this.scanTxService).recordScanFailure(SCAN_ID, failure.getMessage());
+  }
+
+  private double rejected(final String kind) {
+    final var counter = this.meterRegistry.find("repsy.security.scan.rejected").tag("kind", kind);
+    return counter.counter() == null ? 0 : counter.counter().count();
   }
 
   private void givenSchedulerAt(final Instant now) {
@@ -599,6 +639,7 @@ class ArtifactScanListenerTest {
             this.dockerScanTokenIssuer,
             this.taskScheduler,
             PROPERTIES,
+            this.meterRegistry,
             this.scanTaskExecutor,
             Map.of("HELM", storage));
     when(this.scanner.getName()).thenReturn("trivy");

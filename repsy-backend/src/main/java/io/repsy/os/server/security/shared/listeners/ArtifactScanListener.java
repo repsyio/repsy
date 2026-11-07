@@ -15,6 +15,7 @@
  */
 package io.repsy.os.server.security.shared.listeners;
 
+import io.micrometer.core.instrument.MeterRegistry;
 import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.RetryableException;
@@ -64,12 +65,21 @@ public class ArtifactScanListener implements ManualScanExecutor {
   private static final String EXECUTOR_SATURATED_MESSAGE =
       "Scan executor is saturated; retry later";
 
+  /**
+   * Counts the scans the saturated scan executor refused (RPS-2508, RPS-2538), tagged {@code kind}:
+   * {@code push}, {@code manual} or {@code retry}. A refused push and a refused retry are recorded
+   * as failed scans, a refused manual scan fails the request with a retryable error. Alert on any
+   * increase of this counter.
+   */
+  public static final String REJECTED_METER = "repsy.security.scan.rejected";
+
   private final VulnerabilityScannerRegistry scannerRegistry;
   private final VulnerabilityScanTxService scanTxService;
   private final RepoTxService repoTxService;
   private final DockerScanTokenIssuer dockerScanTokenIssuer;
   private final TaskScheduler taskScheduler;
   private final TrivyScannerClientProperties scannerProperties;
+  private final MeterRegistry meterRegistry;
 
   @Qualifier("scanTaskExecutor")
   private final Executor scanTaskExecutor;
@@ -95,6 +105,7 @@ public class ArtifactScanListener implements ManualScanExecutor {
     }
 
     this.submitScan(
+        "push",
         event,
         scanId,
         () -> {
@@ -116,6 +127,7 @@ public class ArtifactScanListener implements ManualScanExecutor {
   @Override
   public void executeManualScan(final UUID scanId, final ArtifactPushedEvent event) {
     this.submitScan(
+        "manual",
         event,
         scanId,
         () -> {
@@ -125,10 +137,14 @@ public class ArtifactScanListener implements ManualScanExecutor {
   }
 
   private void submitScan(
-      final ArtifactPushedEvent event, final UUID scanId, final Runnable rejectionAction) {
+      final String kind,
+      final ArtifactPushedEvent event,
+      final UUID scanId,
+      final Runnable rejectionAction) {
     try {
       this.scanTaskExecutor.execute(() -> this.executeScan(event, scanId));
     } catch (final RejectedExecutionException _) {
+      this.meterRegistry.counter(REJECTED_METER, "kind", kind).increment();
       rejectionAction.run();
     }
   }
@@ -310,6 +326,7 @@ public class ArtifactScanListener implements ManualScanExecutor {
     try {
       this.scanTaskExecutor.execute(() -> this.retryScan(event, scanId, scanner, attempt));
     } catch (final RejectedExecutionException _) {
+      this.meterRegistry.counter(REJECTED_METER, "kind", "retry").increment();
       this.scanTxService.recordScanFailure(scanId, EXECUTOR_SATURATED_MESSAGE);
       log.warn(
           "Giving up on the retry of the vulnerability scan for {}@{} (repo={}): scan executor is"
