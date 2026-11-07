@@ -150,6 +150,8 @@ export interface TargetCapabilities {
   expiredTokenStrategy: ExpiredTokenStrategy;
   /** How many deploy tokens one repo may have (`Infinity` on OS; the Repsy Cloud FREE plan allows 1). */
   maxDeployTokensPerRepo: number;
+  /** How many collaborators one repo may have (`Infinity` on OS; the Repsy Cloud FREE plan allows 1, POPULAR 5). */
+  maxCollaboratorsPerRepo: number;
   /** Whether the protocol port answers a `GET` of a directory path with a listing (fingerprints may walk it). */
   supportsDirectoryListing: boolean;
   /** Whether the repo settings accept `releases`/`snapshots` for this repo type (a 400 otherwise, RPS-1210). */
@@ -237,6 +239,7 @@ const OS_CAPABILITIES: ProductCapabilities = {
   supportsExpiredTokenSeed: true,
   expiredTokenStrategy: 'short-ttl-wait',
   maxDeployTokensPerRepo: Number.POSITIVE_INFINITY,
+  maxCollaboratorsPerRepo: Number.POSITIVE_INFINITY,
   supportsDirectoryListing: true,
   supportsVersionAllowanceSettings,
   ui: OS_UI,
@@ -263,6 +266,7 @@ const CLOUD_CAPABILITIES: ProductCapabilities = {
   supportsExpiredTokenSeed: false,
   expiredTokenStrategy: 'short-ttl-wait',
   maxDeployTokensPerRepo: 1,
+  maxCollaboratorsPerRepo: 1,
   supportsDirectoryListing: false,
   supportsVersionAllowanceSettings,
   ui: CLOUD_UI,
@@ -315,20 +319,29 @@ function parseUrlScheme(value: string | undefined, fallback: UrlScheme): UrlSche
   return value as UrlScheme;
 }
 
+function parseLimit(variable: string, value: string | undefined, fallback: number): number {
+  if (!value) {
+    return fallback;
+  }
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    throw new Error(`${variable} must be a positive integer, got "${value}"`);
+  }
+  return parsed;
+}
+
 /**
  * `REPSY_E2E_MAX_DEPLOY_TOKENS` overrides how many deploy tokens one repo may have, for an owner whose plan allows more than the
  * target's default (a cloud-local owner on the POPULAR plan allows 2, RPS-2374). Unset, it is the target's own, so a run
  * on the FREE plan (DEV, PROD) keeps the default of 1.
  */
 export function parseMaxDeployTokens(value: string | undefined, fallback: number): number {
-  if (!value) {
-    return fallback;
-  }
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed < 1) {
-    throw new Error(`REPSY_E2E_MAX_DEPLOY_TOKENS must be a positive integer, got "${value}"`);
-  }
-  return parsed;
+  return parseLimit('REPSY_E2E_MAX_DEPLOY_TOKENS', value, fallback);
+}
+
+/** `REPSY_E2E_MAX_COLLABORATORS` does the same for the collaborators of one repo (RPS-2410), the way a POPULAR owner allows 5. */
+export function parseMaxCollaborators(value: string | undefined, fallback: number): number {
+  return parseLimit('REPSY_E2E_MAX_COLLABORATORS', value, fallback);
 }
 
 const defaults = capabilitiesFor(env.target);
@@ -339,5 +352,9 @@ export const target: TargetCapabilities = {
   maxDeployTokensPerRepo: parseMaxDeployTokens(
     process.env.REPSY_E2E_MAX_DEPLOY_TOKENS,
     defaults.maxDeployTokensPerRepo,
+  ),
+  maxCollaboratorsPerRepo: parseMaxCollaborators(
+    process.env.REPSY_E2E_MAX_COLLABORATORS,
+    defaults.maxCollaboratorsPerRepo,
   ),
 };

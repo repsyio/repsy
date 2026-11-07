@@ -341,6 +341,10 @@ export function registerLoginTokenInvalidation<F>(protocol: LoginTokenProtocol<F
     test('a reused username does not inherit the login token of its former owner', async ({
       seeder,
     }) => {
+      test.skip(
+        target.supportsRepoUsers && target.maxCollaboratorsPerRepo < 2,
+        'RPS-2410: needs the former and the successor as collaborators of one repo',
+      );
       const repo = await seeder.createRepo(protocol.repoType, { privateRepo: true });
       const former = await invalidationUser(seeder, repo.name, protocol.repoType);
       const token = await protocol.login(repo.name, former.username, former.password);

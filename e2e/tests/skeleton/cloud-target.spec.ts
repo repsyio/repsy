@@ -49,7 +49,7 @@ import {
   type ScenarioExpectation,
 } from '../../src/scenarios/types.js';
 import { Seeder } from '../../src/seed/seeder.js';
-import { capabilitiesFor, parseMaxDeployTokens } from '../../src/target.js';
+import { capabilitiesFor, parseMaxCollaborators, parseMaxDeployTokens } from '../../src/target.js';
 import { RepoType } from '../../src/api/panel-backend.js';
 import {
   FAKE_CLOUD_CAPABILITIES,
@@ -101,6 +101,7 @@ test.describe('target capabilities', () => {
       // The harness does not start, restart or reconfigure either, and cannot raise a throttle.
       expect(cloud, name).toMatchObject({ ownsStack: false, canTuneThrottle: false });
       expect(cloud.maxDeployTokensPerRepo, name).toBe(1);
+      expect(cloud.maxCollaboratorsPerRepo, name).toBe(1);
       expect(cloud.supportsRepoUsers, name).toBe(true);
       expect(cloud.supportsUserRole, name).toBe(false);
     }
@@ -112,6 +113,14 @@ test.describe('target capabilities', () => {
     expect(parseMaxDeployTokens('2', 1)).toBe(2);
     for (const bad of ['0', '-1', '1.5', 'two']) {
       expect(() => parseMaxDeployTokens(bad, 1), bad).toThrow(/positive integer/);
+    }
+  });
+
+  test('REPSY_E2E_MAX_COLLABORATORS raises the collaborator limit, unset keeps the plan default (RPS-2410)', () => {
+    expect(parseMaxCollaborators(undefined, 1)).toBe(1);
+    expect(parseMaxCollaborators('5', 1)).toBe(5);
+    for (const bad of ['0', '1.5', 'many']) {
+      expect(() => parseMaxCollaborators(bad, 1), bad).toThrow(/positive integer/);
     }
   });
 
