@@ -622,6 +622,7 @@ Deleting `1.0.0+a` when there is no such entry (the usual case) still deletes `1
 | `DB_URL` | JDBC database URL. The Docker image defaults to the embedded H2 database; running from source (`mvn spring-boot:run`) defaults to PostgreSQL on `localhost:5432` instead. `DB_HOST`, `DB_PORT` and `DB_DATABASE` are not read (Repsy warns at startup if they are set). On H2, a `CHECKPOINT SYNC` after every write (RPS-1556) keeps a crash right after a publish from losing the last commit even though the client was told it succeeded. | `jdbc:h2:file:/app/data/repsy;MODE=PostgreSQL;DB_CLOSE_DELAY=-1` (image only) |
 | `DB_USERNAME` | Database username | `repsy` |
 | `DB_PASSWORD` | Database password | `repsy123` |
+| `STORAGE_BACKEND` | Where artifact bytes are stored. `file-system` (the default) uses `STORAGE_BASE_PATH`. Any other value switches the file system storage off and needs a jar that provides a `StorageStrategyRegistry` bean: put it in `/app/ext` and the image starts with it on the classpath (see [Storage backend](#storage-backend-plugins)). | `file-system` |
 | `STORAGE_BASE_PATH` | Base directory for artifact file storage. Set to a path inside `/app/data` (e.g. `/app/data/storage`) to persist artifacts with a single volume mount (the Docker image already does). Deleting a repo, a package or a version moves its files into a `trash/` directory of the protocol (for example `maven/trash`) first; the trash older than `TRASH_RETENTION` is removed every day (see `TRASH_CLEANUP_ENABLED`). | `~/.repsy` (`/app/data/storage` in the Docker image) |
 | `OS_APP_JWT_SECRET` | JWT signing secret. If not set, a random 256-bit secret is generated on every startup — every restart/redeploy invalidates all existing sessions, forcing every user to log in again. Set a stable, secure random value for any production/self-host deployment. | *(random, regenerated on every startup)* |
 | `SERVER_PORT` | Repository operations port | `9090` |
@@ -691,6 +692,12 @@ Deleting `1.0.0+a` when there is no such entry (the usual case) still deletes `1
 - **Admin Username**: `admin`
 - **Admin Initial Password**: Only applied when no admin user exists in the database. After first run, change your password through the application interface.
 - **OS_APP_JWT_SECRET**: If left unset, a new random secret is generated in memory on every container start — since it isn't persisted, this means every restart or redeploy silently invalidates every issued access/refresh token, logging every user out at once. For any production or self-host deployment, set this to a fixed, securely generated value (e.g. `openssl rand -base64 32`) and keep it unchanged across restarts.
+
+### Storage backend plugins
+
+`STORAGE_BACKEND` (property `os.app.storage.backend`) defaults to `file-system`, which stores artifacts under `STORAGE_BASE_PATH`. With any other value Repsy does not create the file system strategies, so a jar on the classpath has to provide a `StorageStrategyRegistry` bean (one `StorageStrategy` per repository type, see `libs/storage/storage-gateway`); without one the application does not start.
+
+The Docker image looks for such jars in `/app/ext`. When the directory holds at least one `*.jar`, `entrypoint.sh` starts Spring Boot's `PropertiesLauncher` with `-Dloader.path=/app/ext`, so those jars join the classpath. With the directory empty or missing the image starts exactly as before (`java -jar app.jar`). Build a derived image with `FROM` this image and `COPY` the jars into `/app/ext`. The storage interface has no stability promise between releases: build a plugin against the Repsy release it runs on.
 
 ### Content Security Policy
 

@@ -43,4 +43,13 @@ if [ "${STORAGE_BASE_PATH:-}" = "$DEFAULT_STORAGE_DIR" ] \
        "explicitly; see README 'Upgrading' (RPS-1401)." >&2
 fi
 
+# RPS-2580: a storage backend (or any other extension) ships as a jar in /app/ext, usually copied there
+# by a derived image. With at least one jar there, start Spring Boot's PropertiesLauncher, which adds
+# the directory to the classpath, instead of `java -jar`. With none (or no directory) nothing changes.
+EXT_DIR="${REPSY_EXT_DIR:-/app/ext}"
+if [ -n "$(find "$EXT_DIR" -maxdepth 1 -name '*.jar' 2>/dev/null | head -n 1)" ]; then
+  echo "INFO: jars found in $EXT_DIR: starting with PropertiesLauncher (loader.path=$EXT_DIR)" >&2
+  exec java -Dloader.path="$EXT_DIR" -cp app.jar org.springframework.boot.loader.launch.PropertiesLauncher
+fi
+
 exec java -jar app.jar
