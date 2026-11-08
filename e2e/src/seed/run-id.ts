@@ -93,20 +93,32 @@ export function perTestRunId(runId: string, parallelIndex: number, testSeq: numb
   return `${runId}${toBase36(parallelIndex, 1)}${toBase36(testSeq, 3)}`;
 }
 
-/**
- * Worker slots below this are the fixed ones specs pass to `perTestRunId` by hand (0 to 4 for the Cloud harness
- * specs, 35 for `persistence.spec.ts`, 37 for `upgrade.spec.ts`), so a fixture worker starts above them.
- */
-const FIXTURE_WORKER_BASE = 38;
+/** Characters of a base-36 worker slot and of the test counter, the widths `perTestRunId` writes. */
+const WORKER_SLOTS = 36;
+const TESTS_PER_GENERATION = 36 ** 3 / WORKER_SLOTS;
 
 /**
- * The per-test run id of a test that runs in a Playwright worker. It takes `workerIndex`, not `parallelIndex`:
- * Playwright replaces a worker after a failed test, the replacement keeps the `parallelIndex` of the slot and its
- * per-worker counter starts at 1 again, so `(parallelIndex, testSeq)` repeats. The replacement then seeds
- * `e2e-<runid>-user-1` again while the tenant the dead worker soft-deleted under that name still exists, and a
- * login or a `where "username" = ...` statement meets both rows (RPS-2581). `workerIndex` is never reused within a
- * run. The base keeps the slot at two base-36 characters, past the fixed slots above.
+ * The per-test run id of a test that runs in a Playwright worker, from the worker's `workerIndex` instead of its
+ * `parallelIndex`. Playwright replaces a worker after a failed test: the replacement keeps the `parallelIndex` of the
+ * slot and its per-worker counter starts at 1 again, so `(parallelIndex, testSeq)` repeats. The replacement then
+ * seeds `e2e-<runid>-user-1` again while the tenant the dead worker soft-deleted under that name still exists, and a
+ * login or a `where "username" = ...` statement meets both rows (RPS-2581). `workerIndex` is never reused in a run.
+ *
+ * The id keeps the shape `<runid><slot><counter>` that Cloud's `collaboratorName` reads (the character after the run
+ * id must differ between workers that run at once, or two of them register the same collaborator): the slot is
+ * `workerIndex % 36`, and every further 36 workers (`generation`) move the counter on by a block of
+ * {@link TESTS_PER_GENERATION} tests, so a replacement never repeats an id of the worker before it. Workers that run
+ * at once are fewer than 36 and, with replacements, a long way from 36 indexes apart; a worker that runs more than
+ * {@link TESTS_PER_GENERATION} tests or the 36 * 36 th worker of a run is an error, not a repeated id.
  */
 export function workerTestRunId(runId: string, workerIndex: number, testSeq: number): string {
-  return perTestRunId(runId, FIXTURE_WORKER_BASE + workerIndex, testSeq);
+  const generation = Math.floor(workerIndex / WORKER_SLOTS);
+  if (testSeq >= TESTS_PER_GENERATION || generation >= WORKER_SLOTS) {
+    throw new Error(`No run id left for test ${testSeq} of worker ${workerIndex}.`);
+  }
+  return perTestRunId(
+    runId,
+    workerIndex % WORKER_SLOTS,
+    generation * TESTS_PER_GENERATION + testSeq,
+  );
 }
