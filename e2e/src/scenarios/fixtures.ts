@@ -33,7 +33,7 @@ import { isUnsupportedPanelOperation, type PanelBackend, RepoType } from '../api
 import { ownerCredential } from '../clients/raw-http.js';
 import { env } from '../env.js';
 import { isCloudSkipped, testGapKey } from '../known-gaps.js';
-import { perTestRunId, RUN_PREFIX } from '../seed/run-id.js';
+import { RUN_PREFIX, workerTestRunId } from '../seed/run-id.js';
 import { Seeder } from '../seed/seeder.js';
 import { target, type TargetCapabilities } from '../target.js';
 import type { ProtocolAdapter } from './adapter.js';
@@ -302,7 +302,7 @@ export const test = base.extend<Fixtures & FixtureOptions>({
 
   seeder: async ({ panelApi }, use, testInfo) => {
     testSeqByWorker += 1;
-    const runId = perTestRunId(env.runId, testInfo.parallelIndex, testSeqByWorker);
+    const runId = workerTestRunId(env.runId, testInfo.workerIndex, testSeqByWorker);
     const seeder = new Seeder(panelApi, runId);
     await use(seeder);
     await seeder.cleanup();

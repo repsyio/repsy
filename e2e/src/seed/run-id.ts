@@ -92,3 +92,21 @@ function toBase36(value: number, width: number): string {
 export function perTestRunId(runId: string, parallelIndex: number, testSeq: number): string {
   return `${runId}${toBase36(parallelIndex, 1)}${toBase36(testSeq, 3)}`;
 }
+
+/**
+ * Worker slots below this are the fixed ones specs pass to `perTestRunId` by hand (0 to 4 for the Cloud harness
+ * specs, 35 for `persistence.spec.ts`, 37 for `upgrade.spec.ts`), so a fixture worker starts above them.
+ */
+const FIXTURE_WORKER_BASE = 38;
+
+/**
+ * The per-test run id of a test that runs in a Playwright worker. It takes `workerIndex`, not `parallelIndex`:
+ * Playwright replaces a worker after a failed test, the replacement keeps the `parallelIndex` of the slot and its
+ * per-worker counter starts at 1 again, so `(parallelIndex, testSeq)` repeats. The replacement then seeds
+ * `e2e-<runid>-user-1` again while the tenant the dead worker soft-deleted under that name still exists, and a
+ * login or a `where "username" = ...` statement meets both rows (RPS-2581). `workerIndex` is never reused within a
+ * run. The base keeps the slot at two base-36 characters, past the fixed slots above.
+ */
+export function workerTestRunId(runId: string, workerIndex: number, testSeq: number): string {
+  return perTestRunId(runId, FIXTURE_WORKER_BASE + workerIndex, testSeq);
+}
