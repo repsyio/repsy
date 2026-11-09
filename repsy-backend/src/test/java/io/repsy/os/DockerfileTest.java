@@ -149,6 +149,21 @@ class DockerfileTest {
   }
 
   @Test
+  @DisplayName("RPS-2580: entrypoint.sh starts PropertiesLauncher only for jars in /app/ext")
+  void entrypointLoadsExtJarsThroughThePropertiesLauncher() throws IOException {
+    final String script = read(ROOT.resolve("entrypoint.sh"));
+
+    assertThat(script)
+        .contains("EXT_DIR=\"${REPSY_EXT_DIR:-/app/ext}\"")
+        .contains("-Dloader.path=\"$EXT_DIR\"")
+        .contains("org.springframework.boot.loader.launch.PropertiesLauncher");
+    assertThat(script.lines().filter(l -> l.startsWith("exec java")).toList())
+        .as("the plain start is the only top-level exec, after the launcher branch")
+        .hasSize(1)
+        .containsExactly("exec java -jar app.jar");
+  }
+
+  @Test
   @DisplayName("RPS-1166: the Dockerfile pnpm pin equals CI's setup-pnpm pin and is a version")
   void dockerfilePnpmEqualsTheCiPin() throws IOException {
     final String image = pin(ROOT.resolve("Dockerfile"), "corepack prepare");

@@ -20,13 +20,25 @@ import io.repsy.os.server.protocols.shared.storage.FileSystemStorageBeanRegistra
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import io.repsy.protocols.shared.storage.StorageStrategyRegistry;
 import java.util.EnumMap;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 
-/** The file system storage of every protocol, reachable through {@link StorageStrategyRegistry}. */
+/**
+ * The file system storage of every protocol, reachable through {@link StorageStrategyRegistry}.
+ *
+ * <p>Active while {@code os.app.storage.backend} (env {@code STORAGE_BACKEND}) is {@code
+ * file-system}, which is also the value when it is not set. Any other value switches this wiring
+ * off, and a jar on the classpath (see {@code /app/ext} in the image) must then provide the {@link
+ * StorageStrategyRegistry} bean.
+ */
 @Configuration
+@ConditionalOnProperty(
+    name = "os.app.storage.backend",
+    havingValue = "file-system",
+    matchIfMissing = true)
 @Import(FileSystemStorageBeanRegistrar.class)
 public class ProtocolStorageConfig {
 

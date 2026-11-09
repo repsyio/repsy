@@ -399,6 +399,9 @@ os:
     schema: public
 
     storage:
+      # `file-system` wires the strategies below. Any other value needs a jar that provides the
+      # StorageStrategyRegistry bean (README, "Storage backend").
+      backend: ${STORAGE_BACKEND:file-system}
       file-system:
         trash-retention: ${TRASH_RETENTION:P7D}
         maven:
