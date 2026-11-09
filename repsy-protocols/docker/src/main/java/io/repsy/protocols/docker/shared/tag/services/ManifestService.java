@@ -26,8 +26,11 @@ import java.util.Optional;
  * The manifests of a Docker repo. A manifest is content-addressed: one row per image and digest,
  * kept for as long as something (a tag, an index, or nobody) still has it, and pullable by its
  * digest whatever tags point at it. A tag is a movable pointer to a manifest.
+ *
+ * @param <R> the type of the repo id
+ * @param <P> the type of the image, tag and manifest ids
  */
-public interface ManifestService<I> {
+public interface ManifestService<R, P> {
 
   /**
    * Refuses an index that references a manifest the image does not have, before anything of the
@@ -36,23 +39,23 @@ public interface ManifestService<I> {
    * @throws io.repsy.core.error_handling.exceptions.ItemNotFoundException {@code manifestNotFound}
    *     for the first digest (of either algorithm) that is no manifest of the image
    */
-  void verifyManifestsExist(I repoId, I imageId, List<String> digests);
+  void verifyManifestsExist(R repoId, P imageId, List<String> digests);
 
   /**
    * Stores the manifest list (index) and replaces the manifests it references. When the form's
    * reference is a tag, the tag is created or moved to the index.
    */
-  void createManifestList(I repoId, I imageId, TagForm tagForm);
+  void createManifestList(R repoId, P imageId, TagForm tagForm);
 
   /**
    * Stores an image manifest under its digest, once per image, and, when the form's reference is a
    * tag, creates the tag or moves it to the manifest. The manifest the tag pointed at before stays
    * stored, untagged.
    */
-  void createSinglePlatformManifest(I repoId, BaseImageInfo<I> imageInfo, TagForm tagForm);
+  void createSinglePlatformManifest(R repoId, BaseImageInfo<P> imageInfo, TagForm tagForm);
 
-  Optional<BaseTagDetail<I>> findActiveTagByNameAndRepoAndImage(
-      I repoId, String imageName, String tag);
+  Optional<BaseTagDetail<P>> findActiveTagByNameAndRepoAndImage(
+      R repoId, String imageName, String tag);
 
   /**
    * Finds a manifest of the image by its digest, of either algorithm, however it got there: pushed
@@ -60,12 +63,12 @@ public interface ManifestService<I> {
    *
    * @throws io.repsy.core.error_handling.exceptions.ItemNotFoundException {@code manifestNotFound}
    */
-  BaseManifestDetail<I> getManifestByRepoIdAndImageNameAndDigest(
-      I repoId, BaseImageInfo<I> imageInfo, String digest);
+  BaseManifestDetail<P> getManifestByRepoIdAndImageNameAndDigest(
+      R repoId, BaseImageInfo<P> imageInfo, String digest);
 
   /**
    * The names of the tags of an image, in no particular order: the caller sorts and pages them, so
    * the order a listing answers in does not depend on the database's collation.
    */
-  List<String> findTagNamesByImageId(I imageId);
+  List<String> findTagNamesByImageId(P imageId);
 }

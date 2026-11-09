@@ -26,7 +26,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class DockerUploadFinalizeProtocolMethodHandler
-    extends AbstractDockerUploadFinalizeProtocolMethodHandler<UUID> {
+    extends AbstractDockerUploadFinalizeProtocolMethodHandler<UUID, UUID> {
 
   public DockerUploadFinalizeProtocolMethodHandler(
       @Qualifier("osDockerPathParser") final PathParser basePathParser,

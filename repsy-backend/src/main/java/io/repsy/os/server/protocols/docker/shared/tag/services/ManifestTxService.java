@@ -73,7 +73,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
-public class ManifestTxService implements ManifestService<UUID> {
+public class ManifestTxService implements ManifestService<UUID, UUID> {
 
   private static final String MULTIPLATFORM = "Multiplatform";
 

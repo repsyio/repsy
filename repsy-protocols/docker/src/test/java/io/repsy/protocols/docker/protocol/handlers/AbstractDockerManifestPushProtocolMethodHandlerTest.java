@@ -79,16 +79,17 @@ class AbstractDockerManifestPushProtocolMethodHandlerTest {
   @Mock private DockerProtocolFacade<UUID> dockerFacade;
   @Mock private DockerProtocolProvider provider;
   @Mock private AbstractDockerLayerRenamer<UUID> layerRenamer;
-  @Mock private ImageService<UUID> imageService;
+  @Mock private ImageService<UUID, UUID> imageService;
 
-  private static class TestHandler extends AbstractDockerManifestPushProtocolMethodHandler<UUID> {
+  private static class TestHandler
+      extends AbstractDockerManifestPushProtocolMethodHandler<UUID, UUID> {
 
     TestHandler(
         final PathParser basePathParser,
         final DockerProtocolFacade<UUID> dockerFacade,
         final DockerProtocolProvider provider,
         final AbstractDockerLayerRenamer<UUID> layerRenamer,
-        final ImageService<UUID> imageService) {
+        final ImageService<UUID, UUID> imageService) {
       super(basePathParser, dockerFacade, provider, layerRenamer, imageService);
     }
 
@@ -108,7 +109,7 @@ class AbstractDockerManifestPushProtocolMethodHandlerTest {
     }
   }
 
-  private AbstractDockerManifestPushProtocolMethodHandler<UUID> handler() {
+  private AbstractDockerManifestPushProtocolMethodHandler<UUID, UUID> handler() {
     return new TestHandler(
         this.basePathParser,
         this.dockerFacade,
