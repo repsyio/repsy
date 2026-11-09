@@ -47,25 +47,28 @@ import tools.jackson.databind.ObjectMapper;
  * DockerManifestWriter} (push), {@link DockerManifestReader} (pull) and {@link DockerBlobResolver}
  * (files and layer rows), and this class keeps the layer upload and the tag list. The constructor
  * and the protected collaborators are the contract of a subclass.
+ *
+ * @param <R> the type of the repo id
+ * @param <P> the type of the image, tag and manifest ids
  */
-public abstract class AbstractDockerProtocolTxFacade<I>
-    implements DockerProtocolFacade<I>, DockerPathParserLayer, DockerPathParserManifest {
+public abstract class AbstractDockerProtocolTxFacade<R, P>
+    implements DockerProtocolFacade<P>, DockerPathParserLayer, DockerPathParserManifest {
 
-  protected final DockerStorageService<I> dockerStorageService;
-  protected final LayerService<I> layerService;
-  protected final ImageService<I> imageService;
-  protected final ManifestService<I> manifestService;
+  protected final DockerStorageService<R> dockerStorageService;
+  protected final LayerService<R> layerService;
+  protected final ImageService<R, P> imageService;
+  protected final ManifestService<R, P> manifestService;
   protected final ObjectMapper objectMapper;
 
-  private final DockerBlobResolver<I> blobs;
-  private final DockerManifestWriter<I> manifestWriter;
-  private final DockerManifestReader<I> manifestReader;
+  private final DockerBlobResolver<R> blobs;
+  private final DockerManifestWriter<R, P> manifestWriter;
+  private final DockerManifestReader<R, P> manifestReader;
 
   protected AbstractDockerProtocolTxFacade(
-      final DockerStorageService<I> dockerStorageService,
-      final LayerService<I> layerService,
-      final ImageService<I> imageService,
-      final ManifestService<I> manifestService,
+      final DockerStorageService<R> dockerStorageService,
+      final LayerService<R> layerService,
+      final ImageService<R, P> imageService,
+      final ManifestService<R, P> manifestService,
       final ObjectMapper objectMapper) {
 
     this.dockerStorageService = dockerStorageService;
@@ -95,7 +98,7 @@ public abstract class AbstractDockerProtocolTxFacade<I>
       final long contentLength)
       throws IOException {
 
-    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<R>getRepoInfo(context);
     final var storagePath = StoragePath.of(repoInfo.getStorageKey(), relativePath.getPath());
 
     final var chunkUsages =
@@ -112,7 +115,7 @@ public abstract class AbstractDockerProtocolTxFacade<I>
       final ProtocolContext context, final RelativePath relativePath, final String digest)
       throws IOException {
 
-    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<R>getRepoInfo(context);
     final var resource = this.blobs.getResource(repoInfo, relativePath);
 
     if (!BlobDigests.matches(digest, resource.getInputStream())) {
@@ -124,7 +127,7 @@ public abstract class AbstractDockerProtocolTxFacade<I>
   public long getUploadSize(final ProtocolContext context, final RelativePath relativePath)
       throws IOException {
 
-    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<R>getRepoInfo(context);
 
     return this.blobs.getResource(repoInfo, relativePath).contentLength();
   }
@@ -134,7 +137,7 @@ public abstract class AbstractDockerProtocolTxFacade<I>
       final ProtocolContext context, final RelativePath relativePath, final LayerInfo layerInfo)
       throws IOException {
 
-    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<R>getRepoInfo(context);
     final var resource = this.blobs.getResource(repoInfo, relativePath);
     layerInfo.setSize(resource.contentLength());
 
@@ -142,7 +145,7 @@ public abstract class AbstractDockerProtocolTxFacade<I>
   }
 
   @Override
-  public SavedManifest<I> saveManifest(
+  public SavedManifest<P> saveManifest(
       final ProtocolContext context, final String imageName, final ManifestForm form)
       throws IOException {
 
@@ -154,7 +157,7 @@ public abstract class AbstractDockerProtocolTxFacade<I>
       final ProtocolContext context, final String digest, final String servletPath)
       throws IOException {
 
-    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<R>getRepoInfo(context);
 
     final var layer = this.blobs.findLayerInfoByRepoIdAndDigest(repoInfo.getId(), digest);
 
@@ -170,7 +173,7 @@ public abstract class AbstractDockerProtocolTxFacade<I>
   @Override
   public @Nullable String getLayerMediaType(final ProtocolContext context, final String digest) {
 
-    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<R>getRepoInfo(context);
 
     return this.layerService
         .findLayerInfoByRepoIdAndDigest(repoInfo.getId(), digest)
@@ -196,7 +199,7 @@ public abstract class AbstractDockerProtocolTxFacade<I>
       final @Nullable Integer limit,
       final @Nullable String last) {
 
-    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<R>getRepoInfo(context);
 
     final var imageInfo =
         this.imageService.getImageInfoByRepoIdAndName(repoInfo.getId(), imageName);

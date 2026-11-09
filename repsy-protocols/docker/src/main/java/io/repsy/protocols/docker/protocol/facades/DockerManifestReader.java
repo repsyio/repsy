@@ -37,11 +37,11 @@ import org.springframework.core.io.Resource;
 
 /** The manifest read of the Docker facade: a reference to a digest to the manifest's file. */
 @RequiredArgsConstructor
-final class DockerManifestReader<I> {
+final class DockerManifestReader<R, P> {
 
-  private final ImageService<I> imageService;
-  private final ManifestService<I> manifestService;
-  private final DockerBlobResolver<I> blobs;
+  private final ImageService<R, P> imageService;
+  private final ManifestService<R, P> manifestService;
+  private final DockerBlobResolver<R> blobs;
   private final DockerPathParserManifest manifestPaths;
 
   ManifestDetails getManifest(
@@ -51,7 +51,7 @@ final class DockerManifestReader<I> {
       final String requestPath)
       throws IOException {
 
-    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<R>getRepoInfo(context);
 
     final var imageInfo =
         this.imageService.getImageInfoByRepoIdAndName(repoInfo.getId(), imageName);
@@ -80,9 +80,9 @@ final class DockerManifestReader<I> {
    * it. Both are tried, so a file that was renamed just before its row was updated is still found.
    */
   Resource getManifestResource(
-      final BaseRepoInfo<I> repoInfo,
+      final BaseRepoInfo<R> repoInfo,
       final String imageName,
-      final BaseManifestDetail<I> manifest,
+      final BaseManifestDetail<P> manifest,
       final String requestPath) {
 
     if (manifest.getStorageName() != null) {
@@ -103,7 +103,7 @@ final class DockerManifestReader<I> {
   }
 
   String resolveManifestDigest(
-      final BaseRepoInfo<I> repoInfo, final String imageName, final String reference) {
+      final BaseRepoInfo<R> repoInfo, final String imageName, final String reference) {
 
     if (BlobDigests.startsWithDigestPrefix(reference)) {
       return OciDigestUtils.normalize(reference);

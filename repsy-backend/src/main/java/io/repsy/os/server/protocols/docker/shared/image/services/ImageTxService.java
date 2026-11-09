@@ -42,7 +42,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
-public class ImageTxService implements ImageService<UUID> {
+public class ImageTxService implements ImageService<UUID, UUID> {
 
   private final ImageMapper imageConverter;
   private final ImageRepository imageRepository;

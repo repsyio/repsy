@@ -57,25 +57,25 @@ import tools.jackson.databind.ObjectMapper;
  * platform of the config, the manifest file and the rows, in the order the push depends on.
  */
 @RequiredArgsConstructor
-final class DockerManifestWriter<I> {
+final class DockerManifestWriter<R, P> {
 
   private static final String MULTIPLATFORM = "Multiplatform";
   private static final String USAGES_PROPERTY = "usages";
   private static final String ARTIFACT_NAME_PROPERTY = "artifactName";
   private static final String ARTIFACT_VERSION_PROPERTY = "artifactVersion";
 
-  private final DockerStorageService<I> dockerStorageService;
-  private final LayerService<I> layerService;
-  private final ImageService<I> imageService;
-  private final ManifestService<I> manifestService;
+  private final DockerStorageService<R> dockerStorageService;
+  private final LayerService<R> layerService;
+  private final ImageService<R, P> imageService;
+  private final ManifestService<R, P> manifestService;
   private final ObjectMapper objectMapper;
-  private final DockerBlobResolver<I> blobs;
+  private final DockerBlobResolver<R> blobs;
 
-  SavedManifest<I> saveManifest(
+  SavedManifest<P> saveManifest(
       final ProtocolContext context, final String imageName, final ManifestForm form)
       throws IOException {
 
-    final var repoInfo = ProtocolContextUtils.<I>getRepoInfo(context);
+    final var repoInfo = ProtocolContextUtils.<R>getRepoInfo(context);
 
     this.verifyReference(form);
     this.checkRepoAllowOverride(repoInfo, form.getTagName(), imageName, form.getDigest());
@@ -107,7 +107,7 @@ final class DockerManifestWriter<I> {
   }
 
   BaseUsages createManifest(
-      final BaseRepoInfo<I> repoInfo, final BaseImageInfo<I> imageInfo, final ManifestForm form)
+      final BaseRepoInfo<R> repoInfo, final BaseImageInfo<P> imageInfo, final ManifestForm form)
       throws IOException {
 
     final var manifestInfo =
@@ -132,7 +132,7 @@ final class DockerManifestWriter<I> {
   }
 
   BaseUsages createManifestList(
-      final BaseRepoInfo<I> repoInfo, final BaseImageInfo<I> imageInfo, final ManifestForm form)
+      final BaseRepoInfo<R> repoInfo, final BaseImageInfo<P> imageInfo, final ManifestForm form)
       throws IOException {
 
     final var manifestList =
@@ -154,7 +154,7 @@ final class DockerManifestWriter<I> {
 
   BaseUsages writeFileAndUpdateUsage(
       final InputStream inputStream,
-      final BaseRepoInfo<I> repoInfo,
+      final BaseRepoInfo<R> repoInfo,
       final RelativePath relativePath) {
 
     final var storagePath = StoragePath.of(repoInfo.getStorageKey(), relativePath.getPath());
@@ -169,7 +169,7 @@ final class DockerManifestWriter<I> {
    * so is any push by digest: there is no tag to move.
    */
   void checkRepoAllowOverride(
-      final BaseRepoInfo<I> repoInfo,
+      final BaseRepoInfo<R> repoInfo,
       final String reference,
       final String imageName,
       final String digest) {
@@ -187,7 +187,7 @@ final class DockerManifestWriter<I> {
     }
   }
 
-  BaseUsages writeManifest(final BaseRepoInfo<I> repoInfo, final ManifestForm form)
+  BaseUsages writeManifest(final BaseRepoInfo<R> repoInfo, final ManifestForm form)
       throws IOException {
 
     try (final var inputStream = new ByteArrayInputStream(form.getManifestBytes())) {
@@ -195,7 +195,7 @@ final class DockerManifestWriter<I> {
     }
   }
 
-  void verifyLayers(final I repoId, final ManifestInfo manifestInfo) {
+  void verifyLayers(final R repoId, final ManifestInfo manifestInfo) {
 
     final var configDigest = manifestInfo.getConfig().getDigest();
 
@@ -235,7 +235,7 @@ final class DockerManifestWriter<I> {
    * architecture}: any other config media type is an OCI artifact, legitimately without either, and
    * is stored under {@link DockerConstants#UNKNOWN_PLATFORM} (RPS-1116).
    */
-  String extractPlatform(final BaseRepoInfo<I> repoInfo, final OciImageConfig config)
+  String extractPlatform(final BaseRepoInfo<R> repoInfo, final OciImageConfig config)
       throws IOException {
 
     if (!DockerManifestParser.isImageConfigMediaType(config.getMediaType())) {

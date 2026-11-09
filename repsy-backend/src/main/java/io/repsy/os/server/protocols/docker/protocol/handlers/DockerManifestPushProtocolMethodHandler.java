@@ -29,14 +29,14 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class DockerManifestPushProtocolMethodHandler
-    extends AbstractDockerManifestPushProtocolMethodHandler<UUID> {
+    extends AbstractDockerManifestPushProtocolMethodHandler<UUID, UUID> {
 
   public DockerManifestPushProtocolMethodHandler(
       @Qualifier("osDockerPathParser") final PathParser basePathParser,
       final DockerProtocolFacade<UUID> dockerFacade,
       final DockerProtocolProvider provider,
       final DockerLayerRenamer layerRenamer,
-      final ImageService<UUID> imageService) {
+      final ImageService<UUID, UUID> imageService) {
 
     super(basePathParser, dockerFacade, provider, layerRenamer, imageService);
   }

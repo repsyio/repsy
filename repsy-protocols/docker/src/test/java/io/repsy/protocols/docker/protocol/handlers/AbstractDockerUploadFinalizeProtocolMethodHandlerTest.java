@@ -66,7 +66,8 @@ class AbstractDockerUploadFinalizeProtocolMethodHandlerTest {
 
   private ProtocolContext context;
 
-  private static class TestHandler extends AbstractDockerUploadFinalizeProtocolMethodHandler<UUID> {
+  private static class TestHandler
+      extends AbstractDockerUploadFinalizeProtocolMethodHandler<UUID, UUID> {
 
     TestHandler(
         final PathParser basePathParser,

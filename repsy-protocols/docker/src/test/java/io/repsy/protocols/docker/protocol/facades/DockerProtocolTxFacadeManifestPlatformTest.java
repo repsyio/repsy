@@ -76,18 +76,18 @@ class DockerProtocolTxFacadeManifestPlatformTest {
 
   @Mock private DockerStorageService<UUID> dockerStorageService;
   @Mock private LayerService<UUID> layerService;
-  @Mock private ImageService<UUID> imageService;
-  @Mock private ManifestService<UUID> manifestService;
+  @Mock private ImageService<UUID, UUID> imageService;
+  @Mock private ManifestService<UUID, UUID> manifestService;
 
   private TestFacade facade;
 
-  private static class TestFacade extends AbstractDockerProtocolTxFacade<UUID> {
+  private static class TestFacade extends AbstractDockerProtocolTxFacade<UUID, UUID> {
 
     TestFacade(
         final DockerStorageService<UUID> dockerStorageService,
         final LayerService<UUID> layerService,
-        final ImageService<UUID> imageService,
-        final ManifestService<UUID> manifestService) {
+        final ImageService<UUID, UUID> imageService,
+        final ManifestService<UUID, UUID> manifestService) {
       super(
           dockerStorageService,
           layerService,

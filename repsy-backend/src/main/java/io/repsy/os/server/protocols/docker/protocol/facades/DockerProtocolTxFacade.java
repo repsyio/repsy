@@ -43,14 +43,14 @@ import tools.jackson.databind.ObjectMapper;
 
 @Component
 @Transactional(readOnly = true)
-public class DockerProtocolTxFacade extends AbstractDockerProtocolTxFacade<UUID> {
+public class DockerProtocolTxFacade extends AbstractDockerProtocolTxFacade<UUID, UUID> {
 
   private final ManifestDeleter manifestDeleter;
 
   public DockerProtocolTxFacade(
-      final ImageService<UUID> imageTxService,
+      final ImageService<UUID, UUID> imageTxService,
       final LayerService<UUID> layerTxService,
-      final ManifestService<UUID> manifestTxService,
+      final ManifestService<UUID, UUID> manifestTxService,
       final DockerStorageService<UUID> dockerStorageService,
       final ObjectMapper objectMapper,
       final ManifestDeleter manifestDeleter) {
