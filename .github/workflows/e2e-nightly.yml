@@ -778,4 +778,9 @@ jobs:
           # The leg's own runner containers first: after a timeout or a cancel Playwright is still running in them
           # (RPS-1981).
           docker ps -aq --filter "label=com.docker.compose.project=${REPSY_E2E_PROJECT}-runners" | xargs -r docker rm -f || true
+          # Then the leg's runner images and cache volumes (RPS-2534). The project name is fixed per leg, so on a host
+          # that outlives the job the images would otherwise stay and shadow a changed runner Dockerfile, which
+          # compose only builds when the image is missing. The layer cache keeps the next build cheap.
+          docker compose -p "${REPSY_E2E_PROJECT}-runners" -f docker-compose.runners.yml down -v --rmi local \
+            || echo "::warning::Could not remove the runner images of ${REPSY_E2E_PROJECT}-runners"
           ./run.sh local down "${stack_args[@]}"

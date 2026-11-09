@@ -962,7 +962,8 @@ Otherwise `run.sh` does the following for every subcommand:
   stops the stack only and leaves those images and cache volumes (that command is how they go). A run that is
   cancelled, or a job that hits its timeout, ends the `docker compose` client but not the container: Playwright
   keeps running in it, on `network_mode: host`, against the ports of whatever stack uses that port offset next.
-  The nightly removes the leg's `<project>-runners` containers in `Stop the stack` and every
+  The nightly removes the leg's `<project>-runners` containers, images and cache volumes in `Stop the stack`
+  (RPS-2534: a changed runner Dockerfile is not shadowed by an image of an earlier run) and every
   `repsy-e2e-*-runners` container when a run starts (RPS-1981); locally, `docker ps -a --filter
 label=com.docker.compose.project=<project>-runners` shows them.
 - prints a warning when `COMPOSE_PROJECT_NAME` is set (a line of `.env` is sourced into `run.sh`'s
