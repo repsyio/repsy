@@ -17,14 +17,11 @@ package io.repsy.os.shared.messages;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.repsy.core.test.msgid.MsgIdSourceScanner;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -32,10 +29,8 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -50,14 +45,17 @@ import org.junit.jupiter.api.Test;
  * of errors thrown from services and protocol modules, which {@code ProtocolErrorAdvice} turns into
  * responses.
  *
- * <p>What it recognises: an identifier-like string literal or an {@code UPPER_SNAKE} constant that
- * is the first argument of {@code success}/{@code warning}/{@code error} on the response factory,
- * or of a msgId-carrying exception constructor, plus the {@code ProtocolErrorCodes}/{@code
- * ErrorConstants} constant {@code ProtocolErrorAdvice} falls back to when an exception carries no
- * message. Ids held in other variables are not seen. A string literal that starts an exception's
- * msgId but is free text or continued by a concatenation, {@code .formatted(} or {@code
- * String.format(} cannot have a bundle entry, so {@link #msgIdsAreFixedIdentifiers()} fails on it
- * (RPS-992, RPS-1127).
+ * <p>The regular expressions, the source walk and the constant resolution are {@code repsy-core}'s
+ * {@link MsgIdSourceScanner} (RPS-2537), shared with Repsy Cloud and Imentis. This class keeps what
+ * is Repsy OS's own: the source directories, the call shapes only this code base has, the bundle,
+ * the pending list and every assertion.
+ *
+ * <p>What the scan recognises: an identifier-like string literal or an {@code UPPER_SNAKE} constant
+ * that is the first argument of {@code success}/{@code warning}/{@code error} on the response
+ * factory, or of a msgId-carrying exception constructor, plus the three shapes below. Ids held in
+ * other variables are not seen. A string literal that starts an exception's msgId but is free text
+ * or continued by a concatenation, {@code .formatted(} or {@code String.format(} cannot have a
+ * bundle entry, so {@link #msgIdsAreFixedIdentifiers()} fails on it (RPS-992, RPS-1127).
  *
  * <p>Bundle keys that no code uses are not flagged: most of them are leftovers tracked by RPS-959.
  */
@@ -73,44 +71,20 @@ class MessageKeysTest {
   private static final List<Path> SIBLING_DIRS =
       List.of(Path.of("..", "libs"), Path.of("..", "repsy-protocols"));
 
-  private static final String LITERAL_OR_CONSTANT =
-      "(?:\"(?<literal>\\w+)\"|(?<constant>(?:\\w+\\.)*[A-Z][A-Z0-9_]*))(?=\\s*[,)])";
-
-  private static final Pattern RESPONSE_MSG_ID =
-      Pattern.compile(
-          "(?:\\b(?:resp|responseFactory|restResponseFactory)\\s*\\.\\s*(?:success|warning|error)\\(\\s*"
-              // ErrorResponseService.error(request, status, msgId, ...): the panel answers a
-              // problem
-              // document
-              + "|\\bthis\\s*\\.\\s*(?:errors\\s*\\.\\s*)?error\\(\\s*request\\s*,\\s*[\\w.]+\\s*,\\s*)"
-              + LITERAL_OR_CONSTANT);
-
-  /** Exceptions {@code ProtocolErrorAdvice} renders with the exception message as the msgId. */
-  private static final String MSG_ID_EXCEPTION =
-      "\\bnew\\s+(?:ItemNotFound|BadRequest|ItemAlreadyExist|AccessNotAllowed|UnAuthorized"
-          + "|ErrorOccurred|SignatureNotVerified|Mfa|DataExportRequest|SubscriptionLimitReached)"
-          + "Exception\\(\\s*";
-
-  private static final Pattern EXCEPTION_MSG_ID =
-      Pattern.compile(MSG_ID_EXCEPTION + LITERAL_OR_CONSTANT);
-
   /**
-   * The first argument of an exception's msgId that cannot have a bundle entry (RPS-992, RPS-1127):
-   * a string literal that is not a bare identifier, or that is continued by a concatenation ({@code
-   * +}) or by {@code .formatted(}, or a {@code String.format(} / {@code MessageFormat.format(}
-   * call. {@code ProtocolErrorAdvice} returns such a msgId as both {@code msgId} and {@code text}.
+   * {@code ErrorResponseService.error(request, status, msgId, ...)}: the panel answers a problem
+   * document.
    */
-  private static final Pattern NON_IDENTIFIER_MSG_ID =
+  private static final Pattern ERROR_RESPONSE_MSG_ID =
       Pattern.compile(
-          MSG_ID_EXCEPTION
-              + "(?:\"(?<text>(?:[^\"\\\\]|\\\\.)*)\"\\s*(?<next>[,)+]|\\.\\s*formatted\\s*\\()"
-              + "|(?<call>(?:String|MessageFormat)\\s*\\.\\s*format\\s*\\())");
+          "\\bthis\\s*\\.\\s*(?:errors\\s*\\.\\s*)?error\\(\\s*request\\s*,\\s*[\\w.]+\\s*,\\s*"
+              + MsgIdSourceScanner.LITERAL_OR_CONSTANT);
 
   /**
    * The constant an {@code ProtocolErrorAdvice} handler falls back to, as in {@code
    * exceptionMessage != null ? exceptionMessage : ProtocolErrorCodes.UN_AUTHORIZED}, when the
-   * exception carries no message. It reaches {@code resp.error} through a variable, so {@link
-   * #RESPONSE_MSG_ID} misses it.
+   * exception carries no message. It reaches {@code resp.error} through a variable, so the scan of
+   * the response factory calls misses it.
    */
   private static final Pattern FALLBACK_MSG_ID =
       Pattern.compile(
@@ -127,9 +101,32 @@ class MessageKeysTest {
               + "(?:\"(?<literal>\\w+)\"|(?<constant>(?:ProtocolErrorCodes|ErrorConstants)"
               + "\\.[A-Z][A-Z0-9_]*))\\s*\\)");
 
-  private static final Pattern CONSTANT_DEFINITION =
-      Pattern.compile(
-          "static\\s+final\\s+(?:@\\w+\\s+)?String\\s+([A-Z][A-Z0-9_]*)\\s*=\\s*\"([^\"\\\\]*)\"");
+  /**
+   * Exceptions {@code ProtocolErrorAdvice} renders with the exception message as the msgId. The
+   * list and the response factory names equal the scanner's defaults and are passed anyway, so a
+   * change of those defaults cannot change what this test scans.
+   */
+  private static final List<String> MSG_ID_EXCEPTION_PREFIXES =
+      List.of(
+          "ItemNotFound",
+          "BadRequest",
+          "ItemAlreadyExist",
+          "AccessNotAllowed",
+          "UnAuthorized",
+          "ErrorOccurred",
+          "SignatureNotVerified",
+          "Mfa",
+          "DataExportRequest",
+          "SubscriptionLimitReached");
+
+  private static final MsgIdSourceScanner SCANNER =
+      MsgIdSourceScanner.builder()
+          .exceptionPrefixes(MSG_ID_EXCEPTION_PREFIXES)
+          .responseReceivers(List.of("resp", "responseFactory", "restResponseFactory"))
+          .extraPattern(ERROR_RESPONSE_MSG_ID)
+          .extraPattern(FALLBACK_MSG_ID)
+          .extraPattern(FORWARDED_MSG_ID)
+          .build();
 
   /**
    * Error msgIds thrown from exceptions with no bundle entry yet. RPS-958 adds the entries or drops
@@ -171,21 +168,22 @@ class MessageKeysTest {
       messages.load(Objects.requireNonNull(in, "messages.properties is not on the classpath"));
     }
 
-    final var sources = readSources();
-    final var constants = collectConstants(sources.values());
+    final var roots = new ArrayList<Path>();
 
-    usedMsgIds = new TreeMap<>();
-    unresolvedConstants = new TreeSet<>();
-    nonIdentifierMsgIds = new TreeMap<>();
+    roots.add(MODULE_DIR.resolve("src/main/java"));
 
-    sources.forEach(
-        (file, source) -> {
-          collect(RESPONSE_MSG_ID, source, file, constants);
-          collect(EXCEPTION_MSG_ID, source, file, constants);
-          collect(FALLBACK_MSG_ID, source, file, constants);
-          collect(FORWARDED_MSG_ID, source, file, constants);
-          collectNonIdentifiers(source, file);
-        });
+    for (final var dir : SIBLING_DIRS) {
+      roots.addAll(MsgIdSourceScanner.findSourceRoots(dir, 6));
+    }
+
+    assertThat(roots).as("source roots").hasSizeGreaterThan(10);
+
+    final var sources = MsgIdSourceScanner.readSources(roots);
+    final var scan = SCANNER.scan(sources, MsgIdSourceScanner.collectConstants(sources.values()));
+
+    usedMsgIds = scan.usedMsgIds();
+    unresolvedConstants = scan.unresolvedConstants();
+    nonIdentifierMsgIds = scan.nonIdentifierMsgIds();
   }
 
   @Test
@@ -218,7 +216,7 @@ class MessageKeysTest {
   @DisplayName("the msgId scan flags free text, concatenation, .formatted( and String.format(")
   void nonIdentifierScanFlagsFreeTextMsgIds() {
     assertThat(
-            findNonIdentifierMsgIds(
+            SCANNER.findNonIdentifierMsgIds(
                 """
                 throw new BadRequestException("Invalid path");
                 throw new ItemNotFoundException("no key with Id %s".formatted(id));
@@ -245,7 +243,7 @@ class MessageKeysTest {
   @DisplayName("the msgId scan flags a formatting call as the msgId, on one line or several")
   void nonIdentifierScanFlagsFormattingCalls() {
     assertThat(
-            findNonIdentifierMsgIds(
+            SCANNER.findNonIdentifierMsgIds(
                 """
                 throw new BadRequestException(String.format("Invalid %s", type));
                 throw new BadRequestException(
@@ -262,28 +260,18 @@ class MessageKeysTest {
   @DisplayName("the msgId scan covers every msgId-carrying exception")
   void nonIdentifierScanCoversEveryExceptionType() {
     final var source =
-        Stream.of(
-                "ItemNotFound",
-                "BadRequest",
-                "ItemAlreadyExist",
-                "AccessNotAllowed",
-                "UnAuthorized",
-                "ErrorOccurred",
-                "SignatureNotVerified",
-                "Mfa",
-                "DataExportRequest",
-                "SubscriptionLimitReached")
+        MSG_ID_EXCEPTION_PREFIXES.stream()
             .map(type -> "throw new " + type + "Exception(\"free text\");")
             .collect(Collectors.joining("\n"));
 
-    assertThat(findNonIdentifierMsgIds(source)).hasSize(10);
+    assertThat(SCANNER.findNonIdentifierMsgIds(source)).hasSize(10);
   }
 
   @Test
   @DisplayName("the msgId scan leaves fixed identifiers, constants and other arguments alone")
   void nonIdentifierScanIgnoresFixedIdentifiers() {
     assertThat(
-            findNonIdentifierMsgIds(
+            SCANNER.findNonIdentifierMsgIds(
                 """
                 throw new BadRequestException("chartNameMissing");
                 throw new ItemNotFoundException(ERR_NOT_FOUND);
@@ -360,123 +348,5 @@ class MessageKeysTest {
             "chartNameMissing", // BadRequestException in a protocol module
             "gemNameMissing") // forwarded through a helper
         .hasSizeGreaterThan(100);
-  }
-
-  private static void collect(
-      final Pattern pattern,
-      final String source,
-      final String file,
-      final Map<String, Set<String>> constants) {
-    final Matcher matcher = pattern.matcher(source);
-
-    while (matcher.find()) {
-      final var literal = groupOrNull(matcher, "literal");
-      final var constant = groupOrNull(matcher, "constant");
-
-      if (literal != null) {
-        addUsage(literal, file);
-      } else if (constant != null) {
-        final var name = constant.substring(constant.lastIndexOf('.') + 1);
-        final var values = constants.get(name);
-
-        if (values == null) {
-          unresolvedConstants.add(constant + " (" + file + ")");
-        } else {
-          values.forEach(value -> addUsage(value, file));
-        }
-      }
-    }
-  }
-
-  private static void collectNonIdentifiers(final String source, final String file) {
-    findNonIdentifierMsgIds(source)
-        .forEach(
-            text -> nonIdentifierMsgIds.computeIfAbsent(text, key -> new TreeSet<>()).add(file));
-  }
-
-  /**
-   * The msgId arguments in {@code source} that are free text, or continued by a concatenation,
-   * {@code .formatted(} or {@code String.format(}, as the text of each (RPS-992, RPS-1127).
-   */
-  static List<String> findNonIdentifierMsgIds(final String source) {
-    final var found = new ArrayList<String>();
-    final Matcher matcher = NON_IDENTIFIER_MSG_ID.matcher(source);
-
-    while (matcher.find()) {
-      final var call = matcher.group("call");
-
-      if (call != null) {
-        found.add(call.replaceAll("\\s", ""));
-        continue;
-      }
-
-      final var text = matcher.group("text");
-      final var next = matcher.group("next");
-      final var continued = !",".equals(next) && !")".equals(next);
-
-      if (continued || !text.matches("\\w+")) {
-        found.add(text);
-      }
-    }
-
-    return found;
-  }
-
-  /** {@code Matcher.group(name)} throws when the pattern has no group of that name. */
-  private static String groupOrNull(final Matcher matcher, final String name) {
-    return matcher.pattern().namedGroups().containsKey(name) ? matcher.group(name) : null;
-  }
-
-  private static void addUsage(final String msgId, final String file) {
-    usedMsgIds.computeIfAbsent(msgId, key -> new TreeSet<>()).add(file);
-  }
-
-  /** Constant name to every value a scanned class gives it; a name may be reused across classes. */
-  private static Map<String, Set<String>> collectConstants(final Iterable<String> sources) {
-    final var constants = new HashMap<String, Set<String>>();
-
-    for (final var source : sources) {
-      final var matcher = CONSTANT_DEFINITION.matcher(source);
-
-      while (matcher.find()) {
-        constants.computeIfAbsent(matcher.group(1), key -> new HashSet<>()).add(matcher.group(2));
-      }
-    }
-
-    return constants;
-  }
-
-  /** File name to source, for the main sources of the backend, {@code libs} and the protocols. */
-  private static Map<String, String> readSources() throws IOException {
-    final var roots = new ArrayList<Path>();
-
-    roots.add(MODULE_DIR.resolve("src/main/java"));
-
-    for (final var dir : SIBLING_DIRS) {
-      try (Stream<Path> walk = Files.walk(dir, 6)) {
-        walk.filter(path -> path.endsWith(Path.of("src", "main", "java"))).forEach(roots::add);
-      }
-    }
-
-    assertThat(roots).as("source roots").hasSizeGreaterThan(10);
-
-    final var sources = new TreeMap<String, String>();
-
-    for (final var root : roots) {
-      try (Stream<Path> walk = Files.walk(root)) {
-        walk.filter(path -> path.toString().endsWith(".java"))
-            .forEach(path -> sources.put(root.relativize(path).toString(), read(path)));
-      }
-    }
-
-    return sources;
-  }
-
-  private static String read(final Path path) {
-    try {
-      return Files.readString(path);
-    } catch (final IOException e) {
-      throw new UncheckedIOException(e);
-    }
   }
 }

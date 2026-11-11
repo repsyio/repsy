@@ -348,6 +348,12 @@
         </dependency>
 
         <dependency>
+            <groupId>io.repsy.core</groupId>
+            <artifactId>core-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
             <groupId>io.repsy.libs</groupId>
             <artifactId>test-support</artifactId>
             <version>${project.version}</version>
