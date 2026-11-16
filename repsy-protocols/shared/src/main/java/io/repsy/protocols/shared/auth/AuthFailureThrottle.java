@@ -315,7 +315,10 @@ public class AuthFailureThrottle {
     }
 
     if (this.bans.asMap().putIfAbsent(client, now) == null) {
-      log.warn(
+      // INFO, not WARN, as the probe ban of SuspiciousRequestThrottle: the throttle working is not
+      // something to act on. Every instance bans (and logs) on its own before a shared ban reaches
+      // it, so one client can log one line per instance.
+      log.info(
           "Client {} (network {}) used up its failed password checks in {} windows in a row ({})",
           remoteAddr,
           client,
