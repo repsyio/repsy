@@ -259,7 +259,10 @@ public class SuspiciousRequestThrottle {
       return;
     }
 
-    log.warn(
+    // INFO, not WARN: a scanner being banned is the throttle working, not something to act on; the
+    // bans are counted in BANS_METRIC. Every instance that sees the burst bans (and logs) on its own
+    // before a shared ban (ClientBanListener) reaches it, so one scan can log one line per instance.
+    log.info(
         "Client {} (network {}) sent suspicious requests {} reaching {} strikes ({})",
         remoteAddr,
         client,
