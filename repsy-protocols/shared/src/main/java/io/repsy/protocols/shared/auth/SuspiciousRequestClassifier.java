@@ -23,6 +23,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Predicate;
+import java.util.stream.Stream;
 import org.springframework.stereotype.Component;
 
 /**
@@ -189,6 +190,30 @@ public class SuspiciousRequestClassifier {
     }
 
     return found;
+  }
+
+  /**
+   * The literal needles of each family that matches by needle, the methods of {@link
+   * SignalFamily#METHOD_ABUSE} included (RPS-2633). The shared test vectors must hit every one of
+   * them, so a needle added here without a vector fails {@code SuspiciousRequestVectorsTest}; the
+   * families without needles (traversal, NUL byte, double encoding, overlong URI) are not listed.
+   */
+  static Map<SignalFamily, List<String>> needles() {
+
+    final var scriptTargets =
+        Stream.concat(SCRIPT_EXTENSIONS.stream(), SCRIPT_NEEDLES.stream()).toList();
+
+    return Map.of(
+        SignalFamily.SECRET_PATH, SECRET_NEEDLES,
+        SignalFamily.METHOD_ABUSE, ABUSED_METHODS.stream().sorted().toList(),
+        SignalFamily.SCRIPT_TARGET, scriptTargets,
+        SignalFamily.SQLI, SQLI_NEEDLES,
+        SignalFamily.XSS, XSS_NEEDLES,
+        SignalFamily.CMDI, CMDI_NEEDLES,
+        SignalFamily.SSRF_URL, SSRF_NEEDLES,
+        SignalFamily.LOG4SHELL, LOG4SHELL_NEEDLES,
+        SignalFamily.SSTI, SSTI_NEEDLES,
+        SignalFamily.SCANNER_UA, SCANNER_AGENTS);
   }
 
   private boolean isOn(final SignalFamily family, final boolean apiPort) {
