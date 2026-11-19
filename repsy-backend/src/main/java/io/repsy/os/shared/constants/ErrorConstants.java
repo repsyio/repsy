@@ -29,6 +29,7 @@ public final class ErrorConstants {
   public static final String ACCESS_TOKEN_EXPIRATION_IN_PAST = "accessTokenExpirationInPast";
   public static final String ACCESS_TOKEN_EXPIRATION_TOO_LATE = "accessTokenExpirationTooLate";
   public static final String ACCESS_TOKEN_LIMIT_REACHED = "accessTokenLimitReached";
+  public static final String ACCESS_TOKEN_NAME_IN_USE = "accessTokenNameInUse";
   public static final String ACCESS_TOKEN_NOT_FOUND = "accessTokenNotFound";
   public static final String CANNOT_DELETE_LAST_ADMIN_USER = "cannotDeleteLastAdminUser";
   public static final String CANNOT_DEMOTE_LAST_ADMIN_USER = "cannotDemoteLastAdminUser";

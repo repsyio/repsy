@@ -79,6 +79,9 @@ class PersonalAccessTokenControllerIT extends AbstractIT {
   private static final String TOKEN_NOT_FOUND_TEXT = "Access token not found.";
   private static final String NOT_AN_ACCESS_TOKEN_TEXT =
       "This request is not authenticated with an access token.";
+  private static final String NAME_IN_USE_TEXT =
+      "You already have an access token with this name. Choose another name, or revoke the old"
+          + " token first.";
   private static final String LIMIT_TEXT =
       "You already have the maximum number of access tokens that have not expired (50). Revoke one first.";
 
@@ -370,16 +373,74 @@ class PersonalAccessTokenControllerIT extends AbstractIT {
     expectValidationError(this.create(this.aliceBearer, "{\"name\":\"ci\"}"), "scopes");
   }
 
+  // ---------------------------------------------------------------------------------------------
+  // Unique names (RPS-2655)
+  // ---------------------------------------------------------------------------------------------
+
   @Test
-  @DisplayName("two tokens with the same name are two tokens, and each has its own secret")
-  void namesAreNotUnique() throws Exception {
+  @DisplayName(
+      "POST refuses a name a live token of the user has, ignoring case, with 409"
+          + " accessTokenNameInUse, and creates nothing")
+  void namesAreUniqueAmongLiveTokens() throws Exception {
+    expectCreated(this.create(this.aliceBearer, form("ci", "repo:read")));
+
+    for (final var name : List.of("ci", "CI", "Ci")) {
+      expectError(
+          this.create(this.aliceBearer, form(name, "repo:read")),
+          HttpStatus.CONFLICT,
+          "accessTokenNameInUse",
+          "accessTokenNameInUse",
+          NAME_IN_USE_TEXT);
+    }
+    assertThat(this.countOf(this.alice)).isEqualTo(1);
+  }
+
+  @Test
+  @DisplayName("another user may use the same name")
+  void namesAreUniquePerUser() throws Exception {
+    this.seed(this.bob, "ci");
+
+    expectCreated(this.create(this.aliceBearer, form("ci", "repo:read")));
+  }
+
+  @Test
+  @DisplayName("the name of a revoked token is free again")
+  void aRevokedTokensNameIsFree() throws Exception {
     final var first = expectCreated(this.create(this.aliceBearer, form("ci", "repo:read")));
+    expectNoContent(this.revoke(this.aliceBearer, idOf(first)));
+
     final var second = expectCreated(this.create(this.aliceBearer, form("ci", "repo:read")));
 
-    assertThat(idOf(first)).isNotEqualTo(idOf(second));
-    assertThat(JsonPath.<String>read(first, "$.token"))
-        .isNotEqualTo(JsonPath.<String>read(second, "$.token"));
+    assertThat(idOf(second)).isNotEqualTo(idOf(first));
+  }
+
+  @Test
+  @DisplayName("the name of an expired token is free again, and both rows stay")
+  void anExpiredTokensNameIsFree() throws Exception {
+    final var expired = this.seedExpired(this.alice, "ci");
+
+    expectCreated(this.create(this.aliceBearer, form("CI", "repo:read")));
+
+    assertThat(this.tokenRepository.findById(expired.getId())).isPresent();
     assertThat(this.countOf(this.alice)).isEqualTo(2);
+  }
+
+  @Test
+  @DisplayName(
+      "names taken twice before the rule stay: both tokens work and are listed, and a third is"
+          + " refused")
+  void namesTakenBeforeTheRuleStay() throws Exception {
+    this.seed(this.alice, "legacy");
+    this.seed(this.alice, "legacy");
+
+    assertThat(namesOf(expectBare(this.list(this.aliceBearer))))
+        .containsExactly("legacy", "legacy");
+    expectError(
+        this.create(this.aliceBearer, form("legacy", "repo:read")),
+        HttpStatus.CONFLICT,
+        "accessTokenNameInUse",
+        "accessTokenNameInUse",
+        NAME_IN_USE_TEXT);
   }
 
   // ---------------------------------------------------------------------------------------------
@@ -811,10 +872,12 @@ class PersonalAccessTokenControllerIT extends AbstractIT {
   @DisplayName("the routes that manage tokens take a personal access token as Bearer (RPS-2440)")
   void acceptsAPersonalAccessTokenAsBearerOnly(final Endpoint endpoint) throws Exception {
     // The token holds repo:read itself: a token hands on only the scopes it holds, and the create
-    // route of this test asks for repo:read.
+    // route of this test asks for repo:read. Its name is not the one that route creates, since
+    // names are unique among live tokens (RPS-2655).
     final var body =
         expectCreated(
-            this.create(this.aliceBearer, form("ci", "repo:manage", "repo:write", "repo:read")));
+            this.create(
+                this.aliceBearer, form("manager", "repo:manage", "repo:write", "repo:read")));
     final String secret = JsonPath.read(body, "$.token");
     final var expected =
         endpoint.name().startsWith("DELETE") ? 404 : endpoint.hasBody() ? 201 : 200;

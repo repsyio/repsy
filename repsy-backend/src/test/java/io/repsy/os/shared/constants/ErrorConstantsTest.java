@@ -35,6 +35,7 @@ class ErrorConstantsTest {
           "accessTokenExpirationInPast",
           "accessTokenExpirationTooLate",
           "accessTokenLimitReached",
+          "accessTokenNameInUse",
           "accessTokenNotFound",
           "cannotDeleteLastAdminUser",
           "cannotDemoteLastAdminUser",

@@ -21,6 +21,7 @@
 export const ERROR_CODES = {
   ACCESS_DENIED: 'accessDenied',
   ACCESS_NOT_ALLOWED: 'accessNotAllowed',
+  ACCESS_TOKEN_NAME_IN_USE: 'accessTokenNameInUse',
   INVALID_CREDENTIALS: 'invalidCredentials',
   LOGIN_REQUIRED: 'loginRequired',
   REFRESH_TOKEN_EXPIRED: 'refreshTokenExpired',

@@ -14,12 +14,15 @@
 /// limitations under the License.
 ///
 
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import moment from 'moment';
 import { finalize } from 'rxjs/operators';
 
 import { AccessTokenCreated, AccessTokenForm, AccessTokensApi, AccessTokenScope } from '../../../../../generated/api';
+import { ERROR_CODES } from '../../../../shared/constants/error-codes';
+import { problemCode } from '../../../../shared/error-handler/problem.utils';
 import { idFactory } from '../../../../shared/utils/unique-id';
 import { ProfileService } from '../../../pages/profile/services/profile.service';
 import { MAX_ACCESS_TOKEN_NAME_LENGTH } from '../../../pages/settings/access-tokens/access-token-limits';
@@ -55,6 +58,12 @@ export class AccessTokenFormComponent implements OnInit {
    */
   scopeOptions: readonly SelectableScope[] = selectableScopesFor(false);
   loading = false;
+  /**
+   * The name the server refused because a live token of the user has it (`accessTokenNameInUse`, 409,
+   * RPS-2655), or null. The form says so while the name field still holds it; a control error would not
+   * do, as enabling the form again after the request clears it.
+   */
+  private refusedName: string | null = null;
   form: FormGroup;
   selectedScopes = new Set<AccessTokenScope>();
   minDate: string;
@@ -123,6 +132,10 @@ export class AccessTokenFormComponent implements OnInit {
     );
   }
 
+  get isNameInUse(): boolean {
+    return this.refusedName !== null && (this.form.get('name')?.value ?? '').trim() === this.refusedName;
+  }
+
   get canSubmit(): boolean {
     return (
       this.form.valid && this.selectedScopes.size > 0 && !this.expirationInvalid && !this.loading && !this.blockedReason
@@ -166,7 +179,9 @@ export class AccessTokenFormComponent implements OnInit {
           this.created.emit(token);
           this.toastService.show('Access token created successfully.', 'success');
         },
-        error: () => {},
+        error: (error: HttpErrorResponse) => {
+          this.refusedName = problemCode(error) === ERROR_CODES.ACCESS_TOKEN_NAME_IN_USE ? payload.name : null;
+        },
       });
   }
 }

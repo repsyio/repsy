@@ -35,6 +35,7 @@ import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -264,6 +265,34 @@ class PersonalAccessTokenRotationIT extends AbstractPatIT {
 
     assertThat(response.getStatus()).isEqualTo(400);
     assertThat(response.getContentAsString()).contains("accessTokenLimitReached");
+    assertThat(this.row(old.id())).isNotNull();
+  }
+
+  @Test
+  @DisplayName(
+      "an expired token is live again once rotated, so its name must be free: 409"
+          + " accessTokenNameInUse, and nothing changes (RPS-2655)")
+  void anExpiredTokenNeedsAFreeName() throws Exception {
+    final var old =
+        this.seedPat(this.alice, Instant.now().minus(Duration.ofDays(2)), TokenScope.REPO_READ);
+    final var name = this.row(old.id()).getName();
+    final var created =
+        this.perform(
+                post(TOKENS)
+                    .header(AUTHORIZATION, this.aliceLogin)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(
+                        "{\"name\":\""
+                            + name.toUpperCase(Locale.ROOT)
+                            + "\",\"scopes\":[\"repo:read\"]}"))
+            .andReturn()
+            .getResponse();
+    assertThat(created.getStatus()).as("the expired token's name is free").isEqualTo(201);
+
+    final var response = this.rotate(this.aliceLogin, old.id());
+
+    assertThat(response.getStatus()).isEqualTo(409);
+    assertThat(response.getContentAsString()).contains("accessTokenNameInUse");
     assertThat(this.row(old.id())).isNotNull();
   }
 

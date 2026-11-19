@@ -64,6 +64,13 @@ public interface PersonalAccessTokenRepository extends JpaRepository<PersonalAcc
       UUID userId, PersonalAccessTokenKind kind, Instant now);
 
   /**
+   * Whether the user holds a token of this kind named {@code name}, ignoring case, that has not
+   * expired at {@code now} (RPS-2655). A revoked token is deleted, so it never counts.
+   */
+  boolean existsByUserIdAndKindAndNameIgnoreCaseAndExpirationDateAfter(
+      UUID userId, PersonalAccessTokenKind kind, String name, Instant now);
+
+  /**
    * Deletes the temporary tokens of the user that were created before {@code createdAt}, which is
    * the newer token's own creation time: a newer token is never revoked by an older one.
    *
