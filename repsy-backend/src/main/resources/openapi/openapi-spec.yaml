@@ -6091,6 +6091,7 @@ components:
       properties:
         id:
           type: string
+          format: uuid
         name:
           type: string
         scopes:
@@ -6399,6 +6400,7 @@ components:
           type: string
         id:
           type: string
+          format: uuid
         readOnly:
           type: boolean
         createdAt:
