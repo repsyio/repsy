@@ -164,7 +164,8 @@ class DockerfileTest {
   }
 
   @Test
-  @DisplayName("RPS-2646: every JVM the images start turns off the Base64 intrinsic (CVE-2026-114938)")
+  @DisplayName(
+      "RPS-2646: every JVM the images start turns off the Base64 intrinsic (CVE-2026-114938)")
   void everyJvmStartTurnsOffTheBase64Intrinsic() throws IOException {
     final String script = read(ROOT.resolve("entrypoint.sh"));
 
