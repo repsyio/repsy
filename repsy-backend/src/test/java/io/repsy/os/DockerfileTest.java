@@ -160,7 +160,20 @@ class DockerfileTest {
     assertThat(script.lines().filter(l -> l.startsWith("exec java")).toList())
         .as("the plain start is the only top-level exec, after the launcher branch")
         .hasSize(1)
-        .containsExactly("exec java -jar app.jar");
+        .containsExactly("exec java -XX:-UseBASE64Intrinsics -jar app.jar");
+  }
+
+  @Test
+  @DisplayName(
+      "RPS-2646: every JVM the images start turns off the Base64 intrinsic (CVE-2026-114938)")
+  void everyJvmStartTurnsOffTheBase64Intrinsic() throws IOException {
+    final String script = read(ROOT.resolve("entrypoint.sh"));
+
+    assertThat(script.lines().filter(l -> l.strip().startsWith("exec java")).toList())
+        .hasSize(2)
+        .allMatch(l -> l.contains("-XX:-UseBASE64Intrinsics"));
+    assertThat(read(ROOT.resolve("repsy-scanner-trivy/Dockerfile")))
+        .contains("ENTRYPOINT [\"java\", \"-XX:-UseBASE64Intrinsics\", \"-jar\", \"app.jar\"]");
   }
 
   @Test

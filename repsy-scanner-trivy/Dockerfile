@@ -78,4 +78,5 @@ EXPOSE 8090
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD wget -q -O- http://localhost:8090/health || exit 1
 
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# RPS-2646: CVE-2026-114938 ("Java4Shell"), see entrypoint.sh at the repository root.
+ENTRYPOINT ["java", "-XX:-UseBASE64Intrinsics", "-jar", "app.jar"]
