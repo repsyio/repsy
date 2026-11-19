@@ -456,7 +456,7 @@ paths:
         `Location`. It keeps its expiration date, or, if it has already expired, expires in 365
         days. Rotating does not change how many tokens the user holds, so it works at the limit of
         50; only a token that has expired needs room, as it counts again (`accessTokenLimitReached`,
-        400). A token of another user is a 404, as is one that is gone and a temporary token. Takes
+        400), and its name must be free, as for a new token (`accessTokenNameInUse`, 409). A token of another user is a 404, as is one that is gone and a temporary token. Takes
         the access token of a login, a temporary token (`rct-...`) or a long-lived personal access
         token; an unknown or expired token answers 401. With a temporary or a personal token the
         token to rotate may have only scopes that the calling token has itself, otherwise the
@@ -492,6 +492,8 @@ paths:
           "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
+        '409':
+          "$ref": "#/components/responses/Conflict"
       summary: Rotate a personal access token
     parameters:
       - name: tokenId
@@ -539,7 +541,9 @@ paths:
         the expiration date is in the past (`accessTokenExpirationInPast`) or more than 365 days
         ahead by UTC calendar day (`accessTokenExpirationTooLate`), and when the user already holds
         50 tokens that have not expired (`accessTokenLimitReached`); an expired token and a temporary
-        token do not count. Takes the access token of a login, a temporary token (`rct-...`) or a
+        token do not count. The answer is 409 `accessTokenNameInUse` when a token of the user that
+        has not expired already has the name, ignoring case; a revoked or expired token's name is
+        free (RPS-2655). Takes the access token of a login, a temporary token (`rct-...`) or a
         long-lived personal access token. With a temporary or a personal token the form may ask
         only for scopes that token has itself, otherwise the answer is 400 `validationError` and
         nothing is created; an unknown or expired token answers 401.
@@ -575,6 +579,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '409':
+          "$ref": "#/components/responses/Conflict"
       summary: Create a personal access token
   "/api/profile/cli-tokens":
     post:
@@ -5432,7 +5438,8 @@ components:
     Conflict:
       description: >-
         The request collides with something that exists (`itemAlreadyExists`, `repoExists`,
-        `keyStoreAlreadyExists`, `pgpPublicKeyAlreadyExists`, `scanAlreadyRunning`), or with another
+        `keyStoreAlreadyExists`, `pgpPublicKeyAlreadyExists`, `scanAlreadyRunning`,
+        `accessTokenNameInUse`), or with another
         request that changed the same item at the same moment (`concurrentModification`): read the
         item again and repeat the request.
       content:
@@ -5594,6 +5601,7 @@ components:
             - accessTokenExpirationInPast
             - accessTokenExpirationTooLate
             - accessTokenLimitReached
+            - accessTokenNameInUse
             - accessTokenNotFound
             - allowedKeyserverNotFound
             - archiveFileNameInvalid

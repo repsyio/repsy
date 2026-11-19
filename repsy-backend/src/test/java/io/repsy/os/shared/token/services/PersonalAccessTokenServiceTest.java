@@ -29,6 +29,7 @@ import static org.mockito.Mockito.when;
 
 import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
+import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.generated.model.AccessTokenForm;
@@ -505,6 +506,43 @@ class PersonalAccessTokenServiceTest {
     verify(this.tokenRepository).saveAndFlush(any());
   }
 
+  @Test
+  @DisplayName(
+      "refuses a name a live token of the user has, ignoring case, with accessTokenNameInUse"
+          + " (RPS-2655), and saves nothing")
+  void refusesANameThatALiveTokenHas() {
+    when(this.userRepository.lockUserIdForUpdate(USER_ID)).thenReturn(Optional.of(USER_ID));
+    when(this.tokenRepository.existsByUserIdAndKindAndNameIgnoreCaseAndExpirationDateAfter(
+            USER_ID, PersonalAccessTokenKind.PERSONAL, "ci", NOW))
+        .thenReturn(true);
+
+    final var tokenForm = form(null, TokenScope.REPO_READ);
+
+    assertThatThrownBy(() -> this.service.createToken(USER_ID, tokenForm))
+        .isInstanceOf(ItemAlreadyExistException.class)
+        .hasMessage("accessTokenNameInUse");
+    verify(this.tokenRepository, never()).saveAndFlush(any());
+  }
+
+  @Test
+  @DisplayName(
+      "checks the name after the lock on the user, against the live personal tokens at the"
+          + " moment of the request")
+  void checksTheNameUnderTheLock() {
+    this.whenUserExists();
+    this.whenFlushed();
+
+    this.service.createToken(USER_ID, form(null, TokenScope.REPO_READ));
+
+    final var order = inOrder(this.userRepository, this.tokenRepository);
+    order.verify(this.userRepository).lockUserIdForUpdate(USER_ID);
+    order
+        .verify(this.tokenRepository)
+        .existsByUserIdAndKindAndNameIgnoreCaseAndExpirationDateAfter(
+            USER_ID, PersonalAccessTokenKind.PERSONAL, "ci", NOW);
+    order.verify(this.tokenRepository).saveAndFlush(any(PersonalAccessToken.class));
+  }
+
   // -------------------------------------------------------------------------------------------
   // revokeToken
   // -------------------------------------------------------------------------------------------
@@ -677,6 +715,41 @@ class PersonalAccessTokenServiceTest {
     this.service.rotateToken(USER_ID, old.getId(), everything());
 
     assertThat(this.savedToken().getExpirationDate()).isEqualTo(NOW.plus(Duration.ofDays(365)));
+  }
+
+  @Test
+  @DisplayName(
+      "an expired token is live again, so its name must be free: accessTokenNameInUse, and"
+          + " nothing changes (RPS-2655)")
+  void anExpiredTokenNeedsAFreeName() {
+    this.whenUserExists();
+    final var old = this.rotatable(NOW.minus(Duration.ofDays(1)), TokenScope.REPO_READ);
+    when(this.tokenRepository.existsByUserIdAndKindAndNameIgnoreCaseAndExpirationDateAfter(
+            USER_ID, PersonalAccessTokenKind.PERSONAL, "deploy-ci", NOW))
+        .thenReturn(true);
+
+    final var oldId = old.getId();
+    final var everything = everything();
+
+    assertThatThrownBy(() -> this.service.rotateToken(USER_ID, oldId, everything))
+        .isInstanceOf(ItemAlreadyExistException.class)
+        .hasMessage("accessTokenNameInUse");
+    verify(this.tokenRepository, never()).delete(any());
+    verify(this.tokenRepository, never()).saveAndFlush(any());
+  }
+
+  @Test
+  @DisplayName("a live token keeps its name when rotated, without a name check")
+  void aLiveTokenIsRotatedWithoutANameCheck() {
+    this.whenUserExists();
+    this.whenFlushed();
+    final var old = this.rotatable(NOW.plus(Duration.ofDays(1)), TokenScope.REPO_READ);
+
+    this.service.rotateToken(USER_ID, old.getId(), everything());
+
+    assertThat(this.savedToken().getName()).isEqualTo("deploy-ci");
+    verify(this.tokenRepository, never())
+        .existsByUserIdAndKindAndNameIgnoreCaseAndExpirationDateAfter(any(), any(), any(), any());
   }
 
   @Test

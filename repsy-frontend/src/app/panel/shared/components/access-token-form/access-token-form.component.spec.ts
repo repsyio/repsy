@@ -13,6 +13,7 @@
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
 ///
+import { HttpErrorResponse } from '@angular/common/http';
 import { FormBuilder } from '@angular/forms';
 import { of, throwError } from 'rxjs';
 
@@ -180,5 +181,33 @@ describe('AccessTokenFormComponent', () => {
 
       expect(api.createAccessToken.calls.mostRecent().args[0].scopes as unknown).toEqual(['repo:read']);
     });
+  });
+  it('says the name is in use when the server answers accessTokenNameInUse, until the name changes', () => {
+    init('ci', ['repo:read']);
+    api.createAccessToken.and.returnValue(
+      throwError(
+        () => new HttpErrorResponse({ status: 409, error: { status: 409, code: 'accessTokenNameInUse' } }),
+      ) as never,
+    );
+
+    component.submit();
+
+    expect(component.isNameInUse).toBeTrue();
+    expect(component.form.enabled).toBeTrue();
+    component.form.get('name')?.setValue('ci-2');
+    expect(component.isNameInUse).toBeFalse();
+  });
+
+  it('does not blame the name for another failure', () => {
+    init('ci', ['repo:read']);
+    api.createAccessToken.and.returnValue(
+      throwError(
+        () => new HttpErrorResponse({ status: 400, error: { status: 400, code: 'validationError' } }),
+      ) as never,
+    );
+
+    component.submit();
+
+    expect(component.isNameInUse).toBeFalse();
   });
 });

@@ -17,6 +17,7 @@ package io.repsy.os.shared.token.services;
 
 import io.repsy.core.error_handling.exceptions.AccessNotAllowedException;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
+import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.generated.model.AccessTokenCreated;
@@ -191,6 +192,7 @@ public class PersonalAccessTokenService {
 
     this.lockUser(userId);
     this.requireRoom(userId, now);
+    this.requireFreeName(userId, form.getName(), now);
 
     return this.insert(
         userId,
@@ -346,6 +348,8 @@ public class PersonalAccessTokenService {
 
     if (expired) {
       this.requireRoom(userId, now);
+      // An expired token is live again afterwards, so its name must be free like a new one's.
+      this.requireFreeName(userId, token.getName(), now);
     }
 
     final var expirationDate =
@@ -360,6 +364,23 @@ public class PersonalAccessTokenService {
         token.getName(),
         token.getScopes(),
         expirationDate);
+  }
+
+  /**
+   * Refuses a name that a live personal token of the user already has, ignoring case (RPS-2655):
+   * the name is how a person tells the tokens apart in the panel, in {@code rp auth status} and in
+   * the logs. A revoked token is gone and an expired one is not live, so their names are free. It
+   * runs under the lock on the user, like {@link #requireRoom}, so two requests cannot both take a
+   * name. Names that were taken twice before this rule stay as they are.
+   *
+   * @throws ItemAlreadyExistException ({@code accessTokenNameInUse}, 409) if the name is taken
+   */
+  private void requireFreeName(final UUID userId, final String name, final Instant now) {
+
+    if (this.tokenRepository.existsByUserIdAndKindAndNameIgnoreCaseAndExpirationDateAfter(
+        userId, PersonalAccessTokenKind.PERSONAL, name, now)) {
+      throw new ItemAlreadyExistException(ErrorConstants.ACCESS_TOKEN_NAME_IN_USE);
+    }
   }
 
   @Transactional

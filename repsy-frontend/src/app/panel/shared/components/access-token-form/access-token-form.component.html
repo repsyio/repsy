@@ -20,6 +20,8 @@
           <p data-testid="access-token-name-error-required">• Should not be empty</p>
         } @else if (form.get('name').errors?.['maxlength'] && form.get('name').touched) {
           <p data-testid="access-token-name-error-maxlength">• Should be maximum 80 characters</p>
+        } @else if (isNameInUse) {
+          <p data-testid="access-token-name-error-in-use">• You already have a token with this name</p>
         }
       </div>
     </div>
