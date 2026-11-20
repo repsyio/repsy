@@ -187,9 +187,12 @@ COPY ${HARNESS_DIR}/runners/sbt2-warmup /tmp/sbt2-warmup
 RUN cd /tmp/sbt2-warmup \
     && PATH="${SBT_HOME_2}/bin:${PATH}" HOME=/opt/sbt-cache/home COURSIER_CACHE=/opt/sbt-cache/coursier sbt -batch -no-colors \
         -Dsbt.boot.directory=/opt/sbt-cache/boot -Dsbt.ivy.home=/opt/sbt-cache/ivy \
-        -Dsbt.global.base=/opt/sbt-cache/global -Dsbt.server.autostart=false \
-        +update +compile +package +makePom \
-    && rm -rf /tmp/sbt2-warmup /tmp/.sbt /opt/sbt-cache/home /opt/sbt-cache/global \
+        -Dsbt.global.base=/opt/sbt-cache/global \
+        ';update;compile;package;makePom;shutdown'
+
+# Separate step: the sbt 2 server finishes writing into the project after the client disconnects, so
+# removing the project in the same RUN as sbt fails with "Directory not empty".
+RUN rm -rf /tmp/sbt2-warmup /tmp/.sbt /opt/sbt-cache/home /opt/sbt-cache/global \
     && mkdir -p /opt/sbt-cache/global && chmod -R a+rwX /opt/sbt-cache
 
 RUN java --version && mvn --version && GRADLE_USER_HOME=/tmp/gradle-check gradle --version && rm -rf /tmp/gradle-check && gpg --version | head -1 && ant -version && java -cp "${IVY_JAR}" org.apache.ivy.Main -version
