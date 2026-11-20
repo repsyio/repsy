@@ -27,7 +27,7 @@
     <maven-checkstyle-plugin.version>3.6.0</maven-checkstyle-plugin.version>
     <checkstyle.version>14.4.0</checkstyle.version>
     <error-prone.version>2.52.0</error-prone.version>
-    <nullaway.version>0.14.3</nullaway.version>
+    <nullaway.version>0.14.4</nullaway.version>
   </properties>
 
   <!-- RPS-2265: the core-* artifacts that libs/scanner-client brings come from the repsy-maven release repository. -->
