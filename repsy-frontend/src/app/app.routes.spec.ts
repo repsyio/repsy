@@ -23,6 +23,7 @@ import { AuthGuard } from './auth/guards/auth.guard';
 import { AuthRedirectGuard } from './auth/guards/auth-redirect.guard';
 import { LoginComponent } from './auth/pages/login/login.component';
 import { CliAuthComponent } from './panel/pages/cli-auth/cli-auth.component';
+import { ConnectorAuthComponent } from './panel/pages/connector-auth/connector-auth.component';
 import { NotFoundComponent } from './panel/pages/not-found/not-found.component';
 import { ProfileComponent } from './panel/pages/profile/profile.component';
 import { repoTypeResolver } from './panel/pages/repository/repo-entry/repo-type.resolver';
@@ -70,6 +71,7 @@ describe('app routes', () => {
         'users',
         'security',
         'cli/auth',
+        'connector/auth',
         'not-found',
         ':repoName',
       ]);
@@ -82,6 +84,7 @@ describe('app routes', () => {
         ['users', UserManagementComponent, 'repsy | User Management'],
         ['security', SecurityComponent, 'repsy | Security'],
         ['cli/auth', CliAuthComponent, 'repsy | CLI Sign In'],
+        ['connector/auth', ConnectorAuthComponent, 'repsy | Connect an Application'],
         ['not-found', NotFoundComponent, 'repsy | Not Found'],
       ];
 
@@ -97,11 +100,12 @@ describe('app routes', () => {
       expect(child('users').canActivate).toEqual([AuthGuard, adminGuard]);
       expect(child('security').canActivate).toEqual([AuthGuard, adminGuard]);
       expect(child('cli/auth').canActivate).toEqual([AuthGuard]);
+      expect(child('connector/auth').canActivate).toEqual([AuthGuard]);
       expect(child('not-found').canActivate).toBeUndefined();
     });
 
     it('matches the static pages in full', () => {
-      for (const path of ['profile', 'repositories', 'users', 'security', 'cli/auth']) {
+      for (const path of ['profile', 'repositories', 'users', 'security', 'cli/auth', 'connector/auth']) {
         expect(child(path).pathMatch).withContext(path).toBe('full');
       }
     });

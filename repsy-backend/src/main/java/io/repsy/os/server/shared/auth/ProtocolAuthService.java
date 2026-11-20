@@ -525,7 +525,9 @@ public class ProtocolAuthService {
   protected void authorizePersonalAccessToken(
       final PersonalAccessTokenInfo token, final Permission permission) {
 
-    if (!TokenScope.permits(token.scopes(), permission)) {
+    // The prefix keeps a connector token away from the protocol routes; this keeps it away should
+    // a row of that kind ever be reached another way (RPS-2660).
+    if (token.isConnector() || !TokenScope.permits(token.scopes(), permission)) {
       throw new UnAuthorizedException(ProtocolErrorCodes.UN_AUTHORIZED);
     }
 
@@ -558,7 +560,7 @@ public class ProtocolAuthService {
     final var service = this.personalAccessTokens;
 
     if (service != null) {
-      service.updateLastUsedTime(token.id());
+      service.recordUse(token);
     }
   }
 
@@ -781,7 +783,9 @@ public class ProtocolAuthService {
 
   private void rejectPersonalAccessTokenAsPassword(final String password) {
 
-    if (TokenType.isUserToken(password)) {
+    // A rat- connector token is no protocol credential at all (RPS-2660), so it is refused here
+    // too, without the cost of a password check.
+    if (TokenType.isPanelToken(password)) {
       throw this.countedUnAuthorized();
     }
   }

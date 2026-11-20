@@ -152,6 +152,13 @@ public final class PanelAuthHelper implements AdminAuthenticator {
 
     final var token = this.liveToken(secret);
 
+    // A connected application holds a grant, not a credential it may hand on (RPS-2660): it can
+    // neither mint, rotate nor revoke a token. It can end its own grant, which is a route of its
+    // own (authenticateConnectorToken).
+    if (token.isConnector()) {
+      throw new AccessNotAllowedException(ProtocolErrorCodes.ACCESS_DENIED);
+    }
+
     final var user = this.userTxService.getAuthenticatedUserById(token.userId());
 
     this.touch(token);
@@ -163,6 +170,31 @@ public final class PanelAuthHelper implements AdminAuthenticator {
         token.userId());
 
     return new TokenManagerSession(user, token.scopes());
+  }
+
+  /**
+   * Authenticates the caller of {@code DELETE /api/profile/connector-tokens/current} (RPS-2660): a
+   * live connector token ({@code rat-}), which is answered with itself. A login, and a personal or
+   * temporary token, are valid callers with no connector token to end and are answered {@code
+   * notAConnectorToken} (400); anything else is a 401.
+   */
+  public PersonalAccessTokenInfo authenticateConnectorToken(final String authHeader) {
+
+    final var secret = AuthUtils.personalAccessTokenSecretOf(authHeader);
+
+    if (secret == null) {
+      this.authenticate(authHeader);
+
+      throw new BadRequestException(ErrorConstants.NOT_A_CONNECTOR_TOKEN);
+    }
+
+    final var token = this.liveToken(secret);
+
+    if (!token.isConnector()) {
+      throw new BadRequestException(ErrorConstants.NOT_A_CONNECTOR_TOKEN);
+    }
+
+    return token;
   }
 
   private UserInfo authenticateOrPersonalAccessToken(
@@ -205,7 +237,7 @@ public final class PanelAuthHelper implements AdminAuthenticator {
     final var service = this.personalAccessTokens;
 
     if (service != null) {
-      service.updateLastUsedTime(token.id());
+      service.recordUse(token);
     }
   }
 

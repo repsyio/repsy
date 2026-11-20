@@ -79,6 +79,31 @@ public class PersonalAccessTokenService {
   /** The name of a temporary token, which nobody is asked for: it is never listed. */
   public static final String TEMPORARY_TOKEN_NAME = "Repsy CLI login";
 
+  /**
+   * How long a connector token (RPS-2660) lives after its last use: every use moves its expiration
+   * date to this far ahead, so a connected application that is used keeps working, and one that is
+   * forgotten stops on its own.
+   */
+  public static final Duration CONNECTOR_TOKEN_IDLE_LIFETIME = Duration.ofDays(90);
+
+  /**
+   * The longest a connector token lives, counted from its creation, however often it is used; then
+   * the user consents again.
+   */
+  public static final Duration CONNECTOR_TOKEN_MAX_LIFETIME = Duration.ofDays(365);
+
+  /**
+   * How far the expiration date of a connector token must move before a use writes it, so that a
+   * busy token costs at most one such write a day.
+   */
+  static final Duration CONNECTOR_TOKEN_RENEWAL_STEP = Duration.ofDays(1);
+
+  /**
+   * The most live connector tokens a user can hold, a guard rail of their own: they do not count
+   * against {@link #MAX_TOKENS_PER_USER}.
+   */
+  public static final int MAX_CONNECTOR_TOKENS_PER_USER = 50;
+
   /** The expiry of a token created without a date, and the furthest a date can be set. */
   private static final Duration DEFAULT_EXPIRATION_DURATION = Duration.ofDays(365);
 
@@ -114,6 +139,17 @@ public class PersonalAccessTokenService {
 
     return this.tokenRepository.findAllByUserIdAndKind(
         userId, PersonalAccessTokenKind.PERSONAL, pageable);
+  }
+
+  /**
+   * The connector tokens of {@code userId} that still work (RPS-2660): the connected applications
+   * of the user. An expired one is left out.
+   */
+  public Page<PersonalAccessTokenListItem> getConnectorTokens(
+      final UUID userId, final Pageable pageable) {
+
+    return this.tokenRepository.findAllByUserIdAndKindAndExpirationDateAfter(
+        userId, PersonalAccessTokenKind.CONNECTOR, this.now(), pageable);
   }
 
   /**
@@ -252,6 +288,74 @@ public class PersonalAccessTokenService {
         userId, PersonalAccessTokenKind.TEMPORARY, current.getCreatedAt());
   }
 
+  /**
+   * Creates the connector token of a consent (RPS-2660): {@link #CONNECTOR_TOKEN_IDLE_LIFETIME}
+   * from now, named after the application, with {@code scopes}. It does not count against {@link
+   * #MAX_TOKENS_PER_USER}; it has a cap of its own, {@link #MAX_CONNECTOR_TOKENS_PER_USER}, checked
+   * under the same lock on the user. The expired connector tokens of the user are deleted first.
+   *
+   * <p>A refusal does not roll back the caller's transaction: the exchange that calls this has
+   * already used up its one-time code, and that must hold whatever the answer.
+   *
+   * @throws BadRequestException ({@code connectorTokenLimitReached}) if the user already holds
+   *     {@link #MAX_CONNECTOR_TOKENS_PER_USER} live connector tokens
+   */
+  @Transactional(noRollbackFor = BadRequestException.class)
+  public AccessTokenCreated createConnectorToken(
+      final UUID userId, final String name, final Set<TokenScope> scopes) {
+
+    final var now = this.now();
+
+    this.lockUser(userId);
+    this.tokenRepository.deleteExpiredByUserIdAndKind(
+        userId, PersonalAccessTokenKind.CONNECTOR, now);
+
+    if (this.tokenRepository.countByUserIdAndKindAndExpirationDateAfter(
+            userId, PersonalAccessTokenKind.CONNECTOR, now)
+        >= MAX_CONNECTOR_TOKENS_PER_USER) {
+      throw new BadRequestException(ErrorConstants.CONNECTOR_TOKEN_LIMIT_REACHED);
+    }
+
+    return this.insert(
+        userId,
+        PersonalAccessTokenKind.CONNECTOR,
+        TokenFactory.connectorToken(),
+        name,
+        scopes,
+        now.plus(CONNECTOR_TOKEN_IDLE_LIFETIME));
+  }
+
+  /**
+   * Revokes a connector token of {@code userId} from the panel (RPS-2660). A token of another user,
+   * and one of another kind, answer the same as one that does not exist.
+   *
+   * @throws ItemNotFoundException if the user holds no such connector token
+   */
+  @Transactional
+  public void revokeConnectorToken(final UUID userId, final UUID tokenId) {
+
+    final var token =
+        this.tokenRepository
+            .findByUserIdAndIdAndKind(userId, tokenId, PersonalAccessTokenKind.CONNECTOR)
+            .orElseThrow(() -> new ItemNotFoundException(ErrorConstants.ACCESS_TOKEN_NOT_FOUND));
+
+    this.tokenRepository.delete(token);
+  }
+
+  /**
+   * Revokes the connector token a request is authenticated with (RPS-2660): the application ends
+   * its own grant. Repeating it is harmless, but the second call no longer authenticates.
+   */
+  @Transactional
+  public void revokeOwnConnectorToken(final PersonalAccessTokenInfo token) {
+
+    if (!token.isConnector()) {
+      throw new BadRequestException(ErrorConstants.NOT_A_CONNECTOR_TOKEN);
+    }
+
+    this.tokenRepository.deleteById(token.id());
+  }
+
   private AccessTokenCreated insert(
       final UUID userId,
       final PersonalAccessTokenKind kind,
@@ -383,10 +487,41 @@ public class PersonalAccessTokenService {
     }
   }
 
+  /**
+   * Records that {@code token} authenticated a request: its last use, and for a connector token
+   * (RPS-2660) a new expiration date, {@link #CONNECTOR_TOKEN_IDLE_LIFETIME} from now but never
+   * beyond {@link #CONNECTOR_TOKEN_MAX_LIFETIME} from its creation. The date is written only when
+   * it moves by more than {@link #CONNECTOR_TOKEN_RENEWAL_STEP}, so a token in steady use costs at
+   * most one such write a day.
+   */
   @Transactional
-  public void updateLastUsedTime(final UUID tokenId) {
+  public void recordUse(final PersonalAccessTokenInfo token) {
 
-    this.tokenRepository.updateLastUsedTime(tokenId, this.clock.instant());
+    final var now = this.now();
+
+    if (token.isConnector()) {
+      final var renewed = connectorExpirationDate(token.createdAt(), now);
+
+      if (renewed.isAfter(token.expirationDate().plus(CONNECTOR_TOKEN_RENEWAL_STEP))) {
+        this.tokenRepository.updateLastUsedTimeAndExpirationDate(token.id(), now, renewed);
+        return;
+      }
+    }
+
+    this.tokenRepository.updateLastUsedTime(token.id(), now);
+  }
+
+  /**
+   * The expiration date of a connector token created at {@code createdAt} and used at {@code now}:
+   * {@link #CONNECTOR_TOKEN_IDLE_LIFETIME} ahead, capped at {@link #CONNECTOR_TOKEN_MAX_LIFETIME}
+   * from its creation.
+   */
+  static Instant connectorExpirationDate(final Instant createdAt, final Instant now) {
+
+    final var idle = now.plus(CONNECTOR_TOKEN_IDLE_LIFETIME);
+    final var cap = createdAt.plus(CONNECTOR_TOKEN_MAX_LIFETIME);
+
+    return idle.isBefore(cap) ? idle : cap;
   }
 
   /**

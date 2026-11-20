@@ -51,6 +51,22 @@ public interface PersonalAccessTokenRepository extends JpaRepository<PersonalAcc
   Page<PersonalAccessTokenListItem> findAllByUserIdAndKind(
       UUID userId, PersonalAccessTokenKind kind, Pageable pageable);
 
+  /** The tokens of the user and kind that have not expired at {@code now} (RPS-2660). */
+  Page<PersonalAccessTokenListItem> findAllByUserIdAndKindAndExpirationDateAfter(
+      UUID userId, PersonalAccessTokenKind kind, Instant now, Pageable pageable);
+
+  /**
+   * Deletes the tokens of the user and kind that have expired at {@code now} (RPS-2660): an expired
+   * connector token is never listed and never works again, so its row is only clutter.
+   *
+   * @return how many were deleted
+   */
+  @Modifying
+  @Query(
+      "delete from PersonalAccessToken pat where pat.user.id = :userId"
+          + " and pat.kind = :kind and pat.expirationDate <= :now")
+  int deleteExpiredByUserIdAndKind(UUID userId, PersonalAccessTokenKind kind, Instant now);
+
   long countByUserId(UUID userId);
 
   long countByUserIdAndKind(UUID userId, PersonalAccessTokenKind kind);
@@ -86,4 +102,13 @@ public interface PersonalAccessTokenRepository extends JpaRepository<PersonalAcc
   @Modifying
   @Query("update PersonalAccessToken pat set pat.lastUsedAt = :now where pat.id = :tokenId")
   void updateLastUsedTime(UUID tokenId, Instant now);
+
+  /**
+   * Records a use of a connector token and moves its expiration date (RPS-2660), in one statement.
+   */
+  @Modifying
+  @Query(
+      "update PersonalAccessToken pat set pat.lastUsedAt = :now,"
+          + " pat.expirationDate = :expirationDate where pat.id = :tokenId")
+  void updateLastUsedTimeAndExpirationDate(UUID tokenId, Instant now, Instant expirationDate);
 }

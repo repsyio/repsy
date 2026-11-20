@@ -125,10 +125,19 @@ class OpenApiSpecConsistencyIT extends AbstractIT {
    *       credentials for it.
    *   <li>{@code getServerInfo} (RPS-2347): the release and commit of the running build, which a
    *       client asks before it signs in; it holds no data of a user.
+   *   <li>{@code exchangeConnectorCode} (RPS-2660): the one-time code of a consent and its PKCE
+   *       verifier are its credential, like the refresh token of {@code refreshToken}; it is how a
+   *       connected application gets its token.
    * </ul>
    */
   private static final Set<String> PUBLIC_OPERATIONS =
-      Set.of("login", "refreshToken", "logout", "getSupportedRepoTypes", "getServerInfo");
+      Set.of(
+          "login",
+          "refreshToken",
+          "logout",
+          "getSupportedRepoTypes",
+          "getServerInfo",
+          "exchangeConnectorCode");
 
   /**
    * RPS-1593: the operations that answer 403 to a USER because their handler calls {@code
@@ -163,12 +172,13 @@ class OpenApiSpecConsistencyIT extends AbstractIT {
 
   /**
    * The operations whose 403 is not a role refusal but "the calling token lacks a scope of the
-   * token in the request" (RPS-2440). A login never gets it, so the e2e role sweep does not call
-   * them "USER gets 403" operations; the spec marks each with {@code x-forbidden-by: token-scope},
-   * which the sweep reads.
+   * token in the request" (RPS-2440), or "the calling token is a connector token, which manages no
+   * token" (RPS-2660). A login never gets it, so the e2e role sweep does not call them "USER gets
+   * 403" operations; the spec marks each with {@code x-forbidden-by: token-scope}, which the sweep
+   * reads.
    */
   private static final Set<String> TOKEN_SCOPE_OPERATIONS =
-      Set.of("revokeAccessToken", "rotateAccessToken");
+      Set.of("createAccessToken", "listAccessTokens", "revokeAccessToken", "rotateAccessToken");
 
   /**
    * RPS-1269: the one name a path variable has for each role, across every panel controller. A

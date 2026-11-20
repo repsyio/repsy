@@ -261,7 +261,7 @@ public class NpmAuthenticatorImpl extends ProtocolAuthService
 
   private Caller bearerCaller(final UUID repoId, final String header) {
 
-    final var patSecret = AuthUtils.personalAccessTokenSecretOf(header);
+    final var patSecret = AuthUtils.userTokenSecretOf(header);
 
     if (patSecret != null) {
       return personalAccessTokenCaller(super.authenticateWithPat(patSecret));

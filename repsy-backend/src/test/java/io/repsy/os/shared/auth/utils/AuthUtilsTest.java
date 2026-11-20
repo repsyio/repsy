@@ -18,6 +18,7 @@ package io.repsy.os.shared.auth.utils;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import io.repsy.os.shared.token.utils.TokenFactory;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
@@ -29,6 +30,32 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 @DisplayName("AuthUtils")
 class AuthUtilsTest {
+
+  @Nested
+  @DisplayName("token secrets of a Bearer header (RPS-2660)")
+  class TokenSecrets {
+
+    @Test
+    @DisplayName("the panel reads every personal access token kind, a connector token included")
+    void thePanelReadsEveryKind() {
+      final var connector = TokenFactory.connectorToken();
+      final var personal = TokenFactory.personalAccessToken();
+
+      assertThat(AuthUtils.personalAccessTokenSecretOf("Bearer " + connector)).isEqualTo(connector);
+      assertThat(AuthUtils.personalAccessTokenSecretOf("Bearer " + personal)).isEqualTo(personal);
+      assertThat(AuthUtils.personalAccessTokenSecretOf("Basic " + connector)).isNull();
+    }
+
+    @Test
+    @DisplayName("a protocol route reads rut- and rct- tokens, never a connector token")
+    void aProtocolRouteNeverReadsAConnectorToken() {
+      final var cli = TokenFactory.cliToken();
+
+      assertThat(AuthUtils.userTokenSecretOf("Bearer " + TokenFactory.connectorToken())).isNull();
+      assertThat(AuthUtils.userTokenSecretOf("Bearer " + cli)).isEqualTo(cli);
+      assertThat(AuthUtils.userTokenSecretOf("Basic " + cli)).isNull();
+    }
+  }
 
   @Nested
   @DisplayName("boundBySession")

@@ -16,8 +16,9 @@
 package io.repsy.os.shared.token.dtos;
 
 /**
- * The kind of a row of the personal access token table (RPS-2039). Both kinds are authenticated by
- * the same lookup; they differ in who creates them and how they are managed.
+ * The kind of a row of the personal access token table (RPS-2039, RPS-2660). Every kind is
+ * authenticated by the same lookup; they differ in who creates them, where they are accepted and
+ * how they are managed.
  */
 public enum PersonalAccessTokenKind {
   /**
@@ -29,5 +30,12 @@ public enum PersonalAccessTokenKind {
    * The 24-hour token the authorize screen hands to the Repsy CLI. It is never listed, never counts
    * against the cap, and a newer one replaces the previous one of the same user.
    */
-  TEMPORARY
+  TEMPORARY,
+  /**
+   * The token a user grants a connected application, such as the remote MCP gateway, on the consent
+   * page (RPS-2660). It is accepted on the panel API only, never on a protocol route; it cannot
+   * manage tokens; it lives 90 days from its last use, at most 365 days from its creation; it is
+   * listed apart from the personal tokens and does not count against their cap.
+   */
+  CONNECTOR
 }

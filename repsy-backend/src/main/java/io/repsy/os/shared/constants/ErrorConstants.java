@@ -31,12 +31,17 @@ public final class ErrorConstants {
   public static final String ACCESS_TOKEN_LIMIT_REACHED = "accessTokenLimitReached";
   public static final String ACCESS_TOKEN_NAME_IN_USE = "accessTokenNameInUse";
   public static final String ACCESS_TOKEN_NOT_FOUND = "accessTokenNotFound";
+  public static final String CONNECTOR_REDIRECT_URI_NOT_REGISTERED =
+      "connectorRedirectUriNotRegistered";
+  public static final String CONNECTOR_TOKEN_LIMIT_REACHED = "connectorTokenLimitReached";
   public static final String CANNOT_DELETE_LAST_ADMIN_USER = "cannotDeleteLastAdminUser";
   public static final String CANNOT_DEMOTE_LAST_ADMIN_USER = "cannotDemoteLastAdminUser";
   public static final String DOWNLOAD_TOKEN_EXPIRED = "downloadTokenExpired";
   public static final String INVALID_AUTH_TYPE = "invalidAuthType";
+  public static final String INVALID_CONNECTOR_CODE = "invalidConnectorCode";
   public static final String INVALID_CREDENTIALS = "invalidCredentials";
   public static final String NOT_AN_ACCESS_TOKEN = "notAnAccessToken";
+  public static final String NOT_A_CONNECTOR_TOKEN = "notAConnectorToken";
   public static final String PGP_SETTINGS_UNSUPPORTED = "pgpSettingsUnsupported";
   public static final String REFRESH_TOKEN_EXPIRED = "refreshTokenExpired";
   public static final String RELEASES_SNAPSHOTS_UNSUPPORTED = "releasesSnapshotsUnsupported";

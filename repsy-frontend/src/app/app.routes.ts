@@ -22,6 +22,7 @@ import { AuthGuard } from './auth/guards/auth.guard';
 import { AuthRedirectGuard } from './auth/guards/auth-redirect.guard';
 import { LoginComponent } from './auth/pages/login/login.component';
 import { CliAuthComponent } from './panel/pages/cli-auth/cli-auth.component';
+import { ConnectorAuthComponent } from './panel/pages/connector-auth/connector-auth.component';
 import { NotFoundComponent } from './panel/pages/not-found/not-found.component';
 import { ProfileComponent } from './panel/pages/profile/profile.component';
 import { repoTypeResolver } from './panel/pages/repository/repo-entry/repo-type.resolver';
@@ -98,6 +99,14 @@ export const routes: Routes = [
         canActivate: [AuthGuard],
         title: 'repsy | CLI Sign In',
         component: CliAuthComponent,
+      },
+      // RPS-2660: the consent page of a connected application, ahead of ':repoName' like 'cli/auth'.
+      {
+        path: 'connector/auth',
+        pathMatch: 'full',
+        canActivate: [AuthGuard],
+        title: 'repsy | Connect an Application',
+        component: ConnectorAuthComponent,
       },
       {
         path: 'not-found',
