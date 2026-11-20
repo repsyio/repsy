@@ -221,6 +221,9 @@ repsy:
       # ban-seconds, so it no longer gets a fresh set of checks every window. 0 turns the ban off.
       ban-seconds: ${AUTH_THROTTLE_BAN_SECONDS:3600}
       ban-after-blocked-windows: ${AUTH_THROTTLE_BAN_AFTER_BLOCKED_WINDOWS:3}
+      # RPS-2664: comma-separated addresses or CIDR ranges that are never counted, refused or banned,
+      # for a server-side client that calls for many users from one address (the remote MCP gateway).
+      allowlist: ${AUTH_THROTTLE_ALLOWLIST:}
     # RPS-2319: bans a client that sends probes (path traversal, .env and similar secret paths, null
     # bytes, TRACE/PROPFIND on the API port). max-strikes strikes in window-seconds ban it for
     # ban-seconds (429 on every path). mode: off, observe (log and count repsy.security.probe_*,

@@ -27,7 +27,8 @@ class AuthThrottlePropertiesTest {
   @Test
   @DisplayName("nothing set means enforce with 20 failures, a 60 second window and 10000 clients")
   void defaults() {
-    final var properties = new AuthThrottleProperties(null, null, null, null, null, null, null);
+    final var properties =
+        new AuthThrottleProperties(null, null, null, null, null, null, null, null);
 
     assertThat(properties.mode()).isEqualTo(ThrottleMode.ENFORCE);
     assertThat(properties.enabled()).isNull();
@@ -36,22 +37,25 @@ class AuthThrottlePropertiesTest {
     assertThat(properties.maxClients()).isEqualTo(10_000);
     assertThat(properties.banSeconds()).isEqualTo(3600);
     assertThat(properties.banAfterBlockedWindows()).isEqualTo(3);
+    assertThat(properties.allowlist()).isEmpty();
   }
 
   @Test
   @DisplayName("a ban length of 0 is allowed and turns the ban off, a negative one is refused")
   void banSettings() {
-    assertThat(new AuthThrottleProperties(null, null, null, null, null, 0L, null).banSeconds())
+    assertThat(
+            new AuthThrottleProperties(null, null, null, null, null, 0L, null, null).banSeconds())
         .isZero();
     assertThat(
-            new AuthThrottleProperties(null, null, null, null, null, 0L, 0)
+            new AuthThrottleProperties(null, null, null, null, null, 0L, 0, null)
                 .banAfterBlockedWindows())
         .isZero();
     assertThatIllegalArgumentException()
-        .isThrownBy(() -> new AuthThrottleProperties(null, null, null, null, null, -1L, null));
+        .isThrownBy(
+            () -> new AuthThrottleProperties(null, null, null, null, null, -1L, null, null));
     assertThatIllegalArgumentException()
-        .isThrownBy(() -> new AuthThrottleProperties(null, null, null, null, null, 60L, 0));
-    assertThat(new AuthThrottleProperties(ThrottleMode.OFF, null, 0, 0L, 0L, -1L, 0).mode())
+        .isThrownBy(() -> new AuthThrottleProperties(null, null, null, null, null, 60L, 0, null));
+    assertThat(new AuthThrottleProperties(ThrottleMode.OFF, null, 0, 0L, 0L, -1L, 0, null).mode())
         .isEqualTo(ThrottleMode.OFF);
   }
 
@@ -59,7 +63,7 @@ class AuthThrottlePropertiesTest {
   @DisplayName("the legacy enabled=false turns the throttle off whatever the mode says")
   void legacyDisabledWinsOverMode() {
     final var properties =
-        new AuthThrottleProperties(ThrottleMode.ENFORCE, false, null, null, null, null, null);
+        new AuthThrottleProperties(ThrottleMode.ENFORCE, false, null, null, null, null, null, null);
 
     assertThat(properties.mode()).isEqualTo(ThrottleMode.OFF);
     assertThat(properties.enabled()).isFalse();
@@ -69,7 +73,7 @@ class AuthThrottlePropertiesTest {
   @DisplayName("the legacy enabled=true leaves the mode alone")
   void legacyEnabledKeepsMode() {
     final var properties =
-        new AuthThrottleProperties(ThrottleMode.OBSERVE, true, null, null, null, null, null);
+        new AuthThrottleProperties(ThrottleMode.OBSERVE, true, null, null, null, null, null, null);
 
     assertThat(properties.mode()).isEqualTo(ThrottleMode.OBSERVE);
     assertThat(properties.enabled()).isNull();
@@ -79,11 +83,14 @@ class AuthThrottlePropertiesTest {
   @DisplayName("a non-positive setting is refused unless the mode is off")
   void nonPositiveSettings() {
     assertThatIllegalArgumentException()
-        .isThrownBy(() -> new AuthThrottleProperties(null, null, 0, null, null, null, null));
+        .isThrownBy(() -> new AuthThrottleProperties(null, null, 0, null, null, null, null, null));
     assertThatIllegalArgumentException()
         .isThrownBy(
-            () -> new AuthThrottleProperties(ThrottleMode.OBSERVE, null, 5, -1L, 5L, null, null));
-    assertThat(new AuthThrottleProperties(ThrottleMode.OFF, null, 0, 0L, 0L, null, null).mode())
+            () ->
+                new AuthThrottleProperties(
+                    ThrottleMode.OBSERVE, null, 5, -1L, 5L, null, null, null));
+    assertThat(
+            new AuthThrottleProperties(ThrottleMode.OFF, null, 0, 0L, 0L, null, null, null).mode())
         .isEqualTo(ThrottleMode.OFF);
   }
 

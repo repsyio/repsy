@@ -765,7 +765,8 @@ class AuthFailureThrottleTest {
                   WINDOW_SECONDS,
                   100L,
                   BAN_SECONDS,
-                  BAN_AFTER),
+                  BAN_AFTER,
+                  null),
               AuthFailureThrottleTest.this.meterRegistry,
               AuthFailureThrottleTest.this.ticker);
 
@@ -829,7 +830,7 @@ class AuthFailureThrottleTest {
   @Test
   @DisplayName("defaults to enforce when the mode is not set at all")
   void defaultsToEnforce() {
-    assertThat(new AuthThrottleProperties(null, null, 5, 30L, 50L, null, null).mode())
+    assertThat(new AuthThrottleProperties(null, null, 5, 30L, 50L, null, null, null).mode())
         .isEqualTo(ThrottleMode.ENFORCE);
   }
 
@@ -837,9 +838,10 @@ class AuthFailureThrottleTest {
   @DisplayName("the legacy enabled=false switches the throttle off whatever the mode says")
   void legacyEnabledFalseMeansOff() {
     assertThat(
-            new AuthThrottleProperties(ThrottleMode.ENFORCE, false, 5, 30L, 50L, null, null).mode())
+            new AuthThrottleProperties(ThrottleMode.ENFORCE, false, 5, 30L, 50L, null, null, null)
+                .mode())
         .isEqualTo(ThrottleMode.OFF);
-    assertThat(new AuthThrottleProperties(null, true, 5, 30L, 50L, null, null).mode())
+    assertThat(new AuthThrottleProperties(null, true, 5, 30L, 50L, null, null, null).mode())
         .isEqualTo(ThrottleMode.ENFORCE);
   }
 
@@ -847,14 +849,83 @@ class AuthFailureThrottleTest {
   @DisplayName("refuses settings that could not hold a window, unless the mode is off")
   void rejectsNonPositiveSettings() {
     for (final var mode : List.of(ThrottleMode.OBSERVE, ThrottleMode.ENFORCE)) {
-      assertThatThrownBy(() -> new AuthThrottleProperties(mode, null, 0, 60L, 10L, null, null))
+      assertThatThrownBy(
+              () -> new AuthThrottleProperties(mode, null, 0, 60L, 10L, null, null, null))
           .isInstanceOf(IllegalArgumentException.class);
-      assertThatThrownBy(() -> new AuthThrottleProperties(mode, null, 10, 0L, 10L, null, null))
+      assertThatThrownBy(
+              () -> new AuthThrottleProperties(mode, null, 10, 0L, 10L, null, null, null))
           .isInstanceOf(IllegalArgumentException.class);
-      assertThatThrownBy(() -> new AuthThrottleProperties(mode, null, 10, 60L, 0L, null, null))
+      assertThatThrownBy(
+              () -> new AuthThrottleProperties(mode, null, 10, 60L, 0L, null, null, null))
           .isInstanceOf(IllegalArgumentException.class);
     }
 
     assertThat(AuthThrottleProperties.disabled().mode()).isEqualTo(ThrottleMode.OFF);
+  }
+
+  @Nested
+  @DisplayName("allowlist (RPS-2664)")
+  class Allowlist {
+
+    private final AuthFailureThrottle allowing =
+        new AuthFailureThrottle(
+            new AuthThrottleProperties(
+                ThrottleMode.ENFORCE,
+                null,
+                MAX_FAILURES,
+                WINDOW_SECONDS,
+                100L,
+                3600L,
+                1,
+                List.of("10.42.0.0/16", " 192.0.2.5 ", "")),
+            AuthFailureThrottleTest.this.meterRegistry,
+            AuthFailureThrottleTest.this.ticker);
+
+    private void failMany(final AuthFailureThrottle throttle) {
+      for (var i = 0; i < MAX_FAILURES * AuthFailureThrottle.SATURATION_FACTOR + 1; i++) {
+        throttle.recordFailure();
+      }
+    }
+
+    @Test
+    @DisplayName("an allowlisted client is never counted, refused, saturated or banned")
+    void anAllowlistedClientIsNeverThrottled() {
+      for (final var address : List.of("10.42.7.9", "192.0.2.5")) {
+        requestFrom(address);
+        this.failMany(this.allowing);
+
+        assertThatCode(this.allowing::checkAllowed).doesNotThrowAnyException();
+        assertThat(this.allowing.isSaturated()).isFalse();
+      }
+    }
+
+    @Test
+    @DisplayName("a client outside the allowlist is throttled as before")
+    void anotherClientIsThrottled() {
+      requestFrom("10.43.0.1");
+      this.failMany(this.allowing);
+
+      assertThatThrownBy(this.allowing::checkAllowed).isInstanceOf(TooManyRequestsException.class);
+      assertThat(this.allowing.isSaturated()).isTrue();
+    }
+
+    @Test
+    @DisplayName("a bad entry stops the start and names the setting")
+    void aBadEntryIsRefused() {
+      for (final var bad : List.of("not-an-address", "10.0.0.0/33", "10.0.0.0/x")) {
+        final var properties =
+            new AuthThrottleProperties(
+                ThrottleMode.ENFORCE, null, 3, 60L, 10L, 0L, 1, List.of(bad));
+
+        assertThatThrownBy(
+                () ->
+                    new AuthFailureThrottle(
+                        properties,
+                        AuthFailureThrottleTest.this.meterRegistry,
+                        AuthFailureThrottleTest.this.ticker))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("repsy.security.auth-throttle.allowlist");
+      }
+    }
   }
 }

@@ -15,6 +15,7 @@
  */
 package io.repsy.protocols.shared.auth;
 
+import java.util.List;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -38,6 +39,9 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
  *     banAfterBlockedWindows} (RPS-2306); {@code 0} turns the ban off
  * @param banAfterBlockedWindows how many windows in a row a client must have used up its failures
  *     in before it is banned
+ * @param allowlist addresses or CIDR ranges ({@code 10.42.0.0/16}) that are never counted, refused
+ *     or banned (RPS-2664): a server-side client that calls for many users from one address, such
+ *     as the remote MCP gateway, whose refused tokens would otherwise ban every user at once
  */
 @ConfigurationProperties(prefix = "repsy.security.auth-throttle")
 public record AuthThrottleProperties(
@@ -47,7 +51,8 @@ public record AuthThrottleProperties(
     Long windowSeconds,
     Long maxClients,
     Long banSeconds,
-    Integer banAfterBlockedWindows) {
+    Integer banAfterBlockedWindows,
+    List<String> allowlist) {
 
   static final int DEFAULT_MAX_FAILURES = 20;
   static final long DEFAULT_WINDOW_SECONDS = 60;
@@ -66,6 +71,7 @@ public record AuthThrottleProperties(
     banSeconds = Objects.requireNonNullElse(banSeconds, DEFAULT_BAN_SECONDS);
     banAfterBlockedWindows =
         Objects.requireNonNullElse(banAfterBlockedWindows, DEFAULT_BAN_AFTER_BLOCKED_WINDOWS);
+    allowlist = List.copyOf(Objects.requireNonNullElse(allowlist, List.of()));
 
     requirePositiveUnlessOff(mode, maxFailures, windowSeconds, maxClients);
     requireValidBanUnlessOff(mode, banSeconds, banAfterBlockedWindows);
@@ -104,7 +110,7 @@ public record AuthThrottleProperties(
   /** Settings under which no client is ever tracked or refused. */
   public static AuthThrottleProperties disabled() {
 
-    return new AuthThrottleProperties(ThrottleMode.OFF, null, 0, 0L, 0L, 0L, 0);
+    return new AuthThrottleProperties(ThrottleMode.OFF, null, 0, 0L, 0L, 0L, 0, List.of());
   }
 
   /** Settings under which every check runs in full and a saturated client is refused. */
@@ -118,7 +124,8 @@ public record AuthThrottleProperties(
         windowSeconds,
         maxClients,
         DEFAULT_BAN_SECONDS,
-        DEFAULT_BAN_AFTER_BLOCKED_WINDOWS);
+        DEFAULT_BAN_AFTER_BLOCKED_WINDOWS,
+        List.of());
   }
 
   /** Like {@link #enforcing(int, long, long)}, with the ban of RPS-2306 set explicitly. */
@@ -136,7 +143,8 @@ public record AuthThrottleProperties(
         windowSeconds,
         maxClients,
         banSeconds,
-        banAfterBlockedWindows);
+        banAfterBlockedWindows,
+        List.of());
   }
 
   /** Settings under which a saturated client is counted and logged but let through. */
@@ -150,6 +158,7 @@ public record AuthThrottleProperties(
         windowSeconds,
         maxClients,
         DEFAULT_BAN_SECONDS,
-        DEFAULT_BAN_AFTER_BLOCKED_WINDOWS);
+        DEFAULT_BAN_AFTER_BLOCKED_WINDOWS,
+        List.of());
   }
 }

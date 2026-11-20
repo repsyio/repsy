@@ -22,6 +22,7 @@ import com.google.common.cache.CacheBuilder;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.repsy.protocols.shared.exceptions.TooManyRequestsException;
 import java.time.Duration;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
@@ -101,6 +102,7 @@ public class AuthFailureThrottle {
   private final LogGate windowLog;
   private final AtomicReference<@Nullable ClientBanListener> banListener = new AtomicReference<>();
   private final int banAfterBlockedWindows;
+  private final List<CidrRange> allowlist;
 
   /**
    * The registry is optional: without Micrometer the {@link ThrottleMode#OBSERVE} counter is
@@ -143,6 +145,8 @@ public class AuthFailureThrottle {
     this.bannedLog = new LogGate(ticker, properties.maxClients());
     this.windowLog = new LogGate(ticker, properties.maxClients());
     this.banAfterBlockedWindows = properties.banAfterBlockedWindows();
+    this.allowlist =
+        CidrRange.parseAll(properties.allowlist(), "repsy.security.auth-throttle.allowlist");
 
     final var tracksClients = this.mode != ThrottleMode.OFF;
     final var bansClients = tracksClients && properties.banSeconds() > 0;
@@ -181,7 +185,7 @@ public class AuthFailureThrottle {
 
     final var client = ClientKeys.currentClient();
 
-    if (this.windows == null || client == null) {
+    if (this.windows == null || client == null || this.isAllowlisted()) {
       return;
     }
 
@@ -283,7 +287,10 @@ public class AuthFailureThrottle {
     final var remoteAddr = ClientKeys.currentRemoteAddr();
     final var client = remoteAddr == null ? null : ClientKeys.throttleKey(remoteAddr);
 
-    if (this.windows == null || client == null) {
+    if (this.windows == null
+        || remoteAddr == null
+        || client == null
+        || CidrRange.anyContains(this.allowlist, remoteAddr)) {
       return;
     }
 
@@ -354,7 +361,7 @@ public class AuthFailureThrottle {
 
     final var client = ClientKeys.currentClient();
 
-    if (this.windows == null || client == null) {
+    if (this.windows == null || client == null || this.isAllowlisted()) {
       return false;
     }
 
@@ -389,6 +396,17 @@ public class AuthFailureThrottle {
         this.windows == null || client == null ? null : this.windows.getIfPresent(client);
 
     return window == null ? 1 : this.secondsLeft(window, now);
+  }
+
+  /**
+   * Whether the remote address of the current request is on the allowlist (RPS-2664): such a client
+   * is never counted, refused or banned.
+   */
+  private boolean isAllowlisted() {
+
+    final var remoteAddr = ClientKeys.currentRemoteAddr();
+
+    return remoteAddr != null && CidrRange.anyContains(this.allowlist, remoteAddr);
   }
 
   /** Forgets every client. Only tests need it: their requests all come from one address. */

@@ -19,9 +19,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Ticker;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import com.google.common.net.InetAddresses;
 import io.micrometer.core.instrument.MeterRegistry;
-import java.net.InetAddress;
 import java.time.Duration;
 import java.util.List;
 import java.util.Set;
@@ -65,7 +63,7 @@ public class SuspiciousRequestThrottle {
   private final SuspiciousRequestProperties properties;
   private final Supplier<@Nullable MeterRegistry> meterRegistry;
   private final Ticker ticker;
-  private final List<Cidr> allowlist;
+  private final List<CidrRange> allowlist;
   private final @Nullable Cache<String, Window> windows;
   private final @Nullable Cache<String, Long> bans;
   private final long windowNanos;
@@ -98,7 +96,8 @@ public class SuspiciousRequestThrottle {
     this.properties = properties;
     this.meterRegistry = meterRegistry;
     this.ticker = ticker;
-    this.allowlist = properties.allowlist().stream().map(Cidr::parse).toList();
+    this.allowlist =
+        CidrRange.parseAll(properties.allowlist(), "repsy.security.probe-throttle.allowlist");
     this.windowNanos = TimeUnit.SECONDS.toNanos(properties.windowSeconds());
     this.banNanos = TimeUnit.SECONDS.toNanos(properties.banSeconds());
     this.wouldBlockLog = new LogGate(ticker, properties.maxClients());
@@ -158,19 +157,7 @@ public class SuspiciousRequestThrottle {
   /** Whether the remote address is in the allowlist, so its requests are never counted. */
   public boolean isAllowlisted(final String remoteAddr) {
 
-    if (this.allowlist.isEmpty()) {
-      return false;
-    }
-
-    final InetAddress address;
-
-    try {
-      address = InetAddresses.forString(remoteAddr);
-    } catch (final IllegalArgumentException _) {
-      return false;
-    }
-
-    return this.allowlist.stream().anyMatch(cidr -> cidr.contains(address));
+    return CidrRange.anyContains(this.allowlist, remoteAddr);
   }
 
   /** Seconds left of the client's ban, rounded up; 0 when it is not banned. */
@@ -349,69 +336,6 @@ public class SuspiciousRequestThrottle {
     boolean bans(final int maxStrikes) {
 
       return this.strikes > 0 && this.total() >= maxStrikes;
-    }
-  }
-
-  /** An address range, {@code 10.0.0.0/8}; a bare address is a range of one. */
-  private static final class Cidr {
-
-    private static final int BITS_PER_BYTE = 8;
-
-    private final byte[] network;
-    private final int prefixBits;
-
-    private Cidr(final byte[] network, final int prefixBits) {
-
-      this.network = network.clone();
-      this.prefixBits = prefixBits;
-    }
-
-    static Cidr parse(final String text) {
-
-      final var slash = text.indexOf('/');
-      final var host = slash < 0 ? text : text.substring(0, slash);
-      final byte[] bytes;
-
-      try {
-        bytes = InetAddresses.forString(host.trim()).getAddress();
-      } catch (final IllegalArgumentException e) {
-        throw new IllegalArgumentException(
-            "repsy.security.probe-throttle.allowlist: not an address or CIDR range: " + text, e);
-      }
-
-      final var bits =
-          slash < 0
-              ? bytes.length * Cidr.BITS_PER_BYTE
-              : Integer.parseInt(text.substring(slash + 1).trim());
-
-      if (bits < 0 || bits > bytes.length * Cidr.BITS_PER_BYTE) {
-        throw new IllegalArgumentException(
-            "repsy.security.probe-throttle.allowlist: bad prefix length: " + text);
-      }
-
-      return new Cidr(bytes, bits);
-    }
-
-    boolean contains(final InetAddress address) {
-
-      final var other = address.getAddress();
-
-      if (other.length != this.network.length) {
-        return false;
-      }
-
-      for (var bit = 0; bit < this.prefixBits; bit += BITS_PER_BYTE) {
-        final var index = bit / BITS_PER_BYTE;
-        final var remaining = this.prefixBits - bit;
-        final var mask =
-            remaining >= BITS_PER_BYTE ? 0xFF : (0xFF << (BITS_PER_BYTE - remaining)) & 0xFF;
-
-        if ((this.network[index] & mask) != (other[index] & mask)) {
-          return false;
-        }
-      }
-
-      return true;
     }
   }
 }
