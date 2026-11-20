@@ -30,7 +30,7 @@
  *
  * Everything sbt writes lives under this run's own `HOME`, Ivy home, global base and temp directory.
  * Only the sbt launcher's boot directory is shared, and a publish also reads Coursier's cache: both are
- * primed in the runner image (`runners/maven.Dockerfile`, `runners/sbt-warmup`) with the sbt jars, the
+ * primed in the runner image (`runners/maven.Dockerfile`, `runners/sbt-warmup` for sbt 1, `runners/sbt2-warmup` for sbt 2) with the sbt jars, the
  * Scala compilers and their bridges, never a test artifact, because every test publishes to a
  * repository of its own. A resolve gets an empty Coursier cache of its own and resolves neither the
  * Scala library nor the compiler, so it can only ever find the library in the Repsy repository.

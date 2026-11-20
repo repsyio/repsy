@@ -41,7 +41,6 @@ import {
   SCALA_213,
   SCALA_3,
   SBT_VERSION,
-  SBT_VERSION_2,
   seedPublish,
 } from './sbt.js';
 
