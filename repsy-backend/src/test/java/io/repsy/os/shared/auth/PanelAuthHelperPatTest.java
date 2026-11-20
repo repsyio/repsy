@@ -125,7 +125,7 @@ class PanelAuthHelperPatTest {
 
     assertThat(this.helper.authenticateRepoReader(this.header).getId()).isEqualTo(OWNER_ID);
 
-    verify(this.tokens).updateLastUsedTime(token.id());
+    verify(this.tokens).recordUse(token);
   }
 
   @Test
@@ -136,7 +136,7 @@ class PanelAuthHelperPatTest {
     assertThatThrownBy(() -> this.helper.authenticateRepoReader(this.header))
         .isExactlyInstanceOf(AccessNotAllowedException.class)
         .hasMessage("accessDenied");
-    verify(this.tokens, never()).updateLastUsedTime(any());
+    verify(this.tokens, never()).recordUse(any());
   }
 
   @Test
@@ -260,7 +260,7 @@ class PanelAuthHelperPatTest {
     assertThat(session.user().getId()).isEqualTo(OWNER_ID);
     assertThat(session.grantable())
         .containsExactlyInAnyOrder(TokenScope.PROFILE_READ, TokenScope.REPO_READ);
-    verify(this.tokens).updateLastUsedTime(token.id());
+    verify(this.tokens).recordUse(token);
   }
 
   @Test
@@ -275,7 +275,7 @@ class PanelAuthHelperPatTest {
     assertThat(session.grantable())
         .containsExactlyInAnyOrder(TokenScope.PROFILE_READ, TokenScope.REPO_READ)
         .doesNotContain(TokenScope.REPO_WRITE, TokenScope.REPO_MANAGE);
-    verify(this.tokens).updateLastUsedTime(token.id());
+    verify(this.tokens).recordUse(token);
   }
 
   @Test
@@ -301,7 +301,7 @@ class PanelAuthHelperPatTest {
     assertThatThrownBy(() -> this.helper.authenticateTokenManager(this.header))
         .isExactlyInstanceOf(UnAuthorizedException.class)
         .hasMessage("unAuthorized");
-    verify(this.tokens, never()).updateLastUsedTime(any());
+    verify(this.tokens, never()).recordUse(any());
     verifyNoInteractions(this.userTxService);
   }
 
@@ -313,7 +313,7 @@ class PanelAuthHelperPatTest {
 
     assertThatThrownBy(() -> this.helper.authenticateTokenManager(this.header))
         .isExactlyInstanceOf(UnAuthorizedException.class);
-    verify(this.tokens, never()).updateLastUsedTime(any());
+    verify(this.tokens, never()).recordUse(any());
   }
 
   @Test
@@ -336,6 +336,65 @@ class PanelAuthHelperPatTest {
 
     assertThatThrownBy(() -> this.helper.authenticateTokenManager("Bearer " + cli))
         .isExactlyInstanceOf(UnAuthorizedException.class);
+  }
+
+  /** A live connector token (RPS-2660) for {@code secret}, which is a {@code rat-} secret. */
+  private PersonalAccessTokenInfo foundConnector(final String secret) {
+    final var token =
+        new PersonalAccessTokenInfo(
+            UUID.randomUUID(),
+            OWNER_ID,
+            "owner",
+            PersonalAccessTokenKind.CONNECTOR,
+            "Claude",
+            TokenScope.withImplicit(List.of(TokenScope.REPO_MANAGE)),
+            Instant.now().plus(Duration.ofDays(90)),
+            null,
+            Instant.now());
+
+    when(this.tokens.findByToken(secret)).thenReturn(Optional.of(token));
+
+    return token;
+  }
+
+  @Test
+  @DisplayName("the token routes refuse a connector token with 403, whatever its scopes (RPS-2660)")
+  void tokenManagerRefusesAConnectorToken() {
+    final var connector = TokenFactory.connectorToken();
+    foundConnector(connector);
+
+    assertThatThrownBy(() -> this.helper.authenticateTokenManager("Bearer " + connector))
+        .isExactlyInstanceOf(AccessNotAllowedException.class)
+        .hasMessage("accessDenied");
+    verify(this.tokens, never()).recordUse(any());
+  }
+
+  @Test
+  @DisplayName("the connector route takes a connector token and answers it (RPS-2660)")
+  void connectorRouteTakesAConnectorToken() {
+    final var connector = TokenFactory.connectorToken();
+    final var token = foundConnector(connector);
+
+    assertThat(this.helper.authenticateConnectorToken("Bearer " + connector)).isEqualTo(token);
+  }
+
+  @Test
+  @DisplayName("the connector route answers notAConnectorToken to a personal token and a login")
+  void connectorRouteRefusesAnyOtherCaller() {
+    found(TokenScope.REPO_READ);
+    final var login = "Bearer a.login.jwt";
+
+    when(this.jwtUtils.extractPanelClaims(login))
+        .thenReturn(new PanelTokenClaims(OWNER_ID, "owner", 0, Instant.now()));
+    when(this.userTxService.getAuthenticatedUserByUsername("owner"))
+        .thenReturn(UserInfo.builder().id(OWNER_ID).username("owner").role(UserRole.USER).build());
+
+    assertThatThrownBy(() -> this.helper.authenticateConnectorToken(this.header))
+        .isExactlyInstanceOf(BadRequestException.class)
+        .hasMessage("notAConnectorToken");
+    assertThatThrownBy(() -> this.helper.authenticateConnectorToken(login))
+        .isExactlyInstanceOf(BadRequestException.class)
+        .hasMessage("notAConnectorToken");
   }
 
   @Test

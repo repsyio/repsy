@@ -65,6 +65,11 @@ public record PersonalAccessTokenInfo(
     return this.kind == PersonalAccessTokenKind.TEMPORARY;
   }
 
+  /** Whether this is the token of a connected application (RPS-2660), a panel API credential. */
+  public boolean isConnector() {
+    return this.kind == PersonalAccessTokenKind.CONNECTOR;
+  }
+
   /** Whether the token has stopped working: an expired one is refused, whatever its scopes. */
   public boolean isExpired() {
     return !Instant.now().isBefore(this.expirationDate);

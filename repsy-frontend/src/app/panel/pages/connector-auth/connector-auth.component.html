@@ -1,0 +1,117 @@
+<div animate.enter="fade-in-down" class="mx-auto max-w-[700px] space-y-[24px]">
+  @switch (mode) {
+    @case ('approve') {
+      <h2 data-testid="connector-auth-title" class="text-[24px] text-white">
+        Connect {{ clientName }} to your Repsy account?
+      </h2>
+      <p class="text-sm text-[#9FA0A0]">
+        An application is asking to use your account. Nothing happens until you authorize. It then receives a token of
+        its own, which you can disconnect at any time.
+      </p>
+      <div data-testid="connector-auth-approval" class="space-y-4 rounded-xl border border-[#404141] bg-[#101112] p-6">
+        <dl class="space-y-3 text-[14px]">
+          <div>
+            <dt class="text-[#9FA0A0]">Application</dt>
+            <dd data-testid="connector-auth-client" class="text-white">
+              {{ clientName }}
+              <span class="block text-[13px] text-[#9FA0A0]">
+                As the application names itself. It returns to
+                <code data-testid="connector-auth-target" class="text-white">{{ redirectUri }}</code
+                >.
+              </span>
+            </dd>
+          </div>
+          <div>
+            <dt class="text-[#9FA0A0]">Signed in as</dt>
+            <dd data-testid="connector-auth-account" class="text-white">{{ username }}</dd>
+          </div>
+          <div>
+            <dt class="text-[#9FA0A0]">The application will be able to</dt>
+            <dd>
+              <ul data-testid="connector-auth-scopes" class="mt-1 space-y-2">
+                @for (option of scopeDetails; track option.scope) {
+                  <li class="text-white" [attr.data-testid]="'connector-auth-scope-' + option.scope">
+                    {{ option.label }} <code class="text-[12px] text-[#9FA0A0]">{{ option.scope }}</code>
+                    <span class="block text-[13px] text-[#9FA0A0]">{{ option.description }}</span>
+                  </li>
+                }
+              </ul>
+              <p class="mt-2 text-[13px] text-[#9FA0A0]">
+                It can only do what you can do yourself, narrowed to these permissions, and it cannot manage your
+                tokens.
+              </p>
+            </dd>
+          </div>
+          <div>
+            <dt class="text-[#9FA0A0]">Valid for</dt>
+            <dd data-testid="connector-auth-expiry" class="text-white">
+              {{ idleDays }} days after its last use
+              <span class="block text-[13px] text-[#9FA0A0]">
+                At most {{ maxDays }} days; then the application asks you again.
+              </span>
+            </dd>
+          </div>
+        </dl>
+
+        @if (authorizeFailed) {
+          <p data-testid="connector-auth-approve-error" class="text-error text-sm">
+            The authorization failed, so nothing was sent to the application. You can try again.
+          </p>
+        }
+
+        <div class="flex gap-2 sm:justify-end">
+          <button
+            data-testid="connector-auth-decline"
+            type="button"
+            class="repsy-btn-secondary w-full sm:w-auto"
+            [disabled]="authorizing"
+            (click)="decline()"
+          >
+            Decline
+          </button>
+          <button
+            data-testid="connector-auth-approve"
+            type="button"
+            class="repsy-btn-confirm w-full sm:w-auto"
+            [disabled]="!canAuthorize"
+            (click)="authorize()"
+          >
+            Authorize
+          </button>
+        </div>
+      </div>
+    }
+    @case ('redirecting') {
+      <h2 data-testid="connector-auth-title" class="text-[24px] text-white">Returning to {{ clientName }}</h2>
+      <p data-testid="connector-auth-redirecting" class="text-sm text-[#9FA0A0]">
+        You authorized the application. Your browser is taking you back to it.
+      </p>
+    }
+    @case ('declined') {
+      <h2 data-testid="connector-auth-title" class="text-[24px] text-white">Request declined</h2>
+      <p data-testid="connector-auth-declined" class="text-sm text-[#9FA0A0]">
+        You declined. Nothing was created and nothing was sent to the application. You can close this tab.
+      </p>
+    }
+    @case ('invalid') {
+      <h2 data-testid="connector-auth-title" class="text-[24px] text-white">This link cannot be used</h2>
+      <p data-testid="connector-auth-invalid" class="text-warning-500 text-sm">
+        The link does not carry what a connection needs, so nothing was created. Start again from the application. If
+        you did not start this yourself, close this page.
+      </p>
+    }
+    @case ('unavailable') {
+      <h2 data-testid="connector-auth-title" class="text-[24px] text-white">Connected applications are off</h2>
+      <p data-testid="connector-auth-unavailable" class="text-sm text-[#9FA0A0]">
+        This Repsy server does not offer connected applications, so nothing was created.
+      </p>
+    }
+    @case ('unregistered') {
+      <h2 data-testid="connector-auth-title" class="text-[24px] text-white">This application is not known here</h2>
+      <p data-testid="connector-auth-unregistered" class="text-warning-500 text-sm">
+        The link asks to return to an address this Repsy server does not know, so nothing was created. If you did not
+        start this yourself, close this page.
+      </p>
+    }
+  }
+</div>

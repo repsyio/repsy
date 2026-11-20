@@ -190,7 +190,7 @@ class ProtocolAuthServicePatTest {
       assertUnauthorized(() -> authService.tryAuthorizeWithPat(secret, Permission.READ));
 
       verify(throttle).recordFailure();
-      verify(tokens, never()).updateLastUsedTime(any());
+      verify(tokens, never()).recordUse(any());
     }
 
     @Test
@@ -232,7 +232,7 @@ class ProtocolAuthServicePatTest {
 
       assertThat(authService.tryAuthorizeWithPat(secret, Permission.READ)).isTrue();
 
-      verify(tokens).updateLastUsedTime(token.id());
+      verify(tokens).recordUse(token);
       verifyNoInteractions(throttle, userTxService);
     }
 
@@ -253,7 +253,7 @@ class ProtocolAuthServicePatTest {
       assertUnauthorized(() -> authService.tryAuthorizeWithPat(secret, Permission.MANAGE));
 
       verifyNoInteractions(throttle);
-      verify(tokens, never()).updateLastUsedTime(any());
+      verify(tokens, never()).recordUse(any());
     }
 
     @Test

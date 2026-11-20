@@ -511,7 +511,9 @@ paths:
         The personal access tokens of the current user. Temporary tokens (`rct-...`) are not listed.
         Sortable by `id`, `name`, `expirationDate`, `lastUsedAt`, `createdAt` (`property,direction`).
         The default is `id,desc`. Takes the access token of a login, a temporary token or a
-        long-lived personal access token; an unknown or expired token answers 401.
+        long-lived personal access token; an unknown or expired token answers 401, the token of a
+        connected application 403 `accessDenied`.
+      x-forbidden-by: token-scope
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -530,6 +532,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
       summary: List the personal access tokens of the current user
     post:
       tags:
@@ -546,7 +550,9 @@ paths:
         free (RPS-2655). Takes the access token of a login, a temporary token (`rct-...`) or a
         long-lived personal access token. With a temporary or a personal token the form may ask
         only for scopes that token has itself, otherwise the answer is 400 `validationError` and
-        nothing is created; an unknown or expired token answers 401.
+        nothing is created; an unknown or expired token answers 401, the token of a connected
+        application 403 `accessDenied`.
+      x-forbidden-by: token-scope
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -579,6 +585,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '409':
           "$ref": "#/components/responses/Conflict"
       summary: Create a personal access token
@@ -644,6 +652,183 @@ paths:
         '404':
           "$ref": "#/components/responses/NotFound"
       summary: Revoke the previous temporary tokens of a CLI login
+    parameters:
+      - name: tokenId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+  "/api/profile/connector-authorizations":
+    post:
+      tags:
+        - access-tokens
+      operationId: createConnectorAuthorization
+      description: >-
+        The consent of a connected application (RPS-2660), such as the remote MCP gateway: the
+        `/connector/auth` page calls it when the signed-in user approves. The answer is a one-time
+        code that the page hands to the application through its registered redirect, together with
+        the `state` the application sent; the application exchanges it with `exchangeConnectorCode`
+        within 60 seconds. `redirectUri` must be one of the redirects the operator registered
+        (`CONNECTOR_REDIRECT_URIS`), compared as exact strings, otherwise the answer is 400
+        `connectorRedirectUriNotRegistered`. `scopes` are one or more of `repo:read`, `repo:write`
+        and `repo:manage` (`profile:read` is always added); `codeChallenge` is the PKCE S256
+        challenge of the application and `codeChallengeMethod` must be `S256`. Anything else is 400
+        `validationError`. Takes the access token of a login only. When connected applications are
+        turned off (`CONNECTOR_ENABLED`, the default) the answer is 404 `itemNotFound`.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/ConnectorAuthorizationForm"
+        required: true
+      responses:
+        '201':
+          description: Created
+          headers:
+            Cache-Control:
+              description: "`no-store`, the response carries a secret"
+              schema:
+                type: string
+            Location:
+              description: >-
+                `/api/profile/connector-authorizations/{id}`, the id of the code. Nothing is served
+                there: a code is only ever exchanged.
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ConnectorAuthorizationInfo"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+      summary: Approve a connected application and get its one-time code
+  "/api/connector/tokens":
+    post:
+      tags:
+        - access-tokens
+      operationId: exchangeConnectorCode
+      description: >-
+        Exchanges the one-time code of `createConnectorAuthorization` for the connector token of the
+        grant (RPS-2660), server to server: it is called by the application, not by a browser, and
+        takes no credential but the code. `redirectUri` must be the one the code was issued for and
+        `codeVerifier` the PKCE verifier of its challenge. The code is used up by the first
+        exchange, whatever its outcome. An unknown, used or expired code, a wrong verifier and
+        another redirect are all answered with the one 400 `invalidConnectorCode`, and count
+        against the client like a wrong password (429 when it has used up its failures). The token
+        (`rat-...`) is a credential of the panel API only: it is refused on every package manager
+        route and cannot manage tokens. It expires 90 days after its last use, and at the latest 365
+        days after its creation. The user holds at most 50 live connector tokens
+        (`connectorTokenLimitReached`, 400; the code is used up all the same). When connected
+        applications are turned off the answer is 404 `itemNotFound`.
+      security: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/ConnectorTokenExchangeForm"
+        required: true
+      responses:
+        '201':
+          description: Created
+          headers:
+            Cache-Control:
+              description: "`no-store`, the response carries a secret"
+              schema:
+                type: string
+            Location:
+              description: >-
+                The URL of the token, `/api/profile/connector-tokens/{tokenId}`, where the user can
+                revoke it.
+              schema:
+                type: string
+                format: uri
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/AccessTokenCreated"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+        '429':
+          "$ref": "#/components/responses/TooManyRequests"
+      summary: Exchange the one-time code of a consent for a connector token
+  "/api/profile/connector-tokens":
+    get:
+      tags:
+        - access-tokens
+      operationId: listConnectorTokens
+      description: >-
+        The connected applications of the current user (RPS-2660): their connector tokens that have
+        not expired. Sortable by `id`, `name`, `expirationDate`, `lastUsedAt`, `createdAt`
+        (`property,direction`). The default is `id,desc`. Takes the access token of a login only.
+        When connected applications are turned off the answer is 404 `itemNotFound`.
+      parameters:
+        - "$ref": "#/components/parameters/Page"
+        - "$ref": "#/components/parameters/Size"
+        - "$ref": "#/components/parameters/Sort"
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/PagedModelAccessTokenListItem"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+      summary: List the connected applications of the current user
+  "/api/profile/connector-tokens/current":
+    delete:
+      tags:
+        - access-tokens
+      operationId: revokeCurrentConnectorToken
+      description: >-
+        Ends the grant of the connected application that calls it (RPS-2660): the connector token
+        of the request is revoked at once. The application calls it when the grant is removed on its
+        side. A login or a personal access token has no connector token to end and is answered 400
+        `notAConnectorToken`; an unknown, expired or revoked token answers 401. When connected
+        applications are turned off the answer is 404 `itemNotFound`.
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
+      responses:
+        '204':
+          "$ref": "#/components/responses/NoContent"
+        '400':
+          "$ref": "#/components/responses/BadRequest"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+      summary: Revoke the connector token the request is authenticated with
+  "/api/profile/connector-tokens/{tokenId}":
+    delete:
+      tags:
+        - access-tokens
+      operationId: revokeConnectorToken
+      description: >-
+        Disconnects a connected application (RPS-2660): its connector token stops working at once.
+        A token of another user, one that is gone and a token of another kind answer 404. Takes the
+        access token of a login only. When connected applications are turned off the answer is 404
+        `itemNotFound`.
+      responses:
+        '204':
+          "$ref": "#/components/responses/NoContent"
+        '401':
+          "$ref": "#/components/responses/Unauthorized"
+        '404':
+          "$ref": "#/components/responses/NotFound"
+      summary: Disconnect a connected application
     parameters:
       - name: tokenId
         in: path
@@ -5307,7 +5492,10 @@ components:
         A personal access token, sent as `Authorization: Bearer <token>`. There are two kinds. The
         long-lived one (`rut-...`) is issued by `createAccessToken`. The temporary one (`rct-...`)
         is issued by `createCliToken` for the Repsy CLI after a browser authorization, lives 24
-        hours, is never listed and does not count against the 50 token cap. An operation that
+        hours, is never listed and does not count against the 50 token cap. The token of a
+        connected application (`rat-...`, RPS-2660) is issued by `exchangeConnectorCode`; it is
+        accepted where the other two are, except the routes that manage tokens (403
+        `accessDenied`), and it is refused on every package manager route. An operation that
         accepts them lists `personalAccessToken` next to `bearerAuth` in its `security`: the
         operations on a repository (every path with `{repoName}`), `listRepos`, `createRepo`,
         `getSecuritySummary`, `getCurrentAccessToken`, and `createAccessToken`, `listAccessTokens`, `revokeAccessToken`
@@ -5420,8 +5608,9 @@ components:
       description: >-
         The calling token is a temporary or a long-lived personal access token, and the token the
         request names holds a scope the calling token does not hold (`accessDenied`). A token hands
-        on, revokes and rotates only tokens whose scopes it has itself. A login never gets this
-        status, as it holds every scope. Nothing changes.
+        on, revokes and rotates only tokens whose scopes it has itself. The token of a connected
+        application (`rat-...`, RPS-2660) gets this status on every route that manages tokens, as it
+        hands on nothing. A login never gets this status, as it holds every scope. Nothing changes.
       content:
         application/problem+json:
           schema:
@@ -5644,6 +5833,8 @@ components:
             - cleanupPolicyDisabled
             - cleanupPolicyNotFound
             - concurrentModification
+            - connectorRedirectUriNotRegistered
+            - connectorTokenLimitReached
             - crateNameSpellingMismatch
             - crateNotFound
             - crateVersionAlreadyExists
@@ -5694,6 +5885,7 @@ components:
             - imageNotFound
             - invalidArtifactPath
             - invalidAuthType
+            - invalidConnectorCode
             - invalidCredentials
             - invalidGemFile
             - invalidModulePath
@@ -5744,6 +5936,7 @@ components:
             - moduleZipTooLarge
             - moduleZipTooManyFiles
             - movedToPath
+            - notAConnectorToken
             - notAcceptable
             - notAnAccessToken
             - npmPublishBodyEmpty
@@ -6053,6 +6246,76 @@ components:
       required:
         - name
         - scopes
+    ConnectorAuthorizationForm:
+      type: object
+      description: >-
+        What the `/connector/auth` page sends when the user approves a connected application
+        (RPS-2660), taken from the link the application opened.
+      properties:
+        redirectUri:
+          type: string
+          maxLength: 2048
+          description: A redirect the operator registered, compared as an exact string.
+        clientName:
+          type: string
+          minLength: 1
+          maxLength: 150
+          description: >-
+            The name the application gave itself and the user saw on the page. It names the token
+            in the list of connected applications.
+        scopes:
+          type: array
+          uniqueItems: true
+          minItems: 1
+          items:
+            "$ref": "#/components/schemas/AccessTokenScope"
+          description: One or more of `repo:read`, `repo:write` and `repo:manage`.
+        codeChallenge:
+          type: string
+          description: The PKCE S256 challenge, base64url of a SHA-256 without padding (43 characters).
+        codeChallengeMethod:
+          type: string
+          description: Must be `S256`.
+      required:
+        - redirectUri
+        - clientName
+        - scopes
+        - codeChallenge
+        - codeChallengeMethod
+    ConnectorAuthorizationInfo:
+      type: object
+      description: The one-time code of a consent, for the application to exchange (RPS-2660).
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: The id of the code, which the `Location` header names.
+        code:
+          type: string
+          description: The secret. It is shown once and works once, for 60 seconds.
+        expiresAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - code
+        - expiresAt
+    ConnectorTokenExchangeForm:
+      type: object
+      description: The exchange of a one-time code by the application that asked for it (RPS-2660).
+      properties:
+        code:
+          type: string
+        codeVerifier:
+          type: string
+          description: The PKCE verifier whose S256 challenge the consent carried.
+        redirectUri:
+          type: string
+          description: The redirect the code was issued for.
+      required:
+        - code
+        - codeVerifier
+        - redirectUri
     CliTokenForm:
       type: object
       description: The scopes the Repsy CLI asked for and the user approved.

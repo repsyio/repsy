@@ -43,6 +43,21 @@ class TokenTypeTest {
     assertThat(TokenType.isUserToken(TokenFactory.deployToken())).isFalse();
   }
 
+  @Test
+  @DisplayName("a connector token starts with rat-, is a panel token and never a user token")
+  void connectorToken() {
+    final var connector = TokenFactory.connectorToken();
+
+    assertThat(TokenType.REPSY_CONNECTOR_TOKEN.getPrefix()).isEqualTo("rat-");
+    assertThat(connector).startsWith("rat-");
+    assertThat(TokenType.isUserToken(connector)).isFalse();
+    assertThat(TokenType.isPanelToken(connector)).isTrue();
+    assertThat(TokenType.isPanelToken(TokenFactory.personalAccessToken())).isTrue();
+    assertThat(TokenType.isPanelToken(TokenFactory.cliToken())).isTrue();
+    assertThat(TokenType.isPanelToken(TokenFactory.deployToken())).isFalse();
+    assertThat(TokenType.isPanelToken("RAT-x")).isFalse();
+  }
+
   @ParameterizedTest(name = "\"{0}\" is not a user token")
   @ValueSource(strings = {"", "rct", "rut", "RCT-x", "RUT-x", "xrct-x", " rct-x", "rdt-x"})
   void lookalikesAreNot(final String secret) {

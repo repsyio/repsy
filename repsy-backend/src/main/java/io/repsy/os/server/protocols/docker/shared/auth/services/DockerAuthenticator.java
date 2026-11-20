@@ -19,8 +19,8 @@ import static io.repsy.os.shared.auth.utils.AuthUtils.TIMEOUT_ACCESS_TOKEN;
 import static io.repsy.os.shared.auth.utils.AuthUtils.extractCredentialsFromBasicToken;
 import static io.repsy.os.shared.auth.utils.AuthUtils.isBasicToken;
 import static io.repsy.os.shared.auth.utils.AuthUtils.isBearerToken;
-import static io.repsy.os.shared.auth.utils.AuthUtils.personalAccessTokenSecretOf;
 import static io.repsy.os.shared.auth.utils.AuthUtils.removeBasicPrefix;
+import static io.repsy.os.shared.auth.utils.AuthUtils.userTokenSecretOf;
 
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
@@ -268,7 +268,7 @@ public class DockerAuthenticator extends ProtocolAuthService implements DockerAu
 
     // A personal access token presented as the Bearer value itself is no JWT and carries no
     // grants: it is authorized as the token, by its scopes. Only a delete reads it as a JWT.
-    if (permission != Permission.MANAGE && personalAccessTokenSecretOf(authHeader) != null) {
+    if (permission != Permission.MANAGE && userTokenSecretOf(authHeader) != null) {
       return;
     }
 

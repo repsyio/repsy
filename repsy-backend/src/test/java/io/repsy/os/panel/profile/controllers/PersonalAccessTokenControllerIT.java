@@ -598,7 +598,7 @@ class PersonalAccessTokenControllerIT extends AbstractIT {
         .containsOnlyKeys(LIST_ITEM_KEYS)
         .containsEntry("id", token.getId().toString());
 
-    this.tokenService.updateLastUsedTime(token.getId());
+    this.tokenService.recordUse(this.tokenService.findById(token.getId()).orElseThrow());
     this.entityManager.flush();
     this.entityManager.clear();
 

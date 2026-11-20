@@ -93,12 +93,29 @@ public class AuthUtils {
   }
 
   /**
-   * The secret of a personal access token (a long-lived {@code rut-} one or a temporary {@code
-   * rct-} one) sent as the Bearer value, or {@code null} for any other header. A header is a
-   * personal access token by its prefix and nothing else, which is what keeps it away from the JWT
-   * and the password checks.
+   * The secret of a personal access token (a long-lived {@code rut-} one, a temporary {@code rct-}
+   * one or the {@code rat-} token of a connected application) sent as the Bearer value, or {@code
+   * null} for any other header. A header is a personal access token by its prefix and nothing else,
+   * which is what keeps it away from the JWT and the password checks. Only the panel API reads it;
+   * the protocol routes do not recognize a {@code rat-} token.
    */
   public static @Nullable String personalAccessTokenSecretOf(final String authHeader) {
+
+    if (!isBearerToken(authHeader)) {
+      return null;
+    }
+
+    final var bearerToken = removeBearerHeader(authHeader);
+
+    return TokenType.isPanelToken(bearerToken) ? bearerToken : null;
+  }
+
+  /**
+   * Like {@link #personalAccessTokenSecretOf}, for a protocol route: the secret of a {@code rut-}
+   * or {@code rct-} token sent as the Bearer value, or {@code null} for any other header, a {@code
+   * rat-} connector token included (RPS-2660), which no package manager may use.
+   */
+  public static @Nullable String userTokenSecretOf(final String authHeader) {
 
     if (!isBearerToken(authHeader)) {
       return null;

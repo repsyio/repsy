@@ -33,6 +33,7 @@ import io.repsy.core.error_handling.exceptions.ItemAlreadyExistException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.core.error_handling.exceptions.UnAuthorizedException;
 import io.repsy.os.generated.model.AccessTokenForm;
+import io.repsy.os.shared.token.dtos.PersonalAccessTokenInfo;
 import io.repsy.os.shared.token.dtos.PersonalAccessTokenKind;
 import io.repsy.os.shared.token.dtos.TokenScope;
 import io.repsy.os.shared.token.entities.PersonalAccessToken;
@@ -1078,12 +1079,23 @@ class PersonalAccessTokenServiceTest {
   }
 
   @Test
-  @DisplayName("records the time a token was last used")
+  @DisplayName("records the time a personal token was last used, and leaves its expiry alone")
   void recordsTheLastUse() {
-    final var tokenId = UUID.randomUUID();
+    final var token =
+        new PersonalAccessTokenInfo(
+            UUID.randomUUID(),
+            USER_ID,
+            USERNAME,
+            PersonalAccessTokenKind.PERSONAL,
+            "ci",
+            Set.of(TokenScope.REPO_READ),
+            NOW.plus(Duration.ofDays(1)),
+            null,
+            NOW.minus(Duration.ofDays(364)));
 
-    this.service.updateLastUsedTime(tokenId);
+    this.service.recordUse(token);
 
-    verify(this.tokenRepository).updateLastUsedTime(tokenId, NOW);
+    verify(this.tokenRepository).updateLastUsedTime(token.id(), NOW);
+    verify(this.tokenRepository, never()).updateLastUsedTimeAndExpirationDate(any(), any(), any());
   }
 }

@@ -22,7 +22,13 @@ public enum TokenType {
   REPSY_DEPLOY_TOKEN("rdt-"),
   REPSY_USER_TOKEN("rut-"),
   /** The temporary token of a CLI login (RPS-2039), 24 hours; a personal access token row. */
-  REPSY_CLI_TOKEN("rct-");
+  REPSY_CLI_TOKEN("rct-"),
+  /**
+   * The token a user grants a connected application on the consent page (RPS-2660), for example the
+   * remote MCP gateway; a personal access token row of kind {@code CONNECTOR}. It is a panel API
+   * credential only: the protocol entry points never recognize it (see {@link #isUserToken}).
+   */
+  REPSY_CONNECTOR_TOKEN("rat-");
 
   private final String prefix;
 
@@ -43,5 +49,15 @@ public enum TokenType {
    */
   public static boolean isUserToken(final String secret) {
     return REPSY_USER_TOKEN.matches(secret) || REPSY_CLI_TOKEN.matches(secret);
+  }
+
+  /**
+   * Whether {@code secret} is a secret of the personal access token table that the panel API
+   * accepts: a {@link #isUserToken user token} or a {@link #REPSY_CONNECTOR_TOKEN}. The panel entry
+   * points ask this question; the protocol entry points ask {@link #isUserToken}, so a connector
+   * token never authenticates a package manager (RPS-2660).
+   */
+  public static boolean isPanelToken(final String secret) {
+    return isUserToken(secret) || REPSY_CONNECTOR_TOKEN.matches(secret);
   }
 }

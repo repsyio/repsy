@@ -173,6 +173,15 @@ repsy:
       ttl: ${PENDING_SIGNATURE_TTL:PT24H}
       purge-interval: ${PENDING_SIGNATURE_PURGE_INTERVAL:PT15M}
 
+  connector:
+    # RPS-2660: the consent flow of connected applications (the remote MCP gateway of Repsy Cloud):
+    # the /connector/auth page, a one-time code and its server-to-server exchange for a CONNECTOR
+    # token (rat-). Off by default; while off, every route of the flow answers 404.
+    enabled: ${CONNECTOR_ENABLED:false}
+    # The redirects of the applications that may ask for a consent, comma-separated, compared as
+    # exact strings: absolute https URIs without a fragment (plain http only on a loopback host).
+    redirect-uris: ${CONNECTOR_REDIRECT_URIS:}
+
   ssl:
     api:
       enabled: ${API_SSL_ENABLED:false}

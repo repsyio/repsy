@@ -67,7 +67,7 @@ public class CargoAuthenticator extends ProtocolAuthService {
     }
 
     if (isBearerToken(authHeader)) {
-      final var patSecret = AuthUtils.personalAccessTokenSecretOf(authHeader);
+      final var patSecret = AuthUtils.userTokenSecretOf(authHeader);
 
       if (patSecret != null) {
         return this.authenticateWithPersonalAccessToken(patSecret);

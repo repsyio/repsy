@@ -41,4 +41,9 @@ public class TokenFactory {
 
     return of(TokenType.REPSY_CLI_TOKEN);
   }
+
+  public static String connectorToken() {
+
+    return of(TokenType.REPSY_CONNECTOR_TOKEN);
+  }
 }

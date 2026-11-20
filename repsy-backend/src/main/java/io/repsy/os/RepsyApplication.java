@@ -24,6 +24,7 @@ import io.repsy.os.server.protocols.shared.storage.StorageTrashProperties;
 import io.repsy.os.shared.configs.AppCorsProperties;
 import io.repsy.os.shared.configs.AppHstsProperties;
 import io.repsy.os.shared.configs.ContentSecurityPolicyProperties;
+import io.repsy.os.shared.connector.configs.ConnectorProperties;
 import io.repsy.os.shared.user.PasswordResetMarkerProperties;
 import io.repsy.protocols.shared.auth.AuthThrottleProperties;
 import io.repsy.protocols.shared.auth.BasicAuthCacheProperties;
@@ -51,6 +52,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
   AppHstsProperties.class,
   ContentSecurityPolicyProperties.class,
   PasswordResetMarkerProperties.class,
+  ConnectorProperties.class,
 })
 @EnableAsync
 @EnableRetry

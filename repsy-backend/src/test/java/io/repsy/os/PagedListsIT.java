@@ -36,6 +36,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.core.io.ClassPathResource;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.yaml.snakeyaml.LoaderOptions;
@@ -53,6 +54,13 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
  * is read (what is rejected, what is accepted), not what the lists contain. The contents of each
  * list, the {@code q} filter included, are pinned by the integration test of its protocol.
  */
+// Connected applications are on (RPS-2660), so their list answers; the same two properties as
+// ConnectorTokenIT, so the two classes share one context.
+@TestPropertySource(
+    properties = {
+      "CONNECTOR_ENABLED=true",
+      "CONNECTOR_REDIRECT_URIS=https://gateway.example.test/oauth/upstream/callback"
+    })
 @DisplayName("Paged panel lists: page, size, sort and q")
 class PagedListsIT extends AbstractIT {
 
@@ -111,6 +119,16 @@ class PagedListsIT extends AbstractIT {
               "listAccessTokens",
               null,
               "/api/profile/access-tokens",
+              false,
+              "id",
+              "name",
+              "expirationDate",
+              "lastUsedAt",
+              "createdAt"),
+          list(
+              "listConnectorTokens",
+              null,
+              "/api/profile/connector-tokens",
               false,
               "id",
               "name",
