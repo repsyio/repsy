@@ -49,7 +49,9 @@ public record ConnectorProperties(boolean enabled, @Nullable List<String> redire
 
   /** The registered redirects, never {@code null}. */
   public List<String> registeredRedirectUris() {
-    return redirectUris == null ? List.of() : redirectUris;
+    final var uris = this.redirectUris;
+
+    return uris == null ? List.of() : uris;
   }
 
   /** Whether {@code redirectUri} is registered, by exact string comparison. */
@@ -58,22 +60,30 @@ public record ConnectorProperties(boolean enabled, @Nullable List<String> redire
   }
 
   private static void checkRedirectUri(final String redirectUri) {
-    final URI uri;
+    final var uri = parse(redirectUri);
+    final var scheme = lowerCase(uri.getScheme());
+    final var host = lowerCase(uri.getHost());
 
+    if (host.isEmpty() || uri.getRawFragment() != null || !isAllowedScheme(scheme, host)) {
+      throw invalid(redirectUri, null);
+    }
+  }
+
+  /** {@code https} anywhere, plain {@code http} only on a loopback host. */
+  private static boolean isAllowedScheme(final String scheme, final String host) {
+    return "https".equals(scheme) || ("http".equals(scheme) && LOOPBACK_HOSTS.contains(host));
+  }
+
+  private static URI parse(final String redirectUri) {
     try {
-      uri = new URI(redirectUri);
+      return new URI(redirectUri);
     } catch (final URISyntaxException e) {
       throw invalid(redirectUri, e);
     }
+  }
 
-    final var scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
-    final var host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
-    final var secure = "https".equals(scheme);
-    final var loopback = "http".equals(scheme) && LOOPBACK_HOSTS.contains(host);
-
-    if (host.isEmpty() || uri.getRawFragment() != null || !(secure || loopback)) {
-      throw invalid(redirectUri, null);
-    }
+  private static String lowerCase(final @Nullable String value) {
+    return value == null ? "" : value.toLowerCase(Locale.ROOT);
   }
 
   private static IllegalArgumentException invalid(

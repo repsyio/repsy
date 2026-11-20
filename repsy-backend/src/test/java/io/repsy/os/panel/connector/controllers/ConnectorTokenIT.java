@@ -51,12 +51,16 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
  * where it is refused, the listing, the revocations and the sliding expiry. The flow turned off is
  * {@code ConnectorDisabledIT}.
  */
+// The same two properties as PagedListsIT, so the two classes share one context.
 @TestPropertySource(
-    properties = {"CONNECTOR_ENABLED=true", "CONNECTOR_REDIRECT_URIS=" + ConnectorTokenIT.REDIRECT})
+    properties = {
+      "CONNECTOR_ENABLED=true",
+      "CONNECTOR_REDIRECT_URIS=https://gateway.example.test/oauth/upstream/callback"
+    })
 @DisplayName("Connected applications (RPS-2660)")
 class ConnectorTokenIT extends AbstractPatIT {
 
-  static final String REDIRECT = "https://gateway.example.test/oauth/upstream/callback";
+  private static final String REDIRECT = "https://gateway.example.test/oauth/upstream/callback";
 
   private static final String AUTHORIZATIONS = "/api/profile/connector-authorizations";
   private static final String EXCHANGE = "/api/connector/tokens";
@@ -89,9 +93,8 @@ class ConnectorTokenIT extends AbstractPatIT {
   }
 
   private static String consent(final String redirectUri, final String scopes) {
-    return """
-        {"redirectUri":"%s","clientName":"Claude","scopes":[%s],
-         "codeChallenge":"%s","codeChallengeMethod":"S256"}"""
+    return ("{\"redirectUri\":\"%s\",\"clientName\":\"Claude\",\"scopes\":[%s],"
+            + "\"codeChallenge\":\"%s\",\"codeChallengeMethod\":\"S256\"}")
         .formatted(redirectUri, scopes, PkceUtils.challengeOf(VERIFIER));
   }
 
