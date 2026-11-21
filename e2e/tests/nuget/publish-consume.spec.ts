@@ -149,6 +149,63 @@ test(
 );
 
 test(
+  'nuget > deploy token in packageSourceCredentials with --api-key any (RPS-1431)',
+  { tag: ['@smoke'] },
+  async ({ seeder }) => {
+    const repo = await seeder.createRepo(RepoType.NUGET, { privateRepo: true });
+    const token = await seeder.createToken(repo.name, { readOnly: false });
+    const credential = {
+      transport: 'basic' as const,
+      username: token.username,
+      password: token.token,
+      kind: 'token' as const,
+    };
+    const packageId = `e2e-${seeder.runId}-cfgcreds`;
+    const version = nugetAdapter.version('release');
+
+    const { home, work } = await isolatedWorkDir(`nuget-cfgcreds-push-${seeder.runId}`);
+    const nupkgFile = path.join(work, 'package.nupkg');
+    await fs.writeFile(nupkgFile, buildNupkg({ packageId, version }));
+
+    // The config carries the deploy token as packageSourceCredentials (the docs' NuGet.Config form)
+    // and the flag is `--api-key any`, so only the Basic credentials of the config can authenticate
+    // the push. The catalog passes a deploy token as --api-key, which never reaches this path.
+    const pushCfg = await renderNuGetConfig(home, repo.name, credential);
+
+    const pushResult = await run(
+      'dotnet',
+      [
+        'nuget',
+        'push',
+        nupkgFile,
+        '--source',
+        'repsy',
+        '--configfile',
+        pushCfg,
+        '--allow-insecure-connections',
+        '--no-symbols',
+        '--timeout',
+        '60',
+        '--api-key',
+        'any',
+      ],
+      {
+        cwd: work,
+        env: nugetEnv(home),
+        timeoutMs: 120_000,
+        redact: [credential.password],
+        label: 'nuget-cfgcreds-push',
+      },
+    );
+    expect(pushResult.exitCode, `dotnet nuget push: ${pushResult.command}`).toBe(0);
+
+    const versionsRes = await rawGetVersions(repo.name, adminCredential(), packageId.toLowerCase());
+    expect(versionsRes.status, 'the pushed version is listed').toBe(200);
+    expect(parseVersions(versionsRes.body)).toContain(normalizeVersion(version));
+  },
+);
+
+test(
   'nuget > mixed-case package id real client round trip',
   { tag: ['@smoke'] },
   async ({ seeder }) => {
