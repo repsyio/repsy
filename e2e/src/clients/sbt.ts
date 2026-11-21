@@ -30,7 +30,7 @@
  *
  * Everything sbt writes lives under this run's own `HOME`, Ivy home, global base and temp directory.
  * Only the sbt launcher's boot directory is shared, and a publish also reads Coursier's cache: both are
- * primed in the runner image (`runners/maven.Dockerfile`, `runners/sbt-warmup`) with the sbt jars, the
+ * primed in the runner image (`runners/maven.Dockerfile`, `runners/sbt-warmup` for sbt 1, `runners/sbt2-warmup` for sbt 2) with the sbt jars, the
  * Scala compilers and their bridges, never a test artifact, because every test publishes to a
  * repository of its own. A resolve gets an empty Coursier cache of its own and resolves neither the
  * Scala library nor the compiler, so it can only ever find the library in the Repsy repository.
@@ -56,8 +56,9 @@ import { minimalPom, splitPackageName } from './maven-raw.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TEMPLATES_DIR = path.resolve(__dirname, '../packages/sbt');
 
-/** The sbt and Scala versions of the runner image. Keep equal to `runners/maven.Dockerfile` and `runners/sbt-warmup`. */
+/** The sbt and Scala versions of the runner image. Keep equal to `runners/maven.Dockerfile` and `runners/sbt-warmup*`. */
 export const SBT_VERSION = '1.13.0';
+export const SBT_VERSION_2 = '2.1.0';
 export const SCALA_213 = '2.13.18';
 export const SCALA_3 = '3.3.8';
 
@@ -88,6 +89,8 @@ export interface SbtOptions {
   overwrite?: boolean;
   /** The realm the credential names; defaults to Repsy's own. */
   realm?: string;
+  /** The sbt version to use; defaults to `SBT_VERSION`. */
+  sbtVersion?: string;
 }
 
 /** An sbt project directory, its isolated home, and the environment and arguments an `sbt` run needs. */
@@ -242,7 +245,7 @@ async function renderPublisher(
     ...credentialView(world.credential, credentialVia, realm),
   });
   await renderTemplate('build', 'properties', path.join(sbt.work, 'project', 'build.properties'), {
-    sbtVersion: SBT_VERSION,
+    sbtVersion: options.sbtVersion ?? SBT_VERSION,
   });
 
   const sourceDir = path.join(sbt.work, 'src', 'main', 'scala', 'io', 'repsy', 'e2e');
@@ -358,7 +361,7 @@ export async function resolve(world: World, options: SbtOptions = {}): Promise<A
     ...credentialView(world.credential, credentialVia, realm),
   });
   await renderTemplate('build', 'properties', path.join(sbt.work, 'project', 'build.properties'), {
-    sbtVersion: SBT_VERSION,
+    sbtVersion: options.sbtVersion ?? SBT_VERSION,
   });
 
   const result = await run('sbt', [...sbt.args, 'fetchDependencies'], {

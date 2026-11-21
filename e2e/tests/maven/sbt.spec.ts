@@ -15,8 +15,8 @@
 ///
 
 /**
- * The scenario-driven sbt suite: the whole shared catalog (`scenarios/catalog.ts`) run through the
- * real `sbt publish` and a real sbt dependency resolution (`clients/sbt-adapter.ts`), against an
+ * The scenario-driven sbt 1.x suite: the whole shared catalog (`scenarios/catalog.ts`) run through the
+ * real `sbt 1.13` publish and a real sbt dependency resolution (`clients/sbt-adapter.ts`), against an
  * ordinary Repsy Maven repository (RPS-134).
  */
 import { sbtAdapter } from '../../src/clients/sbt-adapter.js';
@@ -27,5 +27,5 @@ import { registerSbtExtras } from '../../src/scenarios/sbt-extras.js';
 // A cold sbt (JVM start, build load, a Scala compile) per publish and resolve.
 test.describe.configure({ timeout: 360_000 });
 
-registerPublishConsumeLoop(sbtAdapter);
+registerPublishConsumeLoop(sbtAdapter('1.13.0'));
 registerSbtExtras();
