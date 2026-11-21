@@ -2008,6 +2008,45 @@ class NuGetPublishProtocolIT extends AbstractIT {
       assertThat(NuGetPublishProtocolIT.this.storedVersions(repo, pkg.id())).hasSize(1);
     }
 
+    /**
+     * RPS-1431: the form the docs show. The dotnet client sends the {@code
+     * packageSourceCredentials} of {@code NuGet.Config} as HTTP Basic. A deploy token secret in the
+     * password position is accepted whatever the username is, because the deploy token is looked up
+     * by its secret only.
+     */
+    @Test
+    @DisplayName(
+        "accepts a deploy token secret as the Basic password, with any username (RPS-1431)")
+    void basicPasswordWithDeployTokenSecret() throws Exception {
+      final var repo = NuGetPublishProtocolIT.this.privateNugetRepo();
+      final var pkg = new Pkg(uniquePackageId(), "1.0.0");
+      final var secret = NuGetPublishProtocolIT.this.seedDeployToken(repo, false);
+
+      assertStatus(
+          NuGetPublishProtocolIT.this.pushAs(repo, pkg.nupkg(), basic("any-username", secret)),
+          201);
+
+      assertThat(NuGetPublishProtocolIT.this.storedVersions(repo, pkg.id())).hasSize(1);
+    }
+
+    /**
+     * RPS-1431: the other side of the case above. A read-only deploy token authenticates, but a
+     * push needs write permission, so it is refused and nothing is stored.
+     */
+    @Test
+    @DisplayName("refuses a read-only deploy token secret as the Basic password (RPS-1431)")
+    void basicPasswordWithReadOnlyDeployTokenSecret() throws Exception {
+      final var repo = NuGetPublishProtocolIT.this.privateNugetRepo();
+      final var pkg = new Pkg(uniquePackageId(), "1.0.0");
+      final var secret = NuGetPublishProtocolIT.this.seedDeployToken(repo, true);
+
+      assertStatus(
+          NuGetPublishProtocolIT.this.pushAs(repo, pkg.nupkg(), basic("any-username", secret)),
+          401);
+
+      NuGetPublishProtocolIT.this.assertNothingStored(repo, pkg.id());
+    }
+
     @Test
     @DisplayName("accepts a token sent in the X-NuGet-ApiKey header, as nuget push -ApiKey does")
     void apiKeyHeader() throws Exception {
