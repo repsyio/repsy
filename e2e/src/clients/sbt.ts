@@ -68,6 +68,7 @@ export const REPSY_REALM = 'Repsy';
 /** A cold sbt (JVM start, build load, compile) is slower than a cold `mvn`. */
 const PUBLISH_TIMEOUT_MS = 240_000;
 const CONSUME_TIMEOUT_MS = 240_000;
+const SHUTDOWN_TIMEOUT_MS = 60_000;
 
 /** The primed caches of the runner image; absent outside it, where sbt then downloads what it needs. */
 const SBT_CACHE_DIR = process.env.SBT_CACHE_DIR ?? '/opt/sbt-cache';
@@ -102,6 +103,17 @@ export interface SbtRun {
   secrets: string[];
   /** The `sbt` arguments before the task names. */
   args: string[];
+  /**
+   * Stops the sbt server this run left behind: call it once the run is over, whether it succeeded or
+   * not. sbt 2.x always works through a server, which outlives the client (a JVM of up to 768 MB per
+   * run); it does nothing for sbt 1.x, which runs in the launcher's process.
+   */
+  stop: () => Promise<void>;
+}
+
+/** sbt 2.x has no mode without a server, see `SbtRun.stop`. */
+function usesServer(sbtVersion: string): boolean {
+  return sbtVersion.startsWith('2.');
 }
 
 /** The host a Credentials entry is keyed by: the repository base URL's host name. */
@@ -119,6 +131,7 @@ export async function prepareSbtRun(
   via: CredentialVia = 'env',
   realm: string = REPSY_REALM,
   coursierCache: 'primed' | 'private' = 'primed',
+  sbtVersion: string = SBT_VERSION,
 ): Promise<SbtRun> {
   const { home, work } = await isolatedWorkDir(prefix);
   // Short on purpose: sbt's boot server socket is a unix domain socket in `<tmp>/.sbt/sbt-socket<n>/`,
@@ -133,7 +146,9 @@ export async function prepareSbtRun(
   const args = [
     '-batch',
     '-no-colors',
-    '-Dsbt.server.autostart=false',
+    // sbt 1.x runs a batch in its own process with this; sbt 2.x fails with "no sbt server is
+    // running", because its batch is a client of a server it starts itself (RPS-1327).
+    ...(usesServer(sbtVersion) ? [] : ['-Dsbt.server.autostart=false']),
     '-Dsbt.supershell=false',
     '-Dsbt.ci=true',
     `-Dsbt.global.base=${path.join(home, 'sbt-global')}`,
@@ -178,7 +193,22 @@ export async function prepareSbtRun(
     }
   }
 
-  return { home, work, env: childEnv, secrets, args };
+  const stop = async (): Promise<void> => {
+    if (!usesServer(sbtVersion)) {
+      return;
+    }
+    // A failed task leaves the server running too, so this is a call of its own rather than a
+    // trailing `;shutdown` of the task run. The server is found by the project directory.
+    await run('sbt', [...args, 'shutdown'], {
+      cwd: work,
+      env: childEnv,
+      timeoutMs: SHUTDOWN_TIMEOUT_MS,
+      redact: secrets,
+      label: 'sbt-shutdown',
+    }).catch(() => undefined);
+  };
+
+  return { home, work, env: childEnv, secrets, args, stop };
 }
 
 /** Renders `<name>.template.<ext>` into `dest`. */
@@ -283,6 +313,8 @@ export async function publishWithSbt(world: World, options: SbtOptions = {}): Pr
     world.credential,
     options.credentialVia,
     options.realm,
+    'primed',
+    options.sbtVersion,
   );
   const { groupId, artifactId, artifactBase, version } = await renderPublisher(sbt, world, options);
   const scalaVersion = options.scalaVersion ?? SCALA_213;
@@ -297,7 +329,7 @@ export async function publishWithSbt(world: World, options: SbtOptions = {}): Pr
       redact: sbt.secrets,
       label: `sbt-publish-${world.scenario.id}`,
     },
-  );
+  ).finally(sbt.stop);
 
   const built = path.join(
     sbt.work,
@@ -348,6 +380,7 @@ export async function resolve(world: World, options: SbtOptions = {}): Promise<A
     credentialVia,
     realm,
     'private',
+    options.sbtVersion,
   );
   const [groupId, artifactId] = splitPackageName(world.consumeTarget.packageName);
   const version = world.consumeTarget.version;
@@ -370,7 +403,7 @@ export async function resolve(world: World, options: SbtOptions = {}): Promise<A
     timeoutMs: CONSUME_TIMEOUT_MS,
     redact: sbt.secrets,
     label: `sbt-consume-${world.scenario.id}`,
-  });
+  }).finally(sbt.stop);
 
   const httpStatus = await rawConsumeCheck(world);
   const resolved = await findResolvedJar(
