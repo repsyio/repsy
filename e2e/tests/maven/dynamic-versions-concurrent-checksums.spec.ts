@@ -321,12 +321,22 @@ test.describe('maven dynamic versions, concurrent deploy, and checksums (RPS-171
         deployArtifact(repo.name, groupId, artifactId, version),
       ]);
 
-      // One should succeed (the first to write), the other should fail with 403
+      // Each file (POM, jar) is a separate PUT and the refusal is decided per file, so over a
+      // network the race can split: one client loses the POM, the other loses the jar, and both
+      // mvn runs fail. That is correct server behaviour (every second write of a file is refused),
+      // so the test does not assume one client wins both files. It asserts that the two deploys
+      // never both succeed, that every failure is the 403 override refusal, and (below) that the
+      // stored files are intact.
+      const deploys = [deploy1, deploy2];
       expect(
-        (deploy1.exitCode === 0 && deploy2.exitCode !== 0) ||
-          (deploy1.exitCode !== 0 && deploy2.exitCode === 0),
-        'exactly one of the concurrent deploys should succeed (the other loses the race)',
-      ).toBe(true);
+        deploys.filter((d) => d.exitCode === 0).length,
+        'the two concurrent deploys must not both succeed (allowOverride=false)',
+      ).toBeLessThan(2);
+      for (const failed of deploys.filter((d) => d.exitCode !== 0)) {
+        expect(failed.stdout, 'a losing deploy is refused with 403, not another error').toMatch(
+          /403/,
+        );
+      }
 
       // Verify the metadata is valid and NOT corrupted (no duplicate version entries from race)
       const metadataPath = `${groupId.replace(/\./g, '/')}/${artifactId}/maven-metadata.xml`;
@@ -352,6 +362,12 @@ test.describe('maven dynamic versions, concurrent deploy, and checksums (RPS-171
         `${jarPath}/${artifactId}-${version}.jar`,
       );
       expect(jar.status, 'jar should be stored by the winning deploy').toBe(200);
+      // The refused write must not replace what is stored: the jar is exactly one deploy's jar
+      // (both deploys upload the same bytes, so this pins "not truncated or mixed").
+      expect(
+        [deploy1.jarSha, deploy2.jarSha],
+        'the stored jar is byte-equal to a deployed jar',
+      ).toContain(sha256Hex(jar.body));
     },
   );
 
