@@ -71,7 +71,9 @@ const REPO_TYPE_BY_PROTOCOL: Record<string, RepoType> = {
 };
 
 export function repoTypeForProtocol(protocol: string): RepoType {
-  const repoType = REPO_TYPE_BY_PROTOCOL[protocol];
+  // The sbt adapter registers one protocol key per sbt version (`sbt-1.13`, `sbt-2.1`, see
+  // `sbtProtocol` in `clients/sbt-adapter.ts`); every one of them uses an ordinary Maven repo.
+  const repoType = protocol.startsWith('sbt-') ? RepoType.MAVEN : REPO_TYPE_BY_PROTOCOL[protocol];
   if (!repoType) {
     throw new Error(`world(): unknown protocol "${protocol}"`);
   }
