@@ -5732,6 +5732,10 @@ components:
           type: string
         refreshToken:
           type: string
+      required:
+        - username
+        - token
+        - refreshToken
     PageMetadata:
       type: object
       properties:
@@ -5747,6 +5751,11 @@ components:
         totalPages:
           type: integer
           format: int64
+      required:
+        - size
+        - number
+        - totalElements
+        - totalPages
     ProblemDetail:
       type: object
       description: >-
@@ -6198,9 +6207,7 @@ components:
         - id
         - username
         - role
-        - diskUsage
         - createdAt
-        - lastLoginAt
     AccessTokenScope:
       type: string
       enum:
@@ -6507,6 +6514,8 @@ components:
       required:
         - name
         - createdAt
+        - privateRepo
+        - diskUsage
     RepoCreateForm:
       type: object
       description: >-
@@ -6643,6 +6652,9 @@ components:
           type: string
         username:
           type: string
+      required:
+        - token
+        - username
     RepoPermissionInfo:
       type: object
       properties:
@@ -6718,11 +6730,16 @@ components:
           format: int64
         text:
           type: string
+      required:
+        - value
+        - text
     RepoUsageInfo:
       type: object
       properties:
         diskUsed:
           "$ref": "#/components/schemas/UsageInfo"
+      required:
+        - diskUsed
     ServerInfo:
       type: object
       required:

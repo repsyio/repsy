@@ -62,7 +62,10 @@ const SEVERITY_CHART_LABELS = ['Critical', 'High', 'Medium', 'Low', 'Unknown'];
 export class SecurityComponent implements OnInit, OnDestroy {
   loading = true;
   scans: VulnerabilityScanInfo[] = [];
-  pagedData: PagedModelVulnerabilityScanInfo = { content: [], page: { totalPages: 0 } };
+  pagedData: PagedModelVulnerabilityScanInfo = {
+    content: [],
+    page: { size: 0, number: 0, totalElements: 0, totalPages: 0 },
+  };
   pageNum = 0;
   pageSize = 10;
   repoNameSearch = '';

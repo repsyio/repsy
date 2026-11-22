@@ -97,7 +97,7 @@ describe('DashboardComponent in an OnPush host (RPS-1459)', () => {
   });
 
   it('shows the disk usage when it answers', () => {
-    usage.next({ diskUsed: { bytes: 1024, text: '1 KB' }, reposCount: 4 } as TotalUsageInfo);
+    usage.next({ diskUsed: { value: 1024, text: '1 KB' }, reposCount: 4 } as TotalUsageInfo);
     fixture.detectChanges();
 
     expect(text('disk-usage-total')).toBe('1 KB');
@@ -114,7 +114,15 @@ describe('DashboardComponent in an OnPush host (RPS-1459)', () => {
 
   it('lists the recent repositories when they answer', () => {
     recent.next({
-      content: [{ name: 'my-repo', type: RepoType.Maven, diskUsage: 1024, createdAt: new Date().toISOString() }],
+      content: [
+        {
+          name: 'my-repo',
+          type: RepoType.Maven,
+          privateRepo: true,
+          diskUsage: 1024,
+          createdAt: new Date().toISOString(),
+        },
+      ],
     });
     fixture.detectChanges();
 

@@ -111,7 +111,8 @@ class ProfileControllerIT extends AbstractIT {
   class Get {
 
     @Test
-    @DisplayName("returns the full profile of the authenticated user, including the diskUsage gap")
+    @DisplayName(
+        "returns the profile of the authenticated user; diskUsage is declared but never set")
     void returnsProfileForAuthenticatedUser() throws Exception {
       final var user = ProfileControllerIT.this.createUser(uniqueUsername("getme"), UserRole.USER);
       final var token = ProfileControllerIT.this.bearerTokenFor(user.getId(), user.getUsername());
@@ -126,11 +127,10 @@ class ProfileControllerIT extends AbstractIT {
               .andExpect(jsonPath("$.id").value(user.getId().toString()))
               .andExpect(jsonPath("$.username").value(user.getUsername()))
               .andExpect(jsonPath("$.role").value("USER"))
-              // ProfileService.getProfile() never populates diskUsage, even though the OpenAPI
-              // schema marks it required -- it always serializes as null. Real gap, asserted
-              // deliberately.
+              // ProfileService.getProfile() never populates diskUsage, so it always serializes as
+              // null; the schema declares the property but does not require it (RPS-2279).
               .andExpect(jsonPath("$.diskUsage").value(nullValue()))
-              // Freshly created user has never logged in.
+              // Freshly created user has never logged in; lastLoginAt is not required either.
               .andExpect(jsonPath("$.lastLoginAt").value(nullValue()))
               .andExpect(jsonPath("$.createdAt").value(notNullValue()))
               .andReturn()
