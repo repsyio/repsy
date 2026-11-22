@@ -8630,7 +8630,6 @@ components:
           type: array
           items:
             "$ref": "#/components/schemas/GemDependencyInfo"
-
       required:
         - version
         - platform
