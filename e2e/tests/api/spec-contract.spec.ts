@@ -40,6 +40,8 @@ const ITEM = {
   updatedAt: '2026-09-26T11:39:58.568004Z',
 };
 
+const REPO = { name: 'r', createdAt: ITEM.updatedAt, privateRepo: false, diskUsage: 0 };
+
 test.describe('the response validator', () => {
   test('accepts a body that matches its schema', () => {
     expect(contractProblems('listPypiPackages', 200, packages(ITEM))).toEqual([]);
@@ -54,16 +56,10 @@ test.describe('the response validator', () => {
       ).join(),
     ).toContain('/content/0/updatedAt must match format "date-time"');
     // an enum behind a $ref (RepoType inside RepoListInfo)
-    expect(
-      contractProblems('getRepo', 200, { name: 'r', createdAt: ITEM.updatedAt, type: 'MAVEN' }),
-    ).toEqual([]);
-    expect(
-      contractProblems('getRepo', 200, {
-        name: 'r',
-        createdAt: ITEM.updatedAt,
-        type: 'NOTHING',
-      }).join(),
-    ).toContain('/type must be equal to one of the allowed values');
+    expect(contractProblems('getRepo', 200, { ...REPO, type: 'MAVEN' })).toEqual([]);
+    expect(contractProblems('getRepo', 200, { ...REPO, type: 'NOTHING' }).join()).toContain(
+      '/type must be equal to one of the allowed values',
+    );
     // 404 is `#/components/responses/NotFound`: the spec's ProblemDetail (application/problem+json), whose traceId is a uuid.
     expect(
       contractProblems('deleteMavenGroup', 404, {
