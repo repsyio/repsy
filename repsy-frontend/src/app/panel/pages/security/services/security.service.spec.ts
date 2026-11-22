@@ -36,11 +36,13 @@ const SCANS: PagedModelVulnerabilityScanInfo = {
   content: [{ id: 'scan-1', repoName: REPO }] as PagedModelVulnerabilityScanInfo['content'],
   page: { number: 1, size: 20, totalElements: 21, totalPages: 2 },
 };
-const SUMMARY: Record<string, RepoSecuritySummary> = { [REPO]: { severity: Severity.High, scanned: true } };
-const VERSION_SUMMARY: Record<string, VersionSecuritySummary> = {
-  '1.0.0': { severity: Severity.Low, findingCount: 2, scanned: true },
+const SUMMARY: Record<string, RepoSecuritySummary> = {
+  [REPO]: { severity: Severity.High, scanned: true } as RepoSecuritySummary,
 };
-const DETAIL: RepoSecurityDetail = { criticalCount: 1, highCount: 2, totalCount: 3 };
+const VERSION_SUMMARY: Record<string, VersionSecuritySummary> = {
+  '1.0.0': { severity: Severity.Low, findingCount: 2, scanned: true } as VersionSecuritySummary,
+};
+const DETAIL = { criticalCount: 1, highCount: 2, totalCount: 3 } as RepoSecurityDetail;
 const SCANS_SUMMARY: SecurityScansSummary = { criticalCount: 1, highCount: 2, totalCount: 3 };
 
 describe('SecurityService', () => {

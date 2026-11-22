@@ -6957,6 +6957,15 @@ components:
         totalCount:
           type: integer
           format: int32
+      required:
+        - scanId
+        - status
+        - criticalCount
+        - highCount
+        - mediumCount
+        - lowCount
+        - unknownCount
+        - totalCount
     RepoSecuritySummary:
       # the generator ignores a property-level policy on a oneOf property, so the whole model omits nulls
       x-class-extra-annotation: '@com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)'
@@ -6996,6 +7005,12 @@ components:
             of the repository's versions has a completed scan.
           type: integer
           format: int32
+      required:
+        - scanned
+        - rescanInProgressCount
+        - rescanFailedCount
+        - unscannedInProgressCount
+        - unscannedFailedCount
     SecuritySummary:
       type: object
       additionalProperties:
@@ -7059,6 +7074,13 @@ components:
             instead.
           type: integer
           format: int32
+      required:
+        - findingCount
+        - scanned
+        - rescanInProgressCount
+        - rescanFailedCount
+        - unscannedInProgressCount
+        - unscannedFailedCount
     VersionSecuritySummaryMap:
       type: object
       additionalProperties:
@@ -7145,6 +7167,14 @@ components:
           type: array
           items:
             "$ref": "#/components/schemas/RecentScannedVersion"
+      required:
+        - criticalCount
+        - highCount
+        - mediumCount
+        - lowCount
+        - unknownCount
+        - totalCount
+        - recentScans
     SecurityScansSummary:
       type: object
       properties:
