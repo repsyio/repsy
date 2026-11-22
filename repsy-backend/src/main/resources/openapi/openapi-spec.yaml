@@ -7378,6 +7378,12 @@ components:
           type: string
           format: date-time
           description: When the policy runs next, absent while it is disabled.
+      required:
+        - enabled
+        - cadence
+        - keepLastN
+        - keepDays
+        - nameRegex
     CleanupPolicyStatusForm:
       type: object
       properties:
@@ -7404,6 +7410,11 @@ components:
           type: integer
           format: int64
           description: Sum of the sizes of those layers; refunded to the usage as the blobs go.
+      required:
+        - deletedManifests
+        - freedManifestBytes
+        - orphanLayersScheduled
+        - orphanLayerBytes
     ImageListItem:
       type: object
       description: >-
@@ -7497,6 +7508,10 @@ components:
           type: string
         configDigest:
           type: string
+      required:
+        - name
+        - digest
+        - platform
     PagedModelManifestListItem:
       type: object
       properties:
@@ -7533,6 +7548,13 @@ components:
         lastUpdatedAt:
           type: string
           format: date-time
+      required:
+        - id
+        - digest
+        - imageName
+        - name
+        - platform
+        - mediaType
     # region: go
     GoModuleListItem:
       type: object

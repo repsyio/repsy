@@ -763,14 +763,9 @@ class OpenApiSpecConsistencyIT extends AbstractIT {
   /**
    * RPS-2279: list items without a {@code required} list, with the reason. Cloud copies the shared
    * list-item schemas from this spec, so a missing list makes every property optional in the
-   * generated TypeScript. These two have no Java projection to read the nullability from. The map
-   * may only shrink.
+   * generated TypeScript. Empty since the Docker items declare theirs; the map may only shrink.
    */
-  private static final Map<String, String> LIST_ITEMS_WITHOUT_REQUIRED =
-      Map.of(
-          "CleanupPolicyItem",
-              "built from the cleanup policy settings; nullability not derived yet",
-          "ManifestListItem", "built from the manifest row and a platform lookup; not derived yet");
+  private static final Map<String, String> LIST_ITEMS_WITHOUT_REQUIRED = Map.of();
 
   @Test
   @DisplayName("every list item declares its non-null members as required, every page its content")
