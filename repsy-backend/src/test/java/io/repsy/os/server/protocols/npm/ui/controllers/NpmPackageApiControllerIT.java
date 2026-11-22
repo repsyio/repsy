@@ -375,7 +375,12 @@ class NpmPackageApiControllerIT extends AbstractIT {
           .andExpect(jsonPath("$.license").value("Apache-2.0"))
           .andExpect(jsonPath("$.homepage").value("https://repsy.io"))
           .andExpect(jsonPath("$.deprecated").value(false))
-          .andExpect(jsonPath("$.keywords[*].keyword").value(containsInAnyOrder("fixture", "npm")));
+          .andExpect(jsonPath("$.keywords[*].keyword").value(containsInAnyOrder("fixture", "npm")))
+          // the other members PackageVersionDetail declares as required (RPS-2279)
+          .andExpect(jsonPath("$.deleted").value(false))
+          .andExpect(jsonPath("$.createdAt").value(notNullValue()))
+          .andExpect(jsonPath("$.maintainers").isArray())
+          .andExpect(jsonPath("$.distributionTags").isArray());
       NpmPackageApiControllerIT.this
           .perform(
               get(

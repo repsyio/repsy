@@ -8080,6 +8080,9 @@ components:
         createdAt:
           type: string
           format: date-time
+      required:
+        - packageName
+        - createdAt
     PagedModelNpmPackageListItem:
       type: object
       properties:
@@ -8172,6 +8175,16 @@ components:
         createdAt:
           type: string
           format: date-time
+      required:
+        - id
+        - packageName
+        - versionName
+        - deprecated
+        - deleted
+        - createdAt
+        - keywords
+        - maintainers
+        - distributionTags
     PackageVersionListItem:
       type: object
       properties:
@@ -8441,6 +8454,9 @@ components:
           type: string
         classifier:
           type: string
+      required:
+        - classifier
+        - value
     ReleaseDetail:
       type: object
       properties:
@@ -8488,6 +8504,17 @@ components:
           type: array
           items:
             "$ref": "#/components/schemas/ReleaseProjectUrlInfo"
+      required:
+        - id
+        - packageName
+        - version
+        - finalRelease
+        - preRelease
+        - postRelease
+        - devRelease
+        - createdAt
+        - classifiers
+        - projectUrls
     ReleaseProjectUrlInfo:
       type: object
       properties:
@@ -8495,6 +8522,9 @@ components:
           type: string
         url:
           type: string
+      required:
+        - label
+        - url
     # region: ruby
     GemListItem:
       type: object
