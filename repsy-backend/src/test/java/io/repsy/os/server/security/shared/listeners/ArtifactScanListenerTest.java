@@ -195,8 +195,10 @@ class ArtifactScanListenerTest {
         .thenReturn(SCAN_ID);
     doThrow(new RejectedExecutionException()).when(this.scanTaskExecutor).execute(any());
 
-    this.listener.onArtifactPushed(this.event());
-    assertThatThrownBy(() -> this.listener.executeManualScan(SCAN_ID, this.event()))
+    final var event = this.event();
+
+    this.listener.onArtifactPushed(event);
+    assertThatThrownBy(() -> this.listener.executeManualScan(SCAN_ID, event))
         .isInstanceOf(RetryableException.class);
 
     assertThat(this.rejected("push")).isEqualTo(1);
