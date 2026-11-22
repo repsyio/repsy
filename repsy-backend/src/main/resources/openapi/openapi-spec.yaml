@@ -6605,6 +6605,9 @@ components:
           type: boolean
         path:
           type: string
+      required:
+        - name
+        - directory
     # region: repo-tokens
     DeployTokenForm:
       type: object
@@ -7892,6 +7895,19 @@ components:
             True when the POM signature was verified or, on a repository with
             pgpVerifyAllSignaturesEnabled, when every file of the version has a verified signature
             (for a snapshot, every file of its newest build).
+      required:
+        - id
+        - versionName
+        - artifactName
+        - artifactGroupName
+        - artifactVersionName
+        - type
+        - hasDocuments
+        - hasSources
+        - hasModules
+        - signed
+        - licenses
+        - developers
     VersionDeveloperInfo:
       type: object
       properties:
@@ -7899,6 +7915,8 @@ components:
           type: string
         email:
           type: string
+      required:
+        - name
     VersionLicenseInfo:
       type: object
       properties:
@@ -7906,6 +7924,8 @@ components:
           type: string
         url:
           type: string
+      required:
+        - name
     # region: mvn-key-stores
     AllowedKeyserverItem:
       type: object

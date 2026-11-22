@@ -450,7 +450,16 @@ class MavenArtifactControllerIT extends AbstractIT {
           .andExpect(jsonPath("$.artifactGroupName").value(GROUP))
           .andExpect(jsonPath("$.artifactVersionName").value("1.1.0-SNAPSHOT"))
           .andExpect(jsonPath("$.versionName").value("1.1.0-SNAPSHOT"))
-          .andExpect(jsonPath("$.pomFile").value(notNullValue()));
+          .andExpect(jsonPath("$.pomFile").value(notNullValue()))
+          // the members ArtifactVersionInfo declares as required are never null (RPS-2279)
+          .andExpect(jsonPath("$.id").value(notNullValue()))
+          .andExpect(jsonPath("$.type").value(notNullValue()))
+          .andExpect(jsonPath("$.hasDocuments").isBoolean())
+          .andExpect(jsonPath("$.hasSources").isBoolean())
+          .andExpect(jsonPath("$.hasModules").isBoolean())
+          .andExpect(jsonPath("$.signed").isBoolean())
+          .andExpect(jsonPath("$.licenses").isArray())
+          .andExpect(jsonPath("$.developers").isArray());
 
       MavenArtifactControllerIT.this
           .mockMvc
