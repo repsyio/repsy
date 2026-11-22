@@ -495,7 +495,9 @@ class DockerImageControllerIT extends AbstractIT {
               "name",
               "platform",
               "mediaType",
-              "createdAt");
+              "createdAt")
+          .as("the required members of TagDetail are never null (RPS-2279)")
+          .doesNotContainValue(null);
 
       final var manifest =
           BareBodyAssertions.expectBare(
@@ -619,7 +621,9 @@ class DockerImageControllerIT extends AbstractIT {
       final var manifestPage = data(manifests);
       assertThat((java.util.List<?>) manifestPage.get("content")).hasSize(1);
       assertThat((Map<String, Object>) ((java.util.List<?>) manifestPage.get("content")).getFirst())
-          .containsKeys("name", "digest", "createdAt", "platform", "configDigest");
+          .containsKeys("name", "digest", "createdAt", "platform", "configDigest")
+          .as("the required members of ManifestListItem are never null (RPS-2279)")
+          .doesNotContainValue(null);
     }
 
     @Test
@@ -1192,7 +1196,11 @@ class DockerImageControllerIT extends AbstractIT {
               it.perform(
                   delete("/api/repos/%s/docker/untagged-manifests".formatted(repo.getName()))
                       .header(AUTHORIZATION, token)));
-      assertThat(data(cleaned)).containsEntry("deletedManifests", 0);
+      assertThat(data(cleaned))
+          .containsEntry("deletedManifests", 0)
+          .containsKeys("freedManifestBytes", "orphanLayersScheduled", "orphanLayerBytes")
+          .as("every member of UntaggedManifestCleanupResult is required (RPS-2279)")
+          .doesNotContainValue(null);
     }
 
     @Test
