@@ -144,9 +144,11 @@ import type { Scenario } from './types.js';
 /**
  * The protocol keys that talk to a Maven repository: `mvn` itself, the Gradle client in both build
  * file languages (RPS-133), sbt (RPS-134) and Apache Ivy (RPS-135). A scenario about Maven repository
- * rules (release/snapshot switches, SNAPSHOT deploys) lists these instead of `'maven'` alone.
+ * rules (release/snapshot switches, SNAPSHOT deploys) lists these instead of `'maven'` alone. sbt has
+ * one key per sbt version, `sbtProtocol(SBT_VERSION)` and `sbtProtocol(SBT_VERSION_2)` of
+ * `clients/sbt-adapter.ts` (RPS-1327): keep them in step with the versions in `clients/sbt.ts`.
  */
-const MAVEN_CLIENTS = ['maven', 'gradle-groovy', 'gradle-kotlin', 'sbt', 'ivy'];
+const MAVEN_CLIENTS = ['maven', 'gradle-groovy', 'gradle-kotlin', 'sbt-1.13', 'sbt-2.1', 'ivy'];
 
 /**
  * `MAVEN_CLIENTS` plus the Gradle plugin flow (RPS-133), which applies a published plugin from a Maven

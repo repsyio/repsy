@@ -347,12 +347,12 @@ export function stubSupportedRepoTypes(
  */
 export function stubRepoSecuritySummary(
   page: Page,
-  summaries: Readonly<Record<string, RepoSecuritySummary>>,
+  summaries: Readonly<Record<string, Partial<RepoSecuritySummary>>>,
 ): Promise<StubHandle> {
   return stub(page, SECURITY_PATHS.repoSummary, (route, url) => {
     const asked = url.searchParams.get('repoNames');
     const names = asked ? asked.split(',') : Object.keys(summaries);
-    const data: Record<string, RepoSecuritySummary> = {};
+    const data: Record<string, Partial<RepoSecuritySummary>> = {};
     for (const name of names) {
       if (name in summaries) {
         data[name] = summaries[name];
@@ -369,7 +369,7 @@ export function stubRepoSecuritySummary(
 export function stubArtifactSecuritySummary(
   page: Page,
   repoName: string,
-  summaries: Readonly<Record<string, VersionSecuritySummary>>,
+  summaries: Readonly<Record<string, Partial<VersionSecuritySummary>>>,
 ): Promise<StubHandle> {
   return stub(page, SECURITY_PATHS.artifactsSummary, (route, _url, [repo]) =>
     repo === repoName ? json(route, { ...summaries }) : route.fallback(),
@@ -383,7 +383,7 @@ export function stubArtifactSecuritySummary(
 export function stubVersionSecuritySummary(
   page: Page,
   repoName: string,
-  summaries: Readonly<Record<string, VersionSecuritySummary>>,
+  summaries: Readonly<Record<string, Partial<VersionSecuritySummary>>>,
 ): Promise<StubHandle> {
   return stubArtifact(
     page,
@@ -521,7 +521,7 @@ export class ScanScript {
     return this.scans.find((scan) => scan.status === ScanStatus.COMPLETED);
   }
 
-  overview(): ScanOverview {
+  overview(): Partial<ScanOverview> {
     if (this.scans.length === 0) {
       // The panel only asks for the overview of a version that has scans; never-scanned is `{}`.
       return {};
