@@ -270,6 +270,23 @@ class PypiPackageControllerIT extends AbstractIT {
         .containsEntry("requiresPython", ">=3.11")
         .containsEntry("summary", "Integration test package 2.0.0")
         .containsEntry("descriptionContentType", "text/plain");
+    final Map<String, Object> detail = JsonPath.read(detailResponse, "$");
+    for (final var required :
+        List.of(
+            "id",
+            "packageName",
+            "version",
+            "finalRelease",
+            "preRelease",
+            "postRelease",
+            "devRelease",
+            "createdAt",
+            "classifiers",
+            "projectUrls")) {
+      assertThat(detail.get(required))
+          .as("%s is required by ReleaseDetail and never null (RPS-2279)", required)
+          .isNotNull();
+    }
     assertThat((List<Map<String, Object>>) JsonPath.read(detailResponse, "$.classifiers"))
         .containsExactly(Map.of("classifier", "Programming Language", "value", "Python :: 3"));
     assertThat((List<Map<String, Object>>) JsonPath.read(detailResponse, "$.projectUrls"))

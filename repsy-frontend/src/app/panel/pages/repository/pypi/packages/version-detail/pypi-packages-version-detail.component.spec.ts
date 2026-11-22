@@ -48,14 +48,14 @@ describe('PypiPackagesVersionDetailComponent description', () => {
     descriptionContentType: string | undefined,
     extra: Partial<ReleaseDetail> = {},
   ): HTMLElement {
-    const versionInfo: ReleaseDetail = {
+    const versionInfo = {
       packageName: 'acme-lib',
       version: '1.2.3',
       classifiers: [],
       description,
       descriptionContentType,
       ...extra,
-    };
+    } as ReleaseDetail;
     pypiService.fetchRelease.and.returnValue(of(versionInfo));
 
     const fixture: ComponentFixture<PypiPackagesVersionDetailComponent> = TestBed.createComponent(

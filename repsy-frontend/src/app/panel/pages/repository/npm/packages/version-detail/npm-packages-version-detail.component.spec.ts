@@ -44,7 +44,7 @@ describe('NpmPackagesVersionDetailComponent README', () => {
   let npmService: jasmine.SpyObj<NpmService>;
 
   function render(readme: string | undefined, extra: Partial<PackageVersionDetail> = {}): HTMLElement {
-    const versionInfo: PackageVersionDetail = { packageName: 'acme-lib', readme, ...extra };
+    const versionInfo = { packageName: 'acme-lib', readme, ...extra } as PackageVersionDetail;
     npmService.fetchPackageVersion.and.returnValue(of(versionInfo));
 
     const fixture: ComponentFixture<NpmPackagesVersionDetailComponent> = TestBed.createComponent(
