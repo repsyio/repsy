@@ -57,6 +57,7 @@ import {
 } from '../../src/clients/maven-raw.js';
 import { detachedSign, generateKeyPair } from '../../src/clients/pgp.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
+import { target } from '../../src/target.js';
 import type { Seeder } from '../../src/seed/seeder.js';
 
 const OCTET = 'application/octet-stream';
@@ -368,6 +369,17 @@ test.describe('maven key-server lookup switched off (RPS-1204)', () => {
       const layout = await newRepoWithPom(seeder);
       await seeder.setSettings(layout.repoName, { pgpKeyServerLookupEnabled: false });
       const unregistered = await generateKeyPair();
+      // A normal PUT of a second POM in this repo is the network baseline: a remote target adds
+      // latency to every request, so the bound there is relative to it (RPS-2412).
+      const baselineVersion = '2.0';
+      const baselineStarted = Date.now();
+      const baseline = await layout.put(
+        `${versionDir(layout.groupId, ARTIFACT_ID, baselineVersion)}/${ARTIFACT_ID}-${baselineVersion}.pom`,
+        minimalPom(layout.groupId, ARTIFACT_ID, baselineVersion),
+        OCTET,
+      );
+      const baselineMs = Date.now() - baselineStarted;
+      expect(baseline.status, 'baseline PUT of a second POM').toBe(200);
       const before = await repoTree(layout.repoName);
 
       const signature = await detachedSign(
@@ -382,7 +394,15 @@ test.describe('maven key-server lookup switched off (RPS-1204)', () => {
       expect(put.msgId, 'error message id').toBe(ERROR_CODES.ARTIFACT_SIGNING_KEY_NOT_REGISTERED);
       // With the lookup on, the default key servers are asked and may take their whole timeout
       // when this sandbox has no network; switched off, nothing is asked.
-      expect(elapsedMs, 'answered without waiting for a key server').toBeLessThan(2_000);
+      // The msgId above is the proof that no lookup happened. The time bound is strict (2 s) on a
+      // target next to the harness; over a network it is 4x a normal PUT plus 3 s, still far below
+      // the wait of an unreachable key server.
+      // eslint-disable-next-line playwright/no-conditional-in-test -- the bound depends on the target
+      const boundMs = target.isRemote ? 4 * baselineMs + 3_000 : 2_000;
+      expect(
+        elapsedMs,
+        `answered without waiting for a key server (bound ${boundMs} ms, baseline PUT ${baselineMs} ms)`,
+      ).toBeLessThan(boundMs);
       expect(await repoTree(layout.repoName), 'repo tree unchanged').toEqual(before);
     },
   );
