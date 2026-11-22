@@ -7632,6 +7632,11 @@ components:
           type: array
           items:
             "$ref": "#/components/schemas/GoModuleVersionListItem"
+      required:
+        - id
+        - modulePath
+        - createdAt
+        - versions
     # region: helm
     HelmChartListItem:
       type: object
@@ -7717,6 +7722,10 @@ components:
         updatedAt:
           type: string
           format: date-time
+      required:
+        - name
+        - latestVersion
+        - updatedAt
     HelmChartDetail:
       type: object
       properties:
@@ -8571,6 +8580,11 @@ components:
         updatedAt:
           type: string
           format: date-time
+      required:
+        - name
+        - latestVersion
+        - createdAt
+        - updatedAt
     GemVersionListItem:
       type: object
       properties:
@@ -8609,6 +8623,10 @@ components:
           type: string
         type:
           type: string
+      required:
+        - name
+        - requirements
+        - type
     GemVersionInfo:
       type: object
       properties:
@@ -8642,3 +8660,11 @@ components:
           type: array
           items:
             "$ref": "#/components/schemas/GemDependencyInfo"
+      required:
+        - version
+        - platform
+        - checksum
+        - yanked
+        - createdAt
+        - runtimeDependencies
+        - developmentDependencies
