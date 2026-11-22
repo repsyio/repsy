@@ -22,7 +22,13 @@ import { HIGHLIGHT_OPTIONS } from 'ngx-highlightjs';
 import { BehaviorSubject, of, Subject, throwError } from 'rxjs';
 
 import { environment } from '../../../../../../../environments/environment';
-import { ArtifactVersionInfo, ArtifactVersionListItem, RepoPermissionInfo } from '../../../../../../../generated/api';
+import {
+  ArtifactVersionInfo,
+  ArtifactVersionListItem,
+  RepoPermissionInfo,
+  VersionDeveloperInfo,
+  VersionLicenseInfo,
+} from '../../../../../../../generated/api';
 import { CopyClipboardComponent } from '../../../../../shared/components/copy-clipboard/copy-clipboard.component';
 import { DangerModalService } from '../../../../../shared/components/modals/danger-modal/danger-modal.service';
 import { SecurityScanSectionComponent } from '../../../../../shared/components/security-scan-section/security-scan-section.component';
@@ -418,7 +424,7 @@ describe('MavenArtifactsVersionDetailComponent template', () => {
     });
 
     it('does not render the URL of a license as a link', async () => {
-      const fixture = await render({ ...VERSION, licenses: [{ url: 'javascript:alert(1)' }] });
+      const fixture = await render({ ...VERSION, licenses: [{ url: 'javascript:alert(1)' } as VersionLicenseInfo] });
 
       const licenses = fixture.nativeElement.querySelector('[data-testid="pkg-detail-meta-licenses"]') as HTMLElement;
       expect(licenses.querySelector('a')).toBeNull();
@@ -429,19 +435,25 @@ describe('MavenArtifactsVersionDetailComponent template', () => {
 describe('formatLicenses and formatDevelopers (RPS-1425)', () => {
   it('names a license by its name, falls back to its URL, and skips an empty entry', () => {
     expect(
+      // The API always sends a name; entries without one are malformed on purpose.
       formatLicenses([
         { url: 'https://b.example/license' },
         { name: ' ' },
         { name: 'BSD' },
         {},
         { name: 'Apache', url: 'x' },
-      ]),
+      ] as VersionLicenseInfo[]),
     ).toBe('Apache, BSD, https://b.example/license');
   });
 
   it('writes a developer as "name <email>", or just the one of the two that is there', () => {
     expect(
-      formatDevelopers([{ email: 'only@example.org' }, { name: 'Bob', email: 'bob@example.org' }, { name: 'Al' }, {}]),
+      formatDevelopers([
+        { email: 'only@example.org' },
+        { name: 'Bob', email: 'bob@example.org' },
+        { name: 'Al' },
+        {},
+      ] as VersionDeveloperInfo[]),
     ).toBe('Al, Bob <bob@example.org>, only@example.org');
   });
 
