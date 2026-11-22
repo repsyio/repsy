@@ -331,11 +331,13 @@ export async function publishWithSbt(world: World, options: SbtOptions = {}): Pr
     },
   ).finally(sbt.stop);
 
-  const built = path.join(
-    sbt.work,
-    'target',
-    `scala-${scalaVersion.startsWith('3.') ? scalaVersion : scalaVersion.split('.').slice(0, 2).join('.')}`,
-  );
+  // sbt 1 builds into `target/scala-<binary or 3.x version>`; sbt 2 into `target/out/jvm/scala-<full version>/<name>`.
+  // A wrong directory here would make the probe below re-send a minimal POM over the POM sbt published,
+  // leaving the stored `.pom.sha1` stale (Coursier then fails on "wrong checksum").
+  const scalaDir = `scala-${scalaVersion.startsWith('3.') ? scalaVersion : scalaVersion.split('.').slice(0, 2).join('.')}`;
+  const built = usesServer(options.sbtVersion ?? SBT_VERSION)
+    ? path.join(sbt.work, 'target', 'out', 'jvm', `scala-${scalaVersion}`, artifactBase)
+    : path.join(sbt.work, 'target', scalaDir);
   const stem = `${artifactBase}${crossSuffix(scalaVersion)}-${version}`;
   const pomBytes = await fs
     .readFile(path.join(built, `${stem}.pom`))
