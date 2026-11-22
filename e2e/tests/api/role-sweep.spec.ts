@@ -140,12 +140,13 @@ test.describe('the operations the spec declares 403 on', { tag: ['@smoke'] }, ()
       expect(ids.has(id), id).toBe(true);
     }
     // Every delete of a package, version or repo, in every protocol; only deleting yourself, or
-    // revoking an access token of your own (or the connector token the request itself carries,
-    // RPS-2660: any signed-in caller, no MANAGE), is not one.
+    // revoking an access token of your own (or a connector token of your own, or the one the request
+    // itself carries, RPS-2660: any signed-in caller, no MANAGE), is not one.
     const ownDeletes = new Set([
       'deleteProfile',
       'revokeAccessToken',
       'revokeCurrentConnectorToken',
+      'revokeConnectorToken',
     ]);
     const deletes = OPERATIONS.filter(
       (candidate) => candidate.method === 'DELETE' && !ownDeletes.has(candidate.operationId),
