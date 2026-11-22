@@ -41,7 +41,7 @@ describe('SecurityScanSectionComponent failed state', () => {
   function render(status: ScanStatus, errorMessage?: string): HTMLElement {
     const info: VulnerabilityScanInfo = { id: 'scan-1', status, repoName: REPO, errorMessage };
     const detail: VulnerabilityScanDetail = { id: 'scan-1', status, repoName: REPO, errorMessage };
-    const overview: ScanOverview = { scanId: 'scan-1', status };
+    const overview = { scanId: 'scan-1', status } as ScanOverview;
     api.listVulnerabilityScans.and.callFake(() => reply({ content: [info], page: { totalPages: 1 } }));
     api.getScanOverview.and.callFake(() => reply(overview));
     api.getVulnerabilityScan.and.callFake((() => reply(detail)) as never);

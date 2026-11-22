@@ -58,7 +58,7 @@ function finding(id: string, severity: Severity): VulnerabilityFindingInfo {
 }
 
 function overviewOf(scanId: string, status: ScanStatus, counts: Partial<ScanOverview> = {}): ScanOverview {
-  return { scanId, status, ...counts };
+  return { scanId, status, ...counts } as ScanOverview;
 }
 
 describe('SecurityScanSectionComponent', () => {

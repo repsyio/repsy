@@ -26,7 +26,7 @@ describe('VersionSecurityModalComponent failed state', () => {
   let fixture: ComponentFixture<VersionSecurityModalComponent>;
   let scanService: jasmine.SpyObj<SecurityScansApi>;
 
-  function render(overview: ScanOverview): HTMLElement {
+  function render(overview: Partial<ScanOverview>): HTMLElement {
     scanService.getScanOverview.and.returnValue(of(overview) as never);
     fixture.componentRef.setInput('repoName', 'repo');
     fixture.componentRef.setInput('repoType', 'maven');
