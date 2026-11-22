@@ -22,7 +22,8 @@ lazy val root = (project in file("."))
     credentials += Credentials(Path.userHome / ".sbt" / ".credentials"),
 {{/credentialsFile}}
     fetchDependencies := {
-      val out = target.value / "resolved"
+      // baseDirectory, not target: sbt 2 moves target.value to target/out/jvm/scala-<version>/<name>.
+      val out = baseDirectory.value / "target" / "resolved"
       IO.createDirectory(out)
       update.value.allFiles.filter(_.getName.endsWith(".jar")).foreach(f => IO.copyFile(f, out / f.getName))
     },
