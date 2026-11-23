@@ -25,14 +25,12 @@
  *    `cm-push` plugin only pushes), so the request is raw: `client: 'raw'`, no client exit code. The
  *    existing single-cell pin is R14 in `tests/helm/registry-rules.spec.ts`; the matrix adds the other
  *    credentials and the "nothing changed" half of every refused cell.
- *  - `delete-oci-manifest` is `DELETE /v2/<repo>/<chart>/manifests/<tag>` on a Helm repo, what an OCI
- *    client's manifest delete (`oras manifest delete`) would send. Helm's OCI protocol has no such
- *    handler: NO_ROUTE. Every credential gets the router's 404 (`unknownPath`, `NAME_UNKNOWN` in an OCI
- *    envelope), whether the chart exists or not, and the chart stays servable.
+ *
+ * The OCI manifest DELETE, which Helm's OCI protocol has no route for (404 `unknownPath` for every
+ * credential, the chart stays), is `ProtocolPathDeleteIT` (RPS-2739).
  */
 import { expect } from '@playwright/test';
 
-import { v2RepoUrl } from '../repo-url.js';
 import { bindPrepared, type ManageOperation } from '../scenarios/manage-catalog.js';
 import type { MaterializedCredential } from '../scenarios/world.js';
 import type { SeededRepo, Seeder } from '../seed/seeder.js';
@@ -45,12 +43,8 @@ import {
   parseIndex,
   rawDownloadChart,
   rawGetIndex,
-  rawGetManifest,
-  rawPutManifest,
-  rawUploadBlob,
   rawUploadChart,
   sha256Hex,
-  HELM_MEDIA_TYPES,
 } from './helm-raw.js';
 
 /** What a cell acts on: one chart of two versions, and the version the operation targets. */
@@ -144,101 +138,5 @@ function deleteChart(): ManageOperation {
   };
 }
 
-/** What the OCI operation reads back: the manifest of the chart, served by tag. */
-export interface HelmOciFingerprint {
-  manifestStatus: number;
-  manifestSha256?: string;
-}
-
-function deleteOciManifest(): ManageOperation {
-  return {
-    protocol: 'helm',
-    id: 'delete-oci-manifest',
-    permission: 'NO_ROUTE',
-    client: 'raw DELETE /v2/<repo>/<chart>/manifests/<tag>',
-    // The router answers a route no handler recognises with 404, before any credential is looked at:
-    // every credential gets the same answer.
-    refusedStatus: 404,
-    async prepare(seeder, repo) {
-      const chart = `e2e-${seeder.runId}-delete-oci`;
-      const version = '0.1.0';
-      const admin = adminCredential();
-      const built = await buildChart({ name: chart, version, marker: 'delete-oci' });
-      const config = Buffer.from(
-        JSON.stringify({ name: chart, version, apiVersion: 'v2', type: 'application' }),
-      );
-      const layer = built.tgzBytes;
-      for (const [bytes, contentType] of [
-        [config, HELM_MEDIA_TYPES.config],
-        [layer, HELM_MEDIA_TYPES.layer],
-      ] as const) {
-        const up = await rawUploadBlob(
-          repo.name,
-          admin,
-          chart,
-          bytes,
-          `sha256:${sha256Hex(bytes)}`,
-          {
-            contentType,
-          },
-        );
-        expect(up.status, `seed blob of ${chart}: ${up.msgId ?? ''}`).toBe(201);
-      }
-      const manifest = Buffer.from(
-        JSON.stringify({
-          schemaVersion: 2,
-          mediaType: HELM_MEDIA_TYPES.manifest,
-          config: {
-            mediaType: HELM_MEDIA_TYPES.config,
-            digest: `sha256:${sha256Hex(config)}`,
-            size: config.length,
-          },
-          layers: [
-            {
-              mediaType: HELM_MEDIA_TYPES.layer,
-              digest: `sha256:${sha256Hex(layer)}`,
-              size: layer.length,
-            },
-          ],
-        }),
-      );
-      const put = await rawPutManifest(
-        repo.name,
-        admin,
-        chart,
-        version,
-        manifest,
-        HELM_MEDIA_TYPES.manifest,
-      );
-      expect(put.status, `seed manifest of ${chart}: ${put.msgId ?? ''}`).toBe(201);
-
-      const url = v2RepoUrl(repo.name, `${chart}/manifests/${version}`);
-      return bindPrepared<HelmOciFingerprint>({
-        run: async (credential) => {
-          const res = await fetch(url, { method: 'DELETE', headers: authHeader(credential) });
-          await res.arrayBuffer();
-          return {
-            status: res.status,
-            command: `DELETE ${url.replace(repo.name, '<repo>')}`,
-          };
-        },
-        fingerprint: async () => {
-          const res = await rawGetManifest(repo.name, admin, chart, version);
-          return {
-            manifestStatus: res.status,
-            manifestSha256: res.status === 200 ? sha256Hex(res.body) : undefined,
-          };
-        },
-        expectEffect: () => {
-          throw new Error('delete-oci-manifest has no route: no credential may be allowed');
-        },
-      });
-    },
-  };
-}
-
 /** The Helm operations of the manage matrix (`tests/helm/manage-matrix.spec.ts`). */
-export const HELM_MANAGE_OPERATIONS: readonly ManageOperation[] = [
-  deleteChart(),
-  deleteOciManifest(),
-];
+export const HELM_MANAGE_OPERATIONS: readonly ManageOperation[] = [deleteChart()];

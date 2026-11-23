@@ -1404,20 +1404,17 @@ a USER password may yank/unlist (RPS-1317); an anonymous caller on a public repo
 checks the status), so `ruby-manage.ts` reads the outcome from the server's "Successfully yanked gem"
 message instead of the exit code.
 
-Helm, Docker and the protocols with no wire delete (`clients/{helm,docker,no-route}-manage.ts`,
-`tests/{helm,docker,pypi,go,maven}/manage-matrix.spec.ts`; `./run.sh test --protocol
-helm,docker,pypi,go,maven --grep " manage "`, 35 cells). MANAGE: the classic Helm chart
+Helm and Docker (`clients/{helm,docker}-manage.ts`, `tests/{helm,docker}/manage-matrix.spec.ts`; `./run.sh test --protocol
+helm,docker --grep " manage "`, 15 cells). MANAGE: the classic Helm chart
 `DELETE /<repo>/api/charts/<chart>/<version>` (raw, no Helm command sends it) and Docker
 `delete-manifest`/`delete-tag` (the real `crane delete` by digest and by tag, replayed as the token
 dance plus `DELETE` for a refused cell). A USER account gets a Docker token (issuance is not scope- or
 role-checked) and then a 401 on the `DELETE` with a Bearer challenge, not a 403 (`insufficient_scope`
 only comes for a token asked for less than `delete`, R15); a deploy token likewise; an anonymous caller
-never gets past the token endpoint (401, Basic challenge, even on a public repo). `NO_ROUTE` (PyPI
-wheel, Go module zip, Maven jar, Helm OCI manifest `DELETE /v2/<repo>/<chart>/manifests/<tag>`): no
-handler exists, so the router answers a plain 404 `unknownPath` (an OCI `NAME_UNKNOWN` envelope on
-`/v2`) to every credential, admin included, whether the file exists or not and before any credential
-is looked at (an unauthenticated `DELETE` on a private repo gets the same 404, not a challenge); the
-file is still served byte for byte. Removing those is a panel action.
+never gets past the token endpoint (401, Basic challenge, even on a public repo). `NO_ROUTE` (PyPI wheel, Go module zip, Maven jar, Helm OCI manifest `DELETE /v2/<repo>/<chart>/manifests/<tag>`):
+no handler exists, so the router answers a plain 404 `unknownPath` to every credential, admin included, whether the
+file exists or not, and the file is still served byte for byte. Since RPS-2738 those cells are the Java IT
+`ProtocolPathDeleteIT` (RPS-2739), not e2e cells. Removing those is a panel action.
 
 ## Maven runner
 
@@ -5483,28 +5480,20 @@ What it pins, as observed on the built image:
 
 Two more specs of the `api` runner (`./run.sh test --protocol api`, see "API suite"), both raw HTTP:
 
-- **Role sweep** (`tests/api/role-sweep.spec.ts`, not tagged `@smoke` since RPS-2727: it runs whole in the wire leg only, so the h2 and tls smoke sets do not carry it). The operation list is not written down: `src/api/spec-ops.ts`
+- **Role sweep** (`tests/api/role-sweep.spec.ts`). The operation list is not written down: `src/api/spec-ops.ts`
   reads `repsy-backend/src/main/resources/openapi/openapi-spec.yaml` (mounted read-only into the runners) with the
   existing `yaml` dependency. The spec declares `403 Forbidden` on exactly the operations a plain USER may not
-  call: the `@RepoOperation(MANAGE)` routes and the `requireAdmin` ones (48 of 122 today). The sweep pins:
-  1. every operation declaring 403, called as a USER Bearer, answers `403 accessDenied`. With placeholder
-     path parameters that cannot exist (a nil UUID, `e2e-sweep-no-such-repo`) the 403 comes BEFORE the 404 on every
-     one of them, so the sweep needs no data. Bodies are valid but inert, because `PUT /api/users/{id}`,
-     `POST /api/users` and `POST /api/repos` validate the body first (an empty `{}` gets a USER a 400);
-  2. the same 48 on real data: one private repo per protocol, each with a seeded package, a deploy token, a key
+  call: the `@RepoOperation(MANAGE)` routes and the `requireAdmin` ones (48 of 122 today). Since RPS-2738 the sweep
+  on placeholder names (a USER gets `403 accessDenied` before any 404 on every operation that declares 403,
+  an anonymous caller gets 401 on every operation that is not `security: []`, the public ones are not 401, a USER
+  is not 403 anywhere else, the floors and the known-route guards) is the Java IT `OpenApiOperationRoleSweepIT`
+  (RPS-2739): it derives the same operations from the same spec and runs in every `mvn verify`. What stays here is
+  what needs a real stack with data, in the `on real data` group:
+  1. the same 48 on real data: one private repo per protocol, each with a seeded package, a deploy token, a key
      store, a PGP key and a second user. The USER gets 403 everywhere and every repo-scoped read operation of the
      spec, called as admin before and after (plus the run's users and repos), answers the same (`errorCode`, a
      fresh correlation id per error, is dropped from the comparison);
-  3. an anonymous caller gets 401 on every operation that is not `security: []`, on placeholders and on real
-     private repos; the public ones (`login`, `refreshToken`, `checkGoSumdbSupported`,
-     `getSupportedRepoTypes`) are not 401;
-  4. the reverse: every OTHER operation, called as a USER, is not 403, so a MANAGE route that forgot to document its
-     403 fails the build. `REVERSE_SKIP` holds `deleteProfile`, `updateUsername`, `updatePassword`, `login` and
-     `refreshToken` with a reason each, and a test that every entry exists in the spec.
-
-  A floor (at least 48 forbidden operations, at least 120 operations) and a check of names that must be in the set
-  (all of `/api/users*`, `createRepository`, the settings, token, key store and rename routes, and every `DELETE`
-  but `deleteProfile`) stop a parser bug from emptying the sweep.
+  2. an anonymous caller gets 401 on every operation of a seeded private repo.
 
   Two low observations, NOT pinned: `PUT /api/users/{id}`, `POST /api/users` and `POST /api/repos` validate the
   body before authorization (a USER with an empty body gets 400 `validationError`, not 403, which is why the sweep
