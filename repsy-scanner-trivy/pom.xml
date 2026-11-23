@@ -8,7 +8,7 @@
   <parent>
     <groupId>org.springframework.boot</groupId>
     <artifactId>spring-boot-starter-parent</artifactId>
-    <version>4.1.2</version>
+    <version>4.2.0</version>
     <relativePath/>
   </parent>
 
@@ -26,7 +26,7 @@
     <fmt-maven-plugin.version>2.29</fmt-maven-plugin.version>
     <maven-checkstyle-plugin.version>3.6.0</maven-checkstyle-plugin.version>
     <checkstyle.version>14.4.0</checkstyle.version>
-    <error-prone.version>2.52.0</error-prone.version>
+    <error-prone.version>2.53.0</error-prone.version>
     <nullaway.version>0.14.4</nullaway.version>
   </properties>
 
