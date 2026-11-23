@@ -70,6 +70,61 @@ const PUBLISH_TIMEOUT_MS = 240_000;
 const CONSUME_TIMEOUT_MS = 240_000;
 const SHUTDOWN_TIMEOUT_MS = 60_000;
 
+/**
+ * How many sbt runs may be alive at once across all Playwright workers of this runner. Every sbt run
+ * is one or two JVMs (sbt 2.x also leaves a server) that grow to -Xmx768m each, so six workers running
+ * sbt together hold about 8 GiB: the size of a `repsy-md` CI runner, whose cgroup then kills the whole
+ * job (the Playwright process, `run.sh`, even the later leak check: exit 137) with no test result.
+ * Three at a time peak at about half of that and, on that runner's 4 CPUs, run no slower per run.
+ * `REPSY_E2E_SBT_CONCURRENCY` overrides it.
+ */
+const SBT_CONCURRENCY = Math.max(1, Number(process.env.REPSY_E2E_SBT_CONCURRENCY) || 3);
+const SBT_SLOT_DIR = path.join(os.tmpdir(), 'repsy-e2e-sbt-slots');
+const SBT_SLOT_POLL_MS = 500;
+
+function isAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === 'EPERM';
+  }
+}
+
+/** Takes one of the `SBT_CONCURRENCY` slots (a file per slot, created exclusively, holding its owner's pid); returns its release. */
+async function acquireSbtSlot(): Promise<() => Promise<void>> {
+  await fs.mkdir(SBT_SLOT_DIR, { recursive: true });
+  for (;;) {
+    for (let n = 0; n < SBT_CONCURRENCY; n++) {
+      const slot = path.join(SBT_SLOT_DIR, `slot-${n}`);
+      try {
+        await fs.writeFile(slot, String(process.pid), { flag: 'wx' });
+        return () => fs.rm(slot, { force: true });
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
+          throw error;
+        }
+      }
+      // A slot whose owner died (a killed worker) would block the others for good.
+      const owner = Number(await fs.readFile(slot, 'utf8').catch(() => ''));
+      if (owner > 0 && !isAlive(owner)) {
+        await fs.rm(slot, { force: true });
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, SBT_SLOT_POLL_MS));
+  }
+}
+
+/** Runs `body` while holding an sbt slot, see `SBT_CONCURRENCY`. */
+async function withSbtSlot<T>(body: () => Promise<T>): Promise<T> {
+  const release = await acquireSbtSlot();
+  try {
+    return await body();
+  } finally {
+    await release();
+  }
+}
+
 /** The primed caches of the runner image; absent outside it, where sbt then downloads what it needs. */
 const SBT_CACHE_DIR = process.env.SBT_CACHE_DIR ?? '/opt/sbt-cache';
 
@@ -319,17 +374,15 @@ export async function publishWithSbt(world: World, options: SbtOptions = {}): Pr
   const { groupId, artifactId, artifactBase, version } = await renderPublisher(sbt, world, options);
   const scalaVersion = options.scalaVersion ?? SCALA_213;
 
-  const result = await run(
-    'sbt',
-    [...sbt.args, options.crossScalaVersions ? '+publish' : 'publish'],
-    {
+  const result = await withSbtSlot(() =>
+    run('sbt', [...sbt.args, options.crossScalaVersions ? '+publish' : 'publish'], {
       cwd: sbt.work,
       env: sbt.env,
       timeoutMs: PUBLISH_TIMEOUT_MS,
       redact: sbt.secrets,
       label: `sbt-publish-${world.scenario.id}`,
-    },
-  ).finally(sbt.stop);
+    }).finally(sbt.stop),
+  );
 
   // sbt 1 builds into `target/scala-<binary or 3.x version>`; sbt 2 into `target/out/jvm/scala-<full version>/<name>`.
   // A wrong directory here would make the probe below re-send a minimal POM over the POM sbt published,
@@ -399,13 +452,15 @@ export async function resolve(world: World, options: SbtOptions = {}): Promise<A
     sbtVersion: options.sbtVersion ?? SBT_VERSION,
   });
 
-  const result = await run('sbt', [...sbt.args, 'fetchDependencies'], {
-    cwd: sbt.work,
-    env: sbt.env,
-    timeoutMs: CONSUME_TIMEOUT_MS,
-    redact: sbt.secrets,
-    label: `sbt-consume-${world.scenario.id}`,
-  }).finally(sbt.stop);
+  const result = await withSbtSlot(() =>
+    run('sbt', [...sbt.args, 'fetchDependencies'], {
+      cwd: sbt.work,
+      env: sbt.env,
+      timeoutMs: CONSUME_TIMEOUT_MS,
+      redact: sbt.secrets,
+      label: `sbt-consume-${world.scenario.id}`,
+    }).finally(sbt.stop),
+  );
 
   const httpStatus = await rawConsumeCheck(world);
   const resolved = await findResolvedJar(
