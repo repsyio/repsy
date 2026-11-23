@@ -210,9 +210,7 @@ e2e/
     skeleton/credential-invalidation-seed.spec.ts  # RPS-1481 the user of a credential-invalidation test comes from `seedUserCredential`: helper against a Cloud-shaped fake, and the real tests against a registry that refuses an ungranted user
     skeleton/known-gaps.spec.ts      # RPS-1510 the known-gap mechanism for specs outside the catalog (`src/known-gaps.ts`): registry rules, test keys, `byTarget`, and an inner run (`known-gap-inner/`) of the fake cloud that proves a gap that still fails is an expected failure, one that stops failing FAILS the run, gaps are per target, `@cloud-skip` skips, and an OS target has none
     skeleton/ui-target.spec.ts       # RPS-1638 the UI seam (`target.ui`): route builders per target, session keys, base-URL chain, the descriptors' routes on both, and `--list` under `cloud-remote` excluding `@cloud-skip`
-    skeleton/repo-settings.spec.ts  # RPS-1200 settings-PUT field-by-field matrix across RepoTypes; untagged (not smoke-sized)
-    skeleton/repo-type-casing.spec.ts  # RPS-1269 repo type: /format answers upper case; type accepted in any case (query and body)
-    skeleton/login-password.spec.ts  # RPS-1308 POST /api/auth/login: a wrong password of any strength is 401 invalidCredentials; malformed shapes stay 400
+    skeleton/repo-settings.spec.ts  # RPS-1435 Cargo and Go settings omit `allowOverride` and ignore it on write (the two tests Cloud pins as known gaps; the rest of the settings PUT is `ProtocolRepoControllerIT`)
     maven/
       publish-consume.spec.ts   # registerPublishConsumeLoop(mavenAdapter) + the RPS-1196 real-client test
       upload-rules.spec.ts      # raw-HTTP pins of the override / releases / snapshots upload rules
@@ -438,9 +436,8 @@ The engine uses the capabilities and three hooks, so **no cloud-specific outcome
   the run** ("Expected to fail, but passed"), so the entry is removed in the same change as the bump
   that fixed it. A spec outside the catalog has its own hook, "Known gaps outside the catalog" below.
   `knownGap`, `knownTestGap` and `expectByTarget` are optional on a backend; absent means none.
-- **`@cloud-skip`**: a tag for what does not apply to Repsy Cloud at all ("Tags" below). `tests/stack/**`,
-  `login-password.spec.ts` and the OS-only tests of `backend-module.spec.ts` and `repo-type-casing.spec.ts`
-  carry it. A catalog scenario carrying it is skipped by the loop, and any test of a spec on this harness's
+- **`@cloud-skip`**: a tag for what does not apply to Repsy Cloud at all ("Tags" below). `tests/stack/**`
+  and the OS-only tests of `backend-module.spec.ts` carry it. A catalog scenario carrying it is skipped by the loop, and any test of a spec on this harness's
   `test` is skipped by an auto fixture, on a cloud target, with a reason; a cloud runner can also exclude it
   for whole specs: `--grep-invert @cloud-skip`.
 - **Token limits.** `tests/skeleton/seed.spec.ts` seeds `min(3, maxDeployTokensPerRepo)` tokens (in the
@@ -496,8 +493,8 @@ class CloudPanelBackend implements PanelBackend {
 ```
 
 - **The key of a test** is `<project> > <file stem> > <describe titles > test title>` (`testGapKey`), for
-  example `skeleton > repo-settings > a settings PUT with a single field changed leaves every other field alone
-(maven)`. A parameterised test carries its parameter in the title, so each is a key of its own. The match is
+  example `skeleton > repo-settings > allowOverride is omitted from the settings and ignored on write (RPS-1435,
+CARGO)`. A parameterised test carries its parameter in the title, so each is a key of its own. The match is
   exact. `defineKnownGaps` throws at load on a ticket that is not `RPS-nnn`, an empty reason, no target, or the
   same key twice for one target.
 - **The lookup is automatic.** `knownGap` is an `auto` fixture of the `test` of `src/scenarios/fixtures.ts`
@@ -523,11 +520,10 @@ class CloudPanelBackend implements PanelBackend {
 The skeleton project run against Repsy Cloud (RPS-1506 measured 87 passed, 20 skipped, 7 failed) is handled so:
 
 - `@cloud-skip` (OS-only, nothing to pin on Cloud): `backend-module.spec.ts` "without it the built-in Repsy OS
-  backend is used" and "an empty value counts as unset" (a Cloud target has no built-in backend), and
-  `repo-type-casing.spec.ts` "the type of a new repository is read in any case...", "a type that names no
-  repository type is refused..." and "the type filter of the repository list is read in any case" (they call
-  the OS routes `POST /api/repos` and `GET /api/repos?type=`, which Repsy Cloud does not have; what its own
-  `{TYPE}` routes do with a lower-case type is RPS-1636, pinned by the Cloud harness on its own routes).
+  backend is used" and "an empty value counts as unset" (a Cloud target has no built-in backend). The
+  `repo-type-casing.spec.ts` of RPS-1269 was removed (RPS-2738): `RepoCollectionControllerIT` pins the OS
+  routes `POST /api/repos` and `GET /api/repos?type=`, which Repsy Cloud does not have; what its own `{TYPE}`
+  routes do with a lower-case type is RPS-1636, pinned by the Cloud harness on its own routes.
 - Known gaps for the Cloud registry (RPS-1577, Cloud still shows `allowOverride` of Cargo and Go), keys of
   `repo-settings.spec.ts`: `skeleton > repo-settings > allowOverride is omitted from the settings and ignored
 on write (RPS-1435, CARGO)` and the same with `GOLANG`.
@@ -860,8 +856,7 @@ test, or behind a function (RPS-1500 moved the ones that did this).
 
 ### `@cloud-skip`: excluding whole specs
 
-`@cloud-skip` (RPS-1498) marks what does not apply to Repsy Cloud: the `tests/stack/**` specs and
-`login-password.spec.ts`, plus any catalog scenario that carries it. Two mechanisms, both by tag:
+`@cloud-skip` (RPS-1498) marks what does not apply to Repsy Cloud: the `tests/stack/**` specs, plus any catalog scenario that carries it. Two mechanisms, both by tag:
 
 - **The consumer's config, for whole specs:** `grepInvert: /@cloud-skip/` (config-wide, as above, or on a
   project), or `--grep-invert @cloud-skip` on the command line. The tagged tests are not listed at all
@@ -1107,9 +1102,8 @@ Before this step, no test under `tests/skeleton/` carried an `@smoke` tag, so
 `./run.sh test --protocol skeleton --grep '@smoke'` reported "No tests found" and a non-zero exit —
 confirmed live. Both tests in `tests/skeleton/seed.spec.ts` (the seed/cleanup test and the
 expired-token test) now carry `{ tag: ['@smoke'] }`, the same tag signature every other suite's
-dedicated tests already use. `tests/skeleton/repo-settings.spec.ts` (RPS-1200's settings-PUT
-field-by-field matrix, looped over `RepoType.NPM`/`RepoType.MAVEN`) is left untagged: it is the
-settings-matrix-style test the plan says to leave alone, not smoke-sized.
+dedicated tests already use. `tests/skeleton/repo-settings.spec.ts` (the RPS-1435 Cargo and Go
+settings tests) is left untagged: it is not smoke-sized.
 
 ## Scenario model
 
@@ -4127,7 +4121,7 @@ download` in the catalog loop succeeds against pages carrying it.
 - **H23** (no releases/snapshots rule): confirmed live — `registry-rules.spec.ts`'s dedicated test:
   `1.0.0`/`1.0.0a1`/`1.0.0.post1`/`1.0.0.dev0` all publish and serve fine; since RPS-1210
   `releases`/`snapshots` cannot be switched off on a PyPI repo at all (the settings PUT answers 400
-  `releasesSnapshotsUnsupported`, pinned in `skeleton/repo-settings.spec.ts`).
+  `releasesSnapshotsUnsupported`, pinned in `ProtocolRepoControllerIT`).
 - **H24** (the runner image's stdlib import check passes with the derived apt list): confirmed live
   on the FIRST build attempt — see this section's opening paragraph for the exact package list and
   how it was derived (`ldd` against a live container, not a generic runtime-deps list).
@@ -5181,8 +5175,8 @@ REPSY_E2E_PROBE_BAN=1 ./run.sh test --protocol stack --grep @probe-ban   # last:
 
 The first case keeps the leg honest: an overlay that silently did nothing would pass every runner. The second
 catches what the runners cannot: a signal that adds strikes without banning alone (`SCANNER_UA`), and a client
-whose requests were counted but whose spec did not fail. The api runner sends a probe shape on
-purpose (`../x`, `tests/api/maven-browser.spec.ts`) and never runs on this stack. The leg runs `@smoke` because the full
+whose requests were counted but whose spec did not fail. The api runner sends probe shapes on
+purpose (`../` paths) and never runs on this stack. The leg runs `@smoke` because the full
 catalogs of the other runners have not been checked against the strict stack; to try one, give `run.sh test`
 a wider `--grep` by hand and read the failures as findings.
 
@@ -5565,14 +5559,6 @@ Two more specs of the `api` runner (`./run.sh test --protocol api`, see "API sui
   body before authorization (a USER with an empty body gets 400 `validationError`, not 403, which is why the sweep
   sends valid inert bodies), and an anonymous 401 has two `msgId`s (`loginRequired` on repo routes,
   `missingRequestHeader` elsewhere, so the sweep asserts the status only).
-
-- **Maven browser** (`tests/api/maven-browser.spec.ts`). `GET /api/repos/{repo}/contents?path=` lists a
-  directory (names, sizes, directory flag, matched against the bytes the wire serves; `400 invalidStoragePath` for
-  `../x`, `404` for a path that is not there). `POST /api/repos/{repo}/download-token?path=` gives a one-minute
-  token that opens ONE path of ONE repo on the protocol port to a caller with no credentials: refused for another
-  path of the repo, for the same path in another repo, for a garbage token, for a `PUT` (repo unchanged), and as a
-  Bearer or `?downloadToken=` on the panel API and on the protocol port. The expiry test waits 61 s and is tagged
-  `@slow` (`--grep '^((?!@slow).)*$'` leaves it out).
 
 ## Panel API contract specs (RPS-1483)
 

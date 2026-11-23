@@ -336,6 +336,23 @@ class MavenDownloadTokenIT extends AbstractIT {
     }
 
     @Test
+    @DisplayName("it is not honoured on the panel API as a query parameter either")
+    void refusedAsAQueryParameterOnThePanelApi() throws Exception {
+      final var repo = seedMavenWithFiles(true);
+      final var token = issue(repo, JAR);
+
+      // Control: the very same token is a valid credential where it belongs, the protocol port.
+      assertThat(protocol(download(repo, JAR, token)).getResponse().getStatus()).isEqualTo(200);
+
+      // On the panel API, with no Authorization header, a valid token in the query opens nothing.
+      perform(
+              get("/api/repos/{repo}/contents", repo.getName())
+                  .param("path", "/")
+                  .param("downloadToken", token))
+          .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     @DisplayName("it is not a protocol token: Maven refuses it in the header and in ?token=")
     void refusedAsAProtocolToken() throws Exception {
       final var repo = seedMavenWithFiles(true);
