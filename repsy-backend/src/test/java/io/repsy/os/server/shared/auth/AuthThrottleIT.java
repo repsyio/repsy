@@ -55,6 +55,7 @@ import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -74,6 +75,8 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
  * That gives this class a Spring context of its own.
  */
 @DisplayName("Failed password checks are throttled per client")
+// extended: throttle and ban windows across routes, timing-driven matrix
+@Tag("extended")
 class AuthThrottleIT extends AbstractIT {
 
   private static final int MAX_FAILURES = 20;

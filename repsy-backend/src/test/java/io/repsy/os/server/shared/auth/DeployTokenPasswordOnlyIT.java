@@ -39,6 +39,7 @@ import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -67,6 +68,8 @@ import tools.jackson.databind.ObjectMapper;
  * pulling with the token it issues.
  */
 @DisplayName("A deploy token authenticates by its secret, whatever username is sent")
+// extended: accepted/refused matrix of deploy-token secrets per protocol
+@Tag("extended")
 class DeployTokenPasswordOnlyIT extends AbstractIT {
 
   private static final String MODULE = "example.com/mod";

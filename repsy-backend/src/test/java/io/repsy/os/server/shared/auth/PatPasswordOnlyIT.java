@@ -29,6 +29,7 @@ import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -48,6 +49,8 @@ import org.junit.jupiter.params.provider.MethodSource;
  * {@code /v2}, so it is covered where its token exchange is ({@code DockerPatTokenExchangeIT}).
  */
 @DisplayName("A personal access token authenticates by its secret, whatever username is sent")
+// extended: accepted/refused matrix of PAT secrets
+@Tag("extended")
 class PatPasswordOnlyIT extends AbstractPatIT {
 
   private static final String MODULE = "example.com/mod";

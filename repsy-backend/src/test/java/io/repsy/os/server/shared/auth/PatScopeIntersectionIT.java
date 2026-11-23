@@ -26,6 +26,7 @@ import io.repsy.os.shared.token.dtos.TokenScope;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -41,6 +42,8 @@ import org.junit.jupiter.params.provider.EnumSource;
  * refused token is answered {@code 401}, as every protocol answers a caller that may not do it.
  */
 @DisplayName("A personal access token is limited to its scopes and to what its owner may do")
+// extended: PAT scope and role intersection matrix
+@Tag("extended")
 class PatScopeIntersectionIT extends AbstractPatIT {
 
   private static final String READ_PATH = "/{repo}/com/example/lib/1.0/lib-1.0.pom";

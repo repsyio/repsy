@@ -25,6 +25,7 @@ import io.repsy.os.AbstractIT;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -39,6 +40,8 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
  * announces a Bearer realm that points to its token endpoint.
  */
 @DisplayName("Protocol 401 answers carry the challenge of the protocol")
+// extended: auth challenge matrix per repo type
+@Tag("extended")
 class ProtocolAuthChallengeIT extends AbstractIT {
 
   private static final String REPOSITORY_REALM = "Basic realm=\"Repsy\"";

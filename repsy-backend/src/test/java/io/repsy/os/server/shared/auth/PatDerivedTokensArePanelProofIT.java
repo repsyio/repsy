@@ -38,6 +38,7 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -54,6 +55,8 @@ import tools.jackson.databind.ObjectMapper;
  * right.
  */
 @DisplayName("A token made from a personal access token is never a panel token")
+// extended: PAT-derived tokens refused on every panel route
+@Tag("extended")
 class PatDerivedTokensArePanelProofIT extends AbstractPatIT {
 
   @Autowired private PanelAuthHelper panelAuthHelper;

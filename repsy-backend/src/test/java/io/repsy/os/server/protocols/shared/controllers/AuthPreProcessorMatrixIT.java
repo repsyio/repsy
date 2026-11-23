@@ -40,6 +40,7 @@ import java.util.Objects;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -61,6 +62,8 @@ import org.springframework.test.web.servlet.request.AbstractMockHttpServletReque
  * written as {@code {repo}} so that the table does not depend on the random names.
  */
 @DisplayName("Auth pre-processors answer every credential case as they did (RPS-2062)")
+// extended: auth pre-processor matrix over every protocol
+@Tag("extended")
 class AuthPreProcessorMatrixIT extends AbstractIT {
 
   private static final int MAX_FAILURES = 20;

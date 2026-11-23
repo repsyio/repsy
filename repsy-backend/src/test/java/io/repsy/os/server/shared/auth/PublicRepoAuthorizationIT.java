@@ -60,6 +60,7 @@ import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -94,6 +95,8 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("A USER who may not manage a public repo can read it and nothing more (RPS-1602)")
+// extended: role matrix on public repos across protocols
+@Tag("extended")
 class PublicRepoAuthorizationIT extends AbstractIT {
 
   private static final byte[] JAR = "not really a jar".getBytes(StandardCharsets.UTF_8);

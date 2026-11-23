@@ -33,6 +33,7 @@ import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -49,6 +50,8 @@ import org.springframework.web.context.WebApplicationContext;
  * uncommitted data.
  */
 @DisplayName("Docker token scope on DELETE (RPS-1434)")
+// extended: docker token scope and delete permission matrix
+@Tag("extended")
 class DockerTokenScopeIT extends AbstractIT {
 
   private static final String IMAGE = "app";

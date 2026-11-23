@@ -38,6 +38,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -56,6 +57,8 @@ import org.springframework.test.web.servlet.request.AbstractMockHttpServletReque
  * fixture stops being a valid credential, not only if the query parameter starts working again.
  */
 @DisplayName("A credential in the ?token= query parameter is refused by every protocol")
+// extended: query-string token refusal matrix per repo type
+@Tag("extended")
 class QueryTokenRefusedIT extends AbstractIT {
 
   private static final String MODULE = "example.com/mod";

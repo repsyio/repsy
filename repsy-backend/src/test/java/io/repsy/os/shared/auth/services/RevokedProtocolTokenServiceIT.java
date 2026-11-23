@@ -23,11 +23,14 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
 /** RPS-1361: the registry of the protocol tokens that a logout revoked. */
 @DisplayName("RevokedProtocolTokenService")
+// extended: revoked protocol token store edge cases
+@Tag("extended")
 class RevokedProtocolTokenServiceIT extends AbstractIT {
 
   @Autowired private RevokedProtocolTokenService service;

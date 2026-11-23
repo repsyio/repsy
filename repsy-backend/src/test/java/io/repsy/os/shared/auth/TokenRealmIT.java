@@ -36,6 +36,7 @@ import java.time.Duration;
 import java.util.Base64;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MvcResult;
@@ -50,6 +51,8 @@ import org.springframework.test.web.servlet.request.AbstractMockHttpServletReque
  * test fails if an issuer stops stamping its tokens, not only if the verifier changes.
  */
 @DisplayName("Token realms: panel vs protocol bearer tokens")
+// extended: token realm accept/refuse matrix (panel vs protocol)
+@Tag("extended")
 class TokenRealmIT extends AbstractIT {
 
   private MvcResult protocol(final AbstractMockHttpServletRequestBuilder<?> request)

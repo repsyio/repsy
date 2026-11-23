@@ -31,6 +31,7 @@ import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -45,6 +46,8 @@ import org.junit.jupiter.api.Test;
  * refused at the endpoint itself, before any token exists.
  */
 @DisplayName("Docker anonymous token")
+// extended: docker anonymous token access matrix
+@Tag("extended")
 class DockerAnonymousTokenIT extends AbstractIT {
 
   private static final String IMAGE = "app";
