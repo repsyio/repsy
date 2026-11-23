@@ -45,6 +45,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -54,6 +55,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.context.WebApplicationContext;
 
+// Extended tier: failure-injection or storage-consistency scenario (RPS-2731).
+@Tag("extended")
 @DisplayName("The blobs of the orphan layers are deleted only after the row deletion commits")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 class DockerOrphanLayerAfterCommitIT extends AbstractIT {

@@ -66,6 +66,7 @@ import org.awaitility.Awaitility;
 import org.awaitility.core.ConditionTimeoutException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.mockito.Mockito;
@@ -108,6 +109,8 @@ import tools.jackson.databind.ObjectMapper;
  * the toggle is turned on: the recompute has the most to do (three verifications and three recorded
  * signatures per version).
  */
+// Extended tier: timing measurement of a large recompute (RPS-2731).
+@Tag("extended")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @EnabledIfSystemProperty(named = "rps1449.perf", matches = "true")
 @DisplayName("Maven signed recompute on a large repo (RPS-1449, measurement)")

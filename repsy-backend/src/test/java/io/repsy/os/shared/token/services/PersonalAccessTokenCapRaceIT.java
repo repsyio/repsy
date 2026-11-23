@@ -38,6 +38,7 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Propagation;
@@ -56,6 +57,8 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>It commits its rows, so it runs without the inherited test transaction, and it deletes the
  * users it creates (the tokens go with them, the foreign key cascades).
  */
+// Extended tier: concurrency or race scenario (RPS-2731).
+@Tag("extended")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("personal access token creates under concurrent requests (RPS-1901)")
 class PersonalAccessTokenCapRaceIT extends AbstractIT {

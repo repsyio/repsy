@@ -46,6 +46,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.HexFormat;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -67,6 +68,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * <p>{@link UsageUpdateService} is mocked: it is {@code @Async}, so it cannot see this test's
  * uncommitted data. The mock records the disk-usage deltas the uploads and the cleanup request.
  */
+// Extended tier: cleanup of residue left by abandoned uploads (RPS-2731).
+@Tag("extended")
 @DisplayName("Abandoned blob upload cleanup")
 class AbandonedBlobUploadCleanupIT extends AbstractIT {
 

@@ -46,6 +46,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
@@ -71,6 +72,8 @@ import org.springframework.web.context.WebApplicationContext;
  * transaction rolls back for real; it deletes the repos (the scans go with their repo) and the user
  * it committed.
  */
+// Extended tier: failure-injection or storage-consistency scenario (RPS-2731).
+@Tag("extended")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("Docker delete when the manifest file cannot be deleted (RPS-1448)")
 class DockerDeleteStorageFailureIT extends AbstractIT {

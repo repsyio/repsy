@@ -35,6 +35,7 @@ import java.util.Map;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.aop.support.AopUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -54,6 +55,8 @@ import org.springframework.util.FileSystemUtils;
  *
  * <p>No database row is written, so the committed-rows guard has nothing to check.
  */
+// Extended tier: expired storage trash cleanup (RPS-2731).
+@Tag("extended")
 @DisplayName("Storage trash cleanup")
 class StorageTrashCleanupIT extends AbstractIT {
 

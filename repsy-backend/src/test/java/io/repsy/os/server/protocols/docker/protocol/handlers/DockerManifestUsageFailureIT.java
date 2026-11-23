@@ -41,6 +41,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -66,6 +67,8 @@ import org.springframework.web.context.WebApplicationContext;
  * <p>Runs without a test transaction, since a rollback is only observable when the request's own
  * transaction rolls back for real; it deletes the repo and the user it committed.
  */
+// Extended tier: failure-injection or storage-consistency scenario (RPS-2731).
+@Tag("extended")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("Docker delete when the manifest usage lookup fails (RPS-1463)")
 class DockerManifestUsageFailureIT extends AbstractIT {

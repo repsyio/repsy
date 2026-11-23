@@ -45,6 +45,7 @@ import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -66,6 +67,8 @@ import org.springframework.web.context.WebApplicationContext;
  * <p>Runs without a test transaction since the requests have to commit and meet in the database; it
  * deletes the repo and the user it committed.
  */
+// Extended tier: failure-injection or storage-consistency scenario (RPS-2731).
+@Tag("extended")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("A failed Docker manifest push leaves no image without a manifest (RPS-1350)")
 class DockerFailedFirstPushIT extends AbstractIT {

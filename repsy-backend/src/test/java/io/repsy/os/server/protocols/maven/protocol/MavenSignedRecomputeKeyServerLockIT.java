@@ -46,6 +46,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -75,6 +76,8 @@ import org.springframework.web.client.RestClient;
  * because the recompute's transaction takes the row lock before it asks the key server and only
  * releases it once the lookup (and the rest of the recompute) is done.
  */
+// Extended tier: concurrency or race scenario (RPS-2731).
+@Tag("extended")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName(
     "Maven signed recompute does not hold the version lock across a key-server lookup (RPS-1469)")

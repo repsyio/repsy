@@ -49,6 +49,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.CannotAcquireLockException;
@@ -81,6 +82,8 @@ import tools.jackson.databind.ObjectMapper;
  * <p>Runs without a test transaction since the requests have to commit and meet in the database; it
  * deletes the repo and the user it committed.
  */
+// Extended tier: concurrency or race scenario (RPS-2731).
+@Tag("extended")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("Lock order of the pending signatures and the version row (RPS-1352)")
 class PendingSignatureLockOrderIT extends AbstractIT {

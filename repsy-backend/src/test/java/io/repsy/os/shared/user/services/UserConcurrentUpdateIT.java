@@ -37,6 +37,7 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -58,6 +59,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>It commits its rows, so it runs without the inherited test transaction and deletes exactly the
  * users it created.
  */
+// Extended tier: concurrency or race scenario (RPS-2731).
+@Tag("extended")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("concurrent user updates")
 class UserConcurrentUpdateIT extends AbstractIT {

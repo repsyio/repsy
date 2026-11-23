@@ -52,6 +52,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.invocation.InvocationOnMock;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -75,6 +76,8 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Runs without a test transaction, because a race needs both sides to commit. It deletes the
  * repos it commits.
  */
+// Extended tier: failure-injection or storage-consistency scenario (RPS-2731).
+@Tag("extended")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("PyPI deletes keep storage and the database in agreement with a publish (RPS-1277)")
 class PypiDeleteStorageConsistencyIT extends AbstractIT {

@@ -42,6 +42,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.BeanPostProcessor;
@@ -67,6 +68,8 @@ import org.springframework.web.context.WebApplicationContext;
  * and before they update it. Runs without a test transaction since both pushes have to commit; it
  * deletes the repo and the user it committed.
  */
+// Extended tier: concurrency or race scenario (RPS-2731).
+@Tag("extended")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("Concurrent moves of one Docker tag (RPS-1322)")
 @Import(DockerConcurrentTagMoveIT.TagReadHook.class)

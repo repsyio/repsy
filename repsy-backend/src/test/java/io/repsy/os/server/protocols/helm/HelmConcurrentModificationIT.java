@@ -65,6 +65,7 @@ import java.util.function.Consumer;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -127,6 +128,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 // This class needs a Spring context of its own (the hook below), and every cached context keeps a
 // connection pool open on the one PostgreSQL that all ITs share: a small pool keeps the total
 // under its max_connections. A request and the bump of its row hold two connections at once.
+// Extended tier: concurrency or race scenario (RPS-2731).
+@Tag("extended")
 @TestPropertySource(properties = "spring.datasource.hikari.maximum-pool-size=6")
 class HelmConcurrentModificationIT extends AbstractIT {
 

@@ -41,6 +41,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
@@ -69,6 +70,8 @@ import org.springframework.transaction.annotation.Transactional;
  * the repos and users it commits. {@link UsageUpdateService} is mocked to see what a request
  * reported.
  */
+// Extended tier: failure-injection or storage-consistency scenario (RPS-2731).
+@Tag("extended")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName(
     "Maven registration that fails after the store keeps repo and usage in step (RPS-1199)")
