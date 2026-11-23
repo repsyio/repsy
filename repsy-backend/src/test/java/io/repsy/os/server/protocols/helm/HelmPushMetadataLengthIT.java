@@ -44,6 +44,7 @@ import java.util.Map;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -70,6 +71,8 @@ import org.springframework.test.web.servlet.ResultActions;
 // OCI
 // manifest before the column limits this class pins can be reached, so it runs on the lenient wire.
 @TestPropertySource(properties = "repsy.helm.oci.strict-wire=false")
+// RPS-2729: sample of the extended tier, proves the exclusion; see "Testing" in AGENTS.md.
+@Tag("extended")
 @DisplayName("Helm push holds chart and OCI metadata to its columns (RPS-1072)")
 class HelmPushMetadataLengthIT extends AbstractIT {
 
