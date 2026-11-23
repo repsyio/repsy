@@ -1195,6 +1195,12 @@ What the server does, per rule (all pinned above or in `tests/maven/upload-rules
   under the same scenario, and the consumer resolves the second publish's jar. `snapshots: false`
   still refuses it, like any snapshot. A real client never sends a file of an existing timestamped
   build or of a release twice; that is pinned with raw PUTs in `upload-rules.spec.ts`.
+- **A literal `-SNAPSHOT` file of a directory that holds only timestamped builds** (`lib-1.0-SNAPSHOT.jar`
+  next to `lib-1.0-20260921.101010-2.jar`) is answered with the file of the newest build, and so are its
+  checksums, like Maven repository managers do. sbt 2.x publishes timestamped builds and the version-level
+  metadata, sends the POM under the literal name too, and then asks for the literal jar: the `sbt-2.1`
+  SNAPSHOT scenarios resolve through that and compare the resolved jar's bytes with the newest build's. A
+  stored file always wins and a request no build matches stays a 404.
 - **A snapshot-directory file named for another artifact or version** (`lib-2.0-SNAPSHOT.jar`,
   `other-1.0-SNAPSHOT.jar`, `lib-1.0-SNAPSHOTX.jar` in `g/lib/1.0-SNAPSHOT/`) is refused with
   `400 invalidArtifactPath` and stores nothing: the file name must start with the directory's

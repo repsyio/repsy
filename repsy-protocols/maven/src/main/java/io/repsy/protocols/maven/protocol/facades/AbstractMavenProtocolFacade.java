@@ -19,6 +19,7 @@ import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
+import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.protocols.maven.protocol.facades.contracts.MavenProtocolFacade;
 import io.repsy.protocols.maven.protocol.resources.SynthesizedFileResource;
@@ -34,6 +35,7 @@ import io.repsy.protocols.maven.shared.utils.MavenPublishLimits;
 import io.repsy.protocols.maven.shared.utils.MavenUploadLimits;
 import io.repsy.protocols.maven.shared.utils.PomModelUtils;
 import io.repsy.protocols.maven.shared.utils.SignatureFileUtils;
+import io.repsy.protocols.maven.shared.utils.SnapshotNameUtils;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.BoundedEntryReader;
@@ -44,6 +46,7 @@ import io.repsy.protocols.shared.utils.SpooledUpload;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.List;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -61,6 +64,9 @@ public abstract class AbstractMavenProtocolFacade<I> implements MavenProtocolFac
   private static final String USAGES = "usages";
   private static final String ARTIFACT_NAME = "artifactName";
   private static final String ARTIFACT_VERSION = "artifactVersion";
+
+  private static final List<String> LITERAL_CHECKSUM_SUFFIXES =
+      List.of(".sha1", ".md5", ".sha256", ".sha512");
 
   private static final Set<String> SCANNABLE_EXTENSIONS = Set.of("jar", "war", "ear");
 
@@ -103,10 +109,81 @@ public abstract class AbstractMavenProtocolFacade<I> implements MavenProtocolFac
       }
 
       if (synthesized == null) {
+        synthesized = this.resolveLiteralSnapshot(repoInfo, relativePath.getPath());
+      }
+
+      if (synthesized == null) {
         throw e;
       }
 
       return synthesized;
+    }
+  }
+
+  /**
+   * Answers the literal {@code <artifactId>-<base>-SNAPSHOT.<ext>} (and its checksums) of a {@code
+   * SNAPSHOT} directory that holds only timestamped builds with the file of its newest build, the
+   * way Maven repository managers do. sbt 2 publishes timestamped files and still resolves a
+   * snapshot through its literal name (its POM is sent under it too), so without this its jar is a
+   * 404. A stored file always wins and nothing is written; a request that no stored build matches
+   * stays a 404.
+   */
+  private @Nullable Resource resolveLiteralSnapshot(
+      final BaseRepoInfo<I> repoInfo, final String path) {
+
+    final var segments = path.split("/", -1);
+
+    if (segments.length < 3) {
+      return null;
+    }
+
+    final var fileName = segments[segments.length - 1];
+    final var version = segments[segments.length - 2];
+    final var artifactId = segments[segments.length - 3];
+
+    if (!version.endsWith("-SNAPSHOT")) {
+      return null;
+    }
+
+    String checksumSuffix = "";
+    var mainName = fileName;
+
+    for (final var suffix : LITERAL_CHECKSUM_SUFFIXES) {
+      if (fileName.endsWith(suffix)) {
+        checksumSuffix = suffix;
+        mainName = fileName.substring(0, fileName.length() - suffix.length());
+        break;
+      }
+    }
+
+    final var prefix = artifactId + "-" + version + ".";
+
+    if (!mainName.startsWith(prefix) || mainName.length() == prefix.length()) {
+      return null;
+    }
+
+    final var directory = path.substring(0, path.length() - fileName.length() - 1);
+    final var names =
+        this.mavenStorageService
+            .getItems(StoragePath.of(repoInfo.getStorageKey(), directory))
+            .stream()
+            .filter(item -> !item.isDirectory())
+            .map(StorageItemInfo::getName)
+            .toList();
+    final var newest =
+        SnapshotNameUtils.newestSnapshotMainFileName(
+            artifactId, version, mainName.substring(prefix.length()), names);
+
+    if (newest == null || newest.equals(mainName)) {
+      return null;
+    }
+
+    try {
+      return this.mavenStorageService.getResource(
+          repoInfo.getName(),
+          StoragePath.of(repoInfo.getStorageKey(), directory + "/" + newest + checksumSuffix));
+    } catch (final ItemNotFoundException _) {
+      return null;
     }
   }
 
