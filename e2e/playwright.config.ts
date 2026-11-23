@@ -163,6 +163,9 @@ export default defineConfig({
     {
       name: 'npm',
       testMatch: 'npm/**/*.spec.ts',
+      // A testMatch glob also matches inside other directories: `npm/**` picks up tests/npm-clients/npm/
+      // (RPS-2738), which the npm-clients project runs, so the npm project leaves them out.
+      testIgnore: 'npm-clients/**',
       retries: retriesFor(false),
     },
     {
