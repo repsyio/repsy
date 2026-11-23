@@ -296,7 +296,13 @@ Coverage (RPS-2359, RPS-2361, RPS-2368):
   `@Tag("extended")` at class level (a class-level tag covers its `@Nested` groups), with a one-line
   comment above it saying why. The Failsafe property `it.excluded.groups` (empty by default, so a
   plain `mvn verify` and the nightly run everything) lists the tags to leave out, e.g.
-  `-Dit.excluded.groups=extended`; only `pr-checks.yml` may pass it. `-Dit.test=...` runs honour the
+  `-Dit.excluded.groups=extended`; only `pr-checks.yml` may pass it (RPS-2734): a pull request runs the
+  PR tier (everything untagged), while the nightly, `sonarcloud.yml` and every other build run all
+  ITs. The "Pick the integration test tier" step falls back to the full suite when the diff touches an
+  `*IT.java`, a test base class, `src/test/resources`, a `pom.xml` or a migration, when the branch is
+  `core/*` or `dependabot/maven/*`, when the PR carries the `full-it` label (use it when a change to
+  main code is covered only by tagged ITs, or when the Sonar new-code coverage gate complains), or
+  when the base cannot be diffed; its step summary names the tier and the reason. `-Dit.test=...` runs honour the
   exclusion too, so run a tagged class with the property empty. Never tag an abstract base (the tag is
   inherited by every subclass) or a guard IT (`OpenApiSpecConsistencyIT`, `EntitySchemaAnnotationIT`,
   `CommittedRowsGuardIT`, `ProtocolRoutePermissionIT`); a class holding a protocol's only

@@ -7,6 +7,9 @@ on:
   pull_request:
     branches:
       - main
+    # labeled and unlabeled so that adding or removing the "full-it" label re-runs the checks
+    # (see "Pick the integration test tier").
+    types: [opened, synchronize, reopened, labeled, unlabeled]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -85,12 +88,54 @@ jobs:
           distribution: "temurin"
           cache: maven
 
+      # RPS-2734: a pull request runs the integration tests tagged "extended" only when it could
+      # change what they cover; every other PR leaves them to the scheduled builds (sonarcloud.yml
+      # and the rest run everything, they never pass it_excluded). Full suite (empty value) when:
+      # the diff touches an *IT.java, a test base class, test resources, a pom.xml or a migration,
+      # the head branch is a repsy-core or Maven dependency bump, the PR has the label full-it, the
+      # run is not a pull_request event, or the base cannot be diffed. This workflow file alone
+      # does not force the full suite. Values come in through env, never through the script text.
+      - name: Pick the integration test tier
+        id: tier
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.head_ref }}
+          LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
+        run: |
+          full=""
+          if [ "$EVENT" != pull_request ]; then
+            full="the run is a $EVENT event"
+          elif ! files=$(git diff --name-only "origin/$BASE_REF...HEAD"); then
+            full="the diff against $BASE_REF could not be computed"
+          elif printf '%s' "$LABELS" | tr ',' '\n' | grep -qx full-it; then
+            full="the PR has the full-it label"
+          elif [[ "$HEAD_REF" == core/* || "$HEAD_REF" == dependabot/maven/* ]]; then
+            full="the branch $HEAD_REF is a dependency bump"
+          elif hit=$(printf '%s\n' "$files" | grep -E 'IT\.java$|/src/test/.*/Abstract|/src/test/resources/|^libs/test-support/|/db/migration/|(^|/)pom\.xml$' | head -3 | paste -sd' '); [ -n "$hit" ]; then
+            full="the diff touches $hit"
+          fi
+          if [ -n "$full" ]; then
+            echo "it_excluded=" >> "$GITHUB_OUTPUT"
+            echo "Integration tests: full suite, because $full." | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "it_excluded=-Dit.excluded.groups=extended" >> "$GITHUB_OUTPUT"
+            echo "Integration tests: PR tier (-Dit.excluded.groups=extended), no IT, test base, resource, pom or migration changed." | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+          # The runners keep their workspace and Failsafe appends to jacoco.exec, so coverage of an
+          # earlier run of the other tier would be merged into this one.
+          find . -name 'jacoco*.exec' -not -path '*/node_modules/*' -delete
+          find . -type d -name failsafe-reports -not -path '*/node_modules/*' -prune -exec rm -rf {} +
+
       # it.fork.count is the number of test JVMs the integration tests of repsy-backend are spread
       # over: one per vCPU of the runner, each with a postgres:18 container of its own
       # (AbstractIntegrationTest), so none shares a database. No -T: apache-rat-plugin 0.18 is not
       # thread-safe and fails a parallel reactor with a ConcurrentModificationException (RPS-1849).
       - name: Build and Verify
-        run: mvn -B -ntp verify -Dit.fork.count=4
+        env:
+          IT_EXCLUDED: ${{ steps.tier.outputs.it_excluded }}
+        # IT_EXCLUDED is unquoted on purpose: empty it vanishes, otherwise it is one argument.
+        run: mvn -B -ntp verify -Dit.fork.count=4 $IT_EXCLUDED
 
       # The frontend job runs beside this one and normally uploads its report within a minute. Wait
       # for it (at most 10 minutes), but stop as soon as that job has finished without one, that
