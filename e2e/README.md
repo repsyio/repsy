@@ -5502,7 +5502,7 @@ What it pins, as observed on the built image:
 
 Two more specs of the `api` runner (`./run.sh test --protocol api`, see "API suite"), both raw HTTP:
 
-- **Role sweep** (`tests/api/role-sweep.spec.ts`). The operation list is not written down: `src/api/spec-ops.ts`
+- **Role sweep** (`tests/api/role-sweep.spec.ts`, not tagged `@smoke` since RPS-2727: it runs whole in the wire leg only, so the h2 and tls smoke sets do not carry it). The operation list is not written down: `src/api/spec-ops.ts`
   reads `repsy-backend/src/main/resources/openapi/openapi-spec.yaml` (mounted read-only into the runners) with the
   existing `yaml` dependency. The spec declares `403 Forbidden` on exactly the operations a plain USER may not
   call: the `@RepoOperation(MANAGE)` routes and the `requireAdmin` ones (48 of 122 today). The sweep pins:
