@@ -22,12 +22,12 @@
  *    empty-JSON config) is stored as sent (raw manifest, `oras manifest fetch`, `oras blob fetch`) and
  *    `oras pull` writes the identical bytes, by tag and by digest; `--config` with a custom config media
  *    type works and becomes the artifact type; an absent tag fails.
- *  - OR2 `oras attach` (an SBOM-like blob) to an image. The referrers API is not implemented (RA3, `404
- *    NAME_UNKNOWN`), and oras does NOT probe it for an attach: the `201` of the referrer's manifest PUT
+ *  - OR2 `oras attach` (an SBOM-like blob) to an image. The referrers API is not implemented (`404
+ *    NAME_UNKNOWN`, pinned by DockerReferrersIT), and oras does NOT probe it for an attach: the `201` of the referrer's manifest PUT
  *    carries no `OCI-Subject` header, which oras-go reads as "no referrers API" and takes the spec's
  *    FALLBACK, the referrers TAG schema: it reads `GET manifests/sha256-<subject hex>` (`404` the first
  *    time) and `PUT`s an OCI image index under that tag listing the referrer. The tag is stored like any
- *    other (RA4): readable through raw HTTP and through `crane` byte-identically.
+ *    other (DockerReferrersIT): readable through raw HTTP and through `crane` byte-identically.
  *  - OR3 `oras discover` is where the missing API bites: it asks `GET .../referrers/<digest>`, gets `404`
  *    WITH the `NAME_UNKNOWN` code, and oras-go reads that code as "the repository does not exist" (not as
  *    "API unsupported"), so it FAILS instead of falling back. `--distribution-spec v1.1-referrers-tag`
@@ -47,7 +47,7 @@
  *    That is what `oras push` and `oras attach` produce when they have no files (`{}` as the config AND
  *    the one layer), so an annotation-only attach and an empty artifact are stored.
  *  - OR7 `oras repo tags` lists the tags since `tags/list` exists (RA1, RPS-1489); `repo ls` still fails on
- *    the missing `_catalog` (RA2).
+ *    the missing `_catalog` (DockerCatalogIT).
  */
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -342,8 +342,11 @@ test(
     await writeWork(session, 'sbom.cdx.json', sbom);
     const sbomType = 'application/vnd.cyclonedx+json';
 
-    // Before the attach: the API is absent (RA3) and so is the tag.
-    expect((await rawReferrers(repoName, admin, image, subject)).status, 'RA3').toBe(404);
+    // Before the attach: the API is absent and so is the tag.
+    expect(
+      (await rawReferrers(repoName, admin, image, subject)).status,
+      'referrers API absent',
+    ).toBe(404);
     expect((await rawReferrersIndex(repoName, image, subject)).status, 'no index tag yet').toBe(
       404,
     );
@@ -367,7 +370,10 @@ test(
     );
 
     // The API is still absent: oras did not need it for an attach.
-    expect((await rawReferrers(repoName, admin, image, subject)).status, 'RA3 still').toBe(404);
+    expect(
+      (await rawReferrers(repoName, admin, image, subject)).status,
+      'referrers API still absent',
+    ).toBe(404);
 
     // The fallback: the tag `sha256-<hex>` now holds an image index listing the referrer.
     const index = await rawReferrersIndex(repoName, image, subject);
@@ -867,7 +873,7 @@ test(
       ['repo', 'ls', ...session.common, `${registryHost()}/${repoPath(repoName)}`],
       'or7-repo-ls',
     );
-    expect(catalog.exitCode, 'oras repo ls cannot enumerate: no _catalog route (RA2)').not.toBe(0);
+    expect(catalog.exitCode, 'oras repo ls cannot enumerate: no _catalog route').not.toBe(0);
     expect(catalog.stderr.toLowerCase(), "oras repo ls: the registry's own answer").toContain(
       'unknownpath',
     );

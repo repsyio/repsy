@@ -63,8 +63,8 @@ fi
 usage() {
   cat <<'EOF'
 Usage:
-  run.sh local up|down [--h2] [--scanner] [--throttle] [--tls] [--limits] [--cors] [--upgrade] [--trivy] [--proxy] [--upload-ttl] [--probe-ban] [--force]
-  run.sh local logs|ps [--h2] [--scanner] [--throttle] [--tls] [--limits] [--cors] [--upgrade] [--trivy] [--proxy] [--upload-ttl] [--probe-ban]
+  run.sh local up|down [--h2] [--scanner] [--throttle] [--tls] [--limits] [--upgrade] [--trivy] [--proxy] [--probe-ban] [--force]
+  run.sh local logs|ps [--h2] [--scanner] [--throttle] [--tls] [--limits] [--upgrade] [--trivy] [--proxy] [--probe-ban]
   run.sh test [--target local|remote|ci] [--protocol a,b] [--grep PATTERN] [--grep-invert PATTERN] [--workers N] [--update-snapshots] [-b]
   run.sh sweep [--hours N] [--all] [--dry-run]
 
@@ -142,10 +142,6 @@ PyPI/Helm/NuGet upload, a gem, a crate and a Go module zip (docker-compose.stack
 specs of the pypi, helm, nuget, ruby, cargo, go and api runners: an over-limit push gets a 413. No other
 suite may run there. See README.md "Size-limit leg".
 
---cors (or REPSY_E2E_CORS=1) is the CORS overlay: Repsy starts with APP_ALLOWED_ORIGINS set to two origins
-(docker-compose.stack-cors.yml, RPS-1590), for the @cors specs of the api runner; the default stack leaves it
-unset (same-origin only). No other suite may run there. See README.md "CORS leg".
-
 --upgrade (or REPSY_E2E_UPGRADE=1) is the upgrade-path overlay (docker-compose.stack-upgrade.yml, RPS-1487): "local up"
 starts the PREVIOUS release on a fresh volume (the tag in src/upgrade/previous-release.ts, or
 REPSY_E2E_UPGRADE_FROM=<tag>) and builds the image under test
@@ -174,9 +170,7 @@ OVERLAYS=(
   "limits|--limits|REPSY_E2E_LIMITS|docker-compose.stack-limits.yml"
   "upgrade|--upgrade|REPSY_E2E_UPGRADE|docker-compose.stack-upgrade.yml"
   "trivy|--trivy|REPSY_E2E_TRIVY|docker-compose.stack-trivy.yml"
-  "cors|--cors|REPSY_E2E_CORS|docker-compose.stack-cors.yml"
   "proxy|--proxy|REPSY_E2E_PROXY|docker-compose.stack-proxy.yml"
-  "upload-ttl|--upload-ttl|REPSY_E2E_UPLOAD_TTL|docker-compose.stack-upload-ttl.yml"
   "probe-ban|--probe-ban|REPSY_E2E_PROBE_BAN|docker-compose.stack-probe-ban.yml"
 )
 
@@ -637,9 +631,6 @@ cmd_local_up() {
   fi
   if overlay_active limits; then
     echo "Limits overlay on: uploads over 64 KiB are refused (413); run REPSY_E2E_LIMITS=1 ./run.sh test --protocol pypi,helm,nuget,ruby,cargo,go,api --grep @limits, one runner per call"
-  fi
-  if overlay_active cors; then
-    echo "CORS overlay on: APP_ALLOWED_ORIGINS is set; run REPSY_E2E_CORS=1 ./run.sh test --protocol api --grep @cors"
   fi
   if overlay_active upgrade; then
     echo "Upgrade overlay on: run REPSY_E2E_UPGRADE=1 ./run.sh test --protocol stack --grep @upgrade (the stack ends on the image under test)"

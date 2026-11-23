@@ -373,29 +373,6 @@ export async function rawDeleteManifest(
   };
 }
 
-/** `DELETE /v2/<repo>/<image>/manifests/<ref>` with a Basic `Authorization` header sent directly, no
- *  token exchange -- the route only ever accepts a Bearer value (`DockerAuthPreProcessor
- *  .authenticateRequest`'s `authHeader.startsWith("Bearer ")` check runs before anything looks at
- *  the credential itself), so a Basic header here is refused at the same operation hop a missing
- *  header would be, with the same `delete`-scoped Bearer challenge (`registry-rules.spec.ts`'s
- *  "R15b"). */
-export async function rawDeleteManifestBasicAuth(
-  repoName: string,
-  credential: MaterializedCredential,
-  image: string,
-  ref: string,
-): Promise<RawResponse & { wwwAuthenticate?: string }> {
-  const res = await rawFetch(v2RepoUrl(repoName, `${image}/manifests/${ref}`), {
-    method: 'DELETE',
-    headers: authHeader(credential),
-  });
-  return {
-    status: res.status,
-    body: res.body,
-    wwwAuthenticate: res.headers.get('www-authenticate') ?? undefined,
-  };
-}
-
 /** `HEAD /v2/<repo>/<image>/blobs/<digest>`. */
 export async function rawHeadBlob(
   repoName: string,
@@ -773,17 +750,6 @@ export async function rawFollowNextLink(
     hop: res.hop,
     link: res.headers.get('link') ?? undefined,
   };
-}
-
-/** `GET /v2/_catalog[?query]` through the two-hop `dockerRequest` for `CATALOG_SCOPE`. */
-export async function rawCatalog(
-  credential: MaterializedCredential,
-  query?: string,
-): Promise<RawResponse & { hop: 'token' | 'request' }> {
-  const res = await dockerRequest(credential, CATALOG_SCOPE, (headers) =>
-    rawFetch(v2Url(`/_catalog${query ? `?${query}` : ''}`), { headers }),
-  );
-  return { status: res.status, body: res.body, hop: res.hop };
 }
 
 /** `GET /v2/<repo>/<image>/referrers/<digest>[?artifactType=...]` (OCI distribution 1.1's referrers
