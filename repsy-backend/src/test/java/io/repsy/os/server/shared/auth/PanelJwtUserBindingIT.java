@@ -26,6 +26,7 @@ import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -43,6 +44,8 @@ import org.springframework.test.web.servlet.ResultActions;
  * there for up to 30 minutes after a password change, and a reused username inherited it.
  */
 @DisplayName("A panel access token ends with the credentials it was issued for (RPS-1604)")
+// extended: panel JWT user-binding matrix across routes
+@Tag("extended")
 class PanelJwtUserBindingIT extends AbstractIT {
 
   private static final String NEW_PASSWORD = "NewPassword2@";

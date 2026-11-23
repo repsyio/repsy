@@ -35,6 +35,7 @@ import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.TestPropertySource;
@@ -50,6 +51,8 @@ import org.springframework.test.web.servlet.ResultActions;
  */
 @TestPropertySource(properties = "repsy.cargo.max-crate-size=4KB")
 @DisplayName("Cargo publish hardening (RPS-1119, RPS-1141)")
+// extended: cargo publish refusal cases; the happy path stays in the other cargo ITs
+@Tag("extended")
 class CargoPublishHardeningIT extends AbstractIT {
 
   private static final String PUBLISH_PATH = "/{repo}/api/v1/crates/new";

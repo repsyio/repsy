@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -46,6 +47,8 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("HTTP Basic remembers a successful password check")
+// extended: basic-auth cache invalidation matrix (password, delete, demote)
+@Tag("extended")
 class BasicAuthCacheIT extends AbstractIT {
 
   /**

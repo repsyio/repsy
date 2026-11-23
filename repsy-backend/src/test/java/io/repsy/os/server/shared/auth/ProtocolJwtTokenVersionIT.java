@@ -45,6 +45,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -69,6 +70,8 @@ import tools.jackson.databind.ObjectMapper;
  * (404 for a package that does not exist) for an accepted one.
  */
 @DisplayName("A protocol JWT ends when the token version of its user moves on")
+// extended: protocol JWT token-version matrix per repo type
+@Tag("extended")
 class ProtocolJwtTokenVersionIT extends AbstractIT {
 
   private static final String NEW_PASSWORD = "NewPassword2@";

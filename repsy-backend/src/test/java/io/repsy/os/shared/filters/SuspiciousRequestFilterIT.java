@@ -23,6 +23,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import io.repsy.os.AbstractIT;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 
@@ -35,6 +36,8 @@ import org.springframework.http.HttpMethod;
  * another address with {@code remoteAddr}.
  */
 @DisplayName("Clients that send probes are banned")
+// extended: suspicious-request ban signal matrix
+@Tag("extended")
 class SuspiciousRequestFilterIT extends AbstractIT {
 
   private static final String CLIENT = "203.0.113.7";

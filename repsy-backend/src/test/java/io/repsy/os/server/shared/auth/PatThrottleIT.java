@@ -33,6 +33,7 @@ import io.repsy.protocols.shared.auth.PasswordHasher;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -51,6 +52,8 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers;
  * no hash check, so the limit is reached quickly.
  */
 @DisplayName("Failed personal access token checks are throttled per client")
+// extended: PAT failure throttle counting matrix
+@Tag("extended")
 class PatThrottleIT extends AbstractPatIT {
 
   private static final String READ = "/{repo}/com/example/lib/1.0/lib-1.0.pom";

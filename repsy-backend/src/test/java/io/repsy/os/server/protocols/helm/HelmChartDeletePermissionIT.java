@@ -40,6 +40,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -53,6 +54,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * challenge and the chart stays; an admin deletes it.
  */
 @DisplayName("Helm classic chart delete needs MANAGE (RPS-1424)")
+// extended: helm chart delete permission matrix
+@Tag("extended")
 class HelmChartDeletePermissionIT extends AbstractIT {
 
   private static final String CHART = "payments";

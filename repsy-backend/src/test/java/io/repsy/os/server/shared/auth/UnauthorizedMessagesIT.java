@@ -37,6 +37,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -52,6 +53,8 @@ import org.springframework.test.web.servlet.request.AbstractMockHttpServletReque
  * would tell a caller whether an account exists.
  */
 @DisplayName("401 messages of the Docker token endpoint and Go (RPS-1435)")
+// extended: unauthorized message matrix for docker and go; success paths live in the protocol ITs
+@Tag("extended")
 class UnauthorizedMessagesIT extends AbstractIT {
 
   private static final String GENERIC =

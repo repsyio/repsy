@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -53,6 +54,8 @@ import tools.jackson.databind.ObjectMapper;
  * working at the rotation, not at its own expiry (up to 90 days for npm).
  */
 @DisplayName("A JWT minted from a deploy token ends when the token is rotated")
+// extended: deploy-token rotation vs issued JWT matrix per protocol
+@Tag("extended")
 class DeployTokenRotationJwtIT extends AbstractIT {
 
   private static final String IMAGE = "some-image";

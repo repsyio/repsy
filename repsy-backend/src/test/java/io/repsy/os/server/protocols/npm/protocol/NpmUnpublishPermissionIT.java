@@ -42,6 +42,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -64,6 +65,8 @@ import tools.jackson.databind.ObjectMapper;
  * rolled-back transaction, like {@link NpmUnpublishProtocolIT}.
  */
 @DisplayName("npm unpublish needs MANAGE, deprecate and dist-tag stay WRITE (RPS-1424)")
+// extended: npm unpublish permission matrix
+@Tag("extended")
 class NpmUnpublishPermissionIT extends AbstractIT {
 
   private static final String PACKAGE = "perm-package";

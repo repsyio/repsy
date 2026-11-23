@@ -40,6 +40,7 @@ import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -60,6 +61,8 @@ import org.springframework.beans.factory.annotation.Autowired;
  * this class is about.
  */
 @DisplayName("scan:read on the scan routes")
+// extended: scan-read scope matrix over routes
+@Tag("extended")
 class PatScanReadScopeIT extends AbstractPatIT {
 
   private static final String ARTIFACT = "/artifacts/pkg";

@@ -31,6 +31,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -44,6 +45,8 @@ import org.springframework.test.util.ReflectionTestUtils;
  * npm's equivalent case).
  */
 @DisplayName("Docker's pre-processor answers 401, not 403, for a rejected bearer")
+// extended: docker bearer refusal cases
+@Tag("extended")
 class DockerAuthPreProcessorIT extends AbstractIT {
 
   private static final String IMAGE = "some-image";

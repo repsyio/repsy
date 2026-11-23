@@ -39,6 +39,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -55,6 +56,8 @@ import tools.jackson.databind.ObjectMapper;
  * logout and is refused after it.
  */
 @DisplayName("npm wire protocol DELETE /-/user/token/{token}")
+// extended: npm token revoke principal matrix; login and logout flows stay in NpmPatLoginIT
+@Tag("extended")
 class NpmTokenRevokeProtocolIT extends AbstractIT {
 
   private static final String LOGIN = "/{repo}/-/user/org.couchdb.user:{name}";

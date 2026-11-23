@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.transaction.annotation.Propagation;
@@ -48,6 +49,8 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("HTTP Basic with a colon in the password")
+// extended: colon-in-password edge cases of basic auth
+@Tag("extended")
 class BasicAuthColonPasswordIT extends AbstractIT {
 
   private static final String COLON_PASSWORD = "Pass:Word1:tail";
