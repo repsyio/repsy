@@ -30,6 +30,7 @@ import static org.mockito.Mockito.when;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.RelativePath;
+import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.protocols.maven.protocol.resources.SynthesizedFileResource;
 import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredPlugin;
@@ -382,6 +383,84 @@ class AbstractMavenProtocolFacadeDownloadTest {
         mock(ArtifactService.class, org.mockito.Mockito.CALLS_REAL_METHODS);
 
     assertThat(service.getRegisteredPlugins(this.repoInfo, "com.acme")).isEmpty();
+  }
+
+  private static StorageItemInfo file(final String name) {
+    return StorageItemInfo.builder().name(name).directory(false).build();
+  }
+
+  private void snapshotDirectoryHolds(final String... names) {
+    when(this.storageService.getItems(any(StoragePath.class)))
+        .thenReturn(java.util.Arrays.stream(names).map(n -> file(n)).toList());
+  }
+
+  @Test
+  @DisplayName("answers the literal -SNAPSHOT jar with the file of the newest timestamped build")
+  void literalSnapshotJar() {
+    nothingIsStored();
+    final var newest = new ByteArrayResource(new byte[] {2});
+    when(this.storageService.getResource(
+            eq(REPO_NAME),
+            argThat(
+                p ->
+                    p != null
+                        && p.getPath()
+                            .equals(
+                                REPO_ID
+                                    + "/com/acme/lib/1.0-SNAPSHOT/lib-1.0-20260921.101010-2.jar"))))
+        .thenReturn(newest);
+    snapshotDirectoryHolds(
+        "lib-1.0-20260921.101009-1.jar",
+        "lib-1.0-20260921.101010-2.jar",
+        "lib-1.0-20260921.101010-2.pom",
+        "lib-1.0-SNAPSHOT.pom");
+    requestFor("/com/acme/lib/1.0-SNAPSHOT/lib-1.0-SNAPSHOT.jar");
+
+    assertThat(this.facade.download(this.context)).isSameAs(newest);
+  }
+
+  @Test
+  @DisplayName("answers the checksum of the literal -SNAPSHOT jar with the newest build's")
+  void literalSnapshotChecksum() {
+    nothingIsStored();
+    final var checksum = new ByteArrayResource(new byte[] {3});
+    when(this.storageService.getResource(
+            eq(REPO_NAME),
+            argThat(
+                p ->
+                    p != null
+                        && p.getPath()
+                            .equals(
+                                REPO_ID
+                                    + "/com/acme/lib/1.0-SNAPSHOT/lib-1.0-20260921.101010-2.jar.sha1"))))
+        .thenReturn(checksum);
+    snapshotDirectoryHolds("lib-1.0-20260921.101010-2.jar");
+    requestFor("/com/acme/lib/1.0-SNAPSHOT/lib-1.0-SNAPSHOT.jar.sha1");
+
+    assertThat(this.facade.download(this.context)).isSameAs(checksum);
+  }
+
+  @Test
+  @DisplayName("stays a 404 when no timestamped build of that extension is stored")
+  void literalSnapshotWithoutBuild() {
+    nothingIsStored();
+    snapshotDirectoryHolds("lib-1.0-20260921.101010-2.pom", "lib-1.0-SNAPSHOT.pom");
+    requestFor("/com/acme/lib/1.0-SNAPSHOT/lib-1.0-SNAPSHOT.jar");
+
+    assertThatThrownBy(() -> this.facade.download(this.context))
+        .isInstanceOf(ItemNotFoundException.class);
+  }
+
+  @Test
+  @DisplayName("lists no directory for a path that is not a literal SNAPSHOT file")
+  void releasePathListsNothing() {
+    nothingIsStored();
+    requestFor("/com/acme/lib/1.0/lib-1.0.jar");
+
+    assertThatThrownBy(() -> this.facade.download(this.context))
+        .isInstanceOf(ItemNotFoundException.class);
+
+    verify(this.storageService, never()).getItems(any(StoragePath.class));
   }
 
   private static String hex(final byte[] content, final String algorithm) {

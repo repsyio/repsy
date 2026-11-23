@@ -19,10 +19,12 @@ import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.core.error_handling.exceptions.ItemNotFoundException;
 import io.repsy.libs.protocol.router.ProtocolContext;
 import io.repsy.libs.storage.core.dtos.BaseUsages;
+import io.repsy.libs.storage.core.dtos.StorageItemInfo;
 import io.repsy.libs.storage.core.dtos.StoragePath;
 import io.repsy.protocols.maven.protocol.facades.contracts.MavenProtocolFacade;
 import io.repsy.protocols.maven.protocol.resources.SynthesizedFileResource;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
+import io.repsy.protocols.maven.shared.artifact.dtos.LiteralSnapshotRequest;
 import io.repsy.protocols.maven.shared.artifact.dtos.RegisteredVersion;
 import io.repsy.protocols.maven.shared.artifact.dtos.SignatureOutcome;
 import io.repsy.protocols.maven.shared.artifact.services.contracts.ArtifactService;
@@ -34,6 +36,7 @@ import io.repsy.protocols.maven.shared.utils.MavenPublishLimits;
 import io.repsy.protocols.maven.shared.utils.MavenUploadLimits;
 import io.repsy.protocols.maven.shared.utils.PomModelUtils;
 import io.repsy.protocols.maven.shared.utils.SignatureFileUtils;
+import io.repsy.protocols.maven.shared.utils.SnapshotNameUtils;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
 import io.repsy.protocols.shared.repo.dtos.BaseRepoInfo;
 import io.repsy.protocols.shared.utils.BoundedEntryReader;
@@ -103,10 +106,57 @@ public abstract class AbstractMavenProtocolFacade<I> implements MavenProtocolFac
       }
 
       if (synthesized == null) {
+        synthesized = this.resolveLiteralSnapshot(repoInfo, relativePath.getPath());
+      }
+
+      if (synthesized == null) {
         throw e;
       }
 
       return synthesized;
+    }
+  }
+
+  /**
+   * Answers the literal {@code <artifactId>-<base>-SNAPSHOT.<ext>} (and its checksums) of a {@code
+   * SNAPSHOT} directory that holds only timestamped builds with the file of its newest build, the
+   * way Maven repository managers do. sbt 2 publishes timestamped files and still resolves a
+   * snapshot through its literal name (its POM is sent under it too), so without this its jar is a
+   * 404. A stored file always wins and nothing is written; a request that no stored build matches
+   * stays a 404.
+   */
+  private @Nullable Resource resolveLiteralSnapshot(
+      final BaseRepoInfo<I> repoInfo, final String path) {
+
+    final var request = LiteralSnapshotRequest.parse(path);
+
+    if (request == null) {
+      return null;
+    }
+
+    final var names =
+        this.mavenStorageService
+            .getItems(StoragePath.of(repoInfo.getStorageKey(), request.directory()))
+            .stream()
+            .filter(item -> !item.isDirectory())
+            .map(StorageItemInfo::getName)
+            .toList();
+    final var newest =
+        SnapshotNameUtils.newestSnapshotMainFileName(
+            request.artifactId(), request.version(), request.extension(), names);
+
+    if (newest == null || newest.equals(request.mainName())) {
+      return null;
+    }
+
+    try {
+      return this.mavenStorageService.getResource(
+          repoInfo.getName(),
+          StoragePath.of(
+              repoInfo.getStorageKey(),
+              request.directory() + "/" + newest + request.checksumSuffix()));
+    } catch (final ItemNotFoundException _) {
+      return null;
     }
   }
 

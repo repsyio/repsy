@@ -31,7 +31,7 @@ import { slugify } from '../scenarios/coordinates.js';
 import type { ProtocolAdapter } from '../scenarios/adapter.js';
 import type { Scenario } from '../scenarios/types.js';
 import { uniqueVersion } from './maven-adapter.js';
-import { expectNothingStored } from './maven-checks.js';
+import { expectNothingStored, expectSnapshotFollowedThroughMetadata } from './maven-checks.js';
 import { repoTree, type RepoTree } from './maven-raw.js';
 import { expectLiteralSnapshotStored } from './sbt-checks.js';
 import {
@@ -72,7 +72,17 @@ export function sbtAdapter(version: string = SBT_VERSION): ProtocolAdapter<RepoT
     expectNothingStored,
 
     afterSuccessfulRoundTrip: async (world, _published, resolved) => {
-      if (world.scenario.versionType === 'snapshot') {
+      if (world.scenario.versionType !== 'snapshot') {
+        return;
+      }
+      if (version.startsWith('2.')) {
+        // sbt 2.x publishes timestamped builds and the version-level metadata, but coursier still
+        // asks for the literal `-SNAPSHOT` jar (the server answers it with the newest build's):
+        // the resolved file keeps that name, so the check compares its bytes.
+        await expectSnapshotFollowedThroughMetadata(world, world.scenario, resolved, {
+          resolvedFileKeepsSnapshotName: true,
+        });
+      } else {
         await expectLiteralSnapshotStored(world, resolved);
       }
     },
