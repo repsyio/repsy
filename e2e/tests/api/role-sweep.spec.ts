@@ -14,28 +14,17 @@
 /// limitations under the License.
 
 /**
- * RPS-1483: the role sweep. The panel API spec (`openapi-spec.yaml`) documents `403 Forbidden` on exactly
- * the operations a plain USER may not call: the `@RepoOperation(MANAGE)` routes and the `requireAdmin`
- * ones. The sweep is derived from that document (`src/api/spec-ops.ts`), so a new route is in it the
- * moment it is in the spec:
+ * RPS-1483: the role sweep, on real data. The sweep itself (every operation of the panel API spec, called
+ * as a USER and as an anonymous caller, with the floors and the known-route guards) is
+ * `OpenApiOperationRoleSweepIT` (RPS-2739), derived from the same `openapi-spec.yaml` and run in every
+ * `mvn verify`; its static twin is `OpenApiSpecConsistencyIT.everyDocumented403IsManageOrAdmin` (RPS-1593).
  *
- *  1. every operation that declares 403, called as a USER, answers 403 `accessDenied`, before any 404
- *     (called with names that cannot exist) and before any change (called with names that do, and the
- *     panel read back before and after);
- *  2. every operation that needs authentication answers 401 to an anonymous caller;
- *  3. the reverse: no other operation answers a USER 403, so a MANAGE route that forgot to declare its
- *     403 (or a read route that turned admin-only unannounced) fails here instead of going unnoticed.
+ * What stays here is what MockMvc cannot show, because it needs a real stack with seeded data:
  *
- * Its static twin is `OpenApiSpecConsistencyIT.everyDocumented403IsManageOrAdmin` (RPS-1593): every
- * documented 403 is a MANAGE route or in its literal `ADMIN_OPERATIONS`, with the same floor, in every
- * `mvn verify`. A new `requireAdmin` route is added to both. A 403 marked `x-forbidden-by: token-scope`
- * (revoke and rotate of an access token, RPS-2440) is the refusal of a calling token, which a login never
- * gets: those operations are in the reverse sweep, and the IT lists them in `TOKEN_SCOPE_OPERATIONS`.
- *
- * A floor on the size of the set (48 today) and a check of names that must be in it stop a parser bug
- * from emptying the sweep without a failure.
+ *  1. a USER calling every operation that declares 403, with names that exist, changes nothing: the panel
+ *     is read back before and after and is the same;
+ *  2. an anonymous caller is refused 401 on every operation of a seeded private repository.
  */
-import { ERROR_CODES } from '../../src/error-codes.js';
 import { loadSpecOperations, requestFor, type SpecOperation } from '../../src/api/spec-ops.js';
 import { bodyFor, seedSweepWorld, snapshotWorld, valuesFor } from '../../src/api/sweep-world.js';
 import { createPanelBackend } from '../../src/api/backend-registry.js';
@@ -47,19 +36,6 @@ import { Seeder } from '../../src/seed/seeder.js';
 
 const OPERATIONS = loadSpecOperations();
 const FORBIDDEN = OPERATIONS.filter((op) => op.declares403);
-const NOT_FORBIDDEN = OPERATIONS.filter((op) => !op.declares403);
-
-/**
- * Operations the reverse sweep cannot call as the USER without harming the caller or the run, each
- * with the reason. The anonymous sweep still calls them (a 401 changes nothing).
- */
-const REVERSE_SKIP: Readonly<Record<string, string>> = {
-  deleteProfile: 'deletes the calling USER, whose token the rest of the sweep needs',
-  updateUsername: 'renames the calling USER',
-  updatePassword: 'changes the calling USER password, so the token stops being the one it was',
-  login: 'public: takes credentials, not a token',
-  refreshToken: 'public: takes a refresh token, not an access token',
-};
 
 const label = (op: SpecOperation): string => `${op.method} ${op.path} (${op.operationId})`;
 
@@ -98,114 +74,6 @@ async function call(
     },
   });
 }
-
-const msgId = (res: EdgeResponse): unknown => (res.json as { code?: unknown } | undefined)?.code;
-
-/** Bodies that pass validation, on names that cannot exist, for the operations that need one. */
-const PLACEHOLDER_WORLD = {
-  fresh: { username: 'e2e-sweep-nobody', repoName: 'e2e-sweep-newrepo' },
-};
-
-test.describe('the operations the spec declares 403 on', () => {
-  test('the set is derived from the spec and is not empty', () => {
-    expect(OPERATIONS.length).toBeGreaterThanOrEqual(120);
-    expect(FORBIDDEN.length).toBeGreaterThanOrEqual(48);
-  });
-
-  test('the set holds the routes that are known to be MANAGE or admin only', () => {
-    const ids = new Set(FORBIDDEN.map((op) => op.operationId));
-
-    // Everything under /api/users, and creating a repository, is admin only.
-    for (const op of OPERATIONS.filter((candidate) => candidate.path.startsWith('/api/users'))) {
-      expect(ids.has(op.operationId), label(op)).toBe(true);
-    }
-    expect(ids.has('createRepository')).toBe(true);
-    // A repo's own settings, tokens, name and description (one PATCH, `updateRepo`) and key stores.
-    for (const id of [
-      'getRepoSettings',
-      'updateRepoSettings',
-      'updateRepo',
-      'listDeployTokens',
-      'createDeployToken',
-      'revokeDeployToken',
-      'rotateDeployToken',
-      'listMavenKeyStores',
-      'createMavenKeyStore',
-      'deleteMavenKeyStore',
-      'listMavenPgpPublicKeys',
-      'createMavenPgpPublicKey',
-      'deleteMavenPgpPublicKey',
-      'deleteRepo',
-    ]) {
-      expect(ids.has(id), id).toBe(true);
-    }
-    // Every delete of a package, version or repo, in every protocol; only deleting yourself, or
-    // revoking an access token of your own (or a connector token of your own, or the one the request
-    // itself carries, RPS-2660: any signed-in caller, no MANAGE), is not one.
-    const ownDeletes = new Set([
-      'deleteProfile',
-      'revokeAccessToken',
-      'revokeCurrentConnectorToken',
-      'revokeConnectorToken',
-    ]);
-    const deletes = OPERATIONS.filter(
-      (candidate) => candidate.method === 'DELETE' && !ownDeletes.has(candidate.operationId),
-    );
-    expect(deletes.length).toBeGreaterThanOrEqual(28);
-    for (const op of deletes) {
-      expect(ids.has(op.operationId), label(op)).toBe(true);
-    }
-  });
-
-  test('every skipped operation exists in the spec', () => {
-    const ids = new Set(OPERATIONS.map((op) => op.operationId));
-    for (const id of Object.keys(REVERSE_SKIP)) {
-      expect(ids.has(id), id).toBe(true);
-    }
-  });
-
-  for (const op of FORBIDDEN) {
-    test(`a USER gets 403 before anything else on ${label(op)}`, async ({ sweepUser }) => {
-      const res = await call(
-        op,
-        { body: bodyFor(op.operationId, PLACEHOLDER_WORLD) },
-        sweepUser.token,
-      );
-
-      expect(res.status, res.text.slice(0, 200)).toBe(403);
-      expect(msgId(res)).toBe(ERROR_CODES.ACCESS_DENIED);
-    });
-  }
-});
-
-test.describe('anonymous callers', () => {
-  for (const op of OPERATIONS.filter((candidate) => candidate.security !== 'public')) {
-    test(`get 401 on ${label(op)}`, async () => {
-      const res = await call(op, { body: bodyFor(op.operationId, PLACEHOLDER_WORLD) });
-
-      expect(res.status, res.text.slice(0, 200)).toBe(401);
-    });
-  }
-
-  for (const op of OPERATIONS.filter((candidate) => candidate.security === 'public')) {
-    test(`are let through on the public ${label(op)}`, async () => {
-      const res = await call(op, {});
-
-      expect(res.status, res.text.slice(0, 200)).not.toBe(401);
-      expect(res.status).not.toBe(403);
-    });
-  }
-});
-
-test.describe('the operations the spec does not declare 403 on', () => {
-  for (const op of NOT_FORBIDDEN.filter((candidate) => !(candidate.operationId in REVERSE_SKIP))) {
-    test(`a USER is not refused with 403 on ${label(op)}`, async ({ sweepUser }) => {
-      const res = await call(op, {}, sweepUser.token);
-
-      expect(res.status, res.text.slice(0, 200)).not.toBe(403);
-    });
-  }
-});
 
 test.describe('on real data', () => {
   test('a USER changes nothing: 403 on every forbidden operation, the panel the same before and after', async ({

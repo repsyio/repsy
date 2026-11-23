@@ -17,8 +17,8 @@
 /**
  * RPS-1475: the wire permission matrix for Helm (README "Manage matrix"). The classic chart DELETE
  * (MANAGE: ADMIN only, a USER account and a deploy token are refused with 401, RPS-1424; no Helm command
- * sends it, so the request is raw) and the OCI manifest DELETE, which Helm's OCI protocol has no route
- * for (NO_ROUTE: every credential gets 404). A refused cell must leave the chart served byte for byte.
+ * sends it, so the request is raw). A refused cell must leave the chart served byte for byte. The OCI
+ * manifest DELETE has no route (404 for every credential): `ProtocolPathDeleteIT`.
  */
 import { HELM_MANAGE_OPERATIONS } from '../../src/clients/helm-manage.js';
 import { registerManageMatrix } from '../../src/scenarios/manage-matrix.js';
