@@ -37,6 +37,7 @@ import java.util.stream.Stream;
 import org.hibernate.SessionFactory;
 import org.hibernate.resource.jdbc.spi.StatementInspector;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -55,6 +56,8 @@ import org.springframework.jdbc.core.ConnectionCallback;
  * planner makes on a table with rows.
  */
 @DisplayName("Contains searches use their trigram index (RPS-2117)")
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class TrigramSearchExplainIT extends AbstractIT {
 
   @Autowired private EntityManagerFactory entityManagerFactory;

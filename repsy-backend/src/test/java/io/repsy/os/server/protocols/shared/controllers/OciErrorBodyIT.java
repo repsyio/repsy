@@ -29,6 +29,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -43,6 +44,8 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
  * they reject.
  */
 @DisplayName("OCI distribution error bodies")
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class OciErrorBodyIT extends AbstractIT {
 
   private static final String IMAGE = "app";

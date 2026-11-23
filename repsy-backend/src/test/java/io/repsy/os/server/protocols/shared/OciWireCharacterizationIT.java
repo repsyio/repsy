@@ -44,6 +44,7 @@ import java.util.zip.GZIPOutputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -73,6 +74,8 @@ import org.springframework.web.context.WebApplicationContext;
  * a plain upload start (202 and a new session), never a 201 mount.
  */
 @DisplayName("OCI wire of Docker and Helm OCI")
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class OciWireCharacterizationIT extends AbstractIT {
 
   private static final String NAME = "app";

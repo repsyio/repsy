@@ -30,6 +30,7 @@ import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -41,6 +42,8 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
  * document, while the protocol routes keep the error format of their own client.
  */
 @DisplayName("Panel API problem+json errors")
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class PanelProblemJsonIT extends AbstractIT {
 
   private static final String NOT_VALID_TEXT = "Incoming data couldn't be validated.";

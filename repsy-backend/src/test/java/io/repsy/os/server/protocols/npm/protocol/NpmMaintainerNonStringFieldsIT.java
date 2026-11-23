@@ -25,6 +25,7 @@ import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -37,6 +38,8 @@ import tools.jackson.databind.ObjectMapper;
  * which is NOT NULL, drops the whole entry instead, RPS-2186).
  */
 @DisplayName("npm publish with a non-string maintainer email or url (RPS-2199)")
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class NpmMaintainerNonStringFieldsIT extends AbstractIT {
 
   private static final String NAME = "left-pad";

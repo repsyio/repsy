@@ -26,6 +26,7 @@ import io.repsy.os.shared.repo.entities.Repo;
 import io.repsy.protocols.maven.shared.artifact.dtos.ArtifactVersionType;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Pageable;
@@ -40,6 +41,8 @@ import org.springframework.data.domain.Pageable;
  * ArtifactListItem#getLatest} and {@code ArtifactVersionListItem#getLastUpdatedAt}.
  */
 @DisplayName("Maven projections of nullable columns (RPS-2077)")
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class MavenNullableProjectionIT extends AbstractIT {
 
   @Autowired private ArtifactRepository artifactRepository;

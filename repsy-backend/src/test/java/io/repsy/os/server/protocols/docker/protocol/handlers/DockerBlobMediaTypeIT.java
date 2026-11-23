@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,6 +62,8 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("Docker blob GET answers the stored layer media type (RPS-2213)")
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class DockerBlobMediaTypeIT extends AbstractIT {
 
   private static final String IMAGE = "app";

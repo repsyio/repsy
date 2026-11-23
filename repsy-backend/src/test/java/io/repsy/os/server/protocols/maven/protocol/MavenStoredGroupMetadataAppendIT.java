@@ -46,6 +46,7 @@ import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.maven.artifact.repository.metadata.Plugin;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -69,6 +70,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName(
     "A registered plugin POM completes the stored group-level maven-metadata.xml (RPS-1457)")
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class MavenStoredGroupMetadataAppendIT extends AbstractIT {
 
   private static final String GROUP = "com.example.tools";

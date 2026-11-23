@@ -26,6 +26,7 @@ import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Pageable;
@@ -37,6 +38,8 @@ import org.springframework.data.domain.Pageable;
  * {@code @Nullable} of the three getters makes the reads below fail.
  */
 @DisplayName("npm projections read null columns")
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class NpmProjectionNullIT extends AbstractIT {
 
   private static final Instant NOW = Instant.parse("2026-09-01T10:00:00Z");

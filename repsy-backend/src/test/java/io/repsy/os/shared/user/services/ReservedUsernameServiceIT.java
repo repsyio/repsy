@@ -21,6 +21,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import io.repsy.core.error_handling.exceptions.BadRequestException;
 import io.repsy.os.AbstractIT;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +32,8 @@ import org.springframework.beans.factory.annotation.Autowired;
  * case-insensitivity is exercised end to end, independent of the request validation.
  */
 @DisplayName("ReservedUsernameService")
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class ReservedUsernameServiceIT extends AbstractIT {
 
   @Autowired private ReservedUsernameService reservedUsernameService;

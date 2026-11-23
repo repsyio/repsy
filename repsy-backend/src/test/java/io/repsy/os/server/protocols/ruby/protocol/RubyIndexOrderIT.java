@@ -31,6 +31,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 
@@ -41,6 +42,8 @@ import org.springframework.http.MediaType;
  * every update of a row. The id ends the order.
  */
 @DisplayName("Ruby /info lists versions in a fixed order (RPS-1614)")
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class RubyIndexOrderIT extends AbstractIT {
 
   private void push(final Repo repo, final String token, final String name, final String version)

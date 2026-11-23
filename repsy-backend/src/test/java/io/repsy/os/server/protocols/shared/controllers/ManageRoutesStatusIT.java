@@ -29,6 +29,7 @@ import java.util.TreeSet;
 import java.util.UUID;
 import org.assertj.core.api.SoftAssertions;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
@@ -50,6 +51,8 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
  * variables other than the repository are placeholders and no request changes anything.
  */
 @DisplayName("MANAGE routes: 403 for a user who is not allowed, 401 for a bad credential")
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class ManageRoutesStatusIT extends AbstractIT {
 
   /** A floor, so an enumeration that silently finds nothing cannot pass. */

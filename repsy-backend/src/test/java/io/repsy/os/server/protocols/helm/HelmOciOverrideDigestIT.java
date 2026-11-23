@@ -33,6 +33,7 @@ import io.repsy.os.shared.usage.services.UsageUpdateService;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -46,6 +47,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * that.
  */
 @DisplayName("Helm OCI override keeps the previous digest pullable (RPS-1314)")
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class HelmOciOverrideDigestIT extends AbstractIT {
 
   private static final String CHART = "payments";

@@ -49,6 +49,7 @@ import java.util.stream.Collectors;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -70,6 +71,8 @@ import org.springframework.beans.factory.annotation.Value;
  * metadata rewrite.
  */
 @DisplayName("Maven artifact deletion safety (RPS-1190, RPS-1197, RPS-1349, RPS-1573)")
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class MavenArtifactDeletionSafetyIT extends AbstractIT {
 
   @Autowired private RepoTxService repoTxService;

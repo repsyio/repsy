@@ -64,6 +64,7 @@ import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -98,6 +99,8 @@ import tools.jackson.databind.ObjectMapper;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("npm operations on a package whose metadata file is gone (RPS-1300)")
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class NpmMissingMetadataIT extends AbstractIT {
 
   private static final String UNDELETABLE_VERSION = "1.9.9";

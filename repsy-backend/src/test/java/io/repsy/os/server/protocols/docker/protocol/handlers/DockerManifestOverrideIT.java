@@ -44,6 +44,7 @@ import java.nio.file.Files;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -62,6 +63,8 @@ import org.springframework.web.context.WebApplicationContext;
  * usage the pushes and deletes ask for.
  */
 @DisplayName("Docker manifests are content-addressed (RPS-1216)")
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class DockerManifestOverrideIT extends AbstractIT {
 
   private static final String IMAGE = "app";

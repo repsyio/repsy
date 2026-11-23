@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -56,6 +57,8 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("Maven releases/snapshots settings also refuse redeploys (RPS-1174)")
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class MavenVersionTypeRedeployIT extends AbstractIT {
 
   private static final String SNAPSHOT_POM = "com/acme/lib/1.0-SNAPSHOT/lib-1.0-SNAPSHOT.pom";

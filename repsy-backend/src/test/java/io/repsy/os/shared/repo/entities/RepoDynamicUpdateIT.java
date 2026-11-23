@@ -27,6 +27,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -46,6 +47,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("Repo full-row save versus a concurrent usage increment")
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class RepoDynamicUpdateIT extends AbstractIT {
 
   private static final long TIMEOUT_SECONDS = 20;

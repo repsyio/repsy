@@ -30,6 +30,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockPart;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -42,6 +43,8 @@ import org.yaml.snakeyaml.Yaml;
  * index} writes it.
  */
 @DisplayName("Helm index.yaml lists charts by name and versions highest first (RPS-1614)")
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class HelmIndexOrderIT extends AbstractIT {
 
   /** {@code @Async}, so it cannot see this class's uncommitted rows. */

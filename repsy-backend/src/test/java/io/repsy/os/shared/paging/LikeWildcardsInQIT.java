@@ -39,6 +39,7 @@ import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -51,6 +52,8 @@ import org.springframework.beans.factory.annotation.Autowired;
  * matches, so the test fails on a {@code like %:q%} query.
  */
 @DisplayName("_ and % in q match literally (RPS-1891)")
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class LikeWildcardsInQIT extends AbstractIT {
 
   @Autowired private NpmPackageRepository npmPackageRepository;

@@ -35,6 +35,7 @@ import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.ResultActions;
@@ -53,6 +54,8 @@ import org.springframework.test.web.servlet.ResultActions;
  * name. Real crates.io refuses this.
  */
 @DisplayName("Cargo publish refuses a different spelling of an existing crate's name (RPS-1721)")
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class CargoPublishNameSpellingIT extends AbstractIT {
 
   private static final String PUBLISH = "/{repo}/api/v1/crates/new";

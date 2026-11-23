@@ -35,6 +35,7 @@ import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.request.AbstractMockHttpServletRequestBuilder;
 
@@ -48,6 +49,8 @@ import org.springframework.test.web.servlet.request.AbstractMockHttpServletReque
  * answers in heap order, which is publish order here) fails the order assertions.
  */
 @DisplayName("Cargo search pages in a stable order")
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class CargoSearchPagingIT extends AbstractIT {
 
   private static final String PUBLISH = "/{repo}/api/v1/crates/new";
