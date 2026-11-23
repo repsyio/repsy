@@ -341,6 +341,10 @@ class MavenDownloadTokenIT extends AbstractIT {
       final var repo = seedMavenWithFiles(true);
       final var token = issue(repo, JAR);
 
+      // Control: the very same token is a valid credential where it belongs, the protocol port.
+      assertThat(protocol(download(repo, JAR, token)).getResponse().getStatus()).isEqualTo(200);
+
+      // On the panel API, with no Authorization header, a valid token in the query opens nothing.
       perform(
               get("/api/repos/{repo}/contents", repo.getName())
                   .param("path", "/")
