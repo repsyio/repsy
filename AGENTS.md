@@ -532,6 +532,25 @@ rebase or update the branch when another PR has just changed the same area, and 
 - The same rules apply in `repsy-core` and `repsy-mono`; change them in all three repositories together.
 
 
+## Release and the nightlies
+
+The first job of `release.yml` (`nightly-state`, script `.github/scripts/nightly-state.sh`) reads the newest
+completed scheduled run on `main` of `sonarcloud.yml` and `e2e-nightly.yml` and writes a table to the run summary:
+conclusion, date, run commit, how many commits of the release that run did not cover, and a link. A red nightly, a
+nightly with no run, or a last run older than 36 hours (`sonarcloud.yml` runs five times a day, so a few hours is
+normal) gives one `::warning::` annotation. An API error is also only a warning; the script fails open.
+
+- Today the gate is `warn`: the job always succeeds and a release is never held. Red nightlies mean the releaser
+  looks at the table and decides, and says so in the release note or PR. A flaky red is cleared by re-running the
+  nightly (`gh workflow run e2e-nightly.yml`), not by editing the check.
+- To hold releases on a red nightly, set the repository variable `NIGHTLY_GATE` to `block` (`gh variable set
+  NIGHTLY_GATE --body block`); `warn` or unset restores the warning. `build-and-push` and `build-and-push-scanner`
+  need the job, so `block` stops both images and with them the Helm update.
+- The check uses the workflow file at the tag, so it exists only for tags cut after it was merged.
+- Run it alone, without a release: `gh workflow run nightly-state.yml` (it only reads run data). Locally:
+  `GITHUB_REPOSITORY=repsyio/repsy .github/scripts/nightly-state.sh sonarcloud.yml e2e-nightly.yml`.
+
+
 ## Keeping the pnpm pin up to date
 
 The pnpm version is a literal in `.github/actions/setup-pnpm/action.yml`, the `Dockerfile` and every
