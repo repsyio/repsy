@@ -106,7 +106,7 @@ const PLACEHOLDER_WORLD = {
   fresh: { username: 'e2e-sweep-nobody', repoName: 'e2e-sweep-newrepo' },
 };
 
-test.describe('the operations the spec declares 403 on', { tag: ['@smoke'] }, () => {
+test.describe('the operations the spec declares 403 on', () => {
   test('the set is derived from the spec and is not empty', () => {
     expect(OPERATIONS.length).toBeGreaterThanOrEqual(120);
     expect(FORBIDDEN.length).toBeGreaterThanOrEqual(48);
@@ -178,7 +178,7 @@ test.describe('the operations the spec declares 403 on', { tag: ['@smoke'] }, ()
   }
 });
 
-test.describe('anonymous callers', { tag: ['@smoke'] }, () => {
+test.describe('anonymous callers', () => {
   for (const op of OPERATIONS.filter((candidate) => candidate.security !== 'public')) {
     test(`get 401 on ${label(op)}`, async () => {
       const res = await call(op, { body: bodyFor(op.operationId, PLACEHOLDER_WORLD) });
@@ -197,7 +197,7 @@ test.describe('anonymous callers', { tag: ['@smoke'] }, () => {
   }
 });
 
-test.describe('the operations the spec does not declare 403 on', { tag: ['@smoke'] }, () => {
+test.describe('the operations the spec does not declare 403 on', () => {
   for (const op of NOT_FORBIDDEN.filter((candidate) => !(candidate.operationId in REVERSE_SKIP))) {
     test(`a USER is not refused with 403 on ${label(op)}`, async ({ sweepUser }) => {
       const res = await call(op, {}, sweepUser.token);
