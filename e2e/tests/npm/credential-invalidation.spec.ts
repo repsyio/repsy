@@ -47,7 +47,8 @@ const isStored = async (repoName: string, packageName: string, version: string) 
 registerCredentialInvalidation({ adapter: npmAdapter, repoType: RepoType.NPM, isStored });
 
 // RPS-1552: the token `npm login` stores (a 90 day JWT) ends with a password change. The real `npm publish`
-// sends it as `_authToken`, so the refusal is proved with the tool as well as with a raw request.
+// sends it as `_authToken`, so the refusal is proved with the tool. The raw-request cases of the same rule are
+// `ProtocolJwtTokenVersionIT` (RPS-2738).
 registerLoginTokenInvalidation({
   name: 'npm',
   repoType: RepoType.NPM,
@@ -65,4 +66,5 @@ registerLoginTokenInvalidation({
       Authorization: `Bearer ${token}`,
     }),
   realClient: { adapter: npmAdapter, isStored },
+  rawTests: false,
 });

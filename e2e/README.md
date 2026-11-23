@@ -211,8 +211,7 @@ e2e/
     skeleton/repo-settings.spec.ts  # RPS-1435 Cargo and Go settings omit `allowOverride` and ignore it on write (the two tests Cloud pins as known gaps; the rest of the settings PUT is `ProtocolRepoControllerIT`)
     maven/
       publish-consume.spec.ts   # registerPublishConsumeLoop(mavenAdapter) + the RPS-1196 real-client test
-      upload-rules.spec.ts      # raw-HTTP pins of the override / releases / snapshots upload rules
-      validation.spec.ts        # RPS-1716 maven validation edge cases: groupId/artifactId/version length limits (boundary probes), raw deploy-token Bearer auth behavior; pins RPS-1732 (255-char artifactId/version max 500s with FileSystemException)
+      validation.spec.ts        # RPS-1716 maven validation edge cases: the artifactId sized to a 255-byte file name, raw deploy-token Bearer auth behavior (the length limits are `MavenPublishLimitsIT`, RPS-2738)
       version-delete.spec.ts    # the panel's version delete for a raw-PUT artifact: with no stored maven-metadata.xml (the generated one drops the version, RPS-1331, RPS-1369), with one, with `<metadata/>`
       pgp-signature.spec.ts     # registered PGP public keys (RPS-1189): verify, reject, isolate, delete; every-signature verification (RPS-1188); key-server lookup off (RPS-1204); toggling every-signature verification recomputes `signed` and verifies stored `.asc` files (RPS-1316, RPS-1323)
       parallel-signed-deploy.spec.ts  # a REAL parallel `mvn deploy:deploy-file` of a signed release to a verify-all repo (RPS-1188), plus the one-thread control
@@ -231,11 +230,11 @@ e2e/
       maven-reactor-plugin.spec.ts # RPS-1488: RA1-RA5, real `mvn deploy` of a parent + jar + war reactor (consumed by a second project), a hand-built war and `maven-plugin` packaging (group-level metadata Maven uploads, `mvn hello:hi`)
     npm/
       publish-consume.spec.ts   # registerPublishConsumeLoop(npmAdapter) + a scoped-package real-client test
-      registry-rules.spec.ts    # raw-HTTP pins of override/version-validation rules + the RPS-1205 tarball probe
-      packument-read.spec.ts    # raw-HTTP reads: abbreviated packument, no publish-only fields, HEAD, ETag/304/gzip, undeprecate, tarball header (RPS-1356..1360, 1363)
+      registry-rules.spec.ts    # raw-HTTP pin of the invalid-version rule (the override refusal, the revoked Bearer token and the dist.tarball rules are ITs, RPS-2738)
+      packument-read.spec.ts    # raw-HTTP read of a gzip-compressed packument (RPS-1359); the other reads are `NpmPackumentReadIT` (RPS-2738)
       unpublish.spec.ts         # real `npm unpublish` (RPS-1289): one version (unscoped/scoped), the only version, a whole package; refused for a read-write deploy token (RPS-1424)
       size-limits.spec.ts       # RPS-1482/RPS-1561 registerSizeLimitSpecs(npmAdapter): a real `npm publish` over NPM_MAX_PUBLISH_SIZE, @limits
-      validation.spec.ts        # RPS-1717 npm validation edge cases: package name/version length limits (boundary probes), packageNameMismatch (tarball name != URL), unpublish races (concurrent unpublish invariants), cross-user token revoke (all requests refused after revocation)
+      validation.spec.ts        # RPS-1717 npm validation edge cases: package name/version length limits (boundary probes; the 215-character name and the name mismatch are `NpmPublishProtocolIT`), unpublish races (concurrent unpublish invariants), cross-user token revoke (all requests refused after revocation)
     npm-clients/
       npm/publish-consume.spec.ts   # registerPublishConsumeLoop(npmFamilyAdapter(npmClient)): the catalog through the npm-family harness
       pnpm/*.spec.ts            # pnpm: the catalog, `pnpm -r publish` (workspace: rewrite), native-command wire proof, resolution / minimumReleaseAge
@@ -1194,7 +1193,7 @@ jar; `snapshot-deploy`/`snapshot-redeploy` assert the metadata's buildNumber, th
 timestamped file name, that every deploy's own jar is still stored, and that the resolved jar is the
 deployed one.
 
-What the server does, per rule (all pinned above or in `tests/maven/upload-rules.spec.ts`):
+What the server does, per rule (all pinned above or in the Java ITs `MavenVersionTypeRedeployIT`, `MavenLiteralSnapshotRedeployIT`, `MavenArtifactPathIT`, `MavenChecksumRulesIT` and `MavenMetadataUploadIT`; the raw-PUT spec `upload-rules.spec.ts` was removed in RPS-2738):
 
 - **A switched-off kind** (`releases: false` / `snapshots: false`) refuses an upload of that kind
   with `403` (`releaseVersionsAreProhibited` / `snapshotVersionsAreProhibited`) on the first file of
@@ -1218,7 +1217,7 @@ What the server does, per rule (all pinned above or in `tests/maven/upload-rules
   checksums and classifier jars) is not an override either (RPS-1328): the redeploy is accepted,
   under the same scenario, and the consumer resolves the second publish's jar. `snapshots: false`
   still refuses it, like any snapshot. A real client never sends a file of an existing timestamped
-  build or of a release twice; that is pinned with raw PUTs in `upload-rules.spec.ts`.
+  build or of a release twice; that is pinned with raw PUTs in the Java IT `MavenVersionTypeRedeployIT`.
 - **A literal `-SNAPSHOT` file of a directory that holds only timestamped builds** (`lib-1.0-SNAPSHOT.jar`
   next to `lib-1.0-20260921.101010-2.jar`) is answered with the file of the newest build, and so are its
   checksums, like Maven repository managers do. sbt 2.x publishes timestamped builds and the version-level
@@ -2105,7 +2104,7 @@ depends on a public package).
   metadata cache. Pinned in `matrix/wire.spec.ts` (B8 of the plan).
 
 **The read side is fixed since** (RPS-1356, 1357, 1358, 1359, 1360, 1363; the pins above were flipped, and
-`tests/npm/packument-read.spec.ts` proves each at the wire with the headers the clients hide): the abbreviated
+`NpmPackumentReadIT` and `NpmWriteResponseIT` prove each, `tests/npm/packument-read.spec.ts` the gzip answer at the wire): the abbreviated
 packument copies `os`, `cpu`, `libc`, `peerDependenciesMeta`, `hasInstallScript`, `funding` and
 `acceptDependencies`; `_attachments`, `_from` and `_resolved` are neither stored nor served; `HEAD` of a package
 or tarball that does not exist is 404 (the repo itself and `/-/...` endpoints stay 200); the packument carries a
@@ -2118,7 +2117,7 @@ tarball download is `Content-Disposition: attachment; filename="<name>-<version>
 
 Still open: RPS-1345 (audit findings query performance). RPS-1343 (search qualifiers; a qualifier-only
 text matches nothing) and RPS-1344 (`size=0`, `from` beyond the end, a 400 for a `size`/`from` that is no
-number) are fixed and asserted in `tests/npm/search-token-dist-tags.spec.ts` and `matrix/registry-endpoints.spec.ts`.
+number) are fixed and asserted in `NpmSearchQualifiersProtocolIT` and `matrix/registry-endpoints.spec.ts`.
 
 ### pnpm (RPS-1330, PR 2)
 
@@ -2589,11 +2588,13 @@ real docker client exchanges its Basic credentials again for every operation and
   (`rawStartUploadWithToken`, which builds its URL with `v2RepoUrl`, so it reaches
   `/v2/<owner>/<repo>/<image>/...` on an owner-scoped registry: without the owner segment the probe was a `404`,
   and a dead session could not read as one, RPS-1520).
-- `tests/npm/credential-invalidation.spec.ts`: a read with the login token, and the real `npm publish` with it as
-  `_authToken` (refused, nothing stored, and the new login publishes).
-- `tests/cargo/credential-invalidation.spec.ts`: a sparse-index read with the `/me` token.
+- `tests/npm/credential-invalidation.spec.ts`: the real `npm publish` with the login token as `_authToken` (refused,
+  nothing stored, and the new login publishes). The raw-request cases are `ProtocolJwtTokenVersionIT` since
+  RPS-2738 (`rawTests: false`).
+- Cargo: the sparse-index read with the `/me` token is `ProtocolJwtTokenVersionIT` too; the e2e spec keeps only
+  the bare-token renewal.
 
-Each runs four tests: the password change ends the token (`401`, "Session expired.", the same answer as an expired
+Each registers up to four raw tests: the password change ends the token (`401`, "Session expired.", the same answer as an expired
 token and not counted against the client like a wrong password) and a new login works; an admin
 `reset-password` ends it; another user's password change leaves it alone; a deploy-token JWT is not tied to any
 user (it is checked against its token row) and survives a password change. `--grep "login token invalidation"`

@@ -291,6 +291,11 @@ export interface LoginTokenProtocol<F = unknown> {
    * proved with the tool as well as with the raw probe.
    */
   realClient?: Pick<CredentialInvalidationProtocol<F>, 'adapter' | 'isStored'>;
+  /**
+   * `false` leaves out the raw-request tests: `ProtocolJwtTokenVersionIT` pins the same rules for npm
+   * and Cargo (RPS-2738), so only the real client test remains.
+   */
+  rawTests?: boolean;
 }
 
 export function registerLoginTokenInvalidation<F>(protocol: LoginTokenProtocol<F>): void {
@@ -309,130 +314,132 @@ export function registerLoginTokenInvalidation<F>(protocol: LoginTokenProtocol<F
   }
 
   test.describe(`${name} login token invalidation (RPS-1552)`, () => {
-    test(
-      'a changed password ends the login token at once and a new login works',
-      { tag: ['@smoke'] },
-      async ({ seeder }) => {
+    if (protocol.rawTests !== false) {
+      test(
+        'a changed password ends the login token at once and a new login works',
+        { tag: ['@smoke'] },
+        async ({ seeder }) => {
+          const repo = await seeder.createRepo(protocol.repoType, { privateRepo: true });
+          const user = await invalidationUser(seeder, repo.name, protocol.repoType);
+          const token = await protocol.login(repo.name, user.username, user.password);
+
+          // Used twice first: what ends is a token that worked, not one that never did.
+          await accepted(repo.name, token, 'the login token before the change');
+          await accepted(repo.name, token, 'the login token, again');
+
+          const userApi = await createPanelBackend();
+          await userApi.login(user.username, user.password);
+          const newPassword = `${user.password}${NEW_PASSWORD_SUFFIX}`;
+          await userApi.changeOwnPassword(newPassword);
+
+          await endedSession(repo.name, token, 'the login token after the password change');
+
+          const fresh = await protocol.login(repo.name, user.username, newPassword);
+          await accepted(repo.name, fresh, 'the token of a login with the new password');
+        },
+      );
+
+      /**
+       * RPS-1604: the name a user had is freed by a rename and registered again. A fresh user starts at
+       * `token_version` 0, which is what the old token carries (the rename moved only the old user's
+       * version), so only the token's subject (the user id) tells the two users apart.
+       */
+      test('a reused username does not inherit the login token of its former owner', async ({
+        seeder,
+      }) => {
+        test.skip(
+          target.supportsRepoUsers && target.maxCollaboratorsPerRepo < 2,
+          'RPS-2410: needs the former and the successor as collaborators of one repo',
+        );
+        const repo = await seeder.createRepo(protocol.repoType, { privateRepo: true });
+        const former = await invalidationUser(seeder, repo.name, protocol.repoType);
+        const token = await protocol.login(repo.name, former.username, former.password);
+        await accepted(repo.name, token, 'the login token before the rename');
+
+        const formerApi = await createPanelBackend();
+        await formerApi.login(former.username, former.password);
+        const renamed = await formerApi.rawRequest('PATCH', '/api/profile/username', {
+          username: seeder.reserveUsername(),
+        });
+        expect(renamed.status, `rename: ${JSON.stringify(renamed.body)}`).toBe(200);
+
+        // The successor deploys and logs in, so it is seeded through the target's `user-password` credential
+        // under the freed name (a Repsy Cloud tenant needs a grant on the repo, RPS-1890), not `createUser()`.
+        const successor = await seeder.backend.seedUserCredential({
+          seeder,
+          repoName: repo.name,
+          repoType: protocol.repoType,
+          username: former.username,
+        });
+        expect(successor.username, 'the successor was seeded under the freed name').toBe(
+          former.username,
+        );
+
+        await endedSession(
+          repo.name,
+          token,
+          'the old login token, the name now belongs to another user',
+        );
+
+        const fresh = await protocol.login(repo.name, former.username, successor.password!);
+        await accepted(repo.name, fresh, 'the token of the new owner of the name');
+      });
+
+      // @cloud-skip: `POST /api/users/{id}/actions/reset-password` is an admin route of Repsy OS; a Repsy Cloud
+      // tenant has no administrator who resets another's password.
+      test(
+        'an admin password reset ends the login token at once',
+        { tag: ['@cloud-skip'] },
+        async ({ seeder, panelApi }) => {
+          const repo = await seeder.createRepo(protocol.repoType, { privateRepo: true });
+          const user = await invalidationUser(seeder, repo.name, protocol.repoType);
+          const token = await protocol.login(repo.name, user.username, user.password);
+          await accepted(repo.name, token, 'the login token before the reset');
+
+          // The admin's own session (`panelApi`); the reset answers the generated password as a bare JSON string.
+          const reset = await panelApi.rawRequest(
+            'POST',
+            `/api/users/${user.id}/actions/reset-password`,
+          );
+          expect(reset.status, `reset-password: ${JSON.stringify(reset.body)}`).toBe(200);
+          // The body is the bare string, typed as the generic `{ data?: unknown }` of `rawRequest`.
+          const generated = String(reset.body as unknown);
+
+          await endedSession(repo.name, token, 'the login token after the admin reset');
+          const fresh = await protocol.login(repo.name, user.username, generated);
+          await accepted(repo.name, fresh, 'the token of a login with the generated password');
+        },
+      );
+
+      test('a password change of another user leaves the login token alone', async ({ seeder }) => {
         const repo = await seeder.createRepo(protocol.repoType, { privateRepo: true });
         const user = await invalidationUser(seeder, repo.name, protocol.repoType);
+        const other = await seeder.createUser();
         const token = await protocol.login(repo.name, user.username, user.password);
 
-        // Used twice first: what ends is a token that worked, not one that never did.
-        await accepted(repo.name, token, 'the login token before the change');
-        await accepted(repo.name, token, 'the login token, again');
+        const otherApi = await createPanelBackend();
+        await otherApi.login(other.username, other.password);
+        await otherApi.changeOwnPassword(`${other.password}${NEW_PASSWORD_SUFFIX}`);
+
+        await accepted(repo.name, token, 'the login token after ANOTHER user changed the password');
+      });
+
+      test('a deploy-token JWT is not tied to any user and survives a password change', async ({
+        seeder,
+      }) => {
+        const repo = await seeder.createRepo(protocol.repoType, { privateRepo: true });
+        const user = await seeder.createUser();
+        const deployToken = await seeder.createToken(repo.name, { readOnly: false });
+        const jwt = await protocol.login(repo.name, deployToken.username, deployToken.token);
+        await accepted(repo.name, jwt, 'the deploy-token JWT before the change');
 
         const userApi = await createPanelBackend();
         await userApi.login(user.username, user.password);
-        const newPassword = `${user.password}${NEW_PASSWORD_SUFFIX}`;
-        await userApi.changeOwnPassword(newPassword);
+        await userApi.changeOwnPassword(`${user.password}${NEW_PASSWORD_SUFFIX}`);
 
-        await endedSession(repo.name, token, 'the login token after the password change');
-
-        const fresh = await protocol.login(repo.name, user.username, newPassword);
-        await accepted(repo.name, fresh, 'the token of a login with the new password');
-      },
-    );
-
-    /**
-     * RPS-1604: the name a user had is freed by a rename and registered again. A fresh user starts at
-     * `token_version` 0, which is what the old token carries (the rename moved only the old user's
-     * version), so only the token's subject (the user id) tells the two users apart.
-     */
-    test('a reused username does not inherit the login token of its former owner', async ({
-      seeder,
-    }) => {
-      test.skip(
-        target.supportsRepoUsers && target.maxCollaboratorsPerRepo < 2,
-        'RPS-2410: needs the former and the successor as collaborators of one repo',
-      );
-      const repo = await seeder.createRepo(protocol.repoType, { privateRepo: true });
-      const former = await invalidationUser(seeder, repo.name, protocol.repoType);
-      const token = await protocol.login(repo.name, former.username, former.password);
-      await accepted(repo.name, token, 'the login token before the rename');
-
-      const formerApi = await createPanelBackend();
-      await formerApi.login(former.username, former.password);
-      const renamed = await formerApi.rawRequest('PATCH', '/api/profile/username', {
-        username: seeder.reserveUsername(),
+        await accepted(repo.name, jwt, 'the deploy-token JWT after a user changed the password');
       });
-      expect(renamed.status, `rename: ${JSON.stringify(renamed.body)}`).toBe(200);
-
-      // The successor deploys and logs in, so it is seeded through the target's `user-password` credential
-      // under the freed name (a Repsy Cloud tenant needs a grant on the repo, RPS-1890), not `createUser()`.
-      const successor = await seeder.backend.seedUserCredential({
-        seeder,
-        repoName: repo.name,
-        repoType: protocol.repoType,
-        username: former.username,
-      });
-      expect(successor.username, 'the successor was seeded under the freed name').toBe(
-        former.username,
-      );
-
-      await endedSession(
-        repo.name,
-        token,
-        'the old login token, the name now belongs to another user',
-      );
-
-      const fresh = await protocol.login(repo.name, former.username, successor.password!);
-      await accepted(repo.name, fresh, 'the token of the new owner of the name');
-    });
-
-    // @cloud-skip: `POST /api/users/{id}/actions/reset-password` is an admin route of Repsy OS; a Repsy Cloud
-    // tenant has no administrator who resets another's password.
-    test(
-      'an admin password reset ends the login token at once',
-      { tag: ['@cloud-skip'] },
-      async ({ seeder, panelApi }) => {
-        const repo = await seeder.createRepo(protocol.repoType, { privateRepo: true });
-        const user = await invalidationUser(seeder, repo.name, protocol.repoType);
-        const token = await protocol.login(repo.name, user.username, user.password);
-        await accepted(repo.name, token, 'the login token before the reset');
-
-        // The admin's own session (`panelApi`); the reset answers the generated password as a bare JSON string.
-        const reset = await panelApi.rawRequest(
-          'POST',
-          `/api/users/${user.id}/actions/reset-password`,
-        );
-        expect(reset.status, `reset-password: ${JSON.stringify(reset.body)}`).toBe(200);
-        // The body is the bare string, typed as the generic `{ data?: unknown }` of `rawRequest`.
-        const generated = String(reset.body as unknown);
-
-        await endedSession(repo.name, token, 'the login token after the admin reset');
-        const fresh = await protocol.login(repo.name, user.username, generated);
-        await accepted(repo.name, fresh, 'the token of a login with the generated password');
-      },
-    );
-
-    test('a password change of another user leaves the login token alone', async ({ seeder }) => {
-      const repo = await seeder.createRepo(protocol.repoType, { privateRepo: true });
-      const user = await invalidationUser(seeder, repo.name, protocol.repoType);
-      const other = await seeder.createUser();
-      const token = await protocol.login(repo.name, user.username, user.password);
-
-      const otherApi = await createPanelBackend();
-      await otherApi.login(other.username, other.password);
-      await otherApi.changeOwnPassword(`${other.password}${NEW_PASSWORD_SUFFIX}`);
-
-      await accepted(repo.name, token, 'the login token after ANOTHER user changed the password');
-    });
-
-    test('a deploy-token JWT is not tied to any user and survives a password change', async ({
-      seeder,
-    }) => {
-      const repo = await seeder.createRepo(protocol.repoType, { privateRepo: true });
-      const user = await seeder.createUser();
-      const deployToken = await seeder.createToken(repo.name, { readOnly: false });
-      const jwt = await protocol.login(repo.name, deployToken.username, deployToken.token);
-      await accepted(repo.name, jwt, 'the deploy-token JWT before the change');
-
-      const userApi = await createPanelBackend();
-      await userApi.login(user.username, user.password);
-      await userApi.changeOwnPassword(`${user.password}${NEW_PASSWORD_SUFFIX}`);
-
-      await accepted(repo.name, jwt, 'the deploy-token JWT after a user changed the password');
-    });
+    }
 
     const { realClient } = protocol;
     if (realClient) {

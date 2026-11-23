@@ -42,7 +42,7 @@ registerPublishConsumeLoop(mavenAdapter);
  * Against the pre-RPS-1196 image this fails with a non-zero `mvn deploy` exit code (the jar its
  * `deploy` goal PUTs first is parsed as a POM and refused, 400 `malformedPomFile`), the exact
  * discrepancy the harness exists to catch: a raw POM PUT under the same artifactId answers 200 (see
- * `upload-rules.spec.ts`'s own RPS-1196 test), because only the artifact's *other* files are
+ * `MavenDottedArtifactIdIT`'s RPS-1196 case), because only the artifact's *other* files are
  * casualties of the whole-path substring bug.
  */
 test(

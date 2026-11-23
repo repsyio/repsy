@@ -144,7 +144,7 @@ export function buildTarball(opts: { packageName: string; version: string }): Bu
  * with `_id`/`name`/`description`/`dist-tags`/`versions`/`_attachments`. `tarballBytes` are used
  * as-is (a real client's `npm pack` output, or arbitrary bytes for a raw-only probe -- Repsy never
  * validates that a stored "tarball" is actually a valid tar+gzip stream, the same way maven's raw
- * seeds use plain strings as "jar" bytes in `upload-rules.spec.ts`).
+ * seeds use plain strings as "jar" bytes).
  */
 export function buildPublishDocument(opts: {
   repoName: string;

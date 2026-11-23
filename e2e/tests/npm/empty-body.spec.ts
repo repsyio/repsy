@@ -26,7 +26,9 @@ import { expect, test } from '../../src/scenarios/fixtures.js';
 const FORM = 'application/x-www-form-urlencoded';
 
 test.describe('npm empty publish body (raw HTTP)', () => {
-  for (const contentType of [undefined, 'application/json', FORM]) {
+  // `application/json` is `EmptyUploadBodyIT`. A body with no Content-Type is not, and the form type
+  // stays because Tomcat's own form handling (RPS-1443) is what MockMvc cannot show.
+  for (const contentType of [undefined, FORM]) {
     test(
       `an empty publish (Content-Type ${contentType ?? 'none'}) answers 400 npmPublishBodyEmpty and stores nothing (RPS-1466)`,
       { tag: ['@negative'] },
