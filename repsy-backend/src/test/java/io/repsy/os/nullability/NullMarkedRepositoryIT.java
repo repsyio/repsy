@@ -24,6 +24,7 @@ import io.repsy.os.shared.repo.repositories.RepoRepository;
 import jakarta.persistence.EntityManager;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.EmptyResultDataAccessException;
@@ -42,6 +43,8 @@ import org.springframework.transaction.annotation.Transactional;
  * filter had the shape of {@code bareParameter} before they were annotated.
  */
 @Transactional
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class NullMarkedRepositoryIT extends AbstractIT {
 
   @Autowired private EntityManager entityManager;

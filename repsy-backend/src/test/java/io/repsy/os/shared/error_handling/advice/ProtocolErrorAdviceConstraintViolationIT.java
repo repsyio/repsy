@@ -21,6 +21,7 @@ import static io.repsy.os.shared.error_handling.advice.ConstraintViolationChecks
 
 import io.repsy.os.AbstractIT;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -32,6 +33,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * driver reports and not one a unit test made up. The {@code users} table is the fixture: a {@code
  * varchar(25)} username, a unique username index and a check on the role.
  */
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class ProtocolErrorAdviceConstraintViolationIT extends AbstractIT {
 
   @Autowired private ProtocolErrorAdvice advice;

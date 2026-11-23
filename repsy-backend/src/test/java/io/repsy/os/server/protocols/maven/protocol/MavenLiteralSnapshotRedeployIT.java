@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -57,6 +58,8 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("Maven allowOverride:false lets a literal SNAPSHOT be redeployed (RPS-1328)")
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class MavenLiteralSnapshotRedeployIT extends AbstractIT {
 
   private static final String DIR = "com/acme/lib/1.0-SNAPSHOT/";

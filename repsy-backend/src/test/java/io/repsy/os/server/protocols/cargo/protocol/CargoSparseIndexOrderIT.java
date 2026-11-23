@@ -38,6 +38,7 @@ import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.request.AbstractMockHttpServletRequestBuilder;
 
@@ -47,6 +48,8 @@ import org.springframework.test.web.servlet.request.AbstractMockHttpServletReque
  * moves it, which flipped {@code 1.0.0, 2.0.0} to {@code 2.0.0, 1.0.0}.
  */
 @DisplayName("Cargo sparse index lists versions in publish order")
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class CargoSparseIndexOrderIT extends AbstractIT {
 
   private static final String CRATE = "order_crate";

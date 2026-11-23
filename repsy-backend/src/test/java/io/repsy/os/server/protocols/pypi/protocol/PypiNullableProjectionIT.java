@@ -35,6 +35,7 @@ import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Pageable;
@@ -52,6 +53,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * of that.
  */
 @DisplayName("PyPI projections of nullable columns (RPS-2077)")
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class PypiNullableProjectionIT extends AbstractIT {
 
   @Autowired private RepoTxService repoTxService;

@@ -61,6 +61,8 @@ import org.springframework.web.context.WebApplicationContext;
  * {@code sha256} one. A {@code sha512:} reference never becomes a tag row.
  */
 @DisplayName("Docker sha512 digest references")
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@org.junit.jupiter.api.Tag("extended")
 class DockerSha512ReferenceIT extends AbstractIT {
 
   private static final String IMAGE = "app";

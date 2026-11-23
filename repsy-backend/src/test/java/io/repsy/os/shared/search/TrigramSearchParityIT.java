@@ -22,11 +22,14 @@ import io.repsy.os.server.protocols.npm.shared.npm_package.repositories.NpmPacka
 import io.repsy.os.server.protocols.pypi.shared.python_package.repositories.PypiPackageRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
 /** The contains-searches on PostgreSQL, where the trigram indexes serve them (RPS-2117). */
 @DisplayName("Contains searches are case-insensitive and literal on PostgreSQL (RPS-2117)")
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class TrigramSearchParityIT extends AbstractIT {
 
   @Autowired private ArtifactRepository artifactRepository;

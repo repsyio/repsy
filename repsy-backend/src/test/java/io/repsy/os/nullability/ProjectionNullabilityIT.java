@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -43,6 +44,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * (npm: {@code NpmPackageListItem#getLatest}, {@code PackageMaintainerListItem#getEmail}/{@code
  * getUrl}, {@code VersionMaintainerListItem#getEmail}).
  */
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class ProjectionNullabilityIT extends AbstractIT {
 
   /** {@code Projection#getter} that is not derivable and not null, with the proof. */

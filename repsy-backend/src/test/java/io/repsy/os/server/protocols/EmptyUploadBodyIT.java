@@ -47,6 +47,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -74,6 +75,8 @@ import org.springframework.web.context.WebApplicationContext;
  * the Ruby case here pins what the handler does with a form-typed body and an empty one.
  */
 @DisplayName("Empty and form-typed upload bodies (RPS-1466)")
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class EmptyUploadBodyIT extends AbstractIT {
 
   private static final String FORM = "application/x-www-form-urlencoded";

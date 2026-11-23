@@ -57,6 +57,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -70,6 +71,8 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
  * left the tied rows to the database.
  */
 @DisplayName("Paged lists break sort ties by id (RPS-1298)")
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class StablePagingIT extends AbstractIT {
 
   private static final int ROWS = 60;

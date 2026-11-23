@@ -36,6 +36,7 @@ import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.mock.web.MockPart;
@@ -49,6 +50,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * ChartService.update} already does on the classic override path.
  */
 @DisplayName("Helm OCI override refreshes the chart version row (RPS-1218)")
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class HelmOciOverrideIT extends AbstractIT {
 
   private static final String CHART = "payments";

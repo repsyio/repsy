@@ -25,6 +25,7 @@ import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.user.entities.UserRole;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
@@ -34,6 +35,8 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
  * {@code itemNotFound}, as a path nothing maps does, whoever calls it.
  */
 @DisplayName("Connected applications, turned off (the default)")
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class ConnectorDisabledIT extends AbstractIT {
 
   private int status(final MockHttpServletRequestBuilder request, final String login)

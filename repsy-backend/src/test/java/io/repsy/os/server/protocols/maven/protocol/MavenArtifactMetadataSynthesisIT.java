@@ -39,6 +39,7 @@ import java.nio.file.Files;
 import java.time.Instant;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mock.web.MockHttpServletResponse;
@@ -54,6 +55,8 @@ import org.springframework.test.web.servlet.request.AbstractMockHttpServletReque
  * joins the transaction that is rolled back afterwards.
  */
 @DisplayName("Maven artifact-level metadata is generated when none is stored (RPS-1369)")
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class MavenArtifactMetadataSynthesisIT extends AbstractIT {
 
   private static final String GROUP = "com.acme";

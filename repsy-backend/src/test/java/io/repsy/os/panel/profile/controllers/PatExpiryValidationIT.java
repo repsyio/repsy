@@ -30,6 +30,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -48,6 +49,8 @@ import org.springframework.test.web.servlet.ResultActions;
  * PersonalAccessTokenServiceTest}, which runs on a fixed clock.
  */
 @DisplayName("PersonalAccessToken expiration date")
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class PatExpiryValidationIT extends AbstractIT {
 
   private static final String BASE = "/api/profile/access-tokens";

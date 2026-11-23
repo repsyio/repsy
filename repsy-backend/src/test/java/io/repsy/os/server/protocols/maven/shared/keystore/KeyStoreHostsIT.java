@@ -35,6 +35,7 @@ import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.ByteArrayResource;
@@ -44,6 +45,8 @@ import org.springframework.core.io.ByteArrayResource;
  * only, in a fixed order. A keyserver an admin deactivated must not be contacted, and the host that
  * is tried first must not depend on the query plan.
  */
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class KeyStoreHostsIT extends AbstractIT {
 
   private static final PgpTestKeys SIGNER = PgpTestKeys.generate();

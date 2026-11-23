@@ -27,6 +27,7 @@ import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.List;
 import org.assertj.core.api.SoftAssertions;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpMethod;
@@ -45,6 +46,8 @@ import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandl
  * the callers of the MANAGE routes apart; this class is about who may not get in at all.
  */
 @DisplayName("@RepoOperation routes: an anonymous caller is answered 401 (RPS-1558)")
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class RepoOperationRoutesStatusIT extends AbstractIT {
 
   /** A floor, so an enumeration that silently finds nothing cannot pass. */

@@ -23,6 +23,7 @@ import io.repsy.os.AbstractIT;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletResponse;
 
@@ -37,6 +38,8 @@ import org.springframework.mock.web.MockHttpServletResponse;
  * authentication step (401, before any lookup) from the lookup (404).
  */
 @DisplayName("HEAD of the protocols: authentication and routing (RPS-2059)")
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class ProtocolHeadWireIT extends AbstractIT {
 
   private MockHttpServletResponse headOf(

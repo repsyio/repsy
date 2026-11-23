@@ -36,6 +36,7 @@ import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -51,6 +52,8 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * tag down with it even though it now belonged to a version that still exists.
  */
 @DisplayName("Helm OCI tag re-link on override (RPS-1111)")
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class HelmOciTagRelinkIT extends AbstractIT {
 
   private static final String CHART = "payments";

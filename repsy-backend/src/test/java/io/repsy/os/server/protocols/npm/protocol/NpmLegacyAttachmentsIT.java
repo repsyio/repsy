@@ -30,6 +30,7 @@ import java.nio.file.Files;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -46,6 +47,8 @@ import tools.jackson.databind.ObjectMapper;
  * packument says about its versions, and the tarballs, stay as they were.
  */
 @DisplayName("npm packuments stored with the publish's attachments (RPS-1390)")
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class NpmLegacyAttachmentsIT extends AbstractIT {
 
   private static final String DIST_TAG = "/{repo}/-/package/{name}/dist-tags/{tag}";

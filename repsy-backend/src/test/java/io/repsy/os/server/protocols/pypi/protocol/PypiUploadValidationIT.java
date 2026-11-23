@@ -37,6 +37,7 @@ import java.util.HashMap;
 import java.util.HexFormat;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -56,6 +57,8 @@ import org.springframework.web.servlet.HandlerExceptionResolver;
  * dropped instead and the rest of the publish goes through, matching {@code PypiPublishLimits}.
  */
 @DisplayName("PyPI upload validation (RPS-1224, RPS-1137)")
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class PypiUploadValidationIT extends AbstractIT {
 
   @Autowired private RepoTxService repoTxService;

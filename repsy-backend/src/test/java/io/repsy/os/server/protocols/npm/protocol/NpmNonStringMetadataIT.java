@@ -31,6 +31,7 @@ import java.util.Map;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -50,6 +51,8 @@ import tools.jackson.databind.ObjectMapper;
  * a value the publish cannot do without is refused with a 400, never a 500.
  */
 @DisplayName("npm publish with non-string package.json values (RPS-2210)")
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class NpmNonStringMetadataIT extends AbstractIT {
 
   private static final String NAME = "left-pad";

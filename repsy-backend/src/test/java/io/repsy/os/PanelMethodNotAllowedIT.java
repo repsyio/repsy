@@ -25,6 +25,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -37,6 +38,8 @@ import org.springframework.http.HttpStatus;
  * every verb, and a path nothing maps is still 404.
  */
 @DisplayName("Panel API wrong verb answers 405")
+// Extended tier: edge, validation or boundary case (RPS-2732).
+@Tag("extended")
 class PanelMethodNotAllowedIT extends AbstractIT {
 
   private static final String USAGE_PATH = "/api/usage";
