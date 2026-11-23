@@ -92,7 +92,8 @@ jobs:
           # The runner whose full catalog runs on H2 tonight: one protocol runner per night, in turn
           # (the date, so every runner comes round every len(ROTATION) days). Not skeleton (the harness
           # proof), not stack (its @local-only cases already run in full in the h2 leg) and not api (its
-          # 18 raw-HTTP tests are all @smoke, so the h2 leg already runs them in full).
+          # raw-HTTP tests are mostly header checks that no database changes; the @smoke ones run on the h2 leg
+          # as their @pr cells and in full on PostgreSQL. role-sweep lost @smoke in RPS-2727).
           ROTATION = [r for r in WIRE if r not in ("skeleton", "stack", "api")]
           H2_FULL = os.environ["H2_FULL"].strip()
           h2_full_runner = H2_FULL or ROTATION[datetime.datetime.now(datetime.timezone.utc).toordinal() % len(ROTATION)]
@@ -120,7 +121,8 @@ jobs:
               # in WebKit, on the default stack, each its own runner so a failure names its browser. The project's own
               # filter applies, so the default grep is empty; nothing is opt-in here, so skips are not an error.
               "browsers": ("browsers", "", ["ui-firefox", "ui-webkit"], "", 30, "", True),
-              # Embedded H2: @smoke of every wire runner (README.md "Scope decision"), not the catalogs.
+              # Embedded H2: @smoke of every wire runner (README.md "Scope decision"), not the catalogs; the runners with @pr
+              # cells run only those (RUNNER_GREP below, RPS-2738).
               "h2": ("h2", "--h2", WIRE, "@smoke", 90, "", True),
               # The COMPLETE panel UI suite on the embedded-H2 stack (RPS-1652, README.md "UI suite on H2"): H2 is
               # the database of the Docker image's default, so what a self-hoster sees in the panel (orderings,
@@ -213,9 +215,17 @@ jobs:
           # runner has no @smoke test, so `--grep @smoke` would fail it with "No tests found".
           # The tls leg's ui runners also take the @tls panel spec (tagged @tls only, so that the proxy leg, which runs the
           # ui runner's @smoke, does not meet it skipped); the proxy leg's api runner takes only @proxy.
+          # `@pr` alone would also select @proxy and @probe-ban (README.md "The @pr set").
+          PR_CELLS = r"@pr\b"
           RUNNER_GREP = {
-              "h2": {"stack": ""},
-              "tls": {r: "@smoke|@tls" for r in UI},
+              # RPS-2738: the h2 leg proves the H2 database under each protocol, which a client does not change, so the runners
+              # that have @pr cells (README.md "The @pr set") run only those there. skeleton, the runners without @pr cells
+              # (cargo, nuget, helm, go, ruby, npm-clients) and stack keep their own set.
+              "h2": {"stack": "", **{r: PR_CELLS for r in ("maven", "npm", "pypi", "docker", "api")}},
+              # The tls leg proves each client trusts the CA. Every JVM client takes the same truststore (JAVA_TOOL_OPTIONS) and
+              # npm is one client, so maven and npm run their @pr cells; pypi (pip and uv), docker (crane, regctl, skopeo),
+              # api (https headers), skeleton (tls-listeners) and the rest keep @smoke: each has a trust path of its own.
+              "tls": {"maven": PR_CELLS, "npm": PR_CELLS, **{r: "@smoke|@tls" for r in UI}},
               "proxy": {"api": "@proxy"},
               "probe-ban": {"stack": "@probe-ban"},
           }
