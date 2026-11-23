@@ -38,6 +38,7 @@ import java.util.concurrent.Future;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -58,6 +59,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  * they were opened and which {@code SET DEFAULT_LOCK_TIMEOUT} does not raise for them.
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
+// RPS-2730: embedded H2 dialect check, repeats behaviour the PostgreSQL ITs cover; see "Testing" in
+// AGENTS.md.
+@Tag("extended")
 @DisplayName("last admin guards under concurrent requests on the embedded H2 database (RPS-1101)")
 class H2LastAdminConcurrencyIT extends H2IntegrationTest {
 

@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.web.MockHttpServletResponse;
 
@@ -48,6 +49,9 @@ import org.springframework.mock.web.MockHttpServletResponse;
  * <p>None of these reaches the database with an over-long value, so they run in this class's test
  * transaction.
  */
+// RPS-2730: size or length limit edge cases, the protocol happy flows stay in the PR run; see
+// "Testing" in AGENTS.md.
+@Tag("extended")
 @DisplayName("Go module upload holds metadata to its columns (RPS-1072)")
 class GolangUploadMetadataLengthIT extends AbstractIT {
 

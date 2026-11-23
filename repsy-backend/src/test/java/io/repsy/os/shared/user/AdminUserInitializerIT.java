@@ -30,6 +30,7 @@ import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.protocols.shared.auth.PasswordHasher;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,6 +50,9 @@ import org.springframework.http.MediaType;
  * and sees the rows the test changed, and the rollback undoes everything.
  */
 @ExtendWith(OutputCaptureExtension.class)
+// RPS-2730: one-off data migration or backfill, only relevant when its code changes; see "Testing"
+// in AGENTS.md.
+@Tag("extended")
 @DisplayName("AdminUserInitializer password reset")
 class AdminUserInitializerIT extends AbstractIT {
 

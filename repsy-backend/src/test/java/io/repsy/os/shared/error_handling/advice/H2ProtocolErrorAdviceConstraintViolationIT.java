@@ -24,6 +24,7 @@ import static io.repsy.os.shared.error_handling.advice.ConstraintViolationChecks
 import io.repsy.os.H2IntegrationTest;
 import io.repsy.os.shared.user.repositories.UserRepository;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -37,6 +38,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * state, or hid it behind a wrapper, the 4xx answers would silently be 500s on an H2 install. The
  * test rolls back with the rest of {@link H2IntegrationTest}, so it commits no rows.
  */
+// RPS-2730: embedded H2 dialect check, repeats behaviour the PostgreSQL ITs cover; see "Testing" in
+// AGENTS.md.
+@Tag("extended")
 @DisplayName(
     "ProtocolErrorAdvice maps constraint violations on the embedded H2 database (RPS-1079)")
 class H2ProtocolErrorAdviceConstraintViolationIT extends H2IntegrationTest {

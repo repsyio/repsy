@@ -35,6 +35,7 @@ import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -67,6 +68,9 @@ import org.springframework.transaction.annotation.Transactional;
  * repos and users it commits.
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
+// RPS-2730: size or length limit edge cases, the protocol happy flows stay in the PR run; see
+// "Testing" in AGENTS.md.
+@Tag("extended")
 @DisplayName("Maven upload length guards (RPS-1138)")
 class MavenPublishLimitsIT extends AbstractIT {
 

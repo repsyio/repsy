@@ -25,6 +25,7 @@ import io.repsy.os.AbstractIT;
 import io.repsy.os.shared.user.entities.UserRole;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
@@ -45,6 +46,9 @@ import org.springframework.test.util.ReflectionTestUtils;
  * <p>The tests remove every admin inside the test transaction, so the initializer creates a new
  * one, and the rollback brings the seeded admin back.
  */
+// RPS-2730: one-off data migration or backfill, only relevant when its code changes; see "Testing"
+// in AGENTS.md.
+@Tag("extended")
 @DisplayName("AdminUserInitializer bootstrap password")
 class AdminUserInitializerBootstrapIT extends AbstractIT {
 

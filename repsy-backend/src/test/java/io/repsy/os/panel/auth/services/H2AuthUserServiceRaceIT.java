@@ -29,6 +29,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,6 +50,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
  * transaction: a rejected login rolls its own transaction back before the surrounding test
  * transaction ever commits, so there is nothing to clean up.
  */
+// RPS-2730: embedded H2 dialect check, repeats behaviour the PostgreSQL ITs cover; see "Testing" in
+// AGENTS.md.
+@Tag("extended")
 @DisplayName("login vs. a user deletion racing the token write, under H2 (RPS-1152)")
 class H2AuthUserServiceRaceIT extends H2IntegrationTest {
 

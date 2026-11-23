@@ -37,6 +37,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -45,6 +46,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * RPS-1038: manifests that a push accepted before RPS-978 stored under the path name while the
  * chart carries the {@code Chart.yaml} name.
  */
+// RPS-2730: one-off data migration or backfill, only relevant when its code changes; see "Testing"
+// in AGENTS.md.
+@Tag("extended")
 @DisplayName("Helm OCI manifest name repair (RPS-1038)")
 class HelmOciManifestNameRepairServiceIT extends AbstractIT {
 

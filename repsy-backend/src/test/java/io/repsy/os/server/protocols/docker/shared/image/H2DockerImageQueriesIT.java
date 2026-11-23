@@ -46,6 +46,9 @@ import org.springframework.beans.factory.annotation.Autowired;
  * image insert that skips an existing row, and the recursive queries that follow an index through
  * the indexes it lists.
  */
+// RPS-2730: embedded H2 dialect check, repeats behaviour the PostgreSQL ITs cover; see "Testing" in
+// AGENTS.md.
+@org.junit.jupiter.api.Tag("extended")
 @DisplayName("Docker image queries on embedded H2 (RPS-1350)")
 class H2DockerImageQueriesIT extends H2IntegrationTest {
 

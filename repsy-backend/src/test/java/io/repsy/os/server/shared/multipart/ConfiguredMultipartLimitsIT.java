@@ -18,6 +18,7 @@ package io.repsy.os.server.shared.multipart;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -36,6 +37,9 @@ import org.springframework.test.context.TestPropertySource;
       "MULTIPART_MAX_FILE_SIZE=256KB",
       "MULTIPART_MAX_REQUEST_SIZE=300KB",
     })
+// RPS-2730: size or length limit edge cases, the protocol happy flows stay in the PR run; see
+// "Testing" in AGENTS.md.
+@Tag("extended")
 @DisplayName("Multipart upload limits, configured (RPS-1049)")
 class ConfiguredMultipartLimitsIT extends AbstractMultipartLimitIT {
 

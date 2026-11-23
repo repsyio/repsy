@@ -31,6 +31,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.context.TestPropertySource;
 
@@ -43,6 +44,9 @@ import org.springframework.test.context.TestPropertySource;
  * which does not need to hold hundreds of megabytes to prove the limit works.
  */
 @TestPropertySource(properties = "repsy.golang.max-module-zip-size=4KB")
+// RPS-2730: size or length limit edge cases, the protocol happy flows stay in the PR run; see
+// "Testing" in AGENTS.md.
+@Tag("extended")
 @DisplayName("Go module zip publish size limit (RPS-1119)")
 class GolangModuleZipSizeLimitIT extends AbstractIT {
 

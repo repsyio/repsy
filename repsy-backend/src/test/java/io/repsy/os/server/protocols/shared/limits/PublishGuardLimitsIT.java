@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import io.repsy.os.AbstractIT;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -26,6 +27,9 @@ import org.junit.jupiter.api.Test;
  * PyPI (RPS-1137) publish paths hold pushed metadata to equal to the PostgreSQL columns Flyway
  * creates. It only reads {@code information_schema}, so it commits no rows.
  */
+// RPS-2730: size or length limit edge cases, the protocol happy flows stay in the PR run; see
+// "Testing" in AGENTS.md.
+@Tag("extended")
 @DisplayName(
     "Helm, Cargo, Go, npm, Docker, PyPI and Maven publish limits against the PostgreSQL schema")
 class PublishGuardLimitsIT extends AbstractIT {
