@@ -17,6 +17,10 @@
     <properties>
         <!-- RPS-1453: JVMs the integration tests are spread over (see the Failsafe configuration). -->
         <it.fork.count>4</it.fork.count>
+        <!-- RPS-2729: JUnit tags the integration tests leave out (Failsafe excludedGroups). Empty runs every
+            test, today's behaviour. The PR check can pass -Dit.excluded.groups=extended (see "Testing" in
+            AGENTS.md); the nightly and every local run leave it empty. -->
+        <it.excluded.groups></it.excluded.groups>
         <!-- RPS-2347: what GET /api/info reports as release and commit. The image build passes the image tag and the
             full commit sha (-Drelease.version, -Dbuild.sha, from the Dockerfile build arguments); a local build
             reports the project version and "unknown". -->
@@ -377,6 +381,8 @@
                          a database and CommittedRowsGuard still sees only its own JVM's rows. Failsafe
                          hands the classes out to the JVMs one by one. -->
                     <forkCount>${it.fork.count}</forkCount>
+                    <!-- RPS-2729: a comma-separated list of tags to leave out, empty by default. -->
+                    <excludedGroups>${it.excluded.groups}</excludedGroups>
                 </configuration>
             </plugin>
 

@@ -291,6 +291,17 @@ Coverage (RPS-2359, RPS-2361, RPS-2368):
   `mvn verify` runs the forked test JVMs with C1 only (`test.jvm.args` in the root `pom.xml`, which
   `core-parent` appends to the Surefire and Failsafe `argLine`): see the comment there, and never set
   the `argLine` property itself.
+- **IT tiers (opt-out, RPS-2729).** An `*IT` is untagged by default and then runs everywhere, so a
+  forgotten tag costs seconds, never coverage. A slow or low-value class opts out with
+  `@Tag("extended")` at class level (a class-level tag covers its `@Nested` groups), with a one-line
+  comment above it saying why. The Failsafe property `it.excluded.groups` (empty by default, so a
+  plain `mvn verify` and the nightly run everything) lists the tags to leave out, e.g.
+  `-Dit.excluded.groups=extended`; only `pr-checks.yml` may pass it. `-Dit.test=...` runs honour the
+  exclusion too, so run a tagged class with the property empty. Never tag an abstract base (the tag is
+  inherited by every subclass) or a guard IT (`OpenApiSpecConsistencyIT`, `EntitySchemaAnnotationIT`,
+  `CommittedRowsGuardIT`, `ProtocolRoutePermissionIT`); a class holding a protocol's only
+  publish-and-read flow stays untagged. `IntegrationTestTierGuardTest` fails on an unknown `@Tag`
+  value and on a protocol package left with no untagged `*IT`.
 - Do not declare versions for `org.testcontainers:*` artifacts: they are managed by `core-parent`
   (`testcontainers-bom`). The same goes for any other dependency `repsy-core` already manages,
   so only add a `<version>` for something it does not.
