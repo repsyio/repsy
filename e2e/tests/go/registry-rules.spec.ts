@@ -46,7 +46,6 @@ import {
   adminCredential,
   authHeader,
   buildModuleZip,
-  buildModuleZipWithGoMod,
   infoRelPath,
   latestRelPath,
   listRelPath,
@@ -88,120 +87,6 @@ function expectMsgId(res: GoRawResponse, status: number, msgId: string | undefin
 }
 
 test.describe('go registry rules (raw HTTP)', () => {
-  test(
-    'a read-only deploy token publish is refused with a flat 401 (not 403), and the same token ' +
-      'can still read @v/list (R1)',
-    { tag: ['@auth', '@negative'] },
-    async ({ seeder }) => {
-      const layout = await newRepo(seeder, 'roauth');
-      const token = await seeder.createToken(layout.repoName, { readOnly: true });
-      const credential = {
-        transport: 'basic' as const,
-        username: token.username,
-        password: token.token,
-        kind: 'token' as const,
-      };
-      const built = await buildModuleZip({ modulePath: layout.modulePath, version: 'v0.0.1' });
-
-      const res = await rawUpload(layout.repoName, credential, built);
-      expectMsgId(res, 401, undefined);
-      // RPS-1435: the go command prints a 401 body only when it is text/plain, so that is what the
-      // refusal is (it was the panel's JSON envelope, or empty when no credentials were sent).
-      expect(res.contentType, 'a text/plain refusal the go command can print').toMatch(
-        /^text\/plain/,
-      );
-      expect(res.body.toString('utf8'), 'the generic message').toMatch(/credentials/);
-
-      const seedRes = await rawUpload(layout.repoName, adminCredential(), built);
-      expectMsgId(seedRes, 200, undefined);
-
-      const readRes = await rawGet(layout.repoName, credential, listRelPath(layout.modulePath));
-      expect(readRes.status, 'the read-only token can still READ @v/list').toBe(200);
-      expect(parseVersionList(readRes.body)).toContain('v0.0.1');
-    },
-  );
-
-  test(
-    'the upload URL accepts no suffix, a .zip suffix, and (G6) even a .mod/.info suffix with a ' +
-      'zip body (R2)',
-    { tag: ['@negative'] },
-    async ({ seeder }) => {
-      const layout = await newRepo(seeder, 'suffixes');
-      const admin = adminCredential();
-
-      const noSuffix = await buildModuleZip({ modulePath: layout.modulePath, version: 'v0.0.1' });
-      expectMsgId(
-        await rawUpload(layout.repoName, admin, noSuffix, { urlSuffix: '' }),
-        200,
-        undefined,
-      );
-
-      const zipSuffix = await buildModuleZip({ modulePath: layout.modulePath, version: 'v0.0.2' });
-      expectMsgId(
-        await rawUpload(layout.repoName, admin, zipSuffix, { urlSuffix: '.zip' }),
-        200,
-        undefined,
-      );
-
-      // G6: a PUT to a ".mod"-suffixed URL is STILL treated as a zip-body upload -- the suffix is
-      // only used to strip the version out of the last path segment, nothing else looks at it.
-      const modSuffix = await buildModuleZip({ modulePath: layout.modulePath, version: 'v0.0.3' });
-      expectMsgId(
-        await rawUpload(layout.repoName, admin, modSuffix, { urlSuffix: '.mod' }),
-        200,
-        undefined,
-      );
-
-      const listRes = await rawGet(layout.repoName, admin, listRelPath(layout.modulePath));
-      expect(parseVersionList(listRes.body)).toEqual(['v0.0.1', 'v0.0.2', 'v0.0.3']);
-
-      // The ".mod"-suffixed PUT really did store a working module: its own .zip route serves the
-      // zip body, and .mod carries the go.mod EXTRACTED from that zip, not the raw PUT body.
-      const zipRes = await rawGet(layout.repoName, admin, zipRelPath(layout.modulePath, 'v0.0.3'));
-      expect(sha256Hex(zipRes.body)).toBe(modSuffix.sha256Hex);
-    },
-  );
-
-  test(
-    'Content-Sha256 is verified when present, ignored when absent (R3)',
-    { tag: ['@negative'] },
-    async ({ seeder }) => {
-      const layout = await newRepo(seeder, 'sha256');
-      const admin = adminCredential();
-
-      const correct = await buildModuleZip({ modulePath: layout.modulePath, version: 'v0.0.1' });
-      expectMsgId(await rawUpload(layout.repoName, admin, correct), 200, undefined);
-
-      const wrong = await buildModuleZip({ modulePath: layout.modulePath, version: 'v0.0.2' });
-      expectMsgId(
-        await rawUpload(layout.repoName, admin, wrong, { contentSha256: 'deadbeef' }),
-        400,
-        ERROR_CODES.SHA256_MISMATCH,
-      );
-
-      // An upper-case hex digest is lower-cased before comparison.
-      const upper = await buildModuleZip({ modulePath: layout.modulePath, version: 'v0.0.3' });
-      expectMsgId(
-        await rawUpload(layout.repoName, admin, upper, {
-          contentSha256: upper.sha256Hex.toUpperCase(),
-        }),
-        200,
-        undefined,
-      );
-
-      // No header at all: skipped, never computed.
-      const absent = await buildModuleZip({ modulePath: layout.modulePath, version: 'v0.0.4' });
-      expectMsgId(
-        await rawUpload(layout.repoName, admin, absent, { contentSha256: null }),
-        200,
-        undefined,
-      );
-
-      const listRes = await rawGet(layout.repoName, admin, listRelPath(layout.modulePath));
-      expect(parseVersionList(listRes.body)).toEqual(['v0.0.1', 'v0.0.3', 'v0.0.4']);
-    },
-  );
-
   test(
     'a duplicate version is refused with a REAL, UNCONDITIONAL 409 under both allowOverride ' +
       'settings, and the refused re-PUT never changes what is stored (R4/H9)',
@@ -312,42 +197,6 @@ test.describe('go registry rules (raw HTTP)', () => {
   );
 
   test(
-    'a go.mod whose module directive names a different module than the URL path is refused with ' +
-      '400 goModModulePathMismatch (RPS-1228)',
-    { tag: ['@negative'] },
-    async ({ seeder }) => {
-      const layout = await newRepo(seeder, 'mismatch');
-      const admin = adminCredential();
-      const version = 'v0.1.0';
-
-      const goModText = `module ${MODULE_DOMAIN}/completely-different\n\ngo 1.21\n`;
-      const built = buildModuleZipWithGoMod({ modulePath: layout.modulePath, version, goModText });
-      const res = await rawPut(
-        layout.repoName,
-        admin,
-        `${layout.modulePath}/@v/${version}`,
-        built.bytes,
-      );
-
-      expectMsgId(res, 400, ERROR_CODES.GO_MOD_MODULE_PATH_MISMATCH);
-    },
-  );
-
-  test(
-    'a non-semver version string is refused with 400 invalidModuleVersion (RPS-1227)',
-    { tag: ['@negative'] },
-    async ({ seeder }) => {
-      const layout = await newRepo(seeder, 'nonsemver');
-      const admin = adminCredential();
-
-      const built = await buildModuleZip({ modulePath: layout.modulePath, version: 'banana' });
-      const res = await rawUpload(layout.repoName, admin, built);
-
-      expectMsgId(res, 400, ERROR_CODES.INVALID_MODULE_VERSION);
-    },
-  );
-
-  test(
     '@v/list is a sorted, newline-joined text/plain body; an unknown module is a text/plain 404, ' +
       'so the go command tries the next GOPROXY entry (R8, RPS-1428)',
     { tag: ['@negative'] },
@@ -368,25 +217,6 @@ test.describe('go registry rules (raw HTTP)', () => {
       const res = await rawGet(layout.repoName, admin, listRelPath(layout.modulePath));
       // Real semver order, not lexicographic: v0.2.0 < v0.10.0.
       expect(parseVersionList(res.body)).toEqual(['v0.1.0', 'v0.2.0', 'v0.10.0']);
-    },
-  );
-
-  test(
-    '@v/list excludes pseudo-versions but keeps a tagged pre-release (R8b, RPS-1733): the GOPROXY ' +
-      'protocol says the list "should not include pseudo-versions"',
-    { tag: ['@negative'] },
-    async ({ seeder }) => {
-      const layout = await newRepo(seeder, 'listpseudo');
-      const admin = adminCredential();
-
-      for (const version of ['v1.0.0', 'v1.1.0-rc1', 'v1.2.0-20240101120000-0123456789ab']) {
-        const built = await buildModuleZip({ modulePath: layout.modulePath, version });
-        expectMsgId(await rawUpload(layout.repoName, admin, built), 200, undefined);
-      }
-
-      const res = await rawGet(layout.repoName, admin, listRelPath(layout.modulePath));
-      // The pseudo-version (v1.2.0-...) is not listed; the tagged pre-release (v1.1.0-rc1) is.
-      expect(parseVersionList(res.body)).toEqual(['v1.0.0', 'v1.1.0-rc1']);
     },
   );
 
@@ -430,73 +260,6 @@ test.describe('go registry rules (raw HTTP)', () => {
       expect(parseInfo(res.body).Version, 'v1.2.0 is a real release; v1.3.0-beta.1 is not').toBe(
         'v1.2.0',
       );
-    },
-  );
-
-  test(
-    '@latest falls back to the highest tagged pre-release, then to a pseudo-version, when no ' +
-      'release is published (R9b, RPS-1733)',
-    { tag: ['@negative'] },
-    async ({ seeder }) => {
-      const preReleaseOnly = await newRepo(seeder, 'latestprereleaseonly');
-      const admin = adminCredential();
-
-      for (const version of ['v1.0.0-alpha.1', 'v1.0.0-beta.1']) {
-        const built = await buildModuleZip({ modulePath: preReleaseOnly.modulePath, version });
-        expectMsgId(await rawUpload(preReleaseOnly.repoName, admin, built), 200, undefined);
-      }
-      const preReleaseRes = await rawGet(
-        preReleaseOnly.repoName,
-        admin,
-        latestRelPath(preReleaseOnly.modulePath),
-      );
-      expect(parseInfo(preReleaseRes.body).Version).toBe('v1.0.0-beta.1');
-
-      const pseudoOnly = await newRepo(seeder, 'latestpseudoonly');
-      const pseudoVersion = 'v1.0.0-20240101120000-0123456789ab';
-      const pseudoBuilt = await buildModuleZip({
-        modulePath: pseudoOnly.modulePath,
-        version: pseudoVersion,
-      });
-      expectMsgId(await rawUpload(pseudoOnly.repoName, admin, pseudoBuilt), 200, undefined);
-
-      const pseudoRes = await rawGet(
-        pseudoOnly.repoName,
-        admin,
-        latestRelPath(pseudoOnly.modulePath),
-      );
-      expect(
-        parseInfo(pseudoRes.body).Version,
-        'a pseudo-version still answers @latest rather than 404ing, when it is the only version',
-      ).toBe(pseudoVersion);
-    },
-  );
-
-  test(
-    'module paths are case-sensitive for storage/lookup: a mixed-case upload does not collide ' +
-      "with its lower-case spelling -- each is Go's own, distinct module (RPS-1232, fixed)",
-    { tag: ['@negative'] },
-    async ({ seeder }) => {
-      const layout = await newRepo(seeder, 'mixedcase');
-      const admin = adminCredential();
-
-      const lower = await buildModuleZip({ modulePath: layout.modulePath, version: 'v0.0.1' });
-      expectMsgId(await rawUpload(layout.repoName, admin, lower), 200, undefined);
-
-      const mixedCasePath = layout.modulePath.replace(/e2e-/, 'E2E-');
-      const mixed = await buildModuleZip({ modulePath: mixedCasePath, version: 'v0.0.2' });
-      expectMsgId(await rawUpload(layout.repoName, admin, mixed), 200, undefined);
-
-      const listRes = await rawGet(layout.repoName, admin, listRelPath(layout.modulePath));
-      expect(parseVersionList(listRes.body), 'the mixed-case upload is a DISTINCT module').toEqual([
-        'v0.0.1',
-      ]);
-
-      const mixedListRes = await rawGet(layout.repoName, admin, listRelPath(mixedCasePath));
-      expect(
-        parseVersionList(mixedListRes.body),
-        'the mixed-case module keeps its own, separate version history',
-      ).toEqual(['v0.0.2']);
     },
   );
 

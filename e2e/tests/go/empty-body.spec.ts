@@ -35,7 +35,9 @@ import { expect, test } from '../../src/scenarios/fixtures.js';
 const FORM = 'application/x-www-form-urlencoded';
 
 test.describe('go empty upload body (raw HTTP)', () => {
-  for (const contentType of [undefined, 'application/zip', FORM]) {
+  // `application/zip` is `EmptyUploadBodyIT`; no Content-Type is not, and the form type stays because
+  // Tomcat's own form handling (RPS-1443) is what MockMvc cannot show.
+  for (const contentType of [undefined, FORM]) {
     test(
       `an empty module zip (Content-Type ${contentType ?? 'none'}) answers 400 goModuleZipEmpty and stores nothing (RPS-1466)`,
       { tag: ['@negative'] },

@@ -57,7 +57,6 @@ import {
   rawGetConfigJson,
   rawGetIndex,
   rawPublish,
-  sha256Hex,
   type RawResponse,
 } from '../../src/clients/cargo-raw.js';
 import { cargoAdapter } from '../../src/clients/cargo.js';
@@ -112,63 +111,6 @@ function expectPut(res: RawResponse, status: number, detailContains: string | un
 }
 
 test.describe('cargo registry rules (raw HTTP)', () => {
-  test(
-    're-publishing an existing version is refused whatever allowOverride says, and leaves the ' +
-      'stored bytes untouched (RPS-1124, fixed)',
-    { tag: ['@settings', '@negative'] },
-    async ({ seeder }) => {
-      const layout = await newRepo(seeder, 'override');
-      const admin = adminCredential();
-      const v1 = cargoAdapter.version('release');
-
-      const bytesA = fakeCrate(layout.packageName, v1, 'v1');
-      expectPut(
-        await rawPublish(
-          layout.repoName,
-          admin,
-          buildPublishBody({ name: layout.packageName, version: v1, crateBytes: bytesA }),
-        ),
-        200,
-        undefined,
-      );
-
-      await seeder.setSettings(layout.repoName, {
-        privateRepo: true,
-        allowOverride: false,
-      });
-
-      const indexBefore = await rawGetIndex(layout.repoName, admin, layout.packageName);
-      const dlBefore = await rawDownload(layout.repoName, admin, layout.packageName, v1);
-      expect(dlBefore.status, 'the seeded version downloads').toBe(200);
-      expect(sha256Hex(dlBefore.body), 'the seeded version is bytesA').toBe(sha256Hex(bytesA));
-
-      // Re-publishing the SAME version, even with different bytes and allowOverride: false, is
-      // refused -- and (RPS-1124, fixed) the refusal must not touch storage either.
-      const bytesB = fakeCrate(layout.packageName, v1, 'v1-again');
-      expectPut(
-        await rawPublish(
-          layout.repoName,
-          admin,
-          buildPublishBody({ name: layout.packageName, version: v1, crateBytes: bytesB }),
-        ),
-        400,
-        'already exists',
-      );
-
-      const indexAfter = await rawGetIndex(layout.repoName, admin, layout.packageName);
-      expect(indexAfter.body.toString('utf8'), 'the served (DB-backed) index is unchanged').toBe(
-        indexBefore.body.toString('utf8'),
-      );
-
-      // RPS-1124 (fixed, #507): the duplicate check now runs BEFORE the .crate is written, so the
-      // refused duplicate no longer overwrites the stored bytes.
-      const dlAfter = await rawDownload(layout.repoName, admin, layout.packageName, v1);
-      expect(sha256Hex(dlAfter.body), 'the stored .crate is unchanged (bytesA)').toBe(
-        sha256Hex(bytesA),
-      );
-    },
-  );
-
   test(
     'a new version of an existing crate is accepted regardless of allowOverride',
     { tag: ['@settings'] },

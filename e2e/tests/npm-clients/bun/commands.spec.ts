@@ -33,7 +33,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 import { MARKER_FILENAME } from '../../../src/clients/npm.js';
-import { npmAuthHeader, rawGetPackument, rawGetPath } from '../../../src/clients/npm-raw.js';
+import { rawGetPackument, rawGetPath } from '../../../src/clients/npm-raw.js';
 import { bunClient, bunExec } from '../../../src/clients/npm-family/bun-client.js';
 import type { ClientCtx } from '../../../src/clients/npm-family/client.js';
 import {
@@ -512,38 +512,5 @@ test(
     } finally {
       await recorder.stop();
     }
-  },
-);
-
-test(
-  'the tarball download is an attachment named after the tarball (raw): RPS-1363',
-  {
-    tag: ['@bun', '@wire'],
-  },
-  async ({ seeder }) => {
-    const repo = await newRepo(seeder);
-    const writer = await tokenBinding(seeder, repo.name, { readOnly: false });
-    const name = packageNameFor(seeder, 'download');
-    const published = await publishPackage(
-      bunClient,
-      await bunClient.prepare('download', [writer]),
-      {
-        packageName: name,
-        version: '1.0.0',
-      },
-    );
-    expect(published.result.exitCode, `publish: ${published.result.command}`).toBe(0);
-
-    // What `bun add --verbose` shows on every tarball request, and a browser or `curl -OJ` acts on:
-    // it used to be a fixed, made-up `inline;filename=f.txt` in place of `<name>-<version>.tgz`.
-    const res = await fetch(repoUrl(repo.name, `${name}/-/${name}-1.0.0.tgz`), {
-      headers: npmAuthHeader(adminCredential()),
-    });
-    expect(res.status).toBe(200);
-    expect(res.headers.get('content-type')).toBe('application/octet-stream');
-    expect(
-      res.headers.get('content-disposition'),
-      'RPS-1363: the file name is the tarball name, as an attachment',
-    ).toBe(`attachment; filename="${name}-1.0.0.tgz"`);
   },
 );

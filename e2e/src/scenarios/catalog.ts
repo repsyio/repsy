@@ -49,7 +49,7 @@
  *    send them again on every redeploy; that is no override either (RPS-1328), so the same scenario
  *    holds for them and the consumer resolves the second publish's jar. Only re-uploading a file of
  *    an existing timestamped build, or of a release, is an override; that is pinned at the protocol
- *    level in `tests/maven/upload-rules.spec.ts`, since no real client does it.
+ *    level in the Java IT `MavenVersionTypeRedeployIT`, since no real client does it.
  *  - `reuseCoordinates` marks the scenarios about a redeploy: the fixture pre-publishes (admin,
  *    permissive defaults) the same coordinate the scenario's own publish targets, and only then
  *    applies the scenario's `repo` settings. Every other pre-publish lands on a separate coordinate.

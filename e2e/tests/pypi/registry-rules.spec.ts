@@ -70,11 +70,8 @@ import {
   rawGetSimplePage,
   rawGetSimplePageNoFollow,
   rawGetSimpleRoot,
-  rawHead,
   rawUpload,
   sha256Hex,
-  simplePagePath,
-  simpleRootPath,
   uploadUrl,
   wheelFilename,
   type RawResponse,
@@ -102,120 +99,6 @@ function expectMsgId(res: RawResponse, status: number, msgId: string | undefined
 }
 
 test.describe('pypi registry rules (raw HTTP)', () => {
-  test(
-    'a read-only deploy token publish is refused with a flat 401 (not 403), and the same token ' +
-      'can still read the project page (H5)',
-    { tag: ['@auth', '@negative'] },
-    async ({ seeder }) => {
-      const layout = await newRepo(seeder, 'roauth');
-      const token = await seeder.createToken(layout.repoName, { readOnly: true });
-      const credential = {
-        transport: 'basic' as const,
-        username: token.username,
-        password: token.token,
-        kind: 'token' as const,
-      };
-      const version = pypiAdapter.version('release');
-      const built = buildWheel({ name: layout.packageName, version });
-
-      const res = await rawUpload(layout.repoName, credential, built);
-      expectMsgId(res, 401, ERROR_CODES.UN_AUTHORIZED);
-
-      // Real Repsy panel envelope (not a bodyless 401), with the Basic challenge header every
-      // other protocol in this harness gives too.
-      expect(res.msgId, 'msgId').toBe(ERROR_CODES.UN_AUTHORIZED);
-
-      // Seed a file with admin so the read side has something to read.
-      const seedRes = await rawUpload(layout.repoName, adminCredential(), built);
-      expectMsgId(seedRes, 200, undefined);
-
-      const readRes = await rawGetSimplePage(layout.repoName, credential, layout.packageName);
-      expect(readRes.status, 'the read-only token can still READ').toBe(200);
-    },
-  );
-
-  test(
-    'a non-multipart POST to the repo root is 404 unknownPath (no handler matches at all); a ' +
-      'multipart POST without a "content" part is a bodyless 400 (H11)',
-    { tag: ['@negative'] },
-    async ({ seeder }) => {
-      const layout = await newRepo(seeder, 'badupload');
-      const admin = adminCredential();
-
-      const jsonRes = await fetch(uploadUrl(layout.repoName), {
-        method: 'POST',
-        headers: { ...authHeader(admin), 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      });
-      const jsonBytes = Buffer.from(await jsonRes.arrayBuffer());
-      expectMsgId({ status: jsonRes.status, body: jsonBytes }, 404, ERROR_CODES.UNKNOWN_PATH);
-
-      const form = new FormData();
-      form.append('name', 'not-a-real-upload');
-      const noContentRes = await fetch(uploadUrl(layout.repoName), {
-        method: 'POST',
-        headers: authHeader(admin),
-        body: form,
-      });
-      const noContentBytes = Buffer.from(await noContentRes.arrayBuffer());
-      expect(noContentRes.status, 'a multipart POST with no "content" part').toBe(400);
-      expect(noContentBytes, 'the 400 is bodyless').toHaveLength(0);
-    },
-  );
-
-  test(
-    'POST /<repo> without a trailing slash is accepted like POST /<repo>/; POST /<repo>/simple ' +
-      'still 404s by design -- the panel no longer instructs that URL (RPS-1222, H12)',
-    { tag: ['@negative'] },
-    async ({ seeder }) => {
-      const layout = await newRepo(seeder, 'notrailingslash');
-      const admin = adminCredential();
-      const version = pypiAdapter.version('release');
-      const built = buildWheel({ name: layout.packageName, version });
-
-      const noSlashUrl = repoUrl(layout.repoName);
-      const form = new FormData();
-      form.append('name', built.name);
-      form.append('version', built.version);
-      form.append('requires_python', built.requiresPython);
-      form.append('sha256_digest', built.sha256Hex);
-      form.append('content', new Blob([new Uint8Array(built.bytes)]), built.filename);
-      const res = await fetch(noSlashUrl, {
-        method: 'POST',
-        headers: authHeader(admin),
-        body: form,
-      });
-      const bytes = Buffer.from(await res.arrayBuffer());
-      expectMsgId({ status: res.status, body: bytes }, 200, undefined);
-
-      // RPS-1222 (fixed): the panel's config screen used to point `.pypirc`'s `repository` at
-      // `<baseUrl>/<repo>/simple` -- exactly the URL a real `twine upload -r <source>` built from it
-      // would POST to, which 404s. The panel now omits the `/simple` suffix (`repository=<baseUrl>/
-      // <repo>`, matching `noSlashUrl` above), so a user following the CURRENT instructions never
-      // hits this path. `/simple` itself remains the read-only "simple index" route (used for `pip`'s
-      // `--extra-index-url`, see `installation` in `pypi-packages-version-detail.component.ts`), so
-      // `POST` there is correctly refused -- this is no longer a bug, just documented behaviour.
-      const simpleIndexUrl = repoUrl(layout.repoName, 'simple');
-      const built2 = buildWheel({
-        name: layout.packageName,
-        version: pypiAdapter.version('release'),
-      });
-      const form2 = new FormData();
-      form2.append('name', built2.name);
-      form2.append('version', built2.version);
-      form2.append('requires_python', built2.requiresPython);
-      form2.append('sha256_digest', built2.sha256Hex);
-      form2.append('content', new Blob([new Uint8Array(built2.bytes)]), built2.filename);
-      const simpleRes = await fetch(simpleIndexUrl, {
-        method: 'POST',
-        headers: authHeader(admin),
-        body: form2,
-      });
-      const simpleBytes = Buffer.from(await simpleRes.arrayBuffer());
-      expectMsgId({ status: simpleRes.status, body: simpleBytes }, 404, ERROR_CODES.UNKNOWN_PATH);
-    },
-  );
-
   test(
     'an archive filename that does not match NAME-VERSION(-tag)*.(tar.gz|whl|zip) is refused ' +
       'with 400 archiveFileNameInvalid',
@@ -472,50 +355,6 @@ test.describe('pypi registry rules (raw HTTP)', () => {
 
       const followed = await rawGetSimplePage(layout.repoName, admin, mixedCaseName);
       expect(followed.status, 'following the redirect lands on the real project page').toBe(200);
-    },
-  );
-
-  test(
-    'HEAD mirrors GET’s status: 404 for a path that was never published, 200 once it is ' +
-      '(RPS-1226, fixed)',
-    { tag: ['@negative'] },
-    async ({ seeder }) => {
-      const layout = await newRepo(seeder, 'head');
-      const admin = adminCredential();
-      const version = pypiAdapter.version('release');
-      const built = buildWheel({ name: layout.packageName, version });
-
-      // RPS-1226 (fixed): HEAD used to answer 200 unconditionally, existence never checked.
-      const missingProject = await rawHead(layout.repoName, admin, simplePagePath('no-such-pkg'));
-      expect(missingProject.status, 'HEAD of a project page that was never published').toBe(404);
-
-      const missingFile = await rawHead(
-        layout.repoName,
-        admin,
-        downloadPath(layout.packageName, wheelFilename(layout.packageName, version)),
-      );
-      expect(missingFile.status, 'HEAD of an archive file that was never published').toBe(404);
-
-      expectMsgId(await rawUpload(layout.repoName, admin, built), 200, undefined);
-
-      const existingProject = await rawHead(
-        layout.repoName,
-        admin,
-        simplePagePath(layout.packageName),
-      );
-      expect(existingProject.status, 'HEAD of the now-published project page').toBe(200);
-
-      const existingFile = await rawHead(
-        layout.repoName,
-        admin,
-        downloadPath(layout.packageName, built.filename),
-      );
-      expect(existingFile.status, 'HEAD of the now-published archive file').toBe(200);
-
-      const rootIndex = await rawHead(layout.repoName, admin, simpleRootPath());
-      expect(rootIndex.status, 'HEAD of the root /simple/ index (the repo already resolved)').toBe(
-        200,
-      );
     },
   );
 

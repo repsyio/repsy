@@ -18,9 +18,8 @@
  * changed password, a deleted user, a revoked or rotated deploy token). The scenarios live in
  * `scenarios/credential-invalidation.ts`, shared with `tests/maven/credential-invalidation.spec.ts`.
  *
- * RPS-1552 for Cargo: the token `GET /{repo}/me` answers a user's password with is bound to the user's
- * `token_version`, so a password change ends it at once (it lives 30 minutes otherwise), and `/me` does not
- * renew a token that was ended. The scenarios live in `scenarios/credential-invalidation.ts`.
+ * RPS-1552 for Cargo (the token `GET /{repo}/me` answers a user's password with is bound to the user's
+ * `token_version`) is `ProtocolJwtTokenVersionIT` since RPS-2738; only the bare-token renewal stays here.
  */
 import { RepoType } from '../../src/api/panel-api.js';
 import {
@@ -33,10 +32,7 @@ import {
 } from '../../src/clients/cargo-raw.js';
 import { cargoAdapter } from '../../src/clients/cargo.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
-import {
-  registerCredentialInvalidation,
-  registerLoginTokenInvalidation,
-} from '../../src/scenarios/credential-invalidation.js';
+import { registerCredentialInvalidation } from '../../src/scenarios/credential-invalidation.js';
 import { repoUrl } from '../../src/repo-url.js';
 
 registerCredentialInvalidation({
@@ -53,26 +49,6 @@ registerCredentialInvalidation({
     const entries = parseIndex(res.body);
     return entries.some((e) => e.vers === version);
   },
-});
-
-registerLoginTokenInvalidation({
-  name: 'cargo',
-  repoType: RepoType.CARGO,
-  login: async (repoName, username, secret) => {
-    const res = await rawMe(repoName, {
-      transport: 'basic',
-      username,
-      password: secret,
-      kind: 'password',
-    });
-    if (!res.token) {
-      throw new Error(
-        `GET /me for ${username} answered ${res.status}: ${res.response.body.toString('utf8')}`,
-      );
-    }
-    return res.token;
-  },
-  probe: (repoName, token) => rawGetIndexWithBearer(repoName, 'no_such_crate_rps1552', token),
 });
 
 /**

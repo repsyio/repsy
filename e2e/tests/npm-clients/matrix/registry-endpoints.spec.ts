@@ -28,7 +28,7 @@
  *  - `search` finds a package of THIS repository by a free-text term, never another repository's, and
  *    answers `[]` with exit 0 for a term nothing matches. The qualifiers (`author:`, `maintainer:`,
  *    `is:`/`not:`; RPS-1343) go through the client's own text too, and the raw probes of them and of
- *    `size`/`from` (RPS-1344) are in `tests/npm/search-token-dist-tags.spec.ts`.
+ *    `size`/`from` (RPS-1344) are `NpmSearchQualifiersProtocolIT`.
  *  - `logout` (npm, pnpm; RPS-1361) revokes the token of a login (`DELETE /-/user/token/<token>`): the
  *    command exits 0 and the token is refused afterwards.
  *  - `audit` of an installed tree exits 0 with no vulnerabilities and the client really asked the
@@ -38,7 +38,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 
-import { npmAuthHeader, rawLogin, rawRequestPath } from '../../../src/clients/npm-raw.js';
+import { rawLogin, rawRequestPath } from '../../../src/clients/npm-raw.js';
 import type { ClientId, NpmFamilyClient } from '../../../src/clients/npm-family/client.js';
 import {
   adminBinding,
@@ -50,9 +50,8 @@ import {
 } from '../../../src/clients/npm-family/fixtures.js';
 import { clientsWith, ENABLED_CLIENTS } from '../../../src/clients/npm-family/registry.js';
 import { startWireRecorder } from '../../../src/clients/npm-family/wire-recorder.js';
-import { adminCredential } from '../../../src/clients/raw-http.js';
 import { env } from '../../../src/env.js';
-import { repoPath, repoUrl } from '../../../src/repo-url.js';
+import { repoPath } from '../../../src/repo-url.js';
 import { expect, test } from '../../../src/scenarios/fixtures.js';
 
 /**
@@ -162,25 +161,6 @@ for (const client of ENABLED_CLIENTS.filter((candidate) => candidate.logout)) {
     },
   );
 }
-
-test(
-  'whoami needs credentials even on a public repository (raw)',
-  {
-    tag: ['@npm', '@whoami', '@negative'],
-  },
-  async ({ seeder }) => {
-    const publicRepo = await newRepo(seeder, false);
-    const url = repoUrl(publicRepo.name, '-/whoami');
-
-    const anonymous = await fetch(url);
-    expect(anonymous.status, 'anonymous whoami on a public repository').toBe(401);
-    expect(anonymous.headers.get('www-authenticate')).toMatch(/^Basic realm=/);
-
-    const authenticated = await fetch(url, { headers: npmAuthHeader(adminCredential()) });
-    expect(authenticated.status).toBe(200);
-    expect(await authenticated.json()).toEqual({ username: env.adminUsername });
-  },
-);
 
 for (const client of clientsWith('pingCmd')) {
   test(
@@ -359,30 +339,3 @@ for (const client of clientsWith('auditCmd')) {
     },
   );
 }
-
-test(
-  'the audit endpoints answer an empty report for a package version nothing is known about (raw)',
-  {
-    tag: ['@npm', '@audit'],
-  },
-  async ({ seeder }) => {
-    const repo = await newRepo(seeder);
-    const headers = { ...npmAuthHeader(adminCredential()), 'Content-Type': 'application/json' };
-    const base = repoUrl(repo.name, '-/npm/v1/security');
-
-    const bulk = await fetch(`${base}/advisories/bulk`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ 'left-pad': ['1.3.0'] }),
-    });
-    expect(bulk.status, 'advisories/bulk').toBe(200);
-    expect(await bulk.json()).toEqual({});
-
-    const anonymous = await fetch(`${base}/advisories/bulk`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 'left-pad': ['1.3.0'] }),
-    });
-    expect(anonymous.status, 'a private repository still needs credentials for an audit').toBe(401);
-  },
-);

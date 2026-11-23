@@ -33,7 +33,6 @@
  * the `GET` of the same path.
  */
 import { MARKER_FILENAME } from '../../../src/clients/npm.js';
-import { npmAuthHeader } from '../../../src/clients/npm-raw.js';
 import type { ClientId } from '../../../src/clients/npm-family/client.js';
 import {
   adminBinding,
@@ -45,8 +44,7 @@ import {
 } from '../../../src/clients/npm-family/fixtures.js';
 import { clientsWith } from '../../../src/clients/npm-family/registry.js';
 import { startWireRecorder } from '../../../src/clients/npm-family/wire-recorder.js';
-import { adminCredential } from '../../../src/clients/raw-http.js';
-import { repoPath, repoUrl } from '../../../src/repo-url.js';
+import { repoPath } from '../../../src/repo-url.js';
 import { expect, test } from '../../../src/scenarios/fixtures.js';
 import type { Seeder } from '../../../src/seed/seeder.js';
 
@@ -160,29 +158,3 @@ for (const client of clientsWith('frozenInstall')) {
     );
   }
 }
-
-test(
-  'HEAD answers 404 for a package that does not exist, like GET (raw): RPS-1358',
-  {
-    tag: ['@npm', '@wire'],
-  },
-  async ({ seeder }) => {
-    const repo = await newRepo(seeder);
-    const missing = repoUrl(repo.name, packageNameFor(seeder, 'never-published'));
-    const headers = npmAuthHeader(adminCredential());
-
-    const get = await fetch(missing, { headers });
-    expect(get.status, 'GET of a package that does not exist').toBe(404);
-
-    const head = await fetch(missing, { method: 'HEAD', headers });
-    expect(head.status, 'RPS-1358: HEAD of the same path is 404 too').toBe(404);
-
-    // Control: a repository that does not exist is 404 for HEAD as well, so the answer is per
-    // package, not a blanket one per repository.
-    const noRepo = await fetch(repoUrl(`e2e-${seeder.runId}-norepo`, 'x'), {
-      method: 'HEAD',
-      headers,
-    });
-    expect(noRepo.status, 'HEAD in a repository that does not exist').toBe(404);
-  },
-);
