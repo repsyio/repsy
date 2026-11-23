@@ -543,6 +543,22 @@ rebase or update the branch when another PR has just changed the same area, and 
 - The same rules apply in `repsy-core` and `repsy-mono`; change them in all three repositories together.
 
 
+## Red nightly
+
+`sonarcloud.yml` (the scheduled full `mvn verify`) and `e2e-nightly.yml` end with a `notify` job that runs
+`.github/scripts/nightly-alert.sh` on a scheduled run (RPS-2728). It never runs on a pull request, a push or a normal manual run:
+this repository is public.
+
+- Red run: ONE open issue per workflow, titled `Nightly red: <workflow>` with the label `nightly-red`, gets the run link and the failing
+  job names (a new comment for each further red run). It needs no secret. The issue is closed by the first green scheduled run.
+- Slack: the same step also posts when the secret `SLACK_WEBHOOK_URL` exists (an organisation secret visible to this repository; the
+  value is never in the repo, the step reads it only from its environment). Without it the issue is the only alert.
+- Who is told: whoever watches the repository's issues (assignee and subscribers of the `nightly-red` issue) and the Slack channel of the webhook.
+- Owner: (to be named). The maintainers have to name who looks first at a red nightly and put the name here.
+- Test the alert without waiting for a red night: `gh workflow run sonarcloud.yml -f alert_test=true` (or `e2e-nightly.yml`). The real jobs are
+  skipped, a job fails on purpose and the issue is titled `Nightly red (alert test): <workflow>`; close it by hand afterwards. For
+  `e2e-nightly.yml` do it outside 01:23-04:00 UTC (the concurrency group queues it behind the nightly).
+
 ## Release and the nightlies
 
 The first job of `release.yml` (`nightly-state`, script `.github/scripts/nightly-state.sh`) reads the newest

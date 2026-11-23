@@ -10,6 +10,11 @@ on:
     - cron: "0 10,12,14,16,18 * * *"
       timezone: "Europe/Amsterdam"
   workflow_dispatch:
+    inputs:
+      alert_test:
+        description: "Skip the real jobs and fail on purpose, to exercise the red-nightly alert (issue, Slack when configured). Default off"
+        type: boolean
+        default: false
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -21,6 +26,7 @@ jobs:
   # in pr-checks.yml, minus lint.
   frontend-coverage:
     name: Frontend coverage
+    if: ${{ !inputs.alert_test }}
     runs-on: repsy-md
     timeout-minutes: 30
     defaults:
@@ -117,3 +123,42 @@ jobs:
           -Dsonar.organization=repsy
           -Dsonar.exclusions=**/*.spec.ts
           -Dsonar.coverage.jacoco.xmlReportPaths=${{ github.workspace }}/coverage-report/target/site/jacoco-aggregate/jacoco.xml
+
+  # A deliberate failure to exercise the alert path (RPS-2728): gh workflow run sonarcloud.yml -f alert_test=true
+  alert-test:
+    name: Alert test
+    if: ${{ inputs.alert_test }}
+    runs-on: repsy-sm
+    timeout-minutes: 5
+    steps:
+      - run: |
+          echo "::error::Deliberate failure (alert_test)"
+          exit 1
+
+  # Last job: opens or updates the issue "Nightly red: <workflow>" (and posts to Slack when
+  # SLACK_WEBHOOK_URL exists) when a scheduled run is red, and closes it when one is green (RPS-2728, AGENTS.md
+  # "Red nightly"). Only for `schedule` and the alert test: this is a public repository.
+  notify:
+    name: Alert on red nightly
+    needs: [frontend-coverage, analyze, alert-test]
+    if: ${{ always() && (github.event_name == 'schedule' || inputs.alert_test) }}
+    runs-on: repsy-sm
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          sparse-checkout: .github/scripts
+      - name: Alert
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          WORKFLOW_NAME: ${{ github.workflow }}
+          NOTIFY_JOB_NAME: Alert on red nightly
+          RUN_ID: ${{ github.run_id }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          ALERT_TEST: ${{ inputs.alert_test }}
+        run: .github/scripts/nightly-alert.sh
