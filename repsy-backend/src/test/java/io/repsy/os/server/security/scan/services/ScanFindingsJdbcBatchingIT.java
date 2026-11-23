@@ -35,6 +35,7 @@ import java.time.Instant;
 import java.util.stream.IntStream;
 import org.hibernate.SessionFactory;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -43,6 +44,8 @@ import org.springframework.beans.factory.annotation.Autowired;
  * spring.jpa.properties.hibernate.jdbc.batch_size} is 50, so 2,000 findings take about 40 prepared
  * statements instead of 2,000. It runs inside the test transaction, so nothing is committed.
  */
+// Extended tier: JDBC batching performance check (RPS-2731).
+@Tag("extended")
 class ScanFindingsJdbcBatchingIT extends AbstractIT {
 
   private static final int FINDINGS = 2_000;

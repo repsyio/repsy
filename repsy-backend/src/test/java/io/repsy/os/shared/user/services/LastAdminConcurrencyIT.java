@@ -38,6 +38,7 @@ import java.util.concurrent.Executors;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -65,6 +66,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * two, and it is restored afterwards. The row counts stay the same, so the leak guard is satisfied,
  * and the IT classes run one after the other.
  */
+// Extended tier: concurrency or race scenario (RPS-2731).
+@Tag("extended")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("last admin guards under concurrent requests (RPS-1101)")
 class LastAdminConcurrencyIT extends AbstractIT {

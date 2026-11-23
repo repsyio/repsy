@@ -51,6 +51,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.zip.ZipOutputStream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.mockito.invocation.InvocationOnMock;
@@ -82,6 +83,8 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>{@link UsageUpdateService} is mocked like in {@link NuGetPublishProtocolIT}: the mock records
  * whether a push reported any usage.
  */
+// Extended tier: failure-injection or storage-consistency scenario (RPS-2731).
+@Tag("extended")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("NuGet push keeps storage and the database in agreement (RPS-999)")
 class NuGetPublishStorageConsistencyIT extends AbstractIT {

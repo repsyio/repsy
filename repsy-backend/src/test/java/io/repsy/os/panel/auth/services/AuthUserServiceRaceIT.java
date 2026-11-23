@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -64,6 +65,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * created users are cleaned up afterwards; a rejected request rolls its own transaction back,
  * including the deletion the spy performed, so the row is still there to delete.
  */
+// Extended tier: concurrency or race scenario (RPS-2731).
+@Tag("extended")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("login/refresh vs. a user deletion racing the token write (RPS-1152)")
 class AuthUserServiceRaceIT extends AbstractIT {

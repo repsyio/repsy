@@ -45,6 +45,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.invocation.InvocationOnMock;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -74,6 +75,8 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Replacing a version whose file write fails part-way is not covered beyond keeping its row: the
  * file system strategy truncates the file in place, so its old bytes cannot be restored.
  */
+// Extended tier: failure-injection or storage-consistency scenario (RPS-2731).
+@Tag("extended")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("Helm chart upload keeps storage and the database in agreement (RPS-1124)")
 class HelmPublishStorageConsistencyIT extends AbstractIT {

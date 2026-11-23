@@ -55,6 +55,7 @@ import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.invocation.InvocationOnMock;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -80,6 +81,8 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <p>{@link UsageUpdateService} is mocked: the mock records whether a push reported any usage.
  */
+// Extended tier: failure-injection or storage-consistency scenario (RPS-2731).
+@Tag("extended")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("Cargo publish keeps storage and the database in agreement (RPS-1124)")
 class CargoPublishStorageConsistencyIT extends AbstractIT {

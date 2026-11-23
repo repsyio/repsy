@@ -54,6 +54,7 @@ import java.util.concurrent.TimeUnit;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.invocation.InvocationOnMock;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -79,6 +80,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <p>Runs without a test transaction, since both pushes have to commit. It deletes the repos and
  * users it commits.
  */
+// Extended tier: concurrency or race scenario (RPS-2731).
+@Tag("extended")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("Concurrent overriding pushes of one Helm chart version take turns (RPS-1273)")
 class HelmConcurrentOverrideIT extends AbstractIT {

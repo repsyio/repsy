@@ -47,6 +47,7 @@ import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.invocation.InvocationOnMock;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -73,6 +74,8 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <p>{@link UsageUpdateService} is mocked because usage accounting is not under test.
  */
+// Extended tier: concurrency or race scenario (RPS-2731).
+@Tag("extended")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("Cargo publish shares new authors, keywords and categories safely (RPS-1271)")
 class CargoPublishGlobalRowsRaceIT extends AbstractIT {

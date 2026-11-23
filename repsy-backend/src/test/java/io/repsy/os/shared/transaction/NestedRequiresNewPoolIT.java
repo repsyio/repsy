@@ -40,6 +40,7 @@ import java.util.concurrent.Callable;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -63,6 +64,8 @@ import tools.jackson.databind.ObjectMapper;
  * <p>Runs without a test transaction: the transaction of the request must be the outer one, and the
  * rows it writes are committed and deleted afterwards.
  */
+// Extended tier: connection-pool starvation regression (RPS-2731).
+@Tag("extended")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("nested REQUIRES_NEW work with one free pooled connection (RPS-2176)")
 class NestedRequiresNewPoolIT extends AbstractIT {

@@ -69,6 +69,7 @@ import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -121,6 +122,8 @@ import tools.jackson.databind.ObjectMapper;
  * <p>Not covered: the Helm OCI blob and manifest push (Helm's own storage service), and a failure
  * after the file was written (the {@code *PublishStorageConsistencyIT} classes cover that).
  */
+// Extended tier: failure-injection or storage-consistency scenario (RPS-2731).
+@Tag("extended")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("Publish when storage fails (RPS-2093)")
 class PublishStorageFailureIT extends AbstractIT {

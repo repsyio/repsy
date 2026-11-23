@@ -36,6 +36,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -58,6 +59,8 @@ import org.springframework.transaction.annotation.Transactional;
  * are therefore committed for real and {@link #cleanUp()} removes exactly what the test created,
  * following the pattern in {@code UsageControllerIT}.
  */
+// Extended tier: concurrency or race scenario (RPS-2731).
+@Tag("extended")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("RepoTxService: concurrent create/rename to the same name (RPS-1134)")
 class RepoNameRaceIT extends AbstractIT {

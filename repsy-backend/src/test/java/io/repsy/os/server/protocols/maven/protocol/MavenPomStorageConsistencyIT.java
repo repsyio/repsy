@@ -39,6 +39,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -62,6 +63,8 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>{@link UsageUpdateService} is mocked, as in the other protocol ITs: the mock records whether
  * an upload reported any usage.
  */
+// Extended tier: failure-injection or storage-consistency scenario (RPS-2731).
+@Tag("extended")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("Maven POM is validated before it is stored (RPS-1058)")
 class MavenPomStorageConsistencyIT extends AbstractIT {

@@ -38,6 +38,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -61,6 +62,8 @@ import org.springframework.transaction.annotation.Transactional;
  * <p>Runs without a test transaction: inside one, the facade would join it and the rollback could
  * not be told apart from the test's own. It deletes the repos and users it commits.
  */
+// Extended tier: failure-injection or storage-consistency scenario (RPS-2731).
+@Tag("extended")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("Helm chart delete keeps its rows when the storage fails (RPS-1086)")
 class HelmDeleteStorageFailureIT extends AbstractIT {

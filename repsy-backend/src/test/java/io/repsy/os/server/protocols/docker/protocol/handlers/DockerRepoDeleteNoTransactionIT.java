@@ -37,6 +37,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -58,6 +59,8 @@ import org.springframework.web.context.WebApplicationContext;
  * <p>Runs without a test transaction (the test transaction would itself be the active one), so it
  * deletes what it committed.
  */
+// Extended tier: concurrency or race scenario (RPS-2731).
+@Tag("extended")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("Docker repo delete holds no transaction during the storage call (RPS-2114)")
 class DockerRepoDeleteNoTransactionIT extends AbstractIT {

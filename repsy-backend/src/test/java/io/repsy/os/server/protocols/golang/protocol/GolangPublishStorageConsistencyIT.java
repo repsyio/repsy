@@ -48,6 +48,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.invocation.InvocationOnMock;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -72,6 +73,8 @@ import org.springframework.transaction.annotation.Transactional;
  *
  * <p>{@link UsageUpdateService} is mocked: the mock records whether an upload reported any usage.
  */
+// Extended tier: failure-injection or storage-consistency scenario (RPS-2731).
+@Tag("extended")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
 @DisplayName("Go module upload keeps storage and the database in agreement (RPS-1124)")
 class GolangPublishStorageConsistencyIT extends AbstractIT {
