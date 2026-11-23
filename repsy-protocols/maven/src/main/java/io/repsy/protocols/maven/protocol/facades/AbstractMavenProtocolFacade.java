@@ -29,6 +29,7 @@ import io.repsy.protocols.maven.shared.artifact.dtos.SignatureOutcome;
 import io.repsy.protocols.maven.shared.artifact.services.contracts.ArtifactService;
 import io.repsy.protocols.maven.shared.storage.services.MavenStorageService;
 import io.repsy.protocols.maven.shared.utils.ArtifactMetadataSynthesizer;
+import io.repsy.protocols.maven.shared.utils.LiteralSnapshotRequest;
 import io.repsy.protocols.maven.shared.utils.MavenFileNameUtils;
 import io.repsy.protocols.maven.shared.utils.MavenGavUtils;
 import io.repsy.protocols.maven.shared.utils.MavenPublishLimits;
@@ -46,7 +47,6 @@ import io.repsy.protocols.shared.utils.SpooledUpload;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.List;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -64,9 +64,6 @@ public abstract class AbstractMavenProtocolFacade<I> implements MavenProtocolFac
   private static final String USAGES = "usages";
   private static final String ARTIFACT_NAME = "artifactName";
   private static final String ARTIFACT_VERSION = "artifactVersion";
-
-  private static final List<String> LITERAL_CHECKSUM_SUFFIXES =
-      List.of(".sha1", ".md5", ".sha256", ".sha512");
 
   private static final Set<String> SCANNABLE_EXTENSIONS = Set.of("jar", "war", "ear");
 
@@ -131,57 +128,33 @@ public abstract class AbstractMavenProtocolFacade<I> implements MavenProtocolFac
   private @Nullable Resource resolveLiteralSnapshot(
       final BaseRepoInfo<I> repoInfo, final String path) {
 
-    final var segments = path.split("/", -1);
+    final var request = LiteralSnapshotRequest.parse(path);
 
-    if (segments.length < 3) {
+    if (request == null) {
       return null;
     }
 
-    final var fileName = segments[segments.length - 1];
-    final var version = segments[segments.length - 2];
-    final var artifactId = segments[segments.length - 3];
-
-    if (!version.endsWith("-SNAPSHOT")) {
-      return null;
-    }
-
-    String checksumSuffix = "";
-    var mainName = fileName;
-
-    for (final var suffix : LITERAL_CHECKSUM_SUFFIXES) {
-      if (fileName.endsWith(suffix)) {
-        checksumSuffix = suffix;
-        mainName = fileName.substring(0, fileName.length() - suffix.length());
-        break;
-      }
-    }
-
-    final var prefix = artifactId + "-" + version + ".";
-
-    if (!mainName.startsWith(prefix) || mainName.length() == prefix.length()) {
-      return null;
-    }
-
-    final var directory = path.substring(0, path.length() - fileName.length() - 1);
     final var names =
         this.mavenStorageService
-            .getItems(StoragePath.of(repoInfo.getStorageKey(), directory))
+            .getItems(StoragePath.of(repoInfo.getStorageKey(), request.directory()))
             .stream()
             .filter(item -> !item.isDirectory())
             .map(StorageItemInfo::getName)
             .toList();
     final var newest =
         SnapshotNameUtils.newestSnapshotMainFileName(
-            artifactId, version, mainName.substring(prefix.length()), names);
+            request.artifactId(), request.version(), request.extension(), names);
 
-    if (newest == null || newest.equals(mainName)) {
+    if (newest == null || newest.equals(request.mainName())) {
       return null;
     }
 
     try {
       return this.mavenStorageService.getResource(
           repoInfo.getName(),
-          StoragePath.of(repoInfo.getStorageKey(), directory + "/" + newest + checksumSuffix));
+          StoragePath.of(
+              repoInfo.getStorageKey(),
+              request.directory() + "/" + newest + request.checksumSuffix()));
     } catch (final ItemNotFoundException _) {
       return null;
     }
