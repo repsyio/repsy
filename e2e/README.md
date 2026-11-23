@@ -85,8 +85,6 @@ e2e/
   docker-compose.stack-scanner.yml  # OPT-IN overlay on either stack: a stub scanner + Repsy with the scanner enabled, `run.sh local up|down --scanner`, see "Scanner stack"
   docker-compose.stack-trivy.yml  # OPT-IN overlay on either stack: the REAL repsy-scanner-trivy (built from the repository root, `repsy-scanner-trivy/Dockerfile`) + Repsy with the scanner enabled, `run.sh local up|down --trivy`, see "Real scanner stack"
   docker-compose.stack-limits.yml  # OPT-IN overlay on either stack: every configurable upload limit at 64 KiB, `run.sh local up|down --limits`, see "Size-limit leg"
-  docker-compose.stack-upload-ttl.yml  # OPT-IN overlay on either stack: short ABANDONED_UPLOAD_TTL (5 s) and cleanup intervals for testing abandoned upload cleanup, `run.sh local up|down --upload-ttl`, see "Abandoned upload cleanup"
-  docker-compose.stack-cors.yml    # OPT-IN overlay on either stack: APP_ALLOWED_ORIGINS set to two origins, `run.sh local up|down --cors`, see "CORS leg"
   docker-compose.stack-proxy.yml   # OPT-IN overlay on either stack: an nginx in front of Repsy terminating TLS (RPS-1651), `run.sh local up|down --proxy`, see "Reverse proxy stack"
   proxy/default.conf.template  # the nginx configuration of that overlay (three listeners, the README's X-Forwarded-* example)
   docker-compose.runners.yml   # one runner service per protocol: "skeleton", "maven", "npm", "npm-clients", "cargo", "nuget", "docker", "helm", "pypi", "go", "ruby"; plus "ui", "ui-firefox", "ui-webkit", "ui-visual" and "api"
@@ -289,7 +287,7 @@ e2e/
     api/
       port-separation.spec.ts   # RPS-1480 /api/** is not served on the protocol port (404 unknownPath); /v2/ and a Maven path on the api port are the SPA, not the protocol
       forwarded-headers.spec.ts # RPS-1480 X-Forwarded-Proto/Host/Port drive the Docker realm, the Cargo config.json and the PyPI simple links
-      cors-csp.spec.ts          # RPS-1480 CSP on the SPA and never on /api or the protocol port; the default (unset APP_ALLOWED_ORIGINS: same-origin only, no CORS header, RPS-1590) CORS of the panel API and, with the `--cors` overlay, `@cors` ("CORS leg"); RPS-1514 no CORS on the protocol port, nosniff/Referrer-Policy/XFO, no HSTS over http
+      cors-csp.spec.ts          # RPS-1480 CSP on the SPA and never on /api or the protocol port; the default (unset APP_ALLOWED_ORIGINS: same-origin only, no CORS header, RPS-1590) CORS of the panel API (the configured-origins half is `CorsAllowedOriginsListIT`); RPS-1514 no CORS on the protocol port, nosniff/Referrer-Policy/XFO, no HSTS over http
 ```
 
 ## Setup
@@ -332,8 +330,6 @@ pnpm gen:api            # (re)generates src/api/generated from ../repsy-backend'
 | `REPSY_E2E_THROTTLE`          | _(unset)_                                   | `1` makes `local up\|down` include the auth-throttle overlay (same as `--throttle`) and `test` add `throttle` to `REPSY_E2E_OPT_IN`, see "Auth-throttle leg"                                                                                                                                                                                                                                                                             |
 | `REPSY_E2E_PROBE_BAN`         | _(unset)_                                   | `1` makes `local up\|down` include the strict probe-ban overlay (same as `--probe-ban`) and `test` add `probe-ban` to `REPSY_E2E_OPT_IN`, see "Probe-ban leg"                                                                                                                                                                                                                                                                            |
 | `REPSY_E2E_LIMITS`            | _(unset)_                                   | `1` makes `local up\|down` include the tiny-upload-limit overlay (same as `--limits`) and `test` add `limits` to `REPSY_E2E_OPT_IN`, see "Size-limit leg"                                                                                                                                                                                                                                                                                |
-| `REPSY_E2E_UPLOAD_TTL`        | _(unset)_                                   | `1` makes `local up\|down` include the short-ttl abandoned-upload-cleanup overlay (same as `--upload-ttl`) and `test` add `upload-ttl` to `REPSY_E2E_OPT_IN`, see "Abandoned upload cleanup"                                                                                                                                                                                                                                             |
-| `REPSY_E2E_CORS`              | _(unset)_                                   | `1` makes `local up\|down` include the APP_ALLOWED_ORIGINS overlay (same as `--cors`) and `test` add `cors` to `REPSY_E2E_OPT_IN`, see "CORS leg"                                                                                                                                                                                                                                                                                        |
 | `REPSY_E2E_TRIVY`             | _(unset)_                                   | `1` makes `local up\|down` include the real-scanner overlay (same as `--trivy`) and `test` add `trivy` to `REPSY_E2E_OPT_IN`, see "Real scanner stack"                                                                                                                                                                                                                                                                                   |
 | `REPSY_E2E_SCANNER_PORT`      | `8090` + offset                             | host port (loopback) the stub scanner's `/control` API is published on; the ui runner reaches it there                                                                                                                                                                                                                                                                                                                                   |
 | `REPSY_SCANNER_STUB_URL`      | `http://localhost:8090`                     | ui runner only: where the `@scanner` specs reach that API (follows `REPSY_E2E_SCANNER_PORT`)                                                                                                                                                                                                                                                                                                                                             |
@@ -3319,7 +3315,7 @@ read-only token's write refusal at the OPERATION hop, reads still working (R3); 
 blob upload, a wrong digest, and dedup (R4); the OCI `digest-algorithm` hint of a blob upload
 start — `sha256`/`sha512` start a session and a sha512 blob (monolithic or chunked) is stored under its
 `sha512`, any other algorithm is `400 DIGEST_INVALID` with no session (R4b, **RPS-1594**); manifest push validation — missing blobs, a wrong
-`sha256:` reference, an unknown `Content-Type` (R5, **B4**); the override rule and an orphaned blob
+`sha256:` reference, an unknown `Content-Type` (R5, **B4**; now `DockerRegistryRulesIT`, as are R6, R6a and R15b, RPS-2738); the override rule and an orphaned blob
 after a refusal (R6); overriding a tag leaving the OLD manifest pullable by digest (R7, **B2, fixed by RPS-1216**);
 `HEAD` vs. `GET` by digest (R8, **B1, fixed by RPS-1215**); retagging the same digest under a second tag (R9); a
 config blob missing `os`/`architecture` (R12, **B5**); a multi-arch index referencing a
@@ -3550,8 +3546,9 @@ getMediaType()`) instead of the pushed, required, already-validated `Content-Typ
 
 ### Docker registry API pins: tags/list (RPS-1489), `_catalog`, referrers, `mount=` (RPS-1478 part A)
 
-`tests/docker/registry-api.spec.ts` (RA1-RA6, raw HTTP through `docker-raw.ts`'s `rawTagsList`/
-`rawCatalog`/`rawReferrers`/`rawMountUpload`, no runner change) pins what the Docker server does
+`tests/docker/registry-api.spec.ts` (RA1, RA1b, RA5 and RA6 remain; raw HTTP through `docker-raw.ts`'s `rawTagsList`/
+`rawMountUpload`, no runner change; RA2 to RA4, the `_catalog` and referrers pins, moved to the Java ITs `DockerCatalogIT` and
+`DockerReferrersIT`, RPS-2738) pins what the Docker server does
 with the distribution spec: `tags/list` (implemented by RPS-1489, RA1) and the parts it does not implement, so the second client family
 (skopeo/regctl/oras, RPS-1478 parts B and C) meets a documented, tested surface. Every row was
 probed against a live stack first. It is pinned at today's behaviour (no `test.fail`, no ticket
@@ -3792,9 +3789,9 @@ layer digest always equals `sha256(tgzBytes)`).
 BOTH modes): the `/v2/` ping is Docker's own, not Helm's (R1); the OCI auth matrix — single-hop
 Basic, no token exchange (R2); blob upload flows — monolithic, chunked, wrong digest, dedup (R3);
 OCI manifest push validation — missing blob, malformed JSON, empty layers, a MISSING (not merely
-empty) `Content-Type` (R4, **B-H7**); the OCI override rule (R5); `GET tags/list` is served (`200`, R8,
+empty) `Content-Type` (R4, **B-H7**); the OCI override rule (R5; its `DENIED` code is in `HelmRegistryRulesIT`, RPS-2738); `GET tags/list` is served (`200`, R8,
 **B-H3**, RPS-1219); classic upload rules — missing `chart` part (plain text, no envelope),
-Chart.yaml validation, uppercase names, both classic routes accepting the same request (R11);
+Chart.yaml validation (R11b, minus the missing Chart.yaml, name and version, now `HelmRegistryRulesIT`), uppercase names, both classic routes accepting the same request (R11);
 classic read auth — bare 401 on a private repo, 200 with credentials, anonymous 200 on a public one
 (R12); `index.yaml`'s shape (R13, **B-H8**); and `DELETE` removing a chart from both the classic
 index and, for an OCI-pushed chart, its manifest too (R14).
@@ -4849,18 +4846,16 @@ differently, so each of them is an **opt-in overlay**: a compose file layered on
 PostgreSQL one or the H2 one) with one more `-f`, that changes what Repsy runs with for one nightly leg
 and is never part of the default stack.
 
-| Overlay      | Flag (`local up\|down`) | Switch (env)             | Compose file                          | Opt-in name  | What it changes                                            | Specs                                                                          |
-| ------------ | ----------------------- | ------------------------ | ------------------------------------- | ------------ | ---------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `scanner`    | `--scanner`             | `REPSY_E2E_SCANNER=1`    | `docker-compose.stack-scanner.yml`    | `scanner`    | stub scanner, `SECURITY_SCANNER=enabled`                   | `@scanner` (ui, npm-clients, docker, maven, pypi), "Scanner stack"             |
-| `throttle`   | `--throttle`            | `REPSY_E2E_THROTTLE=1`   | `docker-compose.stack-throttle.yml`   | `throttle`   | 3 failed password checks per 10 s per client               | `@throttle` (stack, ui), "Auth-throttle leg"                                   |
-| `probe-ban`  | `--probe-ban`           | `REPSY_E2E_PROBE_BAN=1`  | `docker-compose.stack-probe-ban.yml`  | `probe-ban`  | the probe ban in enforce, one strike bans a client         | `@probe-ban` (stack), "Probe-ban leg"; nightly `@smoke` of all clients         |
-| `tls`        | `--tls`                 | `REPSY_E2E_TLS=1`        | `docker-compose.stack-tls.yml`        | `tls`        | Repsy's own https listeners 8443/9443                      | `@tls` (skeleton, go, ui), "TLS stack"; nightly `@smoke` of all clients        |
-| `limits`     | `--limits`              | `REPSY_E2E_LIMITS=1`     | `docker-compose.stack-limits.yml`     | `limits`     | every configurable upload limit at 64 KiB                  | `@limits` (7 runners), "Size-limit leg"                                        |
-| `cors`       | `--cors`                | `REPSY_E2E_CORS=1`       | `docker-compose.stack-cors.yml`       | `cors`       | `APP_ALLOWED_ORIGINS` set to two origins (default: unset)  | `@cors` (api), "CORS leg"                                                      |
-| `proxy`      | `--proxy`               | `REPSY_E2E_PROXY=1`      | `docker-compose.stack-proxy.yml`      | `proxy`      | an nginx in front of Repsy, TLS terminated there           | `@proxy` (ui, api), "Reverse proxy stack"                                      |
-| `upload-ttl` | `--upload-ttl`          | `REPSY_E2E_UPLOAD_TTL=1` | `docker-compose.stack-upload-ttl.yml` | `upload-ttl` | short `ABANDONED_UPLOAD_TTL` (5 s) and cleanup intervals   | `@upload-ttl` (docker runner: Docker and Helm OCI), "Abandoned upload cleanup" |
-| `upgrade`    | `--upgrade`             | `REPSY_E2E_UPGRADE=1`    | `docker-compose.stack-upgrade.yml`    | `upgrade`    | the PREVIOUS release's image and its old-style environment | `@upgrade` (stack), "Upgrade path"                                             |
-| `trivy`      | `--trivy`               | `REPSY_E2E_TRIVY=1`      | `docker-compose.stack-trivy.yml`      | `trivy`      | the REAL repsy-scanner-trivy, `SECURITY_SCANNER=enabled`   | `@trivy` (api), "Real scanner stack"                                           |
+| Overlay     | Flag (`local up\|down`) | Switch (env)            | Compose file                         | Opt-in name | What it changes                                            | Specs                                                                   |
+| ----------- | ----------------------- | ----------------------- | ------------------------------------ | ----------- | ---------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `scanner`   | `--scanner`             | `REPSY_E2E_SCANNER=1`   | `docker-compose.stack-scanner.yml`   | `scanner`   | stub scanner, `SECURITY_SCANNER=enabled`                   | `@scanner` (ui, npm-clients, docker, maven, pypi), "Scanner stack"      |
+| `throttle`  | `--throttle`            | `REPSY_E2E_THROTTLE=1`  | `docker-compose.stack-throttle.yml`  | `throttle`  | 3 failed password checks per 10 s per client               | `@throttle` (stack, ui), "Auth-throttle leg"                            |
+| `probe-ban` | `--probe-ban`           | `REPSY_E2E_PROBE_BAN=1` | `docker-compose.stack-probe-ban.yml` | `probe-ban` | the probe ban in enforce, one strike bans a client         | `@probe-ban` (stack), "Probe-ban leg"; nightly `@smoke` of all clients  |
+| `tls`       | `--tls`                 | `REPSY_E2E_TLS=1`       | `docker-compose.stack-tls.yml`       | `tls`       | Repsy's own https listeners 8443/9443                      | `@tls` (skeleton, go, ui), "TLS stack"; nightly `@smoke` of all clients |
+| `limits`    | `--limits`              | `REPSY_E2E_LIMITS=1`    | `docker-compose.stack-limits.yml`    | `limits`    | every configurable upload limit at 64 KiB                  | `@limits` (7 runners), "Size-limit leg"                                 |
+| `proxy`     | `--proxy`               | `REPSY_E2E_PROXY=1`     | `docker-compose.stack-proxy.yml`     | `proxy`     | an nginx in front of Repsy, TLS terminated there           | `@proxy` (ui, api), "Reverse proxy stack"                               |
+| `upgrade`   | `--upgrade`             | `REPSY_E2E_UPGRADE=1`   | `docker-compose.stack-upgrade.yml`   | `upgrade`   | the PREVIOUS release's image and its old-style environment | `@upgrade` (stack), "Upgrade path"                                      |
+| `trivy`     | `--trivy`               | `REPSY_E2E_TRIVY=1`     | `docker-compose.stack-trivy.yml`     | `trivy`     | the REAL repsy-scanner-trivy, `SECURITY_SCANNER=enabled`   | `@trivy` (api), "Real scanner stack"                                    |
 
 How it fits together, so a later overlay is one row:
 
@@ -5439,51 +5434,6 @@ cases, plus npm and every npm-family publisher -- pnpm, yarn classic, yarn berry
 one green; running the specs on the default stack with `REPSY_E2E_OPT_IN=limits` does the same (every push
 succeeds); without the opt-in every `@limits` test skips, and the nightly leg fails on a skip.
 
-### Abandoned upload cleanup (RPS-1718)
-
-Docker and Helm OCI blob uploads that are started but never finished (abandoned when a `docker push`
-or `helm chart push` is aborted) are cleaned up after their TTL expires, releasing the disk space they
-were charged for. The default stack leaves this at its default TTL of 24 hours (`ABANDONED_UPLOAD_TTL`),
-so the overlay `docker-compose.stack-upload-ttl.yml` sets a short TTL of **5 seconds** and cleanup
-intervals of **1 second initial delay** and **2 seconds interval**, allowing tests to run without waiting
-24 hours. Only Docker and Helm OCI uploads are tested (Maven, npm, PyPI and others do not support OCI blob
-uploads).
-
-```bash
-./run.sh local up --upload-ttl                                           # (or REPSY_E2E_UPLOAD_TTL=1) add --h2 for H2
-REPSY_E2E_UPLOAD_TTL=1 ./run.sh test --protocol docker --grep @upload-ttl
-./run.sh local down --upload-ttl
-```
-
-`tests/docker/abandoned-upload-ttl.spec.ts` (`@upload-ttl`) verifies that:
-
-- **Single abandoned upload is cleaned up**: Start a blob upload (POST to get an upload UUID) but never
-  finish it. After the TTL passes, attempting to check the status (HEAD on the upload) or resume it
-  (PATCH) returns 404 or 410.
-- **Concurrent abandoned uploads are all cleaned up**: Multiple concurrent abandoned uploads for different
-  images are all deleted after their TTL.
-
-No other suite may run on this stack: the short TTL means any long-running process that starts but does
-not finish an upload will be cleaned up before the test completes.
-
-### CORS leg (RPS-1590)
-
-With `APP_ALLOWED_ORIGINS` unset (the default stack) the panel API is same-origin only: no CORS header for any
-origin, no answer to a preflight, and no `403` either (the request is served, the browser refuses the page the
-response). Setting the variable is the only thing that opens CORS, for exactly the listed origins. The default
-stack proves the unset half (`@smoke`, `tests/api/cors-csp.spec.ts`); the overlay `docker-compose.stack-cors.yml`
-sets `APP_ALLOWED_ORIGINS=http://allowed.e2e.test,http://second-allowed.e2e.test` for the other half (`@cors`, same
-file): each listed origin is reflected with `Access-Control-Allow-Credentials: true` on a preflight and on a
-request, any other origin gets `403` and no header, the protocol port sends nothing even for a listed origin,
-and the CSP `connect-src` names both. No other suite may run there (the `@smoke` CORS and CSP specs assert the
-unset default and skip themselves when the `cors` opt-in is on).
-
-```bash
-./run.sh local up --cors                                        # (or REPSY_E2E_CORS=1) add --h2 for H2
-REPSY_E2E_CORS=1 ./run.sh test --protocol api --grep @cors
-./run.sh local down --cors
-```
-
 ## API suite (RPS-1480)
 
 Raw `fetch` against the two ports of a Repsy, no package client and no browser: what the HTTP edge
@@ -5526,7 +5476,8 @@ What it pins, as observed on the built image:
   only (RPS-1590): a preflight or a request from a foreign origin gets no CORS header (and is still served,
   no `403`), as does a request without an `Origin`; the protocol port sends no CORS header at all, for a
   preflight or a plain request. The configured half (a foreign origin refused, the allowed one reflected,
-  `connect-src` naming it) needs a stack that sets the variable: the `cors` overlay ("CORS leg").
+  `connect-src` naming it) is pinned by `CorsAllowedOriginsListIT` (RPS-2739; the `@cors` e2e specs and their overlay were
+  removed, RPS-2738).
 
 ## Role sweep and Maven browser (RPS-1483)
 
@@ -7441,7 +7392,6 @@ says; without it the leg takes tonight's runner of the rotation and `protocol` f
 | `throttle`          | PostgreSQL + the auth-throttle overlay      | `REPSY_E2E_OPT_IN=throttle`, `--grep @throttle` on `stack` then `ui` (last), 9 tests, "Auth-throttle leg"                                                                                                                                                                                                                              | 30 min                                                                     |
 | `probe-ban`         | PostgreSQL + the strict probe-ban overlay   | `REPSY_E2E_OPT_IN=probe-ban`, `--grep @smoke` on every protocol runner but `stack` and `api`, and on `ui`, then `--grep @probe-ban` on `stack` (last), "Probe-ban leg": a client the probe ban counts bans the gateway and fails the leg                                                                                               |
 | `limits`            | PostgreSQL + the tiny-upload-limit overlay  | `REPSY_E2E_OPT_IN=limits`, `--grep @limits` on `pypi`, `helm`, `nuget`, `ruby`, `cargo`, `go` and `api`, 16 tests, "Size-limit leg"                                                                                                                                                                                                    | 60 min                                                                     |
-| `cors`              | PostgreSQL + the CORS overlay               | `REPSY_E2E_OPT_IN=cors`, `--grep @cors` on `api`, "CORS leg": the configured origins are reflected, any other refused                                                                                                                                                                                                                  | 30 min                                                                     |
 | `upgrade`           | PostgreSQL + the upgrade overlay            | `REPSY_E2E_OPT_IN=upgrade`, `--grep @upgrade` on `stack`: the previous release, populated, recreated on this image (5 tests, "Upgrade path")                                                                                                                                                                                           | 30 min                                                                     |
 | `upgrade-h2`        | embedded H2 + the upgrade overlay           | the same on the H2 stack                                                                                                                                                                                                                                                                                                               | 30 min                                                                     |
 | `trivy`             | PostgreSQL + the real scanner overlay       | `REPSY_E2E_OPT_IN=trivy`, `--grep @trivy` on `api`, 20 tests, "Real scanner stack": the contract the stub mimics, the status and advisory lookup, one real `npm audit` and one real scan of an npm package and of a Docker image                                                                                                       | 45 min                                                                     |

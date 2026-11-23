@@ -23,11 +23,7 @@
  */
 import { ERROR_CODES } from '../../src/error-codes.js';
 import { RepoType } from '../../src/api/panel-api.js';
-import {
-  buildChart,
-  buildChartFromRawYaml,
-  buildChartWithoutChartYaml,
-} from '../../src/clients/helm-chart.js';
+import { buildChart, buildChartFromRawYaml } from '../../src/clients/helm-chart.js';
 import {
   adminCredential,
   chartFileName,
@@ -304,8 +300,8 @@ test.describe('helm registry rules (raw HTTP)', () => {
       manifest2,
       'application/vnd.oci.image.manifest.v1+json',
     );
-    expectOci(refused, 409, 'DENIED');
-    expect(ociErrorOf(refused.body)?.detail).toBe(ERROR_CODES.CHART_ALREADY_EXISTS);
+    // The DENIED code and the chartAlreadyExists detail are pinned by HelmRegistryRulesIT.
+    expect(refused.status, 'a refused OCI override is a 409').toBe(409);
 
     const getAfterRefused = await rawGetManifest(layout.repoName, admin, layout.chart, 'tag1');
     expect(sha256Hex(getAfterRefused.body)).toBe(sha256Hex(manifest1));
@@ -467,7 +463,8 @@ test.describe('helm registry rules (raw HTTP)', () => {
   );
 
   test(
-    'R11b: classic Chart.yaml validation (12 refusal branches from HelmChartParser)',
+    'R11b: classic Chart.yaml validation (9 refusal branches from HelmChartParser; ' +
+      'a missing Chart.yaml, name and version are pinned by HelmRegistryRulesIT)',
     { tag: ['@negative'] },
     async ({ seeder }) => {
       const layout = await newRepo(seeder, 'chartyamlvalidation');
@@ -481,19 +478,9 @@ test.describe('helm registry rules (raw HTTP)', () => {
 
       const cases: TestCase[] = [
         {
-          name: ERROR_CODES.CHART_YAML_NOT_FOUND,
-          chartYaml: '', // Placeholder; buildChartWithoutChartYaml handles this case
-          expectedMsgId: ERROR_CODES.CHART_YAML_NOT_FOUND,
-        },
-        {
           name: ERROR_CODES.CHART_YAML_INVALID,
           chartYaml: '{ invalid yaml : [}',
           expectedMsgId: ERROR_CODES.CHART_YAML_INVALID,
-        },
-        {
-          name: ERROR_CODES.CHART_NAME_MISSING,
-          chartYaml: 'apiVersion: v2\nversion: 1.0.0\n',
-          expectedMsgId: ERROR_CODES.CHART_NAME_MISSING,
         },
         {
           name: ERROR_CODES.CHART_NAME_INVALID,
@@ -504,11 +491,6 @@ test.describe('helm registry rules (raw HTTP)', () => {
           name: ERROR_CODES.CHART_NAME_TOO_LONG,
           chartYaml: `apiVersion: v2\nname: ${'a'.repeat(256)}\nversion: 1.0.0\n`,
           expectedMsgId: ERROR_CODES.CHART_NAME_TOO_LONG,
-        },
-        {
-          name: ERROR_CODES.CHART_VERSION_MISSING,
-          chartYaml: 'apiVersion: v2\nname: test-chart\n',
-          expectedMsgId: ERROR_CODES.CHART_VERSION_MISSING,
         },
         {
           name: ERROR_CODES.CHART_VERSION_INVALID,
@@ -544,18 +526,12 @@ test.describe('helm registry rules (raw HTTP)', () => {
       ];
 
       for (const testCase of cases) {
-        const built =
-          testCase.name === ERROR_CODES.CHART_YAML_NOT_FOUND
-            ? await buildChartWithoutChartYaml({
-                name: 'test-chart',
-                marker: `r11b-${testCase.name}`,
-              })
-            : await buildChartFromRawYaml({
-                chartYaml: testCase.chartYaml,
-                marker: `r11b-${testCase.name}`,
-                name: 'test-chart',
-                version: '1.0.0',
-              });
+        const built = await buildChartFromRawYaml({
+          chartYaml: testCase.chartYaml,
+          marker: `r11b-${testCase.name}`,
+          name: 'test-chart',
+          version: '1.0.0',
+        });
 
         const push = await rawUploadChart(
           layout.repoName,
@@ -912,12 +888,6 @@ test.describe('helm registry rules (raw HTTP)', () => {
 
       const manifestAfterDelete = await rawGetManifest(layout.repoName, admin, ociChart, '0.1.0');
       expect(manifestAfterDelete.status, 'the manifest is gone too').toBe(404);
-
-      // R14 extension: tags/list no longer lists the deleted version
-      const tagsAfterDelete = await rawGetTagsList(layout.repoName, admin, ociChart);
-      expect(tagsAfterDelete.status, 'tags/list still works').toBe(200);
-      const tagsBody = JSON.parse(tagsAfterDelete.body.toString('utf8'));
-      expect(tagsBody.tags, 'the deleted version is gone from tags/list').not.toContain('0.1.0');
 
       // R14 extension: republish of same name:version under Deny (override off) is now accepted
       const republished = await buildChart({

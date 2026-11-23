@@ -31,18 +31,14 @@
  *    with CORS headers (it used to reflect any origin with credentials). It still serves the request:
  *    the browser, not the server, refuses a cross-origin page the response. The repository port sends
  *    no CORS header at all, whatever the origin.
- *  - CORS with `APP_ALLOWED_ORIGINS` set (`@cors`, the `--cors` overlay, README.md "CORS leg"): exactly
- *    the listed origins are reflected, with credentials, on the panel API only; any other origin is
- *    refused with 403; the CSP `connect-src` names them; the repository port still sends nothing.
+ *  - CORS with `APP_ALLOWED_ORIGINS` set (a list of origins) is pinned by `CorsAllowedOriginsListIT`, which
+ *    binds the variable in a Spring context of its own.
  */
 import { apiUrl, edgeRequest, type EdgeResponse, repoUrl } from '../../src/clients/edge-raw.js';
 import { env } from '../../src/env.js';
 import { expect, test } from '../../src/scenarios/fixtures.js';
-import { optedIn } from '../../src/stack-overlays.js';
 
 const FOREIGN_ORIGIN = 'http://evil.e2e.test';
-// The two origins docker-compose.stack-cors.yml sets APP_ALLOWED_ORIGINS to.
-const ALLOWED_ORIGINS = ['http://allowed.e2e.test', 'http://second-allowed.e2e.test'];
 const SPA_PATHS = ['/', '/some/deep/route', '/index.html'];
 
 test.describe('Content-Security-Policy', { tag: ['@smoke'] }, () => {
@@ -63,7 +59,6 @@ test.describe('Content-Security-Policy', { tag: ['@smoke'] }, () => {
 
   test('connect-src is self only while APP_ALLOWED_ORIGINS is unset', async () => {
     test.skip(env.target === 'remote', 'the remote instance own APP_ALLOWED_ORIGINS');
-    test.skip(optedIn('cors'), 'the cors overlay sets APP_ALLOWED_ORIGINS, see the @cors describe');
 
     const csp = (await edgeRequest(apiUrl('/'))).headers.get('content-security-policy');
 
@@ -164,7 +159,6 @@ test.describe(
   { tag: ['@smoke'] },
   () => {
     test.skip(env.target === 'remote', 'the remote instance own APP_ALLOWED_ORIGINS');
-    test.skip(optedIn('cors'), 'the cors overlay sets APP_ALLOWED_ORIGINS, see the @cors describe');
 
     test('a preflight from a foreign origin is not answered with CORS headers', async () => {
       const res = await edgeRequest(apiUrl('/api/repos'), {
@@ -218,78 +212,3 @@ test.describe(
     });
   },
 );
-
-// Needs the `--cors` overlay (docker-compose.stack-cors.yml sets APP_ALLOWED_ORIGINS to ALLOWED_ORIGINS):
-// ./run.sh local up --cors, then REPSY_E2E_CORS=1 ./run.sh test --protocol api --grep @cors
-test.describe('CORS on the panel API with APP_ALLOWED_ORIGINS set', { tag: ['@cors'] }, () => {
-  test.skip(env.target === 'remote', 'the remote instance own APP_ALLOWED_ORIGINS');
-  test.skip(
-    !optedIn('cors'),
-    'opt-in: needs the cors overlay; ./run.sh local up --cors, then REPSY_E2E_CORS=1 ./run.sh test --protocol api --grep @cors',
-  );
-
-  for (const origin of ALLOWED_ORIGINS) {
-    test(`a preflight from ${origin} is answered with that origin and credentials`, async () => {
-      const res = await edgeRequest(apiUrl('/api/repos'), {
-        method: 'OPTIONS',
-        headers: {
-          Origin: origin,
-          'Access-Control-Request-Method': 'GET',
-          'Access-Control-Request-Headers': 'authorization',
-        },
-      });
-
-      expect(res.status).toBe(200);
-      expect(res.headers.get('access-control-allow-origin')).toBe(origin);
-      expect(res.headers.get('access-control-allow-credentials')).toBe('true');
-      expect(res.headers.get('access-control-allow-methods')).toBe('GET');
-      expect(res.headers.get('access-control-allow-headers')).toBe('authorization');
-    });
-
-    test(`a request from ${origin} gets that origin back with credentials`, async () => {
-      const res = await edgeRequest(apiUrl('/api/profile'), { headers: { Origin: origin } });
-
-      expect(res.status).toBe(401);
-      expect(res.headers.get('access-control-allow-origin')).toBe(origin);
-      expect(res.headers.get('access-control-allow-credentials')).toBe('true');
-    });
-  }
-
-  test('an origin that is not listed is refused, for a preflight and for a request', async () => {
-    const preflight = await edgeRequest(apiUrl('/api/repos'), {
-      method: 'OPTIONS',
-      headers: { Origin: FOREIGN_ORIGIN, 'Access-Control-Request-Method': 'GET' },
-    });
-    const plain = await edgeRequest(apiUrl('/api/profile'), {
-      headers: { Origin: FOREIGN_ORIGIN },
-    });
-
-    for (const res of [preflight, plain]) {
-      expect(res.status).toBe(403);
-      expectNoCorsHeaders(res, 'foreign origin');
-    }
-  });
-
-  test('a request without an Origin gets no CORS header', async () => {
-    expectNoCorsHeaders(await edgeRequest(apiUrl('/api/profile')), 'no Origin');
-  });
-
-  test('the protocol port sends no CORS header even for a listed origin', async () => {
-    for (const path of ['/v2/', '/']) {
-      const preflight = await edgeRequest(repoUrl(path), {
-        method: 'OPTIONS',
-        headers: { Origin: ALLOWED_ORIGINS[0], 'Access-Control-Request-Method': 'GET' },
-      });
-      const plain = await edgeRequest(repoUrl(path), { headers: { Origin: ALLOWED_ORIGINS[0] } });
-
-      expectNoCorsHeaders(preflight, `${path} preflight`);
-      expectNoCorsHeaders(plain, `${path} plain`);
-    }
-  });
-
-  test('the CSP connect-src names the listed origins', async () => {
-    const csp = (await edgeRequest(apiUrl('/'))).headers.get('content-security-policy');
-
-    expect(csp).toContain(`connect-src 'self' ${ALLOWED_ORIGINS.join(' ')}`);
-  });
-});

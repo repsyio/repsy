@@ -36,7 +36,8 @@
  *    images; the panel is the only place an image list is available), and OCI-1.1-aware clients
  *    (`oras discover`, `regctl artifact tree`, `cosign tree`) must take their spec-mandated fallback, the
  *    referrers TAG schema (`sha256-<hex>` tag holding an image index), which the server serves like any
- *    other tag (RA4).
+ *    other tag (`DockerCatalogIT` and
+ *    `DockerReferrersIT` pin these over the wire).
  *  - `POST /v2/<repo>/<image>/blobs/uploads/?mount=<digest>[&from=<repo>]`: `mount`/`from` are
  *    ignored. The server answers the spec-allowed fallback `202` + a fresh upload session (`Location`,
  *    `Docker-Upload-UUID`) whether the blob exists or not, in this repo or in another, and never the
@@ -58,16 +59,12 @@ import { isolatedWorkDir } from '../../src/clients/exec.js';
 import {
   adminCredential,
   ociErrorOf,
-  rawCatalog,
   rawGetAnonymous,
   rawHeadBlob,
   rawMountUpload,
   rawPutManifest,
   rawFollowNextLink,
-  rawGetManifest,
-  rawReferrers,
   rawTagsList,
-  rawToken,
   rawUploadBlob,
   type RawResponse,
 } from '../../src/clients/docker-raw.js';
@@ -266,111 +263,6 @@ test.describe('docker registry API gaps (raw HTTP, pinned at current behaviour)'
     expect(JSON.parse(docker.body.toString('utf8')).name).toBe(
       `${repoPath(dockerLayout.repoName)}/${dockerLayout.image}`,
     );
-  });
-
-  test('RA2: _catalog is no route (crane catalog, regctl repo ls cannot enumerate the registry)', async ({
-    seeder,
-  }) => {
-    const layout = await newRepo(seeder, 'catalog');
-    await pushImage(layout, 'v1', 'catalog');
-    const admin = adminCredential();
-
-    const token = await rawToken(admin, 'registry:catalog:*');
-    expect(token.status, 'the token endpoint issues a catalog-scope token, unread').toBe(200);
-
-    const res = await rawCatalog(admin);
-    expect(res.hop).toBe('request');
-    expectNoRoute(res, 'GET /v2/_catalog');
-    const paged = await rawCatalog(admin, 'n=5');
-    expectNoRoute(paged, 'GET /v2/_catalog?n=5');
-
-    const anon = await rawGetAnonymous('/_catalog');
-    expectNoRoute(anon, 'anonymous GET /v2/_catalog');
-
-    // A per-repo catalog is no route either.
-    const perRepo = await rawGetAnonymous(`/${repoPath(layout.repoName)}/_catalog`);
-    expectNoRoute(perRepo, `GET /v2/${repoPath(layout.repoName)}/_catalog`);
-  });
-
-  test(
-    'RA3: the referrers API is no route (oras discover, regctl artifact tree take the tag-schema fallback)',
-    { tag: ['@auth'] },
-    async ({ seeder }) => {
-      const layout = await newRepo(seeder, 'referrers');
-      const built = await pushImage(layout, 'v1', 'referrers');
-      const admin = adminCredential();
-      const ro = await tokenCredential(seeder, layout.repoName, true);
-
-      const res = await rawReferrers(layout.repoName, admin, layout.image, built.manifestDigest);
-      expect(res.hop).toBe('request');
-      expectNoRoute(res, 'referrers of a stored manifest');
-
-      const filtered = await rawReferrers(
-        layout.repoName,
-        admin,
-        layout.image,
-        built.manifestDigest,
-        'application/vnd.e2e.test',
-      );
-      expectNoRoute(filtered, 'referrers?artifactType=');
-
-      const readOnly = await rawReferrers(layout.repoName, ro, layout.image, built.manifestDigest);
-      expectNoRoute(readOnly, 'referrers with a read-only token');
-
-      // A digest the repo does not hold is the same 404: the spec says an empty index, 200.
-      const unknown = await rawReferrers(
-        layout.repoName,
-        admin,
-        layout.image,
-        `sha256:${'0'.repeat(64)}`,
-      );
-      expectNoRoute(unknown, 'referrers of an unknown digest');
-
-      const anon = await rawGetAnonymous(
-        `/${repoPath(layout.repoName)}/${layout.image}/referrers/${built.manifestDigest}`,
-      );
-      expectNoRoute(anon, 'anonymous referrers');
-    },
-  );
-
-  test('RA4: the referrers tag-schema fallback works as an ordinary tag (what oras/regctl need after RA3)', async ({
-    seeder,
-  }) => {
-    const layout = await newRepo(seeder, 'refstag');
-    const built = await pushImage(layout, 'v1', 'refstag');
-    const admin = adminCredential();
-    const fallbackTag = built.manifestDigest.replace(':', '-');
-
-    // A client that got RA3's 404 reads `sha256-<hex>`: absent (a plain tag miss, not "no route").
-    const missing = await rawGetManifest(layout.repoName, admin, layout.image, fallbackTag);
-    expect(missing.status, 'the fallback tag is absent until a referrer is attached').toBe(404);
-    const missingOci = ociErrorOf(missing.body);
-    expect(missingOci?.code).toBe('MANIFEST_UNKNOWN');
-    expect(missingOci?.detail).toBe(ERROR_CODES.TAG_NOT_FOUND);
-
-    // ... then writes the referrers index under it: a plain OCI image index, accepted like any tag.
-    const index = Buffer.from(
-      JSON.stringify({
-        schemaVersion: 2,
-        mediaType: 'application/vnd.oci.image.index.v1+json',
-        manifests: [],
-      }),
-      'utf8',
-    );
-    const put = await rawPutManifest(
-      layout.repoName,
-      admin,
-      layout.image,
-      fallbackTag,
-      index,
-      'application/vnd.oci.image.index.v1+json',
-    );
-    expect(put.status, 'PUT of the referrers index under the fallback tag').toBe(201);
-
-    const read = await rawGetManifest(layout.repoName, admin, layout.image, fallbackTag);
-    expect(read.status, 'the fallback tag reads back').toBe(200);
-    expect(read.contentType).toBe('application/vnd.oci.image.index.v1+json');
-    expect(read.body.equals(index), 'the index bytes come back unchanged').toBe(true);
   });
 
   test(

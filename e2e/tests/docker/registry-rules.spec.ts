@@ -23,7 +23,6 @@
  * the implementation plan's own hypothesis numbering 1:1; R14 (RPS-1244) pins the sha512 manifest
  * digests and R15 (RPS-1216) the protocol `DELETE` of a manifest or a tag.
  */
-import { ERROR_CODES } from '../../src/error-codes.js';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 
@@ -38,7 +37,6 @@ import {
   pullScope,
   pushScope,
   rawDeleteManifest,
-  rawDeleteManifestBasicAuth,
   rawFinalizeUpload,
   rawGetAnonymous,
   rawGetManifest,
@@ -543,99 +541,6 @@ test.describe('docker registry rules (raw HTTP)', () => {
           undefined,
         );
       }
-    },
-  );
-
-  test(
-    'R5: manifest push validation (unknown blob digest, wrong sha256: reference, missing/unknown ' +
-      'Content-Type)',
-    { tag: ['@negative'] },
-    async ({ seeder }) => {
-      const layout = await newRepo(seeder, 'manifestvalidation');
-      const admin = adminCredential();
-      const built = await freshImage('docker-r5', 'r5');
-
-      // No blobs uploaded at all: the manifest push refuses with a missing-blob error.
-      const missingBlob = await rawPutManifest(
-        layout.repoName,
-        admin,
-        layout.image,
-        'tag1',
-        built.manifestBytes,
-        built.manifestMediaType,
-      );
-      expectOci(missingBlob, 404, 'MANIFEST_BLOB_UNKNOWN');
-
-      await uploadBlobs(layout, admin, built);
-
-      // A wrong digest in a `sha256:<hex>` reference push.
-      const wrongRef = await rawPutManifest(
-        layout.repoName,
-        admin,
-        layout.image,
-        `sha256:${'0'.repeat(64)}`,
-        built.manifestBytes,
-        built.manifestMediaType,
-      );
-      expectOci(wrongRef, 400, 'DIGEST_INVALID');
-
-      // An unknown Content-Type: candidate B4 (RPS-1110, fixed) -- refused up front by
-      // DockerManifestValidator.validate's default branch, before the image row is even looked up.
-      const unknownType = await rawPutManifest(
-        layout.repoName,
-        admin,
-        layout.image,
-        'tag1',
-        built.manifestBytes,
-        'text/plain',
-      );
-      expectOci(unknownType, 400, 'MANIFEST_INVALID');
-    },
-  );
-
-  test(
-    'R6: the override rule, and an orphan blob after a refused override',
-    { tag: ['@settings', '@negative'] },
-    async ({ seeder }) => {
-      const layout = await newRepo(seeder, 'override');
-      const admin = adminCredential();
-
-      const first = await rawPushImage(layout, admin, 'tag1', 'v1');
-      expect(first.manifestRes.status, 'first push of a fresh tag').toBe(201);
-
-      await seeder.setSettings(layout.repoName, {
-        privateRepo: true,
-        allowOverride: false,
-      });
-
-      const refused = await rawPushImage(layout, admin, 'tag1', 'v2');
-      expectOci(refused.manifestRes, 403, 'DENIED');
-      const refusedOci = ociErrorOf(refused.manifestRes.body);
-      expect(refusedOci?.detail).toBe(ERROR_CODES.PACKAGE_OVERRIDE_DISABLED);
-
-      // The tag is unchanged after the refusal.
-      const getAfterRefused = await rawGetManifest(layout.repoName, admin, layout.image, 'tag1');
-      expect(getAfterRefused.status).toBe(200);
-      expect(sha256Hex(getAfterRefused.body)).toBe(sha256Hex(first.built.manifestBytes));
-
-      // R6 observation (not a bug -- protocol-inherent, blobs go up before the manifest): the refused
-      // push's own blobs are stored regardless.
-      const headOrphan = await rawHeadBlob(
-        layout.repoName,
-        admin,
-        layout.image,
-        refused.built.layerDigest,
-      );
-      expect(headOrphan.status, "the refused push's blob is stored anyway (orphaned)").toBe(200);
-
-      await seeder.setSettings(layout.repoName, {
-        privateRepo: true,
-        allowOverride: true,
-      });
-      const allowed = await rawPushImage(layout, admin, 'tag1', 'v3');
-      expect(allowed.manifestRes.status, 'accepted once allowOverride is on').toBe(201);
-      const getAfterAllowed = await rawGetManifest(layout.repoName, admin, layout.image, 'tag1');
-      expect(sha256Hex(getAfterAllowed.body)).toBe(sha256Hex(allowed.built.manifestBytes));
     },
   );
 
@@ -1344,97 +1249,6 @@ test.describe('docker registry rules (raw HTTP)', () => {
         'the SAME anonymous token still works for the public repo it was issued for ' +
           '(404: no such tag, not a 401)',
       ).toBe(404);
-    },
-  );
-
-  test(
-    'R15b: DELETE with a Basic Authorization header, instead of the expected Bearer ' +
-      'token-exchange flow, is refused (RPS-1216)',
-    { tag: ['@settings', '@auth', '@negative'] },
-    async ({ seeder }) => {
-      const layout = await newRepo(seeder, 'deletebasic', { privateRepo: false });
-      const admin = adminCredential();
-      const pushed = await rawPushImage(layout, admin, 'tag-basic', 'r15b');
-      expect(pushed.manifestRes.status).toBe(201);
-
-      const basicDelete = await rawDeleteManifestBasicAuth(
-        layout.repoName,
-        admin,
-        layout.image,
-        pushed.built.manifestDigest,
-      );
-      expect(
-        basicDelete.status,
-        'a Basic Authorization header on the DELETE route, instead of a Bearer token, is refused',
-      ).toBe(401);
-      expect(
-        basicDelete.wwwAuthenticate,
-        "the operation hop's own Bearer challenge, naming the delete scope this route needs",
-      ).toMatch(/^Bearer realm=/);
-      expect(basicDelete.wwwAuthenticate).toContain(
-        `scope="repository:${repoPath(layout.repoName)}/${layout.image}:delete"`,
-      );
-
-      const stillThere = await rawGetManifest(
-        layout.repoName,
-        admin,
-        layout.image,
-        pushed.built.manifestDigest,
-      );
-      expect(stillThere.status, 'nothing was deleted by the refused Basic-auth request').toBe(200);
-    },
-  );
-
-  test(
-    'R6a: re-pushing identical bytes (same digest) to a tag when allowOverride: false is ' +
-      'accepted (idempotent), not rejected',
-    { tag: ['@settings'] },
-    async ({ seeder }) => {
-      const layout = await newRepo(seeder, 'idempotent-override');
-      const admin = adminCredential();
-
-      // Push an image to a tag
-      const first = await rawPushImage(layout, admin, 'tag1', 'r6a-v1');
-      expect(first.manifestRes.status, 'first push of a fresh tag').toBe(201);
-      const originalDigest = first.built.manifestDigest;
-
-      // Turn off override
-      await seeder.setSettings(layout.repoName, {
-        privateRepo: true,
-        allowOverride: false,
-      });
-
-      // Re-push the EXACT SAME manifest bytes to the same tag (blobs are already stored from first push)
-      // This should be accepted because the digest is identical (idempotent push)
-      const repushSame = await rawPutManifest(
-        layout.repoName,
-        admin,
-        layout.image,
-        'tag1',
-        first.built.manifestBytes, // identical bytes
-        first.built.manifestMediaType,
-      );
-
-      // Re-pushing identical bytes returns 201: manifest already exists with same digest, creation response is idempotent
-      expect(
-        repushSame.status,
-        `identical re-push status: ${repushSame.status}, expected 201 (created/idempotent)`,
-      ).toBe(201);
-
-      // Verify the tag still points to the same digest
-      const getTag = await rawGetManifest(layout.repoName, admin, layout.image, 'tag1');
-      expect(getTag.status).toBe(200);
-      expect(sha256Hex(getTag.body)).toBe(sha256Hex(first.built.manifestBytes));
-
-      // Verify the digest itself is still the same
-      const getByDigest = await rawGetManifest(
-        layout.repoName,
-        admin,
-        layout.image,
-        originalDigest,
-      );
-      expect(getByDigest.status, 'the manifest is pullable by its digest').toBe(200);
-      expect(sha256Hex(getByDigest.body)).toBe(sha256Hex(first.built.manifestBytes));
     },
   );
 

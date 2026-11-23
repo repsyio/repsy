@@ -16,11 +16,11 @@
 
 /**
  * What the real clients do when they ask a Repsy Docker repo for a tag list or a catalog (RPS-1478
- * part B; the raw pins are RA1/RA2 in `registry-api.spec.ts`). RPS-1489 added `tags/list`, so `crane
+ * part B; the raw pins are RA1 in `registry-api.spec.ts` and `DockerCatalogIT`). RPS-1489 added `tags/list`, so `crane
  * ls`, `skopeo list-tags`, `skopeo inspect <tag>` (which lists the tags too, unless `--no-tags`),
  * `regctl tag ls` and `oras repo tags` list the tags of a pushed image, in lexical order. There is no
  * `_catalog` route: `crane catalog`, `regctl repo ls` and `oras repo ls` still fail with the router's
- * `404 NAME_UNKNOWN / unknownPath` (RA2), which stays pinned here until a story adds it.
+ * `404 NAME_UNKNOWN / unknownPath` (`DockerCatalogIT`), which stays pinned here until a story adds it.
  *
  * Probed live, admin credential, private repo with one image pushed under two tags.
  */
