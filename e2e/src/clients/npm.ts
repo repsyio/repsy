@@ -504,6 +504,7 @@ export async function expectNothingStored(world: World, before: NpmFingerprint):
 export const npmAdapter: ProtocolAdapter<NpmFingerprint> = {
   protocol: 'npm',
   client: { name: 'npm', publishVerb: 'publish', consumeVerb: 'install' },
+  prScenarios: ['password-admin', 'token-rw'],
 
   packageName: (runId, scenario) => `e2e-${runId}-${slugify(scenario.id)}`,
   version: () => boundedSemverVersion(),

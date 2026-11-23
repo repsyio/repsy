@@ -69,7 +69,7 @@ function isTokenListRequest(url: URL, repoName: string, pageIndex: number): bool
 test.describe('Deploy tokens: create', { tag: SETTINGS }, () => {
   test(
     'TOK-01 a Read/Write token: the info modal shows the username and token once, copy works, the row says R/W',
-    { tag: ['@smoke'] },
+    { tag: ['@smoke', '@pr'] },
     async ({ adminPage, context, seeder, panelApi }) => {
       await allowClipboard(context);
       const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });

@@ -540,8 +540,41 @@ on write (RPS-1435, CARGO)` and the same with `GOLANG`.
 | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `@cloud-skip` | does not apply to Repsy Cloud at all (an OS route, a `USER` role, the OS container). Skipped with a reason on a cloud target by the loop (catalog) and by the `test` fixtures (any spec), and excludable whole: `--grep-invert @cloud-skip`. Say why in a comment above it |
 | `@smoke`      | the small, fast subset of a project (`--grep @smoke`): one round trip per protocol, the skeleton's seed and auth probe                                                                                                                                                     |
+| `@pr`         | the crucial set of a pull request (RPS-2735, 23 tests, below). Nothing selects it yet; a PR gate will run `--grep '@pr\b'`, never plain `@pr`, which is also a prefix of `@proxy` and `@probe-ban`                                                                         |
 | `@negative`   | a scenario that spends failed authentications; on an `isRemote` target it runs serially on the `RemoteAuthBudget`                                                                                                                                                          |
 | `@local-only` | needs something only a stack of its own has (two names for the registry); skipped when `isRemote`                                                                                                                                                                          |
+
+#### The `@pr` set (RPS-2735)
+
+`@pr` is a tag of its own, apart from `@smoke` (which keeps driving the H2, TLS, probe-ban, browser, proxy and
+Cloud legs). It marks the tests a pull request should run before merge: 23 in the OS harness.
+
+| Project    | Tests | What                                                                                                        |
+| ---------- | ----- | ----------------------------------------------------------------------------------------------------------- |
+| `skeleton` | 2     | `seed.spec.ts`: the seeder and an expired deploy token                                                      |
+| `api`      | 6     | `port-separation.spec.ts`: the panel API and the wire protocols each stay on their own port                 |
+| `npm`      | 2     | `npm` real client: `password-admin`, `token-rw`                                                             |
+| `pypi`     | 1     | `twine/pip`: `password-admin`                                                                               |
+| `docker`   | 1     | `crane`: `password-admin`                                                                                   |
+| `ui`       | 7     | login, logout, the sign-in guard, create a Maven repo, delete a repo, a deploy token, the visibility toggle |
+| `maven`    | 4     | `mvn`: `password-admin`, `token-rw`; Gradle Kotlin DSL and sbt 1.13: `password-admin`                       |
+
+Choices: sbt 1.13 represents sbt (sbt 2.1 stays nightly); Helm and Cargo are not in the always-on set (`crane`
+covers the OCI path, and the path-filtered nightly covers both); `token-rw` is added only for `mvn` and `npm`
+(it matches the OS catalog and passes on Cloud for both, `cloud-expectations.md`).
+
+- **Mechanism.** A scenario tag would select that scenario for all 28 adapters, so the set is a field of the
+  adapter: `ProtocolAdapter.prScenarios` (the ids of the catalog scenarios it runs on a PR), and the loop
+  (`registerScenario` in `scenarios/loop.ts`) adds `@pr` to exactly those tests. An adapter that spreads another one
+  (`uvAdapter`, `copyAdapter`) sets `prScenarios: undefined`. The other four are plain `tag: [..., '@pr']` edits.
+- **The grep is `@pr\b`.** Playwright greps the title plus its tags, and `@pr` is a prefix of `@proxy` and
+  `@probe-ban`: plain `--grep @pr` lists 12 api and 17 ui tests instead of 6 and 7. Quote it for the shell.
+- **The count check.** `pnpm check:pr-set` (stackless, seconds) runs `playwright test --list --grep '@pr\b'` per
+  project and compares with the numbers pinned in `src/pr-set/check.ts`. It fails when a project lists more or fewer
+  (a tag dropped, a spec renamed away) and when the whole set is empty; there is no `--pass-with-no-tests`.
+  Changing the set on purpose means changing the pinned numbers and this table in one commit.
+- **Cloud.** The same tags apply to Repsy Cloud through the OS submodule. The set avoids the `@cloud-skip` tests
+  (`DASH-01` is not in it); check the Cloud `--list` count after the bump.
 
 ### The UI seam (`target.ui`, RPS-1638)
 
@@ -1296,6 +1329,8 @@ five worked examples.
    the `known*` hooks (`knownConsumeFailure`, `knownPublishSideEffect`, `knownClientExitDisagreement`)
    get the target's capabilities as their last argument, so a bug of one product is
    `target.kind === 'cloud' ? '<reason>' : undefined` and needs no second adapter.
+   An adapter that belongs to the pull-request set lists the scenarios it runs there in `prScenarios` ("The `@pr`
+   set", above); most leave it out.
 3. `src/packages/<protocol>/`: mustache templates of a tiny publishable project. A template that needs
    the repository takes the rendered URL, never the bare name ("Repository URLs").
 4. `runners/<protocol>.Dockerfile`: the toolchain that protocol's client needs, pinned versions as

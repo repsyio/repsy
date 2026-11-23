@@ -42,7 +42,7 @@ async function repoRootStatus(repoName: string, token: string): Promise<number> 
 
 test(
   'seeds a user, a private repo and deploy tokens, and cleanup removes them',
-  { tag: ['@smoke'] },
+  { tag: ['@smoke', '@pr'] },
   async ({ seeder, panelApi }) => {
     const user = await seeder.createUser();
     const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
@@ -80,7 +80,7 @@ test(
 
 test(
   'an expired deploy token is refused on the repo port, a read-write token is not',
-  { tag: ['@smoke'] },
+  { tag: ['@smoke', '@pr'] },
   async ({ seeder }) => {
     // eslint-disable-next-line playwright/no-skipped-test -- a target that cannot seed this (Repsy Cloud) skips it
     test.skip(

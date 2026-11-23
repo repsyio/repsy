@@ -40,6 +40,7 @@ export function uniqueVersion(versionType: 'release' | 'snapshot'): string {
 export const mavenAdapter: ProtocolAdapter<RepoTree> = {
   protocol: 'maven',
   client: { name: 'mvn', publishVerb: 'deploy', consumeVerb: 'dependency:get' },
+  prScenarios: ['password-admin', 'token-rw'],
 
   packageName: (runId: string, scenario: Scenario) =>
     `io.repsy.e2e.${runId}:maven-${slugify(scenario.id)}`,

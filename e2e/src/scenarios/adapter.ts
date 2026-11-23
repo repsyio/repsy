@@ -76,6 +76,14 @@ export interface ProtocolAdapter<F = unknown> {
   readonly label?: string;
   /** Extra tags on every test the loop registers for this adapter (e.g. `@pnpm`, to `--grep` one client). */
   readonly tags?: readonly `@${string}`[];
+  /**
+   * The ids of the catalog scenarios this adapter runs on every pull request (RPS-2735): the loop adds
+   * `@pr` to exactly those tests. It is a field of the adapter, not a tag of the scenario, because a
+   * scenario tag would select that scenario for all adapters at once (28 of them). Left out, the adapter
+   * has no `@pr` test. An adapter built from another one by spreading it (`...pypiAdapter`) must set it
+   * back to `undefined`, so a second client of the same protocol does not join the set by accident.
+   */
+  readonly prScenarios?: readonly string[];
   /** Used only in failure/log messages (e.g. "the real mvn deploy should succeed for ..."). */
   readonly client: { name: string; publishVerb: string; consumeVerb: string };
 

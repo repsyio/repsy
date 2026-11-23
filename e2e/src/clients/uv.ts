@@ -358,6 +358,7 @@ export async function resolve(world: World): Promise<AdapterResult> {
 export const uvAdapter: ProtocolAdapter<PypiFingerprint> = {
   ...pypiAdapter,
   label: 'uv',
+  prScenarios: undefined,
   tags: ['@uv'],
   client: { name: 'uv', publishVerb: 'publish', consumeVerb: 'lock/sync' },
   publish,
