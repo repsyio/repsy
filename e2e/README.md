@@ -760,9 +760,10 @@ REPSY_TARGET=cloud-remote pnpm exec playwright test --list   # no REPSY_ADMIN_PA
 ```
 
 Each project's `testDir` is the protocol's own directory, so a project lists what that directory holds. The
-OS config's `testMatch` globs (`npm/**/*.spec.ts`) match a little more or less than a directory does: the OS
-`npm` project also picks up `tests/npm-clients/npm/` (13 tests, which a `testDir` of `tests/npm` leaves to
-the `npm-clients` project), and six `@local-only` tests (`matrix/tarball-host.spec.ts`, one in
+OS config's `testMatch` globs (`npm/**/*.spec.ts`) match a little more or less than a directory does: the `npm`
+glob also matches `tests/npm-clients/npm/`, which the `npm` project therefore excludes with `testIgnore`
+(RPS-2738: the npm client catalog ran three times in the nightly), leaving it to the `npm-clients` project. The
+`npm` project lists 102 tests instead of 119, and six `@local-only` tests (`matrix/tarball-host.spec.ts`, one in
 `yarn-berry/install-modes.spec.ts`) are only registered on a target that is not `isRemote`, so `npm-clients` lists 233 tests
 under `cloud-remote` and 239 under `local` and `cloud-local` (RPS-1510). Every other protocol project lists the same tests as on OS.
 
