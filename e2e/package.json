@@ -21,7 +21,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "playwright test",
-    "sweep": "tsx src/seed/sweep.ts"
+    "sweep": "tsx src/seed/sweep.ts",
+    "check:pr-set": "tsx src/pr-set/check.ts"
   },
   "dependencies": {
     "ajv": "^8.20.0",

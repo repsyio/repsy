@@ -86,7 +86,7 @@ test.describe('Repository settings: access', { tag: SETTINGS }, () => {
 test.describe('Repository settings: visibility', { tag: SETTINGS }, () => {
   test(
     'SET-02 the Visibility toggle flips Private <-> Public and persists',
-    { tag: ['@smoke'] },
+    { tag: ['@smoke', '@pr'] },
     async ({ adminPage, seeder, panelApi }) => {
       const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
       await seeder.setSettings(repo.name, {

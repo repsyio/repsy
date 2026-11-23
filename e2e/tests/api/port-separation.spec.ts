@@ -35,84 +35,92 @@ import { seedPackage } from '../../src/seed/packages.js';
 
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
-test.describe('the panel API is not served on the protocol port', { tag: ['@smoke'] }, () => {
-  test('an anonymous GET /api/users is a 404 unknownPath', async () => {
-    const res = await edgeRequest(repoUrl('/api/users'));
+test.describe(
+  'the panel API is not served on the protocol port',
+  { tag: ['@smoke', '@pr'] },
+  () => {
+    test('an anonymous GET /api/users is a 404 unknownPath', async () => {
+      const res = await edgeRequest(repoUrl('/api/users'));
 
-    expect(res.status).toBe(404);
-    expect(res.json).toMatchObject({ msgId: ERROR_CODES.UNKNOWN_PATH, type: 'ERROR' });
-  });
-
-  test('an admin GET /api/users is a 404 too, and lists no user', async () => {
-    const token = await adminBearer();
-
-    const res = await edgeRequest(repoUrl('/api/users'), {
-      headers: { Authorization: `Bearer ${token}` },
+      expect(res.status).toBe(404);
+      expect(res.json).toMatchObject({ msgId: ERROR_CODES.UNKNOWN_PATH, type: 'ERROR' });
     });
 
-    expect(res.status).toBe(404);
-    expect(res.json).toMatchObject({ msgId: ERROR_CODES.UNKNOWN_PATH, type: 'ERROR' });
-    expect(res.text).not.toContain('"content"');
-  });
+    test('an admin GET /api/users is a 404 too, and lists no user', async () => {
+      const token = await adminBearer();
 
-  test('POST /api/auth/login is a 404 and mints no token', async () => {
-    const res = await edgeRequest(repoUrl('/api/auth/login'), {
-      method: 'POST',
-      headers: JSON_HEADERS,
-      body: JSON.stringify({ username: env.adminUsername, password: env.adminPassword }),
+      const res = await edgeRequest(repoUrl('/api/users'), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      expect(res.status).toBe(404);
+      expect(res.json).toMatchObject({ msgId: ERROR_CODES.UNKNOWN_PATH, type: 'ERROR' });
+      expect(res.text).not.toContain('"content"');
     });
 
-    expect(res.status).toBe(404);
-    expect(res.json).toMatchObject({ msgId: ERROR_CODES.UNKNOWN_PATH, type: 'ERROR' });
-    expect(res.text).not.toContain('token');
-  });
+    test('POST /api/auth/login is a 404 and mints no token', async () => {
+      const res = await edgeRequest(repoUrl('/api/auth/login'), {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ username: env.adminUsername, password: env.adminPassword }),
+      });
 
-  test('control: the same admin GET /api/users on the api port is a 200 list', async () => {
-    const token = await adminBearer();
-
-    const res = await edgeRequest(apiUrl('/api/users'), {
-      headers: { Authorization: `Bearer ${token}` },
+      expect(res.status).toBe(404);
+      expect(res.json).toMatchObject({ msgId: ERROR_CODES.UNKNOWN_PATH, type: 'ERROR' });
+      expect(res.text).not.toContain('token');
     });
 
-    expect(res.status).toBe(200);
-    expect(res.json).toMatchObject({ content: expect.any(Array) });
-    expect(res.json).not.toHaveProperty('msgId');
-  });
-});
+    test('control: the same admin GET /api/users on the api port is a 200 list', async () => {
+      const token = await adminBearer();
 
-test.describe('the wire protocols are not served on the api port', { tag: ['@smoke'] }, () => {
-  test('GET /v2/ is the SPA on the api port, the registry ping on the protocol port', async () => {
-    const onApi = await edgeRequest(apiUrl('/v2/'));
-    const onRepo = await edgeRequest(repoUrl('/v2/'));
+      const res = await edgeRequest(apiUrl('/api/users'), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-    expect(onApi.status).toBe(200);
-    expect(onApi.headers.get('content-type')).toContain('text/html');
-    expect(onApi.text).toContain('<app-root>');
-    expect(onApi.headers.get('docker-distribution-api-version')).toBeNull();
-    expect(onApi.headers.get('www-authenticate')).toBeNull();
-    // Control: 9090 speaks the registry protocol (a Bearer challenge for an anonymous ping).
-    expect(onRepo.status).toBe(401);
-    expect(onRepo.headers.get('www-authenticate')).toMatch(/^Bearer realm=/);
-    expect(onRepo.headers.get('content-type')).not.toContain('text/html');
-  });
+      expect(res.status).toBe(200);
+      expect(res.json).toMatchObject({ content: expect.any(Array) });
+      expect(res.json).not.toHaveProperty('msgId');
+    });
+  },
+);
 
-  test('a seeded Maven pom is served on the protocol port, and never on the api port', async ({
-    seeder,
-  }) => {
-    const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: false });
-    const pkg = await seedPackage(repo, seeder);
-    const [group, artifact] = pkg.name.split(':');
-    const path = `/${repoPath(repo.name)}/${group.replaceAll('.', '/')}/${artifact}/${pkg.version}/${artifact}-${pkg.version}.pom`;
+test.describe(
+  'the wire protocols are not served on the api port',
+  { tag: ['@smoke', '@pr'] },
+  () => {
+    test('GET /v2/ is the SPA on the api port, the registry ping on the protocol port', async () => {
+      const onApi = await edgeRequest(apiUrl('/v2/'));
+      const onRepo = await edgeRequest(repoUrl('/v2/'));
 
-    const onRepo = await edgeRequest(repoUrl(path));
-    const onApi = await edgeRequest(apiUrl(path));
+      expect(onApi.status).toBe(200);
+      expect(onApi.headers.get('content-type')).toContain('text/html');
+      expect(onApi.text).toContain('<app-root>');
+      expect(onApi.headers.get('docker-distribution-api-version')).toBeNull();
+      expect(onApi.headers.get('www-authenticate')).toBeNull();
+      // Control: 9090 speaks the registry protocol (a Bearer challenge for an anonymous ping).
+      expect(onRepo.status).toBe(401);
+      expect(onRepo.headers.get('www-authenticate')).toMatch(/^Bearer realm=/);
+      expect(onRepo.headers.get('content-type')).not.toContain('text/html');
+    });
 
-    expect(onRepo.status).toBe(200);
-    expect(onRepo.text).toContain(`<artifactId>${artifact}</artifactId>`);
-    expect(onApi.status).toBe(200);
-    expect(onApi.headers.get('content-type')).toContain('text/html');
-    expect(onApi.text).toContain('<app-root>');
-    expect(onApi.text).not.toContain(`<artifactId>${artifact}</artifactId>`);
-    expect(onApi.headers.get('www-authenticate')).toBeNull();
-  });
-});
+    test('a seeded Maven pom is served on the protocol port, and never on the api port', async ({
+      seeder,
+    }) => {
+      const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: false });
+      const pkg = await seedPackage(repo, seeder);
+      const [group, artifact] = pkg.name.split(':');
+      const path = `/${repoPath(repo.name)}/${group.replaceAll('.', '/')}/${artifact}/${pkg.version}/${artifact}-${pkg.version}.pom`;
+
+      const onRepo = await edgeRequest(repoUrl(path));
+      const onApi = await edgeRequest(apiUrl(path));
+
+      expect(onRepo.status).toBe(200);
+      expect(onRepo.text).toContain(`<artifactId>${artifact}</artifactId>`);
+      expect(onApi.status).toBe(200);
+      expect(onApi.headers.get('content-type')).toContain('text/html');
+      expect(onApi.text).toContain('<app-root>');
+      expect(onApi.text).not.toContain(`<artifactId>${artifact}</artifactId>`);
+      expect(onApi.headers.get('www-authenticate')).toBeNull();
+    });
+  },
+);

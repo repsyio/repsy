@@ -369,6 +369,7 @@ async function afterSuccessfulRoundTrip(
 export const pypiAdapter: ProtocolAdapter<PypiFingerprint> = {
   protocol: 'pypi',
   client: { name: 'twine/pip', publishVerb: 'upload', consumeVerb: 'download' },
+  prScenarios: ['password-admin'],
 
   packageName: (runId, scenario) => rawPackageName(runId, scenario),
   // `adapter.version(versionType)` ignores `versionType`: PyPI has no release/prerelease repo-setting

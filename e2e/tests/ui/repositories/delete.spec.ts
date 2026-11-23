@@ -25,7 +25,7 @@ import { RepositoriesPage } from '../../../src/ui/pages/repositories.js';
 test.describe('Delete repository', () => {
   test(
     'REPO-06: Delete in the row menu, confirmed, removes the repository',
-    { tag: ['@smoke'] },
+    { tag: ['@smoke', '@pr'] },
     async ({ adminPage, seeder, panelApi }) => {
       const repos = new RepositoriesPage(adminPage);
       const doomed = await seeder.createRepo(RepoType.MAVEN);

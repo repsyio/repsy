@@ -173,6 +173,7 @@ export function copyAdapter(client: CopyClient): ProtocolAdapter<DockerFingerpri
   return {
     ...dockerAdapter,
     label: client.name,
+    prScenarios: undefined,
     tags: [`@${client.name}`],
     client: { name: client.name, publishVerb: client.publishVerb, consumeVerb: client.consumeVerb },
     publish,

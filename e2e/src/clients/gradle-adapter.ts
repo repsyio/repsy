@@ -47,6 +47,8 @@ export function gradleAdapter(dsl: GradleDsl): ProtocolAdapter<RepoTree> {
   return {
     protocol: gradleProtocol(dsl),
     client: { name: 'gradle', publishVerb: 'publish', consumeVerb: 'fetchDependencies' },
+    // The Kotlin DSL is the one Gradle client on a pull request; the Groovy one runs nightly.
+    prScenarios: dsl === 'kotlin' ? ['password-admin'] : undefined,
 
     packageName: (runId: string, scenario: Scenario) =>
       `io.repsy.e2e.${runId}:gradle-${dsl}-${slugify(scenario.id)}`,

@@ -425,6 +425,7 @@ async function afterSuccessfulRoundTrip(
 export const dockerAdapter: ProtocolAdapter<DockerFingerprint> = {
   protocol: 'docker',
   client: { name: 'crane', publishVerb: 'push', consumeVerb: 'pull' },
+  prScenarios: ['password-admin'],
 
   packageName: (runId, scenario) => rawImageName(runId, scenario),
   // The TAG. `boundedSemverVersion()` (`0.<secs>.<seq>`) is well inside distribution/reference's tag

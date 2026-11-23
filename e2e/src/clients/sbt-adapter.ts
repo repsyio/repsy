@@ -59,6 +59,8 @@ export function sbtAdapter(version: string = SBT_VERSION): ProtocolAdapter<RepoT
   return {
     protocol: sbtProtocol(version),
     client: { name: 'sbt', publishVerb: 'publish', consumeVerb: 'fetchDependencies' },
+    // sbt 1.13 is the one sbt on a pull request; sbt 2 runs nightly.
+    prScenarios: version === SBT_VERSION ? ['password-admin'] : undefined,
 
     packageName: (runId: string, scenario: Scenario) =>
       `io.repsy.e2e.${runId}:sbt-${version.split('.').slice(0, 1).join('.')}-x-${slugify(scenario.id)}${crossSuffix(scalaVersion)}`,

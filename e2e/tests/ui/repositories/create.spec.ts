@@ -35,7 +35,13 @@ test.describe('Create repository modal', () => {
   for (const repoType of UI_REPO_TYPES) {
     test(
       `REPO-01 (${repoType.slug}): admin creates a ${repoType.label} repository`,
-      { tag: repoType.smoke ? ['@smoke'] : [] },
+      {
+        tag: [
+          ...(repoType.smoke ? ['@smoke'] : []),
+          // One type on a pull request: the panel's create flow is the same code for all of them.
+          ...(repoType.type === RepoType.MAVEN ? ['@pr'] : []),
+        ],
+      },
       async ({ adminPage, seeder, panelApi }) => {
         const repos = new RepositoriesPage(adminPage);
         const name = seeder.reserveRepoName(repoType.type);

@@ -236,7 +236,13 @@ export function registerPublishConsumeLoop<F>(
   function registerScenario(scenario: Scenario): void {
     test(
       `${title} > ${scenario.id}`,
-      { tag: [...scenario.tags, ...(adapter.tags ?? [])] },
+      {
+        tag: [
+          ...scenario.tags,
+          ...(adapter.tags ?? []),
+          ...(adapter.prScenarios?.includes(scenario.id) ? ['@pr'] : []),
+        ],
+      },
       async ({ world, panelApi }) => {
         test.skip(
           caps.isRemote && scenario.tags.includes('@local-only'),

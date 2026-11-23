@@ -27,7 +27,7 @@ import { Shell } from '../../src/ui/pages/shell.js';
 import { readStoredSession } from '../../src/ui/session.js';
 
 test.describe('UI smoke', () => {
-  test('UI login lands on the dashboard', { tag: ['@smoke'] }, async ({ page }) => {
+  test('UI login lands on the dashboard', { tag: ['@smoke', '@pr'] }, async ({ page }) => {
     const login = new LoginPage(page);
     const dashboard = new DashboardPage(page);
 
@@ -40,7 +40,7 @@ test.describe('UI smoke', () => {
     await expect(dashboard.welcomeUsername).toContainText(env.adminUsername);
   });
 
-  test('logout returns to /login', { tag: ['@smoke'] }, async ({ adminPage }) => {
+  test('logout returns to /login', { tag: ['@smoke', '@pr'] }, async ({ adminPage }) => {
     const dashboard = new DashboardPage(adminPage);
     const shell = new Shell(adminPage);
 
@@ -57,16 +57,20 @@ test.describe('UI smoke', () => {
     expect(await storedSession()).toEqual({ username: null, token: null, refreshToken: null });
   });
 
-  test('anonymous visit to /repositories lands on login', { tag: ['@smoke'] }, async ({ page }) => {
-    await page.goto('/repositories');
+  test(
+    'anonymous visit to /repositories lands on login',
+    { tag: ['@smoke', '@pr'] },
+    async ({ page }) => {
+      await page.goto('/repositories');
 
-    // AuthGuard sends an anonymous visitor to "/?returnUrl=/repositories", and "/" renders the login
-    // form IN PLACE (AuthRedirectComponent follows the session): the path is "/", not "/login".
-    // Assert what the visitor sees, not a URL that is the dashboard's for everyone else.
-    await expect(new LoginPage(page).submit).toBeVisible();
-    await expect(page).toHaveURL(
-      (url) => url.pathname === '/' && url.searchParams.get('returnUrl') === '/repositories',
-    );
-    await expect(new DashboardPage(page).welcomeCard).toHaveCount(0);
-  });
+      // AuthGuard sends an anonymous visitor to "/?returnUrl=/repositories", and "/" renders the login
+      // form IN PLACE (AuthRedirectComponent follows the session): the path is "/", not "/login".
+      // Assert what the visitor sees, not a URL that is the dashboard's for everyone else.
+      await expect(new LoginPage(page).submit).toBeVisible();
+      await expect(page).toHaveURL(
+        (url) => url.pathname === '/' && url.searchParams.get('returnUrl') === '/repositories',
+      );
+      await expect(new DashboardPage(page).welcomeCard).toHaveCount(0);
+    },
+  );
 });
