@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.repsy.protocols.maven.shared.utils;
+package io.repsy.protocols.maven.shared.artifact.dtos;
 
 import java.util.List;
 import org.jspecify.annotations.Nullable;
