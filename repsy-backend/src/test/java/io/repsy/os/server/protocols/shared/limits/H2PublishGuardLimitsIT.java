@@ -19,6 +19,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import io.repsy.os.H2IntegrationTest;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -30,6 +31,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * (RPS-1072). npm's tables are identical in both databases (RPS-1136), and so are Docker's
  * (RPS-1139, RPS-1140) and PyPI's (RPS-1137).
  */
+// RPS-2730: embedded H2 dialect check, repeats behaviour the PostgreSQL ITs cover; see "Testing" in
+// AGENTS.md.
+@Tag("extended")
 @DisplayName("Helm, Cargo, Go, npm, Docker, PyPI and Maven publish limits against the H2 schema")
 class H2PublishGuardLimitsIT extends H2IntegrationTest {
 

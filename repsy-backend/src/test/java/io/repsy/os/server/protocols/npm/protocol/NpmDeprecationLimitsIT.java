@@ -29,6 +29,7 @@ import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -42,6 +43,9 @@ import tools.jackson.databind.ObjectMapper;
  * RPS-1747: a deprecation message is stored whole and a dist-tag name goes into a length-limited
  * column, so both are bounded before anything is written.
  */
+// RPS-2730: size or length limit edge cases, the protocol happy flows stay in the PR run; see
+// "Testing" in AGENTS.md.
+@Tag("extended")
 @DisplayName("npm deprecation message and dist-tag name limits")
 class NpmDeprecationLimitsIT extends AbstractIT {
 

@@ -37,6 +37,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.function.Function;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -51,6 +52,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * of them share one application context; the tie-breaker sits on the repositories, so the pages are
  * the same ones the endpoints serve.
  */
+// RPS-2730: embedded H2 dialect check, repeats behaviour the PostgreSQL ITs cover; see "Testing" in
+// AGENTS.md.
+@Tag("extended")
 @DisplayName("Paged lists break sort ties by id on embedded H2 (RPS-1298)")
 class H2StablePagingIT extends H2IntegrationTest {
 

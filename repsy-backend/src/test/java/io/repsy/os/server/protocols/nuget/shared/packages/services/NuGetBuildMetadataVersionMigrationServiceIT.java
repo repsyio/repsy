@@ -37,6 +37,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -45,6 +46,9 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
  * RPS-1059: versions that were stored with build metadata before RPS-996 dropped it from the
  * canonical version are moved to the canonical version, row, scans and files.
  */
+// RPS-2730: one-off data migration or backfill, only relevant when its code changes; see "Testing"
+// in AGENTS.md.
+@Tag("extended")
 @DisplayName("NuGet build metadata version migration (RPS-1059)")
 class NuGetBuildMetadataVersionMigrationServiceIT extends AbstractIT {
 

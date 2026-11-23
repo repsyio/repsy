@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -55,6 +56,9 @@ import org.springframework.transaction.annotation.Transactional;
  * deletes the repos and users it commits.
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
+// RPS-2730: size or length limit edge cases, the protocol happy flows stay in the PR run; see
+// "Testing" in AGENTS.md.
+@Tag("extended")
 @DisplayName("Maven upload size limits (RPS-1121)")
 class MavenUploadSizeLimitIT extends AbstractIT {
 

@@ -30,6 +30,7 @@ import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.context.WebApplicationContext;
@@ -42,6 +43,9 @@ import org.springframework.web.context.WebApplicationContext;
  * DockerImageStatsBackfillService} must undo without touching an image that already carries its
  * size and digest.
  */
+// RPS-2730: one-off data migration or backfill, only relevant when its code changes; see "Testing"
+// in AGENTS.md.
+@Tag("extended")
 @DisplayName("Docker image stats backfill (RPS-1563)")
 class DockerImageStatsBackfillIT extends AbstractIT {
 

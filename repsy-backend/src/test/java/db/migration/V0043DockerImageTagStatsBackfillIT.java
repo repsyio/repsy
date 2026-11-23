@@ -22,6 +22,7 @@ import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
@@ -33,6 +34,9 @@ import org.testcontainers.containers.PostgreSQLContainer;
  * would fail here. The seeded images span several 5000-row batches. It owns its container and
  * touches no Spring context.
  */
+// RPS-2730: one-off data migration or backfill, only relevant when its code changes; see "Testing"
+// in AGENTS.md.
+@Tag("extended")
 @DisplayName("V0042-V0043 store the tag statistics of every Docker image (PostgreSQL)")
 class V0043DockerImageTagStatsBackfillIT {
 

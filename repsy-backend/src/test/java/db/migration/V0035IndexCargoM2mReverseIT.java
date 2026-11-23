@@ -22,6 +22,7 @@ import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -35,6 +36,9 @@ import org.testcontainers.containers.PostgreSQLContainer;
  * the lookup the ON DELETE CASCADE check issues. It owns its container and touches no Spring
  * context.
  */
+// RPS-2730: one-off data migration or backfill, only relevant when its code changes; see "Testing"
+// in AGENTS.md.
+@Tag("extended")
 @DisplayName(
     "V0035 indexes the cargo join table reverse sides and key_store keyserver (PostgreSQL)")
 class V0035IndexCargoM2mReverseIT {

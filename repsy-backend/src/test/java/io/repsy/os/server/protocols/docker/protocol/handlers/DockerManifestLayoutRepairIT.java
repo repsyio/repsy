@@ -41,6 +41,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -57,6 +58,9 @@ import org.springframework.web.context.WebApplicationContext;
  * to the legacy name and its row gets that name and loses its {@code sha512} digest, exactly what
  * the database migration leaves behind.
  */
+// RPS-2730: one-off data migration or backfill, only relevant when its code changes; see "Testing"
+// in AGENTS.md.
+@Tag("extended")
 @DisplayName("Docker manifest layout repair (RPS-1216)")
 class DockerManifestLayoutRepairIT extends AbstractIT {
 

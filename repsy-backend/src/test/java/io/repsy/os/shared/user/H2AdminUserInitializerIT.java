@@ -29,6 +29,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,6 +51,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * context.
  */
 @ExtendWith(OutputCaptureExtension.class)
+// RPS-2730: embedded H2 dialect check, repeats behaviour the PostgreSQL ITs cover; see "Testing" in
+// AGENTS.md.
+@Tag("extended")
 @DisplayName("AdminUserInitializer password reset on the embedded H2 database (RPS-1099)")
 class H2AdminUserInitializerIT extends H2IntegrationTest {
 

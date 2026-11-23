@@ -30,6 +30,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -38,6 +39,9 @@ import org.junit.jupiter.api.Test;
  * of the instance. The {@code go.mod} is now capped, and an oversized one is answered with a 400
  * and stores nothing.
  */
+// RPS-2730: size or length limit edge cases, the protocol happy flows stay in the PR run; see
+// "Testing" in AGENTS.md.
+@Tag("extended")
 @DisplayName("Go module upload caps the size of the go.mod (RPS-1054)")
 class GolangPublishGoModSizeIT extends AbstractIT {
 

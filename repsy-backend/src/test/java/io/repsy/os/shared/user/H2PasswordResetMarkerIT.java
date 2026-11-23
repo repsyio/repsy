@@ -29,6 +29,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
@@ -45,6 +46,9 @@ import org.springframework.boot.test.system.OutputCaptureExtension;
  * application context, and it rolls back with the rest of {@link H2IntegrationTest}.
  */
 @ExtendWith(OutputCaptureExtension.class)
+// RPS-2730: embedded H2 dialect check, repeats behaviour the PostgreSQL ITs cover; see "Testing" in
+// AGENTS.md.
+@Tag("extended")
 @DisplayName("PasswordResetMarkerScanner on the embedded H2 database (RPS-1107)")
 class H2PasswordResetMarkerIT extends H2IntegrationTest {
 

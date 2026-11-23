@@ -32,6 +32,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -49,6 +50,9 @@ import org.junit.jupiter.api.Test;
  * which calls the package-visible overload with a small limit: building a real zip that inflates
  * past 500 MiB is not practical to run as part of this suite.
  */
+// RPS-2730: size or length limit edge cases, the protocol happy flows stay in the PR run; see
+// "Testing" in AGENTS.md.
+@Tag("extended")
 @DisplayName("Go module zip entry-count limit (RPS-1118)")
 class GolangModuleZipBombIT extends AbstractIT {
 

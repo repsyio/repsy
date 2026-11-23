@@ -19,6 +19,7 @@ import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
@@ -31,6 +32,9 @@ import org.testcontainers.containers.PostgreSQLContainer;
  * shares nor disturbs the database the other integration tests use; the same scenario runs on H2 in
  * {@code V0030CargoCrateIndexCreatedAtTest}.
  */
+// RPS-2730: one-off data migration or backfill, only relevant when its code changes; see "Testing"
+// in AGENTS.md.
+@Tag("extended")
 @DisplayName("V0030 cargo_crate_index.created_at is backfilled from the publish time (PostgreSQL)")
 class CargoIndexCreatedAtMigrationIT {
 

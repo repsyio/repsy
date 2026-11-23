@@ -27,6 +27,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import io.repsy.os.AbstractIT;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
@@ -38,6 +39,9 @@ import org.springframework.test.web.servlet.ResultActions;
  * that exceeds it stays small.
  */
 @TestPropertySource(properties = "repsy.ruby.max-gem-size=4KB")
+// RPS-2730: size or length limit edge cases, the protocol happy flows stay in the PR run; see
+// "Testing" in AGENTS.md.
+@Tag("extended")
 @DisplayName("Ruby gem push size limit (RPS-1055)")
 class RubyGemSizeLimitIT extends AbstractIT {
 

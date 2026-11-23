@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Map;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
@@ -32,6 +33,9 @@ import org.testcontainers.containers.PostgreSQLContainer;
  * transaction ({@code executeInTransaction=false} in the {@code .sql.conf}). It owns its containers
  * and touches no Spring context.
  */
+// RPS-2730: one-off data migration or backfill, only relevant when its code changes; see "Testing"
+// in AGENTS.md.
+@Tag("extended")
 @DisplayName("V0040 and V0041 install pg_trgm and its search indexes (PostgreSQL)")
 class V0041TrigramSearchIndexesIT {
 

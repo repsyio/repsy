@@ -33,6 +33,7 @@ import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 import org.apache.commons.compress.compressors.gzip.GzipCompressorOutputStream;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -41,6 +42,9 @@ import org.junit.jupiter.api.Test;
  * upload could exhaust the heap of the instance. The manifest is now capped, and an oversized one
  * is answered with a Cargo error and stores nothing.
  */
+// RPS-2730: size or length limit edge cases, the protocol happy flows stay in the PR run; see
+// "Testing" in AGENTS.md.
+@Tag("extended")
 @DisplayName("Cargo publish caps the size of the crate's Cargo.toml")
 class CargoPublishManifestSizeIT extends AbstractIT {
 

@@ -25,10 +25,14 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
 /** The contains-searches on embedded H2, where the rewritten JPQL is a plain LIKE (RPS-2117). */
+// RPS-2730: embedded H2 dialect check, repeats behaviour the PostgreSQL ITs cover; see "Testing" in
+// AGENTS.md.
+@Tag("extended")
 @DisplayName("Contains searches are case-insensitive and literal on embedded H2 (RPS-2117)")
 class H2TrigramSearchIT extends H2IntegrationTest {
 

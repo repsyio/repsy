@@ -18,6 +18,7 @@ package io.repsy.os.server.shared.multipart;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -27,6 +28,9 @@ import org.springframework.test.context.DynamicPropertySource;
  * RPS-1049: with no configuration, a package well over Spring Boot's multipart defaults (1 MB per
  * file, 10 MB per request) is accepted by a real Tomcat.
  */
+// RPS-2730: size or length limit edge cases, the protocol happy flows stay in the PR run; see
+// "Testing" in AGENTS.md.
+@Tag("extended")
 @DisplayName("Multipart upload limits, default configuration (RPS-1049)")
 class DefaultMultipartLimitsIT extends AbstractMultipartLimitIT {
 

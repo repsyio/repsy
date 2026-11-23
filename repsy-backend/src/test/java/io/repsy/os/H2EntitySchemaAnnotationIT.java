@@ -20,6 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import io.repsy.os.EntityColumnSchemaChecks.Dialect;
 import jakarta.persistence.EntityManagerFactory;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -29,6 +30,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * columns the H2 Flyway scripts create, so a value the code lets through is never cut by H2
  * (RPS-1133).
  */
+// RPS-2730: embedded H2 dialect check, repeats behaviour the PostgreSQL ITs cover; see "Testing" in
+// AGENTS.md.
+@Tag("extended")
 @DisplayName("Entity @Column mappings against the H2 schema")
 class H2EntitySchemaAnnotationIT extends H2IntegrationTest {
 

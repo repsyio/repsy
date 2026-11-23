@@ -30,6 +30,7 @@ import io.repsy.protocols.shared.repo.dtos.RepoType;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -38,6 +39,9 @@ import org.springframework.beans.factory.annotation.Autowired;
  * keeps the JSON in the column; on embedded H2 (a clob there) it has to read and write the string
  * all the same.
  */
+// RPS-2730: embedded H2 dialect check, repeats behaviour the PostgreSQL ITs cover; see "Testing" in
+// AGENTS.md.
+@Tag("extended")
 @DisplayName("Helm OCI manifest content on embedded H2 (RPS-1392)")
 class H2HelmOciManifestContentIT extends H2IntegrationTest {
 

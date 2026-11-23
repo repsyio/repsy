@@ -26,6 +26,7 @@ import io.repsy.os.AbstractIT;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.util.Map;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -42,6 +43,9 @@ import tools.jackson.databind.ObjectMapper;
  * that exceeds it stays small.
  */
 @TestPropertySource(properties = "repsy.npm.max-publish-size=4KB")
+// RPS-2730: size or length limit edge cases, the protocol happy flows stay in the PR run; see
+// "Testing" in AGENTS.md.
+@Tag("extended")
 @DisplayName("npm publish size limit (RPS-1561)")
 class NpmPublishSizeLimitIT extends AbstractIT {
 

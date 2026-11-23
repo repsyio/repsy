@@ -49,6 +49,7 @@ import java.util.stream.IntStream;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -67,6 +68,9 @@ import tools.jackson.databind.ObjectMapper;
  * Cloud's {@code MavenPgpCapsIT}; runs without a test transaction so the racers really commit.
  */
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
+// RPS-2730: size or length limit edge cases, the protocol happy flows stay in the PR run; see
+// "Testing" in AGENTS.md.
+@Tag("extended")
 @DisplayName("Maven PGP abuse caps (RPS-1796)")
 class MavenPgpCapsIT extends AbstractIT {
 

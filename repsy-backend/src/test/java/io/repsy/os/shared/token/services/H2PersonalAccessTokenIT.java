@@ -32,6 +32,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -45,6 +46,9 @@ import org.springframework.beans.factory.annotation.Autowired;
  * <p>Runs inside the inherited rollback transaction; the token is read back after the persistence
  * context is cleared, so the value comes from the database.
  */
+// RPS-2730: embedded H2 dialect check, repeats behaviour the PostgreSQL ITs cover; see "Testing" in
+// AGENTS.md.
+@Tag("extended")
 @DisplayName("PersonalAccessToken expiration date under H2: the answer is the stored date")
 class H2PersonalAccessTokenIT extends H2IntegrationTest {
 

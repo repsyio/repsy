@@ -32,6 +32,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
@@ -43,6 +44,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
  * {@code GET /api/repos} and {@code GET /api/repos/counts} on H2. Like the other H2 tests it calls
  * the service instead of MockMvc, so that it shares the one application context of the H2 suites.
  */
+// RPS-2730: embedded H2 dialect check, repeats behaviour the PostgreSQL ITs cover; see "Testing" in
+// AGENTS.md.
+@Tag("extended")
 @DisplayName("Repo collection queries on embedded H2 (RPS-1268)")
 class H2RepoCollectionIT extends H2IntegrationTest {
 
