@@ -1,0 +1,222 @@
+name: E2E PR
+
+# The crucial e2e set of a pull request (RPS-2736, epic RPS-2726): the @pr tests (e2e/README.md "The @pr set") on ONE
+# default PostgreSQL stack, so a protocol or harness regression shows on the PR and not at 01:23 the next night.
+# Path-filtered: it only starts when a protocol module, the panel, the harness, the Dockerfile or this file changes.
+# NOT a required check yet: make it required after two green weeks (RPS-2736). The full suite stays in e2e-nightly.yml.
+#
+# Run it by hand: gh workflow run e2e-pr.yml --ref <branch>
+permissions:
+  contents: read
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "repsy-protocols/**"
+      - "repsy-frontend/**"
+      - "e2e/**"
+      - "Dockerfile"
+      - ".github/workflows/e2e-pr.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  # The tag carries the run id: runs share the Docker host of the runner pool. run.sh starts this image as it is.
+  REPSY_IMAGE: repsy-os-e2e:pr-${{ github.run_id }}
+  # The runners of the @pr set, one `./run.sh test` each (the projects of PR_SET in e2e/src/pr-set/check.ts).
+  PR_RUNNERS: skeleton api npm pypi docker ui maven
+  # Plain @pr also matches @proxy and @probe-ban: the word boundary is part of the tag.
+  PR_GREP: '@pr\b'
+
+jobs:
+  e2e-pr:
+    name: E2E @pr set
+    runs-on: repsy-md
+    timeout-minutes: 45
+    env:
+      # A throwaway stack for this job only; it satisfies the panel's login form (6-50 chars, lower + upper case, a digit).
+      REPSY_ADMIN_PASSWORD: E2eAdmin-Pass1
+      REPSY_E2E_PROJECT: repsy-e2e-pr
+      ARTIFACTS: ${{ github.workspace }}/e2e/e2e-artifacts/pr
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          submodules: recursive
+
+      - name: Set up Node and the harness dependencies
+        uses: ./.github/actions/setup-pnpm
+        with:
+          working-directory: e2e
+          generate-api: "false"
+
+      - name: Generate the panel API client
+        working-directory: e2e
+        run: pnpm run gen:api
+
+      # The count guard: fails when a tag is dropped or added, or the set is empty (a typo would otherwise make this a green no-op).
+      - name: Check the @pr set
+        working-directory: e2e
+        run: pnpm check:pr-set
+
+      - name: Remove runner containers left by cancelled runs
+        run: |
+          docker ps -a --format '{{.ID}} {{.Label "com.docker.compose.project"}}' \
+            | awk '$2 ~ /^repsy-e2e-pr-runners$/ { print $1 }' \
+            | xargs -r docker rm -f || true
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+
+      # Same restore-only cache and build context as e2e-nightly.yml and release.yml (keep the path literal).
+      - name: Restore OpenAPI generator jar
+        id: openapi-jar
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: ~/.cache/openapi-generator-cli
+          key: openapi-generator-${{ runner.os }}-${{ hashFiles('repsy-frontend/openapitools.json') }}
+
+      - name: Prepare OpenAPI generator jar build context
+        env:
+          CACHE_HIT: ${{ steps.openapi-jar.outputs.cache-hit }}
+        run: |
+          mkdir -p "$HOME/.cache/openapi-generator-cli"
+          echo "OPENAPI_JAR_DIR=$HOME/.cache/openapi-generator-cli" >> "$GITHUB_ENV"
+          if [ "$CACHE_HIT" != "true" ]; then
+            echo "::warning::OpenAPI generator jar cache miss: the image build will download it from Maven Central"
+          fi
+
+      - name: Build the image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: Dockerfile
+          build-contexts: |
+            openapi-jar=${{ env.OPENAPI_JAR_DIR }}
+          load: true
+          push: false
+          tags: ${{ env.REPSY_IMAGE }}
+          cache-from: type=gha,scope=e2e-image
+          cache-to: type=gha,scope=e2e-image,mode=max
+
+      # The default PostgreSQL stack, no overlay. REPSY_IMAGE is set, so run.sh starts the image and does not build.
+      - name: Start the stack
+        id: up
+        working-directory: e2e
+        run: |
+          ./run.sh local up
+          docker compose ls
+
+      # Same probe as e2e-nightly.yml: Chromium keeps its sandbox wherever the runner allows it.
+      - name: Probe the Chromium sandbox
+        working-directory: e2e
+        run: |
+          mkdir -p test-results playwright-report
+          HOST_UID="$(id -u)"
+          HOST_GID="$(id -g)"
+          export HOST_UID HOST_GID
+          docker compose -f docker-compose.runners.yml build ui
+          if docker compose -f docker-compose.runners.yml run --rm --no-deps ui \
+            node --input-type=module -e "
+              import { chromium } from '@playwright/test';
+              const b = await chromium.launch({ chromiumSandbox: true });
+              await (await b.newPage()).goto('about:blank');
+              await b.close();
+              console.log('chromium sandbox ok');"; then
+            echo "- Chromium sandbox: on" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::Chromium cannot use its sandbox on this runner; running the UI tests with REPSY_UI_NO_SANDBOX=1"
+            echo "REPSY_UI_NO_SANDBOX=1" >> "$GITHUB_ENV"
+            echo "- Chromium sandbox: OFF (REPSY_UI_NO_SANDBOX=1)" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # One ./run.sh test per runner (every invocation overwrites test-results/); a red runner does not stop the others.
+      - name: Run the @pr tests
+        id: tests
+        working-directory: e2e
+        env:
+          CI: "true"
+        run: |
+          failed=0
+          for protocol in $PR_RUNNERS; do
+            echo "::group::$protocol"
+            ./run.sh test --target ci -b --protocol "$protocol" --grep "$PR_GREP" || failed=1
+            mkdir -p "$ARTIFACTS/$protocol"
+            cp -a test-results "$ARTIFACTS/$protocol/test-results" || true
+            cp -a playwright-report "$ARTIFACTS/$protocol/playwright-report" || true
+            mv "$ARTIFACTS/$protocol/test-results/junit.xml" "$ARTIFACTS/$protocol/junit.xml" || true
+            echo "::endgroup::"
+          done
+          exit "$failed"
+
+      # A runner that ran no test (a grep or tag drift) must not pass silently.
+      - name: Check every runner ran tests
+        if: ${{ !cancelled() && steps.tests.outcome != 'skipped' }}
+        run: |
+          python3 - <<'PY'
+          import os, sys
+          import xml.etree.ElementTree as ET
+
+          bad = False
+          total = 0
+          for runner in os.environ["PR_RUNNERS"].split():
+              path = os.path.join(os.environ["ARTIFACTS"], runner, "junit.xml")
+              try:
+                  cases = list(ET.parse(path).getroot().iter("testcase"))
+              except (OSError, ET.ParseError) as e:
+                  print(f"::error::no readable junit.xml for {runner} ({e})")
+                  bad = True
+                  continue
+              skipped = sum(1 for c in cases if c.find("skipped") is not None)
+              total += len(cases)
+              print(f"{runner}: {len(cases)} tests, {skipped} skipped")
+              if not cases:
+                  print(f"::error::{runner} ran no @pr test")
+                  bad = True
+          print(f"{total} @pr tests ran")
+          sys.exit(1 if bad else 0)
+          PY
+
+      - name: Collect the stack logs
+        if: ${{ failure() }}
+        working-directory: e2e
+        run: |
+          mkdir -p stack-logs
+          ./run.sh local ps > stack-logs/ps.txt 2>&1 || true
+          ./run.sh local logs > stack-logs/stack.log 2>&1 || true
+
+      - name: Upload the reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: e2e-pr-results
+          path: e2e/e2e-artifacts/pr
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Upload the stack logs
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: e2e-pr-stack-logs
+          path: e2e/stack-logs
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Stop the stack
+        if: always()
+        working-directory: e2e
+        run: |
+          docker ps -aq --filter "label=com.docker.compose.project=${REPSY_E2E_PROJECT}-runners" | xargs -r docker rm -f || true
+          docker compose -p "${REPSY_E2E_PROJECT}-runners" -f docker-compose.runners.yml down -v --rmi local \
+            || echo "::warning::Could not remove the runner images of ${REPSY_E2E_PROJECT}-runners"
+          ./run.sh local down
+          docker rmi "$REPSY_IMAGE" || true
