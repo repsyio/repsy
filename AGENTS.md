@@ -560,7 +560,7 @@ this repository is public.
 - Slack: the same step also posts when the secret `SLACK_WEBHOOK_URL` exists (an organisation secret visible to this repository; the
   value is never in the repo, the step reads it only from its environment). Without it the issue is the only alert.
 - Who is told: whoever watches the repository's issues (assignee and subscribers of the `nightly-red` issue) and the Slack channel of the webhook.
-- Owner: (to be named). The maintainers have to name who looks first at a red nightly and put the name here.
+- Owner: Repsy. A red nightly is looked at first by the Repsy maintainers.
 - Test the alert without waiting for a red night: `gh workflow run sonarcloud.yml -f alert_test=true` (or `e2e-nightly.yml`). The real jobs are
   skipped, a job fails on purpose and the issue is titled `Nightly red (alert test): <workflow>`; close it by hand afterwards. For
   `e2e-nightly.yml` do it outside 01:23-04:00 UTC (the concurrency group queues it behind the nightly).
