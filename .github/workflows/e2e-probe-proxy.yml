@@ -1,4 +1,4 @@
-name: E2E Nightly Probe (temporary)
+name: E2E Probe leg proxy (temporary)
 
 # Runs the e2e harness (e2e/, README.md "CI"): the panel UI suite (headless Chromium, and @smoke in Firefox and WebKit) and the
 # wire-level protocol runners (real mvn/npm/cargo/... clients) against a Repsy image built from this
@@ -16,7 +16,7 @@ on:
     branches:
       - main
     paths:
-      - ".github/workflows/e2e-nightly-probe.yml"
+      - ".github/workflows/e2e-probe-proxy.yml"
   workflow_dispatch:
     inputs:
       suite:
@@ -52,7 +52,7 @@ on:
 # One run at a time: the legs are heavy and a manual run must not overlap the nightly one. A run
 # that arrives while another is in progress waits (only the newest waiting run is kept).
 concurrency:
-  group: e2e-nightly-probe-${{ github.ref }}
+  group: e2e-probe-proxy-${{ github.ref }}
   cancel-in-progress: false
 
 # Every job runs on a self-hosted runnerd runner (repsy-sm, repsy-md). RPS-2416 moved the jobs back from
@@ -280,6 +280,7 @@ jobs:
                   "timeout": timeout,
               })
 
+          include = [i for i in include if i["leg"] == "proxy"]
           if not include:
               fail("the suite and protocol inputs select no runner")
           with open(os.environ["GITHUB_OUTPUT"], "a") as out:
