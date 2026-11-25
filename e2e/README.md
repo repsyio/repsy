@@ -7839,3 +7839,5 @@ Pick a `<page>` prefix, tag every control, row and state (rows on the clickable 
 errors per validator, error and empty branches), and update this section in the same PR. The live
 inventory is `grep -rn 'data-testid' repsy-frontend/src/app`; the per-page table is deliberately not
 duplicated here.
+
+<!-- e2e-pr probe: temporary, do not merge -->
