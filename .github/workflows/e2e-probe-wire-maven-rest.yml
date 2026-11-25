@@ -810,3 +810,5 @@ jobs:
 
   # Last job: opens or updates the issue "Nightly red: <workflow>" (and posts to Slack when
   # SLACK_WEBHOOK_URL exists) when a scheduled run is red, and closes it when one is green (RPS-2728, AGENTS.md
+
+# probe iteration 2
