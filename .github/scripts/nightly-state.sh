@@ -33,7 +33,7 @@ fi
 } >> "$SUMMARY"
 
 row() { # name state date sha uncovered url
-  echo "| $1 | $2 | $3 | $4 | $5 | $6 |" >> "$SUMMARY"
+  echo "| ${1//|/\\|} | $2 | $3 | $4 | $5 | $6 |" >> "$SUMMARY"  # workflow names can contain a pipe
   echo "$1: $2, run $3 $4, $5 ${6:+($6)}"
 }
 
