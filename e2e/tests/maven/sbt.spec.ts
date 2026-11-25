@@ -24,8 +24,10 @@ import { test } from '../../src/scenarios/fixtures.js';
 import { registerPublishConsumeLoop } from '../../src/scenarios/loop.js';
 import { registerSbtExtras } from '../../src/scenarios/sbt-extras.js';
 
-// A cold sbt (JVM start, build load, a Scala compile) per publish and resolve.
-test.describe.configure({ timeout: 360_000 });
+// A cold sbt (JVM start, build load, a Scala compile) per publish and resolve. The timeout also covers the wait for one of the
+// REPSY_E2E_SBT_CONCURRENCY slots (clients/sbt.ts): on a busy runner the last scenarios of a run queue for minutes
+// before their sbt starts, and 360 s failed three sbt-2.1 scenarios of one run (RPS-2742).
+test.describe.configure({ timeout: 900_000 });
 
 registerPublishConsumeLoop(sbtAdapter('1.13.0'));
 registerSbtExtras();
