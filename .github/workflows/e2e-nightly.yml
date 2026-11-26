@@ -12,10 +12,9 @@ permissions:
   contents: read
 
 on:
-  # Scheduled runs switched off temporarily (RPS-2726, pipeline load). Restore the block below to turn them back on.
-  # schedule:
-  #  # 01:23 UTC, off-peak and off the round hour, when scheduled runs are delayed the most.
-  #  - cron: "23 1 * * *"
+  schedule:
+    # 01:23 UTC, off-peak and off the round hour, when scheduled runs are delayed the most.
+    - cron: "23 1 * * *"
   workflow_dispatch:
     inputs:
       suite:
