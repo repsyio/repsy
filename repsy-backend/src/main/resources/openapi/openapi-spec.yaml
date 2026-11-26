@@ -362,6 +362,12 @@ paths:
       tags:
         - profile
       operationId: getProfile
+      description: >-
+        The profile of the signed-in user. A personal access token may read its owner's profile
+        too (every token holds `profile:read`, RPS-2227).
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -1000,7 +1006,12 @@ paths:
       operationId: getRepoCounts
       description: >-
         The number of repositories of each type. Every type is a key, zero included. Open to every
-        authenticated user. Bearer token only (Basic authentication is not accepted).
+        authenticated user. Bearer token only (Basic authentication is not accepted). A personal
+        access token needs `repo:read`, or it is answered 403 `accessDenied` (RPS-2227).
+      x-forbidden-by: token-scope
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -1010,6 +1021,8 @@ paths:
                 "$ref": "#/components/schemas/RepoCounts"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
       summary: Count the repositories of each type
   "/api/repos/{repoName}/contents":
     get:
@@ -1394,6 +1407,13 @@ paths:
       tags:
         - usage
       operationId: getTotalUsage
+      description: >-
+        Instance-wide totals, open to every authenticated user. A personal access token needs
+        `repo:read`, or it is answered 403 `accessDenied` (RPS-2227).
+      x-forbidden-by: token-scope
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       responses:
         '200':
           description: OK
@@ -1403,6 +1423,8 @@ paths:
                 "$ref": "#/components/schemas/TotalUsageInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/Forbidden"
       summary: Get total usage statistics
   "/api/repos/{repoName}/usage":
     get:
@@ -2062,7 +2084,14 @@ paths:
         - security-scans
       operationId: listSecurityScans
       description: >-
+        ADMIN only. A personal access token needs `repo:read` and an ADMIN owner, or it is answered
+        403 `accessDenied` (RPS-2227).
+
+
         Sortable by `createdAt` (`property,direction`). The default is `createdAt,desc`.
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       parameters:
         - name: severity
           in: query
@@ -2104,6 +2133,12 @@ paths:
       tags:
         - security-scans
       operationId: getSecurityScansSummary
+      description: >-
+        ADMIN only. A personal access token needs `repo:read` and an ADMIN owner, or it is answered
+        403 `accessDenied` (RPS-2227).
+      security:
+        - bearerAuth: []
+        - personalAccessToken: []
       parameters:
         - name: repoType
           in: query

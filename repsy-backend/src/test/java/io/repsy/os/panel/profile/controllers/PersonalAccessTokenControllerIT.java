@@ -891,6 +891,46 @@ class PersonalAccessTokenControllerIT extends AbstractIT {
   }
 
   @Test
+  @DisplayName("a repo:manage token creates, rotates and revokes a repo:read token (RPS-2443)")
+  void aManageTokenManagesANarrowerToken() throws Exception {
+    final var manager =
+        "Bearer "
+            + JsonPath.<String>read(
+                expectCreated(this.create(this.aliceBearer, form("manager", "repo:manage"))),
+                "$.token");
+
+    final var narrow = expectCreated(this.create(manager, form("reader", "repo:read")));
+    assertThat(JsonPath.<List<String>>read(narrow, "$.scopes"))
+        .containsExactly("profile:read", "repo:read");
+
+    final var rotated =
+        this.perform(
+                post(BASE + "/" + idOf(narrow) + "/actions/rotate")
+                    .with(apiPort())
+                    .header(AUTHORIZATION, manager))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+    this.revoke(manager, idOf(rotated)).andExpect(status().isNoContent());
+  }
+
+  @Test
+  @DisplayName("a repo:read token still cannot create a repo:write token (RPS-2443)")
+  void aReadTokenCannotCreateABroaderToken() throws Exception {
+    final var reader =
+        "Bearer "
+            + JsonPath.<String>read(
+                expectCreated(this.create(this.aliceBearer, form("reader", "repo:read"))),
+                "$.token");
+
+    this.create(reader, form("writer", "repo:write"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.code").value("validationError"));
+  }
+
+  @Test
   @DisplayName("GET /current answers who a personal access token is, what it may do and until when")
   void currentAnswersWhatThePersonalAccessTokenIs() throws Exception {
     final var body = expectCreated(this.create(this.aliceBearer, form("ci", "repo:write")));

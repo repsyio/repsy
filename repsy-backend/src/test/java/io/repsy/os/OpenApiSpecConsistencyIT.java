@@ -172,13 +172,20 @@ class OpenApiSpecConsistencyIT extends AbstractIT {
 
   /**
    * The operations whose 403 is not a role refusal but "the calling token lacks a scope of the
-   * token in the request" (RPS-2440), or "the calling token is a connector token, which manages no
-   * token" (RPS-2660). A login never gets it, so the e2e role sweep does not call them "USER gets
-   * 403" operations; the spec marks each with {@code x-forbidden-by: token-scope}, which the sweep
-   * reads.
+   * token in the request" (RPS-2440), "the calling token is a connector token, which manages no
+   * token" (RPS-2660), or "the calling token lacks {@code repo:read}" on a repo-wide read that is
+   * no repo route (RPS-2227). A login never gets it, so the e2e role sweep does not call them "USER
+   * gets 403" operations; the spec marks each with {@code x-forbidden-by: token-scope}, which the
+   * sweep reads.
    */
   private static final Set<String> TOKEN_SCOPE_OPERATIONS =
-      Set.of("createAccessToken", "listAccessTokens", "revokeAccessToken", "rotateAccessToken");
+      Set.of(
+          "createAccessToken",
+          "listAccessTokens",
+          "revokeAccessToken",
+          "rotateAccessToken",
+          "getRepoCounts",
+          "getTotalUsage");
 
   /**
    * RPS-1269: the one name a path variable has for each role, across every panel controller. A

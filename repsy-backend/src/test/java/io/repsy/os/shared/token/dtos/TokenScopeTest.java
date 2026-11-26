@@ -189,4 +189,49 @@ class TokenScopeTest {
     assertThat(TokenScope.permits(scopes, Permission.WRITE)).isFalse();
     assertThat(TokenScope.permits(scopes, Permission.MANAGE)).isFalse();
   }
+
+  @Test
+  @DisplayName("a repo scope is covered by itself and every rung above it on the ladder (RPS-2443)")
+  void repoScopesAreCoveredUpTheLadder() {
+    final var manage = EnumSet.of(TokenScope.PROFILE_READ, TokenScope.REPO_MANAGE);
+    final var write = EnumSet.of(TokenScope.PROFILE_READ, TokenScope.REPO_WRITE);
+    final var read = EnumSet.of(TokenScope.PROFILE_READ, TokenScope.REPO_READ);
+
+    assertThat(TokenScope.REPO_READ.isCoveredBy(manage)).isTrue();
+    assertThat(TokenScope.REPO_WRITE.isCoveredBy(manage)).isTrue();
+    assertThat(TokenScope.REPO_READ.isCoveredBy(write)).isTrue();
+    assertThat(TokenScope.REPO_WRITE.isCoveredBy(read)).isFalse();
+    assertThat(TokenScope.REPO_MANAGE.isCoveredBy(write)).isFalse();
+    assertThat(TokenScope.REPO_MANAGE.isCoveredBy(read)).isFalse();
+  }
+
+  @Test
+  @DisplayName("scan:read is covered by any repo scope, profile:read only by itself")
+  void scopesOffTheLadder() {
+    final var read = EnumSet.of(TokenScope.REPO_READ);
+    final var scan = EnumSet.of(TokenScope.PROFILE_READ, TokenScope.SCAN_READ);
+
+    assertThat(TokenScope.SCAN_READ.isCoveredBy(read)).isTrue();
+    assertThat(TokenScope.SCAN_READ.isCoveredBy(EnumSet.of(TokenScope.REPO_MANAGE))).isTrue();
+    assertThat(TokenScope.REPO_READ.isCoveredBy(scan)).isFalse();
+    assertThat(TokenScope.PROFILE_READ.isCoveredBy(read)).isFalse();
+    assertThat(TokenScope.PROFILE_READ.isCoveredBy(scan)).isTrue();
+  }
+
+  @Test
+  @DisplayName("covers needs every scope covered: a manage token covers read, read never write")
+  void coversEveryScope() {
+    final var manage = EnumSet.of(TokenScope.PROFILE_READ, TokenScope.REPO_MANAGE);
+    final var read = EnumSet.of(TokenScope.PROFILE_READ, TokenScope.REPO_READ);
+
+    assertThat(TokenScope.covers(manage, read)).isTrue();
+    assertThat(TokenScope.covers(manage, EnumSet.allOf(TokenScope.class))).isTrue();
+    assertThat(TokenScope.covers(read, manage)).isFalse();
+    assertThat(
+            TokenScope.covers(
+                read,
+                EnumSet.of(TokenScope.PROFILE_READ, TokenScope.REPO_READ, TokenScope.REPO_WRITE)))
+        .isFalse();
+    assertThat(TokenScope.covers(read, EnumSet.noneOf(TokenScope.class))).isTrue();
+  }
 }

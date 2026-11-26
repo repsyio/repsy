@@ -39,7 +39,10 @@ import java.util.Set;
  * schemaMapping} in the {@code pom.xml}), so the wire values are the ones in {@link #getValue()}.
  */
 public enum TokenScope {
-  /** Reading who the token belongs to. Every token has it, so it is never asked for. */
+  /**
+   * Reading who the token belongs to: {@code GET /api/profile} (RPS-2227). Every token has it, so
+   * it is never asked for.
+   */
   PROFILE_READ("profile:read", Permission.NONE),
   /** Deleting packages and versions, and changing a repo's settings. Implies write and read. */
   REPO_MANAGE("repo:manage", Permission.MANAGE),
@@ -60,7 +63,8 @@ public enum TokenScope {
    * the security summaries and details of a repo or an artifact). It grants no repo permission, so
    * it never opens the repo, its artifact lists or its files; {@link #REPO_READ} opens the scan
    * routes too, as it always did. It does not start a scan: that writes, so it needs {@link
-   * #REPO_WRITE}. The cross-repo {@code /api/security/scans} browser stays ADMIN only, for a login.
+   * #REPO_WRITE}. The cross-repo {@code /api/security/scans} browser stays ADMIN only and takes a
+   * login or {@link #REPO_READ} (RPS-2227), not this scope.
    */
   SCAN_READ("scan:read", Permission.NONE);
 
@@ -144,5 +148,35 @@ public enum TokenScope {
    */
   public static boolean permitsScanRead(final Collection<TokenScope> scopes) {
     return scopes.contains(SCAN_READ) || permits(scopes, Permission.READ);
+  }
+
+  /**
+   * Whether a credential holding {@code held} holds this scope or a broader one (RPS-2443): the
+   * scope itself, a repo scope higher on the ladder of {@link #grants} ({@code repo:manage} covers
+   * {@code repo:write} and {@code repo:read}, {@code repo:write} covers {@code repo:read}), or for
+   * {@link #SCAN_READ} any scope that reads repos, as {@link #permitsScanRead} says. A scope that
+   * is not about repos is covered only by itself, so nothing lower ever covers a higher rung.
+   */
+  public boolean isCoveredBy(final Collection<TokenScope> held) {
+    if (held.contains(this)) {
+      return true;
+    }
+
+    if (this == SCAN_READ) {
+      return permitsScanRead(held);
+    }
+
+    return this.permission != Permission.NONE && permits(held, this.permission);
+  }
+
+  /**
+   * Whether a credential holding {@code held} may hand on every scope in {@code scopes}: each one
+   * is covered by {@code held} (see {@link #isCoveredBy}). It is the check of creating, rotating
+   * and revoking a token, so a broad token can mint a narrower one and a narrow one never a broader
+   * one.
+   */
+  public static boolean covers(
+      final Collection<TokenScope> held, final Collection<TokenScope> scopes) {
+    return scopes.stream().allMatch(scope -> scope.isCoveredBy(held));
   }
 }
