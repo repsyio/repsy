@@ -102,6 +102,38 @@ describe('CliAuthComponent', () => {
     expect(post).not.toHaveBeenCalled();
   });
 
+  it('ticks every permission the link asks for, and lets the person narrow all but read (RPS-2762)', () => {
+    const api = apiWith();
+    const page = pageWith({ scopes: 'repo:read,repo:write,repo:manage' }, api);
+
+    expect(page.summary).toBe('3 of 3 permissions selected');
+    expect(page.fixedScope).toBe('repo:read');
+
+    page.toggle('repo:manage', false);
+    page.toggle('repo:read', false);
+    page.toggle('repo:write', false);
+    page.toggle('repo:write', true);
+
+    expect(page.summary).toBe('2 of 3 permissions selected');
+    page.authorize();
+
+    expect(api.createCliToken.calls.mostRecent().args[0].scopes as unknown).toEqual(['repo:read', 'repo:write']);
+  });
+
+  it('refuses a scope the link did not ask for, and cannot authorize with nothing ticked', () => {
+    const page = pageFor({ scopes: 'repo:write' });
+
+    page.toggle('repo:manage', true);
+
+    expect(page.chosenScopes).toEqual(['repo:write']);
+    expect(page.fixedScope).toBeNull();
+
+    page.toggle('repo:write', false);
+
+    expect(page.chosenScopes).toEqual([]);
+    expect(page.canAuthorize).toBeFalse();
+  });
+
   describe('with a redirect_uri', () => {
     const redirect = 'http://127.0.0.1:8123/callback';
     const link = { redirect_uri: redirect, state: 'a1b2', scopes: 'repo:read,repo:write' };

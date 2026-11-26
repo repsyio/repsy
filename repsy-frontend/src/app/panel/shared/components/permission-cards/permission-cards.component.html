@@ -1,0 +1,29 @@
+<ul class="space-y-3" [attr.data-testid]="testIdPrefix + '-scopes'">
+  @for (option of options; track option.scope) {
+    <li [attr.data-testid]="testIdPrefix + '-scope-' + option.scope">
+      <label
+        class="flex items-start gap-3.5 rounded-xl border border-[#26262b] bg-[#111113] px-[18px] py-4 transition-colors hover:border-[#3a3a42]"
+        [class.cursor-pointer]="!isFixed(option.scope) && !disabled"
+      >
+        <input
+          type="checkbox"
+          class="mt-0.5 h-[18px] w-[18px] flex-none accent-[#34d399]"
+          [attr.data-testid]="testIdPrefix + '-scope-check-' + option.scope"
+          [checked]="isGranted(option.scope)"
+          [disabled]="isFixed(option.scope) || disabled"
+          (change)="onChange(option.scope, $any($event.target).checked)"
+        />
+        <span class="flex min-w-0 flex-1 flex-col gap-1">
+          <span class="flex flex-wrap items-center gap-x-2.5 text-[15px] font-semibold text-white">
+            {{ option.label }}
+            <code class="text-[12px] font-normal text-[#9FA0A0]">{{ option.scope }}</code>
+            @if (isFixed(option.scope)) {
+              <span class="text-[12px] font-normal text-[#9FA0A0]">Always</span>
+            }
+          </span>
+          <span class="text-[14px] leading-5 text-[#b4b4bc]">{{ option.description }}</span>
+        </span>
+      </label>
+    </li>
+  }
+</ul>
