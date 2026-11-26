@@ -70,6 +70,12 @@ export class CliAuthComponent implements OnInit {
    */
   granted = new Set<AccessTokenScope>();
   readonly readScope: AccessTokenScope = 'repo:read';
+  readonly manageScope: AccessTokenScope = 'repo:manage';
+  /**
+   * The high-impact consent (RPS-2757), as on Cloud: `rp mcp` offers an agent its high-impact tools only when the login
+   * carries it. Off unless the person ticks it, and only with `repo:manage`.
+   */
+  highImpact = false;
   /** The signed in account the token will belong to. */
   username = '';
   readonly lifetimeHours = CLI_TOKEN_LIFETIME_HOURS;
@@ -130,7 +136,24 @@ export class CliAuthComponent implements OnInit {
       this.granted.add(scope);
     } else {
       this.granted.delete(scope);
+      if (scope === this.manageScope) {
+        this.highImpact = false;
+      }
     }
+  }
+
+  /** The high-impact question is offered when the link asks for `repo:manage`, which every high-impact tool needs. */
+  get offersHighImpact(): boolean {
+    return this.scopes.includes(this.manageScope);
+  }
+
+  /** It can be ticked only while `repo:manage` is. */
+  get canTickHighImpact(): boolean {
+    return !this.authorizing && this.granted.has(this.manageScope);
+  }
+
+  toggleHighImpact(checked: boolean): void {
+    this.highImpact = checked && this.granted.has(this.manageScope);
   }
 
   /** The scopes the token gets: those the link asked for that are still ticked, in the link's order. */
@@ -140,7 +163,9 @@ export class CliAuthComponent implements OnInit {
 
   /** "n of m permissions selected", beside the buttons. */
   get summary(): string {
-    return `${this.chosenScopes.length} of ${this.scopes.length} permissions selected`;
+    const total = this.scopes.length + (this.offersHighImpact ? 1 : 0);
+    const selected = this.chosenScopes.length + (this.highImpact ? 1 : 0);
+    return `${selected} of ${total} permissions selected`;
   }
 
   get canAuthorize(): boolean {
@@ -167,7 +192,10 @@ export class CliAuthComponent implements OnInit {
     }
     this.authorizing = true;
     this.authorizeFailed = false;
-    const form = { scopes: this.chosenScopes as unknown as Set<AccessTokenScope> };
+    const form = {
+      scopes: this.chosenScopes as unknown as Set<AccessTokenScope>,
+      highImpact: this.highImpact && this.granted.has(this.manageScope),
+    };
     this.accessTokensApi.createCliToken(form).subscribe({
       next: (token) => {
         this.created = token;

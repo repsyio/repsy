@@ -89,6 +89,49 @@
             [disabled]="authorizing"
             (toggled)="toggle($event.scope, $event.checked)"
           />
+          @if (offersHighImpact) {
+            <label
+              data-testid="cli-auth-high-impact"
+              class="mt-2 flex items-start gap-3.5 rounded-xl border border-[#4a3a16] bg-[#17130b] px-[18px] py-4"
+              [class.cursor-pointer]="canTickHighImpact"
+              [class.opacity-60]="!canTickHighImpact"
+            >
+              <input
+                type="checkbox"
+                class="mt-0.5 h-[18px] w-[18px] flex-none accent-[#f59e0b]"
+                data-testid="cli-auth-high-impact-check"
+                [checked]="highImpact"
+                [disabled]="!canTickHighImpact"
+                (change)="toggleHighImpact($any($event.target).checked)"
+              />
+              <span class="flex min-w-0 flex-1 flex-col gap-1">
+                <span class="flex items-center gap-2 text-[15px] font-semibold text-[#fcd58a]">
+                  <svg
+                    aria-hidden="true"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#f59e0b"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M12 3l9 16H3zM12 10v4M12 17h.01" />
+                  </svg>
+                  High-impact operations for AI agents
+                </span>
+                <span class="text-[14px] leading-5 text-[#d9c9a4]">
+                  Lets an agent that runs <code>rp mcp</code> with this sign-in create and rotate tokens, make a
+                  repository public, rename or delete a repository, give other users access, and add webhooks and proxy
+                  upstreams. The commands you type yourself do not need it. Off unless you turn it on.
+                  @if (!granted.has(manageScope)) {
+                    Needs Manage repositories.
+                  }
+                </span>
+              </span>
+            </label>
+          }
           <p class="pt-1 text-[13px] leading-5 text-[#9FA0A0]">
             The CLI asks you in the terminal before anything that deletes or cannot be undone.
           </p>
