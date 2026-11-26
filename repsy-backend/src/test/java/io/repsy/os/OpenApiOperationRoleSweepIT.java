@@ -54,8 +54,9 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
  *   <li>an operation that needs authentication answers an anonymous caller 401;
  *   <li>the reverse: an operation that does not document {@code 403} never answers a USER 403, so a
  *       MANAGE route that forgot to declare it, or a read route that turned admin-only unannounced,
- *       fails here. A 403 marked {@code x-forbidden-by: token-scope} is a refusal of the calling
- *       token, which a login never gets, so those operations are in the reverse half.
+ *       fails here. Only a 403 whose {@code x-forbidden-by} names {@code role} is one a USER gets;
+ *       one that names only {@code token-scope} is a refusal of the calling token, which a login
+ *       never gets, so those operations are in the reverse half (RPS-2440, RPS-2444).
  * </ol>
  *
  * <p>The sweep is the dynamic half of {@code
@@ -153,7 +154,8 @@ class OpenApiOperationRoleSweepIT extends AbstractIT {
                               path,
                               (String) raw.get("operationId"),
                               responses.containsKey("403")
-                                  && !"token-scope".equals(raw.get("x-forbidden-by")),
+                                  && raw.get("x-forbidden-by") instanceof final List<?> reasons
+                                  && reasons.contains("role"),
                               security != null && security.isEmpty(),
                               parameters.stream()
                                   .filter(

@@ -5483,8 +5483,11 @@ Two more specs of the `api` runner (`./run.sh test --protocol api`, see "API sui
 
 - **Role sweep** (`tests/api/role-sweep.spec.ts`). The operation list is not written down: `src/api/spec-ops.ts`
   reads `repsy-backend/src/main/resources/openapi/openapi-spec.yaml` (mounted read-only into the runners) with the
-  existing `yaml` dependency. The spec declares `403 Forbidden` on exactly the operations a plain USER may not
-  call: the `@RepoOperation(MANAGE)` routes and the `requireAdmin` ones (48 of 122 today). Since RPS-2738 the sweep
+  existing `yaml` dependency. A USER gets 403 on exactly the operations whose 403 names `role` in
+  `x-forbidden-by`: the `@RepoOperation(MANAGE)` routes and the `requireAdmin` ones (48 of 122 today). A 403
+  whose `x-forbidden-by` is only `[token-scope]` (every other repo route, the repo-wide reads, the token routes,
+  RPS-2444) is a refusal of a calling token that a login never gets, so those operations are in the "a USER is
+  not 403" half; `OpenApiSpecConsistencyIT` derives both reasons from the handlers. Since RPS-2738 the sweep
   on placeholder names (a USER gets `403 accessDenied` before any 404 on every operation that declares 403,
   an anonymous caller gets 401 on every operation that is not `security: []`, the public ones are not 401, a USER
   is not 403 anywhere else, the floors and the known-route guards) is the Java IT `OpenApiOperationRoleSweepIT`

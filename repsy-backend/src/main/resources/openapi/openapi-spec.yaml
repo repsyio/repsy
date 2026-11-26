@@ -142,6 +142,7 @@ paths:
             schema:
               "$ref": "#/components/schemas/UserUpdateForm"
         required: true
+      x-forbidden-by: [role]
       responses:
         '200':
           description: OK
@@ -169,6 +170,7 @@ paths:
           schema:
             type: string
             format: uuid
+      x-forbidden-by: [role]
       responses:
         '204':
           "$ref": "#/components/responses/NoContent"
@@ -188,6 +190,7 @@ paths:
       tags:
         - users
       operationId: countAdmins
+      x-forbidden-by: [role]
       responses:
         '200':
           description: OK
@@ -219,6 +222,7 @@ paths:
         - "$ref": "#/components/parameters/Page"
         - "$ref": "#/components/parameters/Size"
         - "$ref": "#/components/parameters/Sort"
+      x-forbidden-by: [role]
       responses:
         '200':
           description: OK
@@ -243,6 +247,7 @@ paths:
             schema:
               "$ref": "#/components/schemas/UserCreateForm"
         required: true
+      x-forbidden-by: [role]
       responses:
         '201':
           description: Created
@@ -275,6 +280,7 @@ paths:
           schema:
             type: string
             format: uuid
+      x-forbidden-by: [role]
       responses:
         '200':
           description: The new password, as a JSON string
@@ -429,7 +435,7 @@ paths:
         scopes that the calling token has itself, otherwise the answer is 403 `accessDenied` and
         the token stays: a credential that cannot create a token cannot end one either. The list
         is not narrowed this way, it shows every token of the user.
-      x-forbidden-by: token-scope
+      x-forbidden-by: [token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -467,7 +473,7 @@ paths:
         token; an unknown or expired token answers 401. With a temporary or a personal token the
         token to rotate may have only scopes that the calling token has itself, otherwise the
         answer is 403 `accessDenied` and nothing changes.
-      x-forbidden-by: token-scope
+      x-forbidden-by: [token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -519,7 +525,7 @@ paths:
         The default is `id,desc`. Takes the access token of a login, a temporary token or a
         long-lived personal access token; an unknown or expired token answers 401, the token of a
         connected application 403 `accessDenied`.
-      x-forbidden-by: token-scope
+      x-forbidden-by: [token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -558,7 +564,7 @@ paths:
         only for scopes that token has itself, otherwise the answer is 400 `validationError` and
         nothing is created; an unknown or expired token answers 401, the token of a connected
         application 403 `accessDenied`.
-      x-forbidden-by: token-scope
+      x-forbidden-by: [token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -848,6 +854,7 @@ paths:
       tags:
         - repos
       operationId: getRepoSettings
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -861,7 +868,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -877,6 +884,7 @@ paths:
             schema:
               "$ref": "#/components/schemas/RepoSettingsForm"
         required: true
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -888,7 +896,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -937,6 +945,7 @@ paths:
         - "$ref": "#/components/parameters/Page"
         - "$ref": "#/components/parameters/Size"
         - "$ref": "#/components/parameters/Sort"
+      x-forbidden-by: [token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -951,6 +960,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
       summary: List repositories, filtered by type and name
     post:
       tags:
@@ -972,6 +983,7 @@ paths:
             schema:
               "$ref": "#/components/schemas/RepoCreateForm"
         required: true
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -993,7 +1005,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '409':
           "$ref": "#/components/responses/Conflict"
         '503':
@@ -1008,7 +1020,7 @@ paths:
         The number of repositories of each type. Every type is a key, zero included. Open to every
         authenticated user. Bearer token only (Basic authentication is not accepted). A personal
         access token needs `repo:read`, or it is answered 403 `accessDenied` (RPS-2227).
-      x-forbidden-by: token-scope
+      x-forbidden-by: [token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -1022,7 +1034,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
       summary: Count the repositories of each type
   "/api/repos/{repoName}/contents":
     get:
@@ -1035,6 +1047,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -1052,6 +1065,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -1072,6 +1087,7 @@ paths:
         One repository: its name, description, type (the format), visibility, disk usage and
         creation time. A public repository may be read anonymously; a private one needs read
         access (404 for a caller who may not know it exists).
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -1085,6 +1101,8 @@ paths:
                 "$ref": "#/components/schemas/RepoListInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -1110,6 +1128,7 @@ paths:
             schema:
               "$ref": "#/components/schemas/RepoUpdateForm"
         required: true
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -1125,7 +1144,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '409':
@@ -1139,6 +1158,7 @@ paths:
       tags:
         - repos
       operationId: deleteRepo
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -1148,7 +1168,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -1175,6 +1195,7 @@ paths:
           schema:
             type: string
             format: uuid
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -1186,7 +1207,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -1210,6 +1231,7 @@ paths:
           schema:
             type: string
             format: uuid
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -1236,7 +1258,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -1260,6 +1282,7 @@ paths:
         - "$ref": "#/components/parameters/Page"
         - "$ref": "#/components/parameters/Size"
         - "$ref": "#/components/parameters/Sort"
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -1275,7 +1298,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -1291,6 +1314,7 @@ paths:
             schema:
               "$ref": "#/components/schemas/DeployTokenForm"
         required: true
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -1318,7 +1342,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -1335,6 +1359,7 @@ paths:
       tags:
         - repos
       operationId: getRepoPermissions
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -1348,6 +1373,8 @@ paths:
                 "$ref": "#/components/schemas/RepoPermissionInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -1370,6 +1397,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -1390,6 +1418,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -1410,7 +1440,7 @@ paths:
       description: >-
         Instance-wide totals, open to every authenticated user. A personal access token needs
         `repo:read`, or it is answered 403 `accessDenied` (RPS-2227).
-      x-forbidden-by: token-scope
+      x-forbidden-by: [token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -1424,13 +1454,14 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
       summary: Get total usage statistics
   "/api/repos/{repoName}/usage":
     get:
       tags:
         - repos
       operationId: getRepoUsage
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -1444,7 +1475,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -1478,6 +1509,7 @@ paths:
         - "$ref": "#/components/parameters/Page"
         - "$ref": "#/components/parameters/Size"
         - "$ref": "#/components/parameters/Sort"
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -1493,6 +1525,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -1531,6 +1565,7 @@ paths:
         - "$ref": "#/components/parameters/Page"
         - "$ref": "#/components/parameters/Size"
         - "$ref": "#/components/parameters/Sort"
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -1546,6 +1581,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -1573,6 +1610,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -1586,6 +1624,8 @@ paths:
                 "$ref": "#/components/schemas/ScanOverview"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -1624,6 +1664,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -1637,6 +1678,8 @@ paths:
                 "$ref": "#/components/schemas/ScanOverview"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -1669,6 +1712,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -1679,6 +1723,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '409':
@@ -1723,6 +1769,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -1733,6 +1780,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '409':
@@ -1766,6 +1815,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -1779,6 +1829,8 @@ paths:
                 "$ref": "#/components/schemas/VersionSecuritySummaryMap"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -1807,6 +1859,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -1820,6 +1873,8 @@ paths:
                 "$ref": "#/components/schemas/VersionSecuritySummaryMap"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -1836,6 +1891,7 @@ paths:
       tags:
         - security-scans
       operationId: getArtifactSecuritySummary
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -1849,6 +1905,8 @@ paths:
                 "$ref": "#/components/schemas/VersionSecuritySummaryMap"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -1872,6 +1930,7 @@ paths:
           schema:
             type: string
             format: uuid
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -1887,6 +1946,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -1916,6 +1977,7 @@ paths:
         - "$ref": "#/components/parameters/Page"
         - "$ref": "#/components/parameters/Size"
         - "$ref": "#/components/parameters/Sort"
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -1931,6 +1993,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -1947,6 +2011,7 @@ paths:
       tags:
         - security-scans
       operationId: getRepoSecurityDetail
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -1960,6 +2025,8 @@ paths:
                 "$ref": "#/components/schemas/RepoSecurityDetail"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -1982,6 +2049,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -1995,6 +2063,8 @@ paths:
                 "$ref": "#/components/schemas/RepoSecurityDetail"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -2023,6 +2093,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -2036,6 +2107,8 @@ paths:
                 "$ref": "#/components/schemas/RepoSecurityDetail"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -2065,6 +2138,7 @@ paths:
       description: >-
         Takes the access token of a login or a personal access token with `repo:read` (RPS-2436); a
         token with `scan:read` alone is answered 403, as it is on the repo list.
+      x-forbidden-by: [token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -2077,6 +2151,8 @@ paths:
                 "$ref": "#/components/schemas/SecuritySummary"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
       summary: Get the worst known severity per repo, across each artifact version's latest completed scan
   "/api/security/scans":
     get:
@@ -2089,6 +2165,7 @@ paths:
 
 
         Sortable by `createdAt` (`property,direction`). The default is `createdAt,desc`.
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -2126,7 +2203,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
       summary: List vulnerability scans across all repositories, filterable by severity/repoType/repoName (a case-insensitive contains match)
   "/api/security/scans/summary":
     get:
@@ -2136,6 +2213,7 @@ paths:
       description: >-
         ADMIN only. A personal access token needs `repo:read` and an ADMIN owner, or it is answered
         403 `accessDenied` (RPS-2227).
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -2165,7 +2243,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
       summary: Get the system-wide severity distribution (each artifact-version's latest completed scan), filterable by repoType/repoName, independent of the scans list's severity filter
   "/api/security/supported-repo-types":
     get:
@@ -2223,6 +2301,7 @@ paths:
         - "$ref": "#/components/parameters/Page"
         - "$ref": "#/components/parameters/Size"
         - "$ref": "#/components/parameters/Sort"
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -2238,6 +2317,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -2260,6 +2341,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -2273,6 +2355,8 @@ paths:
                 "$ref": "#/components/schemas/CrateInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -2288,6 +2372,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -2297,7 +2382,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -2325,6 +2410,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -2338,6 +2424,8 @@ paths:
                 "$ref": "#/components/schemas/CrateVersionInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -2358,6 +2446,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -2367,7 +2456,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -2402,6 +2491,7 @@ paths:
         - "$ref": "#/components/parameters/Page"
         - "$ref": "#/components/parameters/Size"
         - "$ref": "#/components/parameters/Sort"
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -2417,6 +2507,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -2448,6 +2540,7 @@ paths:
         - "$ref": "#/components/parameters/Page"
         - "$ref": "#/components/parameters/Size"
         - "$ref": "#/components/parameters/Sort"
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -2463,6 +2556,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -2482,6 +2577,7 @@ paths:
       description: >-
         Deletes the layers no manifest uses any more. The layer rows are removed before the response;
         the blobs are removed in the background.
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -2491,7 +2587,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -2523,6 +2619,7 @@ paths:
           description: Only delete the untagged manifests of this image.
           schema:
             type: string
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -2536,7 +2633,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -2559,6 +2656,7 @@ paths:
         The cleanup policy of a Docker repository. A disabled default policy is created on the
         first read, so nothing is ever deleted until a policy is enabled. Fails with 400
         (`repoScopeNotMatched`) when the repository is not a Docker repository.
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -2574,7 +2672,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -2599,6 +2697,7 @@ paths:
           application/json:
             schema:
               "$ref": "#/components/schemas/CleanupPolicyForm"
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -2614,7 +2713,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -2642,6 +2741,7 @@ paths:
           application/json:
             schema:
               "$ref": "#/components/schemas/CleanupPolicyStatusForm"
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -2657,7 +2757,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -2680,6 +2780,7 @@ paths:
         Makes the cleanup policy due now; the scheduler runs it on its next pass and the work
         finishes later. The `Location` header is the policy, whose `lastRunAt` reports the outcome.
         The policy must be enabled (400 `cleanupPolicyDisabled`).
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -2691,7 +2792,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -2724,6 +2825,7 @@ paths:
           schema:
             type: string
         - "$ref": "#/components/parameters/DockerImage"
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -2737,6 +2839,8 @@ paths:
                 "$ref": "#/components/schemas/ImageListItem"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -2756,6 +2860,7 @@ paths:
           schema:
             type: string
         - "$ref": "#/components/parameters/DockerImage"
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -2765,7 +2870,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -2806,6 +2911,7 @@ paths:
         - "$ref": "#/components/parameters/Page"
         - "$ref": "#/components/parameters/Size"
         - "$ref": "#/components/parameters/Sort"
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -2821,6 +2927,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -2852,6 +2960,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -2865,6 +2974,8 @@ paths:
                 "$ref": "#/components/schemas/TagDetail"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -2889,6 +3000,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -2898,7 +3010,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -2944,6 +3056,7 @@ paths:
         - "$ref": "#/components/parameters/Page"
         - "$ref": "#/components/parameters/Size"
         - "$ref": "#/components/parameters/Sort"
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -2959,6 +3072,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -2991,6 +3106,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -3004,6 +3120,8 @@ paths:
                 type: string
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -3036,6 +3154,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -3049,6 +3168,8 @@ paths:
                 type: string
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -3080,6 +3201,7 @@ paths:
         - "$ref": "#/components/parameters/Page"
         - "$ref": "#/components/parameters/Size"
         - "$ref": "#/components/parameters/Sort"
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -3095,6 +3217,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -3110,6 +3234,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -3121,7 +3246,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -3158,6 +3283,7 @@ paths:
         - "$ref": "#/components/parameters/Page"
         - "$ref": "#/components/parameters/Size"
         - "$ref": "#/components/parameters/Sort"
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -3173,6 +3299,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -3193,6 +3321,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -3204,7 +3333,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -3229,6 +3358,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -3244,6 +3374,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -3275,6 +3407,7 @@ paths:
         - "$ref": "#/components/parameters/Page"
         - "$ref": "#/components/parameters/Size"
         - "$ref": "#/components/parameters/Sort"
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -3290,6 +3423,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -3307,6 +3442,7 @@ paths:
         - helm-charts
       operationId: getHelmChart
       parameters: []
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -3320,6 +3456,8 @@ paths:
                 "$ref": "#/components/schemas/HelmChartSummary"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -3330,6 +3468,7 @@ paths:
         - helm-charts
       operationId: deleteAllHelmChartVersions
       parameters: []
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -3339,7 +3478,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -3364,6 +3503,7 @@ paths:
         - helm-charts
       operationId: getHelmChartOciTags
       parameters: []
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -3379,6 +3519,8 @@ paths:
                   type: string
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -3413,6 +3555,7 @@ paths:
         - "$ref": "#/components/parameters/Page"
         - "$ref": "#/components/parameters/Size"
         - "$ref": "#/components/parameters/Sort"
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -3428,6 +3571,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -3450,6 +3595,7 @@ paths:
         - helm-charts
       operationId: getHelmChartDetail
       parameters: []
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -3463,6 +3609,8 @@ paths:
                 "$ref": "#/components/schemas/HelmChartDetail"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -3473,6 +3621,7 @@ paths:
         - helm-charts
       operationId: deleteHelmChartVersion
       parameters: []
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -3482,7 +3631,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -3526,6 +3675,7 @@ paths:
         - "$ref": "#/components/parameters/Page"
         - "$ref": "#/components/parameters/Size"
         - "$ref": "#/components/parameters/Sort"
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -3541,6 +3691,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -3576,6 +3728,7 @@ paths:
         - "$ref": "#/components/parameters/Page"
         - "$ref": "#/components/parameters/Size"
         - "$ref": "#/components/parameters/Sort"
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -3591,6 +3744,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -3606,6 +3761,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -3615,7 +3771,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -3642,6 +3798,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -3655,6 +3812,8 @@ paths:
                 "$ref": "#/components/schemas/MavenGroupSummary"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -3695,6 +3854,7 @@ paths:
         - "$ref": "#/components/parameters/Page"
         - "$ref": "#/components/parameters/Size"
         - "$ref": "#/components/parameters/Sort"
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -3710,6 +3870,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -3737,6 +3899,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -3750,6 +3913,8 @@ paths:
                 "$ref": "#/components/schemas/ArtifactVersionInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -3770,6 +3935,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -3779,7 +3945,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -3812,6 +3978,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -3825,6 +3992,8 @@ paths:
                 "$ref": "#/components/schemas/ArtifactVersionInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -3850,6 +4019,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -3859,7 +4029,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -3900,6 +4070,7 @@ paths:
         - "$ref": "#/components/parameters/Page"
         - "$ref": "#/components/parameters/Size"
         - "$ref": "#/components/parameters/Sort"
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -3915,7 +4086,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -3931,6 +4102,7 @@ paths:
             schema:
               "$ref": "#/components/schemas/KeyStoreForm"
         required: true
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -3954,7 +4126,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '409':
@@ -3977,6 +4149,7 @@ paths:
         - "$ref": "#/components/parameters/Page"
         - "$ref": "#/components/parameters/Size"
         - "$ref": "#/components/parameters/Sort"
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -3992,7 +4165,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -4018,6 +4191,7 @@ paths:
             schema:
               "$ref": "#/components/schemas/PgpPublicKeyForm"
         required: true
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -4041,7 +4215,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '409':
@@ -4071,6 +4245,7 @@ paths:
           schema:
             type: string
             format: uuid
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -4086,7 +4261,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -4103,6 +4278,7 @@ paths:
           schema:
             type: string
             format: uuid
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -4114,7 +4290,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -4138,6 +4314,7 @@ paths:
           schema:
             type: string
             format: uuid
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -4153,7 +4330,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -4170,6 +4347,7 @@ paths:
           schema:
             type: string
             format: uuid
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -4181,7 +4359,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -4211,6 +4389,7 @@ paths:
         - "$ref": "#/components/parameters/Page"
         - "$ref": "#/components/parameters/Size"
         - "$ref": "#/components/parameters/Sort"
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -4226,6 +4405,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -4250,6 +4431,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -4263,6 +4445,8 @@ paths:
                 "$ref": "#/components/schemas/NpmPackageInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -4278,6 +4462,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -4287,7 +4472,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -4324,6 +4509,7 @@ paths:
         - "$ref": "#/components/parameters/Page"
         - "$ref": "#/components/parameters/Size"
         - "$ref": "#/components/parameters/Sort"
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -4339,6 +4525,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -4366,6 +4554,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -4379,6 +4568,8 @@ paths:
                 "$ref": "#/components/schemas/PackageVersionDetail"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -4399,6 +4590,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -4408,7 +4600,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -4433,6 +4625,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -4448,6 +4641,8 @@ paths:
                   "$ref": "#/components/schemas/PackageDistributionTagMapListItem"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -4478,6 +4673,7 @@ paths:
         - "$ref": "#/components/parameters/Page"
         - "$ref": "#/components/parameters/Size"
         - "$ref": "#/components/parameters/Sort"
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -4493,6 +4689,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -4528,6 +4726,7 @@ paths:
         - "$ref": "#/components/parameters/Page"
         - "$ref": "#/components/parameters/Size"
         - "$ref": "#/components/parameters/Sort"
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -4543,6 +4742,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -4573,6 +4774,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -4586,6 +4788,8 @@ paths:
                 "$ref": "#/components/schemas/NpmPackageInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -4607,6 +4811,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -4616,7 +4821,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -4659,6 +4864,7 @@ paths:
         - "$ref": "#/components/parameters/Page"
         - "$ref": "#/components/parameters/Size"
         - "$ref": "#/components/parameters/Sort"
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -4674,6 +4880,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -4707,6 +4915,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -4720,6 +4929,8 @@ paths:
                 "$ref": "#/components/schemas/PackageVersionDetail"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -4746,6 +4957,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -4755,7 +4967,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -4786,6 +4998,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -4801,6 +5014,8 @@ paths:
                   "$ref": "#/components/schemas/PackageDistributionTagMapListItem"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -4832,6 +5047,7 @@ paths:
         - "$ref": "#/components/parameters/Page"
         - "$ref": "#/components/parameters/Size"
         - "$ref": "#/components/parameters/Sort"
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -4847,6 +5063,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -4870,6 +5088,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -4883,6 +5102,8 @@ paths:
                 "$ref": "#/components/schemas/NuGetPackageInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -4898,6 +5119,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -4907,7 +5129,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -4944,6 +5166,7 @@ paths:
         - "$ref": "#/components/parameters/Page"
         - "$ref": "#/components/parameters/Size"
         - "$ref": "#/components/parameters/Sort"
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -4959,6 +5182,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -4987,6 +5212,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -5000,6 +5226,8 @@ paths:
                 "$ref": "#/components/schemas/NuGetVersionInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -5020,6 +5248,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -5029,7 +5258,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -5061,6 +5290,7 @@ paths:
         - "$ref": "#/components/parameters/Page"
         - "$ref": "#/components/parameters/Size"
         - "$ref": "#/components/parameters/Sort"
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -5076,6 +5306,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -5110,6 +5342,7 @@ paths:
         - "$ref": "#/components/parameters/Page"
         - "$ref": "#/components/parameters/Size"
         - "$ref": "#/components/parameters/Sort"
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -5125,6 +5358,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -5152,6 +5387,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -5165,6 +5401,8 @@ paths:
                 "$ref": "#/components/schemas/ReleaseDetail"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -5185,6 +5423,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -5194,7 +5433,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -5219,6 +5458,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -5232,6 +5472,8 @@ paths:
                 "$ref": "#/components/schemas/PypiPackageInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -5247,6 +5489,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -5256,7 +5499,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -5289,6 +5532,7 @@ paths:
         - "$ref": "#/components/parameters/Page"
         - "$ref": "#/components/parameters/Size"
         - "$ref": "#/components/parameters/Sort"
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -5304,6 +5548,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -5328,6 +5574,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -5341,6 +5588,8 @@ paths:
                 "$ref": "#/components/schemas/GemPackageInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -5356,6 +5605,7 @@ paths:
           required: true
           schema:
             type: string
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -5365,7 +5615,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -5400,6 +5650,7 @@ paths:
         - "$ref": "#/components/parameters/Page"
         - "$ref": "#/components/parameters/Size"
         - "$ref": "#/components/parameters/Sort"
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -5415,6 +5666,8 @@ paths:
           "$ref": "#/components/responses/BadRequest"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -5448,6 +5701,7 @@ paths:
           schema:
             type: string
             default: 'ruby'
+      x-forbidden-by: [token-scope]
       security:
         - { }
         - bearerAuth: []
@@ -5461,6 +5715,8 @@ paths:
                 "$ref": "#/components/schemas/GemVersionInfo"
         '401':
           "$ref": "#/components/responses/Unauthorized"
+        '403':
+          "$ref": "#/components/responses/ForbiddenByTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -5487,6 +5743,7 @@ paths:
           schema:
             type: string
             default: 'ruby'
+      x-forbidden-by: [role, token-scope]
       security:
         - bearerAuth: []
         - personalAccessToken: []
@@ -5496,7 +5753,7 @@ paths:
         '401':
           "$ref": "#/components/responses/Unauthorized"
         '403':
-          "$ref": "#/components/responses/Forbidden"
+          "$ref": "#/components/responses/ForbiddenByRoleOrTokenScope"
         '404':
           "$ref": "#/components/responses/NotFound"
         '429':
@@ -5641,11 +5898,31 @@ components:
             "$ref": "#/components/schemas/ProblemDetail"
     ForbiddenByTokenScope:
       description: >-
-        The calling token is a temporary or a long-lived personal access token, and the token the
-        request names holds a scope the calling token does not hold (`accessDenied`). A token hands
-        on, revokes and rotates only tokens whose scopes it has itself. The token of a connected
-        application (`rat-...`, RPS-2660) gets this status on every route that manages tokens, as it
-        hands on nothing. A login never gets this status, as it holds every scope. Nothing changes.
+        The caller is a token, not a login: a personal access token (`rut-...`), a temporary token
+        (`rct-...`) or the token of a connected application (`rat-...`), and its scopes do not allow
+        this (`accessDenied`). A repository route needs `repo:read` to read, `repo:write` to publish
+        or to start a scan and `repo:manage` to manage, whether or not the repository exists;
+        `repo:manage` covers `repo:write`, which covers `repo:read`, and a route that reads scan
+        results also takes `scan:read`. The repo-wide reads (the repository list and counts, the
+        usage, the scan overview) need `repo:read`. On the token routes the token the request names
+        holds a scope the calling token does not hold, as a token hands on, revokes and rotates only
+        tokens whose scopes it has itself, and the token of a connected application is refused on
+        every one of them, as it hands on nothing. A login never gets this status, as it holds every
+        scope: it is not a role refusal. Nothing changes.
+      content:
+        application/problem+json:
+          schema:
+            "$ref": "#/components/schemas/ProblemDetail"
+    ForbiddenByRoleOrTokenScope:
+      description: >-
+        The caller is signed in but not allowed to do this (`accessDenied`), for one of two reasons.
+        The role: the admin role is required, which every operation that manages a repository
+        (settings, usage, description, rename, delete, deploy tokens, key stores, deleting packages
+        and versions), creates one or browses the scans of every repository needs; a user who is not
+        an admin gets this status with a login and with a token alike, whether or not the repository
+        exists. The scope: the caller is a token (`rut-...`, `rct-...`, `rat-...`) whose scopes do not
+        allow it, `repo:manage` to manage or create a repository and `repo:read` to browse the scans;
+        a scope never gives the admin role. Nothing changes and the session stays valid.
       content:
         application/problem+json:
           schema:

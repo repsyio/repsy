@@ -49,8 +49,8 @@ export interface SpecOperation {
   operationId: string;
   /**
    * True when the operation documents a `403` response that a plain USER gets: a MANAGE route or an
-   * admin-only one. Not a 403 marked `x-forbidden-by: token-scope` (RPS-2440): only a calling token can
-   * get that one, a login never does.
+   * admin-only one, whose `x-forbidden-by` names `role`. Not a 403 whose `x-forbidden-by` names only
+   * `token-scope` (RPS-2440, RPS-2444): only a calling token can get that one, a login never does.
    */
   declares403: boolean;
   security: SecurityKind;
@@ -67,8 +67,11 @@ interface RawOperation {
   security?: unknown[];
   parameters?: { name?: string; in?: string; required?: boolean }[];
   requestBody?: unknown;
-  /** `token-scope`: the 403 is a refusal of the calling token, not of a role (RPS-2440). */
-  'x-forbidden-by'?: string;
+  /**
+   * Why the 403 is answered (RPS-2444): `role` (a USER lacks the admin role) and `token-scope` (the calling
+   * token lacks a scope, which a login never does). Every operation that documents 403 has it.
+   */
+  'x-forbidden-by'?: string[];
 }
 
 /** The setting that names the spec: the same one the runner's client generation reads (`runners/entrypoint.sh`). */
@@ -156,7 +159,7 @@ export function loadSpecOperations(): SpecOperation[] {
         method: method.toUpperCase() as SpecOperation['method'],
         path,
         operationId: raw.operationId,
-        declares403: '403' in raw.responses && raw['x-forbidden-by'] !== 'token-scope',
+        declares403: '403' in raw.responses && (raw['x-forbidden-by'] ?? []).includes('role'),
         security: securityKind(raw.security),
         pathParams: [...path.matchAll(/\{([^}]+)\}/g)].map((match) => match[1] as string),
         requiredQuery: (raw.parameters ?? [])
