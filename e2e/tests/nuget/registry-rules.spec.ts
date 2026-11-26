@@ -338,6 +338,10 @@ test.describe('nuget registry rules (raw HTTP)', () => {
     'registration index pages when a package has more than 64 versions, and the page structure follows NuGet V3 spec',
     { tag: ['@negative'] },
     async ({ seeder }) => {
+      // 70 publishes and 70 downloads, one request each and in sequence: about 140 round trips, which over the
+      // network to Dev took more than the 120 s default (RPS-2726).
+      test.setTimeout(300_000);
+
       const layout = await newRepo(seeder, 'paging');
       const admin = adminCredential();
       const packageId = layout.packageId;
