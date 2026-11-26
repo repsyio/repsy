@@ -170,22 +170,44 @@ class OpenApiSpecConsistencyIT extends AbstractIT {
           "listSecurityScans",
           "getSecurityScansSummary");
 
+  /** The {@code x-forbidden-by} reason of a 403 that a signed-in USER gets for lacking a role. */
+  private static final String ROLE = "role";
+
+  /** The {@code x-forbidden-by} reason of a 403 that only a token gets, for lacking a scope. */
+  private static final String TOKEN_SCOPE = "token-scope";
+
+  private static final String FORBIDDEN_BY = "x-forbidden-by";
+
   /**
-   * The operations whose 403 is not a role refusal but "the calling token lacks a scope of the
-   * token in the request" (RPS-2440), "the calling token is a connector token, which manages no
-   * token" (RPS-2660), or "the calling token lacks {@code repo:read}" on a repo-wide read that is
-   * no repo route (RPS-2227). A login never gets it, so the e2e role sweep does not call them "USER
-   * gets 403" operations; the spec marks each with {@code x-forbidden-by: token-scope}, which the
-   * sweep reads.
+   * RPS-2444: the {@code PanelAuthHelper} methods that answer a personal, temporary or connector
+   * token 403 {@code accessDenied} when it lacks a scope: the scoped panel routes that are not repo
+   * routes (the repo-wide reads, the repo creation, the scan browser and the token routes). A
+   * handler that calls one of them, directly or through a method of its own class, can refuse on
+   * scope, as can every {@code @RepoOperation} route ({@code ProtocolAuthService} intersects the
+   * token's scopes with the permission the route needs). Nothing else refuses a token on scope.
    */
-  private static final Set<String> TOKEN_SCOPE_OPERATIONS =
+  private static final Set<String> TOKEN_SCOPE_CHECKS =
       Set.of(
-          "createAccessToken",
-          "listAccessTokens",
-          "revokeAccessToken",
-          "rotateAccessToken",
-          "getRepoCounts",
-          "getTotalUsage");
+          "authenticateWithScope",
+          "authenticateRepoReader",
+          "authenticateRepoCreator",
+          "authenticateTokenManager");
+
+  private static final String PANEL_AUTH_HELPER = "io/repsy/os/shared/auth/PanelAuthHelper";
+
+  /**
+   * The operations whose handler calls a {@link #TOKEN_SCOPE_CHECKS} method that can never refuse,
+   * and why. An entry is added on purpose; a stale one fails the test.
+   */
+  private static final Map<String, String> SCOPE_CHECK_NEVER_REFUSES =
+      Map.of("getProfile", "asks for profile:read, which every token holds (RPS-2227)");
+
+  /** The 403 response component of each set of reasons. */
+  private static final Map<Set<String>, String> FORBIDDEN_RESPONSE_OF =
+      Map.of(
+          Set.of(ROLE), "#/components/responses/Forbidden",
+          Set.of(TOKEN_SCOPE), "#/components/responses/ForbiddenByTokenScope",
+          Set.of(ROLE, TOKEN_SCOPE), "#/components/responses/ForbiddenByRoleOrTokenScope");
 
   /**
    * RPS-1269: the one name a path variable has for each role, across every panel controller. A
@@ -579,76 +601,38 @@ class OpenApiSpecConsistencyIT extends AbstractIT {
   }
 
   @Test
-  @DisplayName("every documented 403 belongs to a MANAGE or an admin-only operation (RPS-1593)")
-  void everyDocumented403IsManageOrAdmin() throws IOException {
+  @DisplayName(
+      "every 403 names its reasons, and every route that refuses on role or scope documents it"
+          + " (RPS-1593, RPS-2444)")
+  void every403NamesItsReasons() throws IOException {
     final var doc = loadSpec();
     final var routes = this.panelRoutes();
-    final var findings = new TreeSet<String>();
     final var operations = specOperations(doc);
-    var forbidden = 0;
+    final var expected = forbiddenReasons(operations, routes);
 
-    for (final var operation : operations.values()) {
-      final var codes =
-          asMap(operation.raw().get("responses")).keySet().stream()
-              .map(String::valueOf)
-              .collect(Collectors.toSet());
+    final var byRole = expected.values().stream().filter(r -> r.contains(ROLE)).count();
+    final var byScope = expected.values().stream().filter(r -> r.contains(TOKEN_SCOPE)).count();
 
-      if (!codes.contains("403")) {
-        continue;
-      }
+    // Floors, so a parser bug cannot empty the check: the e2e role sweep's floor for the role, and
+    // every @RepoOperation route for the scope.
+    assertThat(byRole).as("operations that refuse a USER on role").isGreaterThanOrEqualTo(47);
+    assertThat(byScope).as("operations that refuse a token on scope").isGreaterThan(100);
+    assertNoNewFindings(
+        "403 that does not match the role and scope refusals of the handler",
+        forbiddenFindings(operations, expected),
+        Map.of());
 
-      forbidden++;
+    final var findings = new TreeSet<String>();
 
-      final var handlers =
-          routes.stream().filter(route -> route.key().equals(operation.key())).toList();
-      final var manage =
-          !handlers.isEmpty()
-              && handlers.stream()
-                  .allMatch(
-                      route ->
-                          route.repoOperation() != null
-                              && route.repoOperation().permission() == Permission.MANAGE);
-
-      if (!manage
-          && !ADMIN_OPERATIONS.contains(operation.id())
-          && !TOKEN_SCOPE_OPERATIONS.contains(operation.id())) {
-        findings.add(
-            operation.key()
-                + " ("
-                + operation.id()
-                + "): documents 403 but is neither @RepoOperation(MANAGE) nor listed in"
-                + " ADMIN_OPERATIONS or TOKEN_SCOPE_OPERATIONS");
-      }
-
-      final var marked = "token-scope".equals(operation.raw().get("x-forbidden-by"));
-
-      if (marked != TOKEN_SCOPE_OPERATIONS.contains(operation.id())) {
-        findings.add(
-            operation.key()
-                + " ("
-                + operation.id()
-                + "): x-forbidden-by: token-scope and TOKEN_SCOPE_OPERATIONS must agree");
-      }
-    }
-
-    for (final var id : TOKEN_SCOPE_OPERATIONS) {
+    for (final var id : SCOPE_CHECK_NEVER_REFUSES.keySet()) {
       final var operation =
           operations.values().stream().filter(candidate -> candidate.id().equals(id)).findFirst();
 
-      if (operation.isEmpty()) {
-        findings.add(id + ": listed in TOKEN_SCOPE_OPERATIONS but not in the spec");
-        continue;
-      }
-
-      final var documents403 = asMap(operation.get().raw().get("responses")).containsKey("403");
-      final var handlers =
-          routes.stream().filter(route -> route.key().equals(operation.get().key())).toList();
-
-      if (!documents403) {
-        findings.add(id + ": listed in TOKEN_SCOPE_OPERATIONS but does not document 403");
-      }
-      if (handlers.stream().anyMatch(route -> route.repoOperation() != null)) {
-        findings.add(id + ": listed in TOKEN_SCOPE_OPERATIONS but its handler is a repo route");
+      if (operation.isEmpty()
+          || routes.stream()
+              .filter(route -> route.key().equals(operation.get().key()))
+              .noneMatch(RouteInfo::callsTokenScopeCheck)) {
+        findings.add(id + ": listed in SCOPE_CHECK_NEVER_REFUSES but calls no scope check");
       }
     }
 
@@ -661,31 +645,158 @@ class OpenApiSpecConsistencyIT extends AbstractIT {
         continue;
       }
 
-      final var codes =
-          asMap(operation.get().raw().get("responses")).keySet().stream()
-              .map(String::valueOf)
-              .collect(Collectors.toSet());
       final var handlers =
           routes.stream().filter(route -> route.key().equals(operation.get().key())).toList();
 
-      if (!codes.contains("403")) {
-        findings.add(id + ": admin-only but the spec does not document 403");
-      }
       if (handlers.isEmpty()) {
         findings.add(id + ": listed in ADMIN_OPERATIONS but no panel handler serves it");
       }
-      if (handlers.stream()
-          .anyMatch(
-              route ->
-                  route.repoOperation() != null
-                      && route.repoOperation().permission() == Permission.MANAGE)) {
-        findings.add(id + ": listed in ADMIN_OPERATIONS but its handler is @RepoOperation(MANAGE)");
+      if (handlers.stream().anyMatch(route -> route.repoOperation() != null)) {
+        findings.add(id + ": listed in ADMIN_OPERATIONS but its handler is a repo route");
       }
     }
 
-    // The same floor as the e2e role sweep, so a parser bug cannot empty the check.
-    assertThat(forbidden).as("operations that document 403").isGreaterThanOrEqualTo(47);
-    assertNoNewFindings("documented 403 without MANAGE or admin", findings, Map.of());
+    assertNoNewFindings("stale ADMIN_OPERATIONS or SCOPE_CHECK_NEVER_REFUSES", findings, Map.of());
+  }
+
+  @Test
+  @DisplayName("the 403 rule fires on a scoped route without its 403 or its marker (RPS-2444)")
+  void forbiddenRuleFires() throws IOException {
+    final var doc = loadSpec();
+    final var operations = specOperations(doc);
+    final var expected = forbiddenReasons(operations, this.panelRoutes());
+
+    final var paths = asMap(doc.get("paths"));
+    // A MANAGE route that drops its 403 altogether...
+    final var settings = asMap(paths.get("/api/repos/{repoName}/settings"));
+    final var getSettings = asMap(settings.get("get"));
+    asMap(getSettings.get("responses")).remove("403");
+    getSettings.remove(FORBIDDEN_BY);
+    // ...a READ repo route and a repo-wide read, whose only 403 is a scope refusal, drop theirs...
+    for (final var path : List.of("/api/cargo/crates/{repoName}", "/api/repos")) {
+      final var read = asMap(asMap(paths.get(path)).get("get"));
+      asMap(read.get("responses")).remove("403");
+      read.remove(FORBIDDEN_BY);
+    }
+    // ...a MANAGE route that names only the role...
+    asMap(settings.get("put")).put(FORBIDDEN_BY, List.of(ROLE));
+    // ...a scope route whose 403 is the role response...
+    final var counts = asMap(asMap(paths.get("/api/repos/counts")).get("get"));
+    asMap(counts.get("responses")).put("403", Map.of("$ref", "#/components/responses/Forbidden"));
+    // ...and an admin route that claims a scope refusal it cannot give.
+    asMap(asMap(paths.get("/api/users")).get("get")).put(FORBIDDEN_BY, List.of(ROLE, TOKEN_SCOPE));
+
+    assertThat(forbiddenFindings(specOperations(doc), expected))
+        .containsExactlyInAnyOrder(
+            "GET /api/repos/{}/settings (getRepoSettings): documents no 403, but refuses on"
+                + " [role, token-scope]",
+            "PUT /api/repos/{}/settings (updateRepoSettings): x-forbidden-by is [role], the handler"
+                + " refuses on [role, token-scope]",
+            "GET /api/cargo/crates/{} (searchCargoCrates): documents no 403, but refuses on"
+                + " [token-scope]",
+            "GET /api/repos (listRepos): documents no 403, but refuses on [token-scope]",
+            "GET /api/repos/counts (getRepoCounts): the 403 is #/components/responses/Forbidden,"
+                + " not #/components/responses/ForbiddenByTokenScope",
+            "GET /api/users (listUsers): x-forbidden-by is [role, token-scope], the handler refuses"
+                + " on [role]");
+  }
+
+  /**
+   * Why each spec operation may answer 403, from its handlers: {@link #ROLE} for a {@code MANAGE}
+   * repo route or an {@link #ADMIN_OPERATIONS} one, {@link #TOKEN_SCOPE} for every repo route and
+   * every handler that calls a {@link #TOKEN_SCOPE_CHECKS} method. Empty when it never does.
+   */
+  private static Map<String, Set<String>> forbiddenReasons(
+      final Map<String, SpecOperation> operations, final List<RouteInfo> routes) {
+
+    final var reasons = new TreeMap<String, Set<String>>();
+
+    for (final var operation : operations.values()) {
+      final var handlers =
+          routes.stream().filter(route -> route.key().equals(operation.key())).toList();
+      final var found = new TreeSet<String>();
+
+      final var manage =
+          !handlers.isEmpty()
+              && handlers.stream()
+                  .allMatch(
+                      route ->
+                          route.repoOperation() != null
+                              && route.repoOperation().permission() == Permission.MANAGE);
+
+      if (manage || ADMIN_OPERATIONS.contains(operation.id())) {
+        found.add(ROLE);
+      }
+
+      final var scoped =
+          handlers.stream()
+              .anyMatch(
+                  route ->
+                      (route.repoOperation() != null
+                              && route.repoOperation().permission() != Permission.NONE)
+                          || route.callsTokenScopeCheck());
+
+      if (scoped && !SCOPE_CHECK_NEVER_REFUSES.containsKey(operation.id())) {
+        found.add(TOKEN_SCOPE);
+      }
+
+      reasons.put(operation.key(), found);
+    }
+
+    return reasons;
+  }
+
+  /**
+   * RPS-2444: an operation documents 403 exactly when its handler can refuse on role or on scope,
+   * names every reason in {@code x-forbidden-by} (a list of {@link #ROLE} and {@link
+   * #TOKEN_SCOPE}), and uses the response component of those reasons. The e2e role sweep reads the
+   * marker: only a {@link #ROLE} 403 is one a password USER gets.
+   */
+  private static Set<String> forbiddenFindings(
+      final Map<String, SpecOperation> operations, final Map<String, Set<String>> expected) {
+
+    final var findings = new TreeSet<String>();
+
+    for (final var operation : operations.values()) {
+      final var name = operation.key() + " (" + operation.id() + ")";
+      final var reasons = expected.getOrDefault(operation.key(), Set.of());
+      final var forbidden = asMap(operation.raw().get("responses")).get("403");
+      final var marker = operation.raw().get(FORBIDDEN_BY);
+      final var marked =
+          marker instanceof final List<?> list
+              ? list.stream().map(String::valueOf).collect(Collectors.toSet())
+              : marker == null ? Set.<String>of() : Set.of("not a list: " + marker);
+
+      if (reasons.isEmpty()) {
+        if (forbidden != null || marker != null) {
+          findings.add(
+              name + ": documents a 403 or x-forbidden-by, but refuses on no role or scope");
+        }
+        continue;
+      }
+
+      if (forbidden == null) {
+        findings.add(name + ": documents no 403, but refuses on " + new TreeSet<>(reasons));
+        continue;
+      }
+
+      if (!marked.equals(reasons)) {
+        findings.add(
+            name
+                + ": x-forbidden-by is "
+                + new TreeSet<>(marked)
+                + ", the handler refuses on "
+                + new TreeSet<>(reasons));
+      }
+
+      final var ref = asMap(forbidden).get("$ref");
+
+      if (!Objects.equals(ref, FORBIDDEN_RESPONSE_OF.get(reasons))) {
+        findings.add(name + ": the 403 is " + ref + ", not " + FORBIDDEN_RESPONSE_OF.get(reasons));
+      }
+    }
+
+    return findings;
   }
 
   @Test
@@ -1943,6 +2054,75 @@ class OpenApiSpecConsistencyIT extends AbstractIT {
       }
 
       return raw.equals(void.class) || raw.equals(Void.class) ? Shape.NONE : Shape.BODY;
+    }
+
+    /**
+     * Whether the handler calls a {@link #TOKEN_SCOPE_CHECKS} method of {@code PanelAuthHelper}, in
+     * its own bytecode or in a method of its own class that it calls (RPS-2444).
+     */
+    boolean callsTokenScopeCheck() {
+      final var method = this.handler.getMethod();
+
+      return callsTokenScopeCheck(
+          method.getDeclaringClass(), method.getName(), Type.getMethodDescriptor(method), 3);
+    }
+
+    private static boolean callsTokenScopeCheck(
+        final Class<?> declaring, final String name, final String descriptor, final int depth) {
+
+      final var own = new ArrayList<String[]>();
+      final var found = new boolean[1];
+      final var internalName = declaring.getName().replace('.', '/');
+
+      try (var in = declaring.getResourceAsStream("/" + internalName + ".class")) {
+        if (in == null) {
+          return false;
+        }
+
+        new ClassReader(in)
+            .accept(
+                new ClassVisitor(Opcodes.ASM9) {
+                  @Override
+                  public MethodVisitor visitMethod(
+                      final int access,
+                      final String visited,
+                      final String desc,
+                      final String signature,
+                      final String[] exceptions) {
+
+                    if (!visited.equals(name) || !desc.equals(descriptor)) {
+                      return null;
+                    }
+
+                    return new MethodVisitor(Opcodes.ASM9) {
+                      @Override
+                      public void visitMethodInsn(
+                          final int opcode,
+                          final String owner,
+                          final String callee,
+                          final String calleeDesc,
+                          final boolean itf) {
+
+                        if (owner.equals(PANEL_AUTH_HELPER)
+                            && TOKEN_SCOPE_CHECKS.contains(callee)) {
+                          found[0] = true;
+                        } else if (owner.equals(internalName)) {
+                          own.add(new String[] {callee, calleeDesc});
+                        }
+                      }
+                    };
+                  }
+                },
+                ClassReader.SKIP_DEBUG | ClassReader.SKIP_FRAMES);
+      } catch (final IOException e) {
+        throw new java.io.UncheckedIOException(e);
+      }
+
+      return found[0]
+          || (depth > 0
+              && own.stream()
+                  .anyMatch(
+                      callee -> callsTokenScopeCheck(declaring, callee[0], callee[1], depth - 1)));
     }
 
     /**

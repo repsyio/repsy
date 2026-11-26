@@ -735,6 +735,14 @@ panel API. Edit that file for any API change; there is no other copy. Both sides
   declared); security, 401 and 403 documentation, camelCase names, `$ref`s resolve and `ProblemDetail` matches the
   real failure. Each new rule has a test that fails on a planted drift. A status a handler takes from a callee is not
   seen, so that direction of the check is one-way.
+- **403 reasons (RPS-2444).** Every operation that documents 403 names why in `x-forbidden-by`: `[role]`,
+  `[token-scope]` or `[role, token-scope]`. The 403 is `Forbidden`, `ForbiddenByTokenScope` or
+  `ForbiddenByRoleOrTokenScope` to match. `OpenApiSpecConsistencyIT.every403NamesItsReasons` derives the reasons
+  from the handlers and requires them. `role` is a MANAGE `@RepoOperation` or an `ADMIN_OPERATIONS` route.
+  `token-scope` is every `@RepoOperation` route, and every handler that calls a `PanelAuthHelper` scope check
+  (`TOKEN_SCOPE_CHECKS`, read from its bytecode). A new scoped route without its 403 fails the IT. Only a `role`
+  403 is one a password USER gets, which is what the role sweeps (`OpenApiOperationRoleSweepIT`, e2e
+  `role-sweep.spec.ts`) read. The Cloud copy is in repsy-mono's `AGENTS.md`.
 - **Known gap**: `GET /api/usage` documents no 400 (Cloud documents one for its year and month filters, which OS does
   not have: the OS handler takes no parameter that can fail validation, so there is nothing to document here).
 
