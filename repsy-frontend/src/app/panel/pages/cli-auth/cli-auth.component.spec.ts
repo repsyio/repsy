@@ -106,7 +106,7 @@ describe('CliAuthComponent', () => {
     const api = apiWith();
     const page = pageWith({ scopes: 'repo:read,repo:write,repo:manage' }, api);
 
-    expect(page.summary).toBe('3 of 3 permissions selected');
+    expect(page.summary).toBe('3 of 4 permissions selected');
     expect(page.fixedScope).toBe('repo:read');
 
     page.toggle('repo:manage', false);
@@ -114,7 +114,7 @@ describe('CliAuthComponent', () => {
     page.toggle('repo:write', false);
     page.toggle('repo:write', true);
 
-    expect(page.summary).toBe('2 of 3 permissions selected');
+    expect(page.summary).toBe('2 of 4 permissions selected');
     page.authorize();
 
     expect(api.createCliToken.calls.mostRecent().args[0].scopes as unknown).toEqual(['repo:read', 'repo:write']);
@@ -132,6 +132,37 @@ describe('CliAuthComponent', () => {
 
     expect(page.chosenScopes).toEqual([]);
     expect(page.canAuthorize).toBeFalse();
+  });
+
+  it('offers the high-impact consent with Manage only, off until ticked (RPS-2757)', () => {
+    const api = apiWith();
+    const page = pageWith({ scopes: 'repo:read,repo:write,repo:manage' }, api);
+
+    expect(page.offersHighImpact).toBeTrue();
+    expect(page.highImpact).toBeFalse();
+    expect(api.createCliToken).not.toHaveBeenCalled();
+
+    page.toggleHighImpact(true);
+
+    expect(page.summary).toBe('4 of 4 permissions selected');
+    page.authorize();
+
+    expect(api.createCliToken.calls.mostRecent().args[0].highImpact).toBeTrue();
+  });
+
+  it('drops the high-impact consent when Manage is unticked, and cannot tick it again without Manage', () => {
+    const page = pageFor({ scopes: 'repo:read,repo:manage' });
+
+    page.toggleHighImpact(true);
+    page.toggle('repo:manage', false);
+
+    expect(page.highImpact).toBeFalse();
+    expect(page.canTickHighImpact).toBeFalse();
+
+    page.toggleHighImpact(true);
+
+    expect(page.highImpact).toBeFalse();
+    expect(pageFor({ scopes: 'repo:read' }).offersHighImpact).toBeFalse();
   });
 
   describe('with a redirect_uri', () => {

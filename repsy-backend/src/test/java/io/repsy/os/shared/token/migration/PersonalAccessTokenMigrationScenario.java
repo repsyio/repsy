@@ -144,6 +144,8 @@ public final class PersonalAccessTokenMigrationScenario {
     expected.put("expiration_date", "timestamp not null");
     expected.put("last_used_at", "timestamp null");
     expected.put("created_at", "timestamp not null");
+    // V0048 (RPS-2757): the high-impact consent of a CLI login, false for every token that existed.
+    expected.put("high_impact", "boolean not null");
 
     assertThat(columns).isEqualTo(expected);
   }

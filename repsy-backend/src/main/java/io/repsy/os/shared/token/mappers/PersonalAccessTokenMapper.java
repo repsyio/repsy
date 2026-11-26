@@ -35,6 +35,8 @@ public interface PersonalAccessTokenMapper {
   @Mapping(target = "scopes", source = "scopes")
   PersonalAccessTokenInfo toInfo(PersonalAccessToken token);
 
+  /** The answer of {@code current}; the service adds the high-impact consent of a CLI login. */
+  @Mapping(target = "highImpact", ignore = true)
   AccessTokenInfo toWhoAmI(PersonalAccessTokenInfo info);
 
   /** The response of a create: the metadata of the token and, once, its secret. */
