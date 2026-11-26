@@ -134,9 +134,11 @@ public abstract class AbstractMavenProtocolFacade<I> implements MavenProtocolFac
       return null;
     }
 
+    // The directory ends with a slash: an S3 listing of the bare prefix returns the directory
+    // itself and none of its files, so without it hosted storage never finds a build (RPS-2726).
     final var names =
         this.mavenStorageService
-            .getItems(StoragePath.of(repoInfo.getStorageKey(), request.directory()))
+            .getItems(StoragePath.of(repoInfo.getStorageKey(), request.directory() + "/"))
             .stream()
             .filter(item -> !item.isDirectory())
             .map(StorageItemInfo::getName)

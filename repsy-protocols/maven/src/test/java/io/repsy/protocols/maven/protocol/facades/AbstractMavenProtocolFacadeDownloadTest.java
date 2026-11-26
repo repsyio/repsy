@@ -389,8 +389,13 @@ class AbstractMavenProtocolFacadeDownloadTest {
     return StorageItemInfo.builder().name(name).directory(false).build();
   }
 
+  /**
+   * Answers like the S3 storage: a listing holds the files of a directory only when its path ends
+   * with a slash, because the prefix {@code <dir>} with the delimiter {@code /} lists the directory
+   * itself and none of its files (RPS-2726).
+   */
   private void snapshotDirectoryHolds(final String... names) {
-    when(this.storageService.getItems(any(StoragePath.class)))
+    when(this.storageService.getItems(argThat((StoragePath p) -> p.getPath().endsWith("/"))))
         .thenReturn(java.util.Arrays.stream(names).map(n -> file(n)).toList());
   }
 
