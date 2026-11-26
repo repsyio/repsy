@@ -63,7 +63,9 @@ class CliTokenController {
 
     final var userId = this.panelAuthHelper.authenticate(authHeader).getId();
 
-    final var created = this.tokenService.createTemporaryToken(userId, form.getScopes());
+    final var created =
+        this.tokenService.createTemporaryToken(
+            userId, form.getScopes(), Boolean.TRUE.equals(form.getHighImpact()));
 
     NoStore.apply(response);
 

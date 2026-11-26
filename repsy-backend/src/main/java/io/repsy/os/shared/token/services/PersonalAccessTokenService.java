@@ -182,7 +182,15 @@ public class PersonalAccessTokenService {
             .findById(tokenId)
             .orElseThrow(() -> new ItemNotFoundException(ErrorConstants.ACCESS_TOKEN_NOT_FOUND));
 
-    return this.converter.toWhoAmI(this.converter.toInfo(token));
+    final var whoAmI = this.converter.toWhoAmI(this.converter.toInfo(token));
+
+    // Only a CLI login carries the consent (RPS-2757); a personal token has none, and rp keeps its
+    // scopes as the only limit.
+    if (token.getKind() != PersonalAccessTokenKind.PERSONAL) {
+      whoAmI.setHighImpact(token.isHighImpact());
+    }
+
+    return whoAmI;
   }
 
   /**
@@ -252,6 +260,20 @@ public class PersonalAccessTokenService {
   @Transactional
   public AccessTokenCreated createTemporaryToken(final UUID userId, final Set<TokenScope> scopes) {
 
+    return this.createTemporaryToken(userId, scopes, false);
+  }
+
+  /**
+   * As {@link #createTemporaryToken(UUID, Set)}, with the high-impact consent of the authorize
+   * screen (RPS-2757), which is kept only together with {@code repo:manage}: {@code rp mcp} offers
+   * its high-impact tools to a login that carries it.
+   *
+   * @throws BadRequestException if no scope is asked for
+   */
+  @Transactional
+  public AccessTokenCreated createTemporaryToken(
+      final UUID userId, final Set<TokenScope> scopes, final boolean highImpact) {
+
     if (scopes.isEmpty() || scopes.stream().anyMatch(Objects::isNull)) {
       throw new BadRequestException(ProtocolErrorCodes.VALIDATION_ERROR);
     }
@@ -260,13 +282,20 @@ public class PersonalAccessTokenService {
 
     this.lockUser(userId);
 
-    return this.insert(
-        userId,
-        PersonalAccessTokenKind.TEMPORARY,
-        TokenFactory.cliToken(),
-        TEMPORARY_TOKEN_NAME,
-        scopes,
-        now.plus(TEMPORARY_TOKEN_LIFETIME));
+    final var created =
+        this.insert(
+            userId,
+            PersonalAccessTokenKind.TEMPORARY,
+            TokenFactory.cliToken(),
+            TEMPORARY_TOKEN_NAME,
+            scopes,
+            now.plus(TEMPORARY_TOKEN_LIFETIME));
+
+    if (highImpact && scopes.contains(TokenScope.REPO_MANAGE)) {
+      this.tokenRepository.findById(created.getId()).ifPresent(token -> token.setHighImpact(true));
+    }
+
+    return created;
   }
 
   /**

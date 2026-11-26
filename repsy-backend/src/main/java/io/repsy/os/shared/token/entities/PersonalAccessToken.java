@@ -87,6 +87,13 @@ public class PersonalAccessToken {
   @Column(name = "last_used_at")
   private @Nullable Instant lastUsedAt;
 
+  /**
+   * The high-impact consent of a CLI login (RPS-2757): {@code rp mcp} offers its tier X tools to a
+   * TEMPORARY token that carries it. False for every other kind.
+   */
+  @Column(name = "high_impact", nullable = false)
+  private boolean highImpact;
+
   @CreationTimestamp
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;

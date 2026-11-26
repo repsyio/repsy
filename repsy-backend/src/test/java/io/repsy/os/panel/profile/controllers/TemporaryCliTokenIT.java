@@ -36,6 +36,7 @@ import io.repsy.protocols.shared.repo.dtos.RepoType;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -385,6 +386,47 @@ class TemporaryCliTokenIT extends AbstractPatIT {
       assertThat(JsonPath.<String>read(response.getContentAsString(), "$.username"))
           .isEqualTo(this.alice.getUsername());
     }
+  }
+
+  private String createdSecret(final String json) throws Exception {
+    final var body =
+        this.createCliToken(this.aliceLogin, json).andReturn().getResponse().getContentAsString();
+
+    return JsonPath.read(body, "$.token");
+  }
+
+  private String currentOf(final String authorization) throws Exception {
+    return this.perform(get(TOKENS + "/current").header(AUTHORIZATION, authorization))
+        .andReturn()
+        .getResponse()
+        .getContentAsString();
+  }
+
+  @Test
+  @DisplayName(
+      "the high-impact consent of a CLI login is kept with repo:manage and shown by /current")
+  void theHighImpactConsent() throws Exception {
+    final var withManage =
+        this.createdSecret("{\"scopes\":[\"repo:read\",\"repo:manage\"],\"highImpact\":true}");
+    final var withoutManage =
+        this.createdSecret("{\"scopes\":[\"repo:read\"],\"highImpact\":true}");
+    final var notAsked = this.createdSecret(cliForm("repo:read", "repo:manage"));
+
+    assertThat(JsonPath.<Boolean>read(this.currentOf("Bearer " + withManage), "$.highImpact"))
+        .isTrue();
+    assertThat(JsonPath.<Boolean>read(this.currentOf("Bearer " + withoutManage), "$.highImpact"))
+        .isFalse();
+    assertThat(JsonPath.<Boolean>read(this.currentOf("Bearer " + notAsked), "$.highImpact"))
+        .isFalse();
+  }
+
+  @Test
+  @DisplayName("/current names no high-impact consent for a personal token")
+  void aPersonalTokenHasNoHighImpactConsent() throws Exception {
+    final var personal = this.seedPat(this.alice, TokenScope.REPO_MANAGE);
+    final Map<String, Object> body = JsonPath.read(this.currentOf(bearer(personal)), "$");
+
+    assertThat(body).doesNotContainKey("highImpact");
   }
 
   // ---------------------------------------------------------------------------------------------

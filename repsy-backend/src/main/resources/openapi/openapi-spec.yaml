@@ -6333,6 +6333,15 @@ components:
           minItems: 1
           items:
             "$ref": "#/components/schemas/AccessTokenScope"
+        highImpact:
+          type: boolean
+          default: false
+          description: >-
+            The user also allowed high-impact operations on the authorize screen (RPS-2757): an
+            agent that runs `rp mcp` with this login gets the tools that delete or rename a
+            repository, make it public, give others access, add webhooks or upstreams and create or
+            rotate tokens. Kept only together with `repo:manage`. The `rp` commands typed in a
+            terminal do not depend on it.
       required:
         - scopes
     AccessTokenCreated:
@@ -6424,6 +6433,12 @@ components:
           type: string
           format: date-time
           description: When the token last authenticated a request. Absent if it never did.
+        highImpact:
+          type: boolean
+          description: >-
+            Whether the user allowed high-impact operations for this token (RPS-2757). Present for
+            the temporary token of a CLI login and the token of a connected application, absent for
+            a personal access token.
       required:
         - username
         - name
