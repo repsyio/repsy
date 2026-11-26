@@ -12,13 +12,14 @@
 /// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 /// See the License for the specific language governing permissions and
 /// limitations under the License.
-import { NgTemplateOutlet } from '@angular/common';
+import { NgOptimizedImage, NgTemplateOutlet } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 
 import { AccessTokenCreated, AccessTokensApi, AccessTokenScope } from '../../../../generated/api';
 import { AuthService } from '../../../auth/pages/services/auth.service';
 import { CopyClipboardComponent } from '../../shared/components/copy-clipboard/copy-clipboard.component';
+import { PermissionCardsComponent } from '../../shared/components/permission-cards/permission-cards.component';
 import { DEFAULT_CLI_SCOPES } from '../settings/access-tokens/access-token-limits';
 import {
   parseRequestedScopes,
@@ -56,13 +57,19 @@ export const CLI_TOKEN_LIFETIME_HOURS = 24;
  */
 @Component({
   selector: 'app-cli-auth',
-  imports: [CopyClipboardComponent, NgTemplateOutlet, RouterLink],
+  imports: [CopyClipboardComponent, NgOptimizedImage, NgTemplateOutlet, PermissionCardsComponent, RouterLink],
   standalone: true,
   templateUrl: './cli-auth.component.html',
 })
 export class CliAuthComponent implements OnInit {
   mode: CliAuthMode = 'approve';
   scopes: AccessTokenScope[] = [];
+  /**
+   * The scopes the link asks for that the person keeps ticked (RPS-2762, as Cloud RPS-2755): every one at first.
+   * `repo:read` is fixed when the link asks for it.
+   */
+  granted = new Set<AccessTokenScope>();
+  readonly readScope: AccessTokenScope = 'repo:read';
   /** The signed in account the token will belong to. */
   username = '';
   readonly lifetimeHours = CLI_TOKEN_LIFETIME_HOURS;
@@ -93,6 +100,7 @@ export class CliAuthComponent implements OnInit {
     const requested = parseRequestedScopes(params.get('scopes'));
     // A link that names no scope the page knows gets the three repository scopes.
     this.scopes = requested.length > 0 ? requested : [...DEFAULT_CLI_SCOPES];
+    this.granted = new Set(this.scopes);
     this.username = this.authService.username ?? '';
 
     const rawRedirect = params.get('redirect_uri');
@@ -108,8 +116,35 @@ export class CliAuthComponent implements OnInit {
     return SELECTABLE_SCOPES.filter((s) => this.scopes.includes(s.scope));
   }
 
+  /** `repo:read` when the link asks for it: always granted, the card cannot be unticked. */
+  get fixedScope(): AccessTokenScope | null {
+    return this.scopes.includes(this.readScope) ? this.readScope : null;
+  }
+
+  /** The person unticked or ticked a permission the link asked for; a fixed one stays. */
+  toggle(scope: AccessTokenScope, checked: boolean): void {
+    if (scope === this.fixedScope || !this.scopes.includes(scope)) {
+      return;
+    }
+    if (checked) {
+      this.granted.add(scope);
+    } else {
+      this.granted.delete(scope);
+    }
+  }
+
+  /** The scopes the token gets: those the link asked for that are still ticked, in the link's order. */
+  get chosenScopes(): AccessTokenScope[] {
+    return this.scopes.filter((scope) => scope === this.fixedScope || this.granted.has(scope));
+  }
+
+  /** "n of m permissions selected", beside the buttons. */
+  get summary(): string {
+    return `${this.chosenScopes.length} of ${this.scopes.length} permissions selected`;
+  }
+
   get canAuthorize(): boolean {
-    return this.mode === 'approve' && !this.authorizing;
+    return this.mode === 'approve' && !this.authorizing && this.chosenScopes.length > 0;
   }
 
   /** On a refused link: the person chose to get a token to copy by hand anyway. Same screen, no address to post to. */
@@ -132,7 +167,8 @@ export class CliAuthComponent implements OnInit {
     }
     this.authorizing = true;
     this.authorizeFailed = false;
-    this.accessTokensApi.createCliToken({ scopes: this.scopes as unknown as Set<AccessTokenScope> }).subscribe({
+    const form = { scopes: this.chosenScopes as unknown as Set<AccessTokenScope> };
+    this.accessTokensApi.createCliToken(form).subscribe({
       next: (token) => {
         this.created = token;
         this.authorizing = false;
