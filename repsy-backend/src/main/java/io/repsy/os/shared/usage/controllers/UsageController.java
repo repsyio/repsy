@@ -39,12 +39,13 @@ public class UsageController {
 
   /**
    * Instance-wide totals, deliberately open to any authenticated user (no {@code requireAdmin}):
-   * the panel dashboard, which every signed-in user lands on, shows them in its Total Disk card.
+   * the panel dashboard, which every signed-in user lands on, shows them in its Total Disk card. A
+   * personal access token with {@code repo:read} may read them too (RPS-2227).
    */
   @GetMapping
   public TotalUsageInfo getTotalUsage(@RequestHeader(AUTHORIZATION) final String authHeader) {
 
-    this.panelAuthHelper.authenticate(authHeader);
+    this.panelAuthHelper.authenticateRepoReader(authHeader);
 
     return this.usageService.getTotalUsageInfo();
   }

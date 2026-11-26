@@ -26,6 +26,7 @@ import io.repsy.os.generated.model.ProfileInfo;
 import io.repsy.os.generated.model.UpdateUsernameForm;
 import io.repsy.os.panel.profile.services.ProfileService;
 import io.repsy.os.shared.auth.PanelAuthHelper;
+import io.repsy.os.shared.token.dtos.TokenScope;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.os.shared.utils.MultiPortNames;
 import jakarta.servlet.http.HttpServletResponse;
@@ -53,7 +54,10 @@ class ProfileController {
   @GetMapping
   public ProfileInfo get(@RequestHeader(AUTHORIZATION) final String authHeader) {
 
-    final var userId = this.panelAuthHelper.authenticate(authHeader).getId();
+    // Every token holds profile:read, so any live personal access token may read its owner's
+    // profile (RPS-2227). It carries no secret and nothing a token could not learn otherwise.
+    final var userId =
+        this.panelAuthHelper.authenticateWithScope(authHeader, TokenScope.PROFILE_READ).getId();
 
     return this.profileService.getProfile(userId);
   }

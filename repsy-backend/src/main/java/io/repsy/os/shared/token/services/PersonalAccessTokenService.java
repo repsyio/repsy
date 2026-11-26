@@ -209,11 +209,13 @@ public class PersonalAccessTokenService {
 
   /**
    * Creates a personal token for {@code userId} with at most the scopes in {@code grantable}: what
-   * the credential of the caller may hand on. A login may hand on every scope; a temporary token
-   * only its own, so minting a personal token with it can never widen what the caller can do.
+   * the credential of the caller may hand on. A login may hand on every scope; a token only its own
+   * and the ones below them on the ladder ({@link TokenScope#covers}, RPS-2443), so a {@code
+   * repo:manage} token can mint a {@code repo:read} one, and minting can never widen what the
+   * caller can do.
    *
-   * @throws BadRequestException ({@code validationError}) if the form asks for a scope outside
-   *     {@code grantable}
+   * @throws BadRequestException ({@code validationError}) if the form asks for a scope that {@code
+   *     grantable} does not cover
    * @throws BadRequestException as {@link #createToken(UUID, AccessTokenForm)}
    */
   @Transactional
@@ -230,7 +232,7 @@ public class PersonalAccessTokenService {
     final var scopes = requestedScopes(form);
     final var expirationDate = resolveExpirationDate(form.getExpirationDate(), now);
 
-    if (!grantable.containsAll(scopes)) {
+    if (!TokenScope.covers(grantable, scopes)) {
       throw new BadRequestException(ProtocolErrorCodes.VALIDATION_ERROR);
     }
 
@@ -429,7 +431,7 @@ public class PersonalAccessTokenService {
             .findByUserIdAndIdAndKind(userId, tokenId, PersonalAccessTokenKind.PERSONAL)
             .orElseThrow(() -> new ItemNotFoundException(ErrorConstants.ACCESS_TOKEN_NOT_FOUND));
 
-    if (!grantable.containsAll(token.getScopes())) {
+    if (!TokenScope.covers(grantable, token.getScopes())) {
       throw new AccessNotAllowedException(ProtocolErrorCodes.ACCESS_DENIED);
     }
 
@@ -473,7 +475,7 @@ public class PersonalAccessTokenService {
             .findByUserIdAndIdAndKind(userId, tokenId, PersonalAccessTokenKind.PERSONAL)
             .orElseThrow(() -> new ItemNotFoundException(ErrorConstants.ACCESS_TOKEN_NOT_FOUND));
 
-    if (!grantable.containsAll(token.getScopes())) {
+    if (!TokenScope.covers(grantable, token.getScopes())) {
       throw new AccessNotAllowedException(ProtocolErrorCodes.ACCESS_DENIED);
     }
 

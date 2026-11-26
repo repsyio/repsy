@@ -957,6 +957,64 @@ class PersonalAccessTokenServiceTest {
   }
 
   @Test
+  @DisplayName("a repo:manage token can hand on repo:write and repo:read (RPS-2443)")
+  void aManageTokenMintsANarrowerToken() {
+    this.whenUserExists();
+    this.whenFlushed();
+
+    final var created =
+        this.service.createToken(
+            USER_ID,
+            form(null, TokenScope.REPO_WRITE, TokenScope.REPO_READ),
+            EnumSet.of(TokenScope.PROFILE_READ, TokenScope.REPO_MANAGE));
+
+    assertThat(created.getToken()).startsWith("rut-");
+  }
+
+  @Test
+  @DisplayName("a repo:read token still cannot hand on repo:write (RPS-2443)")
+  void aReadTokenCannotMintWrite() {
+    this.whenUserExists();
+
+    final var tokenForm = form(null, TokenScope.REPO_WRITE);
+    final var grantable = EnumSet.of(TokenScope.PROFILE_READ, TokenScope.REPO_READ);
+
+    assertThatThrownBy(() -> this.service.createToken(USER_ID, tokenForm, grantable))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("validationError");
+
+    verify(this.tokenRepository, never()).saveAndFlush(any());
+  }
+
+  @Test
+  @DisplayName("a repo:manage token can revoke a repo:read token (RPS-2443)")
+  void aManageTokenRevokesAReadToken() {
+    final var token = this.tokenOf(this.user);
+    token.setScopes(EnumSet.of(TokenScope.PROFILE_READ, TokenScope.REPO_READ));
+    when(this.tokenRepository.findByUserIdAndIdAndKind(
+            USER_ID, token.getId(), PersonalAccessTokenKind.PERSONAL))
+        .thenReturn(Optional.of(token));
+
+    this.service.revokeToken(
+        USER_ID, token.getId(), EnumSet.of(TokenScope.PROFILE_READ, TokenScope.REPO_MANAGE));
+
+    verify(this.tokenRepository).delete(token);
+  }
+
+  @Test
+  @DisplayName("a repo:manage token can rotate a repo:read token (RPS-2443)")
+  void aManageTokenRotatesAReadToken() {
+    this.whenUserExists();
+    this.whenFlushed();
+    final var old = this.rotatable(NOW.plus(Duration.ofDays(5)), TokenScope.REPO_READ);
+
+    this.service.rotateToken(
+        USER_ID, old.getId(), EnumSet.of(TokenScope.PROFILE_READ, TokenScope.REPO_MANAGE));
+
+    verify(this.tokenRepository).delete(old);
+  }
+
+  @Test
   @DisplayName("revoking a personal token never reaches a temporary token")
   void revokeLooksForPersonalTokensOnly() {
     final var tokenId = UUID.randomUUID();

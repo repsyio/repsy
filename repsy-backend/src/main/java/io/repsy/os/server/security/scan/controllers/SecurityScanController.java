@@ -63,7 +63,7 @@ final class SecurityScanController {
       @PageableDefault(sort = "createdAt", direction = Sort.Direction.DESC)
           final Pageable pageable) {
 
-    this.panelAuthHelper.requireAdmin(this.panelAuthHelper.authenticate(authHeader));
+    this.panelAuthHelper.requireAdmin(this.panelAuthHelper.authenticateRepoReader(authHeader));
 
     SortValidator.requireSortableBy(pageable, SCAN_SORT_PROPERTIES);
 
@@ -78,7 +78,7 @@ final class SecurityScanController {
       @RequestParam(required = false) final @Nullable RepoType repoType,
       @RequestParam(required = false) final @Nullable String repoName) {
 
-    this.panelAuthHelper.requireAdmin(this.panelAuthHelper.authenticate(authHeader));
+    this.panelAuthHelper.requireAdmin(this.panelAuthHelper.authenticateRepoReader(authHeader));
 
     final var summary = this.scanTxService.getSecurityScansSummary(repoType, repoName);
 

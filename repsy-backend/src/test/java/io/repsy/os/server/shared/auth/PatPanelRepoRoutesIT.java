@@ -28,6 +28,7 @@ import io.repsy.os.shared.token.dtos.TokenScope;
 import io.repsy.os.shared.user.entities.User;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.protocols.shared.repo.dtos.RepoType;
+import java.util.Map;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
@@ -47,9 +48,11 @@ import org.springframework.test.web.servlet.request.AbstractMockHttpServletReque
  * intersected with its owner's role, and a token that is signed in but not allowed is answered
  * {@code 403 accessDenied} (RPS-1284), where only a missing or invalid token is {@code 401}.
  *
- * <p>Every other panel route stays on the access token of a login: the profile (password and
- * username), the users, usage, the token management routes. A personal access token is refused
- * there with {@code 401}, whatever its scopes and its owner's role.
+ * <p>RPS-2227 opened the repo-wide reads to a token with {@code repo:read} (the repo counts, the
+ * usage and the ADMIN scan browser) and {@code GET /api/profile} to any token ({@code profile:read}
+ * is implicit). Every other panel route stays on the access token of a login: changing the password
+ * and the username, and the users. A personal access token is refused there with {@code 401},
+ * whatever its scopes and its owner's role.
  */
 @DisplayName("Panel routes and personal access tokens")
 class PatPanelRepoRoutesIT extends AbstractPatIT {
@@ -228,6 +231,75 @@ class PatPanelRepoRoutesIT extends AbstractPatIT {
   }
 
   // ---------------------------------------------------------------------------------------------
+  // The repo-wide reads and the profile (RPS-2227)
+  // ---------------------------------------------------------------------------------------------
+
+  static Stream<Arguments> repoWideReads() {
+    return Stream.of("/api/repos/counts", "/api/usage").map(Arguments::of);
+  }
+
+  @ParameterizedTest(name = "{0} takes repo:read or a broader scope, and refuses others with 403")
+  @MethodSource("repoWideReads")
+  void repoWideReadsNeedRepoRead(final String path) throws Exception {
+    assertThat(this.panelStatus(get(path), this.seedPat(this.user, TokenScope.REPO_READ)))
+        .isEqualTo(200);
+    assertThat(this.panelStatus(get(path), this.seedPat(this.user, TokenScope.REPO_MANAGE)))
+        .isEqualTo(200);
+    assertThat(this.panelStatus(get(path), this.seedPat(this.user, TokenScope.SCAN_READ)))
+        .isEqualTo(403);
+    assertThat(this.panelStatus(get(path), this.seedPat(this.user, TokenScope.PROFILE_READ)))
+        .isEqualTo(403);
+  }
+
+  @Test
+  @DisplayName("the repo counts answer a repo:read token with the same body as a login")
+  void countsAnswerAToken() throws Exception {
+    final var body =
+        this.panel(get("/api/repos/counts"), this.seedPat(this.user, TokenScope.REPO_READ))
+            .getContentAsString();
+
+    // Every type is a key, zero included.
+    assertThat(JsonPath.<Map<String, Object>>read(body, "$")).hasSize(RepoType.values().length);
+  }
+
+  static Stream<Arguments> scanBrowser() {
+    return Stream.of("/api/security/scans", "/api/security/scans/summary").map(Arguments::of);
+  }
+
+  @ParameterizedTest(name = "{0} takes repo:read with an admin owner only")
+  @MethodSource("scanBrowser")
+  void theScanBrowserNeedsRepoReadAndAnAdmin(final String path) throws Exception {
+    assertThat(this.panelStatus(get(path), this.seedPat(this.admin, TokenScope.REPO_READ)))
+        .isEqualTo(200);
+    assertThat(this.panelStatus(get(path), this.seedPat(this.user, TokenScope.REPO_MANAGE)))
+        .isEqualTo(403);
+    // scan:read is deprecated (RPS-2436) and covers the per-repo scan routes only.
+    assertThat(this.panelStatus(get(path), this.seedPat(this.admin, TokenScope.SCAN_READ)))
+        .isEqualTo(403);
+  }
+
+  @Test
+  @DisplayName("GET /api/profile answers any live token with its owner's profile")
+  void theProfileAnswersAnyToken() throws Exception {
+    final var response =
+        this.panel(get("/api/profile"), this.seedPat(this.user, TokenScope.PROFILE_READ));
+
+    assertThat(response.getStatus()).isEqualTo(200);
+    assertThat(JsonPath.<String>read(response.getContentAsString(), "$.username"))
+        .isEqualTo(this.user.getUsername());
+    assertThat(
+            this.mockMvc
+                .perform(
+                    get("/api/profile")
+                        .with(apiPort())
+                        .header(AUTHORIZATION, "Bearer rut-unknown-token"))
+                .andReturn()
+                .getResponse()
+                .getStatus())
+        .isEqualTo(401);
+  }
+
+  // ---------------------------------------------------------------------------------------------
   // What stays on the login token
   // ---------------------------------------------------------------------------------------------
 
@@ -240,7 +312,6 @@ class PatPanelRepoRoutesIT extends AbstractPatIT {
 
   static Stream<Arguments> loginOnlyRoutes() {
     return Stream.of(
-            new Route("GET /api/profile", () -> get("/api/profile")),
             new Route(
                 "PATCH /api/profile/password",
                 () ->
@@ -253,10 +324,7 @@ class PatPanelRepoRoutesIT extends AbstractPatIT {
                     patch("/api/profile/username")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"username\":\"someone-else\"}")),
-            new Route("GET /api/repos/counts", () -> get("/api/repos/counts")),
-            new Route("GET /api/usage", () -> get("/api/usage")),
-            new Route("GET /api/users", () -> get("/api/users")),
-            new Route("GET /api/security/scans", () -> get("/api/security/scans")))
+            new Route("GET /api/users", () -> get("/api/users")))
         .map(Arguments::of);
   }
 

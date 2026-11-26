@@ -52,9 +52,10 @@ import org.springframework.web.util.UriComponentsBuilder;
  *
  * <p>None of these is a {@code @RepoOperation}: they name no repository and the repo type is a
  * query parameter or a body field, not a path variable, so {@code ProtocolAuthInterceptor} does not
- * see them and they authenticate like {@code /api/usage}, with a panel Bearer token only. Every
- * authenticated user may list and count, as the panel dashboard and repository list show them to
- * all roles; creating needs the ADMIN role.
+ * see them and they authenticate like {@code /api/usage}, with a panel Bearer token only: a login,
+ * or a personal access token with {@code repo:read} to list and count (RPS-2227) and {@code
+ * repo:manage} to create. Every authenticated user may list and count, as the panel dashboard and
+ * repository list show them to all roles; creating needs the ADMIN role.
  */
 @RestApiPort(MultiPortNames.PORT_API)
 @RestController
@@ -88,7 +89,7 @@ public class RepoCollectionController {
   @GetMapping("/counts")
   public Map<RepoType, Long> counts(@RequestHeader(AUTHORIZATION) final String authHeader) {
 
-    this.panelAuthHelper.authenticate(authHeader);
+    this.panelAuthHelper.authenticateRepoReader(authHeader);
 
     return this.repoTxService.getRepoCounts();
   }

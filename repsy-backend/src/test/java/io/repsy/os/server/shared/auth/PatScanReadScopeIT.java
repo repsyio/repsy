@@ -52,8 +52,8 @@ import org.springframework.beans.factory.annotation.Autowired;
  * (repo:read, scan:read, both, neither) against every route of {@code VulnerabilityScanController},
  * the reads and the two that start a scan, plus what {@code scan:read} must not open: the repo and
  * its contents, and the cross-repo scan browser ({@code /api/security/scans} and its {@code
- * /summary}), which takes a login only, so no scope of a token opens it, whatever the role of the
- * token's owner. {@code /api/repos/security-summary} is not part of that browser: it is open to
+ * /summary}), which takes a login or {@code repo:read} of an ADMIN since RPS-2227, never {@code
+ * scan:read} alone. {@code /api/repos/security-summary} is not part of that browser: it is open to
  * every signed-in user (RPS-919) and takes {@code repo:read} since RPS-2436.
  *
  * <p>A route that lets the token in is only asserted to be neither {@code 401} nor {@code 403}: the
@@ -386,8 +386,9 @@ class PatScanReadScopeIT extends AbstractPatIT {
   }
 
   @Test
-  @DisplayName("the cross-repo scan browser is for a login: no scope of a token opens it")
-  void noTokenScopeOpensTheCrossRepoScanBrowser() throws Exception {
+  @DisplayName(
+      "the cross-repo scan browser takes repo:read of an ADMIN (RPS-2227), never scan:read alone")
+  void theCrossRepoScanBrowserTakesRepoReadOfAnAdmin() throws Exception {
     final var admin = this.createUser(uniqueUsername("patscanadmin"), UserRole.ADMIN);
 
     // /api/repos/security-summary is not here since RPS-2436: it takes repo:read, see
@@ -396,17 +397,20 @@ class PatScanReadScopeIT extends AbstractPatIT {
 
     for (final var path : paths) {
       for (final var owner : new User[] {this.user, admin}) {
-        for (final var scopes :
-            new TokenScope[][] {
-              {TokenScope.SCAN_READ},
-              {TokenScope.REPO_READ, TokenScope.SCAN_READ},
-              {TokenScope.REPO_MANAGE, TokenScope.REPO_READ, TokenScope.SCAN_READ}
-            }) {
-          assertThat(this.statusOf(get(path), this.seedPat(owner, scopes)))
-              .as("%s with %s of %s", path, scopes, owner.getRole())
-              .isIn(401, 403);
-        }
+        assertThat(this.statusOf(get(path), this.seedPat(owner, TokenScope.SCAN_READ)))
+            .as("%s with scan:read of %s", path, owner.getRole())
+            .isEqualTo(403);
       }
+
+      final var reader = this.seedPat(admin, TokenScope.REPO_READ, TokenScope.SCAN_READ);
+      final var userReader = this.seedPat(this.user, TokenScope.REPO_MANAGE, TokenScope.SCAN_READ);
+
+      assertThat(this.statusOf(get(path), reader))
+          .as("%s with repo:read of ADMIN", path)
+          .isEqualTo(200);
+      assertThat(this.statusOf(get(path), userReader))
+          .as("%s with repo:manage of USER", path)
+          .isEqualTo(403);
     }
   }
 }

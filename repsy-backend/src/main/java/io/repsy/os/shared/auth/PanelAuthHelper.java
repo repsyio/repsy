@@ -31,7 +31,6 @@ import io.repsy.os.shared.user.dtos.UserInfo;
 import io.repsy.os.shared.user.entities.UserRole;
 import io.repsy.os.shared.user.services.UserTxService;
 import io.repsy.protocols.shared.constants.ProtocolErrorCodes;
-import io.repsy.protocols.shared.repo.dtos.Permission;
 import java.util.EnumSet;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -86,11 +85,21 @@ public final class PanelAuthHelper implements AdminAuthenticator {
   }
 
   /**
-   * Authenticates the caller of the repo list: a login, or a personal access token that may read
-   * ({@code repo:read}).
+   * Authenticates the caller of a panel route that a command line client may call with a token
+   * (RPS-2227): a login, or a personal access token that holds {@code scope} or a broader one
+   * ({@link TokenScope#isCoveredBy}). A token without it is signed in but not allowed, so it is
+   * answered {@code 403 accessDenied}; a token that is unknown or expired is a 401.
+   */
+  public UserInfo authenticateWithScope(final String authHeader, final TokenScope scope) {
+    return this.authenticateOrPersonalAccessToken(authHeader, scope);
+  }
+
+  /**
+   * Authenticates the caller of the repo-wide reads, the repo list and counts, the usage and the
+   * scan browser: a login, or a personal access token that may read ({@code repo:read}).
    */
   public UserInfo authenticateRepoReader(final String authHeader) {
-    return this.authenticateOrPersonalAccessToken(authHeader, Permission.READ);
+    return this.authenticateWithScope(authHeader, TokenScope.REPO_READ);
   }
 
   /**
@@ -99,7 +108,7 @@ public final class PanelAuthHelper implements AdminAuthenticator {
    * give.
    */
   public UserInfo authenticateRepoCreator(final String authHeader) {
-    return this.authenticateOrPersonalAccessToken(authHeader, Permission.MANAGE);
+    return this.authenticateWithScope(authHeader, TokenScope.REPO_MANAGE);
   }
 
   /**
@@ -198,7 +207,7 @@ public final class PanelAuthHelper implements AdminAuthenticator {
   }
 
   private UserInfo authenticateOrPersonalAccessToken(
-      final String authHeader, final Permission required) {
+      final String authHeader, final TokenScope required) {
 
     final var secret = AuthUtils.personalAccessTokenSecretOf(authHeader);
 
@@ -209,7 +218,7 @@ public final class PanelAuthHelper implements AdminAuthenticator {
     final var token = this.liveToken(secret);
 
     // Signed in but not allowed is a 403 on the panel API, not a 401 (RPS-1284).
-    if (!TokenScope.permits(token.scopes(), required)) {
+    if (!required.isCoveredBy(token.scopes())) {
       throw new AccessNotAllowedException(ProtocolErrorCodes.ACCESS_DENIED);
     }
 
