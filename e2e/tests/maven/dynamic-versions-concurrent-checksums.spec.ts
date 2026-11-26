@@ -226,6 +226,10 @@ test.describe('maven dynamic versions, concurrent deploy, and checksums (RPS-171
     'dynamic version: LATEST metaversion resolves to the newest release',
     { tag: ['@negative'] },
     async ({ seeder }) => {
+      // Three real Maven deploys and a resolve: over the network to Dev this took more than the 120 s default and
+      // the test only passed on its retry, which cost the shard four minutes each time (RPS-2726).
+      test.setTimeout(240_000);
+
       const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
       const groupId = `io.repsy.e2e.${seeder.runId}`;
       const artifactId = 'latest-test';
@@ -269,6 +273,10 @@ test.describe('maven dynamic versions, concurrent deploy, and checksums (RPS-171
     'dynamic version: version range [1.0,3.0) includes 1.0 and 2.0 but not 3.0',
     { tag: ['@negative'] },
     async ({ seeder }) => {
+      // Three real Maven deploys and a resolve: over the network to Dev this took more than the 120 s default and
+      // the test only passed on its retry, which cost the shard four minutes each time (RPS-2726).
+      test.setTimeout(240_000);
+
       const repo = await seeder.createRepo(RepoType.MAVEN, { privateRepo: true });
       const groupId = `io.repsy.e2e.${seeder.runId}`;
       const artifactId = 'range-test';
